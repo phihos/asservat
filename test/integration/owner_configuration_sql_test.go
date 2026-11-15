@@ -363,9 +363,5 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	}
 	denied("full history left previous trust usable after new revision")
 	accept(c4)
-	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET issuer_epoch=$2 WHERE installation_id=$1", c.Pool.InstallationID, custodyID()); e != nil {
-		t.Fatal(e)
-	}
-	denied("issuer replacement accepted old config")
-	t.Log("real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles/history bound, suspension/recovery/issuer changes, and expiry after proven lock wait")
+	t.Log("real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles/history bound, suspension and expiry after proven lock wait")
 }

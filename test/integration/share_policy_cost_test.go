@@ -291,6 +291,8 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	if _, err := admin.Exec(ctx, `CHECKPOINT`); err != nil {
 		t.Fatal("owned full-page-image checkpoint", err)
 	}
+	// The checkpoint can outlast the synthetic fleet observation.
+	f.Refresh()
 	rollbackBefore := samplePolicyShareCost(t, ctx, admin, root)
 	tx, err := hub.Begin(ctx)
 	if err != nil {
