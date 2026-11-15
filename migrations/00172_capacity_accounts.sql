@@ -256,10 +256,14 @@ BEGIN
  RETURN true;
 END $$;
 
--- Admission deadline of an enrolled workload: the standing date while its
--- rows are active, NULL otherwise.
+-- Admission deadline of a workload: infinity for a root without capacity
+-- settings, the standing date while an enrolled account is active, NULL otherwise.
 CREATE OR REPLACE FUNCTION capacity_managed_admission_until(r uuid,allocation uuid,kind text,n timestamptz) RETURNS timestamptz
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+ -- A root without capacity settings is unmanaged: its allocations keep their
+ -- own byte limits and admission needs no account.
+ SELECT 'infinity'::timestamptz WHERE NOT EXISTS(SELECT 1 FROM public.capacity_settings WHERE root_id=r)
+ UNION ALL
  SELECT LEAST(a.valid_until,cp.valid_until) FROM public.capacity_account c JOIN public.custody_allocation a ON a.id=c.allocation_id JOIN public.custody_pool cp ON cp.id=a.pool_id
  WHERE c.root_id=r AND CASE WHEN kind='context' THEN c.allocation_id=allocation ELSE c.download_allocation_id=allocation END
   AND NOT a.paused AND NOT cp.paused AND n<a.valid_until AND n<cp.valid_until
