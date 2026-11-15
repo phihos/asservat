@@ -41,7 +41,7 @@ func (q *ownerPrerequisiteQuery) QueryRow(_ context.Context, _ string, _ ...any)
 		return nil
 	})
 }
-type functionIdentityRow func(...any) error
 
+type functionIdentityRow func(...any) error
 
 func (r functionIdentityRow) Scan(dst ...any) error { return r(dst...) }

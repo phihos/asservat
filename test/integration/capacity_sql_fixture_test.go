@@ -2,11 +2,11 @@ package integration
 
 import (
 	"context"
-	"encoding/hex"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"slices"
 	"strconv"

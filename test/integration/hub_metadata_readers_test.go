@@ -29,7 +29,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		var err error
 		defer pool.Close() // joins the ordinary pool before this helper ends
 		// The login's grants are the compiled plan: setup reconciled them exactly.
-		permission, err :=postgres.NewPermissions(f.ctx, pool, s.a.RootID)
+		permission, err := postgres.NewPermissions(f.ctx, pool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -88,7 +88,7 @@ The construction and close points are in
 `installer_downloads.go` (removed with the installer).
 The bridge and role-producer constructors fix their one-connection limits in
 `initial_runtime_bridge.go` (removed with the installer),
-[`public_runtime_roles.go`](../../internal/adapters/postgres/public_runtime_roles.go),
+`public_runtime_roles.go` (removed),
 [`owner_identity_roles.go`](../../internal/adapters/postgres/owner_identity_roles.go)
 and [`configuration_runtime_roles.go`](../../internal/adapters/postgres/configuration_runtime_roles.go).
 `WorkerLaunch` closes its configuration-role producer before `Owner` starts,
