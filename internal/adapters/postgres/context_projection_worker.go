@@ -124,8 +124,10 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 	return out, nil
 }
 
-// projectionWorkerRoom applies the live acquisition worker caps shared with
-// downloads: 16 per installation, two per workload and two per principal.
+// projectionWorkerRoom applies the acquisition worker caps (16 per
+// installation, two per workload, two per principal) to projection workers
+// only. Download workers still count toward them but no longer check them
+// (ADR-312); downloadConcurrency bounds downloads per hub-api replica.
 func projectionWorkerRoom(c custodydb.AcquisitionWorkerCapacityRow) bool {
 	return c.Total < 16 && c.Workload < 2 && c.Principal < 2
 }

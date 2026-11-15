@@ -14,7 +14,8 @@ seeded by 00172), which bound window audit bytes.
 
 Verified: `go build`, `go vet` (also `-tags libpcap`), `make go-check
 pcap-check`, the CI gate set, focused download custody tests (real
-PostgreSQL).
+PostgreSQL). Gap: projection and query workers still check
+the 16/2/2 acquisition worker caps, which have no stated reason.
 
 ## Live watch without lifetime (ADR-335 D9, 2026-11-15)
 
