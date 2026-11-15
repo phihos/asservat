@@ -33,14 +33,13 @@ type shareBusinessAudit struct {
 
 func newShareBusinessAudit(t *testing.T, ctx context.Context, hub *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario) *shareBusinessAudit {
 	t.Helper()
-	var encoded []byte
-	var retained int64
-	if err := hub.QueryRow(ctx, `SELECT l.binding->'Policy',p.retained_seconds FROM operation_audit_lifecycle l JOIN operation_audit_pool p USING(root_id,lane) WHERE l.root_id=$1 AND l.lane='normal' ORDER BY l.operation_id LIMIT 1`, s.a.RootID).Scan(&encoded, &retained); err != nil {
-		t.Fatal("original share audit cohort", err)
+	cohort, ok := shareAuditCohorts.Load(s.a.RootID)
+	if !ok {
+		t.Fatal("share fixture requires the sharing-cohort processing fixture")
 	}
-	var policy value.OperationLifecyclePolicy
-	if json.Unmarshal(encoded, &policy) != nil || policy.History == nil || policy.History.Layout != value.ShareOperationHistoryLayout {
-		t.Fatal("share fixture must select original qualified cohort before first audit")
+	policy, retained := cohort.(shareAuditCohort).policy, cohort.(shareAuditCohort).retained
+	if policy.History == nil || policy.History.Layout != value.ShareOperationHistoryLayout {
+		t.Fatal("share fixture must select the qualified share cohort")
 	}
 	// Exact existing synthetic MAC material of newProcessingTestFixture.
 	mac, err := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))

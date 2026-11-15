@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,6 +47,15 @@ func (p processingTestIdentity) ResolveIdentity(ctx context.Context) (identity.I
 	v.VerifiedAt = n
 	v.ValidUntil = n.Add(5 * time.Second)
 	return v, nil
+}
+
+// shareAuditCohorts holds the normal-lane audit policy and retention that a
+// sharing-cohort processing fixture provisioned, keyed by processing root.
+var shareAuditCohorts sync.Map
+
+type shareAuditCohort struct {
+	policy   audit.OperationLifecyclePolicy
+	retained int64
 }
 
 type processingTestFixture struct {
@@ -148,6 +158,9 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		normalAccounts, normalRecords = 16, 256
 	}
 	normalPolicy := policy("normal", normalAccounts, normalRecords)
+	if shares {
+		shareAuditCohorts.Store(s.a.RootID, shareAuditCohort{normalPolicy, normalRetained})
+	}
 	releasePolicy := policy("processing", f.backing.MaxRules, 16)
 	makeAudit := func(p audit.OperationLifecyclePolicy, jp, ap *pgxpool.Pool) *auditapp.HealthyOperationAuditor {
 		var j *postgres.OperationJournal
