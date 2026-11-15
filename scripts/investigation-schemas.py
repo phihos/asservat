@@ -115,21 +115,6 @@ def share_subset(name, tool):
     return description, [success, error]
 
 
-def drop_grant_client_fields(node):
-    if isinstance(node, dict):
-        props = node.get("properties")
-        if isinstance(props, dict):
-            for key in ("client_ids", "can_resolve", "resume_requires_original_client"):
-                props.pop(key, None)
-            if isinstance(node.get("required"), list):
-                node["required"] = [k for k in node["required"] if k not in ("client_ids", "can_resolve", "resume_requires_original_client", "review_until")]
-        for value in node.values():
-            drop_grant_client_fields(value)
-    elif isinstance(node, list):
-        for value in node:
-            drop_grant_client_fields(value)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
@@ -283,12 +268,7 @@ def main():
             # the projection digest; provenance names the one artifact.
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
-            if name in ("request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
-                # ADR-335 D5: result access covers every client of the human
-                # and a review has no fixed window, so these grant views carry
-                # no client list, resolve hints or mandatory review_until.
-                drop_grant_client_fields(description)
-            branches = copy.deepcopy(description["outputSchema"]["allOf"][1]["oneOf"])
+            branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             output = copy.deepcopy(common)
             output.pop("$id", None)
             output["properties"]["truncated"] = {"const": False}
@@ -334,12 +314,7 @@ def main():
             # ADR-249: the four grant tools implement the whole contract (three browser-only).
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
-            if name in ("request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
-                # ADR-335 D5: result access covers every client of the human
-                # and a review has no fixed window, so these grant views carry
-                # no client list, resolve hints or mandatory review_until.
-                drop_grant_client_fields(description)
-            branches = copy.deepcopy(description["outputSchema"]["allOf"][1]["oneOf"])
+            branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             if name == "request_raw_access":
                 description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": True, "items": {"enum": ["download_artifact", "get_logs", "pcap_query", "syscall_query"]}}
                 description["description"] = "Request independent approval for native download or bounded packet queries over exact existing raw artifacts. Reuse a covering approval; a download-only approval does not authorize a packet query."
