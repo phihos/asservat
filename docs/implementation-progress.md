@@ -116,7 +116,7 @@ duty logins, the source frames of the context-start stream, the connector
 observation/operation channels and the hub's ADR-197 operation port, owner
 relay and forwarding, the native forwarded path and the owner-path native
 handler, process self-proofs (`ConnectorAPIExecutionProtection`), and
-`fleet_peer`/`fleet_peer_certificate` (migration 00170). The connector now
+`fleet_peer`/`fleet_peer_certificate` (migration 00171). The connector now
 announces `query/resolve-source-snapshots`, which hubs refused before.
 
 Gaps: the connector identity SQL lane of migrations 00049/00051/00164
