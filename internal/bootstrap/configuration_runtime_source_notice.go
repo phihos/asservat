@@ -75,5 +75,5 @@ func (t installationTrust) FleetAdministration(ctx context.Context) (fleet.Admin
 // revision never changes for one installation.
 func installationTrustAt(installation, issuerEpoch string, now time.Time) fleet.Administration {
 	digest := sha256.Sum256([]byte("asservat-installation-trust/v1\x00" + installation + "\x00" + issuerEpoch))
-	return fleet.Administration{InstallationID: installation, IssuerEpoch: issuerEpoch, Revision: identity.Revision{UID: installation, Generation: 1, Digest: digest}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	return fleet.Administration{InstallationID: installation, IssuerEpoch: issuerEpoch, Revision: identity.Revision{UID: installation, Generation: 1, Digest: digest}, ObservedAt: now, FreshUntil: identity.Check(now, identity.SQLFenced).Until()}
 }
