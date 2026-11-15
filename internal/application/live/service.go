@@ -61,7 +61,7 @@ type Control struct {
 	// ExpiresAt is the selected sources' hard end, not a watch lifetime.
 	AcceptedAt, ExpiresAt, IdleUntil time.Time
 	Spent, BytesPerSecond            int64
-	Fence                                    string
+	Fence                            string
 }
 type Ledger interface {
 	// CurrentLive checks the original current owner/fence and reservation before
@@ -522,6 +522,11 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 	}
 	return end, nil
 }
+
+// liveReplyMarginMS is left between a node read's end and the source check
+// window's end for the reply to reach the hub.
+const liveReplyMarginMS = 1000
+
 func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (v.Batch, error) {
 	var zero v.Batch
 	var previous []v.Position // positions to restore if delivery is refused transiently
@@ -632,7 +637,11 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		projection := st.watch.Projection
 		rowLimit := min(defaultLimit(r.Limit), st.watch.Limits.Rows)
 		st.mu.Unlock()
-		projected, e := s.reader.Read(call, selected, projection, positions, rowLimit, 4096, r.WaitMS)
+		// A read waits up to wait_ms but returns before the current source
+		// check window ends, with a second left for the node's reply, so a
+		// long wait yields an empty batch rather than a missed deadline.
+		wait := min(r.WaitMS, max(0, int(end.Sub(s.cfg.Now())/time.Millisecond)-liveReplyMarginMS))
+		projected, e := s.reader.Read(call, selected, projection, positions, rowLimit, 4096, wait)
 		cancel()
 		st.mu.Lock()
 		st.reading = false

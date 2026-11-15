@@ -25,6 +25,7 @@ type fixedIdentity struct{ i identity.Identity }
 func (f fixedIdentity) ResolveIdentity(context.Context) (identity.Identity, error) { return f.i, nil }
 
 type fixture struct {
+	lastWait                       int
 	now                            time.Time
 	authorityUntil                 time.Time
 	afterProjection, afterChange   func()
@@ -73,6 +74,7 @@ func (f *fixture) Head(context.Context, []v.Source, string) ([]v.Position, error
 }
 func (f *fixture) Read(_ context.Context, _ []v.Source, _ string, positions []v.Position, limit, scan, waitMS int) (Projection, error) {
 	f.reads++
+	f.lastWait = waitMS
 	if f.broken {
 		return Projection{}, v.ErrUnavailable
 	}
@@ -852,6 +854,23 @@ func TestLiveReadDisclosesUnderFreshCheckAfterLongWait(t *testing.T) {
 	f.afterProjection = func() { f.denied = true }
 	if denied, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor}); e == nil || len(denied.Rows) != 0 {
 		t.Fatal("revocation after the node read disclosed rows")
+	}
+}
+
+// A wait longer than the source check window returns before that window
+// ends, leaving the node time to reply, rather than missing the deadline.
+func TestLiveLongWaitEndsBeforeTheCheckWindow(t *testing.T) {
+	s, _, i, r := setup(t)
+	f := s.reader.(*fixture)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor, WaitMS: v.MaxWaitMS}); e != nil {
+		t.Fatal(e)
+	}
+	if f.lastWait <= 0 || f.lastWait > 5000-liveReplyMarginMS {
+		t.Fatal("wait not bounded by the check window", f.lastWait)
 	}
 }
 
