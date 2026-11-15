@@ -59,7 +59,7 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 			// the immutable audience of an existing artifact for measurement.
 			next := f.batch
 			next.Bases = slices.Clone(next.Bases)
-			for n := 0; n < authorization.ShareMaxManagers; n++ {
+			for n := 0; n < 8; n++ { // a fixed eight-owner cohort
 				base := next.Bases[0]
 				base.Resource.UID = custodyID()
 				base.Resource.SpecDigest = sha256.Sum256([]byte(fmt.Sprintf("synthetic-share-owner-%d", n)))

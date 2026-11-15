@@ -322,9 +322,8 @@ def main():
                 # Protected recording-save reasons use the accepted opaque audit path.
                 # Keep the same bounded capture-time sharing subset.
                 sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
-                for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
+                for k in ("outputSelection", "reason", "management"):
                     sharing["properties"].pop(k)
-                sharing["properties"]["recipients"]["maxItems"] = 8
                 description["inputSchema"]["properties"]["sharing"] = sharing
             if name in ("cancel_capture", "list_recordings", "preview_recording_save", "list_capture_profiles", "get_capture_profile"):
                 branches = [b for b in branches if b["properties"]["status"].get("const") != "pending"]
@@ -386,12 +385,11 @@ def main():
             props["preset_ref"]["properties"]["name"] = {"const": "pod-status"}
         if "sharing" in props:
             # ADR-235: capture-time sharing of the one pod-status result with
-            # up to eight recipients and an optional absolute end; no output
-            # selection, reason override or management selection.
+            # recipients and an optional absolute end; no output selection,
+            # reason override or management selection.
             sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
-            for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
+            for k in ("outputSelection", "reason", "management"):
                 sharing["properties"].pop(k)
-            sharing["properties"]["recipients"]["maxItems"] = 8
             props["sharing"] = sharing
         input_schema = {"type": "object", "additionalProperties": False, "properties": props,
                         "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition", "result_access")]}

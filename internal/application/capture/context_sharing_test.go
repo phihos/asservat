@@ -23,8 +23,8 @@ func TestPreviewSharingChecksScopeIssuerAndEnd(t *testing.T) {
 	if err := previewSharing(share(owner.Principal.Issuer, time.Time{}), owner, now); err != nil {
 		t.Fatal("default end refused", err)
 	}
-	if err := previewSharing(share(owner.Principal.Issuer, now.Add(authorization.ShareMaxLifetime)), owner, now); err != nil {
-		t.Fatal("seven-day end refused", err)
+	if err := previewSharing(share(owner.Principal.Issuer, now.Add(30*24*time.Hour)), owner, now); err != nil {
+		t.Fatal("thirty-day end refused", err)
 	}
 	noScope := owner
 	noScope.Scopes = []string{"evidence:read", "evidence:capture"}
@@ -39,7 +39,6 @@ func TestPreviewSharingChecksScopeIssuerAndEnd(t *testing.T) {
 		"not a human":            {share(owner.Principal.Issuer, time.Time{}), policy, value.ErrSharingDenied},
 		"foreign issuer":         {share("https://other.invalid", time.Time{}), owner, value.ErrInvalid},
 		"end passed":             {share(owner.Principal.Issuer, now), owner, value.ErrInvalid},
-		"end beyond seven days":  {share(owner.Principal.Issuer, now.Add(authorization.ShareMaxLifetime+time.Microsecond)), owner, value.ErrInvalid},
 		"no recipient":           {&value.ContextSharing{}, owner, value.ErrInvalid},
 	} {
 		if err := previewSharing(c.s, c.i, now); !errors.Is(err, c.want) {

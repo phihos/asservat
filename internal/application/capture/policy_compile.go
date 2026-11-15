@@ -349,8 +349,8 @@ func compilePolicy(ctx context.Context, catalogTarget targets.Request, spec []by
 }
 
 // compileSharing selects the ADR-239 recurring sharing block: recipients
-// (1–8 User/Group stable IDs of one issuer), futureCaptures.maxCaptures
-// (1–100) and an absolute notAfter. Output selection, a reason override and
+// (User/Group stable IDs of one issuer), an optional
+// futureCaptures.maxCaptures and an optional absolute notAfter. Output selection, a reason override and
 // explicit management are not available for the single-output pod-status
 // capture; management is the policy's owner teams. Only the shape is checked
 // here: the end and the activating human's authority are checked at
@@ -381,9 +381,6 @@ func compileSharing(raw json.RawMessage) (value.PolicySharing, error) {
 	if strict(fields["recipients"], &recipients) != nil || len(recipients) < 1 {
 		return reject(".recipients", "invalid")
 	}
-	if len(recipients) > authorization.ShareMaxRecipients {
-		return reject(".recipients", "at most "+strconv.Itoa(authorization.ShareMaxRecipients)+" recipients")
-	}
 	for i, r := range recipients {
 		x := authorization.ShareRecipient{Kind: r.Kind, Issuer: r.Issuer, ID: r.ID}
 		if !x.Valid() {
@@ -399,24 +396,31 @@ func compileSharing(raw json.RawMessage) (value.PolicySharing, error) {
 	}
 	var future struct {
 		Enabled     bool
-		MaxCaptures int
+		MaxCaptures *int
 	}
 	if strict(fields["futureCaptures"], &future) != nil || !future.Enabled {
 		return reject(".futureCaptures", "invalid")
 	}
-	if future.MaxCaptures < 1 || future.MaxCaptures > value.PolicyShareMaxCaptures {
-		return reject(".futureCaptures.maxCaptures", "must be 1 to "+strconv.Itoa(value.PolicyShareMaxCaptures))
+	// Absent maxCaptures means no count bound; notAfter or the grant end
+	// then bounds the share (checked at activation). An explicit value is
+	// at least 1, as the schema says.
+	if future.MaxCaptures != nil {
+		if *future.MaxCaptures < 1 {
+			return reject(".futureCaptures.maxCaptures", "must be at least 1")
+		}
+		out.MaxCaptures = *future.MaxCaptures
 	}
-	out.MaxCaptures = future.MaxCaptures
-	var end string
-	if strict(fields["notAfter"], &end) != nil {
-		return reject(".notAfter", "an absolute time is required")
+	if raw, ok := fields["notAfter"]; ok {
+		var end string
+		if strict(raw, &end) != nil {
+			return reject(".notAfter", "an absolute time is required")
+		}
+		at, err := time.Parse(time.RFC3339, end)
+		if err != nil {
+			return reject(".notAfter", "an absolute RFC 3339 time is required")
+		}
+		out.NotAfter = at.UTC().Truncate(time.Second)
 	}
-	at, err := time.Parse(time.RFC3339, end)
-	if err != nil {
-		return reject(".notAfter", "an absolute RFC 3339 time is required")
-	}
-	out.NotAfter = at.UTC().Truncate(time.Second)
 	if !out.Valid() {
 		return reject("", "invalid")
 	}

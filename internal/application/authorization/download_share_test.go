@@ -47,7 +47,7 @@ func TestContextDownloadAuthorityAdmitsShareRecipient(t *testing.T) {
 }
 
 func TestContextDownloadAuthorityRefusesShareBeforeCatalog(t *testing.T) {
-	for _, name := range []string{"no-share", "deny", "no-download-scope", "other-version", "revoked", "expired", "suspended", "other-recipient"} {
+	for _, name := range []string{"no-share", "deny", "no-download-scope", "other-version", "revoked", "expired", "other-recipient"} {
 		t.Run(name, func(t *testing.T) {
 			f, shares, s, scope := shareDownloadFixture()
 			switch name {
@@ -65,8 +65,6 @@ func TestContextDownloadAuthorityRefusesShareBeforeCatalog(t *testing.T) {
 				shares.rows[0].RevokedAt, shares.rows[0].Revision = f.now, 2
 			case "expired":
 				shares.rows[0].ExpiresAt = f.now
-			case "suspended":
-				f.p.Allows = f.p.Allows[:1]
 			case "other-recipient":
 				shares.rows[0].Recipients[0].ID = "someone-else"
 			}

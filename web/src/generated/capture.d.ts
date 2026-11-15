@@ -86,6 +86,7 @@ export interface components {
             };
         });
         Contract_sharing_request_23966cae8e071ea3: {
+            /** @description No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason). */
             recipients: components["schemas"]["Contract_common_0e44f1278c675a38"][];
             outputSelection?: {
                 /** @constant */
@@ -101,12 +102,10 @@ export interface components {
                         name: string;
                         version: string;
                     };
-                    operations?: ("get_case" | "list_artifacts" | "get_timeline" | "get_backtrace" | "get_runtime_summary" | "get_profile_summary" | "get_pcap_summary" | "get_zeek_log" | "get_file_excerpt" | "get_logs" | "read_memory" | "debugger_command" | "pcap_query" | "list_cases" | "find_similar_cases" | "compare_profiles" | "get_query_result" | "get_http_headers" | "syscall_query" | "get_syscall_summary" | "get_syscall_events" | "download_artifact")[];
+                    operations?: ("list_cases" | "get_case" | "list_artifacts" | "get_extract" | "compare_profiles" | "get_query_result" | "read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
                 } & unknown)[];
             };
             notAfter?: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
-            /** @default 64 */
-            maxArtifactsPerCapture: number;
             reason?: string;
             management?: components["schemas"]["Contract_management_0d504ecd6bc8c0fd"];
         };

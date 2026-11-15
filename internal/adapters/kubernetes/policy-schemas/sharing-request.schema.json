@@ -13,8 +13,8 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "outputSelection": {
           "oneOf": [
@@ -77,32 +77,21 @@
                         "items": {
                           "type": "string",
                           "enum": [
+                            "list_cases",
                             "get_case",
                             "list_artifacts",
-                            "get_timeline",
-                            "get_backtrace",
-                            "get_runtime_summary",
-                            "get_profile_summary",
-                            "get_pcap_summary",
-                            "get_zeek_log",
-                            "get_file_excerpt",
-                            "get_logs",
+                            "get_extract",
+                            "compare_profiles",
+                            "get_query_result",
                             "read_memory",
                             "debugger_command",
                             "pcap_query",
-                            "list_cases",
-                            "find_similar_cases",
-                            "compare_profiles",
-                            "get_query_result",
-                            "get_http_headers",
                             "syscall_query",
-                            "get_syscall_summary",
-                            "get_syscall_events",
                             "download_artifact"
-                          ]
+                          ],
+                          "description": "Current MCP tool names; raw operations use the grant vocabulary. get_extract views are further limited by the selected data classes."
                         },
                         "minItems": 1,
-                        "maxItems": 32,
                         "uniqueItems": true
                       }
                     },
@@ -167,7 +156,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 }
               },
@@ -181,16 +169,9 @@
         "notAfter": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
         },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 64,
-          "default": 64
-        },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "management": {
           "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
@@ -210,8 +191,8 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "outputSelection": {
           "oneOf": [
@@ -274,32 +255,21 @@
                         "items": {
                           "type": "string",
                           "enum": [
+                            "list_cases",
                             "get_case",
                             "list_artifacts",
-                            "get_timeline",
-                            "get_backtrace",
-                            "get_runtime_summary",
-                            "get_profile_summary",
-                            "get_pcap_summary",
-                            "get_zeek_log",
-                            "get_file_excerpt",
-                            "get_logs",
+                            "get_extract",
+                            "compare_profiles",
+                            "get_query_result",
                             "read_memory",
                             "debugger_command",
                             "pcap_query",
-                            "list_cases",
-                            "find_similar_cases",
-                            "compare_profiles",
-                            "get_query_result",
-                            "get_http_headers",
                             "syscall_query",
-                            "get_syscall_summary",
-                            "get_syscall_events",
                             "download_artifact"
-                          ]
+                          ],
+                          "description": "Current MCP tool names; raw operations use the grant vocabulary. get_extract views are further limited by the selected data classes."
                         },
                         "minItems": 1,
-                        "maxItems": 32,
                         "uniqueItems": true
                       }
                     },
@@ -364,7 +334,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 }
               },
@@ -376,18 +345,12 @@
           ]
         },
         "notAfter": {
-          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
-        },
-        "maxArtifactsPerCapture": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 64,
-          "default": 64
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
+          "description": "Optional end of recurring sharing; defaults to the policy grant end. A policy without a grant must name notAfter or maxCaptures. No weekly renewal."
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "minLength": 1
         },
         "futureCaptures": {
           "type": "object",
@@ -399,12 +362,12 @@
             "maxCaptures": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 9007199254740991,
+              "description": "Optional bound on captures shared; omitted means every capture until notAfter."
             }
           },
           "required": [
-            "enabled",
-            "maxCaptures"
+            "enabled"
           ]
         },
         "management": {
@@ -413,7 +376,6 @@
       },
       "required": [
         "recipients",
-        "notAfter",
         "futureCaptures"
       ]
     }

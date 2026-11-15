@@ -13,7 +13,7 @@ import (
 // previewSharing checks what a preview can check about a capture-time sharing
 // instruction (ADR-235) without another permission read: a human requester
 // with the evidence:share scope, recipients of the requester's own issuer and
-// an explicit end within the seven-day share maximum. Evidence-owner
+// an optional future end. Evidence-owner
 // authority is checked by admission against the same projection it locks.
 func previewSharing(s *value.ContextSharing, i identity.Identity, now time.Time) error {
 	if s == nil {
@@ -22,7 +22,7 @@ func previewSharing(s *value.ContextSharing, i identity.Identity, now time.Time)
 	if i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, authorization.ShareScope) {
 		return value.ErrSharingDenied
 	}
-	if !s.Valid() || s.Recipients[0].Issuer != i.Principal.Issuer || !s.NotAfter.IsZero() && (!s.NotAfter.After(now) || s.NotAfter.After(now.Add(authorization.ShareMaxLifetime))) {
+	if !s.Valid() || s.Recipients[0].Issuer != i.Principal.Issuer || !s.NotAfter.IsZero() && !s.NotAfter.After(now) {
 		return value.ErrInvalid
 	}
 	return nil

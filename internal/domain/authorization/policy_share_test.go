@@ -24,10 +24,10 @@ func TestPolicyShareManagementAndManagers(t *testing.T) {
 	}
 	mate := creator
 	mate.Principal.Subject = "team-mate"
-	if held, _ := PolicySharingManagedBy(creator.Principal, owners, p.Target, mate, p, now); len(held) != 1 || held[0] != owners[0] {
+	if held, _ := PolicySharingManagedBy(owners, mate, now); len(held) != 1 || held[0] != owners[0] {
 		t.Fatal("team member does not manage the recurring sharing", held)
 	}
-	if held, _ := PolicySharingManagedBy(creator.Principal, owners, p.Target, recipient, p, now); held != nil {
+	if held, _ := PolicySharingManagedBy(owners, recipient, now); held != nil {
 		t.Fatal("recipient manages the recurring sharing")
 	}
 }

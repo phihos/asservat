@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Shares without caps or Suspended state (ADR-335 D7, 2026-11-15)
+
+A share lasts until the artifact's access ends unless the creator names an
+earlier end. No Suspended phase or administrator resume; managers are members
+of a managing group now. The 24 h/7 d lifetime, recipient and manager counts,
+32 active shares per artifact and the 100-capture policy limit are gone.
+Migration 00175 drops the SQL checks; the runtime reads the canonical
+`sharing-request` schema. Verification: custody `TestContextAdmissionWithRealServices`
+share subtests; the two `policy-share-*` subtests fail identically on main
+(context admission unavailable).
+
 ## Recovery proof removed (2026-11-15)
 
 Branch `clean/recovery-2`. Migration 00173 removes
@@ -247,7 +258,6 @@ examples go through `readImplementedExample` or the console equivalent.
 | `live-watch.schema.json`, `watch_live` | No watch deadline, duration or lifetime output cap; 10-minute idle close; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
 | `recording-save.schema.json`, `errors.yaml` | Rows with `owner_kind`/`save_via`/`live_projections`; `recordingSaves` default true; `NoCurrentSource` replaces `RecordingSelectionRequired` | `internal/transport/presentation/recording_save_history.go`, `recording_save_operations.go` |
 | `investigation-access.schema.json`, grant views | No `clientIDs`: clients carry the user's access, raw and downloads included | `internal/application/authorization/grants.go`, `raw_query.go`; `internal/domain/authorization/grant.go`; `internal/adapters/postgres/access_grant.go`; `internal/transport/presentation/grant_operations.go` |
-| `sharing-request`, `sharing-intent`, share schemas | No recipient cap (was 32/8), outputs/operations caps or `maxArtifactsPerCapture`; recurring `notAfter`/`maxCaptures` optional | Embedded `internal/adapters/kubernetes/policy-schemas/sharing-request.schema.json`; share admission in `internal/application/authorization` |
 | `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |
 | `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration`, `profileRef.version` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
 | `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |

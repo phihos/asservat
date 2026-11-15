@@ -48,22 +48,6 @@ func (q *Queries) BeginShareEffect(ctx context.Context, arg BeginShareEffectPara
 	return i, err
 }
 
-const countActiveShares = `-- name: CountActiveShares :one
-SELECT count(*) FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND retire_by>clock_timestamp() AND revoked_at IS NULL AND expires_at>clock_timestamp()
-`
-
-type CountActiveSharesParams struct {
-	RootID     pgtype.UUID
-	ArtifactID pgtype.UUID
-}
-
-func (q *Queries) CountActiveShares(ctx context.Context, arg CountActiveSharesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveShares, arg.RootID, arg.ArtifactID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countPolicyShareRevocations = `-- name: CountPolicyShareRevocations :one
 SELECT count(*) FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoke_key=$3
 `
@@ -88,7 +72,7 @@ SELECT $1::uuid, r.root_id, r.artifact_id, r.case_id, r.cluster_id, r.namespace_
 FROM context_case_locator r
 WHERE r.root_id=$13::uuid AND r.artifact_id=$14::uuid AND r.case_id=$15::uuid AND r.cluster_id=$16::uuid
  AND r.namespace_uid=$17::text AND r.workload_uid=$18::text AND r.pod_uid=$19::text
- AND $11::timestamptz>clock_timestamp() AND $11::timestamptz<=clock_timestamp()+interval '7 days'
+ AND $11::timestamptz>clock_timestamp()
 RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id
 `
 
@@ -247,7 +231,8 @@ const listOwnedShares = `-- name: ListOwnedShares :many
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp()
  AND ((creator_issuer=$2 AND creator_subject=$3)
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY($4::jsonb[])))
-ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT $5
+ AND (NOT $5::boolean OR (created_at,id)<($6::timestamptz,$7::uuid))
+ORDER BY created_at DESC, id DESC LIMIT $8
 `
 
 type ListOwnedSharesParams struct {
@@ -255,22 +240,25 @@ type ListOwnedSharesParams struct {
 	CreatorIssuer  string
 	CreatorSubject string
 	Managers       [][]byte
+	Paged          bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
 	RowLimit       int32
 }
 
 // Shares the caller created, in every phase, plus unrevoked, unexpired shares
-// pinning a management assignment of a user or group subject of the caller
-// (ADR-232 increment 4; each pattern is a one-element array
-// [{"Kind","Issuer","SubjectID"}]). Candidates only: the service lists a team
-// share only while the caller holds a pinned assignment that is still current.
-// Active rows first, so old revoked/expired own shares never push a share the
-// caller can still revoke out of the bounded page.
+// managed by a user or group subject of the caller (each pattern is a
+// one-element array [{"Kind","Issuer","SubjectID"}]).
+// Newest first, keyset-paged on (created_at, id) like ListAdministeredShares.
 func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams) ([]EvidenceShare, error) {
 	rows, err := q.db.Query(ctx, listOwnedShares,
 		arg.RootID,
 		arg.CreatorIssuer,
 		arg.CreatorSubject,
 		arg.Managers,
+		arg.Paged,
+		arg.AfterCreatedAt,
+		arg.AfterID,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -321,18 +309,30 @@ func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams
 }
 
 const listReceivedShares = `-- name: ListReceivedShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp() AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
-ORDER BY created_at DESC, id LIMIT $3
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1::uuid AND retire_by>clock_timestamp() AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
+ AND (NOT $3::boolean OR (created_at,id)<($4::timestamptz,$5::uuid))
+ORDER BY created_at DESC, id DESC LIMIT $6
 `
 
 type ListReceivedSharesParams struct {
-	RootID   pgtype.UUID
-	Keys     []string
-	RowLimit int32
+	RootID         pgtype.UUID
+	Keys           []string
+	Paged          bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	RowLimit       int32
 }
 
+// Newest first, keyset-paged on (created_at, id).
 func (q *Queries) ListReceivedShares(ctx context.Context, arg ListReceivedSharesParams) ([]EvidenceShare, error) {
-	rows, err := q.db.Query(ctx, listReceivedShares, arg.RootID, arg.Keys, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listReceivedShares,
+		arg.RootID,
+		arg.Keys,
+		arg.Paged,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -420,18 +420,6 @@ func (q *Queries) LockPolicySharingAcceptance(ctx context.Context, arg LockPolic
 	return i, err
 }
 
-const lockShareArtifact = `-- name: LockShareArtifact :exec
-
-SELECT pg_advisory_xact_lock(hashtextextended('evidence_share:' || $1::text, 0))
-`
-
-// ADR-232 concrete evidence shares.
-// Serializes share creation per artifact so the active-share cap holds.
-func (q *Queries) LockShareArtifact(ctx context.Context, artifactKey string) error {
-	_, err := q.db.Exec(ctx, lockShareArtifact, artifactKey)
-	return err
-}
-
 const readPolicySharingAcceptance = `-- name: ReadPolicySharingAcceptance :one
 
 SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent, observed_events_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing'
@@ -474,7 +462,7 @@ func (q *Queries) ReadPolicySharingAcceptance(ctx context.Context, arg ReadPolic
 
 const readRecipientShares = `-- name: ReadRecipientShares :many
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND retire_by>clock_timestamp() AND revoked_at IS NULL AND expires_at>clock_timestamp() AND recipient_keys && $3::text[]
-ORDER BY created_at, id LIMIT 32
+ORDER BY created_at, id
 `
 
 type ReadRecipientSharesParams struct {
@@ -483,7 +471,7 @@ type ReadRecipientSharesParams struct {
 	Keys       []string
 }
 
-// Keyed by (artifact, the caller's own user/group keys); at most the cap.
+// Keyed by (artifact, the caller's own user/group keys).
 func (q *Queries) ReadRecipientShares(ctx context.Context, arg ReadRecipientSharesParams) ([]EvidenceShare, error) {
 	rows, err := q.db.Query(ctx, readRecipientShares, arg.RootID, arg.ArtifactID, arg.Keys)
 	if err != nil {
@@ -579,6 +567,7 @@ func (q *Queries) ReadShare(ctx context.Context, arg ReadShareParams) (EvidenceS
 }
 
 const readShareByKey = `-- name: ReadShareByKey :one
+
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND creator_issuer=$2 AND creator_subject=$3 AND idempotency_key=$4
 `
 
@@ -589,6 +578,7 @@ type ReadShareByKeyParams struct {
 	IdempotencyKey string
 }
 
+// ADR-232 concrete evidence shares.
 func (q *Queries) ReadShareByKey(ctx context.Context, arg ReadShareByKeyParams) (EvidenceShare, error) {
 	row := q.db.QueryRow(ctx, readShareByKey,
 		arg.RootID,
@@ -687,8 +677,7 @@ type RevokePolicySharesParams struct {
 	OperationID        pgtype.UUID
 }
 
-// Every still-unrevoked share materialized from exactly this acceptance; at
-// most its capture limit (100).
+// Every still-unrevoked share materialized from exactly this acceptance.
 func (q *Queries) RevokePolicyShares(ctx context.Context, arg RevokePolicySharesParams) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, revokePolicyShares,
 		arg.RootID,
