@@ -31,7 +31,7 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 	p := custodydb.DownloadStopPool{RootID: id(root), InstallationID: id(installation), StoreID: id(store), PolicyID: id(allocation), BackupProfileID: id(store), PolicyDigest: stop.PolicyDigest[:], BackupProfileDigest: stop.BackupProfileDigest[:], Slots: 2, Allocated: 2, CipherBytes: 2 * cipher, KeyAttempts: 2 * keys, BackupBytes: 2 * backup, WalBytes: 2 * wal, RetainedSeconds: 64, ValidUntil: ts(until), LifecyclePolicy: wire}
 	b := custodydb.DownloadStopBacking{AllocationID: id(allocation), RootID: id(root), Slots: 2}
 	typ, _ := artifact.LookupNativeType(artifact.PodStatusArtifact)
-	limits := ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4, Duration: 8 * time.Hour}
+	limits := ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20}
 	if !contextPlanBacking(limits, typ, a, c, n, b, p, installation, now) {
 		t.Fatal("exact supported backing rejected")
 	}
@@ -79,7 +79,7 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 	// default 16 MiB profile, but its ten owner updates cannot fund renewals.
 	for _, name := range []string{artifact.PprofArtifact, artifact.GoTraceArtifact} {
 		typ, _ := artifact.LookupNativeType(name)
-		profileLimits, err := boundedNativeDownloadPlan(ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}, typ, 16<<20)
+		profileLimits, err := boundedNativeDownloadPlan(ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes}, typ, 16<<20)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +129,7 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 }
 
 func TestNativeDownloadPlanUsesAcceptedTypeAndSize(t *testing.T) {
-	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}
+	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes}
 	for _, name := range []string{artifact.PodStatusArtifact, artifact.PCAPNGArtifact, artifact.RawPCAPNGArtifact, artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact, artifact.HTTPHeadersArtifact, artifact.LogsArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
 		typ, _ := artifact.LookupNativeType(name)
 		for _, size := range []int64{1, min(typ.MaxBytes, 16<<20), typ.MaxBytes} {
@@ -163,7 +163,7 @@ func TestNativeDownloadPlanUsesAcceptedTypeAndSize(t *testing.T) {
 // response admission. Authority facts are synthetic; this does not read or
 // decrypt managed evidence or qualify an installed native transfer.
 func TestNativeDownloadPlanFundsResponseAfterMetadata(t *testing.T) {
-	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}
+	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes}
 	for _, name := range []string{artifact.LogsArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
 		typ, ok := artifact.LookupNativeType(name)
 		if !ok {
@@ -178,14 +178,14 @@ func TestNativeDownloadPlanFundsResponseAfterMetadata(t *testing.T) {
 				now := time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)
 				const id = "10000000-0000-4000-8000-000000000001"
 				authority := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: "pod", Version: artifact.Digest{1}, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{2}, DecisionDigest: artifact.Digest{3}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: artifact.Digest{4}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), AccessUntil: now.Add(time.Hour)}
-				session := artifact.DownloadSession{ID: id, AllocationID: id, Scope: authority.Scope, RequestDigest: artifact.Digest{5}, State: artifact.DownloadPreparing, CreatedAt: now, Deadline: now.Add(plan.Duration), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit, RequestLimit: plan.RequestLimit}
+				session := artifact.DownloadSession{ID: id, AllocationID: id, Scope: authority.Scope, RequestDigest: artifact.Digest{5}, State: artifact.DownloadPreparing, CreatedAt: now, Deadline: now.Add(time.Hour), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit}
 				session, err = session.Start(authority, artifact.DownloadBatch{ID: id, Purpose: artifact.DownloadMetadata, ReadBytes: evidence.ContextDownloadReadWork}, now)
 				if err != nil {
 					t.Fatal("original metadata admission", err)
 				}
 				session.Active.AuditAcknowledged = true
 				session, err = session.Finish(id, 1, 0, true, false, now)
-				if err != nil || session.State != artifact.DownloadReady || session.ChargedRead != evidence.ContextDownloadReadWork || session.ChargedOutput != 0 || session.Requests != 1 {
+				if err != nil || session.State != artifact.DownloadReady || session.ChargedRead != evidence.ContextDownloadReadWork || session.ChargedOutput != 0 {
 					t.Fatal("original metadata charge/readiness", session, err)
 				}
 				response := artifact.DownloadResponse{ID: id, SessionID: id, OwnerID: id, Plan: artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: size}, WholeFile: true, WindowReadLimit: evidence.NativeWindowReadWork(typ)}, Until: session.Deadline}
@@ -195,12 +195,12 @@ func TestNativeDownloadPlanFundsResponseAfterMetadata(t *testing.T) {
 				}
 				windows := (size-1)/artifact.DownloadWindowBytes + 1
 				wantReads := evidence.ContextDownloadReadWork + 2*windows*evidence.NativeWindowReadWork(typ)
-				if plan.ReadLimit != wantReads || plan.OutputLimit != max(artifact.MaxContextBytes, 2*size) || plan.RequestLimit != ceilings.RequestLimit || plan.Duration != ceilings.Duration {
+				if plan.ReadLimit != wantReads || plan.OutputLimit != max(artifact.MaxContextBytes, 2*size) {
 					t.Fatal("native plan lost exact original bounds", plan)
 				}
 				for _, ceiling := range []ContextDownloadPlanLimits{
-					{OutputLimit: plan.OutputLimit - 1, ReadLimit: ceilings.ReadLimit, RequestLimit: ceilings.RequestLimit, Duration: ceilings.Duration},
-					{OutputLimit: ceilings.OutputLimit, ReadLimit: wantReads - 1, RequestLimit: ceilings.RequestLimit, Duration: ceilings.Duration},
+					{OutputLimit: plan.OutputLimit - 1, ReadLimit: ceilings.ReadLimit},
+					{OutputLimit: ceilings.OutputLimit, ReadLimit: wantReads - 1},
 				} {
 					if _, err := boundedNativeDownloadPlan(ceiling, typ, size); err == nil {
 						t.Fatal("administrator ceiling silently increased", ceiling)

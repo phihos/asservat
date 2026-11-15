@@ -280,7 +280,7 @@ func TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead(t *tes
 	if err = o.Prepare(context.Background(), f); err != nil {
 		t.Fatal("same original preparation did not recover", err)
 	}
-	if f.count("native") != 1 || f.count("begin") != 1 || f.s.Requests != 1 {
+	if f.count("native") != 1 || f.count("begin") != 1 {
 		t.Fatal("recovery repeated paid preparation", f.calls)
 	}
 }
@@ -420,7 +420,7 @@ func TestContextDownloadResultCloseJoinsWorkAndForbidsLateRetention(t *testing.T
 	if _, err = o.Read(context.Background(), f); err == nil {
 		t.Fatal("closed result disclosed")
 	}
-	if f.s.ChargedRead != ContextDownloadReadWork || f.s.Requests != 1 {
+	if f.s.ChargedRead != ContextDownloadReadWork {
 		t.Fatal("cancellation refunded uncertain read")
 	}
 }
@@ -476,7 +476,7 @@ func TestContextDownloadResultLostCommitReplyNeverRepeatsRead(t *testing.T) {
 			}
 			f.lostBeginReply = false
 			f.lostAckReply = false
-			if f.s.Generation != 1 || f.s.Requests != 1 {
+			if f.s.Generation != 1 {
 				t.Fatal("fixture did not commit original batch")
 			}
 			if stage == "outcome-ack" && (!f.acknowledged || f.s.State != artifact.DownloadReady) {

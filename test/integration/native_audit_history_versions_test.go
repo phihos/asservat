@@ -166,7 +166,7 @@ func qualifyHistoricalDownloadAccounting(t *testing.T, ctx context.Context, f na
 				t.Fatal("original byte permission", err)
 			}
 			var beforeOutput, beforeRead, beforeRequests int64
-			if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,requests FROM artifact_download WHERE id=$1", i.SessionID).Scan(&beforeOutput, &beforeRead, &beforeRequests); err != nil {
+			if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,generation FROM artifact_download WHERE id=$1", i.SessionID).Scan(&beforeOutput, &beforeRead, &beforeRequests); err != nil {
 				t.Fatal(err)
 			}
 			var outcome audit.DownloadOutcome
@@ -192,7 +192,7 @@ func qualifyHistoricalDownloadAccounting(t *testing.T, ctx context.Context, f na
 				t.Fatal(err)
 			}
 			var output, read, requests int64
-			if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,requests FROM artifact_download WHERE id=$1", i.SessionID).Scan(&output, &read, &requests); err != nil || output != beforeOutput || read != beforeRead || requests != beforeRequests {
+			if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,generation FROM artifact_download WHERE id=$1", i.SessionID).Scan(&output, &read, &requests); err != nil || output != beforeOutput || read != beforeRead || requests != beforeRequests {
 				t.Fatal("historical accounting refunded spend", err)
 			}
 		})
@@ -215,12 +215,12 @@ func qualifyHistoricalDownloadAccounting(t *testing.T, ctx context.Context, f na
 		t.Fatal(err)
 	}
 	var beforeOutput, beforeRead, beforeRequests int64
-	if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,requests FROM artifact_download WHERE id=$1", i.SessionID).Scan(&beforeOutput, &beforeRead, &beforeRequests); err != nil {
+	if err = f.admin.QueryRow(ctx, "SELECT charged_output,charged_read,generation FROM artifact_download WHERE id=$1", i.SessionID).Scan(&beforeOutput, &beforeRead, &beforeRequests); err != nil {
 		t.Fatal(err)
 	}
 	withHistoricalAuditReceipt(t, ctx, f.admin, "SELECT audit_receipt_json FROM download_batch WHERE id=$1", "UPDATE download_batch SET audit_receipt_json=$2 WHERE id=$1", []any{i.Batch.ID}, func(r *audit.Receipt) { r.Version = "null" }, func() {
 		canceled, err := f.runtime.CancelDownload(ctx, i.SessionID, a.Scope.Principal)
-		if err != nil || canceled.State != artifact.DownloadCancelled || canceled.ChargedOutput != beforeOutput || canceled.ChargedRead != beforeRead || canceled.Requests != beforeRequests {
+		if err != nil || canceled.State != artifact.DownloadCancelled || canceled.ChargedOutput != beforeOutput || canceled.ChargedRead != beforeRead || canceled.Generation != beforeRequests {
 			t.Fatal("historical cancellation changed spend or failed", err)
 		}
 	})

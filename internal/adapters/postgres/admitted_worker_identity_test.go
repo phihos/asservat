@@ -118,7 +118,7 @@ func admittedIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *admittedId
 	}
 	scope := w.Intent.Authority.Scope
 	request := artifact.Digest{7}
-	parent := custodydb.ArtifactDownload{ID: id(w.Intent.SessionID), RootID: id(scope.RootID), AllocationID: id(w.Intent.SessionID), ArtifactID: id(scope.ArtifactID), PrincipalKey: principalKey(scope.Principal), ActorKey: digest(scope.Principal), RequestDigest: request[:], ScopeJson: encode(scope), State: string(artifact.DownloadPreparing), CreatedAt: ts(w.Intent.CreatedAt), Deadline: ts(w.Intent.RunUntil), OutputLimit: 8192, ReadLimit: 12 << 20, RequestLimit: 3}
+	parent := custodydb.ArtifactDownload{ID: id(w.Intent.SessionID), RootID: id(scope.RootID), AllocationID: id(w.Intent.SessionID), ArtifactID: id(scope.ArtifactID), PrincipalKey: principalKey(scope.Principal), ActorKey: digest(scope.Principal), RequestDigest: request[:], ScopeJson: encode(scope), State: string(artifact.DownloadPreparing), CreatedAt: ts(w.Intent.CreatedAt), Deadline: ts(w.Intent.RunUntil), OutputLimit: 8192, ReadLimit: 12 << 20}
 	if _, e := decodeDownload(parent); e != nil {
 		t.Fatal("invalid admitted parent", e)
 	}

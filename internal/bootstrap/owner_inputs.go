@@ -256,7 +256,7 @@ func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 		if installed && (p.Port != contracts.OwnerInstalledPublicPort || providerconfig.ValidateOwnerPublicProviderRecipe(c, *c.ProviderAuthentication, time.Now()) != nil) || !installed && p.ProviderRecipeSHA256 != "" {
 			return ownerInputCheck("public-installed")
 		}
-		if p.Port < 1024 || p.Port > 65535 || p.Port == 9443 || p.Port == contracts.OwnerInstalledNativePort || !identity.Text(p.Version, 64) || p.OperationConcurrency < 1 || p.OperationConcurrency > 64 || p.MCPPerIdentity < 1 || p.MCPPerIdentity > p.OperationConcurrency || p.DownloadConcurrency < 1 || p.DownloadConcurrency > 64 || p.DownloadsPerIdentity < 1 || p.DownloadsPerIdentity > p.DownloadConcurrency || p.DownloadMaxSeconds < 1 || p.DownloadMaxSeconds > 86400 {
+		if p.Port < 1024 || p.Port > 65535 || p.Port == 9443 || p.Port == contracts.OwnerInstalledNativePort || !identity.Text(p.Version, 64) || p.OperationConcurrency < 1 || p.OperationConcurrency > 64 || p.MCPPerIdentity < 1 || p.MCPPerIdentity > p.OperationConcurrency || p.DownloadConcurrency < 1 {
 			return ownerInputCheck("public-limits")
 		}
 	}

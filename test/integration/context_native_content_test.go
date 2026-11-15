@@ -126,8 +126,8 @@ func qualifyFirstContextPreparationRace(t *testing.T, ctx context.Context, f nat
 		t.Fatal("lost first admission refilled preparation")
 	}
 	s, e := f.runtime.LookupDownload(ctx, session.ID, a.Scope.Principal)
-	if e != nil || s.Generation != 1 || s.Requests != 1 || s.ChargedRead != evidence.ContextDownloadReadWork {
-		t.Fatal("original attempt accounting", s.Generation, s.Requests, s.ChargedRead, e)
+	if e != nil || s.Generation != 1 || s.ChargedRead != evidence.ContextDownloadReadWork {
+		t.Fatal("original attempt accounting", s.Generation, s.ChargedRead, e)
 	}
 	var batches, keys int
 	if e = f.admin.QueryRow(ctx, "SELECT count(*) FROM download_batch WHERE session_id=$1", session.ID).Scan(&batches); e != nil || batches != 1 {
@@ -194,8 +194,8 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if e != nil {
 		t.Fatal(e)
 	}
-	if session.Generation != 1 || session.Requests != 1 {
-		t.Fatal("preparation was not the sole attempt", session.Generation, session.Requests)
+	if session.Generation != 1 {
+		t.Fatal("preparation was not the sole attempt", session.Generation)
 	}
 	var batch string
 	var roles int
@@ -248,7 +248,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted" {
 		readLimit = 12 << 20
 	}
-	plans, e := postgres.NewContextDownloadPlans(ctx, planPool, root, target.InstallationID, f.worker.Intent.Profile, f.content.configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: readLimit, RequestLimit: 4, Duration: time.Minute})
+	plans, e := postgres.NewContextDownloadPlans(ctx, planPool, root, target.InstallationID, f.worker.Intent.Profile, f.content.configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: readLimit})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -363,7 +363,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
  (SELECT reserved_windows FROM download_control_allocation WHERE id=$3),
  (SELECT charged_output FROM artifact_download WHERE id=$2),
  (SELECT charged_read FROM artifact_download WHERE id=$2),
- (SELECT requests FROM artifact_download WHERE id=$2),
+ (SELECT generation FROM artifact_download WHERE id=$2),
  (SELECT coalesce(sum(used_roles),0) FROM download_native_key WHERE worker_id=$1),
  (SELECT coalesce(sum(used_roles),0) FROM download_key_binding WHERE session_id=$2),
  (SELECT generation FROM artifact_download WHERE id=$2)`, f.worker.Intent.ID, prep.SessionID, f.allocation.ID).Scan(&v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9]); e != nil {
@@ -454,7 +454,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 	}
 	if f.content.mode == "native-control-admission-race" {
 		original, e := f.runtime.LookupDownload(ctx, prep.SessionID, f.worker.Intent.Authority.Scope.Principal)
-		if e != nil || original.Scope != f.worker.Intent.Authority.Scope || original.Generation != 1 || original.Requests != 1 || original.OutputLimit != 8192 || original.ReadLimit != 8<<20 || original.RequestLimit != 4 {
+		if e != nil || original.Scope != f.worker.Intent.Authority.Scope || original.Generation != 1 || original.OutputLimit != 8192 || original.ReadLimit != 8<<20 {
 			t.Fatal("fresh race must use its own original prepared session and unchanged fixture budgets")
 		}
 		initial := counts()
@@ -639,7 +639,7 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 		t.Fatal(e)
 	}
 	sessions := nativeContentSessions{workerBrowserSession{initial, session.Deadline, 5 * time.Second}}
-	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
 	if e != nil {
 		t.Fatal("public content constructor", e)
 	}

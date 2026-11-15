@@ -153,7 +153,7 @@ func downloadWorkerTest(t *testing.T) (*downloadWorkerFixture, ContextDownloadWo
 	scope := artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: p.e.NamespaceUID, WorkloadUID: p.e.WorkloadUID, PodUID: p.e.PodUID, Version: ContextCopiesDigest(p.copies), Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}}
 	f := &downloadWorkerFixture{now: p.now, body: []byte("synthetic approved native context")}
 	f.a = artifact.DownloadAuthority{Scope: scope, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{3}}, CheckedAt: p.now, ValidUntil: p.now.Add(5 * time.Second), AccessUntil: p.e.Registration.ExpiresAt, DeleteBy: p.e.Registration.DeleteBy}
-	f.s = artifact.DownloadSession{ID: id, AllocationID: id, Scope: scope, RequestDigest: artifact.Digest{7}, State: artifact.DownloadPreparing, CreatedAt: p.now, Deadline: p.now.Add(time.Minute), OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}
+	f.s = artifact.DownloadSession{ID: id, AllocationID: id, Scope: scope, RequestDigest: artifact.Digest{7}, State: artifact.DownloadPreparing, CreatedAt: p.now, Deadline: p.now.Add(time.Minute), OutputLimit: 8192, ReadLimit: 16 << 20}
 	r := ContextDownloadRequest{SessionID: id, Scope: scope, Expectation: p.e, Copies: p.copies}
 	w := ContextDownloadWorker{Sessions: f, AuditAcknowledgements: f, Audit: f, Authority: f, Native: f, Now: func() time.Time { return f.now }, NewID: func() string { return "22222222-2222-4222-8222-222222222222" }}
 	return f, w, r

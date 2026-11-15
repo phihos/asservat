@@ -64,7 +64,7 @@ func TestNativeContentAuthenticationKeepsOriginalCredentialAndNoGETRefresh(t *te
 				credential.issuer = "https://wrong.invalid"
 				defer func() { credential.issuer = h.config.Issuer }()
 			}
-			current, i, end, token, cookie, e := h.authenticate(t.Context(), r, now.Add(time.Hour))
+			current, i, end, token, cookie, e := h.authenticate(t.Context(), r)
 			if mode == "browser" || mode == "bearer" {
 				if e != nil || current == nil || !i.Valid(now) {
 					t.Fatal(e)
@@ -229,7 +229,7 @@ func TestNativeContentCredentialOutageIsNotInvalidCredential(t *testing.T) {
 	h := &DownloadContentHandler{config: DownloadContentConfig{Now: time.Now}, credentials: credential}
 	r := httptest.NewRequest(http.MethodGet, "https://console.invalid/native", nil)
 	r.Header.Set("Authorization", "Bearer synthetic")
-	if _, _, _, _, _, e := h.authenticate(t.Context(), r, time.Now().Add(time.Minute)); !errors.Is(e, identity.ErrUnavailable) {
+	if _, _, _, _, _, e := h.authenticate(t.Context(), r); !errors.Is(e, identity.ErrUnavailable) {
 		t.Fatal("credential observation outage changed to authentication denial", e)
 	}
 }
@@ -243,7 +243,7 @@ func (contentSocketRecorder) SetWriteDeadline(time.Time) error { return nil }
 // Every unavailable reply now names its closed stage for the operator report.
 func TestNativeContentUnavailableNamesItsStage(t *testing.T) {
 	credential := &contentCredentialFixture{err: identity.ErrUnavailable}
-	h := &DownloadContentHandler{config: DownloadContentConfig{PublicOrigin: "https://console.invalid", Issuer: "https://issuer.invalid", Now: time.Now}, credentials: credential, slots: make(chan struct{}, 1), active: map[identity.Principal]int{}}
+	h := &DownloadContentHandler{config: DownloadContentConfig{PublicOrigin: "https://console.invalid", Issuer: "https://issuer.invalid", Now: time.Now}, credentials: credential, slots: make(chan struct{}, 1)}
 	var steps []string
 	h.Refused = func(_ context.Context, operation string, err error) {
 		var fixed interface{ FixedStep() string }

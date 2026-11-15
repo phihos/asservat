@@ -53,8 +53,8 @@ CREATE ROLE download_runtime LOGIN PASSWORD 'synthetic-download'; GRANT CONNECT 
 GRANT SELECT ON goose_db_version,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,download_allocation,artifact_download,download_batch,download_response TO download_runtime;
 GRANT UPDATE(id) ON permission_stream TO download_runtime;
 GRANT UPDATE(reserved_output,reserved_read) ON download_allocation TO download_runtime;
-GRANT INSERT(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit,request_limit) ON artifact_download TO download_runtime;
-GRANT UPDATE(state,charged_output,charged_read,requests,emitted_bytes,generation,active_batch) ON artifact_download TO download_runtime;
+GRANT INSERT(id,root_id,allocation_id,artifact_id,principal_key,actor_key,idempotency_digest,request_digest,scope_json,deadline,output_limit,read_limit) ON artifact_download TO download_runtime;
+GRANT UPDATE(state,charged_output,charged_read,emitted_bytes,generation,active_batch) ON artifact_download TO download_runtime;
 GRANT INSERT(id,session_id,generation,intent_json,lease_until) ON download_batch TO download_runtime;
 GRANT UPDATE(outcome_json) ON download_batch TO download_runtime;
 

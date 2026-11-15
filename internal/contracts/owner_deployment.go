@@ -125,8 +125,6 @@ type OwnerPublicDeployment struct {
 	OperationConcurrency int                       `json:"operationConcurrency"`
 	MCPPerIdentity       int                       `json:"mcpPerIdentity"`
 	DownloadConcurrency  int                       `json:"downloadConcurrency"`
-	DownloadsPerIdentity int                       `json:"downloadsPerIdentity"`
-	DownloadMaxSeconds   int                       `json:"downloadMaxSeconds"`
 	OperationAudit       OwnerPublicOperationAudit `json:"operationAudit"`
 	// RuntimeProjection names the immutable public runtime projection Secret
 	// (ADR-184 decision 6, ADR-194). The provider-installed layout requires it;
@@ -160,10 +158,8 @@ type OwnerPublicEnvironment struct {
 	PathTemplate *DownloadEnvironmentPathTemplate `json:"pathTemplate,omitempty"`
 }
 type OwnerPublicDownloadPlan struct {
-	OutputLimit     int64 `json:"outputLimit"`
-	ReadLimit       int64 `json:"readLimit"`
-	RequestLimit    int   `json:"requestLimit"`
-	DurationSeconds int   `json:"durationSeconds"`
+	OutputLimit int64 `json:"outputLimit"`
+	ReadLimit   int64 `json:"readLimit"`
 }
 type OwnerPublicCluster struct {
 	ClusterID  string                    `json:"clusterID"`

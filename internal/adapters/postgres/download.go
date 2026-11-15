@@ -78,7 +78,7 @@ func (s *Downloads) BindDownloadAllocation(ctx context.Context, a artifact.Downl
 		if err != nil {
 			return err
 		}
-		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(n.Time.Add(8*time.Hour)) {
+		if !n.Time.Before(a.ValidUntil) {
 			return artifact.ErrInvalid
 		}
 		_, err = q.InsertDownloadAllocation(ctx, custodydb.InsertDownloadAllocationParams{ID: id(a.ID), RootID: id(a.RootID), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, OutputLimit: a.OutputLimit, ReadLimit: a.ReadLimit, ValidUntil: ts(a.ValidUntil)})
@@ -91,7 +91,7 @@ func decodeDownload(r custodydb.ArtifactDownload) (artifact.DownloadSession, err
 	if json.Unmarshal(r.ScopeJson, &scope) != nil || len(r.RequestDigest) != 32 || !scope.Valid() || scope.RootID != uid(r.RootID) || scope.ArtifactID != uid(r.ArtifactID) || !bytes.Equal(r.ActorKey, digest(scope.Principal)) || !bytes.Equal(r.PrincipalKey, principalKey(scope.Principal)) {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
-	s := artifact.DownloadSession{StopProtocol: r.StopProtocol.String, ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, RequestLimit: r.RequestLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, Requests: r.Requests, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
+	s := artifact.DownloadSession{StopProtocol: r.StopProtocol.String, ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
 	if !s.Valid() {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
@@ -177,7 +177,7 @@ func updateDownload(ctx context.Context, q *custodydb.Queries, s artifact.Downlo
 	if s.Active != nil {
 		active = id(s.Active.ID)
 	}
-	n, err := q.UpdateDownloadSession(ctx, custodydb.UpdateDownloadSessionParams{ID: id(s.ID), RootID: id(s.Scope.RootID), State: string(s.State), ChargedOutput: s.ChargedOutput, ChargedRead: s.ChargedRead, Requests: s.Requests, EmittedBytes: s.EmittedBytes, Generation: s.Generation, ActiveBatch: active})
+	n, err := q.UpdateDownloadSession(ctx, custodydb.UpdateDownloadSessionParams{ID: id(s.ID), RootID: id(s.Scope.RootID), State: string(s.State), ChargedOutput: s.ChargedOutput, ChargedRead: s.ChargedRead, EmittedBytes: s.EmittedBytes, Generation: s.Generation, ActiveBatch: active})
 	if err == nil && n != 1 {
 		return privacy.ErrConflict
 	}
@@ -264,7 +264,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 	if a.Started() {
 		return out, artifact.ErrDownloadExpired
 	}
-	if !request.Valid() || request.Scope.RootID != s.root || request.Scope != a.Scope || r.IdempotencyDigest == (artifact.Digest{}) || request.State != artifact.DownloadPreparing || request.Active != nil || request.Generation != 0 || request.Requests != 0 || request.ChargedOutput != 0 || request.ChargedRead != 0 || request.EmittedBytes != 0 {
+	if !request.Valid() || request.Scope.RootID != s.root || request.Scope != a.Scope || r.IdempotencyDigest == (artifact.Digest{}) || request.State != artifact.DownloadPreparing || request.Active != nil || request.Generation != 0 || request.ChargedOutput != 0 || request.ChargedRead != 0 || request.EmittedBytes != 0 {
 		return out, artifact.ErrInvalid
 	}
 	topology, err := s.downloadTopology(ctx, a)
@@ -311,14 +311,14 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		if err != nil {
 			return err
 		}
-		if !now.Time.Before(request.Deadline) || request.Deadline.After(now.Time.Add(8*time.Hour)) {
+		if !now.Time.Before(request.Deadline) {
 			return artifact.ErrDownloadExpired
 		}
 		encoded, err := json.Marshal(request.Scope)
 		if err != nil {
 			return artifact.ErrInvalid
 		}
-		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit, RequestLimit: request.RequestLimit, StopProtocol: pgtype.Text{String: request.StopProtocol, Valid: request.StopProtocol != ""}})
+		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit, StopProtocol: pgtype.Text{String: request.StopProtocol, Valid: request.StopProtocol != ""}})
 		if err != nil {
 			return err
 		}
@@ -402,13 +402,6 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 		}
 		// A repeated batch ID is deliberately NOT a second writer permit. Lost
 		// SQL replies remain charged and recover through status + fresh batch.
-		streams, err := q.DownloadStreams(ctx, custodydb.DownloadStreamsParams{RootID: id(s.root), PrincipalKey: principalKey(a.Scope.Principal)})
-		if err != nil {
-			return err
-		}
-		if streams.Total >= 16 || streams.Principal >= 2 {
-			return artifact.ErrDownloadCapacity
-		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err

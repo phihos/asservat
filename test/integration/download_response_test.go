@@ -109,7 +109,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err := config.BindDownloadControlAllocation(ctx, bad); err == nil {
 			t.Fatal("backing changed")
 		}
-		reservation := evidence.DownloadReservation{Authority: a, IdempotencyDigest: artifact.Digest{71}, Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{72}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second), OutputLimit: 1 << 29, ReadLimit: 1 << 30, RequestLimit: 4}}
+		reservation := evidence.DownloadReservation{Authority: a, IdempotencyDigest: artifact.Digest{71}, Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{72}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(20 * time.Second), OutputLimit: 1 << 29, ReadLimit: 1 << 30}}
 		session, err := ledger.ReserveDownload(ctx, reservation)
 		if err != nil {
 			t.Fatal(err)
@@ -227,7 +227,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			}
 		}
 		got, err := ledger.LookupDownload(ctx, session.ID, scope.Principal)
-		if err != nil || got.State != artifact.DownloadCompleted || got.EmittedBytes != request.Plan.Selection.Length || got.ChargedOutput != request.Plan.Selection.Length || got.Requests != 1 || got.Generation != finalGeneration {
+		if err != nil || got.State != artifact.DownloadCompleted || got.EmittedBytes != request.Plan.Selection.Length || got.ChargedOutput != request.Plan.Selection.Length || got.Generation != finalGeneration {
 			t.Fatal("cumulative completion", got, err)
 		}
 		var windows, auditBytes int64

@@ -246,7 +246,7 @@ func (o *ContextDownloadResultOwner) Prepare(ctx context.Context, current identi
 		_, err = o.readChecked(call, check)
 		return err
 	}
-	if o.attempted || observed.Session.State != artifact.DownloadPreparing || observed.Session.Generation != 0 || observed.Session.Requests != 0 || observed.Session.Active != nil {
+	if o.attempted || observed.Session.State != artifact.DownloadPreparing || observed.Session.Generation != 0 || observed.Session.Active != nil {
 		o.mu.Unlock()
 		return ErrDownloadMetadataUnavailable
 	}

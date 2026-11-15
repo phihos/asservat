@@ -10,7 +10,6 @@ func responseFixture(t *testing.T, size int64) (DownloadSession, DownloadAuthori
 	t.Helper()
 	s, a, n := downloadFixture()
 	s.State = DownloadReady
-	s.Requests = 1
 	s.OutputLimit = max(1, size)
 	s.ReadLimit = max(1, size) + DownloadWindowBytes
 	p := DownloadResponsePlan{Version: 1, Selection: DownloadSelection{Length: size}, WholeFile: true, WindowReadLimit: DownloadWindowBytes}
@@ -63,8 +62,8 @@ func TestLargeDownloadOneTiBHasFiniteWindowBackingAndCumulativeCompletion(t *tes
 			t.Fatal(e)
 		}
 	}
-	if s.State != DownloadCompleted || s.EmittedBytes != MaxNativeBytes || s.ChargedOutput != MaxNativeBytes || s.Requests != 1 || r.EmittedBytes != MaxNativeBytes || !r.Closed {
-		t.Fatal("whole response did not complete independently of legacy batches", s.State, s.Requests, r)
+	if s.State != DownloadCompleted || s.EmittedBytes != MaxNativeBytes || s.ChargedOutput != MaxNativeBytes || r.EmittedBytes != MaxNativeBytes || !r.Closed {
+		t.Fatal("whole response did not complete independently of legacy batches", s.State, r)
 	}
 }
 func TestLargeDownloadUncertaintySpendsWindowAndCannotCloseGaps(t *testing.T) {

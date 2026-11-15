@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Download caps removed (ADR-312, ADR-335 D9, 2026-11-15)
+
+A download session runs to its original authority, access and allocation
+bounds. Removed: the 1024-request cap and request counter, the fixed 8-hour
+session and response ceilings, the configured session duration, the
+per-identity download limit and `downloadMaxSeconds`, and the hard-coded
+per-user and per-installation stream and worker counts (migration 00183).
+`downloadConcurrency` stays per hub-api replica; the download Job keeps its
+runtime ceiling while worker certificate epochs exist. The control
+allocation keeps its 1024 partial windows (`artifact.DownloadPartialWindows`,
+seeded by 00172), which bound window audit bytes.
+
+Verified: `go build`, `go vet` (also `-tags libpcap`), `make go-check
+pcap-check`, the CI gate set, focused download custody tests (real
+PostgreSQL). Gap: projection and query workers still check
+the 16/2/2 acquisition worker caps, which have no stated reason.
+
 ## Live watch without lifetime (ADR-335 D9, 2026-11-15)
 
 A live watch ends with its sources or after 10 idle minutes; it has no

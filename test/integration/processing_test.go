@@ -252,7 +252,7 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 		return a
 	}
 	a := current()
-	reservation := evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{37}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}, IdempotencyDigest: artifact.Digest{38}, Authority: a}
+	reservation := evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: artifact.Digest{37}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20}, IdempotencyDigest: artifact.Digest{38}, Authority: a}
 	session, err := runtime.ReserveDownload(ctx, reservation)
 	if err != nil {
 		t.Fatal(err)

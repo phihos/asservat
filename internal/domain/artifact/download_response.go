@@ -9,9 +9,12 @@ const (
 	DownloadResponseVersion        = 1
 	DownloadWindowBytes      int64 = 64 << 20
 	DownloadWindowAuditBytes int64 = 128 << 10
-	// One partial window per request beyond the full output windows.
-	MaxDownloadWindows          = MaxDownloadOutput/DownloadWindowBytes + MaxDownloadRequests
-	MaxDownloadWindowAuditBytes = 2 * MaxDownloadWindows * DownloadWindowAuditBytes
+	// DownloadPartialWindows is the per-workload control allocation's budget
+	// of partial windows (one per response), as migration 00172 seeds it. Each
+	// window reserves audit bytes, so the budget bounds audit storage.
+	DownloadPartialWindows      int64 = 1024
+	MaxDownloadWindows                = MaxDownloadOutput/DownloadWindowBytes + DownloadPartialWindows
+	MaxDownloadWindowAuditBytes       = 2 * MaxDownloadWindows * DownloadWindowAuditBytes
 	// MaxDownloadWindowWrite bounds a window's audit write deadline, which SQL
 	// pins to its control allocation's AuditWriteUntil. A protected-capacity
 	// control lives up to its 24 h admission plus the 5 min audit grace, so the
@@ -68,7 +71,7 @@ type DownloadResponse struct {
 }
 
 func (r DownloadResponse) Valid() bool {
-	return uuid(r.ID) && uuid(r.SessionID) && uuid(r.OwnerID) && r.Generation > 0 && r.Plan.Valid() && !r.StartedAt.IsZero() && r.Until.After(r.StartedAt) && !r.Until.After(r.StartedAt.Add(8*time.Hour)) && r.WindowCount >= 0 && r.WindowCount <= r.Plan.Windows() && r.CompletedWindows >= 0 && r.CompletedWindows <= r.WindowCount && r.EmittedBytes >= 0 && r.EmittedBytes <= r.Plan.Selection.Length && (r.ActiveWindowID == "" || uuid(r.ActiveWindowID)) && r.LeaseSequence >= 0 && (!r.LeaseUntil.After(r.Until))
+	return uuid(r.ID) && uuid(r.SessionID) && uuid(r.OwnerID) && r.Generation > 0 && r.Plan.Valid() && !r.StartedAt.IsZero() && r.Until.After(r.StartedAt) && r.WindowCount >= 0 && r.WindowCount <= r.Plan.Windows() && r.CompletedWindows >= 0 && r.CompletedWindows <= r.WindowCount && r.EmittedBytes >= 0 && r.EmittedBytes <= r.Plan.Selection.Length && (r.ActiveWindowID == "" || uuid(r.ActiveWindowID)) && r.LeaseSequence >= 0 && (!r.LeaseUntil.After(r.Until))
 }
 
 // BeginResponse starts a content response. It requires a complete current

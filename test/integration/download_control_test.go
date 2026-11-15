@@ -102,7 +102,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		// A finite requested transfer lifetime shorter than the independent
 		// thirty-second fixture source observations lets status outlive the
 		// transfer without fabricating renewed evidence authority.
-		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: key, Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(15 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20, RequestLimit: 4}}
+		request := evidence.DownloadReservation{Authority: a, IdempotencyDigest: key, Session: artifact.DownloadSession{ID: custodyID(), AllocationID: allocation.ID, Scope: scope, RequestDigest: evidence.ContextDownloadRequestDigest(scope.ArtifactID), State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(15 * time.Second).Truncate(time.Microsecond), OutputLimit: 8192, ReadLimit: 16 << 20}}
 		query := artifact.DownloadKeyQuery{Identity: actor, Key: key}
 		absent, err := ledger.LookupDownloadKey(ctx, query)
 		if err != nil || absent.Found || !absent.Valid(time.Now()) {
@@ -197,7 +197,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			}
 		}
 		after, err := ledger.LookupDownload(ctx, session.ID, scope.Principal)
-		if err != nil || before.Requests != after.Requests || before.ChargedRead != after.ChargedRead || before.Generation != after.Generation {
+		if err != nil || before.ChargedRead != after.ChargedRead || before.Generation != after.Generation {
 			t.Fatal("metadata polling spent another preparation", err)
 		}
 		content, err := ledger.BeginDownloadBatch(ctx, session.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: metadata.Size, ReadBytes: evidence.ContextDownloadReadWork})
@@ -285,7 +285,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("terminal status after transfer expiry", expected, v, err)
 			}
 			storedAfter, err := ledger.LookupDownload(ctx, id, scope.Principal)
-			if err != nil || storedAfter.State != storedBefore.State || storedAfter.Generation != storedBefore.Generation || storedAfter.Requests != storedBefore.Requests || storedAfter.ChargedRead != storedBefore.ChargedRead || storedAfter.ChargedOutput != storedBefore.ChargedOutput || !storedAfter.Deadline.Equal(storedBefore.Deadline) {
+			if err != nil || storedAfter.State != storedBefore.State || storedAfter.Generation != storedBefore.Generation || storedAfter.ChargedRead != storedBefore.ChargedRead || storedAfter.ChargedOutput != storedBefore.ChargedOutput || !storedAfter.Deadline.Equal(storedBefore.Deadline) {
 				t.Fatal("status mutated durable session", err)
 			}
 			if expected == artifact.DownloadExpired && storedAfter.State != artifact.DownloadPreparing {

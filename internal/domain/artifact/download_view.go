@@ -67,7 +67,7 @@ type DownloadPreparation struct {
 }
 
 func (p DownloadPreparation) Valid() bool {
-	return uuid(p.SessionID) && uuid(p.BatchID) && p.Generation > 0 && p.Generation <= MaxDownloadRequests
+	return uuid(p.SessionID) && uuid(p.BatchID) && p.Generation > 0
 }
 
 // PreparedDownload is returned only by a protected regional native-work port.

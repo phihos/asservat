@@ -179,7 +179,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	setup := func(t *testing.T) fixture { return setupWithKeys(t, nil) }
 	request := func(f fixture, a artifact.DownloadAuthority) evidence.DownloadReservation {
-		return evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: f.allocation.ID, Scope: a.Scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}, IdempotencyDigest: artifact.Digest{9}, Authority: a}
+		return evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: f.allocation.ID, Scope: a.Scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20}, IdempotencyDigest: artifact.Digest{9}, Authority: a}
 	}
 
 	qualifyPermissionDownloadAuditHistory(t, ctx, admin, func(t *testing.T) permissionDownloadAuditFixture {
@@ -193,7 +193,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
 	})
 
-	modes := []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"}
+	modes := []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "expired-claim", "cancelled-parent"}
 	for _, mode := range modes {
 		t.Run("download-worker-"+mode, func(t *testing.T) {
 			ctx := ctx // This subtest owns any native source-observer cancellation.
@@ -569,33 +569,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				var claimed bool
 				if e = admin.QueryRow(ctx, "SELECT claimed_at IS NOT NULL FROM download_worker WHERE id=$1", i.ID).Scan(&claimed); e != nil || claimed {
 					t.Fatal("stale claim consumed", e)
-				}
-				return
-			}
-			if mode == "capacity-held" {
-				r2 := request(f, f.authority())
-				r2.IdempotencyDigest[0]++
-				s2, e := f.runtime.ReserveDownload(ctx, r2)
-				if e != nil {
-					t.Fatal(e)
-				}
-				if _, e = ledger.ReserveDownloadWorker(ctx, s2.ID, custodyID(), f.authority(), profile); e != nil {
-					t.Fatal(e)
-				}
-				r3 := request(f, f.authority())
-				r3.IdempotencyDigest[0] += 2
-				s3, e := f.runtime.ReserveDownload(ctx, r3)
-				if e != nil {
-					t.Fatal(e)
-				}
-				if _, e = ledger.ReserveDownloadWorker(ctx, s3.ID, custodyID(), f.authority(), profile); !errors.Is(e, artifact.ErrDownloadCapacity) {
-					t.Fatal("pending jobs escaped worker budget", e)
-				}
-				if _, e = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); e != nil {
-					t.Fatal(e)
-				}
-				if _, e = ledger.ReserveDownloadWorker(ctx, s3.ID, custodyID(), f.authority(), profile); !errors.Is(e, artifact.ErrDownloadCapacity) {
-					t.Fatal("cancellation refunded unknown worker", e)
 				}
 				return
 			}
@@ -1589,55 +1562,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal("failed begin changed spend", err)
 		}
 	})
-	t.Run("download-principal-limit-spans-clients-cancellation-does-not-free-writer", func(t *testing.T) {
-		f := setup(t)
-		a := f.authority()
-		var sessions []artifact.DownloadSession
-		var intents []audit.DownloadIntent
-		for n := 0; n < 3; n++ {
-			other := a
-			other.Scope.Principal.ClientID = string(rune('a' + n))
-			other.Environment.Principal = other.Scope.Principal
-			r := request(f, other)
-			s, err := f.runtime.ReserveDownload(ctx, r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sessions = append(sessions, s)
-		}
-		for n, s := range sessions {
-			other := a
-			other.Scope = s.Scope
-			other.Environment.Principal = other.Scope.Principal
-			i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
-			if n == 2 {
-				if !errors.Is(err, artifact.ErrDownloadCapacity) {
-					t.Fatal("principal limit", err)
-				}
-			} else {
-				if err != nil {
-					t.Fatal(err)
-				}
-				intents = append(intents, i)
-			}
-		}
-		if _, err := f.runtime.CancelDownload(ctx, sessions[0].ID, sessions[0].Scope.Principal); err != nil {
-			t.Fatal(err)
-		}
-		other := a
-		other.Scope = sessions[2].Scope
-		other.Environment.Principal = other.Scope.Principal
-		if _, err := f.runtime.BeginDownloadBatch(ctx, sessions[2].ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20}); !errors.Is(err, artifact.ErrDownloadCapacity) {
-			t.Fatal("cancel freed still-live writer", err)
-		}
-		i := intents[0]
-		if _, err := f.runtime.FinishDownloadBatch(ctx, i.SessionID, i.Batch.ID, i.Batch.Generation, 0, false, false); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.runtime.BeginDownloadBatch(ctx, sessions[2].ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20}); err != nil {
-			t.Fatal("writer slot never released", err)
-		}
-	})
 	t.Run("download-allocation-isolation-and-current-revocation", func(t *testing.T) {
 		f := setup(t)
 		a := f.authority()
@@ -1685,27 +1609,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 		if _, err = f.runtime.CancelDownload(ctx, s.ID, a.Scope.Principal); err != nil {
 			t.Fatal("revocation prevented owner cancellation", err)
-		}
-	})
-	t.Run("download-installation-stream-cap-and-late-generation", func(t *testing.T) {
-		f := setup(t)
-		a := f.authority()
-		for n := 0; n < 17; n++ {
-			other := a
-			other.Scope.Principal.Subject = string(rune('a' + n))
-			other.Environment.Principal = other.Scope.Principal
-			r := request(f, other)
-			s, err := f.runtime.ReserveDownload(ctx, r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = f.runtime.BeginDownloadBatch(ctx, s.ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
-			if n < 16 && err != nil {
-				t.Fatal("premature installation ceiling", n, err)
-			}
-			if n == 16 && !errors.Is(err, artifact.ErrDownloadCapacity) {
-				t.Fatal("installation ceiling", err)
-			}
 		}
 	})
 	t.Run("download-old-result-cannot-take-over-new-generation", func(t *testing.T) {

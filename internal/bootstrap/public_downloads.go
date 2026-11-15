@@ -52,7 +52,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	in, pc := d.inputs, d.publicContext
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.workerIdentities == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 || p.DownloadPlan.RequestLimit < 1 || p.DownloadPlan.DurationSeconds < 1 || p.DownloadPlan.DurationSeconds > 3600 {
+	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.workerIdentities == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 {
 		return nil, &fixedStepError{"downloads/start", mounts.ErrUnavailable}
 	}
 	g := d.shared.retention
@@ -285,7 +285,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, &fixedStepError{"downloads/services", mounts.ErrUnavailable}
 	}
 	*closers = append(*closers, services.Runtime.Close)
-	plans, err := postgres.NewContextDownloadPlans(ctx, sql["download-plan"], root, installation, profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: p.DownloadPlan.OutputLimit, ReadLimit: p.DownloadPlan.ReadLimit, RequestLimit: int64(p.DownloadPlan.RequestLimit), Duration: time.Duration(p.DownloadPlan.DurationSeconds) * time.Second})
+	plans, err := postgres.NewContextDownloadPlans(ctx, sql["download-plan"], root, installation, profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: p.DownloadPlan.OutputLimit, ReadLimit: p.DownloadPlan.ReadLimit})
 	if err != nil {
 		return nil, &fixedStepError{"downloads/plans", mounts.ErrUnavailable}
 	}

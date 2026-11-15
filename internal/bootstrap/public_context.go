@@ -18,11 +18,12 @@ import (
 // PublicContextConfig is an accepted installation input, never an HTTP body.
 // It adds no collection enablement: only already composed operations exist.
 type PublicContextConfig struct {
-	PublicOrigin, Issuer, Version             string
-	OperationConcurrency, MCPPerIdentity      int
-	DownloadConcurrency, DownloadsPerIdentity int
-	DownloadMaxDuration                       time.Duration
-	Audit                                     presentation.AuditedOperationsConfig
+	PublicOrigin, Issuer, Version        string
+	OperationConcurrency, MCPPerIdentity int
+	// DownloadConcurrency bounds concurrent content responses per hub-api
+	// process: each one runs a download-worker Pod (ADR-069).
+	DownloadConcurrency int
+	Audit               presentation.AuditedOperationsConfig
 }
 
 // PublicContextServices are concrete role-composition dependencies. Bootstrap
@@ -87,8 +88,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	if s.Native != nil {
 		handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{
 			PublicOrigin: c.PublicOrigin, Issuer: c.Issuer,
-			MaxConcurrent: c.DownloadConcurrency, MaxPerIdentity: c.DownloadsPerIdentity,
-			MaxDuration: c.DownloadMaxDuration, Now: c.Audit.Now, NewID: c.Audit.NewID,
+			MaxConcurrent: c.DownloadConcurrency, Now: c.Audit.Now, NewID: c.Audit.NewID,
 		}, sessions, s.DownloadIdentity, audited, s.Native, s.Transfer)
 		if e != nil {
 			return nil, &fixedStepError{"downloads", e}

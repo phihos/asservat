@@ -1181,18 +1181,7 @@
                 },
                 "downloadConcurrency": {
                   "type": "integer",
-                  "minimum": 1,
-                  "maximum": 64
-                },
-                "downloadsPerIdentity": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 64
-                },
-                "downloadMaxSeconds": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 86400
+                  "minimum": 1
                 },
                 "operationAudit": {
                   "type": "object",
@@ -1229,14 +1218,6 @@
                       "minimum": 1
                     },
                     "readLimit": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "requestLimit": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "durationSeconds": {
                       "type": "integer",
                       "minimum": 1
                     }

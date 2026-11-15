@@ -52,7 +52,7 @@ func (s *Downloads) BindDownloadControlAllocation(ctx context.Context, a artifac
 		if e != nil {
 			return e
 		}
-		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(parent.ValidUntil.Time) || a.WindowLimit > (parent.OutputLimit-1)/artifact.DownloadWindowBytes+1+artifact.MaxDownloadRequests {
+		if !n.Time.Before(a.ValidUntil) || a.ValidUntil.After(parent.ValidUntil.Time) || a.WindowLimit > (parent.OutputLimit-1)/artifact.DownloadWindowBytes+1+artifact.DownloadPartialWindows {
 			return artifact.ErrInvalid
 		}
 		_, e = q.InsertDownloadControlAllocation(ctx, custodydb.InsertDownloadControlAllocationParams{ID: id(a.ID), RootID: id(s.root), AuditStoreID: id(a.AuditStoreID), WindowLimit: a.WindowLimit, AuditByteLimit: a.AuditByteLimit, ValidUntil: ts(a.ValidUntil), AuditWriteUntil: ts(a.AuditWriteUntil)})
@@ -160,13 +160,6 @@ func (s *Downloads) beginDownloadResponse(ctx context.Context, sessionID string,
 			if !control.canRespond(r.Plan) {
 				return artifact.ErrDownloadUnavailable
 			}
-		}
-		streams, e := q.DownloadStreams(ctx, custodydb.DownloadStreamsParams{RootID: id(s.root), PrincipalKey: principalKey(a.Scope.Principal)})
-		if e != nil {
-			return e
-		}
-		if streams.Total >= 16 || streams.Principal >= 2 {
-			return artifact.ErrDownloadCapacity
 		}
 		n, e := q.CurrentTime(ctx)
 		if e != nil {

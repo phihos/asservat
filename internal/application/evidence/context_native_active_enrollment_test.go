@@ -28,7 +28,7 @@ func (s *activePreparationSessions) BeginDownloadBatch(ctx context.Context, id s
 	out, err := s.downloadResultFixture.BeginDownloadBatch(ctx, id, a, b)
 	// The synthetic durable ledger retains the spent original batch even when
 	// its acknowledgement is lost. A later attachment exposes only that fact.
-	if s.downloadResultFixture.s.Requests > 0 {
+	if s.downloadResultFixture.s.Generation > 0 {
 		s.lookup.value.MetadataAttempted = true
 	}
 	return out, err
@@ -88,11 +88,11 @@ func TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim(t *testing.T) {
 	if !f.preparation.deadline.Equal(until) || !f.preparation.authorityUntil.Equal(until) || !f.f.i.Batch.LeaseUntil.Equal(until) {
 		t.Fatal("first batch renewed or lost the original shorter parent bound")
 	}
-	if f.f.s.Requests != 1 || f.f.s.Generation != 1 || f.f.s.ChargedRead != ContextDownloadReadWork || f.f.s.ChargedOutput != 0 || f.f.s.ReadLimit != original.ReadLimit || f.f.s.OutputLimit != original.OutputLimit || f.f.s.RequestLimit != original.RequestLimit || f.f.s.Deadline != original.Deadline || f.f.s.ID != original.ID {
+	if f.f.s.Generation != 1 || f.f.s.ChargedRead != ContextDownloadReadWork || f.f.s.ChargedOutput != 0 || f.f.s.ReadLimit != original.ReadLimit || f.f.s.OutputLimit != original.OutputLimit || f.f.s.Deadline != original.Deadline || f.f.s.ID != original.ID {
 		t.Fatal("unknown first batch lost spend or changed original session/backing")
 	}
 	_, err = f.r.ContinueContextDownload(ctx, f.f, original, f.source)
-	if !errors.Is(err, ErrDownloadMetadataUnavailable) || f.f.count("begin") != 1 || f.f.count("finish") != 0 || f.f.s.Requests != 1 || f.f.s.ChargedRead != ContextDownloadReadWork {
+	if !errors.Is(err, ErrDownloadMetadataUnavailable) || f.f.count("begin") != 1 || f.f.count("finish") != 0 || f.f.s.ChargedRead != ContextDownloadReadWork {
 		t.Fatal("unknown first admission was replayed, repaired or refunded", err)
 	}
 }

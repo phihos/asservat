@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -38,11 +37,12 @@ func (s contentConfigurationStep) FixedStep() string { return "content-" + strin
 // Protected installation input. Bearer verification must be pinned to Resource
 // and Issuer independently of the MCP resource. No forwarded-header trust.
 type DownloadContentConfig struct {
-	PublicOrigin, Issuer          string
-	MaxConcurrent, MaxPerIdentity int
-	MaxDuration                   time.Duration
-	Now                           func() time.Time
-	NewID                         func() string
+	PublicOrigin, Issuer string
+	// MaxConcurrent bounds concurrent content responses of this process; each
+	// runs one download-worker Pod, so it bounds the Pods a burst starts.
+	MaxConcurrent int
+	Now           func() time.Time
+	NewID         func() string
 }
 
 func (c DownloadContentConfig) Resource() string { return c.PublicOrigin + "/api/v1/downloads" }
@@ -59,15 +59,13 @@ type DownloadContentHandler struct {
 	runtime     *evidence.ContextNativeRuntime
 	transfer    evidence.DownloadResponseTransfer
 	slots       chan struct{}
-	mu          sync.Mutex
-	active      map[identity.Principal]int
 }
 
 func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler, bearer identities.Resolver, audit *presentation.AuditedOperations, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer) (*DownloadContentHandler, error) {
 	issuer, e := url.Parse(c.Issuer)
 	credential, ok := bearer.(identities.CredentialObserver)
 	switch {
-	case e != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || c.Now == nil || c.NewID == nil || c.MaxConcurrent < 1 || c.MaxConcurrent > 16 || c.MaxPerIdentity < 1 || c.MaxPerIdentity > c.MaxConcurrent || c.MaxDuration <= 0 || c.MaxDuration > 8*time.Hour:
+	case e != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || c.Now == nil || c.NewID == nil || c.MaxConcurrent < 1:
 		return nil, contentConfigurationStep("config")
 	case !sessions.validOrigin() || sessions.Origin != c.PublicOrigin || sessions.Issuer != c.Issuer || sessions.Sessions == nil:
 		return nil, contentConfigurationStep("sessions")
@@ -87,24 +85,7 @@ func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler,
 	if _, e = presentation.NewNativeContentAuditor(audit, presentation.NativeContentInput{DownloadID: "00000000-0000-4000-8000-000000000001"}, c.Now().Add(time.Second)); e != nil {
 		return nil, contentConfigurationStep("auditor")
 	}
-	return &DownloadContentHandler{config: c, sessions: sessions, bearer: bearer, credentials: credential, audit: audit, runtime: runtime, transfer: transfer, slots: make(chan struct{}, c.MaxConcurrent), active: make(map[identity.Principal]int)}, nil
-}
-func (h *DownloadContentHandler) acquire(p identity.Principal) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.active[p] >= h.config.MaxPerIdentity {
-		return false
-	}
-	h.active[p]++
-	return true
-}
-func (h *DownloadContentHandler) release(p identity.Principal) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.active[p]--
-	if h.active[p] == 0 {
-		delete(h.active, p)
-	}
+	return &DownloadContentHandler{config: c, sessions: sessions, bearer: bearer, credentials: credential, audit: audit, runtime: runtime, transfer: transfer, slots: make(chan struct{}, c.MaxConcurrent)}, nil
 }
 
 // contentStep names the closed content stage that refused a response.
@@ -199,7 +180,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	current, i, hardUntil, token, cookie, err := h.authenticate(initial, r, started.Add(h.config.MaxDuration))
+	current, i, hardUntil, token, cookie, err := h.authenticate(initial, r)
 	if err != nil {
 		if errors.Is(err, identity.ErrDenied) || errors.Is(err, identity.ErrInvalid) {
 			h.challenge(w, 401)
@@ -208,11 +189,6 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
-	if !h.acquire(i.Principal) {
-		sessionProblem(w, 429)
-		return
-	}
-	defer h.release(i.Principal)
 	preflightUntil = identity.Earlier(preflightUntil, i.ValidUntil)
 	if !slices.Contains(i.Scopes, "evidence:read") || !slices.Contains(i.Scopes, "evidence:download") {
 		bound, e := h.audit.RejectBeforeDispatch(initial, current, presentation.IngressRejection{RequestedOperation: "download_artifact_content", Kind: presentation.IngressDenied})
@@ -284,7 +260,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 	h.unavailable(owner, w, "transfer", err)
 }
-func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Request, hard time.Time) (identities.CurrentIdentity, identity.Identity, time.Time, string, string, error) {
+func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Request) (identities.CurrentIdentity, identity.Identity, time.Time, string, string, error) {
 	var zero identity.Identity
 	if len(r.Header.Values("Authorization")) != 0 {
 		if len(r.Header.Values("Authorization")) != 1 || len(r.Header.Values("Cookie")) != 0 {
@@ -302,7 +278,8 @@ func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Reque
 		if !v.Identity.Valid(h.config.Now()) || !v.Window.Valid(h.config.Now()) || v.Window.Policy != v.Identity.Policy || v.Window.FreshUntil.After(v.Identity.ValidUntil) || v.Identity.Principal.Issuer != h.config.Issuer {
 			return nil, zero, time.Time{}, "", "", identity.ErrDenied
 		}
-		hard = identity.Earlier(hard, v.Window.TokenExpiresAt)
+		// A started response runs to the token's original bounds (ADR-312).
+		hard := v.Window.TokenExpiresAt
 		current, i, e := identities.NewBearerRequest(ctx, contentPinnedResolver{h}, token, h.config.Now)
 		if e == nil && i.Principal != v.Identity.Principal {
 			e = identity.ErrDenied
@@ -320,7 +297,7 @@ func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Reque
 	if e == nil && v.Identity.Principal.Issuer != h.config.Issuer {
 		e = identity.ErrDenied
 	}
-	return current, v.Identity, identity.Earlier(hard, v.ExpiresAt), "", cookie, e
+	return current, v.Identity, v.ExpiresAt, "", cookie, e
 }
 
 type contentPinnedResolver struct{ handler *DownloadContentHandler }

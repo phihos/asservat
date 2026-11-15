@@ -205,7 +205,7 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 		t.Fatal("original managed download charge", err)
 	}
 	session, err = downloads.LookupDownload(f.ctx, session.ID, actor.Principal)
-	if err != nil || session.Requests != 1 || session.ChargedRead <= 0 || session.AllocationID != enrollment.DownloadAllocationID {
+	if err != nil || session.Generation != 1 || session.ChargedRead <= 0 || session.AllocationID != enrollment.DownloadAllocationID {
 		t.Fatal("managed session spend not retained", err)
 	}
 }

@@ -98,9 +98,6 @@ func (s *Downloads) BeginDownloadWindow(ctx context.Context, sessionID, response
 		if e != nil {
 			return e
 		}
-		if e = renewResponseCapacity(ctx, q, current, r, now.Time); e != nil {
-			return e
-		}
 		_, r, w, e := r.BeginWindow(current, a, windowID, control.AuditStoreID, control.AuditWriteUntil, now.Time.UTC())
 		if e != nil {
 			return e
@@ -146,9 +143,6 @@ func (s *Downloads) LeaseDownloadResponse(ctx context.Context, sessionID, respon
 		}
 		now, e := q.CurrentTime(ctx)
 		if e != nil {
-			return e
-		}
-		if e = renewResponseCapacity(ctx, q, current, r, now.Time); e != nil {
 			return e
 		}
 		r, out, e = r.Lease(current, w, a, ownerID, now.Time.UTC())
@@ -236,20 +230,4 @@ func (s *Downloads) FinishDownloadWindow(ctx context.Context, i audit.DownloadWi
 		return audit.DownloadWindowAuditOutcome{}, e
 	}
 	return out, nil
-}
-
-// Reentering after a no-output lease gap reacquires the same finite stream lane.
-// A previous response admission is not permanent concurrency capacity.
-func renewResponseCapacity(ctx context.Context, q *custodydb.Queries, s artifact.DownloadSession, r artifact.DownloadResponse, now time.Time) error {
-	if now.Before(r.LeaseUntil) {
-		return nil
-	}
-	streams, e := q.DownloadStreams(ctx, custodydb.DownloadStreamsParams{RootID: id(s.Scope.RootID), PrincipalKey: principalKey(s.Scope.Principal)})
-	if e != nil {
-		return e
-	}
-	if streams.Total >= 16 || streams.Principal >= 2 {
-		return artifact.ErrDownloadCapacity
-	}
-	return nil
 }
