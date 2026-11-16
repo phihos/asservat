@@ -215,7 +215,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	}
 	accepted, err := ledger.AdmitQuery(initial.ctx, q, initial.request, initial.authority)
 	if err != nil || !accepted.Fresh {
-		t.Fatal("query admission", err)
+		t.Fatal("query admission", refusalStage(err), err)
 	}
 	if err = admission.AdmitProjectionWorker(initial.ctx, q, initial); err != nil {
 		t.Fatal("reserve/audit/claim/Job", err)

@@ -1,5 +1,19 @@
 # Sustained implementation progress
 
+## Integration tests on the simplified schema (2026-11-16)
+
+Context query admission failed for every query: `guard_context_query`
+still required the `RecoveryIssuerEpoch`/`RecoveryRevision` keys that #263
+removed from the stored query. Migration 00189 drops both from the guard
+and drops the unused `context_query_qualification_valid`, which called a
+function 00172 removed.
+Tests that exercised removed machinery are deleted: the head-specific
+blocks of the schema upgrade test, the dropped
+`capacity_context_protocol_backing` and `context_query_qualification_valid`
+checks, the removed share-expiry refusal (the adapter now clamps) and
+migration downgrades below 125. `scripts/test-custody.py --libpcap` runs the
+libpcap-tagged workflow tests. Query refusals now name the inner step.
+
 ## Static fleet trust (ADR-330 D1/D13, 2026-11-15)
 
 The fleet trust row is static installation identity that `asservat setup`

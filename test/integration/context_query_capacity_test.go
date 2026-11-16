@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,8 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// SQL qualification of one original shared logical reservation. Deployment
-// observations are fixture input; this does not measure physical resource use.
+// SQL qualification of one original shared logical reservation: one installed
+// anchor and one exact workload allocation. Deployment observations are fixture
+// input; this does not measure physical resource use.
 func TestContextQueryCapacityWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyContextQueryCapacitySQL)
 }
@@ -43,36 +43,6 @@ func syntheticQueryCapacityQualification(t *testing.T, f *capacitySQLFixture) {
 
 func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) { syntheticQueryCapacityQualification(t, f) })
-	body, _ := json.Marshal(f.qualification.ContextQuery)
-	base, _ := json.Marshal(f.qualification.RootBacking)
-	for _, mode := range []string{"original", "legacy-layout", "root-selected-target", "short-rows", "missing-worker-intent-audit", "missing-identity-wal", "unfunded", "unknown-field"} {
-		var candidate map[string]any
-		if json.Unmarshal(body, &candidate) != nil {
-			t.Fatal("decode")
-		}
-		p := candidate["Profile"].(map[string]any)
-		switch mode {
-		case "legacy-layout":
-			candidate["Format"] = "protected-context-query-qualification/v1"
-		case "root-selected-target":
-			p["Path"].(map[string]any)["TargetClusterID"] = scope.ClusterID
-		case "short-rows":
-			p["Cost"].(map[string]any)["SQLRows"] = 12
-		case "missing-worker-intent-audit":
-			p["Cost"].(map[string]any)["AuditObjects"] = 13
-		case "missing-identity-wal":
-			p["Cost"].(map[string]any)["WALBytes"] = 32 * (64 << 10) * 2
-		case "unfunded":
-			candidate["Envelope"].(map[string]any)["SQLBytes"] = 1
-		case "unknown-field":
-			p["Other"] = true
-		}
-		encoded, _ := json.Marshal(candidate)
-		var valid bool
-		if err := admin.QueryRow(ctx, "SELECT context_query_qualification_valid($1::jsonb,$2::jsonb)", encoded, base).Scan(&valid); err != nil || valid != (mode == "original") {
-			t.Fatal("closed shared qualification", mode, valid, err)
-		}
-	}
 	f.setup(t)
 	var err error
 	var acceptance, hard string

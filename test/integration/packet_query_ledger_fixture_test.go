@@ -297,7 +297,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	accepted, err := ledger.AdmitQuery(initial.ctx, q, initial.request, initial.authority)
 	if err != nil || !accepted.Fresh {
-		t.Fatal("query admission", err)
+		t.Fatal("query admission", refusalStage(err), err)
 	}
 
 	stored, found, e := ledger.LookupQueryInvocation(initial.ctx, scope.Principal, invocation.Key, invocation.RequestDigest)

@@ -263,13 +263,6 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 		t.Fatal("fresh operation changed original business replay", err, replay)
 	}
 	finish(replayOp)
-	tooLong := begin("create_share", "incompatible-original-cutoff")
-	rejected := another
-	rejected.OperationID = tooLong.ID
-	rejected.Share.ExpiresAt = tooLong.Lifecycle.OriginalPurgeAt.Add(time.Microsecond)
-	if _, _, err = store.CreateShare(ctx, rejected); !errors.Is(err, sharing.ErrRetentionCapacity) {
-		t.Fatal("incompatible original effect bound", err)
-	}
 	transferOp := begin("transfer_share", "one-transfer")
 	replacement := slices.Clone(managers)
 	slices.Reverse(replacement)

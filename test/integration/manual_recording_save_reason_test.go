@@ -312,16 +312,6 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 		t.Fatal("opaque admission/audit/replay added reason key operations", maximumKeys.seals.Load(), maximumKeys.opens.Load())
 	}
 	qualifyReasonProgress(t, ctx, f, policy, snapshot, intents, cipher, reason)
-	t.Run("populated110-down-refusal", func(t *testing.T) {
-		provider, closeProvider := source107MigrationProvider(t, f.admin)
-		defer closeProvider()
-		if _, err := provider.DownTo(ctx, 109); capacitySQLState(err) != "P0001" {
-			t.Fatal("reason downgrade was not restrictive", err)
-		}
-		if version, err := provider.GetDBVersion(ctx); err != nil || version != 110 {
-			t.Fatal("reason refusal partially changed schema", version, err)
-		}
-	})
 }
 
 // Waits against actual UTC while maintaining the fixture's existing source
