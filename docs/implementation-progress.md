@@ -32,6 +32,16 @@ combined journey the same way. Gaps: `hub.url` reaches
 the federation Service, not the console origin; the lifecycle conversations
 and tunnels share one HTTP/2 connection but work is not yet pushed on it.
 
+## Native download window deadline (2026-11-16)
+
+Native downloads failed at `content/transfer/window (invalid)` since #260:
+capacity accounts give the download control the standing date (migration
+00172), and SQL pins each window's audit `WriteUntil` to it, but the domain
+still capped `WriteUntil` at start + 24 h 5 min. The cap is removed; the
+response's own bounds end a transfer (ADR-312). Owned kind cluster
+`asservat-dl-hub` (deleted): combined `TestHelmNativeKindJourney` passes end
+to end, including the native download.
+
 ## Integration tests on the simplified schema (2026-11-16)
 
 Context query admission failed for every query: `guard_context_query`
