@@ -32,6 +32,7 @@ import (
 // authority.
 type Federation struct {
 	handler *connectorlifecycle.Handler
+	tunnel  *connectorlifecycle.TunnelHandler
 	tls     *tls.Config
 	port    int
 	closers []func()
@@ -148,11 +149,16 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
+	settings, err := newFederationSettings(c)
+	if err != nil {
+		return f, err
+	}
 	duties := connectorlifecycle.Duties{Owners: owners}
-	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{duties, c.ServiceIDs, &federationBindings{decoder, remote}}, c.Concurrency)
+	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{duties, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
+	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
 	// The serving identity is deployment-provided server authentication only;
 	// connectors authenticate with their ServiceAccount tokens.
 	pair, err := readServingPair(startup, files)
@@ -210,6 +216,7 @@ type federationServices struct {
 	connectorlifecycle.Duties
 	ids      contracts.ServiceIDs
 	bindings *federationBindings
+	*federationSettings
 }
 
 // federationBindings records connectors' AccessBinding deliveries (ADR-329)
@@ -277,6 +284,7 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 	}
 	mux := http.NewServeMux()
 	mux.Handle(connectorlifecycle.Path, f.handler)
+	mux.Handle(connectorlifecycle.TunnelPath, f.tunnel)
 	server := &http.Server{Handler: mux, TLSConfig: f.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
@@ -287,7 +295,9 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 	}
 	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 35*time.Second)
 	defer cancel()
-	_ = server.Shutdown(stop) // conversations are bounded at thirty seconds
+	// Conversations are bounded at thirty seconds; tunnels end with the
+	// shutdown's deadline.
+	_ = server.Shutdown(stop)
 	<-done
 	return nil
 }

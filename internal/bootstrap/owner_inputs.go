@@ -77,14 +77,11 @@ type ownerInputs struct {
 	// local is the combined-mode hub cluster's own context-start entry,
 	// composed at startup from the stored offer; nil otherwise.
 	local *contracts.OwnerPublicCluster
-	// release is installation.name. remote are the joined mode=cluster
-	// clusters with remoteConfig their addresses and capability Secrets;
-	// remoteOffers and remoteEntries are composed at startup from the
-	// stored offer, one per remote cluster.
+	// release is installation.name. remote are the registered mode=cluster
+	// clusters; remoteEntries are their context-start entries, composed at
+	// startup from the stored offer.
 	release       string
 	remote        []hubAPIRemoteCluster
-	remoteConfig  *contracts.HubAPIRemote
-	remoteOffers  []contracts.RegionalOffer
 	remoteEntries []contracts.OwnerPublicCluster
 }
 

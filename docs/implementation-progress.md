@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
+
+Branch `clean/join`. A workload cluster's release needs only `mode: cluster`,
+`hub.url` (+ optional `hub.caBundle`); the hub lists it in `clusters` by name
+and issuer/JWKS and derives its ID from the name. On connect the federation
+answers a `settings` conversation with the cluster and peer IDs, the stored
+offer and the cluster's own regional object-store capabilities, and relays
+tunnels (`/v1/connector-tunnel`, ServiceAccount token, ends at token expiry)
+to the owners, key service and evidence store named in the offer; the
+connector keeps its own TLS session with each inside the tunnel, so evidence
+uploads travel over the hub connection. Combined mode uses the same path
+(in-cluster federation URL, federation CA), so the connector no longer mounts
+the IDs Secret, the offer ConfigMap or object-store Secrets. Removed: the join
+Secret and its runner, `remote.*`, `region.joinSecret`/`offerConfigMap`/
+`hub.*`/`executor.evidenceSecret`, `clusters[].clusterID`, the offer's
+federation section and passthrough server names. `region.executor.
+profileAuthorization` names a local Secret. The hub.url host is added to the
+federation's generated certificate. Also fixed: since #260 the combined hub-api
+could not start (`observation-ingress` invalid: no peers and no local
+capacity handler); it now serves no observation without peers.
+
+Owned kind clusters `asservat-jn-hub`/`-work` (deleted): the work connector
+received its settings and AccessBindings were delivered; the regional
+pod-status capture in the joined cluster was collected, verified and
+published through the tunnels. `TestHelmNativeKindClusterJoin` and the
+combined `TestHelmNativeKindJourney` both then fail at native download
+(`download content refused: content/transfer/window (invalid)`,
+`BeginDownloadWindow`); origin/main with only the observation fix fails the
+combined journey the same way. Gaps: `hub.url` reaches
+the federation Service, not the console origin; the lifecycle conversations
+and tunnels share one HTTP/2 connection but work is not yet pushed on it.
+
 ## Integration tests on the simplified schema (2026-11-16)
 
 Context query admission failed for every query: `guard_context_query`
@@ -281,10 +313,8 @@ after rewriting the shared operation-audit functions without it. 00154 and 00164
 statements once the lane is gone, so downgrade probes still work.
 
 The unused `federation` values (the regional offer's connector limits) are
-removed. Gaps: the join Secret still carries the offer and copied
-object-store capabilities; cluster IDs still come from values; `hub.url`/
-`hub.caBundle` are not implemented; the node channel is in "Node channel
-stream" below.
+removed. The join Secret is gone too: see "Joined clusters without copied
+Secrets" below; the node channel is in "Node channel stream" below.
 
 ## Node channel stream (ADR-330 D2/D3, 2026-11-15)
 

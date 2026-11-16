@@ -30,6 +30,11 @@ set, else nothing: the `secrets` hook creates `<name>-<component>-tls` once
 {{- $ns := $root.Release.Namespace -}}
 {{- $secret := printf "%s-tls" $svc -}}
 {{- $dns := concat (list $svc (printf "%s.%s" $svc $ns) (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.cluster.local" $svc $ns)) (default list $tls.dnsNames) -}}
+{{- $ips := list -}}
+{{- if and (eq $component "federation") $root.Values.hub.url -}}
+{{- $host := (urlParse $root.Values.hub.url).hostname -}}
+{{- if regexMatch "^[0-9.]+$|:" $host }}{{ $ips = append $ips $host }}{{ else }}{{ $dns = append $dns $host }}{{ end -}}
+{{- end -}}
 {{- $issuer := default dict $tls.issuerRef -}}
 {{- if $tls.existingSecret -}}
 {{- else if $issuer.name }}
@@ -47,6 +52,9 @@ spec:
   privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
   usages: [server auth]
   dnsNames: {{- toYaml $dns | nindent 4 }}
+  {{- with $ips }}
+  ipAddresses: {{- toYaml . | nindent 4 }}
+  {{- end }}
   issuerRef:
     name: {{ $issuer.name | quote }}
     kind: {{ default "Issuer" $issuer.kind | quote }}
@@ -253,6 +261,7 @@ spec:
 {{- $svc := include "asservat.fullname" (list $root $component) -}}
 {{- $ns := $root.Release.Namespace -}}
 {{- $dns := concat (list $svc (printf "%s.%s" $svc $ns) (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.cluster.local" $svc $ns)) (default list $tls.dnsNames) -}}
+{{- if and (eq $component "federation") $root.Values.hub.url }}{{ $dns = append $dns (urlParse $root.Values.hub.url).hostname }}{{ end -}}
 {{- $out = append $out (dict "secret" (printf "%s-tls" $svc) "dnsNames" $dns) -}}
 {{- end -}}
 {{- end -}}

@@ -161,7 +161,7 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	}
 	// Joined mode=cluster clusters: the hub retention source, in process.
 	for _, r := range d.inputs.remote {
-		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, r.ClusterID); err != nil {
+		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, r.clusterID); err != nil {
 			return nil, &fixedStepError{"remote-cluster-topology", err}
 		}
 	}

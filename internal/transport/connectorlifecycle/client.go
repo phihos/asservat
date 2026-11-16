@@ -4,33 +4,75 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"sync"
+	"strings"
 	"time"
 )
 
-// Client is the regional side of one ADR-169 conversation. It dials the
-// pinned hub, authenticates with the connector's ServiceAccount token and answers
-// each phase request with the local in-cluster lifecycle reader. No retry.
+// Client is the connector's side of its hub connection: one HTTP/2
+// connection to the hub URL that carries the finite lifecycle conversations
+// and the tunnels to the hub's in-cluster services. Every request presents
+// the connector's ServiceAccount token (ADR-334). No retry.
 type Client struct {
-	address, host string
-	roots         *x509.CertPool
-	token         func() ([]byte, error)
+	base      string
+	http      *http.Client
+	transport *http.Transport
+	token     func() ([]byte, error)
 }
 
-// NewClient pins the hub endpoint, the server name its certificate must carry
-// and the issuer roots. The name is separate from the dialed address so an
-// installer-pinned identity survives any reachable address.
-func NewClient(endpoint, serverName string, roots *x509.CertPool, token func() ([]byte, error)) (*Client, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil || roots == nil || token == nil || serverName == "" || u.Scheme != "https" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil || u.Port() == "" {
+// NewClient dials hubURL (https, no path, query or user) and verifies the
+// hub's certificate for the URL's host against roots, or the system roots
+// when roots is nil.
+func NewClient(hubURL string, roots *x509.CertPool, token func() ([]byte, error)) (*Client, error) {
+	u, err := url.Parse(hubURL)
+	if err != nil || token == nil || u.Scheme != "https" || u.Host == "" || strings.Trim(u.Path, "/") != "" || u.RawQuery != "" || u.User != nil || u.Fragment != "" {
 		return nil, ErrChannel
 	}
-	return &Client{address: u.Host, host: serverName, roots: roots, token: token}, nil
+	t := &http.Transport{
+		Proxy:               nil,
+		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, NextProtos: []string{"h2"}},
+		ForceAttemptHTTP2:   true,
+		DialContext:         (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second, MaxResponseHeaderBytes: 4 << 10, IdleConnTimeout: 90 * time.Second,
+	}
+	return &Client{base: "https://" + u.Host, transport: t, token: token,
+		http: &http.Client{Transport: t, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+}
+
+// Close closes the idle hub connection.
+func (c *Client) Close() {
+	if c != nil {
+		c.transport.CloseIdleConnections()
+	}
+}
+
+// open starts one full-duplex request on the hub connection: body is what
+// the request streams, and the returned response is HTTP/2 200.
+func (c *Client) open(ctx context.Context, path string, header http.Header, body io.Reader) (*http.Response, error) {
+	token, err := c.token()
+	if err != nil {
+		return nil, ErrChannel
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+path, body)
+	if err != nil {
+		return nil, ErrChannel
+	}
+	for k, v := range header {
+		req.Header[k] = v
+	}
+	req.Header.Set("Authorization", "Bearer "+string(token))
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, ErrChannel
+	}
+	if resp.StatusCode != http.StatusOK || resp.ProtoMajor != 2 {
+		resp.Body.Close()
+		return nil, ErrChannel
+	}
+	return resp, nil
 }
 
 // Run returns the hub's final frame; local answers a delivery request and
@@ -40,53 +82,21 @@ func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame,
 	if c == nil || ctx == nil {
 		return zero, ErrChannel
 	}
-	token, err := c.token()
-	if err != nil {
-		return zero, ErrChannel
-	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	dialer := tls.Dialer{Config: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: c.roots, ServerName: c.host, NextProtos: []string{"h2"}}}
-	raw, err := dialer.DialContext(ctx, "tcp", c.address)
-	if err != nil {
-		return zero, ErrChannel
-	}
-	conn := raw.(*tls.Conn)
-	defer conn.Close()
-	if conn.ConnectionState().NegotiatedProtocol != "h2" {
-		return zero, ErrChannel
-	}
-	var once sync.Once
-	transport := &http.Transport{
-		DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
-			var out net.Conn
-			once.Do(func() { out = conn })
-			if out == nil {
-				return nil, errors.New("connector lifecycle connection already used")
-			}
-			return out, nil
-		},
-		ForceAttemptHTTP2: true, DisableKeepAlives: true, Proxy: nil, MaxResponseHeaderBytes: 4 << 10,
-	}
-	defer transport.CloseIdleConnections()
 	body, writer := io.Pipe()
 	defer writer.Close()
 	out := NewConn(nil, writer, nil, nil)
 	sent := make(chan error, 1)
 	go func() { sent <- out.Send(opening) }()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+c.address+Path, body)
+	resp, err := c.open(ctx, Path, http.Header{"Content-Type": {ContentType}}, body)
 	if err != nil {
-		return zero, ErrChannel
-	}
-	req.Header.Set("Content-Type", ContentType)
-	req.Header.Set("Authorization", "Bearer "+string(token))
-	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := client.Do(req)
-	if err != nil {
+		writer.CloseWithError(err)
+		<-sent
 		return zero, ErrChannel
 	}
 	defer resp.Body.Close()
-	if <-sent != nil || resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != ContentType {
+	if <-sent != nil || resp.Header.Get("Content-Type") != ContentType {
 		return zero, ErrChannel
 	}
 	in := NewConn(resp.Body, nil, nil, func(time.Time) error { return nil }) // ctx bounds the client

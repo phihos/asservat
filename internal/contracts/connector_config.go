@@ -8,76 +8,49 @@ import (
 
 // Regional connector process (ADR-168/169/170). Helm renders its
 // configuration into the ConfigMap `<name>-connector-config` (key
-// config.json), projected with the connector's tokens and credential files at
-// ConnectorConfigRoot. The process holds no hub SQL, signing or audit
-// credential; its cluster credential Secret is read and CAS-updated through
-// the API, never mounted.
+// config.json), projected with the connector's tokens at ConnectorConfigRoot.
+// The process holds no hub SQL, signing or audit credential.
 const ConnectorConfigFormat = "asservat-connector-config/v1"
 const ConnectorConfigRoot = "/run/asservat/connector"
 const ConnectorConfigFile = "config.json"
 const ConnectorConfigMaxBytes = 256 << 10
 const RegionalPodUIDEnvironment = "ASSERVAT_REGIONAL_POD_UID"
 
-// Fixed files next to config.json: the Pod-bound tokens (enrollment audience
-// and Kubernetes API), the API roots, the optional bootstrap record and the
-// executor's object-store capabilities.
+// Fixed files next to config.json: the Pod-bound tokens (hub audience and
+// Kubernetes API), the API roots and the optional hub CA bundle.
 const (
 	ConnectorKubeTokenFile = "kube.token"
 	// ConnectorHubTokenFile is the projected ServiceAccount token with the
 	// hub URL as audience that authenticates the connector (ADR-334).
 	ConnectorHubTokenFile  = "hub.token"
 	ConnectorKubeRootsFile = "kube-ca.crt"
+	// ConnectorHubRootsFile is values hub.caBundle (mode=combined: the
+	// federation's CA); without it the system roots verify the hub.
+	ConnectorHubRootsFile = "hub-ca.crt"
 
-	ConnectorEvidenceFile         = "evidence-storage.json"
-	ConnectorModeCluster          = "cluster"
-	ConnectorModeCombined         = "combined"
-	RegionalHistoryCredentialFile = "history-storage.json"
-	// Cluster mode: the hub-issued join Secret (RemoteJoinSecretName) also
-	// supplies the cluster and peer IDs and the regional offer, as files
-	// next to config.json.
-	ConnectorJoinClusterFile = "clusterID"
-	ConnectorJoinPeerFile    = "peerID"
+	ConnectorModeCluster  = "cluster"
+	ConnectorModeCombined = "combined"
 )
 
-// RemoteJoinSecretName is the hub-api's join Secret for one remote workload
-// cluster (values clusters[].name), in the hub's release namespace. The
-// operator copies it unchanged to the cluster's release namespace.
-func RemoteJoinSecretName(release, cluster string) string { return release + "-join-" + cluster }
-
-// ConnectorConfig holds only Helm values and chart constants (field map
-// class H). In cluster mode the connector reads the hub's regional offer and
-// its cluster and peer IDs from the copied join Secret's files; in combined
-// mode it reads the hub's offer ConfigMap OfferConfigMap in its own (the
-// release) namespace, dials the in-cluster Service addresses in Hub and reads
-// the generated clusterID and peerID from the IDs Secret
-// (InstallationIDsRoot). ClusterID and PeerID are never values: the startup
-// fills them. The bootstrap record itself is a Secret file, never a value.
+// ConnectorConfig holds only Helm values and chart constants. Hub is the hub
+// URL the connector dials (values hub.url; mode=combined: the in-cluster
+// federation). Its cluster and peer IDs, the hub's offer and its
+// object-store capabilities arrive from the hub on connect.
 type ConnectorConfig struct {
 	Format         string                   `json:"format"`
 	Mode           string                   `json:"mode"`
-	ClusterID      string                   `json:"clusterID,omitempty"`
-	PeerID         string                   `json:"peerID,omitempty"`
+	Hub            string                   `json:"hub"`
 	Namespace      string                   `json:"namespace"`
 	Deployment     string                   `json:"deployment"`
 	ServiceAccount string                   `json:"serviceAccount"`
 	ImageDigest    string                   `json:"imageDigest"`
-	OfferConfigMap string                   `json:"offerConfigMap,omitempty"`
-	Hub            *ConnectorHubAddresses   `json:"hub,omitempty"`
 	Executor       *ConnectorExecutorConfig `json:"executor,omitempty"`
 	Collector      *RegionalCollector       `json:"collector,omitempty"`
 }
 
-// ConnectorHubAddresses override the offer's externally exposed addresses
-// with in-cluster Service addresses (combined mode). Server names and roots
-// still come from the offer: TLS verification never depends on the address.
-type ConnectorHubAddresses struct {
-	Federation string `json:"federation"`
-	Owners     string `json:"owners"`
-	KeyService string `json:"keyService"`
-}
-
-// ConnectorExecutorConfig enables ADR-171 regional context start when the
-// offer names the regional executor.
+// ConnectorExecutorConfig enables ADR-171 regional context start.
+// ProfileAuthorization mounts profile-authorization.json from the named
+// Secret (ADR-302).
 type ConnectorExecutorConfig struct {
 	Concurrency          int                       `json:"concurrency"`
 	Alertmanager         string                    `json:"alertmanager,omitempty"`
@@ -168,25 +141,20 @@ type RegionalIdentityMapping struct {
 }
 
 type RegionalEvidenceStore struct {
-	Endpoint string `json:"endpoint"`
-	// ServerName, when set, is the name the endpoint's certificate carries
-	// (the in-cluster Service name behind a TCP passthrough address).
-	ServerName string   `json:"serverName,omitempty"`
-	Roots      [][]byte `json:"roots"`
-	Region     string   `json:"region"`
-	Bucket     string   `json:"bucket"`
-	StoreID    string   `json:"storeID"`
+	Endpoint string   `json:"endpoint"`
+	Roots    [][]byte `json:"roots"`
+	Region   string   `json:"region"`
+	Bucket   string   `json:"bucket"`
+	StoreID  string   `json:"storeID"`
 }
 
 // RegionalWrapService is the hub cluster's local key service for the artifact
-// purpose (ADR-176). The connector presents its own client leaf; each wrap is
-// authorized for one prepared attempt.
+// purpose (ADR-176). The connector presents its ServiceAccount token; each
+// wrap is authorized for one prepared attempt.
 type RegionalWrapService struct {
-	Endpoint string `json:"endpoint"`
-	// ServerName as RegionalEvidenceStore.ServerName.
-	ServerName string   `json:"serverName,omitempty"`
-	Roots      [][]byte `json:"roots"`
-	KeyID      string   `json:"keyID"`
+	Endpoint string   `json:"endpoint"`
+	Roots    [][]byte `json:"roots"`
+	KeyID    string   `json:"keyID"`
 }
 
 // RegionalContextOwners pins the hub's native listener address and its exact
@@ -194,14 +162,6 @@ type RegionalWrapService struct {
 type RegionalContextOwners struct {
 	Address       string             `json:"address"`
 	Configuration OwnerConfiguration `json:"configuration"`
-}
-
-// RegionalHubEndpoint pins the federation endpoint, the server name its
-// certificate must carry and its issuer roots, independently of the address.
-type RegionalHubEndpoint struct {
-	Endpoint   string   `json:"endpoint"`
-	ServerName string   `json:"serverName"`
-	Roots      [][]byte `json:"roots"`
 }
 
 // RegionalProfileEndpointCredential is public policy, never header material.

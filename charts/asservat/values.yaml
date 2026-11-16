@@ -100,29 +100,19 @@ exposure:
     parentRefs: []
     annotations: {}
 
-# Workload clusters joined with `mode: cluster` (hub or combined releases).
-# Their connectors authenticate with their own ServiceAccount tokens
-# (ADR-334); the hub verifies them against the issuer below. The hub-api
-# keeps the join Secret `<name>-join-<name>` with the cluster's IDs, offer
-# and object-store capabilities.
+# Workload clusters installed with `mode: cluster` (hub or combined
+# releases). Their connectors authenticate with their own ServiceAccount
+# tokens (ADR-334); the hub verifies them against the issuer below and
+# derives each cluster's ID from its name. Nothing is copied between
+# clusters.
 clusters: []
-# - name: payments-eu        # DNS label; names the join Secret
-#   clusterID: ""            # a lowercase UUID you choose (uuidgen)
+# - name: payments-eu        # DNS label; how people and policies name it
 #   issuer: https://eu-apiserver.example  # its ServiceAccount issuer
 #   # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
 #   # connector: asservat-system/asservat-connector  # default <namespace>/<name>-connector
 #   # revoked: true          # refuse its tokens
 #   namespace: ""            # its release namespace; default: this one
 #   standby: 2               # context-start standby connections
-
-# How joined clusters reach this hub. TCP passthrough to the Services
-# (LoadBalancer, NodePort or a TLS-passthrough route): connectors verify the
-# in-cluster names, so never terminate TLS in front of them.
-remote:
-  federation: ""   # https://host:port -> <name>-federation:9446
-  owners: ""       # host:port         -> <name>-hub-api-native:9444
-  keyService: ""   # https://host:port -> <name>-key-service:9447
-  objectStore: ""  # https://host:port -> the evidence object store
 
 # Evidence capacity (specs/capacity.md). Every field is optional and
 # changes apply on helm upgrade; an external object store needs
@@ -151,40 +141,18 @@ workloadKeys: {}
 # maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
 retention: {}
 
-# Regional connector (mode=cluster or mode=combined).
-# mode=cluster: register the cluster in the hub's `clusters` values and copy
-# the hub's join Secret `<name>-join-<cluster>` unchanged into this release's
-# namespace; joinSecret names it. It carries the cluster and peer IDs, the
-# hub's regional offer and the executor's object-store capabilities; set
-# hub.federation to the hub's remote.federation URL. The connector
-# authenticates with its ServiceAccount token (ADR-334), no credential.
-# mode=combined: the connector uses the generated `<name>-ids` clusterID and
-# peerID.
+# Regional connector (mode=cluster or mode=combined). mode=cluster: set
+# hub.url to the hub to join and register this cluster in the hub's
+# `clusters` values. The connector authenticates with its ServiceAccount
+# token (ADR-334); the hub sends its IDs and settings on connect.
 region:
   enabled: false
-  # mode=cluster only: the copied join Secret.
-  joinSecret: ""
-  # mode=combined only: the hub's offer ConfigMap in the release namespace.
-  # hub: the addresses the connector dials; empty values use the chart's
-  # Service names (mode=combined). In mode=cluster hub.federation is the
-  # hub's remote.federation URL and the connector's token audience.
-  offerConfigMap: ""
-  hub:
-    federation: ""
-    owners: ""
-    keyService: ""
-  # Regional context start (ADR-171), used when the offer names the
-  # regional executor.
+  # Regional context start (ADR-171).
   executor:
     enabled: true
     concurrency: 4
-    # mode=cluster: Secret with evidence-storage.json and
-    # history-storage.json (and profile-authorization.json with
-    # profileAuthorization); default: the join Secret. mode=combined uses
-    # `<name>-s3-regional-write` and `<name>-s3-regional-history` (key
-    # credentials.json).
-    evidenceSecret: ""
-    profileAuthorization: false
+    # Secret in this namespace with profile-authorization.json (ADR-302).
+    profileAuthorization: ""
     # ADR-231: in-cluster Alertmanager base URL for alert policies.
     alertmanager: ""
     # ADR-245: identity mapping records (adds SubjectAccessReview create).
@@ -219,6 +187,15 @@ collector:
 # Hub workloads (mode hub or combined). Every hub component renders in the
 # release namespace; replicas: 0 stops one.
 hub:
+  # The hub URL connectors dial (one HTTPS endpoint, REQ-FED-002).
+  # mode=cluster: the hub to join. Hub releases with `clusters`: the URL
+  # workload clusters use; its host is added to the federation's generated
+  # serving certificate. Today it reaches the federation Service
+  # (hub.federation.service), not the console's Ingress.
+  url: ""
+  # mode=cluster: PEM roots for hub.url when the system roots do not
+  # verify it.
+  caBundle: ""
   hub-api:
     replicas: 1
     connections: 4
@@ -229,8 +206,7 @@ hub:
     nodeSelector: {}
     tolerations: []
     # Owner native/operation listener for connectors and download workers.
-    # ClusterIP for single-cluster installs; NodePort or LoadBalancer for
-    # remote regions.
+    # Workload clusters reach it through hub.url.
     nativeService:
       type: ClusterIP
       annotations: {}
@@ -286,8 +262,7 @@ hub:
       limits: {cpu: "1", memory: 512Mi}
     nodeSelector: {}
     tolerations: []
-    # ClusterIP for single-cluster installs; NodePort or LoadBalancer when
-    # remote regions dial the federation directly.
+    # NodePort or LoadBalancer to expose hub.url to workload clusters.
     service:
       type: ClusterIP
       nodePort: null
@@ -331,7 +306,7 @@ hub:
       # download workers (hub.download-worker, enabled by default).
       enabled: true
       # Retention topology ConfigMaps by target cluster; the cluster catalog
-      # adds joined regions.
+      # adds registered clusters.
       retentionTopologies: []
   # Asynchronous publication verifier (no listener).
   publisher:
@@ -416,8 +391,7 @@ services:
       rootsPEM: ""
     seaweedfs:
       image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
-      # The S3 Service. NodePort or LoadBalancer when joined clusters
-      # (clusters, remote.objectStore) write evidence.
+      # The S3 Service. Workload clusters reach it through hub.url.
       service:
         type: ClusterIP
         nodePort: null

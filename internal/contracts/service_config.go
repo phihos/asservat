@@ -63,6 +63,16 @@ type FederationConfig struct {
 	Concurrency     int             `json:"concurrency"`
 	Postgres        ServicePostgres `json:"postgres"`
 	ConnectorTokens ConnectorTokens `json:"connectorTokens"`
+	// LocalStorage names the combined-mode connector's object-store
+	// capability Secrets; registered clusters use RemoteObjectStoreSecret.
+	LocalStorage *FederationStorageSecrets `json:"localStorage,omitempty"`
+}
+
+// FederationStorageSecrets are a cluster's regional write and history
+// capability Secrets (key credentials.json).
+type FederationStorageSecrets struct {
+	Write   string `json:"write"`
+	History string `json:"history"`
 }
 
 // ConnectorTokens is how a hub process verifies connector ServiceAccount
@@ -79,10 +89,10 @@ type ConnectorTokens struct {
 }
 
 // FederationCluster is one registered workload cluster: public data only.
-// Without JWKS the hub discovers the issuer's keys.
+// Without JWKS the hub discovers the issuer's keys. Its cluster ID derives
+// from the name (RemoteClusterID).
 type FederationCluster struct {
 	Name      string `json:"name"`
-	ClusterID string `json:"clusterID"`
 	Issuer    string `json:"issuer"`
 	JWKS      string `json:"jwks,omitempty"`
 	Connector string `json:"connector"`
@@ -106,8 +116,8 @@ type KeyServiceConfig struct {
 // the topologies (plus the catalog's joined slots) bound retention.
 type KeyServiceDownloadsConfig struct {
 	RetentionTopologies []ServiceTopology `json:"retentionTopologies"`
-	// RemoteClusters are the joined mode=cluster clusters' IDs; each gets
-	// the in-process topology of the hub retention source.
+	// RemoteClusters are the registered mode=cluster clusters' names; each
+	// gets the in-process topology of the hub retention source.
 	RemoteClusters []string `json:"remoteClusters,omitempty"`
 }
 

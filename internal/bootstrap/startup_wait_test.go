@@ -2,22 +2,12 @@ package bootstrap
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
@@ -67,54 +57,5 @@ func TestWaitStartupStopsWithContext(t *testing.T) {
 	}, nil)
 	if err == nil || n != 3 {
 		t.Fatal(err, n)
-	}
-}
-
-// Issue 3: Helm renders the combined-mode offer ConfigMap empty and the
-// hub-api fills it later. The connector waits for it instead of exiting; a
-// written but malformed offer stays fatal.
-func TestCombinedOfferWaitsUntilTheHubWritesIt(t *testing.T) {
-	fastStartupWait(t)
-	offer := connectorTestOffer(t, nil)
-	raw, _ := json.Marshal(offer)
-	var reads atomic.Int32
-	var body atomic.Value
-	body.Store("")
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if n := reads.Add(1); n == 1 {
-			http.NotFound(w, r) // the release has not rendered it yet
-			return
-		} else if n == 4 {
-			body.Store(string(raw))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: "asservat-regional-offer"}, Data: map[string]string{contracts.RegionalOfferFile: body.Load().(string)}})
-	}))
-	defer server.Close()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, contracts.ConnectorKubeTokenFile), []byte("synthetic-only"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	files, err := os.OpenRoot(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer files.Close()
-	in := &providerInputs{files: files, kubernetesEndpoint: contracts.OwnerProviderEndpoint{Endpoint: server.URL, Roots: [][]byte{server.Certificate().Raw}}}
-	var lines []string
-	var got contracts.RegionalOffer
-	err = waitStartup(t.Context(), "connector", func(s string) { lines = append(lines, s) }, func(ctx context.Context) (err error) {
-		got, err = readCombinedOffer(ctx, in, "asservat-region", "asservat-regional-offer")
-		return err
-	}, nil)
-	if err != nil || got.InstallationID != offer.InstallationID || reads.Load() != 4 {
-		t.Fatal("offer wait", err, reads.Load())
-	}
-	if len(lines) != 3 || !strings.Contains(lines[0], "get/404") || !strings.Contains(lines[1], "at pending") || !strings.Contains(lines[2], "ok after 3") {
-		t.Fatalf("lines %q", lines)
-	}
-	body.Store("{not json")
-	if _, err = readCombinedOffer(t.Context(), in, "asservat-region", "asservat-regional-offer"); !errors.Is(err, cfg.ErrInvalid) || startupRetryable(err) {
-		t.Fatal("malformed offer retried", err)
 	}
 }

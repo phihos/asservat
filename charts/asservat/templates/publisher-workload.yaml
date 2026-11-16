@@ -8,7 +8,7 @@
 {{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
 {{- end }}
 {{- $remote := list }}
-{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .clusterID }}{{ end }}
+{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .name }}{{ end }}
 {{- $store := $p.objectStore }}
 {{- $config := toJson (dict
   "name" $n

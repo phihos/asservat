@@ -251,7 +251,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		}
 	})
 	token := func() ([]byte, error) { return []byte(contextStartTestToken), nil }
-	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, net.JoinHostPort(localIP, strconv.Itoa(port)), owners, connector, token, runner.Process, 1, time.Now)
+	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, net.JoinHostPort(localIP, strconv.Itoa(port)), (&net.Dialer{}).DialContext, owners, connector, token, runner.Process, 1, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}

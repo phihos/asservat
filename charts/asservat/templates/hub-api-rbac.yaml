@@ -34,30 +34,6 @@ rules:
     resources: [configmaps]
     resourceNames: [{{ printf "%s-regional-offer" $n | quote }}]
     verbs: [get, update]
-  {{- if .Values.clusters }}
-  # Joined clusters: the hub-api creates each join Secret when it is missing
-  # (create cannot be limited by name), keeps its public values current and
-  # copies the cluster's two regional object-store capabilities into it.
-  - apiGroups: [""]
-    resources: [secrets]
-    verbs: [create]
-  - apiGroups: [""]
-    resources: [secrets]
-    resourceNames:
-      {{- range .Values.clusters }}
-      - {{ printf "%s-join-%s" $n .name | quote }}
-      {{- end }}
-    # watch: the join runner reacts to the Secret's deletion or change.
-    verbs: [get, update, list, watch]
-  - apiGroups: [""]
-    resources: [secrets]
-    resourceNames:
-      {{- range .Values.clusters }}
-      - {{ printf "%s-s3-regional-write-%s" $n .name | quote }}
-      - {{ printf "%s-s3-regional-history-%s" $n .name | quote }}
-      {{- end }}
-    verbs: [get]
-  {{- end }}
   {{- end }}
   - apiGroups: [asservat.io]
     resources: [debugpolicies]

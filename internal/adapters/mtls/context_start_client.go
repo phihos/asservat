@@ -63,10 +63,11 @@ type OwnerPeerAuthenticator interface {
 // NewContextStartClient dials one installer-pinned host:port with the exact
 // SNI and HTTP authority of each owner (ADR-157/172). connector is this
 // process's identity; token reads the current projected ServiceAccount token.
-func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, address string, owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+// dial opens the raw connection to address (the connector's hub tunnel).
+func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, address string, dial func(context.Context, string, string) (net.Conn, error), owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
 	host, port, e := net.SplitHostPort(address)
 	number, pe := strconv.Atoi(port)
-	if e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || owners == nil {
+	if e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || owners == nil || dial == nil {
 		return nil, value.ErrInvalid
 	}
 	if ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || !connector.Valid() || token == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
@@ -80,7 +81,7 @@ func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 		return nil, e
 	}
 	root, cancel := context.WithCancel(ctx)
-	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, address: address, connector: connector, token: token, process: process, now: now, dial: (&net.Dialer{}).DialContext, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
+	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, address: address, connector: connector, token: token, process: process, now: now, dial: dial, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
 }
 
 // ContextStartExchange owns the actual one-socket HTTP/2 request. The transport

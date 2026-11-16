@@ -44,7 +44,7 @@ PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "sta
                "regionalOffer"}
 # Files the loader and runtime open under each mount.
 INPUT_FILES = {"sql-owner-runtime.json", "owner-pod.token", "kube-observer.token", "provider-auth.token", "provider-audit-storage.json",
-               "kube-ca.crt", "postgres-ca.crt", "audit-store-ca.crt", "key-service-ca.crt", "identity-ca.crt", "federation-ca.crt", "download-key-service-ca.crt"}
+               "kube-ca.crt", "postgres-ca.crt", "audit-store-ca.crt", "key-service-ca.crt", "identity-ca.crt", "download-key-service-ca.crt"}
 PUBLIC_SQL = ["hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"]
 
 
@@ -112,8 +112,7 @@ class HubAPI(unittest.TestCase):
         public = config["public"]
         self.assertEqual((public["origin"], public["browserAudience"]), ("https://asservat.example.test", "asservat-console"))
         self.assertTrue(public["processing"])
-        self.assertEqual(public["regionalOffer"]["federation"], f"https://asservat-federation.{NS}.svc:9446")
-        self.assertNotIn("connector", public["regionalOffer"])
+        self.assertEqual(set(public["regionalOffer"]), {"image"})
         text = cm["config.json"].lower()
         for forbidden in ["uid", "guard", "activation", "installationid", "auditkey", "role\"", "mount"]:
             self.assertNotIn(forbidden, text)
@@ -155,7 +154,7 @@ class HubAPI(unittest.TestCase):
         self.assertEqual(vols["ids"]["secret"]["secretName"], "asservat-ids")
         self.assertEqual(files(vols["inputs"]), INPUT_FILES)
         sources = json.dumps(vols["inputs"])
-        for secret in ["asservat-key-service-tls", "asservat-sql-hub-api", "asservat-s3-owner-audit", "asservat-postgres-state", "asservat-objectstore-state", "asservat-openbao-state", "keycloak-tls", "asservat-federation-tls"]:
+        for secret in ["asservat-key-service-tls", "asservat-sql-hub-api", "asservat-s3-owner-audit", "asservat-postgres-state", "asservat-objectstore-state", "asservat-openbao-state", "keycloak-tls"]:
             self.assertIn(f'"{secret}"', sources)
         self.assertIn('"asservat-owner-provider"', sources)
         self.assertEqual(files(vols["observation"]), {"worker-controls.json", "native-kube-asservat-downloads.token"})

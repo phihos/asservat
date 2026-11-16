@@ -19,17 +19,7 @@ HELM_ARGS = os.environ.get("ASSERVAT_HELM_ARGS", "").split()
 BUNDLED = {"keyService": {"provider": "openbao"}, "objectStore": {"provider": "seaweedfs"},
            "postgres": {"provider": "bundled", "bundled": {"image": "registry.example/postgres@sha256:" + "b" * 64}},
            "identity": {"provider": "keycloak", "keycloak": {"hostname": "https://login.example.invalid", "tlsSecretName": "login-tls"}}}
-JOIN = "asservat-join-work"
-HUB = "https://hub.example.invalid:31446"
-CLUSTER, PEER = "50000000-0000-4000-8000-000000000001", "50000000-0000-4000-8000-000000000002"
-OFFER = {"format": "asservat-regional-offer/v1", "installationID": "10000000-0000-4000-8000-000000000001", "hubClusterID": "10000000-0000-4000-8000-000000000030",
-         "permissionRootID": "10000000-0000-4000-8000-000000000003", "issuerEpoch": "10000000-0000-4000-8000-000000000004",
-         "federation": {"endpoint": "https://hub.example.invalid:31446", "serverName": "federation.example.invalid", "roots": ["AQ=="]},
-         "connectorServerSuffix": "connectors.example.invalid", "connectorIssuerRoots": ["AQ=="],
-         "roles": {"source": "a", "journal": "b", "acknowledgement": "c", "cleanup": "d", "verifier": "e", "finalizer": "f"}, "connectorBacking": {},
-         "image": "registry.example/asservat@" + DIGEST, "owners": {"address": "hub.example.invalid:31447", "configuration": {}},
-         "keyService": {"endpoint": "https://keys.example.invalid:31448", "roots": ["AQ=="], "keyID": "k"},
-         "evidenceStore": {"endpoint": "https://s3.example.invalid", "roots": ["AQ=="], "region": "r", "bucket": "b", "storeID": "10000000-0000-4000-8000-000000000014"}}
+HUB = "https://hub.example.invalid"
 
 
 def render(values, namespace, ok=True):
@@ -43,12 +33,12 @@ def render(values, namespace, ok=True):
 
 
 def base(mode, **region):
-    """mode=cluster reads IDs and offer from the copied join Secret (ADR-331)
-    and names the hub's URL as its token audience (ADR-334); mode=combined
-    takes the IDs from the IDs Secret."""
-    ids = {"joinSecret": JOIN, "hub": {"federation": HUB}} if mode == "cluster" else {}
+    """mode=cluster dials hub.url, its token audience (ADR-334); its IDs and
+    settings arrive from the hub on connect."""
     v = {"mode": mode, "image": {"repository": "registry.example/asservat", "digest": DIGEST},
-         "region": {"enabled": True, **ids, **region}, "collector": {"enabled": True}}
+         "region": {"enabled": True, **region}, "collector": {"enabled": True}}
+    if mode == "cluster":
+        v["hub"] = {"url": HUB}
     if mode == "combined":
         v["origin"], v["services"] = "https://asservat.example.invalid", BUNDLED
         v["exposure"] = {"tlsSecret": "console-tls"}
@@ -68,7 +58,7 @@ def rules(role):
     return {(g, r, v) for rule in role["rules"] for g in rule.get("apiGroups", []) for r in rule["resources"] for v in rule["verbs"]}
 
 
-def check_common(docs, ns, executor=True, audience="https://hub.example.invalid:31446"):
+def check_common(docs, ns, executor=True, audience=HUB):
     d = find(docs, "Deployment", "asservat-connector")
     pod = d["spec"]["template"]["spec"]
     assert pod["automountServiceAccountToken"] is False and pod["securityContext"]["runAsNonRoot"] is True
@@ -114,30 +104,34 @@ def check_common(docs, ns, executor=True, audience="https://hub.example.invalid:
 
 def main():
     configs = []
-    # mode=cluster with an executor offer.
-    docs = render(base("cluster", executor={"enabled": True, "evidenceSecret": "operator-evidence"}), "asservat-region")
+    # mode=cluster: hub.url and its optional CA bundle; nothing copied.
+    v = base("cluster", executor={"enabled": True, "profileAuthorization": "operator-profiles"})
+    v["hub"]["caBundle"] = "-----BEGIN CERTIFICATE-----\n"
+    docs = render(v, "asservat-region")
     c = check_common(docs, "asservat-region")
-    assert c["mode"] == "cluster" and not {"offer", "offerConfigMap", "clusterID", "peerID", "hub"} & set(c) and c["executor"]["concurrency"] == 4
+    assert c["mode"] == "cluster" and c["hub"] == HUB and not {"offer", "clusterID", "peerID"} & set(c) and c["executor"]["concurrency"] == 4, c
+    assert find(docs, "ConfigMap", "asservat-connector-config")["data"]["hub-ca.crt"] == v["hub"]["caBundle"]
+    pod = find(docs, "Deployment", "asservat-connector")["spec"]["template"]["spec"]
+    sources = next(x for x in pod["volumes"] if x["name"] == "inputs")["projected"]["sources"]
+    assert [x["secret"]["name"] for x in sources if "secret" in x] == ["operator-profiles"], sources
     assert not [d for d in docs if d["kind"] == "PriorityClass"], "download workers rendered in a regional release"
     configs.append(c)
-    # A plain offer installs no executor objects.
     docs = render(base("cluster", executor={"enabled": False}), "asservat-region")
     c = check_common(docs, "asservat-region", executor=False)
     assert "executor" not in c
     configs.append(c)
-    # mode=combined: in-cluster addresses, the hub's offer ConfigMap, generated S3 principals, download workers.
+    # mode=combined: the in-cluster federation and its CA; no IDs mount.
     docs = render(base("combined"), "asservat")
     c = check_common(docs, "asservat", audience="https://asservat-federation.asservat.svc:9446")
-    assert "clusterID" not in c and "peerID" not in c
+    assert c["hub"] == "https://asservat-federation.asservat.svc:9446" and "clusterID" not in c, c
     pod = find(docs, "Deployment", "asservat-connector")["spec"]["template"]["spec"]
-    assert {"name": "ids", "secret": {"secretName": "asservat-ids", "defaultMode": 0o440}} in pod["volumes"]
-    assert {"name": "ids", "mountPath": "/run/asservat/ids", "readOnly": True} in pod["containers"][0]["volumeMounts"]
-    assert c["hub"] == {"federation": "https://asservat-federation.asservat.svc:9446", "owners": "asservat-hub-api-native.asservat.svc:9444", "keyService": "https://asservat-key-service.asservat.svc:9447"}
-    assert c["offerConfigMap"] == "asservat-regional-offer" and "offer" not in c
+    assert not [x for x in pod["volumes"] if x["name"] == "ids"]
+    sources = next(x for x in pod["volumes"] if x["name"] == "inputs")["projected"]["sources"]
+    assert [x["secret"] for x in sources if "secret" in x] == [{"name": "asservat-federation-tls", "items": [{"key": "ca.crt", "path": "hub-ca.crt"}]}], sources
     role = find(docs, "Role", "asservat-connector")
-    assert [r for r in role["rules"] if r["resources"] == ["configmaps"]][0] == {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["asservat-regional-offer"], "verbs": ["get"]}
-    sources = next(v for v in pod["volumes"] if v["name"] == "inputs")["projected"]["sources"]
-    assert {s["secret"]["name"] for s in sources if "secret" in s} == {"asservat-s3-regional-write", "asservat-s3-regional-history"}
+    assert not [r for r in role["rules"] if r["resources"] == ["configmaps"]]
+    federation = rules(find(docs, "Role", "asservat-federation"))
+    assert ("", "secrets", "get") in federation
     pc = find(docs, "PriorityClass", "asservat-download-worker")
     assert pc["value"] == 0 and pc["preemptionPolicy"] == "Never"
     profile = json.loads(find(docs, "ConfigMap", "asservat-worker-profile")["data"]["worker-profile.json"])
@@ -151,12 +145,9 @@ def main():
     assert find(docs, "RoleBinding", "asservat-downloads-hub-api")["subjects"][0] == {"kind": "ServiceAccount", "namespace": "asservat", "name": "asservat-hub-api"}
     configs.append(c)
     # Refusals.
-    for bad, ns in [(base("hub"), "asservat"), ({**base("cluster"), "region": {"enabled": True}}, "asservat-region"),
-                    ({**base("cluster"), "region": {**base("cluster")["region"], "bootstrapSecret": "operator-bootstrap"}}, "asservat-region"),
-                    ({**base("cluster"), "region": {"enabled": True, "joinSecret": JOIN}}, "asservat-region"),
-                    ({**base("combined"), "region": {**base("combined")["region"], "joinSecret": JOIN}}, "asservat"),
-                    ({**base("combined"), "region": {**base("combined")["region"], "offer": json.dumps(OFFER)}}, "asservat"),
-                    ({**base("combined"), "region": {**base("combined")["region"], "executor": {"profileAuthorization": True}}}, "asservat"),
+    for bad, ns in [(base("hub"), "asservat"), ({**base("cluster"), "hub": {}}, "asservat-region"),
+                    ({**base("cluster"), "region": {"enabled": True, "joinSecret": "asservat-join-work"}}, "asservat-region"),
+                    ({**base("combined"), "region": {**base("combined")["region"], "hub": {"federation": HUB}}}, "asservat"),
                     ({**base("combined"), "image": {"repository": "r", "digest": ""}}, "asservat")]:
         render(bad, ns, ok=False)
     # The Go loader decodes and validates every rendered config.
@@ -172,7 +163,7 @@ def main():
         env["TMPDIR"] = str(tmp)
         r = subprocess.run(["go", "test", "-count=1", "-run", "TestRenderedConnectorConfigDecodes", "./internal/bootstrap/"], cwd=ROOT, env=env, text=True, capture_output=True, timeout=600)
         assert r.returncode == 0 and "no tests to run" not in r.stdout, r.stdout + r.stderr
-    print("helm region templates OK: cluster join (executor, plain), combined, refusals, Go loader decode")
+    print("helm region templates OK: cluster (executor, plain), combined, refusals, Go loader decode")
 
 
 if __name__ == "__main__":

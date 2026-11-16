@@ -63,27 +63,21 @@ func (o *hubAPIRegionalOffer) setOwners(pool value.OwnerPool, revision int64, ro
 		Namespace: contracts.WorkerObjectReference{Name: pool.Namespace, UID: pool.NamespaceUID}, Service: contracts.WorkerObjectReference{Name: pool.Service, UID: pool.ServiceUID},
 		Deployment: contracts.WorkerObjectReference{Name: pool.Deployment, UID: pool.DeploymentUID}, ServiceAccount: contracts.WorkerObjectReference{Name: pool.ServiceAccount, UID: pool.AccountUID},
 		Port: pool.Port, NativePort: pool.NativePort, NativeBootstrap: pool.NativeBootstrap, NativeCandidateLimit: pool.NativeCandidateLimit, OperationPort: pool.OperationPort, IssuerRoots: roots}}
-	if offered, err := o.offer.RegionalExecutorOffered(); err != nil || !offered {
+	if !o.offer.Complete() {
 		return mounts.ErrUnavailable
 	}
 	return nil
 }
 
-// buildHubAPIRegionalOffer derives the plain connector offer (no regional
-// executor section) from the config, the IDs and the connector roots.
-func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.HubAPIConfig, ids hubAPIIDs, now time.Time) (*hubAPIRegionalOffer, error) {
+// buildHubAPIRegionalOffer derives the offer's identity fields from the
+// config and the IDs; addExecutor and setOwners complete it.
+func buildHubAPIRegionalOffer(h contracts.HubAPIConfig, ids hubAPIIDs) *hubAPIRegionalOffer {
 	if h.Public == nil || h.Public.RegionalOffer == nil {
-		return nil, nil
+		return nil
 	}
 	o := h.Public.RegionalOffer
-	federationRoots, err := readCA(ctx, files, contracts.HubAPIFederationCAFile, now)
-	if err != nil {
-		return nil, err
-	}
-	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: ids.InstallationID, HubClusterID: ids.ClusterID, PermissionRootID: ids.PermissionRootID, IssuerEpoch: ids.IssuerEpoch,
-		Federation: contracts.RegionalHubEndpoint{Endpoint: o.Federation, ServerName: o.ServerName, Roots: federationRoots},
-		Image:      o.Image}
-	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, release: h.Name, hubOnly: o.HubOnly}, nil
+	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: ids.InstallationID, HubClusterID: ids.ClusterID, PermissionRootID: ids.PermissionRootID, IssuerEpoch: ids.IssuerEpoch, Image: o.Image}
+	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, release: h.Name, hubOnly: o.HubOnly}
 }
 
 func (o *hubAPIRegionalOffer) write(ctx context.Context, api kubernetes.Interface, raw string) error {
