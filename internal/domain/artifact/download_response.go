@@ -15,11 +15,6 @@ const (
 	DownloadPartialWindows      int64 = 1024
 	MaxDownloadWindows                = MaxDownloadOutput/DownloadWindowBytes + DownloadPartialWindows
 	MaxDownloadWindowAuditBytes       = 2 * MaxDownloadWindows * DownloadWindowAuditBytes
-	// MaxDownloadWindowWrite bounds a window's audit write deadline, which SQL
-	// pins to its control allocation's AuditWriteUntil. A protected-capacity
-	// control lives up to its 24 h admission plus the 5 min audit grace, so the
-	// former 8 h + 5 min response bound refused every capacity-backed window.
-	MaxDownloadWindowWrite = 24*time.Hour + 5*time.Minute
 )
 
 // DownloadControlAllocation is protected configuration, independent of evidence
@@ -103,6 +98,9 @@ func (s DownloadSession) BeginResponse(a DownloadAuthority, r DownloadResponse, 
 
 // A window is prepaid accounting, not a five-second disclosure lease. Its
 // separately acknowledged encrypted intent must precede any contained byte.
+// WriteUntil is the control allocation's AuditWriteUntil, which SQL pins; a
+// capacity account's control carries the standing date, so it has no upper
+// bound here (ADR-312: the response's own bounds end the transfer).
 type DownloadWindow struct {
 	ID, ResponseID, SessionID, OwnerID, AuditStoreID string
 	Generation, Ordinal, Offset, Length, ReadLimit   int64
@@ -119,7 +117,7 @@ type DownloadWindowOutcome struct {
 }
 
 func (w DownloadWindow) Valid() bool {
-	if !uuid(w.ID) || !uuid(w.ResponseID) || !uuid(w.SessionID) || !uuid(w.OwnerID) || !uuid(w.AuditStoreID) || w.Generation < 1 || w.Ordinal < 1 || w.Ordinal > MaxNativeBytes/DownloadWindowBytes || w.Offset < 0 || w.Offset > MaxNativeBytes || w.Length < 0 || w.Length > DownloadWindowBytes || w.Length > MaxNativeBytes-w.Offset || w.ReadLimit < 1 || w.ReadLimit > MaxDownloadReadWork || !w.Authority.Valid(w.StartedAt) || !w.WriteUntil.After(w.StartedAt) || w.WriteUntil.After(w.StartedAt.Add(MaxDownloadWindowWrite)) {
+	if !uuid(w.ID) || !uuid(w.ResponseID) || !uuid(w.SessionID) || !uuid(w.OwnerID) || !uuid(w.AuditStoreID) || w.Generation < 1 || w.Ordinal < 1 || w.Ordinal > MaxNativeBytes/DownloadWindowBytes || w.Offset < 0 || w.Offset > MaxNativeBytes || w.Length < 0 || w.Length > DownloadWindowBytes || w.Length > MaxNativeBytes-w.Offset || w.ReadLimit < 1 || w.ReadLimit > MaxDownloadReadWork || !w.Authority.Valid(w.StartedAt) || !w.WriteUntil.After(w.StartedAt) {
 		return false
 	}
 	if w.Outcome == nil {

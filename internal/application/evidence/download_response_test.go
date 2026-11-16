@@ -402,17 +402,17 @@ func TestResponseTransferEmptyNativeStillHasOneAuditedWindow(t *testing.T) {
 	}
 }
 
-// Installed native91: the window's audit deadline is its protected-capacity
-// control's, about 24 h ahead; the content transfer must accept it, and a
-// refused window names its stage for the operator report.
+// The window's audit deadline is its capacity control's standing date
+// (migration 00172); the content transfer must accept it, and a refused
+// window names its stage for the operator report.
 func TestResponseTransferAcceptsCapacityControlWindowDeadline(t *testing.T) {
 	f, s, r := newResponseTransferFixture(t, 2)
-	f.windowWrite = f.now.Add(24*time.Hour + 30*time.Second)
+	f.windowWrite = time.Date(9970, 1, 1, 0, 0, 30, 0, time.UTC)
 	if e := s.Transfer(context.Background(), f, r, f, f); e != nil || f.s.State != artifact.DownloadCompleted {
 		t.Fatal("capacity control window deadline refused the transfer", e)
 	}
 	f, s, r = newResponseTransferFixture(t, 2)
-	f.windowWrite = f.now.Add(artifact.MaxDownloadWindowWrite + time.Second)
+	f.windowWrite = f.now
 	e := s.Transfer(context.Background(), f, r, f, f)
 	var fixed interface{ FixedStep() string }
 	if !errors.Is(e, artifact.ErrInvalid) || !errors.As(e, &fixed) || fixed.FixedStep() != "window" {
