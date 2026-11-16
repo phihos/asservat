@@ -27,9 +27,10 @@ import (
 type helmNativeKind struct {
 	Kubeconfig, Namespace, NodeIP, ConsoleCAFile, KeycloakCAFile string
 	ConsolePort                                                  int
-	// WorkKubeconfig and WorkClusterID name a second cluster joined with
-	// mode=cluster (TestHelmNativeKindClusterJoin only).
-	WorkKubeconfig, WorkClusterID string
+	// WorkKubeconfig is a second cluster installed with mode=cluster and
+	// registered in the hub's values as "work"
+	// (TestHelmNativeKindClusterJoin only).
+	WorkKubeconfig string
 }
 
 // TestHelmNativeKindJourney drives the real user journey against a running
@@ -59,7 +60,7 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 	if err != nil || json.Unmarshal(raw, &k) != nil {
 		t.Fatal("kind description", err)
 	}
-	if joined && (k.WorkKubeconfig == "" || k.WorkClusterID == "") {
+	if joined && k.WorkKubeconfig == "" {
 		t.Skip("no joined workload cluster described")
 	}
 	t.Setenv("ASSERVAT_HELM_BUNDLED_IDENTITY", "1")
@@ -98,7 +99,8 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, cluster = kubernetes.NewForConfigOrDie(work), k.WorkClusterID
+		// ADR-335 D4: the hub derives the cluster ID from its name.
+		target, cluster = kubernetes.NewForConfigOrDie(work), contracts.RemoteClusterID(installation, "work")
 	}
 	workload := createHelmNativeWorkload(t, ctx, target)
 	if joined {

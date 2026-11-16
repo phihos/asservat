@@ -63,6 +63,16 @@ type FederationConfig struct {
 	Concurrency     int             `json:"concurrency"`
 	Postgres        ServicePostgres `json:"postgres"`
 	ConnectorTokens ConnectorTokens `json:"connectorTokens"`
+	// LocalStorage names the combined-mode connector's object-store
+	// capability Secrets; registered clusters use RemoteObjectStoreSecret.
+	LocalStorage *FederationStorageSecrets `json:"localStorage,omitempty"`
+}
+
+// FederationStorageSecrets are a cluster's regional write and history
+// capability Secrets (key credentials.json).
+type FederationStorageSecrets struct {
+	Write   string `json:"write"`
+	History string `json:"history"`
 }
 
 // ConnectorTokens is how a hub process verifies connector ServiceAccount

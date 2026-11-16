@@ -52,8 +52,8 @@ data:
 {{- end }}
 {{- if and (include "asservat.hubApi.offer" .) .Values.origin }}
 ---
-# The hub's regional offer (contracts.RegionalOffer) for the combined-mode
-# connector and the joined clusters' join Secrets. hub-api writes
+# The hub's regional offer (contracts.RegionalOffer); the federation sends it
+# to connectors on connect. hub-api writes
 # regional-offer.json once its provider values exist; Helm only creates the
 # object and keeps it.
 apiVersion: v1

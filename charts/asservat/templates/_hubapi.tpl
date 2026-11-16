@@ -43,18 +43,18 @@
 {{- end -}}
 
 {{/* True when the hub publishes its regional offer: mode=combined or
-     remote clusters joined with mode=cluster (values clusters). */}}
+     registered mode=cluster clusters (values clusters). */}}
 {{- define "asservat.hubApi.offer" -}}
 {{- if or (include "asservat.hubApi.combined" .) (and (include "asservat.hub" .) .Values.clusters) }}true{{ end -}}
 {{- end -}}
 
-{{/* The joined remote clusters (contracts.RemoteCluster, JSON list). */}}
+{{/* The registered mode=cluster clusters (contracts.RemoteCluster, JSON
+     list); the hub derives their IDs from the names. */}}
 {{- define "asservat.hubApi.clusters" -}}
 {{- $root := . -}}
 {{- $out := list -}}
 {{- range .Values.clusters -}}
-{{- if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" (toString .clusterID)) }}{{ fail (printf "clusters[%s].clusterID must be a lowercase UUID (uuidgen)" (toString .name)) }}{{ end -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "clusterID" .clusterID "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" $root))))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" $root))))) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -95,19 +95,15 @@
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if include "asservat.hubApi.offer" . -}}
-{{- $fed := include "asservat.fullname" (list . "federation") -}}
-{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) -}}
+{{- $offer := dict "image" (include "asservat.image" .) -}}
 {{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
-{{- if .Values.clusters -}}
-{{- $r := .Values.remote -}}
-{{- $_ := set $offer "remote" (dict "federation" (required "clusters require remote.federation" $r.federation) "owners" (required "clusters require remote.owners" $r.owners) "keyService" (required "clusters require remote.keyService" $r.keyService) "objectStore" (required "clusters require remote.objectStore" $r.objectStore)) -}}
-{{- end -}}
+{{- if .Values.clusters }}{{ $_ := required "clusters need hub.url, the URL workload clusters dial" .Values.hub.url }}{{ end -}}
 {{- $_ := set $pub "regionalOffer" $offer -}}
 {{- end -}}
 {{- $_ := set $c "public" $pub -}}
 {{- end -}}
 {{- with include "asservat.hubApi.clusters" . | fromJsonArray -}}
-{{- if not $.Values.origin }}{{ fail "clusters require origin (the hub-api issues their bootstraps)" }}{{ end -}}
+{{- if not $.Values.origin }}{{ fail "clusters require origin" }}{{ end -}}
 {{- $_ := set $c "clusters" . -}}
 {{- end -}}
 {{- toJson $c -}}

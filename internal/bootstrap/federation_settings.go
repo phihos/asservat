@@ -29,6 +29,7 @@ type federationSettings struct {
 	ids               contracts.ServiceIDs
 	// names maps a registered cluster's ID to its name.
 	names map[string]string
+	local *contracts.FederationStorageSecrets
 	mu    sync.Mutex
 	offer *contracts.RegionalOffer
 }
@@ -46,7 +47,7 @@ func newFederationSettings(c federationInputs) (*federationSettings, error) {
 	for _, r := range c.ConnectorTokens.Clusters {
 		names[contracts.RemoteClusterID(c.InstallationID, r.Name)] = r.Name
 	}
-	return &federationSettings{api: api, namespace: c.Namespace, prefix: c.Name, ids: c.ServiceIDs, names: names}, nil
+	return &federationSettings{api: api, namespace: c.Namespace, prefix: c.Name, ids: c.ServiceIDs, names: names, local: c.LocalStorage}, nil
 }
 
 // stored reads the hub-api's offer once: the first written offer never
@@ -91,8 +92,18 @@ func (s *federationSettings) Settings(ctx context.Context, p value.ConnectorClus
 	if p.InstallationID != s.ids.InstallationID {
 		return out, mounts.ErrUnavailable
 	}
-	secret := func(purpose string) string { return s.prefix + "-s3-" + purpose }
-	if p.ClusterID != s.ids.ClusterID {
+	var secret func(string) string
+	if p.ClusterID == s.ids.ClusterID {
+		if s.local == nil {
+			return out, mounts.ErrUnavailable
+		}
+		secret = func(purpose string) string {
+			if purpose == "regional-write" {
+				return s.local.Write
+			}
+			return s.local.History
+		}
+	} else {
 		name, ok := s.names[p.ClusterID]
 		if !ok {
 			return out, mounts.ErrUnavailable

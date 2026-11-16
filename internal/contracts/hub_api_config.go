@@ -183,10 +183,6 @@ type HubAPIRegionalOffer struct {
 	HubOnly bool `json:"hubOnly,omitempty"`
 }
 
-// HubAPIFederationCAFile is the federation serving CA (combined mode) in
-// OwnerDeploymentRoot; the offer publishes it as the federation roots.
-const HubAPIFederationCAFile = "federation-ca.crt"
-
 // HubAPIName is "<name>-<suffix>": the chart's object name scheme.
 func HubAPIName(name, suffix string) string { return name + "-" + suffix }
 

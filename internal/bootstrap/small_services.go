@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
+	"net"
 	"os"
 	"slices"
 	"strings"
@@ -592,7 +593,18 @@ func servingTLSMaterial(name string, dns []string, now time.Time) (map[string][]
 	if err != nil {
 		return nil, err
 	}
-	leaf := &x509.Certificate{SerialNumber: serial(), Subject: pkix.Name{CommonName: dns[0]}, DNSNames: dns, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0),
+	// A name that is an IP address (hub.url on a node or load-balancer IP)
+	// becomes an IP SAN.
+	var names []string
+	var ips []net.IP
+	for _, n := range dns {
+		if ip := net.ParseIP(n); ip != nil {
+			ips = append(ips, ip)
+		} else {
+			names = append(names, n)
+		}
+	}
+	leaf := &x509.Certificate{SerialNumber: serial(), Subject: pkix.Name{CommonName: dns[0]}, DNSNames: names, IPAddresses: ips, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0),
 		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	leafDER, err := x509.CreateCertificate(rand.Reader, leaf, ca, &key.PublicKey, caKey)
 	if err != nil {

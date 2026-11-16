@@ -346,7 +346,11 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if e != nil {
 			return nil, errors.Join(mounts.ErrUnavailable, e)
 		}
-		observation = &OwnerObservationServingConfig{Pin: pin, Workloads: workload, Peers: peers}
+		// The local capacity observation is gone (capacity from Helm values,
+		// #260): without peers there is nothing to serve.
+		if len(peers) > 0 {
+			observation = &OwnerObservationServingConfig{Pin: pin, Workloads: workload, Peers: peers}
+		}
 	}
 	phase = startupOwnerRuntime
 	var readinessProofs app.OwnerEnrollmentProofReader
