@@ -27,7 +27,8 @@ pod-status capture in the joined cluster was collected, verified and
 published through the tunnels. `TestHelmNativeKindClusterJoin` and the
 combined `TestHelmNativeKindJourney` both then fail at native download
 (`download content refused: content/transfer/window (invalid)`,
-`BeginDownloadWindow`), independent of this change. Gaps: `hub.url` reaches
+`BeginDownloadWindow`); origin/main with only the observation fix fails the
+combined journey the same way. Gaps: `hub.url` reaches
 the federation Service, not the console origin; the lifecycle conversations
 and tunnels share one HTTP/2 connection but work is not yet pushed on it.
 
