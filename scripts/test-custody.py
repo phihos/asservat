@@ -30,6 +30,9 @@ INSTALLED_EVIDENCE_DELETE_BUCKET = "synthetic-installed-evidence-delete"
 # first-level subtests are split by first character, so a new subtest always
 # lands in exactly one shard. scripts/test-custody-shard-selection.py checks
 # that every selected top-level test and subtest runs in exactly one shard.
+# --libpcap builds the integration package with the libpcap tag (the packet
+# workflow tests) against the pinned static archive from `make libpcap`.
+GO_TAGS = []
 CUSTODY_PATTERN = "Test(Custody|PermissionAuthority|ContextAdmission|PeerRegistry|Enrollment)"
 CONTEXT_ADMISSION_TEST = "^TestContextAdmissionWithRealServices$"
 CUSTODY_SHARDS = {
@@ -243,7 +246,7 @@ def main(fleet=False, test_pattern=None, scoped_audit=False, owner_audit_invento
                 incarnation = json.loads(run(["docker", "exec", pgname, "psql", "-U", "postgres", "-d", database, "-At", "-c", "SELECT json_build_object('serverStart',pg_postmaster_start_time(),'databaseOID',oid) FROM pg_database WHERE datname=current_database()"] ))
                 with log_path.open("a") as log:
                     test_started = time.monotonic()
-                    result = subprocess.run(["go", "test", "-race", "-count=1", "-timeout="+str(test_timeout)+"s", "-v", "-run", pattern, "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=test_timeout+60)
+                    result = subprocess.run(["go", "test", *GO_TAGS, "-race", "-count=1", "-timeout="+str(test_timeout)+"s", "-v", "-run", pattern, "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=test_timeout+60)
                     test_elapsed = time.monotonic() - test_started
                 exit_code = result.returncode
                 all_passed = passed_test_names(log_path.read_text(), pattern)
@@ -308,7 +311,13 @@ if __name__ == "__main__":
     parser.add_argument("--run", help="Go test name regex for an owned targeted fixture; default runs the complete suite")
     parser.add_argument("--shard", choices=sorted(CUSTODY_SHARDS), help="Run one CI shard of the complete custody suite (CUSTODY_SHARDS)")
     parser.add_argument("--result-name", help="test/results file prefix, so two local runs (for example two shards) do not share a log")
+    parser.add_argument("--libpcap", action="store_true", help="Build with the libpcap tag (make libpcap first)")
     args=parser.parse_args()
+    if args.libpcap:
+        prefix = Path(os.environ.get("LIBPCAP_PREFIX", Path.home()/".cache/asservat-build/libpcap-1.11.0"))
+        if not (prefix/"lib/libpcap.a").is_file(): parser.error(f"--libpcap needs {prefix}/lib/libpcap.a (make libpcap)")
+        GO_TAGS[:] = ["-tags", "libpcap"]
+        os.environ.update({"CGO_ENABLED": "1", "CGO_CFLAGS": f"-I{prefix}/include", "CGO_LDFLAGS": f"-L{prefix}/lib"})
     if args.shard:
         if args.run or args.fleet or args.scoped_audit or args.owner_audit_inventory or args.native_statistics: parser.error("--shard owns its exact test selection")
         args.run, args.result_name = CUSTODY_SHARDS[args.shard], args.result_name or "custody-" + args.shard

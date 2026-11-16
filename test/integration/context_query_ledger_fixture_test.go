@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -460,4 +461,13 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 		clients = append(clients, privacy.DownloadClient{Issuer: "https://id.example.test", ID: name, Kind: identity.Human, DataClasses: classes, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: evidenceTypes, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}})
 	}
 	return privacy.DownloadPolicy{RootID: p.root, InstallationID: p.installation, RecoveryEpoch: p.epoch, Revision: x.WorkerConfiguration, ProtectionDigest: artifact.Digest{41}, PermittedRegions: []string{"local"}, Paths: []artifact.DownloadPath{path}, Clients: clients, Operators: []privacy.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "console", Kind: "User", ID: "fixture"}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
+}
+
+// refusalStage names the fixed product refusal step, if the error carries one.
+func refusalStage(err error) string {
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		return step.FixedStep()
+	}
+	return ""
 }
