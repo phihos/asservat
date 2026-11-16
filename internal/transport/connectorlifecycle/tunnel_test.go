@@ -3,9 +3,11 @@ package connectorlifecycle
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -14,22 +16,21 @@ import (
 
 type tunnelTokens struct{ until time.Time }
 
-func (t tunnelTokens) VerifyConnectorUntil(_ context.Context, token string) (value.ConnectorCluster, time.Time, error) {
+func (t *tunnelTokens) VerifyConnectorUntil(_ context.Context, token string) (value.ConnectorCluster, time.Time, error) {
 	if token != "synthetic-token" {
 		return value.ConnectorCluster{}, time.Time{}, value.ErrDenied
 	}
 	return value.ConnectorCluster{}, t.until, nil
 }
 
-// The tunnel relays a connector's byte stream to an allowed hub service over
-// the hub connection; other targets and tokens are refused, and the token's
-// expiry ends it.
-func TestTunnelRelaysOnlyAllowedTargets(t *testing.T) {
+// tunnelFixture serves the tunnel over real HTTP/2 to a local echo service.
+func tunnelFixture(t *testing.T) (*Client, string, *httptest.Server, *x509.CertPool, *tunnelTokens) {
+	t.Helper()
 	echo, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer echo.Close()
+	t.Cleanup(func() { echo.Close() })
 	go func() {
 		for {
 			c, err := echo.Accept()
@@ -45,30 +46,39 @@ func TestTunnelRelaysOnlyAllowedTargets(t *testing.T) {
 	server := httptest.NewUnstartedServer(h)
 	server.EnableHTTP2 = true
 	server.StartTLS()
-	defer server.Close()
+	t.Cleanup(server.Close)
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
 	client, err := NewClient(server.URL, roots, syntheticToken)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	t.Cleanup(client.Close)
+	return client, allowed, server, roots, tokens
+}
+
+func echoOnce(t *testing.T, conn net.Conn, msg string) {
+	t.Helper()
+	if _, err := conn.Write([]byte(msg)); err != nil {
+		t.Fatal("write", err)
+	}
+	got := make([]byte, len(msg))
+	if _, err := io.ReadFull(conn, got); err != nil || string(got) != msg {
+		t.Fatal("echo", string(got), err)
+	}
+}
+
+// The tunnel relays a connector's byte stream to an allowed hub service over
+// the hub connection; other targets and tokens are refused, and the token's
+// expiry ends it.
+func TestTunnelRelaysOnlyAllowedTargets(t *testing.T) {
+	client, allowed, server, roots, tokens := tunnelFixture(t)
 	conn, err := client.DialTunnel(t.Context(), "tcp", allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Write([]byte("ping")); err != nil {
-		t.Fatal(err)
-	}
-	got := make([]byte, 4)
-	if _, err = io.ReadFull(conn, got); err != nil || string(got) != "ping" {
-		t.Fatal("echo", string(got), err)
-	}
-	// A deadline ends the tunnel.
-	_ = conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
-	if _, err = conn.Read(got); err == nil {
-		t.Fatal("read after the deadline")
-	}
+	defer conn.Close()
+	echoOnce(t, conn, "ping")
 	if _, err = client.DialTunnel(t.Context(), "tcp", "127.0.0.1:1"); err == nil {
 		t.Fatal("unlisted target relayed")
 	}
@@ -77,13 +87,75 @@ func TestTunnelRelaysOnlyAllowedTargets(t *testing.T) {
 	if _, err = stranger.DialTunnel(t.Context(), "tcp", allowed); err == nil {
 		t.Fatal("unknown token relayed")
 	}
-	// An expired token ends the relay at once.
 	tokens.until = time.Now()
-	if conn, err = client.DialTunnel(t.Context(), "tcp", allowed); err == nil {
-		_, _ = conn.Write([]byte("x"))
-		if _, err = io.ReadFull(conn, got[:1]); err == nil {
+	if late, err := client.DialTunnel(t.Context(), "tcp", allowed); err == nil {
+		_, _ = late.Write([]byte("x"))
+		if _, err = io.ReadFull(late, make([]byte, 1)); err == nil {
 			t.Fatal("relay past the token's expiry")
 		}
-		conn.Close()
+		late.Close()
+	}
+}
+
+// Deadlines follow net.Conn: per direction, an expired one fails only the
+// blocked call with os.ErrDeadlineExceeded and the stream stays usable.
+func TestTunnelDeadlinesArePerDirection(t *testing.T) {
+	client, allowed, _, _, _ := tunnelFixture(t)
+	conn, err := client.DialTunnel(t.Context(), "tcp", allowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	buf := make([]byte, 1)
+
+	// An expired read deadline fails the read; writes still work.
+	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Millisecond))
+	if _, err = conn.Read(buf); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatal("read deadline", err)
+	}
+	if _, err = conn.Write([]byte("a")); err != nil {
+		t.Fatal("write after a read deadline", err)
+	}
+	// Clearing the read deadline restores reads on the same stream.
+	_ = conn.SetReadDeadline(time.Time{})
+	if _, err = io.ReadFull(conn, buf); err != nil || buf[0] != 'a' {
+		t.Fatal("read after clearing", err)
+	}
+
+	// A write deadline does not affect reads, and clearing the read
+	// deadline keeps the write deadline.
+	_ = conn.SetWriteDeadline(time.Now().Add(time.Hour))
+	_ = conn.SetReadDeadline(time.Now().Add(time.Hour))
+	_ = conn.SetReadDeadline(time.Time{})
+	echoOnce(t, conn, "b")
+	_ = conn.SetWriteDeadline(time.Now().Add(-time.Second))
+	if _, err = conn.Write([]byte("c")); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatal("expired write deadline", err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Millisecond))
+	if _, err = conn.Read(buf); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatal("read deadline beside an expired write deadline", err)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	echoOnce(t, conn, "d")
+}
+
+// Close with pending deadlines ends the tunnel and the conn at once.
+func TestTunnelCloseStopsDeadlines(t *testing.T) {
+	client, allowed, _, _, _ := tunnelFixture(t)
+	conn, err := client.DialTunnel(t.Context(), "tcp", allowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetDeadline(time.Now().Add(time.Hour))
+	tc := conn.(*tunnelConn)
+	if err = conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Read(make([]byte, 1)); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatal("read after close", err)
+	}
+	if err = tc.Conn.SetDeadline(time.Now()); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatal("deadline after close", err)
 	}
 }

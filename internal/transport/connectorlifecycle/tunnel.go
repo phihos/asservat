@@ -110,7 +110,9 @@ func (f flushWriter) Write(p []byte) (int, error) {
 }
 
 // DialTunnel opens a tunnel to address (host:port) over the hub connection.
-// The returned conn is a plain byte stream; deadlines close it.
+// The returned conn has net.Pipe semantics: separate read and write
+// deadlines that fail the blocked call with os.ErrDeadlineExceeded and keep
+// the stream open.
 func (c *Client) DialTunnel(ctx context.Context, _, address string) (net.Conn, error) {
 	if c == nil || ctx == nil {
 		return nil, ErrChannel
@@ -126,6 +128,7 @@ func (c *Client) DialTunnel(ctx context.Context, _, address string) (net.Conn, e
 		resp, err := c.open(stream, TunnelPath, http.Header{TunnelHeader: {address}}, body)
 		done <- result{resp, err}
 	}()
+	var resp *http.Response
 	select {
 	case r := <-done:
 		if r.err != nil {
@@ -133,55 +136,35 @@ func (c *Client) DialTunnel(ctx context.Context, _, address string) (net.Conn, e
 			writer.Close()
 			return nil, r.err
 		}
-		return &tunnelConn{r: r.resp.Body, w: writer, cancel: cancel, address: address}, nil
+		resp = r.resp
 	case <-ctx.Done():
 		cancel()
 		writer.Close()
 		return nil, ctx.Err()
 	}
+	local, remote := net.Pipe()
+	go func() {
+		_, _ = io.Copy(writer, remote)
+		_ = writer.Close()
+	}()
+	go func() {
+		_, _ = io.Copy(remote, resp.Body)
+		_ = remote.Close()
+	}()
+	return &tunnelConn{Conn: local, stop: func() { cancel(); _ = writer.Close(); _ = resp.Body.Close(); _ = remote.Close() }}, nil
 }
 
+// tunnelConn is the caller's end of a net.Pipe whose other end relays the
+// tunnel stream; Close also ends the stream.
 type tunnelConn struct {
-	r       io.ReadCloser
-	w       *io.PipeWriter
-	cancel  context.CancelFunc
-	address string
-	mu      sync.Mutex
-	timer   *time.Timer
-	once    sync.Once
+	net.Conn
+	once sync.Once
+	stop func()
 }
 
-func (t *tunnelConn) Read(p []byte) (int, error)  { return t.r.Read(p) }
-func (t *tunnelConn) Write(p []byte) (int, error) { return t.w.Write(p) }
 func (t *tunnelConn) Close() error {
-	t.once.Do(func() {
-		t.cancel()
-		_ = t.w.Close()
-		_ = t.r.Close()
-	})
-	return nil
+	_ = t.Conn.SetDeadline(time.Time{}) // stops the pipe's deadline timers
+	err := t.Conn.Close()
+	t.once.Do(t.stop)
+	return err
 }
-func (t *tunnelConn) LocalAddr() net.Addr  { return tunnelAddr("connector") }
-func (t *tunnelConn) RemoteAddr() net.Addr { return tunnelAddr(t.address) }
-
-// SetDeadline closes the tunnel at t: every caller uses a deadline as the
-// connection's end, never to resume after a timeout.
-func (t *tunnelConn) SetDeadline(at time.Time) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.timer != nil {
-		t.timer.Stop()
-		t.timer = nil
-	}
-	if !at.IsZero() {
-		t.timer = time.AfterFunc(time.Until(at), func() { _ = t.Close() })
-	}
-	return nil
-}
-func (t *tunnelConn) SetReadDeadline(at time.Time) error  { return t.SetDeadline(at) }
-func (t *tunnelConn) SetWriteDeadline(at time.Time) error { return t.SetDeadline(at) }
-
-type tunnelAddr string
-
-func (a tunnelAddr) Network() string { return "asservat-tunnel" }
-func (a tunnelAddr) String() string  { return string(a) }
