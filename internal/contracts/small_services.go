@@ -34,15 +34,10 @@ type SecretsPlan struct {
 	// download workers' namespace (Pods mount only their own namespace's
 	// Secrets), immutable, created once.
 	DownloadStore *SecretsCopy `json:"downloadStore,omitempty"`
-	// RemoteClusters are the joined mode=cluster clusters (values
+	// RemoteClusters are the registered mode=cluster cluster names (values
 	// clusters): with the bundled object store each gets its own regional
 	// capabilities, scoped to its cluster ID (RemoteObjectStoreSecret).
-	RemoteClusters []SecretsRemoteCluster `json:"remoteClusters,omitempty"`
-}
-
-type SecretsRemoteCluster struct {
-	Name      string `json:"name"`
-	ClusterID string `json:"clusterID"`
+	RemoteClusters []string `json:"remoteClusters,omitempty"`
 }
 
 // RemoteObjectStorePrincipals are a joined cluster's regional executor

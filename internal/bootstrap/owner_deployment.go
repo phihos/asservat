@@ -74,8 +74,6 @@ type OwnerDeployment struct {
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	// remoteJoins keep the joined mode=cluster clusters' join Secrets.
-	remoteJoins []*remoteJoinSecret
 	shared      publicShared
 	// localControls are the control documents this process wrote (the
 	// hub-local download workers'); the trust catalog holds them beside the
@@ -234,21 +232,15 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 			}
 			in.local = &local
 		}
-		// Joined mode=cluster clusters: the same derived entry with their own
-		// IDs and namespace, and the offer their join Secret carries.
+		// Registered mode=cluster clusters: the same derived entry with their
+		// own IDs and namespace. Their connectors receive the stored offer
+		// from the federation on connect.
 		for _, r := range in.remote {
-			entry, e := catalogCluster(stored, in.offer.offer.Image, r.ClusterID, r.peerID, r.Namespace, in.release, r.Standby, r.Captures, "remote-cluster")
+			entry, e := catalogCluster(stored, in.offer.offer.Image, r.clusterID, r.peerID, r.Namespace, in.release, r.Standby, r.Captures, "remote-cluster")
 			if e != nil {
 				return nil, e
 			}
-			offer, e := remoteJoinOffer(stored, in.remoteConfig)
-			if e != nil {
-				return nil, e
-			}
-			// ADR-331: the connector delivers the namespaces carrying a
-			// capacity key.
-			offer.Image = in.offer.offer.Image
-			in.remoteEntries, in.remoteOffers = append(in.remoteEntries, entry), append(in.remoteOffers, offer)
+			in.remoteEntries = append(in.remoteEntries, entry)
 		}
 	} else if len(in.remote) != 0 {
 		return nil, &fixedStepError{"remote-clusters-offer", mounts.ErrUnavailable}
@@ -328,9 +320,6 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
-		}
-		if d.remoteJoins, err = newRemoteClusterJoins(in); err != nil {
-			return nil, err
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
 		ids := contracts.ServiceIDs{InstallationID: c.InstallationID, ClusterID: c.ClusterID, PermissionRootID: c.PermissionRootID, PeerID: c.Native.ConnectorPeerID}
@@ -586,13 +575,6 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.recordingCollect.Run(d.root)
-		}()
-	}
-	for _, join := range d.remoteJoins {
-		d.owners.Add(1)
-		go func() {
-			defer d.owners.Done()
-			_ = join.Run(d.root, eventLog(os.Stderr, "remote cluster join "+join.display))
 		}()
 	}
 	if d.history != nil {

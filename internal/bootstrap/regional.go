@@ -15,7 +15,6 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/mtls"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -93,8 +92,8 @@ func RunRegional(ctx context.Context, podUID string) error {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	// Combined mode: the hub-api writes the offer after it starts, so the
-	// connector waits in-process instead of exiting into kubelet back-off.
+	// The hub may start after the connector: wait in-process instead of
+	// exiting into kubelet back-off.
 	var r *Regional
 	if err = waitStartup(ctx, "connector", startupLog, func(ctx context.Context) (err error) {
 		r, err = NewRegional(ctx, files, podUID)
@@ -136,21 +135,22 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 		return r, err
 	}
 	in.kubernetesEndpoint = contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: apiRoots}
-	// Combined mode: the hub's own cluster and local connector peer come
-	// from the IDs Secret (field map class S), not from values.
-	var ids contracts.InstallationIDs
-	if raw.Mode == contracts.ConnectorModeCombined {
-		if ids, err = readCombinedIDs(); err != nil {
-			return r, err
-		}
-		raw.ClusterID, raw.PeerID = ids.ClusterID, ids.PeerID
-	}
-	c, err := resolveRegionalConfig(startup, in, raw)
+	roots, err := hubRoots(startup, in)
 	if err != nil {
 		return r, err
 	}
-	if raw.Mode == contracts.ConnectorModeCombined && !combinedOfferMatches(c.offer, ids) {
-		return r, &fixedStepError{"offer-ids", mounts.ErrUnavailable}
+	hubToken := func() ([]byte, error) { return in.read(context.Background(), contracts.ConnectorHubTokenFile, 16<<10) }
+	channel, err := connectorlifecycle.NewClient(raw.Hub, roots, hubToken)
+	if err != nil {
+		return r, mounts.ErrUnavailable
+	}
+	r.closers = append(r.closers, channel.Close)
+	// The hub sends the cluster's IDs, its offer and object-store
+	// capabilities on connect; the connector restarts when it cannot reach
+	// the hub.
+	c, err := readHubSettings(startup, channel, raw)
+	if err != nil {
+		return r, err
 	}
 	// N values: the connector's own namespace, account and Deployment UIDs,
 	// read by name once.
@@ -165,15 +165,6 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	roots, _, err := mtls.OwnerTrustRoots(c.hub.Roots, time.Now())
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
-	hubToken := func() ([]byte, error) { return in.read(context.Background(), contracts.ConnectorHubTokenFile, 16<<10) }
-	channel, err := connectorlifecycle.NewClient(c.hub.Endpoint, c.hub.ServerName, roots, hubToken)
-	if err != nil {
-		return r, mounts.ErrUnavailable
-	}
 	process := value.ConnectorProcessIdentity{Binding: c.binding, PodUID: podUID, ProcessEpoch: uuid.NewString()}
 	lifecycle := &RegionalLifecycle{Client: channel, Process: process, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
 	if raw.Mode == contracts.ConnectorModeCluster {
@@ -181,7 +172,7 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	}
 	if c.executor {
 		var closers []func()
-		r.context, closers, err = newRegionalContext(startup, c, in, podUID, workload, lifecycle, hubToken)
+		r.context, closers, err = newRegionalContext(startup, c, in, podUID, workload, lifecycle, hubToken, channel.DialTunnel)
 		r.closers = append(r.closers, closers...)
 		if err != nil {
 			return r, err

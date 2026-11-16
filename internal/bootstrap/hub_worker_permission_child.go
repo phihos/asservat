@@ -198,7 +198,7 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	names := map[string]string{}
 	if c := w.config.Capacity; c != nil {
 		for _, r := range c.RemoteClusters {
-			names[r.Name] = r.ClusterID
+			names[r.Name] = contracts.RemoteClusterID(installation, r.Name)
 		}
 	}
 	observer = observer.WithClusterNames(names)

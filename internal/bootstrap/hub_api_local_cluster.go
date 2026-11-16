@@ -66,7 +66,7 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 // skew window (ADR-333); its own digests are recorded with each execution.
 func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, namespace, release string, standby, captures int, step string) (contracts.OwnerPublicCluster, error) {
 	var zero contracts.OwnerPublicCluster
-	if executor, err := stored.RegionalExecutorOffered(); err != nil || !executor {
+	if !stored.Complete() {
 		return zero, &fixedStepError{step + "-offer", mounts.ErrUnavailable}
 	}
 	parts := strings.Split(image, "@sha256:")

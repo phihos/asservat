@@ -65,16 +65,27 @@ type HubAPIConfig struct {
 }
 
 // RemoteCluster is one workload cluster an operator registered in the hub's
-// values (clusters[]): its DNS-label name (the join Secret's suffix), its
-// operator-chosen cluster ID, its release namespace and its context-start
-// reservations. The connector peer ID derives from installation and cluster
+// values (clusters[]): its DNS-label name, its release namespace and its
+// context-start reservations. Its cluster ID derives from the name
+// (RemoteClusterID, ADR-335 D4) and its connector peer from the cluster ID
 // (RemotePeerID). The release name (installation.name) is the hub's.
 type RemoteCluster struct {
 	Name      string `json:"name"`
-	ClusterID string `json:"clusterID"`
 	Namespace string `json:"namespace"`
 	Standby   int    `json:"standby"`
 	Captures  int    `json:"captures"`
+}
+
+// RemoteClusterID is a registered workload cluster's ID: a name-based UUID
+// of the installation and the cluster name (ADR-335 D4), so every hub
+// component derives it without shared state. Empty for an invalid
+// installation ID.
+func RemoteClusterID(installationID, name string) string {
+	ns, err := uuid.Parse(installationID)
+	if err != nil {
+		return ""
+	}
+	return uuid.NewSHA1(ns, []byte("asservat-cluster/v1\x00"+name)).String()
 }
 
 // RemotePeerID is a remote cluster's connector peer: a name-based UUID of
@@ -164,28 +175,12 @@ type HubAPIPublic struct {
 	RegionalOffer *HubAPIRegionalOffer `json:"regionalOffer,omitempty"`
 }
 
-// HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
-// federation endpoint and serving name and the image.
+// HubAPIRegionalOffer holds the offer's Helm-known values: the image.
 type HubAPIRegionalOffer struct {
-	Federation string `json:"federation"`
-	ServerName string `json:"serverName"`
-	Image      string `json:"image"`
-	// HubOnly is mode=hub: no local connector, so no local bootstrap or
-	// hub-cluster catalog entry; the offer serves remote clusters only.
+	Image string `json:"image"`
+	// HubOnly is mode=hub: no local connector and no hub-cluster catalog
+	// entry; the offer serves registered workload clusters only.
 	HubOnly bool `json:"hubOnly,omitempty"`
-	// Remote are the externally reachable addresses remote connectors dial
-	// (values remote.*), which the join Secret's offer carries with the
-	// in-cluster server names their certificates name.
-	Remote *HubAPIRemote `json:"remote,omitempty"`
-}
-
-// HubAPIRemote: Federation, KeyService and ObjectStore are https endpoints,
-// Owners a host:port (the hub-api native listener).
-type HubAPIRemote struct {
-	Federation  string `json:"federation"`
-	Owners      string `json:"owners"`
-	KeyService  string `json:"keyService"`
-	ObjectStore string `json:"objectStore"`
 }
 
 // HubAPIFederationCAFile is the federation serving CA (combined mode) in

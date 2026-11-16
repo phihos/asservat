@@ -339,10 +339,7 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 	if err != nil {
 		return nil, err
 	}
-	offer, err := buildHubAPIRegionalOffer(call, files, h, ids, now)
-	if err != nil {
-		return nil, err
-	}
+	offer := buildHubAPIRegionalOffer(h, ids)
 	remote, err := hubAPIRemoteClusters(h, ids)
 	if err != nil {
 		return nil, err
@@ -366,12 +363,5 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 			}
 		}
 	}
-	out := &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control, release: h.Name, remote: remote}
-	if remote != nil {
-		if !validRemoteAddresses(h.Public.RegionalOffer.Remote) {
-			return nil, hubAPIInputError("remote")
-		}
-		out.remoteConfig = h.Public.RegionalOffer.Remote
-	}
-	return out, nil
+	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer, downloadControl: control, release: h.Name, remote: remote}, nil
 }

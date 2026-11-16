@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -23,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -50,6 +48,7 @@ type regionalContext struct {
 	history   objectstore.HistoryObjects
 	owners    *RegionalLifecycle
 	token     func() ([]byte, error)
+	dial      dialFunc
 }
 
 // regionalOwnerPool converts the pinned hub owner configuration. Its pool must
@@ -65,20 +64,13 @@ func regionalOwnerPool(c regionalConfig, w contracts.OwnerConfiguration) (value.
 	return p, nil
 }
 
-// storageCredentials reads one fixed write-only object credential file per call.
-func storageCredentials(in *providerInputs, name string) aws.CredentialsProviderFunc {
-	return func(ctx context.Context) (aws.Credentials, error) {
-		var zero aws.Credentials
-		b, err := in.read(ctx, name, 32<<10)
-		if err != nil {
-			return zero, mounts.ErrUnavailable
-		}
-		defer clear(b)
-		c, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b))
-		if err != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 4096) || (c.SessionToken != "" && !identity.Text(c.SessionToken, 16384)) {
-			return zero, mounts.ErrUnavailable
-		}
-		return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "protected-regional-projection"}, nil
+// dialFunc opens a connection to one of the hub's services.
+type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
+// staticCredentials is an object-store capability the hub sent on connect.
+func staticCredentials(c contracts.OwnerStorageCredential) aws.CredentialsProviderFunc {
+	return func(context.Context) (aws.Credentials, error) {
+		return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "hub-settings"}, nil
 	}
 }
 
@@ -88,7 +80,7 @@ func storageCredentials(in *providerInputs, name string) aws.CredentialsProvider
 // let other regional reads starve the opening setup's original five seconds
 // (installed native 53). It uses the kube.WithOpeningBurst limiter (ADR-208,
 // installed native 55/57).
-func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInputs, podUID string, workload kube.ConnectorWorkload, owners *RegionalLifecycle, hubToken func() ([]byte, error)) (*regionalContext, []func(), error) {
+func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInputs, podUID string, workload kube.ConnectorWorkload, owners *RegionalLifecycle, hubToken func() ([]byte, error), dial dialFunc) (*regionalContext, []func(), error) {
 	var closers []func()
 	x := *c.Executor
 	control := cfg.NamespaceRef{Name: c.Namespace, UID: workload.NamespaceUID}
@@ -97,7 +89,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken}
+	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken, dial: dial}
 	if out.pool, err = regionalOwnerPool(c, c.owners.Configuration); err != nil {
 		return nil, closers, err
 	}
@@ -141,13 +133,17 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if out.logsClient, err = kube.NewSavedLogClient(in.kubernetes(token)); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	// The owners, key service and evidence store are the hub's in-cluster
+	// services, reached through tunnels on the hub connection; the
+	// connector's TLS session with each verifies the offer's roots.
 	a := c.store
-	storage, err := ownerHTTPNamed(a.Endpoint, a.ServerName, a.Roots)
+	storage, err := ownerHTTPNamed(a.Endpoint, "", a.Roots)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	storage.Transport.(*http.Transport).DialContext = dial
 	closers = append(closers, storage.CloseIdleConnections)
-	store, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, storageCredentials(in, contracts.ConnectorEvidenceFile), storage)
+	store, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, staticCredentials(c.evidence), storage)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -158,7 +154,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	}
 	// History is a separate purpose-limited capability in the same qualified
 	// backend/bucket. It never receives the raw evidence writer's credential.
-	metadata, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, storageCredentials(in, contracts.RegionalHistoryCredentialFile), storage)
+	metadata, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, staticCredentials(c.history), storage)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -170,7 +166,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, ServerName: c.keys.ServerName}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
+	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots}, DialContext: dial, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
 	closers = append(closers, keyTransport.CloseIdleConnections)
 	out.output = regionalArtifactOutput{store: custody, endpoint: c.keys.Endpoint, scope: authorization.KeyScope{InstallationID: c.binding.InstallationID, Purpose: "artifact", KeyID: c.keys.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, token: hubToken, now: time.Now}
 	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
@@ -185,7 +181,7 @@ func (r *regionalContext) run(ctx context.Context) error {
 	if err != nil {
 		return &fixedStepError{"execution-process", err}
 	}
-	client, err := mtls.NewContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.owners, r.owners.Process, r.token, process, r.c.Executor.Concurrency, time.Now)
+	client, err := mtls.NewContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.dial, r.owners, r.owners.Process, r.token, process, r.c.Executor.Concurrency, time.Now)
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}

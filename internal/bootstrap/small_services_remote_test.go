@@ -10,18 +10,19 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// ADR-331: with the bundled object store every joined cluster gets its own
-// regional capabilities, scoped to its cluster ID; mode=hub generates no
+// ADR-331: with the bundled object store every registered cluster gets its own
+// regional capabilities, scoped to the cluster ID derived from its name; mode=hub generates no
 // hub-cluster regional principal.
 func TestSecretsHookScopesJoinedClusterCapabilities(t *testing.T) {
-	const installation, hub, root, remote = "10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003", "50000000-0000-4000-8000-000000000001"
+	const installation, hub, root = "10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"
+	remote := contracts.RemoteClusterID(installation, "eu")
 	api := fake.NewClientset()
 	store := secretStore{api: api.CoreV1().Secrets("hub"), namespace: "hub"}
 	admin, err := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "admin", ScopeID: "10000000-0000-4000-8000-000000000009"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := contracts.SecretsPlan{Name: "asservat", Mode: "hub", ObjectStore: &contracts.SmallSeaweedPlan{Namespace: "hub", Name: "asservat"}, RemoteClusters: []contracts.SecretsRemoteCluster{{Name: "eu", ClusterID: remote}}}
+	p := contracts.SecretsPlan{Name: "asservat", Mode: "hub", ObjectStore: &contracts.SmallSeaweedPlan{Namespace: "hub", Name: "asservat"}, RemoteClusters: []string{"eu"}}
 	ids := installationIDs{"installationID": installation, "clusterID": hub, "permissionRootID": root}
 	if err = store.objectStore(t.Context(), p, ids, admin); err != nil {
 		t.Fatal(err)
@@ -41,9 +42,5 @@ func TestSecretsHookScopesJoinedClusterCapabilities(t *testing.T) {
 	config := string(iam.Data[providerconfig.SeaweedConfigKey]) + string(iam.Data[SeaweedBucketPoliciesKey])
 	if !strings.Contains(config, "asservat-regional-write-"+remote) || !strings.Contains(config, root+"/"+remote) || strings.Contains(config, "asservat-regional-write-"+hub) {
 		t.Fatal("regional principals not scoped to the joined cluster")
-	}
-	p.RemoteClusters[0].ClusterID = hub
-	if err = store.objectStore(t.Context(), p, ids, admin); err == nil {
-		t.Fatal("the hub cluster accepted as a joined cluster")
 	}
 }

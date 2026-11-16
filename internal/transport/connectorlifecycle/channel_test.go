@@ -70,11 +70,11 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	defer server.Close()
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
-	client, err := NewClient(server.URL, "example.com", roots, syntheticToken)
+	client, err := NewClient(server.URL, roots, syntheticToken)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stranger, err := NewClient(server.URL, "example.com", roots, func() ([]byte, error) { return []byte("other-token"), nil })
+	stranger, err := NewClient(server.URL, roots, func() ([]byte, error) { return []byte("other-token"), nil })
 	if err != nil {
 		t.Fatal(err)
 	}

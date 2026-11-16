@@ -70,7 +70,7 @@ func TestRegionalProfileAuthorizationPrivateFileAndPublicSource(t *testing.T) {
 
 func TestRegionalProfileAuthorizationStartupBindingAndLegacyZeroRead(t *testing.T) {
 	cluster := "00000000-0000-4000-8000-000000000001"
-	empty := regionalConfig{ConnectorConfig: contracts.ConnectorConfig{ClusterID: cluster, Executor: &contracts.ConnectorExecutorConfig{}}}
+	empty := regionalConfig{ConnectorConfig: contracts.ConnectorConfig{Executor: &contracts.ConnectorExecutorConfig{}}, ClusterID: cluster}
 	if r, err := newRegionalProfileAuthorizationReader(t.Context(), &providerInputs{}, empty); err != nil || r != nil {
 		t.Fatal("legacy startup required a credential file", err)
 	}

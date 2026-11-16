@@ -51,12 +51,13 @@ func newConnectorTokensFor(c contracts.ConnectorTokens, ids contracts.ServiceIDs
 		clusters = append(clusters, oidcadapter.ServiceAccountCluster{ClusterID: ids.ClusterID, PeerID: ids.PeerID, Discovery: config.Host, Namespace: ns, Account: account, Client: client})
 	}
 	for _, r := range c.Clusters {
-		peer, ok := contracts.RemotePeerID(ids.InstallationID, r.ClusterID)
+		cluster := contracts.RemoteClusterID(ids.InstallationID, r.Name)
+		peer, ok := contracts.RemotePeerID(ids.InstallationID, cluster)
 		ns, account, valid := split(r.Connector)
-		if !ok || !valid || r.ClusterID == ids.ClusterID {
+		if !ok || !valid {
 			return connectorTokens{}, &fixedStepError{"tokens/cluster", configuration.ErrInvalid}
 		}
-		clusters = append(clusters, oidcadapter.ServiceAccountCluster{ClusterID: r.ClusterID, PeerID: peer, Issuer: r.Issuer, JWKS: []byte(r.JWKS), Namespace: ns, Account: account})
+		clusters = append(clusters, oidcadapter.ServiceAccountCluster{ClusterID: cluster, PeerID: peer, Issuer: r.Issuer, JWKS: []byte(r.JWKS), Namespace: ns, Account: account})
 	}
 	v, err := oidcadapter.NewServiceAccountVerifier(c.Audiences, clusters)
 	if err != nil {

@@ -1,12 +1,10 @@
 package contracts
 
-import (
-	"errors"
-)
-
-// RegionalOffer is the hub's public offer to regional installers (ADR-193):
-// the federation endpoint and roots and the hub endpoints a connector
-// reaches. It holds no credential.
+// RegionalOffer is the hub's public offer to connectors: what a connector's
+// regional executor needs from the hub (owners, key service, evidence store).
+// The hub writes it into ConfigMap <name>-regional-offer; the federation
+// sends it with each connector's settings on connect. It holds no
+// credential.
 const RegionalOfferFormat = "asservat-regional-offer/v1"
 const RegionalOfferFile = "regional-offer.json"
 
@@ -16,65 +14,24 @@ type RegionalOffer struct {
 	HubClusterID     string `json:"hubClusterID"`
 	PermissionRootID string `json:"permissionRootID"`
 	IssuerEpoch      string `json:"issuerEpoch"`
-	// Federation is what the connector dials: the external endpoint, the
-	// server name and the roots of the operator's serving certificate.
-	Federation RegionalHubEndpoint `json:"federation"`
-	Image      string              `json:"image"`
-	// Owners is where regional context starts reach the hub's owners: the
-	// exposed native address and the accepted owner pool (ADR-196).
-	Owners *RegionalContextOwners `json:"owners,omitempty"`
+	Image            string `json:"image"`
+	// Owners is where context starts reach the hub's owners: the hub-api
+	// native address and the accepted owner pool (ADR-196).
+	Owners *RegionalContextOwners `json:"owners"`
 	// KeyService is the hub's artifact key service (ADR-198).
-	KeyService *RegionalWrapService `json:"keyService,omitempty"`
+	KeyService *RegionalWrapService `json:"keyService"`
 	// EvidenceStore is where regional artifacts are written (ADR-196
-	// decision 7). An offer naming Owners, KeyService and EvidenceStore
-	// installs the regional executor; one naming none installs the plain
-	// connector; any other combination is refused.
-	EvidenceStore *RegionalEvidenceStore `json:"evidenceStore,omitempty"`
-	// Capacity is the ADR-197 regional capacity section. It requires the
-	// executor section.
-	Capacity *RegionalCapacityOffer `json:"capacity,omitempty"`
+	// decision 7).
+	EvidenceStore *RegionalEvidenceStore `json:"evidenceStore"`
 }
 
-// RegionalCapacityOffer is what a region needs to serve the hub-worker's v2
-// capacity observation (ADR-197): the owner's operation address, the owner
-// pin the standby verifies and the hub's capacity selector keys.
-type RegionalCapacityOffer struct {
-	OperationAddress string                   `json:"operationAddress"`
-	Owner            RegionalOwnerObservation `json:"owner"`
-	Keys             []string                 `json:"keys"`
-	// WorkloadKeys are the workload metadata guard's keys (ADR-247).
-	WorkloadKeys *InstallerWorkloadKeys `json:"workloadKeys,omitempty"`
+// Complete reports whether the offer names every executor section.
+func (o RegionalOffer) Complete() bool {
+	return o.Owners != nil && o.KeyService != nil && o.EvidenceStore != nil
 }
-
-// RegionalOwnerObservation is the hub owner's observation pin: its accepted
-// source and its workload's template, image and guard digests (hex).
-type RegionalOwnerObservation struct {
-	SourceUID        string `json:"sourceUID"`
-	TemplateDigest   string `json:"templateDigest"`
-	ImageDigest      string `json:"imageDigest"`
-	ProtectionDigest string `json:"protectionDigest"`
-}
-
-// RegionalExecutorOffered reports whether the offer names the complete
-// executor section (true), none of it (false), or only part of it (error).
-func (o RegionalOffer) RegionalExecutorOffered() (bool, error) {
-	n := 0
-	for _, set := range []bool{o.Owners != nil, o.KeyService != nil, o.EvidenceStore != nil} {
-		if set {
-			n++
-		}
-	}
-	if n != 0 && n != 3 || o.Capacity != nil && n != 3 {
-		return false, ErrRegionalOfferPartial
-	}
-	return n == 3, nil
-}
-
-var ErrRegionalOfferPartial = errors.New("regional offer names only part of the executor section")
 
 // RegionalServingSlots and RegionalRetainedProcesses are the connector
-// deployment shape installer-cluster writes into every regional source; the
-// hub-decided backing must support it.
+// deployment shape of every catalog entry.
 const (
 	RegionalServingSlots      = 2
 	RegionalRetainedProcesses = 8
