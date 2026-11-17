@@ -28,8 +28,7 @@
       },
       "sample_type": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 64
+        "minLength": 1
       },
       "normalization": {
         "type": "string",
@@ -38,10 +37,10 @@
           "perSecond"
         ]
       },
-      "top_n": {
+      "limit": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 100
+        "maximum": 9007199254740991
       }
     },
     "required": [
@@ -54,77 +53,10 @@
     ]
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "enum": [
-          "metadata",
-          "extract"
-        ]
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/d0"
-        },
-        "maxItems": 2,
-        "minItems": 0,
-        "uniqueItems": true
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -139,13 +71,11 @@
                 "properties": {
                   "sample_type": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "unit": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "normalization": {
                     "type": "string",
@@ -167,8 +97,7 @@
                           "anyOf": [
                             {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 512
+                              "minLength": 1
                             },
                             {
                               "type": "null"
@@ -197,17 +126,14 @@
                         "incident",
                         "delta"
                       ]
-                    },
-                    "maxItems": 100
+                    }
                   },
                   "limitations": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512
-                    },
-                    "maxItems": 16
+                      "minLength": 1
+                    }
                   },
                   "aggregation": {
                     "const": "cumulative"
@@ -266,8 +192,7 @@
                         "anyOf": [
                           {
                             "type": "number",
-                            "exclusiveMinimum": 0,
-                            "maximum": 86400
+                            "exclusiveMinimum": 0
                           },
                           {
                             "type": "null"
@@ -287,13 +212,11 @@
                             "properties": {
                               "type": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                                "minLength": 1
                               },
                               "unit": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                                "minLength": 1
                               },
                               "value": {
                                 "type": "integer",
@@ -447,8 +370,7 @@
                         "anyOf": [
                           {
                             "type": "number",
-                            "exclusiveMinimum": 0,
-                            "maximum": 86400
+                            "exclusiveMinimum": 0
                           },
                           {
                             "type": "null"
@@ -468,13 +390,11 @@
                             "properties": {
                               "type": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                                "minLength": 1
                               },
                               "unit": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                                "minLength": 1
                               },
                               "value": {
                                 "type": "integer",
@@ -626,7 +546,7 @@
                   "query_expires_at": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                   }
                 },
                 "required": [
@@ -672,8 +592,7 @@
                             },
                             "duration_seconds": {
                               "type": "number",
-                              "exclusiveMinimum": 0,
-                              "maximum": 86400
+                              "exclusiveMinimum": 0
                             }
                           }
                         },
@@ -687,8 +606,7 @@
                             },
                             "duration_seconds": {
                               "type": "number",
-                              "exclusiveMinimum": 0,
-                              "maximum": 86400
+                              "exclusiveMinimum": 0
                             }
                           }
                         }
@@ -702,8 +620,7 @@
               },
               "provenance": {
                 "type": "array",
-                "minItems": 1,
-                "maxItems": 2
+                "minItems": 1
               }
             },
             "required": [
@@ -723,13 +640,12 @@
                 "properties": {
                   "query_handle": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 4096
+                    "minLength": 1
                   },
-                  "retry_after_seconds": {
+                  "revision": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 60
+                    "maximum": 9007199254740991
                   },
                   "query_observed_at": {
                     "type": "string",
@@ -739,12 +655,12 @@
                   "query_expires_at": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A status read never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                   }
                 },
                 "required": [
                   "query_handle",
-                  "retry_after_seconds",
+                  "revision",
                   "query_observed_at",
                   "query_expires_at"
                 ]
@@ -770,21 +686,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -796,8 +709,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -819,7 +731,7 @@
       }
     ],
     "$defs": {
-      "d0": {
+      "d1": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -835,6 +747,115 @@
         "required": [
           "artifactID",
           "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
         ]
       }
     }

@@ -11,7 +11,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -187,67 +186,7 @@ func (v *InvestigationContracts) ValidateBrowserOutput(name string, b []byte) er
 	return v.ValidateOutput(name, b)
 }
 func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
-	if err := v.validate(name, b, true); err != nil {
-		return err
-	}
-	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" && name != "get_pcap_summary" && name != "pcap_query" && name != "compare_profiles" && name != "get_syscall_summary" && name != "get_syscall_events" && name != "get_logs" && name != "syscall_query" {
-		return nil
-	}
-	var out struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"`
-		DataClass string `json:"data_class"`
-		Data      struct {
-			ObservedAt time.Time       `json:"query_observed_at"`
-			ExpiresAt  time.Time       `json:"query_expires_at"`
-			Tool       string          `json:"tool_name"`
-			Result     json.RawMessage `json:"result"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(b, &out) != nil {
-		return ErrInvestigationWire
-	}
-	if out.Status == "error" {
-		return nil
-	}
-	if out.Data.ObservedAt.IsZero() || !out.Data.ExpiresAt.After(out.Data.ObservedAt) || out.Data.ExpiresAt.Sub(out.Data.ObservedAt) > time.Minute {
-		return ErrInvestigationWire
-	}
-	if name != "get_query_result" || out.Status != "ok" {
-		return nil
-	}
-	// The server-selected original tool is closed at this implementation
-	// boundary. A future catalog entry cannot choose a weaker nested schema.
-	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" && out.Data.Tool != "get_pcap_summary" && out.Data.Tool != "pcap_query" && out.Data.Tool != "compare_profiles" && out.Data.Tool != "get_syscall_summary" && out.Data.Tool != "get_syscall_events" && out.Data.Tool != "get_logs" && out.Data.Tool != "syscall_query" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
-		return ErrInvestigationWire
-	}
-	if out.Data.Tool == "get_http_headers" {
-		// ADR-282: the page carries no query times; it is the same request's
-		// successful page.
-		var page struct {
-			RequestID string `json:"request_id"`
-			Status    string `json:"status"`
-		}
-		if json.Unmarshal(out.Data.Result, &page) != nil || page.Status != "ok" || page.RequestID != out.RequestID {
-			return ErrInvestigationWire
-		}
-		return nil
-	}
-	var nested struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"`
-		DataClass string `json:"data_class"`
-		Data      struct {
-			ObservedAt time.Time `json:"query_observed_at"`
-			ExpiresAt  time.Time `json:"query_expires_at"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(out.Data.Result, &nested) != nil || nested.Status != "ok" || nested.RequestID != out.RequestID ||
-		(out.Data.Tool == "get_logs" || out.Data.Tool == "pcap_query" || out.Data.Tool == "syscall_query") && nested.DataClass != out.DataClass ||
-		!nested.Data.ObservedAt.Equal(out.Data.ObservedAt) || !nested.Data.ExpiresAt.Equal(out.Data.ExpiresAt) {
-		return ErrInvestigationWire
-	}
-	return nil
+	return v.validate(name, b, true)
 }
 
 // OutputViolation names the first leaf output-schema violation by JSON
