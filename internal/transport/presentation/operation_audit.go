@@ -186,7 +186,22 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			default:
 				return OperationReply{}, auditapp.ErrUnavailable
 			}
-			return s.inner.CallWithContext(ctx, current, OperationCall{requestID: s.config.NewID()}, name, raw)
+			requestID := s.config.NewID()
+			reply, callErr := s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID}, name, raw)
+			// REQ-AUT-005: the stop writes its call row like every other
+			// operation, before any output leaves; the effect row is separate.
+			row := audit.Event{ID: s.config.NewID(), OperationID: requestID, Kind: "call", Operation: name, Actor: initial.Principal, Status: "success", Reason: "prepared", Effect: "accepted", OutputBytes: int64(len(reply.Body))}
+			if callErr != nil {
+				row.Status, row.Reason, row.Effect, row.OutputBytes = "unavailable", "authority_unavailable", "unknown", 0
+			}
+			auditCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			e := s.recorder.Record(auditCtx, row)
+			cancel()
+			if e != nil {
+				clear(reply.Body)
+				return OperationReply{}, stoppedAt("audit", e, auditapp.ErrUnavailable)
+			}
+			return reply, callErr
 		}
 	}
 	actorDigest, err := s.mac.Principal(initial.Principal)

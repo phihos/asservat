@@ -127,7 +127,9 @@ func (f *stopProjectionFixture) CancelContextDownload(context.Context, identitie
 	f.calls++
 	return f.out, nil
 }
-func TestDownloadStopRunsWithoutReadScopeOrCallAudit(t *testing.T) {
+// A stop needs no read scope and writes one call row before its reply; a
+// failed row fails the call.
+func TestDownloadStopRunsWithoutReadScopeAndWritesCallRow(t *testing.T) {
 	audited, current, gate := auditedFixture(t)
 	current.i.Scopes = []string{"openid"}
 	downloads, _, _ := downloadProjection(t)
@@ -140,10 +142,14 @@ func TestDownloadStopRunsWithoutReadScopeOrCallAudit(t *testing.T) {
 	}
 	audited.inner = combined
 	audited.stopSlots = make(chan struct{}, 4)
+	input := []byte(`{"download_id":"`+downloadID+`","idempotency_key":"same-key"}`)
+	out, e := audited.Call(t.Context(), current, "cancel_artifact_download", input)
+	if e != nil || stop.calls != 1 || len(gate.events) != 1 || gate.events[0].Kind != "call" || gate.events[0].Operation != "cancel_artifact_download" || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
+		t.Fatal(string(out.Body), e, gate.events)
+	}
 	gate.fail = true
-	out, e := audited.Call(t.Context(), current, "cancel_artifact_download", []byte(`{"download_id":"`+downloadID+`","idempotency_key":"same-key"}`))
-	if e != nil || stop.calls != 1 || len(gate.events) != 0 || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
-		t.Fatal(string(out.Body), e)
+	if failed, e := audited.Call(t.Context(), current, "cancel_artifact_download", input); e == nil || len(failed.Body) != 0 {
+		t.Fatal("stop reply left without its call row", e)
 	}
 	for _, field := range []string{"artifact_id", "filename", "sha256", "expires_at", "Completed"} {
 		if strings.Contains(string(out.Body), field) {
