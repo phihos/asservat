@@ -46,7 +46,7 @@ func downloadProjection(t *testing.T) (*ContextDownloadOperations, *downloadProj
 	now := time.Now().UTC()
 	current.i.VerifiedAt = now
 	current.i.ValidUntil = now.Add(5 * time.Second)
-	f := &downloadProjectionFixture{view: evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: downloadID, AllocationID: caseID, Scope: artifact.DownloadScope{RootID: caseID, ArtifactID: artifactID, CaptureID: caseID, ClusterID: caseID, NamespaceUID: "private-namespace", WorkloadUID: "private-workload", PodUID: "private-pod", Version: artifact.Digest{1}, Principal: current.i.Principal}, RequestDigest: artifact.Digest{2}, State: artifact.DownloadReady, CreatedAt: now.Add(-time.Minute), Deadline: now.Add(time.Minute), OutputLimit: 4096, ReadLimit: 65536}, Metadata: &artifact.NativeDownloadMetadata{Filename: "pod-status.json", Format: "application/json", ETag: `"native-version"`, Coverage: "One complete bounded pod-status snapshot.", Size: 42, SHA256: artifact.Digest{3}, ReadUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}, ValidUntil: now.Add(time.Second), AccessUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}}
+	f := &downloadProjectionFixture{view: evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: downloadID, AllocationID: caseID, Scope: artifact.DownloadScope{RootID: caseID, ArtifactID: artifactID, CaptureID: caseID, ClusterID: caseID, NamespaceUID: "private-namespace", WorkloadUID: "private-workload", PodUID: "private-pod", Version: artifact.Digest{1}, Principal: current.i.Principal}, RequestDigest: artifact.Digest{2}, State: artifact.DownloadReady, CreatedAt: now.Add(-time.Minute), Deadline: now.Add(time.Minute), OutputLimit: 4096, ReadLimit: 65536, NativeSize: 42, NativeSHA256: artifact.Digest{3}}, Metadata: &artifact.NativeDownloadMetadata{Filename: "pod-status.json", Format: "application/json", ETag: `"native-version"`, Coverage: "One complete bounded pod-status snapshot.", Size: 42, SHA256: artifact.Digest{3}, ReadUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}, ValidUntil: now.Add(time.Second), AccessUntil: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}}
 	s, e := NewContextDownloadOperations(ContextDownloadOperationsConfig{PublicOrigin: "https://console.invalid", Now: func() time.Time { return now }, NewID: func() string { return caseID }}, f)
 	if e != nil {
 		t.Fatal(e)
@@ -60,7 +60,7 @@ func TestDownloadProjectionUsesOnlyPreparedNativeGroup(t *testing.T) {
 		t.Fatalf("status: %s %v", out.Body, e)
 	}
 	var wire struct{ Data ContextDownloadData }
-	if json.Unmarshal(out.Body, &wire) != nil || wire.Data.Filename != "pod-status.json" || wire.Data.SHA256 != hash(f.view.Metadata.SHA256) || wire.Data.ContentPath != "/api/v1/downloads/"+downloadID+"/content" || wire.Data.BrowserURL != "/downloads/"+downloadID || wire.Data.State != "Ready" || wire.Data.Revision != 2 || wire.Data.SizeBytes != 42 {
+	if json.Unmarshal(out.Body, &wire) != nil || wire.Data.Filename != "pod-status.json" || wire.Data.SHA256 != hash(f.view.Metadata.SHA256) || wire.Data.ContentPath != "/api/v1/downloads/"+downloadID+"/content" || wire.Data.BrowserURL != "/downloads/"+downloadID || wire.Data.State != "Ready" || wire.Data.Revision != 2 || wire.Data.SizeBytes == nil || *wire.Data.SizeBytes != 42 {
 		t.Fatal("wrong native projection", string(out.Body))
 	}
 	for _, private := range []string{"private-namespace", "private-workload", "private-pod", "Principal", "RequestDigest", "allocation_id", "ReadLimit"} {
@@ -70,15 +70,20 @@ func TestDownloadProjectionUsesOnlyPreparedNativeGroup(t *testing.T) {
 	}
 }
 
-// Terminal sessions no longer hold the verified size and checksum every
-// canonical status carries; they report the ended state as an error result.
-func TestDownloadTerminalStatusIsCapabilityUnavailable(t *testing.T) {
+// A terminal session keeps the verified size and SHA-256 from Ready on, but
+// no links or native file fields.
+func TestDownloadTerminalStatusKeepsVerifiedFacts(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.view.Session.State = artifact.DownloadCompleted
 	f.view.Session.Deadline = c.i.VerifiedAt.Add(-time.Second)
 	f.view.Metadata = nil
 	out, e := s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`","after_revision":3}`))
-	if e != nil || strings.Contains(string(out.Body), "content_path") || !strings.Contains(string(out.Body), `"code":"CapabilityUnavailable"`) || !strings.Contains(string(out.Body), "Completed") {
+	if e != nil || strings.Contains(string(out.Body), "content_path") || strings.Contains(string(out.Body), "filename") || !strings.Contains(string(out.Body), `"state":"Completed"`) || !strings.Contains(string(out.Body), `"sha256":"`+hash(artifact.Digest{3})+`"`) || !strings.Contains(string(out.Body), `"size_bytes":42`) {
+		t.Fatal(string(out.Body), e)
+	}
+	f.view.Session.State = artifact.DownloadExpired
+	out, e = s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`"}`))
+	if e != nil || !strings.Contains(string(out.Body), `"state":"Failed"`) || !strings.Contains(string(out.Body), `"failure_reason":"Expired"`) {
 		t.Fatal(string(out.Body), e)
 	}
 }
@@ -91,15 +96,16 @@ func TestDownloadInvalidRawOrAmbiguousInputNeverDispatches(t *testing.T) {
 	}
 }
 
-// Preparing has no canonical state: prepare and status ask the caller to
-// repeat prepare with the same key.
-func TestDownloadPreparingIsRetryLater(t *testing.T) {
+// A Preparing session reports its ID and revision without native facts.
+func TestDownloadPreparingReportsSession(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.view.Session.State = artifact.DownloadPreparing
+	f.view.Session.NativeSize, f.view.Session.NativeSHA256 = 0, artifact.Digest{}
 	f.view.Metadata = nil
 	for _, in := range []string{`{"action":"prepare","artifact_id":"` + artifactID + `","idempotency_key":"key","representation":"bundle"}`, `{"action":"status","download_id":"` + downloadID + `"}`} {
 		out, e := s.Call(t.Context(), c, "download_artifact", []byte(in))
-		if e != nil || !strings.Contains(string(out.Body), `"code":"RetryLater"`) {
+		var wire struct{ Data ContextDownloadData }
+		if e != nil || json.Unmarshal(out.Body, &wire) != nil || wire.Data.State != "Preparing" || wire.Data.DownloadID != downloadID || wire.Data.Revision != 1 || wire.Data.SizeBytes != nil || wire.Data.ContentPath != "" {
 			t.Fatal(string(out.Body), e)
 		}
 	}

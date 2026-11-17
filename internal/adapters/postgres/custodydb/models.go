@@ -124,6 +124,8 @@ type ArtifactDownload struct {
 	EmittedBytes      int64
 	Generation        int64
 	ActiveBatch       pgtype.UUID
+	NativeSize        pgtype.Int8
+	NativeSha256      []byte
 }
 
 type ArtifactDownloadStop struct {

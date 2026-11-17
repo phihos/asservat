@@ -90,18 +90,19 @@ type installedJourneyFailure struct {
 }
 
 // installedJourneyPreparing reports whether a download_artifact reply is the
-// RetryLater of a session still preparing: the caller repeats prepare with
-// the same idempotency key.
+// ok reply of a session still Preparing: the caller repeats prepare with the
+// same idempotency key (or follows it with status).
 func installedJourneyPreparing(reply installedJourneyEnvelope) bool {
-	var failure installedJourneyFailure
-	return reply.Status == "error" && json.Unmarshal(reply.Data, &failure) == nil && failure.Code == "RetryLater" && failure.Retryable
+	var download installedJourneyDownload
+	return reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil && download.State == "Preparing" && download.DownloadID != ""
 }
 
-// installedJourneyEnded reports whether a download_artifact status reply says
-// the session ended in state, as CapabilityUnavailable naming that state.
-func installedJourneyEnded(reply installedJourneyEnvelope, state string) bool {
-	var failure installedJourneyFailure
-	return reply.Status == "error" && json.Unmarshal(reply.Data, &failure) == nil && failure.Code == "CapabilityUnavailable" && !failure.Retryable && strings.Contains(failure.Message, "This download session ended: "+state)
+// installedJourneyEnded decodes a download_artifact status reply of a session
+// that ended in state: an ok reply naming that state without native links.
+func installedJourneyEnded(reply installedJourneyEnvelope, state string) (installedJourneyDownload, bool) {
+	var download installedJourneyDownload
+	ok := reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil && download.State == state && download.ContentPath == ""
+	return download, ok
 }
 
 // installedJourney returns the installed S-02 journey for one regional
@@ -163,7 +164,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		// Discovery/status calls may retry, and capture requests retain their
 		// original preview and idempotency key. An uncertain download prepare
 		// or cancel never retries automatically: only an acknowledged
-		// RetryLater below permits another prepare under the exact original key.
+		// Preparing reply below permits another prepare under the exact original key.
 		readReply := func(callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
 			result, err := session.CallTool(callCtx, &sdk.CallToolParams{Name: name, Arguments: arguments})
 			if err != nil {
@@ -427,7 +428,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
 		// prepareReady repeats prepare under the exact key while the session is
-		// still preparing (acknowledged RetryLater) and decodes the Ready reply.
+		// still Preparing and decodes the Ready reply.
 		prepareReady := func(what string, args map[string]string, download *installedJourneyDownload) {
 			t.Helper()
 			wait(what, time.Now().Add(5*time.Minute), func(poll context.Context) bool {
@@ -620,10 +621,11 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		deny(false)
 		until("the restored access", 2*time.Minute, true)
 		healthy()
-		// A terminal session has no canonical status: status names the ended
-		// state and carries no native delivery facts.
+		// A stopped session reports Cancelled with the size and digest it had
+		// when Ready, and no native delivery links.
 		stopped, err := readReply(ctx, "download_artifact", map[string]string{"action": "status", "download_id": stopDownload.DownloadID})
-		if err != nil || !installedJourneyEnded(stopped, "Cancelled") {
+		ended, cancelled := installedJourneyEnded(stopped, "Cancelled")
+		if err != nil || !cancelled || ended.SizeBytes != stopDownload.SizeBytes || ended.SHA256 != stopDownload.SHA256 {
 			t.Fatal("installed Stop did not end the session as Cancelled or regained native delivery", stopped.RequestID, err)
 		}
 		stoppedGet, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+stopContentPath, nil)
@@ -1038,10 +1040,7 @@ func installedJourneyReply(wire *contracts.InvestigationContracts, name string, 
 			Code string `json:"code"`
 		}
 		decoded := json.Unmarshal(out.Data, &failure) == nil
-		// download_artifact also reports a preparing session (RetryLater) and
-		// an ended one (CapabilityUnavailable) as errors.
-		download := name == "download_artifact" && (failure.Code == "RetryLater" || failure.Code == "CapabilityUnavailable")
-		if !decoded || failure.Code != "NotAvailable" && !download {
+		if !decoded || failure.Code != "NotAvailable" {
 			// The schema-validated public code is a closed enum, never input.
 			return installedJourneyEnvelope{}, fmt.Errorf("unexpected installed operation failure %q", failure.Code)
 		}

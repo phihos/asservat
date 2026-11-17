@@ -101,7 +101,7 @@ for (const link of ['content_path', 'browser_url']) {
   const missing = structuredClone(full); delete missing.data[link];
   assert.equal(evidence.validOutput_download_artifact(missing), false, 'Ready requires ' + link);
 }
-for (const state of ['Preparing', 'Streaming', 'Interrupted']) {
+for (const state of ['Streaming', 'Interrupted']) {
   const legacy = structuredClone(full); legacy.data.state = state;
   assert.equal(evidence.validOutput_download_artifact(legacy), false, 'no legacy state ' + state);
 }

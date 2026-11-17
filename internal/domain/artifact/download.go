@@ -35,7 +35,8 @@ func (s DownloadState) Valid() bool {
 }
 
 // DownloadScope contains identifiers and ciphertext/accepted-scope digests only.
-// Native checksums, filenames and evidence never enter the SQL session record.
+// Filenames and evidence never enter the SQL session record; the session
+// keeps only the verified native size and SHA-256 once it is Ready.
 type DownloadScope struct {
 	RootID, ArtifactID, CaptureID, ClusterID, NamespaceUID, WorkloadUID, PodUID string
 	Version                                                                     Digest
@@ -136,6 +137,10 @@ type DownloadSession struct {
 	ChargedOutput, ChargedRead, EmittedBytes int64
 	Generation                               int64
 	Active                                   *DownloadBatch
+	// NativeSize and NativeSHA256 are the verified native facts, recorded
+	// once when the session first reports Ready; zero before.
+	NativeSize   int64
+	NativeSHA256 Digest
 }
 type DownloadPurpose string
 

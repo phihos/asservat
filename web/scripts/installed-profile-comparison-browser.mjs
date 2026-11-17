@@ -259,20 +259,28 @@ try {
       for (;;) {
         event({ kind: 'operation', ...response });
         assert(Object.values(response.transport).every(Boolean), 'original native browser transport');
-        assert.equal(response.input.action, 'prepare');
-        if (key === undefined) key = response.input.idempotency_key;
-        assert.equal(response.input.idempotency_key, key);
-        // RetryLater: the console repeats prepare with the same key.
-        if (response.reply.status === 'error') {
-          assert.equal(response.reply.data.code, 'RetryLater');
+        assert.equal(response.reply.status, 'ok');
+        const data = response.reply.data;
+        assert.equal(data.artifact_id, config.artifactID);
+        if (original === undefined) {
+          assert.equal(response.input.action, 'prepare');
+          key = response.input.idempotency_key;
+          assert(key, 'native preparation key');
+          original = data.download_id; deadline = data.access_until;
+        } else {
+          // The console follows a Preparing session by its download_id and
+          // the revision it last saw.
+          assert.equal(response.input.action, 'status');
+          assert.equal(response.input.download_id, original);
+          assert.equal(typeof response.input.after_revision, 'number');
+        }
+        assert.equal(data.download_id, original);
+        assert.equal(data.access_until, deadline);
+        if (data.state === 'Preparing') {
           assert(Date.now() < end, 'finite native preparation');
           response = await observed('download_artifact', response.responseIndex);
           continue;
         }
-        assert.equal(response.reply.status, 'ok');
-        const data = response.reply.data;
-        assert.equal(data.artifact_id, config.artifactID);
-        original = data.download_id; deadline = data.access_until;
         assert.equal(data.state, 'Ready');
         break;
       }

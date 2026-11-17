@@ -87,6 +87,12 @@ func decodeDownload(r custodydb.ArtifactDownload) (artifact.DownloadSession, err
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
 	s := artifact.DownloadSession{ID: uid(r.ID), AllocationID: uid(r.AllocationID), Scope: scope, RequestDigest: artifact.Digest(r.RequestDigest), State: artifact.DownloadState(r.State), CreatedAt: r.CreatedAt.Time, Deadline: r.Deadline.Time, OutputLimit: r.OutputLimit, ReadLimit: r.ReadLimit, ChargedOutput: r.ChargedOutput, ChargedRead: r.ChargedRead, EmittedBytes: r.EmittedBytes, Generation: r.Generation}
+	if r.NativeSize.Valid != (len(r.NativeSha256) == 32) || r.NativeSize.Valid && r.NativeSize.Int64 < 0 {
+		return artifact.DownloadSession{}, privacy.ErrFence
+	}
+	if r.NativeSize.Valid {
+		s.NativeSize, s.NativeSHA256 = r.NativeSize.Int64, artifact.Digest(r.NativeSha256)
+	}
 	if !s.Valid() {
 		return artifact.DownloadSession{}, privacy.ErrFence
 	}
@@ -341,6 +347,28 @@ func (s *Downloads) LookupDownload(ctx context.Context, sessionID string, actor 
 		return artifact.DownloadSession{}, err
 	}
 	return out, nil
+}
+
+// RecordDownloadNativeFacts stores the verified native size and SHA-256 of a
+// Ready session once; a later call with the same facts changes nothing and
+// different facts are refused.
+func (s *Downloads) RecordDownloadNativeFacts(ctx context.Context, sessionID string, size int64, sha artifact.Digest) error {
+	if !authorization.UUID(sessionID) || size < 0 || sha == (artifact.Digest{}) {
+		return artifact.ErrInvalid
+	}
+	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		if _, err := q.RecordDownloadNativeFacts(ctx, custodydb.RecordDownloadNativeFactsParams{ID: id(sessionID), RootID: id(s.root), NativeSize: pgtype.Int8{Int64: size, Valid: true}, NativeSha256: sha[:]}); err != nil {
+			return err
+		}
+		r, err := q.ReadDownloadSession(ctx, custodydb.ReadDownloadSessionParams{ID: id(sessionID), RootID: id(s.root)})
+		if err != nil {
+			return err
+		}
+		if !r.NativeSize.Valid || r.NativeSize.Int64 != size || !bytes.Equal(r.NativeSha256, sha[:]) {
+			return privacy.ErrConflict
+		}
+		return nil
+	})
 }
 
 func (s *Downloads) BeginDownloadBatch(ctx context.Context, sessionID string, a artifact.DownloadAuthority, b artifact.DownloadBatch) (audit.DownloadIntent, error) {

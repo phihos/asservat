@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import EvidenceWorkspace from './EvidenceWorkspace';
 import { result } from '../capture/test-fixtures';
 import { Evidence } from './evidence';
-import { SyntheticEvidence, session, caseResult, downloadResult, failure, cancelled, id } from './test-fixtures';
+import { SyntheticEvidence, session, caseResult, downloadResult, cancelled, completed, id } from './test-fixtures';
 import { caseIDFromPath, returnPath } from '../routes';
 const controllers: Evidence[] = [];
 afterEach(() => { cleanup(); for (const controller of controllers) controller.reset(); controllers.length = 0; vi.useRealTimers(); });
@@ -46,14 +46,15 @@ it('keeps request recovery visible even if case access becomes unavailable', asy
   expect(screen.getByRole('button', { name: 'Retry same download request' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
 });
-it('shows an ended session without a link or cancellation', async () => {
+it('shows an ended session with its checksum but without a link or cancellation', async () => {
   const { client, controller } = await mount(); await screen.findByRole('button', { name: 'Download' });
   fireEvent.click(screen.getByRole('button', { name: 'Download' }));
   await screen.findByRole('link', { name: 'Download native file' });
-  client.responder = () => failure('CapabilityUnavailable', 'This download session ended: Completed.');
+  client.responder = () => completed();
   await act(() => controller.checkDownload());
-  expect(screen.getByRole('heading', { name: 'Download ended' })).toBeTruthy();
-  expect(screen.getByText(/ended: Completed/)).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Transfer recorded' })).toBeTruthy();
+  expect(screen.getByText('a'.repeat(64))).toBeTruthy();
+  expect(screen.getByText(/cannot confirm local disk storage/)).toBeTruthy();
   expect(screen.queryByRole('link', { name: 'Download native file' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Cancel download' })).toBeNull();
 });

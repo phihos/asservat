@@ -274,37 +274,31 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 				fail("native operation contract")
 			}
 			var reply installedComparisonReply
-			var args map[string]string
+			var args map[string]any
 			if json.Unmarshal(e.Reply, &reply) != nil || json.Unmarshal(e.Input, &args) != nil {
 				fail("native operation association")
 			}
-			switch args["action"] {
+			arg := func(name string) string { value, _ := args[name].(string); return value }
+			switch arg("action") {
 			case "prepare":
-				// Only an acknowledged RetryLater permits another same-key prepare.
-				if args["artifact_id"] != source.ArtifactID || args["idempotency_key"] == "" || key != "" && (key != args["idempotency_key"] || !retry) {
+				// Only an acknowledged Preparing reply permits another same-key prepare.
+				if arg("artifact_id") != source.ArtifactID || arg("idempotency_key") == "" || key != "" && (key != arg("idempotency_key") || !retry) {
 					fail("native preparation key changed")
 				}
-				key = args["idempotency_key"]
+				key = arg("idempotency_key")
 			case "status":
-				if original == "" || args["download_id"] != original {
+				// The console follows a Preparing session by its download_id
+				// and the revision it last saw.
+				if original == "" || arg("download_id") != original || !retry {
 					fail("native status identity changed")
+				}
+				if _, ok := args["after_revision"].(float64); !ok {
+					fail("native status lacks after_revision")
 				}
 			default:
 				fail("native operation action")
 			}
 			retry = false
-			if reply.Status == "error" {
-				// A session still preparing has no public state yet.
-				var failure struct {
-					Code      string `json:"code"`
-					Retryable bool   `json:"retryable"`
-				}
-				if json.Unmarshal(reply.Data, &failure) != nil || failure.Code != "RetryLater" || !failure.Retryable || original != "" {
-					fail("native preparation outcome")
-				}
-				retry = true
-				continue
-			}
 			var current installedJourneyDownload
 			if reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || current.ArtifactID != source.ArtifactID {
 				fail("native operation association")
@@ -312,8 +306,19 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 			if original == "" {
 				original, deadline = current.DownloadID, current.AccessUntil
 			}
-			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.AccessUntil.Equal(deadline) || deadline.After(source.Expires) || current.State != "Ready" {
-				fail("native original identity/deadline/state")
+			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.AccessUntil.Equal(deadline) || deadline.After(source.Expires) {
+				fail("native original identity/deadline")
+			}
+			if current.State == "Preparing" {
+				// A session still Preparing carries no native delivery facts.
+				if current.ContentPath != "" || current.SHA256 != "" {
+					fail("native preparing metadata")
+				}
+				retry = true
+				continue
+			}
+			if current.State != "Ready" {
+				fail("native original state")
 			}
 			if current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes < 1 || current.SizeBytes > artifact.MaxPprofBytes {
 				fail("native ready metadata")

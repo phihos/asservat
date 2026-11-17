@@ -224,26 +224,26 @@ export interface components {
             /** @description Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged. */
             after_revision?: number;
         } & (unknown & unknown & unknown);
-        /** @description Current authorized transfer status. Prepare returns Ready with the catalog's verified metadata in the same request. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file. */
+        /** @description Current authorized transfer status. Prepare returns Ready, or Preparing while the regional reader verifies the file. Ready carries content_path and browser_url; other states carry neither. Size and SHA-256 are kept from Ready on. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file. */
         Contract_artifact_download_0b2b78f874cf920d: {
             /** Format: uuid */
             download_id: string;
             /** Format: uuid */
             artifact_id: string;
             /**
-             * @description An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal.
+             * @description Preparing while the regional reader verifies the file; status with after_revision waits for the next state. An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal.
              * @enum {unknown}
              */
-            state: "Ready" | "Completed" | "Failed" | "Cancelled";
+            state: "Preparing" | "Ready" | "Completed" | "Failed" | "Cancelled";
             /** @description Changes whenever the session state or transfer generation changes; pass it as after_revision to wait for the next change. */
             revision: number;
             /** @description <workload>-<pod>-<time>.<ext> from recorded provenance (core bundle: .core.tar). */
             filename?: string;
             native_format?: string;
-            /** @description Verified size from the catalog; present in every status while the caller may read the artifact's metadata. */
-            size_bytes: number;
-            /** @description Verified full-file SHA-256 from the catalog; present in every status. */
-            sha256: string;
+            /** @description Verified size; present once the session was Ready. */
+            size_bytes?: number;
+            /** @description Verified full-file SHA-256; present once the session was Ready. */
+            sha256?: string;
             content_path?: string;
             emitted_bytes: number;
             /** @constant */
@@ -263,7 +263,7 @@ export interface components {
              * @description AccessUntil: the artifact's access end (retention, share or grant end), never extended by status reads. Resumes are allowed until then; the caller's token lifetime does not shorten a started response (ADR-312).
              */
             access_until: string;
-        } & (unknown & unknown);
+        } & (unknown & unknown & unknown & unknown);
         /** @description A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6). */
         Contract_artifact_download_b566de55874898e7: {
             /** Format: uuid */

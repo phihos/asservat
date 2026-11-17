@@ -249,18 +249,18 @@ func qualifyContextNativeInterrupted(t *testing.T, ctx context.Context, f native
 	if e != nil {
 		t.Fatal("fresh audited preparation", e)
 	}
-	// A session still Preparing has no public state: the reply is RetryLater
-	// and the caller repeats prepare with the same key. The new session ID is
-	// read from SQL because the public reply does not carry it yet.
+	// A session still Preparing returns an ok reply in that state; the caller
+	// follows it with status (or repeats prepare with the same key). The new
+	// session ID is also read from SQL to prove it is a separate session.
 	var envelope struct {
-		Status string                        `json:"status"`
-		Data   presentation.OperationFailure `json:"data"`
+		Status string                           `json:"status"`
+		Data   presentation.ContextDownloadData `json:"data"`
 	}
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "error" || envelope.Data.Code != "RetryLater" || !envelope.Data.Retryable {
+	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.State != "Preparing" || envelope.Data.DownloadID == "" {
 		t.Fatal("fresh explicit preparation not acknowledged", string(reply.Body))
 	}
 	var freshID string
-	if e = f.admin.QueryRow(ctx, "SELECT id FROM artifact_download WHERE allocation_id=$1 AND id<>$2", f.allocation.ID, session.ID).Scan(&freshID); e != nil || freshID == "" {
+	if e = f.admin.QueryRow(ctx, "SELECT id FROM artifact_download WHERE allocation_id=$1 AND id<>$2", f.allocation.ID, session.ID).Scan(&freshID); e != nil || freshID == "" || freshID != envelope.Data.DownloadID {
 		t.Fatal("fresh explicit preparation did not admit its own session", e)
 	}
 	attachment, e := f.content.workers.ReadContextDownloadAttachment(ctx, freshID, f.authority())

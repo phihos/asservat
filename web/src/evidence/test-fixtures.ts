@@ -26,6 +26,18 @@ export function downloadResult(): Output<'download_artifact'> {
   return value;
 }
 export const failure = (code: string, message = 'Synthetic failure.', retryable = false) => ({ schema_version: 'mcp-result/v1', request_id: id(9), data_class: 'metadata', status: 'error', data: { code, message, retryable }, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] }) as Output<'download_artifact'>;
+export function preparing(): Output<'download_artifact'> {
+  const value = downloadResult(); const d = value.data as Record<string, unknown>;
+  for (const key of ['filename', 'native_format', 'size_bytes', 'sha256', 'etag', 'coverage_notice', 'content_path', 'browser_url']) delete d[key];
+  d.state = 'Preparing'; d.revision = 1;
+  return value;
+}
+export function completed(): Output<'download_artifact'> {
+  const value = downloadResult(); const d = value.data as Record<string, unknown>;
+  for (const key of ['filename', 'native_format', 'etag', 'coverage_notice', 'content_path', 'browser_url']) delete d[key];
+  d.state = 'Completed'; d.revision = 15;
+  return value;
+}
 export const cancelled = () => ({ ...downloadResult(), data: { download_id: id(4), state: 'Cancelled' } }) as Output<'download_artifact'>;
 export class SyntheticEvidence implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal }[] = [];

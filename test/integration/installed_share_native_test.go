@@ -133,14 +133,14 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	// fetches a byte range with its own download-route token.
 	prepare := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "installed-share-download"}
 	var download installedJourneyDownload
-	// A session still preparing returns RetryLater; repeat prepare with the
-	// same key until it is Ready.
+	// A session still Preparing returns an ok reply in that state; repeat
+	// prepare with the same key until it is Ready.
 	for deadline := time.Now().Add(3 * time.Minute); ; {
 		status, code := call(recipient, "download_artifact", prepare, &download)
-		if status == "ok" {
+		if status == "ok" && download.State != "Preparing" {
 			break
 		}
-		if code != "RetryLater" || time.Now().After(deadline) {
+		if status != "ok" || time.Now().After(deadline) {
 			diagnose()
 			t.Fatal("installed recipient could not prepare the shared download", status, code)
 		}

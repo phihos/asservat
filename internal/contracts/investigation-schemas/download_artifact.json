@@ -388,12 +388,13 @@
           },
           "state": {
             "enum": [
+              "Preparing",
               "Ready",
               "Completed",
               "Failed",
               "Cancelled"
             ],
-            "description": "An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal."
+            "description": "Preparing while the regional reader verifies the file; status with after_revision waits for the next state. An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal."
           },
           "revision": {
             "type": "integer",
@@ -415,12 +416,12 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991,
-            "description": "Verified size from the catalog; present in every status while the caller may read the artifact's metadata."
+            "description": "Verified size; present once the session was Ready."
           },
           "sha256": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
-            "description": "Verified full-file SHA-256 from the catalog; present in every status."
+            "description": "Verified full-file SHA-256; present once the session was Ready."
           },
           "content_path": {
             "type": "string",
@@ -477,8 +478,6 @@
           "artifact_id",
           "state",
           "revision",
-          "size_bytes",
-          "sha256",
           "access_until",
           "emitted_bytes",
           "local_copy_managed",
@@ -540,6 +539,54 @@
                 ]
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "Ready",
+                    "Completed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "size_bytes",
+                "sha256"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "Preparing"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "size_bytes"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sha256"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "filename"
+                    ]
+                  }
+                ]
+              }
+            }
           }
         ],
         "dependentRequired": {
@@ -562,9 +609,15 @@
             "filename",
             "native_format",
             "etag"
+          ],
+          "size_bytes": [
+            "sha256"
+          ],
+          "sha256": [
+            "size_bytes"
           ]
         },
-        "description": "Current authorized transfer status. Prepare returns Ready with the catalog's verified metadata in the same request. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file."
+        "description": "Current authorized transfer status. Prepare returns Ready, or Preparing while the regional reader verifies the file. Ready carries content_path and browser_url; other states carry neither. Size and SHA-256 are kept from Ready on. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file."
       },
       "d3": {
         "type": "object",

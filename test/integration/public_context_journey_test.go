@@ -73,14 +73,14 @@ func publicJourneyData[T any](t *testing.T, name string, reply presentation.Oper
 	return zero
 }
 
-// publicJourneyRetryLater reports whether reply is the RetryLater error of a
-// download session still preparing; the caller repeats prepare with the same key.
-func publicJourneyRetryLater(reply presentation.OperationReply, err error) bool {
+// publicJourneyPreparing reports whether reply is the ok reply of a download
+// session still Preparing; the caller repeats prepare with the same key.
+func publicJourneyPreparing(reply presentation.OperationReply, err error) bool {
 	var envelope struct {
-		Status string                        `json:"status"`
-		Data   presentation.OperationFailure `json:"data"`
+		Status string                           `json:"status"`
+		Data   presentation.ContextDownloadData `json:"data"`
 	}
-	return err == nil && json.Unmarshal(reply.Body, &envelope) == nil && envelope.Status == "error" && envelope.Data.Code == "RetryLater" && envelope.Data.Retryable
+	return err == nil && json.Unmarshal(reply.Body, &envelope) == nil && envelope.Status == "ok" && envelope.Data.State == "Preparing" && envelope.Data.DownloadID != ""
 }
 
 func publicJourneyInput(t *testing.T, v any) json.RawMessage {
@@ -244,10 +244,10 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	}
 	downloadInput := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "public-journey-original-download"}
 	reply, e = call("download_artifact", downloadInput, false)
-	if !publicJourneyRetryLater(reply, e) {
+	if !publicJourneyPreparing(reply, e) {
 		t.Fatalf("first preparation manufactured ready bytes: %s", reply.Body)
 	}
-	// A preparing session has no public state; its ID comes from SQL.
+	// The pending session ID is read from SQL to check its stored state.
 	var pendingID string
 	publicJourneyRequire(t, "original pending session ID", admin.QueryRow(ctx, "SELECT id FROM artifact_download WHERE allocation_id=$1", native.allocation.ID).Scan(&pendingID))
 	original, e := native.runtime.LookupDownload(ctx, pendingID, actor.Principal)
@@ -283,9 +283,9 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	stopContinuation()
 	outcome.report(t, cleanupStarted)
 	continued, continuedErr := outcome.reply, outcome.err
-	if publicJourneyRetryLater(continued, continuedErr) {
+	if publicJourneyPreparing(continued, continuedErr) {
 		// Enrollment runs independently of the requesting socket; the console repeats
-		// an acknowledged RetryLater reply with the same key after two seconds. This
+		// an acknowledged Preparing reply with the same key after two seconds. This
 		// single next continuation is equally deliberate and has its own identity.
 		select {
 		case <-ctx.Done():
@@ -329,7 +329,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	waitContextNativeHTTP(t, ctx, completed)
 	defer clear(body)
 	digest := sha256.Sum256(body)
-	if e != nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || !bytes.Equal(body, collector.native) || int64(len(body)) != ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 || response.Header.Get("ETag") != ready.ETag {
+	if e != nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || !bytes.Equal(body, collector.native) || ready.SizeBytes == nil || int64(len(body)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 || response.Header.Get("ETag") != ready.ETag {
 		t.Fatal("authenticated native bytes differ from the original Kubernetes capture", response.StatusCode, len(body), e)
 	}
 	// Preparation and the content response; ADR-167 hands the prepared facts to

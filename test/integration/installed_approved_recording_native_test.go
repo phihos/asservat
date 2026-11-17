@@ -122,13 +122,14 @@ func installedNativeDownload(t *testing.T, ctx context.Context, transport http.R
 	t.Helper()
 	var download installedJourneyDownload
 	// As in the main flow: preparation is an effect, so only an acknowledged
-	// RetryLater (session still preparing) permits another exact same-key prepare.
+	// Preparing reply permits another exact same-key prepare.
 	for until := time.Now().Add(3 * time.Minute); ; {
 		reply, code := invoke("download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": key})
-		if code == "" && reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil {
+		preparing := code == "" && installedJourneyPreparing(reply)
+		if code == "" && !preparing && reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil {
 			break
 		}
-		if code != "RetryLater" || !time.Now().Before(until) {
+		if !preparing || !time.Now().Before(until) {
 			diagnose()
 			t.Fatal("mixed download preparation failed", code)
 		}

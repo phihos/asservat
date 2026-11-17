@@ -1,13 +1,10 @@
 import type { Session } from '../auth/session';
 import { operations, operationMessage, OperationFailure, type Operations, type Operation, type Input, type Output, type CaseDetails, type Artifact, type Download, type CancellationReceipt } from './http';
 
-export type State = { busy: boolean; rawApprovalArtifact?: string; caseID?: string; details?: CaseDetails; download?: Download; error?: string; preparingArtifact?: string; uncertain?: boolean; cancelling?: boolean; started?: boolean; cancellation?: CancellationReceipt; ended?: string };
+export type State = { busy: boolean; rawApprovalArtifact?: string; caseID?: string; details?: CaseDetails; download?: Download; error?: string; preparingArtifact?: string; uncertain?: boolean; cancelling?: boolean; started?: boolean; cancellation?: CancellationReceipt };
 type Receipt = { artifactID: string; prepareKey: string; downloadID?: string; cancelKey?: string; terminal?: true; restartKey?: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const isStatus = (value: unknown): value is Download => typeof (value as Download).artifact_id === 'string';
-// download_artifact answers RetryLater while the native file is prepared; the
-// same prepare key is repeated after this delay.
-const preparationRetryMs = 1_000;
 
 // Metadata coordination only. No file bytes, provider tokens or plaintext file
 // caches are held here. The server authorizes every metadata/content request.
@@ -33,7 +30,7 @@ export class Evidence {
     if (identity !== this.identity || this.state.caseID !== caseID) this.reset();
     this.identity = identity; this.session = session; this.scope = scope;
     this.invalidate(); clearTimeout(this.caseExpiryTimer);
-    this.publish({ caseID, busy: false, rawApprovalArtifact: undefined, details: undefined, download: undefined, cancellation: undefined, ended: undefined, error: undefined, started: false, preparingArtifact: this.receipt?.artifactID, uncertain: !!this.receipt && !this.receipt.downloadID, cancelling: !!this.receipt?.cancelKey });
+    this.publish({ caseID, busy: false, rawApprovalArtifact: undefined, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false, preparingArtifact: this.receipt?.artifactID, uncertain: !!this.receipt && !this.receipt.downloadID, cancelling: !!this.receipt?.cancelKey });
     const abort = () => { this.invalidate(); clearTimeout(this.caseExpiryTimer); this.session = undefined; this.publish({ busy: false, rawApprovalArtifact: undefined, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false }); };
     scope.addEventListener('abort', abort, { once: true });
     if (scope.aborted) abort(); else void this.refresh();
@@ -90,7 +87,7 @@ export class Evidence {
   prepare = async (artifact: Artifact) => {
     if (this.state.busy || this.receipt || !this.state.details?.artifacts.some(a => a.artifact_id === artifact.artifact_id) || Date.parse(artifact.expires_at) <= Date.now()) return;
     this.receipt = { artifactID: artifact.artifact_id, prepareKey: this.newID() };
-    this.publish({ rawApprovalArtifact: undefined, preparingArtifact: artifact.artifact_id, uncertain: true, started: false, ended: undefined });
+    this.publish({ rawApprovalArtifact: undefined, preparingArtifact: artifact.artifact_id, uncertain: true, started: false });
     await this.retryPreparation();
   };
   retryPreparation = async () => {
@@ -100,9 +97,6 @@ export class Evidence {
     const result = await this.run('download_artifact', { action: 'prepare', artifact_id: receipt.artifactID, idempotency_key: receipt.prepareKey });
     if (!result || this.receipt !== receipt) return;
     if (result.status === 'error' && result.data.code === 'RawApprovalRequired') { this.publish({ rawApprovalArtifact: receipt.artifactID }); return; }
-    if (result.status === 'error' && result.data.code === 'RetryLater' && this.session && Date.now() < Date.parse(this.session.expires_at)) {
-      clearTimeout(this.timer); this.timer = setTimeout(() => void this.retryPreparation(), preparationRetryMs); return;
-    }
     this.accept(receipt, result);
   };
   checkDownload = async () => {
@@ -111,21 +105,30 @@ export class Evidence {
     const result = await this.run('download_artifact', { action: 'status', download_id: receipt.downloadID });
     if (result && this.receipt === receipt) this.accept(receipt, result);
   };
+  // Waits server-side for the next state of a Preparing session (status with
+  // after_revision); the server resumes the preparation when its worker
+  // advances. No busy state, so Cancel stays available; Cancel aborts it.
+  private async follow(receipt: Receipt, download: Download) {
+    if (!this.session || !this.scope || this.scope.aborted) return;
+    const generation = this.generation; const request = new AbortController(); this.active = request;
+    const abort = () => request.abort(); const scope = this.scope; scope.addEventListener('abort', abort, { once: true });
+    try {
+      const result = await this.client.call('download_artifact', { action: 'status', download_id: download.download_id, after_revision: download.revision }, this.session.csrf_token, request.signal);
+      if (generation === this.generation && this.receipt === receipt && !scope.aborted) this.accept(receipt, result);
+    } catch (error) { if (generation === this.generation && !scope.aborted) this.publish({ error: operationMessage(error) }); }
+    finally { scope.removeEventListener('abort', abort); }
+  }
   private accept(receipt: Receipt, result: Output<'download_artifact'>) {
-    if (result.status === 'error' && result.data.code === 'CapabilityUnavailable' && receipt.downloadID) {
-      // The session ended; its terminal state is named in the message.
-      receipt.terminal = true; clearTimeout(this.timer);
-      this.publish({ download: undefined, uncertain: false, cancelling: false, ended: result.data.message }); return;
-    }
     if (result.status !== 'ok') { this.fail(result); return; }
     const data = result.data;
     if (!isStatus(data) || !uuid.test(data.download_id) || data.artifact_id !== receipt.artifactID || (receipt.downloadID && data.download_id !== receipt.downloadID) || (data.content_path && data.content_path !== `/api/v1/downloads/${data.download_id}/content`)) {
       this.publish({ download: undefined, error: 'The download response could not be verified. Keep this tab open and check the same request again.' }); return;
     }
     receipt.downloadID = data.download_id;
-    if (data.state !== 'Ready') receipt.terminal = true;
+    if (data.state !== 'Ready' && data.state !== 'Preparing') receipt.terminal = true;
     this.publish({ download: data, cancellation: undefined, uncertain: false, cancelling: !!receipt.cancelKey });
     clearTimeout(this.timer);
+    if (data.state === 'Preparing') { if (!receipt.cancelKey) void this.follow(receipt, data); return; }
     const remaining = Date.parse(data.access_until) - Date.now();
     if (remaining <= 0) { this.publish({ download: undefined }); return; }
     // The link stays usable until access_until; afterwards the view refreshes.
@@ -159,7 +162,7 @@ export class Evidence {
   // authenticated clients retain Range and If-Match themselves.
   canRestart = () => {
     const receipt = this.receipt;
-    return !!receipt?.downloadID && !this.state.busy && (!!receipt.restartKey || !!this.state.started || !!this.state.error || !!this.state.ended) &&
+    return !!receipt?.downloadID && !this.state.busy && (!!receipt.restartKey || !!this.state.started || !!this.state.error || !!receipt.terminal) &&
       !!this.state.details?.artifacts.some(a => a.artifact_id === receipt.artifactID && Date.parse(a.expires_at) > Date.now());
   };
   restartDownload = async () => {
@@ -178,12 +181,12 @@ export class Evidence {
       }
     }
     this.receipt = { artifactID: previous.artifactID, prepareKey: previous.restartKey };
-    this.publish({ cancelling: false, cancellation: undefined, ended: undefined, uncertain: true, started: false });
+    this.publish({ cancelling: false, cancellation: undefined, uncertain: true, started: false });
     await this.retryPreparation();
   };
   newDownload = () => {
     if (this.state.busy || !this.receipt?.terminal) return;
     this.receipt = undefined; clearTimeout(this.timer);
-    this.publish({ download: undefined, cancellation: undefined, ended: undefined, preparingArtifact: undefined, uncertain: false, cancelling: false, started: false, error: undefined });
+    this.publish({ download: undefined, cancellation: undefined, preparingArtifact: undefined, uncertain: false, cancelling: false, started: false, error: undefined });
   };
 }

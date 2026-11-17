@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Evidence } from './evidence';
-import { SyntheticEvidence, session, id, caseResult, downloadResult, failure, cancelled } from './test-fixtures';
+import { SyntheticEvidence, session, id, caseResult, downloadResult, failure, cancelled, preparing, completed } from './test-fixtures';
 const controllers: Evidence[] = [];
 afterEach(() => { for (const c of controllers) c.reset(); controllers.length = 0; vi.useRealTimers(); });
 async function ready() {
@@ -20,17 +20,15 @@ it('reads only the exact case and prepares only on request', async () => {
   controller.startDownload(); expect(controller.snapshot().started).toBe(true);
   expect(actions(client)).toEqual(['prepare']);
 });
-it('repeats prepare with the same key while the file is prepared', async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+it('waits on a Preparing session with after_revision instead of repeating prepare', async () => {
   const { controller, client } = await ready();
-  let first = true;
-  client.responder = (name, input) => name === 'get_case' ? caseResult() : first ? (first = false, failure('RetryLater', 'Preparing.', true)) : downloadResult();
+  client.responder = (_name, input) => (input as { action: string }).action === 'prepare' ? preparing() : downloadResult();
   await controller.prepare(controller.snapshot().details!.artifacts[0]);
-  expect(controller.snapshot().download).toBeUndefined();
-  await vi.advanceTimersByTimeAsync(1_000);
   await vi.waitFor(() => expect(controller.snapshot().download?.state).toBe('Ready'));
-  const prepares = client.calls.filter(c => (c.input as { action: string }).action === 'prepare');
-  expect(prepares).toHaveLength(2); expect(prepares[0].input).toEqual(prepares[1].input);
+  expect(client.calls.filter(c => c.name === 'download_artifact').map(c => c.input)).toEqual([
+    { action: 'prepare', artifact_id: id(3), idempotency_key: id(101) },
+    { action: 'status', download_id: id(4), after_revision: 1 },
+  ]);
 });
 it('retains the same preparation key after unknown replies and same-user refresh', async () => {
   const { controller, client, scope, newID } = await ready();
@@ -76,12 +74,13 @@ it('keeps cancellation uncertain, blocks delivery, and retries the original canc
   expect(controller.snapshot().cancellation?.state).toBe('Cancelled');
   controller.newDownload(); expect(controller.snapshot().preparingArtifact).toBeUndefined();
 });
-it('shows an ended session and starts a new download with a fresh key', async () => {
+it('shows an ended session with its verified facts and starts a new download with a fresh key', async () => {
   const { controller, client } = await ready();
   await controller.prepare(controller.snapshot().details!.artifacts[0]);
-  client.responder = () => failure('CapabilityUnavailable', 'This download session ended: Completed.');
+  client.responder = () => completed();
   await controller.checkDownload();
-  expect(controller.snapshot().ended).toContain('Completed'); expect(controller.canStart()).toBe(false); expect(controller.canCancel()).toBe(false);
+  expect(controller.snapshot().download?.state).toBe('Completed'); expect(controller.snapshot().download?.sha256).toBe('a'.repeat(64));
+  expect(controller.canStart()).toBe(false); expect(controller.canCancel()).toBe(false);
   client.responder = () => downloadResult();
   await controller.restartDownload();
   const prepares = client.calls.filter(c => (c.input as { action: string }).action === 'prepare');

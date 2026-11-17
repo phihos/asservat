@@ -272,6 +272,21 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if e != nil || finished.State != artifact.DownloadCompleted {
 		t.Fatal("whole native HTTP response completion", finished.State, e)
 	}
+	// REQ-DLD-003: the verified size and SHA-256 stay on the session once
+	// recorded, so terminal statuses report them; different facts are refused.
+	m := firstMetadata.Native
+	if e = f.runtime.RecordDownloadNativeFacts(ctx, session.ID, m.Size, m.SHA256); e != nil {
+		t.Fatal("record native facts", e)
+	}
+	if e = f.runtime.RecordDownloadNativeFacts(ctx, session.ID, m.Size, m.SHA256); e != nil {
+		t.Fatal("same native facts are idempotent", e)
+	}
+	if e = f.runtime.RecordDownloadNativeFacts(ctx, session.ID, m.Size+1, m.SHA256); e == nil {
+		t.Fatal("changed native facts accepted")
+	}
+	if finished, e = f.runtime.LookupDownload(ctx, session.ID, session.Scope.Principal); e != nil || finished.NativeSize != m.Size || finished.NativeSHA256 != m.SHA256 || finished.State != artifact.DownloadCompleted {
+		t.Fatal("terminal session lost its native facts", finished.NativeSize, e)
+	}
 	// A second exact-target allocation is ambiguous even when it lacks the
 	// supported backing. The reader must not fall back to the usable candidate.
 	ambiguous := f.allocation

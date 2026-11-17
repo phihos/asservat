@@ -385,7 +385,7 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	defer stop()
 	for {
 		// An uncertain prepare is never replayed; only an acknowledged
-		// RetryLater (session still preparing) permits the same-key call again.
+		// Preparing reply permits the same-key call again.
 		reply, status, err := b.operation(limit, "download_artifact", prepare, prepare["idempotency_key"])
 		if err == nil && installedJourneyPreparing(reply) {
 			if installedJourneyPause(limit, 2*time.Second) != nil {
