@@ -53,6 +53,13 @@ func CompilePolicyWithRecorders(ctx context.Context, catalogTarget targets.Reque
 
 // policyObservationPlan parses the same target/detector prefix as compilation.
 // It carries authored names only, never catalog authority or a selected Pod.
+// policyAt reports whether the DebugPolicy targets this cluster and
+// namespace, as a caller names it.
+func policyAt(spec []byte, clusterID, namespace string) bool {
+	plan, _, err := policyObservationPlan(spec)
+	return err == nil && plan.ClusterID == clusterID && plan.Namespace == namespace
+}
+
 func policyObservationPlan(spec []byte) (value.RestartPolicy, bool, error) {
 	var s map[string]json.RawMessage
 	if strict(spec, &s) != nil {

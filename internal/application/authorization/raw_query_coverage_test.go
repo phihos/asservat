@@ -14,10 +14,10 @@ func TestRawQueryReuseRequiresOneOperationPerSelectedFile(t *testing.T) {
 	for _, count := range []int{2, 64} {
 		for _, enough := range []bool{false, true} {
 			f, in, _ := rawQueryFixture(t)
-			in.ArtifactDigests = nil
+			in.Artifacts.Digests = nil
 			in.MaxBytes = int64(count) * 10
 			for n := 1; n <= count; n++ {
-				in.ArtifactDigests = append(in.ArtifactDigests, artifact.Digest{byte(n)})
+				in.Artifacts.Digests = append(in.Artifacts.Digests, artifact.Digest{byte(n)})
 			}
 			g := f.approve(t, requestRawFixture(t, f, in))
 			remaining := int64(count)

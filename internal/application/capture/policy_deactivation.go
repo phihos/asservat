@@ -38,7 +38,7 @@ type PolicyDeactivationResult struct {
 	Replay                  bool
 }
 
-func (s PolicyDeactivation) Deactivate(ctx context.Context, current identities.CurrentIdentity, name string) (PolicyDeactivationResult, error) {
+func (s PolicyDeactivation) Deactivate(ctx context.Context, current identities.CurrentIdentity, clusterID, namespace, name string) (PolicyDeactivationResult, error) {
 	var zero PolicyDeactivationResult
 	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, value.ErrUnavailable
@@ -52,8 +52,8 @@ func (s PolicyDeactivation) Deactivate(ctx context.Context, current identities.C
 	if err != nil || !i.Valid(s.Now()) || i.Principal.Kind != identity.Human {
 		return zero, value.ErrDenied
 	}
-	source, _, err := s.Documents.ReadPolicy(ctx, name, "")
-	if err != nil {
+	source, spec, err := s.Documents.ReadPolicy(ctx, name, "")
+	if err != nil || !policyAt(spec, clusterID, namespace) {
 		return zero, value.ErrUnavailable
 	}
 	status, err := s.Ledger.Status(ctx, source.Revision.UID)

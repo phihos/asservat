@@ -72,9 +72,9 @@ type rawSyscallGrantSelection struct {
 	calls int
 }
 
-func (r *rawSyscallGrantSelection) ResolveRawSyscallQuery(ctx context.Context, current identities.CurrentIdentity, caseID string, digests []artifact.Digest) (RawQuerySelection, error) {
+func (r *rawSyscallGrantSelection) ResolveRawSyscallQuery(ctx context.Context, current identities.CurrentIdentity, caseID string, sel RawArtifactSelection) (RawQuerySelection, error) {
 	r.calls++
-	return r.ResolveRawQuery(ctx, current, caseID, digests)
+	return r.ResolveRawQuery(ctx, current, caseID, sel)
 }
 func TestRawSyscallStandaloneReviewUsesExactSelectorAndReusesCoveringPool(t *testing.T) {
 	f, in, _ := rawQueryFixture(t)

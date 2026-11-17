@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"context"
-	"slices"
 	"time"
 
 	permissions "asservat.local/asservat/internal/application/authorization"
@@ -15,7 +14,7 @@ import (
 
 type rawCaseSelection struct {
 	operation authorization.Operation
-	digests   []artifact.Digest
+	selection permissions.RawArtifactSelection
 	records   []authorizedContext
 	until     time.Time
 }
@@ -23,31 +22,24 @@ type rawCaseSelection struct {
 // ResolveRawQuery reuses case authority and its final checks, with selected-only
 // raw semantics. Private routing narrows versions before any evidence lookup;
 // every selected target needs ordinary download rights, with no share fallback.
-func (s ContextCaseService) ResolveRawQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
-	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.DownloadApproved)
+func (s ContextCaseService) ResolveRawQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, sel permissions.RawArtifactSelection) (permissions.RawQuerySelection, error) {
+	return s.resolveRawSelection(ctx, source, caseID, sel, authorization.DownloadApproved)
 }
-func (s ContextCaseService) ResolveRawPacketQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
-	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.ReadPacketQuery)
+func (s ContextCaseService) ResolveRawPacketQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, sel permissions.RawArtifactSelection) (permissions.RawQuerySelection, error) {
+	return s.resolveRawSelection(ctx, source, caseID, sel, authorization.ReadPacketQuery)
 }
-func (s ContextCaseService) ResolveRawSyscallQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
-	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.ReadSyscallQuery)
+func (s ContextCaseService) ResolveRawSyscallQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, sel permissions.RawArtifactSelection) (permissions.RawQuerySelection, error) {
+	return s.resolveRawSelection(ctx, source, caseID, sel, authorization.ReadSyscallQuery)
 }
-func (s ContextCaseService) ResolveRawLogQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
-	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.ReadLogQuery)
+func (s ContextCaseService) ResolveRawLogQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, sel permissions.RawArtifactSelection) (permissions.RawQuerySelection, error) {
+	return s.resolveRawSelection(ctx, source, caseID, sel, authorization.ReadLogQuery)
 }
-func (s ContextCaseService) resolveRawSelection(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest, operation authorization.Operation) (permissions.RawQuerySelection, error) {
+func (s ContextCaseService) resolveRawSelection(ctx context.Context, source identities.CurrentIdentity, caseID string, sel permissions.RawArtifactSelection, operation authorization.Operation) (permissions.RawQuerySelection, error) {
 	var zero permissions.RawQuerySelection
-	if len(digests) < 1 {
+	if !sel.Valid() {
 		return zero, value.ErrUnavailable
 	}
-	seen := map[artifact.Digest]bool{}
-	for _, d := range digests {
-		if d == (artifact.Digest{}) || seen[d] {
-			return zero, value.ErrUnavailable
-		}
-		seen[d] = true
-	}
-	raw := rawCaseSelection{operation: operation, digests: slices.Clone(digests)}
+	raw := rawCaseSelection{operation: operation, selection: sel}
 	if _, err := s.getContextCase(ctx, source, caseID, &raw); err != nil {
 		return zero, err
 	}

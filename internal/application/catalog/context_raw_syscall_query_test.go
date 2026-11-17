@@ -10,7 +10,7 @@ import (
 )
 
 type rawSyscallSelector interface {
-	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (permissions.RawQuerySelection, error)
+	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, permissions.RawArtifactSelection) (permissions.RawQuerySelection, error)
 }
 
 func TestRawSyscallSelectionUsesCurrentRawRightsWithoutDownload(t *testing.T) {
@@ -33,7 +33,7 @@ func TestRawSyscallSelectionUsesCurrentRawRightsWithoutDownload(t *testing.T) {
 			if !ok {
 				t.Fatal("saved syscall query has no exact ordinary/raw selection facet")
 			}
-			selected, e := selector.ResolveRawSyscallQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{f.record.Version})
+			selected, e := selector.ResolveRawSyscallQuery(t.Context(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: []artifact.Digest{f.record.Version}})
 			if mode == "allowed" {
 				if e != nil || len(selected.Artifacts) != 1 || selected.Artifacts[0].Output.ArtifactDigest != f.record.Version || f.catalogReads != 1 {
 					t.Fatal(selected, e)

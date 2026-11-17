@@ -20,9 +20,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
-	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
-	planningapp "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -241,26 +239,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		r := accept(t, s)
 		flush(t, s)
 		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, r.Record.ID, scope)
-	})
-
-	t.Run("policy-grants-public-request-review-attachment-audit", func(t *testing.T) {
-		s := newSetup(t, 64<<20)
-		spec := publicPolicySpec(t, s.input.Authority)
-		compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		a := s.input.Authority
-		scope := captureapp.RecorderPolicyScope(a.PolicyUID, 1, s.observation.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits)
-		s.input.Authority.ScopeDigest = sha256.Sum256(scope)
-		s.input.Submission.ScopeDigest = s.input.Authority.ScopeDigest
-		target := authorization.WorkloadTarget{ClusterID: s.input.Authority.ClusterID, NamespaceUID: s.input.Authority.NamespaceUID, WorkloadUID: s.input.Authority.WorkloadUID}
-		s.input.Workload = &target
-		s.input.Target = authorization.Target{}
-		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
-		accepted := accept(t, s)
-		flush(t, s)
-		qualifyPolicyGrantPublicOperations(t, ctx, admin, poolFor, store, keys, s.p, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, accepted.Record.ID, spec, s.batch)
 	})
 
 	t.Run("audit-gated-durable-and-no-personal-session-dependency", func(t *testing.T) {

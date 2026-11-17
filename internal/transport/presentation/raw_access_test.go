@@ -70,7 +70,7 @@ func TestRawQueryGrantPublicRequestAndReview(t *testing.T) {
 	if err != nil || !strings.Contains(string(reply.Body), `"phase":"Pending"`) || !strings.Contains(string(reply.Body), `"approval_uri":"https://console.invalid/approvals/`) {
 		t.Fatalf("request: %v %s", err, reply.Body)
 	}
-	if uc.input.CaseID != uc.view.Grant.RawQuery.CaseID || len(uc.input.ArtifactDigests) != 1 || uc.input.ArtifactDigests[0] != (artifact.Digest{1}) || uc.input.Lifetime != time.Hour || uc.input.MaxBytes != 1024 || uc.input.IdempotencyKey != "same-key" {
+	if uc.input.CaseID != uc.view.Grant.RawQuery.CaseID || len(uc.input.Artifacts.Digests) != 1 || uc.input.Artifacts.Digests[0] != (artifact.Digest{1}) || uc.input.Lifetime != time.Hour || uc.input.MaxBytes != 1024 || uc.input.IdempotencyKey != "same-key" {
 		t.Fatal("request changed", uc.input)
 	}
 	for _, phase := range []string{"Expired", "Revoked"} {
@@ -87,8 +87,8 @@ func TestRawQueryGrantPublicRequestAndReview(t *testing.T) {
 	uc.requestErr = authapp.ErrRawQueryOperationUnsupported
 	uc.input = authapp.RawQueryRequestInput{}
 	reply, err = s.Call(t.Context(), f, "request_raw_access", []byte(strings.Replace(in, "download_artifact", "read_memory", 1)))
-	if err == nil || uc.input.CaseID != "" {
-		t.Fatal("unsupported runtime operation reached grant service", err)
+	if err != nil || uc.input.CaseID != "" || !strings.Contains(string(reply.Body), `"code":"CapabilityUnavailable"`) {
+		t.Fatal("unsupported runtime operation reached grant service", err, string(reply.Body))
 	}
 	reply, err = s.Call(t.Context(), f, "request_raw_access", []byte(strings.Replace(in, "download_artifact", "pcap_query", 1)))
 	if err != nil || !strings.Contains(string(reply.Body), `"code":"UnsupportedOperation"`) {
@@ -102,7 +102,7 @@ func TestRawQueryGrantPublicRequestAndReview(t *testing.T) {
 		}
 		reply, err = s.Call(t.Context(), f, name, []byte(input))
 		if err != nil {
-			b, _ := json.Marshal(OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: "00000000-0000-4000-8000-000000000099", DataClass: "metadata", Status: "ok", Data: s.view(uc.view, f.i.Principal, true, base.config.Now()), Warnings: []string{}, Provenance: []any{}})
+			b, _ := json.Marshal(OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: "00000000-0000-4000-8000-000000000099", DataClass: "metadata", Status: "ok", Data: s.view(uc.view, f.i.Principal, true), Warnings: []string{}, Provenance: []any{}})
 			t.Fatalf("%s %v; output contract: %v; %s", name, err, s.contracts.ValidateOutput(name, b), b)
 		}
 		var envelope struct {

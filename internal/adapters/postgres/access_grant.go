@@ -321,21 +321,30 @@ func (s *AccessGrants) list(ctx context.Context, f func(*custodydb.Queries) ([]c
 	return out, nil
 }
 
-func (s *AccessGrants) PendingGrants(ctx context.Context, limit int) ([]authorization.Grant, error) {
+func grantCursor(after authapp.GrantCursor) (pgtype.Timestamptz, pgtype.UUID) {
+	if after.RequestedAt.IsZero() {
+		return pgtype.Timestamptz{}, pgtype.UUID{}
+	}
+	return pgtype.Timestamptz{Time: after.RequestedAt, Valid: true}, id(after.ID)
+}
+
+func (s *AccessGrants) PendingGrants(ctx context.Context, after authapp.GrantCursor, limit int) ([]authorization.Grant, error) {
 	if limit < 1 || limit > 100 {
 		return nil, authorization.ErrGrantInvalid
 	}
+	at, afterID := grantCursor(after)
 	return s.list(ctx, func(q *custodydb.Queries) ([]custodydb.AccessGrant, error) {
-		return q.ListPendingGrants(ctx, custodydb.ListPendingGrantsParams{RootID: id(s.root), RowLimit: int32(limit)})
+		return q.ListPendingGrants(ctx, custodydb.ListPendingGrantsParams{RootID: id(s.root), AfterAt: at, AfterID: afterID, RowLimit: int32(limit)})
 	})
 }
 
-func (s *AccessGrants) RequestedGrants(ctx context.Context, requester identity.Principal, limit int) ([]authorization.Grant, error) {
+func (s *AccessGrants) RequestedGrants(ctx context.Context, requester identity.Principal, after authapp.GrantCursor, limit int) ([]authorization.Grant, error) {
 	if limit < 1 || limit > 100 || !requester.Valid() {
 		return nil, authorization.ErrGrantInvalid
 	}
+	at, afterID := grantCursor(after)
 	return s.list(ctx, func(q *custodydb.Queries) ([]custodydb.AccessGrant, error) {
-		return q.ListRequestedGrants(ctx, custodydb.ListRequestedGrantsParams{RootID: id(s.root), RequesterIssuer: requester.Issuer, RequesterSubject: requester.Subject, RequesterKind: string(requester.Kind), RequesterClient: requester.ClientID, RowLimit: int32(limit)})
+		return q.ListRequestedGrants(ctx, custodydb.ListRequestedGrantsParams{RootID: id(s.root), RequesterIssuer: requester.Issuer, RequesterSubject: requester.Subject, RequesterKind: string(requester.Kind), RequesterClient: requester.ClientID, AfterAt: at, AfterID: afterID, RowLimit: int32(limit)})
 	})
 }
 

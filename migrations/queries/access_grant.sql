@@ -44,14 +44,17 @@ WHERE root_id= @root_id::uuid AND id= @id::uuid AND revoked_at IS NULL AND revis
 -- name: ListPendingGrants :many
 -- The approver inbox: reviewable requests newest first. Candidates only; the
 -- service lists a row only while the caller is a current approver for it.
-SELECT * FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL
+-- after_at/after_id continue after the last row of the previous page.
+SELECT * FROM access_grant WHERE root_id=sqlc.arg(root_id)::uuid AND decision IS NULL AND revoked_at IS NULL
  AND (kind<>'policy' OR policy_not_after>clock_timestamp()) AND (not_after IS NULL OR not_after>clock_timestamp())
+ AND (sqlc.narg(after_at)::timestamptz IS NULL OR requested_at<sqlc.narg(after_at)::timestamptz OR (requested_at=sqlc.narg(after_at)::timestamptz AND id>sqlc.narg(after_id)::uuid))
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ListRequestedGrants :many
 SELECT * FROM access_grant WHERE root_id=sqlc.arg(root_id)::uuid AND requester_issuer=sqlc.arg(requester_issuer)::text AND requester_subject=sqlc.arg(requester_subject)::text
  AND requester_kind=sqlc.arg(requester_kind)::text
  AND (requester_kind='human' OR requester_client=sqlc.arg(requester_client)::text)
+ AND (sqlc.narg(after_at)::timestamptz IS NULL OR requested_at<sqlc.narg(after_at)::timestamptz OR (requested_at=sqlc.narg(after_at)::timestamptz AND id>sqlc.narg(after_id)::uuid))
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ReadGrantArtifact :one

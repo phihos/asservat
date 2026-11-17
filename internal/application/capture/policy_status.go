@@ -32,7 +32,7 @@ type PolicyStatusService struct {
 	RecipeDigest           artifact.Digest
 }
 
-func (s PolicyStatusService) Get(ctx context.Context, current identities.CurrentIdentity, name string) (value.PolicyStatus, time.Time, error) {
+func (s PolicyStatusService) Get(ctx context.Context, current identities.CurrentIdentity, clusterID, namespace, name string) (value.PolicyStatus, time.Time, error) {
 	var zero value.PolicyStatus
 	if ctx == nil || current == nil || s.Documents == nil || s.Ledger == nil || s.Permissions == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, value.ErrUnavailable
@@ -48,6 +48,9 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	}
 	source, spec, err := s.Documents.ReadPolicy(ctx, name, "")
 	if err != nil {
+		return zero, time.Time{}, value.ErrUnavailable
+	}
+	if !policyAt(spec, clusterID, namespace) {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
 	status, err := s.Ledger.Status(ctx, source.Revision.UID)
