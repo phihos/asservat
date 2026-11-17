@@ -64,7 +64,7 @@ func (q *Queries) ReadContextDownloadAllocations(ctx context.Context, arg ReadCo
 }
 
 const readContextDownloadWorkers = `-- name: ReadContextDownloadWorkers :many
-SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at, baseline_query_allocation_id FROM download_worker WHERE session_id=$1 AND root_id=$2 ORDER BY generation ASC LIMIT 2
+SELECT id, session_id, root_id, installation_id, allocation_id, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at, baseline_query_allocation_id FROM download_worker WHERE session_id=$1 AND root_id=$2 ORDER BY generation ASC LIMIT 2
 `
 
 type ReadContextDownloadWorkersParams struct {
@@ -90,7 +90,6 @@ func (q *Queries) ReadContextDownloadWorkers(ctx context.Context, arg ReadContex
 			&i.RootID,
 			&i.InstallationID,
 			&i.AllocationID,
-			&i.PrincipalKey,
 			&i.Generation,
 			&i.IntentJson,
 			&i.RunUntil,

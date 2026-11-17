@@ -9,3 +9,6 @@ SELECT allocation_id FROM capacity_account WHERE root_id=$1 AND cluster_id=$2 AN
 
 -- name: ReadManagedCapacityAdmission :one
 SELECT capacity_managed_admission_until(sqlc.arg(root_id)::uuid,sqlc.arg(allocation_id)::uuid,sqlc.arg(kind)::text,clock_timestamp())::timestamptz AS until_at;
+
+-- name: CapacityExpensiveAdmits :one
+SELECT capacity_expensive_admits(sqlc.arg(allocation_id)::uuid)::boolean AS admits;

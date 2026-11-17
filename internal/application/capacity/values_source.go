@@ -7,11 +7,10 @@ package capacity
 type CapacityValues struct {
 	EvidenceBytes, ReserveBytes, ShareBytes, LimitBytes, NamespaceLimitBytes int64
 	MaxConcurrentExpensive                                                   int64
-	OnFull                                                                   string
 }
 
 // SettingsValid reports whether SQL can apply the values.
 func (v CapacityValues) SettingsValid() bool {
 	return v.EvidenceBytes > 0 && v.ReserveBytes >= 0 && v.ReserveBytes < v.EvidenceBytes && v.ShareBytes >= 0 && v.ShareBytes <= v.EvidenceBytes-v.ReserveBytes &&
-		v.LimitBytes > 0 && v.ShareBytes <= v.LimitBytes && v.NamespaceLimitBytes >= 0 && v.MaxConcurrentExpensive > 0 && (v.OnFull == "RejectNewExpensive" || v.OnFull == "DeleteOldestEligibleInAccount")
+		v.LimitBytes > 0 && v.ShareBytes <= v.LimitBytes && v.NamespaceLimitBytes >= 0 && v.MaxConcurrentExpensive > 0
 }

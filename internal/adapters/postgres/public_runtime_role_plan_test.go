@@ -88,7 +88,9 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		publicRuntimeGrant{"table", "permission_stream", "id", "UPDATE"},
 		publicRuntimeGrant{"table", "context_preview", "", "INSERT"},
 		publicRuntimeGrant{"table", "context_preview", "", "DELETE"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "DELETE"})
+		publicRuntimeGrant{"table", "context_preview_fence", "", "DELETE"},
+		publicRuntimeGrant{"table", "workload_name", "", "SELECT"},
+		publicRuntimeGrant{"table", "workload_name", "", "INSERT"})
 	resolution := append(slices.Clone(common),
 		publicRuntimeGrant{"table", "recording_save_group", "", "SELECT"},
 		publicRuntimeGrant{"table", "recording_selection_set", "", "SELECT"},
@@ -100,6 +102,7 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		publicRuntimeGrant{"table", "permission_review_source", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_review_assignment", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_review_decision", "", "SELECT"},
+		publicRuntimeGrant{"table", "workload_name", "", "SELECT"},
 		publicRuntimeGrant{"table", "authority_audit", "", "SELECT"},
 		publicRuntimeGrant{"table", "context_capture", "", "SELECT"},
 		publicRuntimeGrant{"table", "context_preview", "", "SELECT"},

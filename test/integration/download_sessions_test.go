@@ -103,10 +103,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		query string
 	}{
 		{runtimePool, "UPDATE artifact_download SET deadline=deadline"},
-		{runtimePool, "UPDATE fleet_trust SET suspended=false"},
 		{runtimePool, "UPDATE fleet_trust SET issuer_epoch=issuer_epoch"},
-		{runtimePool, "UPDATE fleet_trust SET fresh_until=clock_timestamp()"},
-		{runtimePool, "UPDATE fleet_observation SET fresh_until=fresh_until"},
 		{runtimePool, "UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()"},
 		{runtimePool, "UPDATE download_allocation SET output_limit=output_limit"},
 		{auditPool, "UPDATE artifact_download SET charged_output=0"},

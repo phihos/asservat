@@ -44,7 +44,7 @@ func (s *InstalledConfigurationProviderEffects) RefreshCleanup(ctx context.Conte
 		if err != nil {
 			return ErrKeyService
 		}
-		if err = lease.AwaitFleetObservation(); err == nil {
+		if err = lease.Schedule(); err == nil {
 			err = slot.refreshOwned(lease.Context(), s)
 		}
 		lease.Release()

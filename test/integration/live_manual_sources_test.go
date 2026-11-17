@@ -46,10 +46,10 @@ func TestLiveManualArgumentsSourceWithRealServices(t *testing.T) {
 }
 
 func withLiveManualSourceFixture(t *testing.T, mode string) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		hook := &liveManualStartedFixture{run: qualifyLiveManualStartedSource}
 		ctx = context.WithValue(ctx, liveManualFixtureKey{}, hook)
-		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(t *testing.T, _ *queryLedgerFixture) {
+		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, _ *queryLedgerFixture) {
 			t.Fatal("manual-only fixture unexpectedly reached saved query qualification")
 		}, false, false, false, mode != "arguments", mode == "raw", mode == "arguments")
 		if !hook.handled {

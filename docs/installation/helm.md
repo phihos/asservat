@@ -267,7 +267,7 @@ derived. Change them on any `helm upgrade`; they take effect at once.
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size | Evidence storage Asservat may use; required for an external store |
-| `capacity.workload.share` | `evidenceStorage` ÷ max(eligible workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
+| `capacity.workload.share` | `evidenceStorage` ÷ max(enrolled workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
 | `capacity.workload.limit` | `10%` | Most a single workload may use, protected share plus shared burst |
 | `capacity.capturesPerCluster` | larger of 8 and the node count | Concurrent captures per cluster |
 | `retention.evidence`, `retention.cores` | `14d` | Default retention |
@@ -387,6 +387,8 @@ ServiceAccount token (ADR-334); nothing is copied between clusters. Register
 the cluster in the hub's values and run `helm upgrade` on the hub:
 
 ```yaml
+hub:
+  url: https://asservat-connect.example.org    # the URL workload clusters dial
 clusters:
   - name: eu                                   # how people and policies name it
     issuer: https://eu-apiserver.example        # its ServiceAccount token issuer
@@ -398,15 +400,20 @@ Then install the workload cluster's release:
 ```sh
 helm --kube-context eu upgrade --install asservat ./charts/asservat \
   -n asservat-system --create-namespace \
-  --set mode=cluster --set hub.url=https://asservat.example.org \
+  --set mode=cluster --set hub.url=https://asservat-connect.example.org \
   --wait --timeout 10m
 ```
 
-The connector reaches the hub at `hub.url`, through the same Ingress or
-Gateway as the console. It trusts the hub's certificate through the system
-roots, or `hub.caBundle` for a private CA. The hub generates the cluster's ID
-from its name and pushes its settings over the connection; changes need no
-restart. Add clusters at any time.
+The connector reaches the hub at `hub.url` and trusts its certificate through
+the system roots, or `hub.caBundle` for a private CA. `hub.url` currently
+points at the federation Service (`hub.federation.service` as NodePort or
+LoadBalancer, or an HTTP/2 Ingress or Gateway route to it); the chart adds
+the URL's host to the federation's generated certificate, whose CA is
+`ca.crt` in `<name>-federation-tls`. Serving it on the console's origin is not
+implemented yet. The connector reaches the hub's owners, key service and
+object store through tunnels on that one connection. The hub generates the
+cluster's ID from its name and sends its settings and object-store
+capabilities on connect. Add clusters at any time.
 
 If the hub cannot reach the workload cluster's issuer (k3s and kubeadm default to the
 in-cluster `https://kubernetes.default.svc.cluster.local`), copy the public keys into that cluster's
@@ -460,7 +467,8 @@ An AccessBinding lives in the application namespace it grants access to, like
 a RoleBinding ([ADR-329](../decisions/329-accessbindings-in-application-namespaces.md)).
 Its scope is that namespace, optionally narrowed to workloads by name; a
 recreated Deployment of the same name keeps its access. A ClusterAccessBinding
-grants a role in every namespace, like a ClusterRoleBinding.
+grants a role in every namespace matching its optional `namespaceSelector`,
+like a ClusterRoleBinding.
 
 ```yaml
 apiVersion: asservat.io/v1alpha1

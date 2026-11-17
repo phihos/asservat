@@ -40,9 +40,6 @@ func (p *replayCompositionNoEffects) CompilePacketQueryFilter(context.Context, s
 func (p *replayCompositionNoEffects) ContextQueryPlan(context.Context, query.ContextProjectionAuthority) (query.ContextQueryPlan, error) {
 	return query.ContextQueryPlan{}, p.fail("plan")
 }
-func (p *replayCompositionNoEffects) ProjectionWorkerRoom(context.Context, query.ContextQuery) error {
-	return p.fail("worker-room")
-}
 func (p *replayCompositionNoEffects) AdmitProjectionWorker(context.Context, query.ContextQuery, app.ContextProjectionRequestOwner) error {
 	return p.fail("worker-admission")
 }

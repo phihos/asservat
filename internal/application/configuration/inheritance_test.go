@@ -329,3 +329,53 @@ func TestInheritanceCarriesDecisionTimeSources(t *testing.T) {
 		t.Fatal("unreadable source list carried review sources")
 	}
 }
+
+// ADR-335 D14: a ClusterAccessBinding narrowed by namespaceSelector has one
+// basis per selected namespace; while its labels are unknown an allow grants
+// nothing and a deny covers every namespace.
+func TestInheritanceNarrowsClusterBindingsBySelector(t *testing.T) {
+	_, _, s, ctx := inheritanceRun(t)
+	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); err != nil {
+		t.Fatal(err)
+	}
+	binding := func(effect string, selector map[string]string) value.Binding {
+		return value.Binding{Resource: value.Resource{ClusterID: inheritanceCluster, Kind: value.ClusterAccessBindingKind, Name: "sre", UID: "cab-" + effect, Generation: 1, ResourceVersion: "1", SpecDigest: artifact.Digest{3}},
+			Effect: effect, Subjects: []value.Subject{{Kind: "Group", ID: "/sre"}}, Roles: []string{"evidence-reader"}, NamespaceSelector: selector, Scope: value.Scope{ClusterID: inheritanceCluster, Namespace: value.AllNamespaces}}
+	}
+	namespaces := func(out inheritanceState, uid string) []string {
+		var got []string
+		for _, p := range out.Bases {
+			if p.Resource.UID == uid {
+				got = append(got, p.Scope.Namespace.UID)
+			}
+		}
+		return got
+	}
+	s.clusterBindings = []value.Binding{binding("Allow", map[string]string{"managed": "true"}), binding("Deny", map[string]string{"managed": "false"})}
+	out := s.inheritance(s.r.Now())
+	if got := namespaces(out, "cab-Allow"); !slices.Equal(got, []string{"payments-uid"}) {
+		t.Fatalf("selected allow %v", got)
+	}
+	if got := namespaces(out, "cab-Deny"); len(got) != 0 {
+		t.Fatalf("unselected deny %v", got)
+	}
+	if k := namespaceKeys(s.sources, s.clusterBindings, inheritanceCluster); !slices.Equal(k.Labels, []string{"managed"}) {
+		t.Fatalf("keys %v", k)
+	}
+	// The hub feed follows the selector keys while the source list is
+	// incomplete.
+	s.syncSources(ctx, value.Snapshot{ClusterBindings: s.clusterBindings})
+	if s.feed == nil || !slices.Equal(s.feed.keys.Labels, []string{"managed"}) || len(s.feed.keys.Annotations) != 0 {
+		t.Fatal("selector keys not observed without a complete source list")
+	}
+	s.sources, s.sourcesComplete = []value.Source{inheritanceSource()}, true
+	// Labels the observation does not carry are unknown.
+	s.clusterBindings = []value.Binding{binding("Allow", map[string]string{"tier": "a"}), binding("Deny", map[string]string{"tier": "a"})}
+	out = s.inheritance(s.r.Now())
+	if got := namespaces(out, "cab-Allow"); len(got) != 0 {
+		t.Fatalf("unknown allow %v", got)
+	}
+	if got := namespaces(out, "cab-Deny"); !slices.Equal(got, []string{"*"}) {
+		t.Fatalf("unknown deny %v", got)
+	}
+}

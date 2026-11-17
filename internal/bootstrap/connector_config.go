@@ -3,12 +3,12 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/pem"
-	"os"
-	"strconv"
-	"time"
+	"errors"
+	"net/url"
+	"strings"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -17,33 +17,32 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"asservat.local/asservat/internal/transport/connectorlifecycle"
+	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/kubernetes"
 )
 
-// regionalConfig is the connector's resolved startup input: the Helm config,
-// the hub's public regional offer and the browser-issued cluster binding.
+// regionalConfig is the connector's resolved startup input: the Helm config
+// and the settings the hub sends on connect.
 type regionalConfig struct {
 	contracts.ConnectorConfig
-	offer   contracts.RegionalOffer
-	binding value.PeerBinding
-	// executor is set when the offer names the regional executor and the
-	// config enables it; owners and keys are the offer's, with combined-mode
-	// in-cluster addresses applied.
-	executor bool
-	hub      contracts.RegionalHubEndpoint
-	owners   contracts.RegionalContextOwners
-	keys     contracts.RegionalWrapService
-	store    contracts.RegionalEvidenceStore
+	ClusterID, PeerID string
+	offer             contracts.RegionalOffer
+	binding           value.PeerBinding
+	// executor is set when the config enables the regional executor;
+	// owners, keys and store are the offer's, and evidence and history the
+	// cluster's object-store capabilities.
+	executor          bool
+	owners            contracts.RegionalContextOwners
+	keys              contracts.RegionalWrapService
+	store             contracts.RegionalEvidenceStore
+	evidence, history contracts.OwnerStorageCredential
 }
 
 func (c regionalConfig) rootID() string { return c.offer.PermissionRootID }
 
 // readConnectorConfig decodes config.json and checks every Helm-supplied
-// name and identifier. The offer is resolved separately.
+// name and identifier.
 func readConnectorConfig(ctx context.Context, in *providerInputs) (contracts.ConnectorConfig, error) {
 	var zero contracts.ConnectorConfig
 	b, err := in.read(ctx, contracts.ConnectorConfigFile, contracts.ConnectorConfigMaxBytes)
@@ -64,20 +63,14 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 	if c.Format != contracts.ConnectorConfigFormat {
 		return bad("format")
 	}
-	switch c.Mode {
-	case contracts.ConnectorModeCluster:
-		if c.Hub != nil || c.OfferConfigMap != "" {
-			return bad("cluster-offer")
-		}
-	case contracts.ConnectorModeCombined:
-		if len(validation.IsDNS1123Subdomain(c.OfferConfigMap)) != 0 || c.Hub == nil || !ownerEndpoint(c.Hub.Federation) || c.Hub.Owners != "" && !ownerDialAddress(c.Hub.Owners) || c.Hub.KeyService != "" && !ownerEndpoint(c.Hub.KeyService) {
-			return bad("combined-hub")
-		}
-	default:
+	if c.Mode != contracts.ConnectorModeCluster && c.Mode != contracts.ConnectorModeCombined {
 		return bad("mode")
 	}
-	if c.ClusterID != "" || c.PeerID != "" || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
-		return bad("binding")
+	if u, err := url.Parse(c.Hub); err != nil || u.Scheme != "https" || u.Host == "" || strings.Trim(u.Path, "/") != "" || u.RawQuery != "" || u.User != nil {
+		return bad("hub")
+	}
+	if len(validation.IsDNS1123Label(c.Namespace)) != 0 {
+		return bad("namespace")
 	}
 	for _, name := range []string{c.Deployment, c.ServiceAccount} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
@@ -102,26 +95,6 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 	return nil
 }
 
-// combinedOfferMatches reports whether the hub's combined-mode offer names
-// the installation, issuer epoch and permission root of the IDs Secret.
-func combinedOfferMatches(o contracts.RegionalOffer, ids contracts.InstallationIDs) bool {
-	return o.InstallationID == ids.InstallationID && o.IssuerEpoch == ids.IssuerEpoch && o.PermissionRootID == ids.PermissionRootID
-}
-
-// readCombinedIDs reads the mounted `<name>-ids` Secret.
-func readCombinedIDs() (contracts.InstallationIDs, error) {
-	root, err := os.OpenRoot(contracts.InstallationIDsRoot)
-	if err != nil {
-		return contracts.InstallationIDs{}, &fixedStepError{"ids", mounts.ErrUnavailable}
-	}
-	defer root.Close()
-	ids, err := contracts.ReadInstallationIDs(root)
-	if err != nil {
-		return ids, &fixedStepError{"ids", err}
-	}
-	return ids, nil
-}
-
 // kubernetesRoots reads the projected kube-root-ca.crt bundle.
 func kubernetesRoots(ctx context.Context, in *providerInputs) ([][]byte, error) {
 	b, err := in.read(ctx, contracts.ConnectorKubeRootsFile, 64<<10)
@@ -144,115 +117,58 @@ func kubernetesRoots(ctx context.Context, in *providerInputs) ([][]byte, error) 
 	return roots, nil
 }
 
-// readJoinFiles reads the cluster-mode join Secret's cluster ID, peer ID
-// and regional offer (the files next to config.json).
-func readJoinFiles(ctx context.Context, in *providerInputs) (cluster, peer string, offer contracts.RegionalOffer, err error) {
-	id := func(name string) (string, error) {
-		b, err := in.read(ctx, name, 64)
-		if err != nil || !authorization.UUID(string(b)) {
-			return "", &fixedStepError{"join/" + name, mounts.ErrUnavailable}
-		}
-		return string(b), nil
-	}
-	if cluster, err = id(contracts.ConnectorJoinClusterFile); err != nil {
-		return
-	}
-	if peer, err = id(contracts.ConnectorJoinPeerFile); err != nil {
-		return
-	}
-	b, err := in.read(ctx, contracts.RegionalOfferFile, 1<<20)
+// hubRoots reads the hub CA bundle; an empty one selects the system roots.
+func hubRoots(ctx context.Context, in *providerInputs) (*x509.CertPool, error) {
+	b, err := in.read(ctx, contracts.ConnectorHubRootsFile, 64<<10)
 	if err != nil {
-		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"hub-roots", mounts.ErrUnavailable}
 	}
-	// The hub writes the offer; fields of a newer hub are ignored (ADR-333).
-	d := json.NewDecoder(bytes.NewReader(b))
-	if d.Decode(&offer) != nil || d.More() || cluster == peer {
-		return "", "", offer, &fixedStepError{"join/offer", mounts.ErrUnavailable}
+	if len(bytes.TrimSpace(b)) == 0 {
+		return nil, nil
 	}
-	return cluster, peer, offer, nil
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(b) {
+		return nil, &fixedStepError{"hub-roots", cfg.ErrInvalid}
+	}
+	return pool, nil
 }
 
-// resolveRegionalConfig completes c with the hub's offer. Cluster mode reads
-// the offer from the join Secret's file. Combined mode reads the hub's
-// published offer ConfigMap in the shared release namespace (get on that one
-// name).
-func resolveRegionalConfig(ctx context.Context, in *providerInputs, c contracts.ConnectorConfig) (regionalConfig, error) {
+// readHubSettings asks the hub for this cluster's settings (REQ-FED-001) and
+// completes c with them.
+func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c contracts.ConnectorConfig) (regionalConfig, error) {
 	out := regionalConfig{ConnectorConfig: c}
-	if c.Mode == contracts.ConnectorModeCluster {
-		cluster, peer, offer, err := readJoinFiles(ctx, in)
-		if err != nil {
-			return out, err
-		}
-		out.ClusterID, out.PeerID, out.offer = cluster, peer, offer
-		c.ClusterID, c.PeerID = cluster, peer
-	} else {
-		offer, err := readCombinedOffer(ctx, in, c.Namespace, c.OfferConfigMap)
-		if err != nil {
-			return out, &fixedStepError{"offer", err}
-		}
-		out.offer = offer
+	frame, err := channel.Run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeSettings, OperationID: uuid.NewString()}, nil)
+	if err != nil || frame.Kind != "result" || frame.Settings == nil {
+		return out, &fixedStepError{"hub-settings", errors.Join(mounts.ErrUnavailable, errRegionalChannel)}
 	}
-	o := out.offer
-	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) {
-		return out, &fixedStepError{"offer/fields", mounts.ErrUnavailable}
+	s := *frame.Settings
+	o := s.Offer
+	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) || s.ClusterID == s.PeerID {
+		return out, &fixedStepError{"hub-settings/fields", mounts.ErrUnavailable}
 	}
-	out.binding = value.PeerBinding{InstallationID: o.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: o.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}
-	out.hub = o.Federation
-	if c.Hub != nil {
-		out.hub.Endpoint = c.Hub.Federation
+	out.ClusterID, out.PeerID, out.offer = s.ClusterID, s.PeerID, o
+	out.binding = value.PeerBinding{InstallationID: o.InstallationID, ClusterID: s.ClusterID, IssuerEpoch: o.IssuerEpoch, PeerID: s.PeerID, Role: value.ConnectorPeer}
+	if !out.binding.Valid() {
+		return out, &fixedStepError{"hub-settings/binding", mounts.ErrUnavailable}
 	}
-	if !out.binding.Valid() || !ownerEndpoint(out.hub.Endpoint) || !identity.Text(out.hub.ServerName, 253) {
-		return out, &fixedStepError{"offer-binding", mounts.ErrUnavailable}
-	}
-	offered, err := o.RegionalExecutorOffered()
-	if err != nil {
-		return out, &fixedStepError{"offer-executor", mounts.ErrUnavailable}
-	}
-	if c.Executor == nil || !offered {
+	if c.Executor == nil {
 		return out, nil
+	}
+	if !o.Complete() {
+		return out, &fixedStepError{"hub-settings/offer", mounts.ErrUnavailable}
 	}
 	out.executor = true
 	out.owners, out.keys, out.store = *o.Owners, *o.KeyService, *o.EvidenceStore
-	if c.Hub != nil && c.Hub.Owners != "" {
-		out.owners.Address = c.Hub.Owners
-	}
-	if c.Hub != nil && c.Hub.KeyService != "" {
-		out.keys.Endpoint = c.Hub.KeyService
-	}
-	s, k := out.store, out.keys
-	if !ownerEndpoint(s.Endpoint) || !identity.Text(s.Region, 128) || !identity.Text(s.Bucket, 63) || !authorization.UUID(s.StoreID) || !ownerEndpoint(k.Endpoint) ||
+	out.evidence, out.history = s.Evidence, s.History
+	st, k := out.store, out.keys
+	if !ownerEndpoint(st.Endpoint) || !identity.Text(st.Region, 128) || !identity.Text(st.Bucket, 63) || !authorization.UUID(st.StoreID) || !ownerEndpoint(k.Endpoint) ||
 		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() || !ownerDialAddress(out.owners.Address) {
-		return out, &fixedStepError{"offer-executor", mounts.ErrUnavailable}
+		return out, &fixedStepError{"hub-settings/executor", mounts.ErrUnavailable}
+	}
+	for _, x := range []contracts.OwnerStorageCredential{out.evidence, out.history} {
+		if !identity.Text(x.AccessKeyID, 256) || !identity.Text(x.SecretAccessKey, 4096) || (x.SessionToken != "" && !identity.Text(x.SessionToken, 16384)) {
+			return out, &fixedStepError{"hub-settings/storage", mounts.ErrUnavailable}
+		}
 	}
 	return out, nil
-}
-
-func readCombinedOffer(ctx context.Context, in *providerInputs, namespace, name string) (contracts.RegionalOffer, error) {
-	var zero contracts.RegionalOffer
-	api, err := kubernetes.NewForConfig(in.kubernetes(contracts.ConnectorKubeTokenFile))
-	if err != nil {
-		return zero, mounts.ErrUnavailable
-	}
-	call, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	var object *core.ConfigMap
-	if object, err = api.CoreV1().ConfigMaps(namespace).Get(call, name, meta.GetOptions{}); err != nil {
-		step := "get"
-		if status, ok := err.(apierrors.APIStatus); ok {
-			step += "/" + strconv.Itoa(int(status.Status().Code))
-		}
-		return zero, &fixedStepError{step, mounts.ErrUnavailable}
-	}
-	raw := object.Data[contracts.RegionalOfferFile]
-	if raw == "" {
-		// Helm renders the ConfigMap empty; the hub-api writes the offer once
-		// its own startup has the values.
-		return zero, &fixedStepError{"pending", mounts.ErrUnavailable}
-	}
-	d := json.NewDecoder(bytes.NewReader([]byte(raw)))
-	var offer contracts.RegionalOffer
-	if len(raw) > 1<<20 || d.Decode(&offer) != nil || d.More() {
-		return zero, &fixedStepError{"decode", cfg.ErrInvalid}
-	}
-	return offer, nil
 }

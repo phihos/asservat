@@ -209,7 +209,7 @@ func admittedAuthorityAudit(ctx context.Context, authority *authorityAuditTurn, 
 		return audit.Receipt{}, &fixedStepError{"audit.admission", mounts.ErrUnavailable}
 	}
 	defer release()
-	if err = lease.AwaitFleetObservation(); err != nil {
+	if err = lease.Schedule(); err != nil {
 		return audit.Receipt{}, &fixedStepError{"audit.fleet", mounts.ErrUnavailable}
 	}
 	return a.writeAuthorityAudit(lease.Context(), write)

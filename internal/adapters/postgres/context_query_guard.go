@@ -70,7 +70,7 @@ func queryGuarded(ctx context.Context, invoke func(context.Context, func(context
 		<-done
 	}
 	if e != nil || !valid || ctx.Err() != nil {
-		return value.ErrUnavailable
+		return queryRefusal("guarded", e) // names the inner step, if any
 	}
 	return nil
 }

@@ -21,7 +21,7 @@
 {{- end }}
 {{- $downloads := dict "retentionTopologies" $topologies }}
 {{- $remote := list }}
-{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .clusterID }}{{ end }}
+{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .name }}{{ end }}
 {{- with $remote }}{{ $_ := set $downloads "remoteClusters" . }}{{ end }}
 {{- $_ := set $config "downloads" $downloads }}
 {{- $purposes = append $purposes "key-acquisition" }}

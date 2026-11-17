@@ -204,8 +204,8 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 			return nil, none, &fixedStepError{"key-service/hub-topology", err}
 		}
 	}
-	for _, cluster := range d.RemoteClusters {
-		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, cluster); err != nil {
+	for _, name := range d.RemoteClusters {
+		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, contracts.RemoteClusterID(c.InstallationID, name)); err != nil {
 			return nil, none, &fixedStepError{"key-service/remote-topology", err}
 		}
 	}

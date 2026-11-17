@@ -21,8 +21,8 @@ import (
 // audit row through the compiled hub-runtime credential (REQ-AUT-005).
 // Protected source and privacy identity remain synthetic inputs.
 func TestProcessingDecisionsOnCapacityRootWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 		f.setup(t)
 		f.refreshBase(t)
 		var lanes []string

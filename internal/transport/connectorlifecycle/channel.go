@@ -33,7 +33,20 @@ const (
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
 	PurposeAccessBindings Purpose = "access-bindings"
+	// PurposeSettings returns the settings the connector needs from the hub
+	// (REQ-FED-001): its cluster and peer IDs, the hub's offer and its
+	// cluster's object-store capabilities. It is the first conversation of
+	// a connector process, so its opening names no process binding.
+	PurposeSettings Purpose = "settings"
 )
+
+// Settings are the hub's answer to PurposeSettings. Evidence and History are
+// the cluster's own object-store capabilities, scoped to its cluster ID.
+type Settings struct {
+	ClusterID, PeerID string
+	Offer             contracts.RegionalOffer
+	Evidence, History contracts.OwnerStorageCredential
+}
 
 // OwnerAuthentication is the hub's answer for one observed owner certificate.
 // It cannot authenticate a TLS peer until the region verifies its own actual
@@ -56,10 +69,11 @@ type Opening struct {
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind    string                           // access-bindings, result, failure
-	Owners  *value.APIContextOwnerCandidates `json:",omitempty"`
-	Owner   *OwnerAuthentication             `json:",omitempty"`
-	Failure string                           `json:",omitempty"`
+	Kind     string                           // access-bindings, result, failure
+	Owners   *value.APIContextOwnerCandidates `json:",omitempty"`
+	Owner    *OwnerAuthentication             `json:",omitempty"`
+	Settings *Settings                        `json:",omitempty"`
+	Failure  string                           `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings"
 	// request; the connector answers Unchanged when its current delivery has
 	// the same digest (ADR-329).

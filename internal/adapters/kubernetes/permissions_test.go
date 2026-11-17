@@ -31,7 +31,7 @@ func permissionSource() map[string]any {
 	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "PermissionSource", "metadata": map[string]any{"name": "owners", "namespace": permissionControl.Name, "uid": "source-uid", "generation": 1, "resourceVersion": "opaque:source"}, "spec": map[string]any{"enabled": true, "cluster": LocalClusterName, "type": "namespaceMetadata", "namespaceSelector": map[string]any{"matchLabels": map[string]any{"example.invalid/managed": "true"}}, "excludedNamespaces": []string{"kube-system"}, "role": "evidence-owner", "protection": map[string]any{"mode": "administratorManaged", "reviewRef": "synthetic-review"}, "metadataMapping": map[string]any{"field": "annotation", "key": "example.invalid/owner", "mode": "valueMap", "issuer": "https://id.example.invalid", "values": map[string]any{"payments": []string{"team-a", "team-b"}}}}}
 }
 func permissionClusterBinding() map[string]any {
-	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBinding", "metadata": map[string]any{"name": "sre.approvers", "uid": "cab-uid", "generation": 1, "resourceVersion": "opaque:cab"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "id": "/sre"}}, "roles": []string{"action-approver", "privacy-operator"}}}
+	return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBinding", "metadata": map[string]any{"name": "sre.approvers", "uid": "cab-uid", "generation": 1, "resourceVersion": "opaque:cab"}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "id": "/sre"}}, "roles": []string{"action-approver"}, "namespaceSelector": map[string]any{"matchLabels": map[string]any{"example.invalid/managed": "true"}}}}
 }
 func permissionList(kind, rv, next string, items ...map[string]any) map[string]any {
 	if items == nil {
@@ -98,7 +98,7 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := s.ClusterBindings; len(c) != 1 || c[0].Invalid || c[0].Scope.ClusterID != permissionCluster || c[0].Scope.Namespace != value.AllNamespaces || len(c[0].Roles) != 1 || c[0].Subjects[0].Issuer != "" {
+	if c := s.ClusterBindings; len(c) != 1 || c[0].Invalid || c[0].Scope.ClusterID != permissionCluster || c[0].Scope.Namespace != value.AllNamespaces || c[0].NamespaceSelector["example.invalid/managed"] != "true" || len(c[0].Roles) != 1 || c[0].Subjects[0].Issuer != "" {
 		t.Fatalf("cluster binding %+v", c)
 	}
 	if len(s.Bindings) != 1 || len(s.Sources) != 1 || s.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || s.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {

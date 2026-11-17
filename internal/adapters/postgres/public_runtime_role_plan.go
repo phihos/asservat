@@ -98,6 +98,10 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		}
 		out = ownerIdentityGrantSet(out)
 	}
+	// ADR-335 D4: workload references match by name through workload_name.
+	if ok && slices.Contains(out, publicRuntimeGrant{"table", "permission_basis", "", "SELECT"}) && !slices.Contains(out, publicRuntimeGrant{"table", "workload_name", "", "SELECT"}) {
+		out = append(out, publicRuntimeGrant{"table", "workload_name", "", "SELECT"})
+	}
 	return out, ok
 }
 
@@ -149,7 +153,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
-		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
+		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
+			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
+		}
 		// A workload enrolls on its first storage read.
 		out = append(out, publicRuntimeGrant{"function", "capacity_enroll(uuid,uuid,text,text,uuid,uuid,bytea)", "", "EXECUTE"})
 	case "capacity-profile-read":
@@ -217,7 +223,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
 		}
-		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
+		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
+			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
+		}
 		// ADR-330 D6: the admission writes its audit row in its transaction.
 		add("audit_event", "INSERT")
 	case "policy-automation":
@@ -298,6 +306,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_preview", "INSERT")
 		add("context_preview", "DELETE")
 		add("context_preview_fence", "DELETE")
+		// ADR-335 D4: resolved workload names (ON CONFLICT DO NOTHING).
+		add("workload_name", "SELECT")
+		add("workload_name", "INSERT")
 		add("recording_selection_set", "INSERT")
 		add("recording_selection_set", "DELETE")
 	case "capture-resolution":

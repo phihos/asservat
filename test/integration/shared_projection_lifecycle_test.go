@@ -33,9 +33,9 @@ import (
 // The SQL native-close call models a positively joined private operation; the
 // real framed join is qualified separately by TestNativeApprovedProjection*.
 func TestSharedProjectionLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("legacy-projection-native-key-authority", func(t *testing.T) {
-			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifySharedProjectionLifecycle)
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifySharedProjectionLifecycle)
 		})
 	})
 }
@@ -183,7 +183,7 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	}
 	accepted, err := ledger.AdmitQuery(initial.ctx, q, initial.request, initial.authority)
 	if err != nil || !accepted.Fresh {
-		t.Fatal("query admission", err)
+		t.Fatal("query admission", refusalStage(err), err)
 	}
 	if err = admission.AdmitProjectionWorker(initial.ctx, q, initial); err != nil {
 		t.Fatal("reserve/audit/claim/Job", err)

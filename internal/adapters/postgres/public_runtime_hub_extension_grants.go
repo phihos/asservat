@@ -323,7 +323,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "download_worker", "installation_id", "INSERT"},
 		{"table", "download_worker", "intent_json", "INSERT"},
 		{"table", "download_worker", "job_json", "UPDATE"},
-		{"table", "download_worker", "principal_key", "INSERT"},
 		{"table", "download_worker", "retired_proof_json", "UPDATE"},
 		{"table", "download_worker", "root_id", "INSERT"},
 		{"table", "download_worker", "run_until", "INSERT"},

@@ -25,6 +25,11 @@ type TokenVerifier interface {
 	VerifyConnector(context.Context, string) (value.ConnectorCluster, error)
 }
 
+// SettingsService answers PurposeSettings for the presented cluster.
+type SettingsService interface {
+	Settings(context.Context, value.ConnectorCluster) (Settings, error)
+}
+
 // AccessBindingsService records a connector's AccessBinding delivery for its
 // presented cluster (ADR-329). The Region reads the delivery; the service
 // must attribute it to region.Presented().ClusterID only.
@@ -113,6 +118,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = ErrChannel // only the observed certificate, never another owner
 		}
 		result.Owner = &owner
+	case PurposeSettings:
+		var settings Settings
+		if source, ok := h.services.(SettingsService); ok {
+			settings, err = source.Settings(ctx, presented)
+		} else {
+			err = ErrChannel
+		}
+		result.Settings = &settings
 	case PurposeAccessBindings:
 		if sink, ok := h.services.(AccessBindingsService); ok {
 			err = sink.AccessBindings(ctx, region)
@@ -131,7 +144,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // admit binds the opening to the token's registered cluster: the process
 // binding must name that cluster's peer.
 func admit(o Opening, p value.ConnectorCluster) bool {
-	if !authorization.UUID(o.OperationID) || !o.Process.Valid() {
+	if !authorization.UUID(o.OperationID) {
+		return false
+	}
+	if o.Purpose == PurposeSettings {
+		return o.Owner == nil && o.Process == (value.ConnectorProcessIdentity{})
+	}
+	if !o.Process.Valid() {
 		return false
 	}
 	switch o.Purpose {

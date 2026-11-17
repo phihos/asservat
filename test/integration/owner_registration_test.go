@@ -87,9 +87,6 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	actualAudit := &interruptedOwnerAudit{OwnerEnrollmentAuditObjects: auditObjects}
 	refresh := func(ctx context.Context) (value.OwnerConfigurationObservation, error) {
 		n := time.Now().UTC().Truncate(time.Microsecond)
-		if e := renewSyntheticFleetObservation(ctx, l.admin, l.observation, 30*time.Second, false); e != nil {
-			return value.OwnerConfigurationObservation{}, e
-		}
 		o := value.OwnerConfigurationObservation{Configuration: c.Clone(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 		r, ok, e := l.writer.ObserveOwnerConfiguration(ctx, o)
 		if e != nil {
@@ -360,26 +357,6 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	if _, err = refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = registry.ReadOwnerRegistration(ctx, clientCert.Certificate); err == nil {
-		t.Fatal("recovery outage did not fence registry")
-	}
-	if _, err = refresh(ctx); err == nil {
-		t.Fatal("source refresh cleared blocked recovery")
-	}
-	if _, err = l.admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID); err != nil {
-		t.Fatal(err)
-	}
-	if restored, err := replaceSyntheticFleetObservationAfterActivation(ctx, l.admin, c.Pool.InstallationID); err != nil {
-		t.Fatal(err)
-	} else {
-		l.observation = restored
-	}
-	if _, err = refresh(ctx); err != nil {
-		t.Fatal(err)
-	}
 	// SQL permissions prevent using an enrollment/reader credential as an audit,
 	// activation, retirement, configuration or recovery writer.
 	for _, tc := range []struct {
@@ -392,7 +369,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 		{"activate_", "UPDATE hub_owner_enrollment SET audit_receipt_json='x' WHERE id=$1", e.ID},
 		{"cleanup_", "UPDATE hub_owner_enrollment SET highest_epoch=0 WHERE id=$1", e.ID},
 		{"", "UPDATE hub_owner_configuration SET generation=0 WHERE installation_id=$1", c.Pool.InstallationID},
-		{"", "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", c.Pool.InstallationID},
+		{"", "UPDATE fleet_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1", c.Pool.InstallationID},
 	} {
 		_, err = pools[tc.role].Exec(ctx, tc.sql, tc.arg)
 		var denied *pgconn.PgError

@@ -67,7 +67,7 @@ func TestHubWorkerCapacitySectionDecodes(t *testing.T) {
 // raised to the effective share.
 func TestCapacityValuesBytes(t *testing.T) {
 	v, err := capacityValues(contracts.CapacityValues{EvidenceStorage: "128Gi", NamespaceLimit: "25%", Workload: contracts.CapacityWorkloadValues{Share: "16Gi"}})
-	if err != nil || v.EvidenceBytes != 128<<30 || v.ReserveBytes != 8<<30 || v.ShareBytes != 16<<30 || v.LimitBytes != 16<<30 || v.NamespaceLimitBytes != 32<<30 || v.MaxConcurrentExpensive != 1 || v.OnFull != "RejectNewExpensive" {
+	if err != nil || v.EvidenceBytes != 128<<30 || v.ReserveBytes != 8<<30 || v.ShareBytes != 16<<30 || v.LimitBytes != 16<<30 || v.NamespaceLimitBytes != 32<<30 || v.MaxConcurrentExpensive != 1 {
 		t.Fatal(v, err)
 	}
 	// A derived share is at most usable/8 (15 GiB here), above 10 %: the

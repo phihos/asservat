@@ -587,6 +587,17 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
 			return err
 		}
+		if a.Plan.Input.Profile != nil {
+			// REQ-CAP-002: the allocation row lock above serializes this
+			// count against concurrent admissions of the same workload.
+			admits, err := q.CapacityExpensiveAdmits(ctx, id(r.AllocationID))
+			if err != nil {
+				return err
+			}
+			if !admits {
+				return value.ErrCapacity
+			}
+		}
 		if a.Plan.Input.Profile != nil || a.Plan.Input.Logs != nil {
 			if err = reserveProfileStreamLocked(ctx, q, r); err != nil {
 				return err

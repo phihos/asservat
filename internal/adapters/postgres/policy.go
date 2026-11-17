@@ -317,7 +317,7 @@ func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installat
 		return zero, value.PolicyAcceptance{}, err
 	}
 	var receipt audit.Receipt
-	if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) || trust.Suspended {
+	if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) {
 		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
 	}
 	now, err = q.CurrentTime(ctx)

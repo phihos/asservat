@@ -9,9 +9,9 @@ import (
 )
 
 // ADR-335 D4: an omitted issuer is the installation's issuer; without one
-// the subject grants nothing. A workload named without uid cannot narrow a
-// basis yet: an allow entry grants nothing, a deny covers the namespace.
-func TestBindingBasisDefaultsIssuerAndFailsClosedOnUnpinnedWorkloads(t *testing.T) {
+// the subject grants nothing. A workload named without uid stays in the
+// basis scope; evaluation matches it by kind and name.
+func TestBindingBasisDefaultsIssuerAndKeepsNamedWorkloads(t *testing.T) {
 	now := time.Now()
 	b := value.Binding{Resource: value.Resource{Kind: "AccessBinding", UID: "b", ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}}, Effect: "Allow", Roles: []string{"evidence-reader"},
 		Subjects: []value.Subject{{Kind: "Group", ID: "/payments"}, {Kind: "Group", Issuer: "https://other.example", ID: "/x"}},
@@ -27,11 +27,10 @@ func TestBindingBasisDefaultsIssuerAndFailsClosedOnUnpinnedWorkloads(t *testing.
 		t.Fatalf("subject without any issuer kept: %+v", got)
 	}
 	b.Scope.Workloads = []value.WorkloadRef{{Kind: "Deployment", Name: "api"}}
-	if _, ok := bindingBasis(b, now); ok {
-		t.Fatal("unpinned workload allow granted")
-	}
-	b.Effect = "Deny"
-	if p, ok := bindingBasis(b, now); !ok || len(p.Scope.Workloads) != 0 {
-		t.Fatal("unpinned workload deny did not cover the namespace")
+	for _, effect := range []string{"Allow", "Deny"} {
+		b.Effect = effect
+		if p, ok := bindingBasis(b, now); !ok || len(p.Scope.Workloads) != 1 || p.Scope.Workloads[0].Name != "api" {
+			t.Fatalf("%s named workload not kept: %+v", effect, p)
+		}
 	}
 }

@@ -94,7 +94,7 @@ func TestWorkerOwnerAuditNeverReplacesSelectedIntervalAndCancelsSupersededSource
 func TestWorkerOwnerSourceLoopsContinueWhileAuditWaitsAndJoinItOnShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	var fleetCalls, ownerCalls atomic.Int32
+	var ownerCalls atomic.Int32
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var once sync.Once
@@ -102,10 +102,6 @@ func TestWorkerOwnerSourceLoopsContinueWhileAuditWaitsAndJoinItOnShutdown(t *tes
 	defer unblock()
 	c := workerOwnerAuditConfiguration()
 	s := &ConfigurationReconciler{
-		Fleet: &TrustObserver{Settings: administrationFunc(func(context.Context) (value.Administration, error) {
-			fleetCalls.Add(1)
-			return value.Administration{}, value.ErrUnavailable
-		}), Projection: &trustObservationFixture{basis: trustObservationBasis(time.Now().UTC().Truncate(time.Microsecond))}, Now: time.Now},
 		Owner: &OwnerConfigurationObserver{Reader: ownerConfigFunc(func(context.Context) (value.OwnerConfigurationObservation, error) {
 			ownerCalls.Add(1)
 			return workerOwnerAuditCandidate(c).observation, nil
@@ -133,11 +129,11 @@ func TestWorkerOwnerSourceLoopsContinueWhileAuditWaitsAndJoinItOnShutdown(t *tes
 		t.Fatal("first audit did not start")
 	}
 	until := time.Now().Add(2500 * time.Millisecond)
-	for (ownerCalls.Load() < 3 || fleetCalls.Load() < 3) && time.Now().Before(until) {
+	for ownerCalls.Load() < 3 && time.Now().Before(until) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if ownerCalls.Load() < 3 || fleetCalls.Load() < 3 {
-		t.Fatal("queued/active audit stalled independent source loops", ownerCalls.Load(), fleetCalls.Load())
+	if ownerCalls.Load() < 3 {
+		t.Fatal("queued/active audit stalled the source loop", ownerCalls.Load())
 	}
 	cancel()
 	select {
@@ -399,9 +395,6 @@ func TestWorkerOwnerAuditSelectsPendingOnlyAfterFIFOAndIndependentNotice(t *test
 			t.Fatal("owner ticket not granted")
 		}
 	}
-	a := workerSchedulingAdministration()
-	gate.NoteFleetObservation(a)
-	gate.NoteFleetCommitted(ctx, a)
 	var call context.Context
 	select {
 	case call = <-entered:
@@ -428,4 +421,14 @@ func TestWorkerOwnerAuditSelectsPendingOnlyAfterFIFOAndIndependentNotice(t *test
 	cancel()
 	unblock()
 	<-done
+}
+
+func workerAuditSchedulingFixture(t *testing.T, ctx context.Context) *WorkerRuntimeAdmission {
+	t.Helper()
+	gate, err := NewWorkerRuntimeAdmission(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(gate.Close)
+	return gate
 }

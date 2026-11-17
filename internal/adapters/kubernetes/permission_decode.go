@@ -308,12 +308,10 @@ func notAfter(s string) (time.Time, error) {
 }
 
 // clusterBindings decodes one ClusterAccessBinding of the hub cluster into
-// one binding per cluster it covers, each over AllNamespaces (ADR-335 D14).
-// Omitted clusters are the binding's own cluster; "*" is every known
-// cluster. privacy-operator has no consumer yet and is dropped. An allow
-// narrowed by namespaceSelector grants nothing yet; a deny so narrowed
-// applies to every namespace. A spec that fails validation becomes one
-// invalid binding that grants and denies nothing.
+// one binding per cluster it covers, each over AllNamespaces narrowed by its
+// namespaceSelector (ADR-335 D14). Omitted clusters are the binding's own
+// cluster; "*" is every known cluster. A spec that fails validation becomes
+// one invalid binding that grants and denies nothing.
 func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) []value.Binding {
 	invalid := func() []value.Binding {
 		ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
@@ -333,13 +331,11 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	if err != nil {
 		return invalid()
 	}
-	var roles []string
-	for _, r := range spec.Roles {
-		if slices.Contains(value.Roles, r) {
-			roles = append(roles, r)
-		}
+	var selector map[string]string
+	if spec.NamespaceSelector != nil && len(spec.NamespaceSelector.MatchLabels) > 0 {
+		selector = spec.NamespaceSelector.MatchLabels
 	}
-	if len(roles) == 0 || spec.Effect == "Allow" && spec.NamespaceSelector != nil && len(spec.NamespaceSelector.MatchLabels) > 0 {
+	if !selectorValid(selector) {
 		return invalid()
 	}
 	clusters := []string{ref.ClusterID}
@@ -358,7 +354,7 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	for _, cluster := range slices.Compact(clusters) {
 		r := ref
 		r.ClusterID = cluster
-		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: roles, NotAfter: expires, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
+		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
 	}
 	return out
 }

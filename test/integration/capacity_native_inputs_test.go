@@ -64,5 +64,5 @@ func capacityNativeQualification(t *testing.T, root, installation, cluster, acco
 // capacityNativeValues are the fixture's Helm capacity values: 16 workload
 // shares of 1 MiB with a 4 MiB burst limit.
 func capacityNativeValues() app.CapacityValues {
-	return app.CapacityValues{EvidenceBytes: 17 << 20, ReserveBytes: 1 << 20, ShareBytes: 1 << 20, LimitBytes: 4 << 20, MaxConcurrentExpensive: 1, OnFull: "RejectNewExpensive"}
+	return app.CapacityValues{EvidenceBytes: 17 << 20, ReserveBytes: 1 << 20, ShareBytes: 1 << 20, LimitBytes: 4 << 20, MaxConcurrentExpensive: 1}
 }

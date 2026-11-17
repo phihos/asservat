@@ -422,8 +422,14 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		}
 		for _, basis := range b.Bases {
 			workloads := make([]string, 0, len(basis.Scope.Workloads))
+			// ADR-335 D4: a uid pins one instance; otherwise the workload
+			// matches by kind and name (workload_name).
 			for _, w := range basis.Scope.Workloads {
-				workloads = append(workloads, w.UID)
+				if w.UID == "" {
+					workloads = append(workloads, w.Kind+"/"+w.Name)
+				} else {
+					workloads = append(workloads, w.UID)
+				}
 			}
 			expiry := pgtype.Timestamptz{}
 			if !basis.NotAfter.IsZero() {

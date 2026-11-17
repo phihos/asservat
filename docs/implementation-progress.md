@@ -1,5 +1,75 @@
 # Sustained implementation progress
 
+## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
+
+Branch `clean/join`. A workload cluster's release needs only `mode: cluster`,
+`hub.url` (+ optional `hub.caBundle`); the hub lists it in `clusters` by name
+and issuer/JWKS and derives its ID from the name. On connect the federation
+answers a `settings` conversation with the cluster and peer IDs, the stored
+offer and the cluster's own regional object-store capabilities, and relays
+tunnels (`/v1/connector-tunnel`, ServiceAccount token, ends at token expiry)
+to the owners, key service and evidence store named in the offer; the
+connector keeps its own TLS session with each inside the tunnel, so evidence
+uploads travel over the hub connection. Combined mode uses the same path
+(in-cluster federation URL, federation CA), so the connector no longer mounts
+the IDs Secret, the offer ConfigMap or object-store Secrets. Removed: the join
+Secret and its runner, `remote.*`, `region.joinSecret`/`offerConfigMap`/
+`hub.*`/`executor.evidenceSecret`, `clusters[].clusterID`, the offer's
+federation section and passthrough server names. `region.executor.
+profileAuthorization` names a local Secret. The hub.url host is added to the
+federation's generated certificate. Also fixed: since #260 the combined hub-api
+could not start (`observation-ingress` invalid: no peers and no local
+capacity handler); it now serves no observation without peers.
+
+Owned kind clusters `asservat-jn-hub`/`-work` (deleted): the work connector
+received its settings and AccessBindings were delivered; the regional
+pod-status capture in the joined cluster was collected, verified and
+published through the tunnels. `TestHelmNativeKindClusterJoin` and the
+combined `TestHelmNativeKindJourney` both then fail at native download
+(`download content refused: content/transfer/window (invalid)`,
+`BeginDownloadWindow`); origin/main with only the observation fix fails the
+combined journey the same way. Gaps: `hub.url` reaches
+the federation Service, not the console origin; the lifecycle conversations
+and tunnels share one HTTP/2 connection but work is not yet pushed on it.
+
+## Native download window deadline (2026-11-16)
+
+Native downloads failed at `content/transfer/window (invalid)` since #260:
+capacity accounts give the download control the standing date (migration
+00172), and SQL pins each window's audit `WriteUntil` to it, but the domain
+still capped `WriteUntil` at start + 24 h 5 min. The cap is removed; the
+response's own bounds end a transfer (ADR-312). Owned kind cluster
+`asservat-dl-hub` (deleted): combined `TestHelmNativeKindJourney` passes end
+to end, including the native download.
+
+## Integration tests on the simplified schema (2026-11-16)
+
+Context query admission failed for every query: `guard_context_query`
+still required the `RecoveryIssuerEpoch`/`RecoveryRevision` keys that #263
+removed from the stored query. Migration 00189 drops both from the guard
+and drops the unused `context_query_qualification_valid`, which called a
+function 00172 removed.
+Tests that exercised removed machinery are deleted: the head-specific
+blocks of the schema upgrade test, the dropped
+`capacity_context_protocol_backing` and `context_query_qualification_valid`
+checks, the removed share-expiry refusal (the adapter now clamps) and
+migration downgrades below 125. `scripts/test-custody.py --libpcap` runs the
+libpcap-tagged workflow tests. Query refusals now name the inner step.
+
+## Static fleet trust (ADR-330 D1/D13, 2026-11-15)
+
+The fleet trust row is static installation identity that `asservat setup`
+seeds (installation ID, issuer epoch). The hub-worker's one-second fleet
+observer, `fleet_observation`, `observe_fleet_administration`,
+`fence_fleet_observation`, the semantic-version trigger and the trust
+suspension are removed (migration 00185). `fleet_current_trust` keeps
+`suspended` (false) and `observed_at`/`fresh_until` (-infinity/infinity) for
+the stored function bodies that still name them. Provider and audit work no
+longer waits for a fleet observation after admission.
+
+Verified: see the PR. Gap: the `configuration-fleet` SQL login now only waits
+for the schema in the hub-worker init container.
+
 ## Download caps removed (ADR-312, ADR-335 D9, 2026-11-15)
 
 A download session runs to its original authority, access and allocation
@@ -14,8 +84,15 @@ seeded by 00172), which bound window audit bytes.
 
 Verified: `go build`, `go vet` (also `-tags libpcap`), `make go-check
 pcap-check`, the CI gate set, focused download custody tests (real
-PostgreSQL). Gap: projection and query workers still check
-the 16/2/2 acquisition worker caps, which have no stated reason.
+PostgreSQL).
+
+## Acquisition worker caps removed (ADR-335 D9, 2026-11-15)
+
+Projection and query workers no longer check the 16 per installation, two
+per workload and two per principal caps. Removed: the worker-room check,
+`ErrBusy` and its busy refusal, the count query, and the `download_worker`
+principal key and index (migration 00186). Query units and the capacity
+concurrency limit bound expensive work.
 
 ## Live watch without lifetime (ADR-335 D9, 2026-11-15)
 
@@ -50,11 +127,18 @@ pcap-check`, the CI gate set, `TestCustodyWithRealServices/bounded_streaming`
 
 No blocking initial AccessBinding review: the first permission batch is
 accepted without a bootstrap review. AccessBinding subject `issuer` and
-`reason` are optional and workload `uid` is optional. PermissionSources name
+`reason` are optional and workload `uid` is optional: a workload named
+without uid matches by kind and name through `workload_name`, which the hub
+fills with every Deployment/StatefulSet it resolves (migration 00188); a uid
+pins one instance. PermissionSources name
 their `cluster` (`local` or a joined cluster) and have no
 `maxDecisionAgeSeconds`/`maxNamespaces`; access reviews map to any role.
 New cluster-scoped ClusterAccessBinding CRD, accepted as one all-namespace
-basis per cluster (migration 00179). Runtime guard proofs, the groupID
+basis per cluster (migration 00179), or with `namespaceSelector` as one basis
+per selected namespace of the cluster's label observation; while those labels
+are unknown an allow grants nothing and a deny covers every namespace. The
+unconsumed `privacy-operator` role is gone (a privacy operator is an
+administrator). Runtime guard proofs, the groupID
 directory and the permission scale caps are gone. Verification:
 `make permission-integration`, focused custody permission subtests.
 
@@ -99,8 +183,7 @@ function body; its Down restores the 00167 view for downgrade probes.
 `RecoveryProof`, `RecoveryState`, every `RecoveryReader`,
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
-lock or check the trust row for recovery. `currentTrust` refuses a suspended
-or stale trust row. Open: the setup recovery step of REQ-DB-005;
+lock or check the trust row for recovery. Open: the setup recovery step of REQ-DB-005;
 retention topology, proofs and source checkpoints (D12); one-step publication;
 the unused `identity-read` pools that only served recovery reads.
 
@@ -149,12 +232,17 @@ cluster-observation capacity purposes, the context-control record counter
 and the download session/response counters (bytes stay bounded).
 `capturesPerCluster` defaults to max(8, node count).
 
-Gaps: the default share divides by max(8, enrolled accounts), not the
-eligible-workload count; namespace eligibility (system/release namespaces,
-`asservat.io/evidence: disabled`) is not checked on enrollment because the
-storage read knows only the namespace UID; `maxConcurrentExpensive` and
-`onFull` are stored but no expensive-action reservation consumes them yet;
-`DeleteOldestEligibleInAccount` has no deletion path.
+Follow-up (branch `clean/capacity-gaps`, migration 00187): target
+resolution marks `kube-*`, the release namespace and namespaces labelled
+`asservat.io/evidence: disabled`; new collection there is refused
+(`targets.ErrEvidenceDisabled`), reads still resolve. A profile
+admission counts the workload's still-writable profile attempts under the
+allocation lock (`capacity_expensive_admits`) and refuses at
+`maxConcurrentExpensive`. The spec now divides the default share by enrolled
+workloads (an all-cluster workload inventory would add watches for no
+benefit) and drops `onFull`/`DeleteOldestEligibleInAccount`: a full account
+rejects new expensive work. Gap: no expensive request waits; one that finds
+the limit reached is refused at once.
 
 ## Capacity from Helm values (2026-11-14)
 
@@ -176,7 +264,7 @@ set, `TestCapacityValuesSourceWithRealPostgres` (real PostgreSQL). Gaps: the
 default share divides by max(8, clusters + 1), not the eligible-workload
 count; the
 `capturesPerCluster` default ignores node count; `maxConcurrentExpensive`
-and `onFull` are not enforced; capacity is on only when a value is set; the
+is not enforced; capacity is on only when a value is set; the
 SQL capacity subsystem (00054, object counts, five-second observation
 loops) is unchanged.
 
@@ -235,10 +323,8 @@ after rewriting the shared operation-audit functions without it. 00154 and 00164
 statements once the lane is gone, so downgrade probes still work.
 
 The unused `federation` values (the regional offer's connector limits) are
-removed. Gaps: the join Secret still carries the offer and copied
-object-store capabilities; cluster IDs still come from values; `hub.url`/
-`hub.caBundle` are not implemented; the node channel is in "Node channel
-stream" below.
+removed. The join Secret is gone too: see "Joined clusters without copied
+Secrets" below; the node channel is in "Node channel stream" below.
 
 ## Node channel stream (ADR-330 D2/D3, 2026-11-15)
 
@@ -263,12 +349,9 @@ the hub-api already reads (added to the implemented identity-settings copy and
 the chart). Removed: the fleet ConfigMap, `fleet` chart values, its schema and
 reader, the fleet protection guard, `contracts.FleetSettings`, the setup Job's
 Kubernetes RBAC, and the unreachable configuration-role/installer chain that
-depended on the reader. The SQL `fleet_trust` row and its observer stay: about
-45 migration functions require a fresh row. Its observation now comes from the
-generated installation ID and issuer epoch alone.
+depended on the reader.
 
-Gaps: the fleet trust heartbeat (one SQL observation per second) remains until those
-functions stop checking `fresh_until`; `administrators` is optional in the
+Gaps: `administrators` is optional in the
 implemented identity copy until the identity reader adopts the canonical
 contract; the `fleet-operator` role name stays in docs/interfaces.
 
@@ -344,10 +427,9 @@ examples go through `readImplementedExample` or the console equivalent.
 | Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; generated DebugPolicy/CaptureProfile CRDs |
 | `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
 | `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
-| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
+| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
 | `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
 
-| `cluster-access-binding.schema.json` | `namespaceSelector` narrows a binding; hub-cluster `privacy-operator` role | `internal/adapters/kubernetes/permission_decode.go` `clusterBindings`: a selector-narrowed Allow grants nothing and a selector-narrowed Deny applies to every namespace (fail closed); `privacy-operator` has no consumer and is dropped |
 | `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |
 
 ## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)

@@ -72,7 +72,7 @@ ORDER BY s.policy_uid;
 -- name: FindAutomationBases :many
 SELECT b.uid, b.generation, b.spec_digest FROM permission_basis b
 WHERE b.stream_id=$1 AND b.kind='AccessBinding' AND b.effect='Allow' AND b.automation_json IS NOT NULL
-AND b.cluster_id=$2 AND b.namespace_uid=$3 AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids))
+AND b.cluster_id=$2 AND b.namespace_uid=$3 AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids) OR EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=b.cluster_id AND w.workload_uid=$4::text AND w.ref=ANY(b.workload_uids)))
 ORDER BY b.basis_key LIMIT 2;
 
 -- name: FindPolicyOccurrence :one

@@ -132,24 +132,6 @@
           "properties": {
             "groups": {
               "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "subjects": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "administrators": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "groups": {
-              "type": "array",
               "uniqueItems": true,
               "items": {
                 "type": "string",
@@ -341,13 +323,12 @@
     },
     "clusters": {
       "type": "array",
-      "description": "Workload clusters joined with mode=cluster, registered by their ServiceAccount issuer (ADR-334); the hub-api keeps each one's join Secret <name>-join-<name>.",
+      "description": "Workload clusters installed with mode=cluster, registered by name and ServiceAccount issuer (ADR-334); the hub derives each cluster ID from its name.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "name",
-          "clusterID",
           "issuer"
         ],
         "properties": {
@@ -355,10 +336,6 @@
             "type": "string",
             "maxLength": 40,
             "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-          },
-          "clusterID": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
           },
           "namespace": {
             "type": "string",
@@ -376,7 +353,10 @@
             "description": "The cluster's ServiceAccount token issuer (kubectl get --raw /.well-known/openid-configuration)."
           },
           "jwks": {
-            "type": ["string", "object"],
+            "type": [
+              "string",
+              "object"
+            ],
             "description": "The issuer's public JWKS (kubectl get --raw /openid/v1/jwks) when the hub cannot reach the issuer."
           },
           "connector": {
@@ -388,33 +368,6 @@
             "type": "boolean",
             "description": "Refuse this cluster's connector tokens."
           }
-        }
-      }
-    },
-    "remote": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Addresses joined clusters dial: TCP passthrough to the hub Services; connectors verify the in-cluster names.",
-      "properties": {
-        "federation": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^https://[^/@?#\\s]+/?$"
-        },
-        "owners": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^[^/@?#\\s:]+:[0-9]{1,5}$"
-        },
-        "keyService": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^https://[^/@?#\\s]+/?$"
-        },
-        "objectStore": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^https://[^/@?#\\s]+/?$"
         }
       }
     },
@@ -451,7 +404,7 @@
           "properties": {
             "share": {
               "$ref": "#/definitions/capacityshare",
-              "description": "Protected allocation per workload. Default usable capacity ÷ max(eligible workloads, 8)."
+              "description": "Protected allocation per workload. Default usable capacity \u00f7 max(enrolled workloads, 8)."
             },
             "limit": {
               "$ref": "#/definitions/capacityshare",
@@ -480,13 +433,6 @@
               "minimum": 1,
               "maximum": 9007199254740991,
               "default": 1
-            },
-            "onFull": {
-              "enum": [
-                "RejectNewExpensive",
-                "DeleteOldestEligibleInAccount"
-              ],
-              "default": "RejectNewExpensive"
             }
           }
         }
@@ -514,38 +460,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "joinSecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "mode=cluster: the hub's join Secret <name>-join-<cluster>, copied into this release's namespace."
-        },
-        "offerConfigMap": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-        },
-        "hub": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "federation": {
-              "type": "string",
-              "maxLength": 512,
-              "pattern": "^$|^https://[^/@?#\\s]+/?$"
-            },
-            "owners": {
-              "type": "string",
-              "maxLength": 512,
-              "pattern": "^$|^[^/@?#\\s:]+:[0-9]{1,5}$"
-            },
-            "keyService": {
-              "type": "string",
-              "maxLength": 512,
-              "pattern": "^$|^https://[^/@?#\\s]+/?$"
-            }
-          }
-        },
         "executor": {
           "type": "object",
           "additionalProperties": false,
@@ -558,13 +472,11 @@
               "minimum": 1,
               "maximum": 16
             },
-            "evidenceSecret": {
+            "profileAuthorization": {
               "type": "string",
               "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            },
-            "profileAuthorization": {
-              "type": "boolean"
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+              "description": "Secret in this namespace with profile-authorization.json (ADR-302); empty: none."
             },
             "alertmanager": {
               "type": "string",
@@ -734,6 +646,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "url": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^$|^https://[^/@?#\\s]+/?$",
+          "description": "The hub URL connectors dial. mode=cluster: the hub to join. Hub releases: the external URL workload clusters use (token audience and serving name)."
+        },
+        "caBundle": {
+          "type": "string",
+          "description": "mode=cluster: PEM roots for hub.url when the system roots do not verify it."
+        },
         "federation": {
           "type": "object",
           "additionalProperties": false,
@@ -1498,7 +1420,7 @@
                       }
                     }
                   },
-                  "description": "The S3 Service; NodePort or LoadBalancer when joined clusters write evidence (remote.objectStore)."
+                  "description": "The S3 Service; workload clusters reach it through hub.url."
                 }
               },
               "required": [

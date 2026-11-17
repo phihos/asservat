@@ -318,7 +318,8 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			b.Resource.UID = custodyID()
 			b.Scope.Workloads = nil
 			for range 62 {
-				b.Scope.Workloads = append(b.Scope.Workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: custodyID()})
+				uid := custodyID()
+				b.Scope.Workloads = append(b.Scope.Workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "api-" + uid[24:], UID: uid})
 			}
 			b.ScopeDigest = configapp.PermissionScopeDigest(b)
 			s.b.Bases = append(s.b.Bases, b)
@@ -1026,6 +1027,49 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		accept(t, &s)
 		if len(projection(t, s).Allows) != 0 {
 			t.Fatal("delete retained access")
+		}
+	})
+	// ADR-335 D4: a workload named without uid matches the resolved workload
+	// of that kind and name; a uid pins one instance.
+	t.Run("workload-by-name", func(t *testing.T) {
+		s := create(t)
+		next(&s)
+		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "api"}}
+		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
+		deny := s.b.Bases[0]
+		deny.Resource.UID = custodyID()
+		deny.Effect = "Deny"
+		deny.Scope.Workloads = []cfg.WorkloadRef{{Kind: "StatefulSet", Name: "db"}}
+		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
+		s.b.Bases = append(s.b.Bases, deny)
+		accept(t, &s)
+		flush(t, s.p)
+		if p := projection(t, s); len(p.Allows) != 0 || len(p.Denies) != 0 {
+			t.Fatal("unresolved workload matched a name")
+		}
+		remember := func(uid, ref string) {
+			if _, err := admin.Exec(ctx, "INSERT INTO workload_name(cluster_id,workload_uid,ref) VALUES($1,$2,$3)", s.target.ClusterID, uid, ref); err != nil {
+				t.Fatal(err)
+			}
+		}
+		remember(s.target.WorkloadUID, "Deployment/api")
+		if p := projection(t, s); len(p.Allows) != 1 || len(p.Denies) != 0 {
+			t.Fatal("named workload not granted", p.Allows, p.Denies)
+		}
+		other := s
+		other.target.WorkloadUID = custodyID()
+		remember(other.target.WorkloadUID, "StatefulSet/db")
+		if p := projection(t, other); len(p.Allows) != 0 || len(p.Denies) != 1 {
+			t.Fatal("named deny not applied", p.Allows, p.Denies)
+		}
+		next(&s)
+		s.b.Bases = s.b.Bases[:1]
+		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "api", UID: custodyID()}}
+		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
+		accept(t, &s)
+		flush(t, s.p)
+		if p := projection(t, s); len(p.Allows) != 0 {
+			t.Fatal("pinned uid matched another instance by name")
 		}
 	})
 	t.Run("explicit-deny-precedes-audit", func(t *testing.T) {

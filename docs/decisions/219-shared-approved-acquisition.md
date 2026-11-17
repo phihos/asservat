@@ -206,7 +206,7 @@ checks only the workload's immutable reserved allocation against the backing;
 `capacity_managed_root_until`. The workload's `context_storage_binding`
 freshness, `capacity_workload` revision/pool/policy match and capacity source
 suspension no longer gate query admission, worker batches or polls. Reads stay
-bounded by the shared acquisition worker limit, the original root, principal
+bounded by the original root, principal
 and per-workload query charges, per-principal operation-audit allowances, and
 every permission, retention, recovery, processing, catalog and accepted worker
 configuration check. Evidence of a deleted workload stays queryable within

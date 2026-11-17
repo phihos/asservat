@@ -38,6 +38,17 @@ func (q *Queries) ApplyCapacity(ctx context.Context, arg ApplyCapacityParams) ([
 	return applied, err
 }
 
+const capacityExpensiveAdmits = `-- name: CapacityExpensiveAdmits :one
+SELECT capacity_expensive_admits($1::uuid)::boolean AS admits
+`
+
+func (q *Queries) CapacityExpensiveAdmits(ctx context.Context, allocationID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, capacityExpensiveAdmits, allocationID)
+	var admits bool
+	err := row.Scan(&admits)
+	return admits, err
+}
+
 const enrollCapacity = `-- name: EnrollCapacity :one
 SELECT capacity_enroll($1::uuid,$2::uuid,$3::text,$4::text,$5::uuid,$6::uuid,$7::bytea)::uuid AS allocation_id
 `

@@ -27,5 +27,8 @@ func (t Targets) ResolveWorkloadIdentity(ctx context.Context, r targets.Workload
 	if call.Err() != nil || !now.Before(until) || !out.Valid(now) || out.Reference != r || out.ClusterID != r.ClusterID || out.Namespace.Name != r.Namespace || r.Kind != "Pod" && (out.Workload.Kind != r.Kind || out.Workload.Name != r.Name) {
 		return targets.WorkloadIdentityResolution{}, targets.ErrUnavailable
 	}
+	if t.remember(ctx, r.ClusterID, out.Workload) != nil {
+		return targets.WorkloadIdentityResolution{}, targets.ErrUnavailable
+	}
 	return out, nil
 }

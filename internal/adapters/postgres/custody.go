@@ -30,7 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 190
+const currentSchemaVersion = 195
 
 // schemaFloorComment prefixes the version table's comment that records the
 // oldest binary schema the database still serves (ADR-227). Only the schema
@@ -194,11 +194,14 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 		}
 		// Never leak SQL, identities or connection details: only a closed cause
 		// word (a SQLSTATE is a fixed five-character class) for diagnostics.
+		var named interface{ FixedStep() string }
 		switch {
 		case errors.As(err, &pe) && len(pe.Code) == 5:
 			return unavailableCause("sql-" + pe.Code)
 		case ctx.Err() != nil:
 			return unavailableCause("deadline")
+		case errors.As(err, &named):
+			return unavailableCause(named.FixedStep())
 		}
 		return unavailableCause("client")
 	}

@@ -9,8 +9,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -48,7 +46,6 @@ type capacityEnrollment struct {
 var capacityStanding = time.Date(9970, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type capacitySQLFixture struct {
-	fleetRefreshMu   sync.Mutex
 	ctx              context.Context
 	admin            *pgxpool.Pool
 	installed        capacityFixtureSetup
@@ -57,8 +54,6 @@ type capacitySQLFixture struct {
 	values           app.CapacityValues
 	permission       *postgres.Permissions
 	batch            cfg.PermissionBatch
-	observer         *postgres.FleetObservation
-	administration   fleet.Administration
 	roles            map[string]*pgxpool.Pool
 	accounts         *auditapp.OperationMAC
 	namespace        cfg.NamespaceRef
@@ -72,9 +67,9 @@ type capacitySQLFixture struct {
 	processingPolicy privacy.DownloadPolicy
 }
 
-func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
+func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
 	t.Helper()
-	f := &capacitySQLFixture{ctx: ctx, admin: admin, installed: newCapacityFixtureSetup(t, scope), administration: administration, roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
+	f := &capacitySQLFixture{ctx: ctx, admin: admin, installed: newCapacityFixtureSetup(t, scope), roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
 	for len(f.workloads) < capacityNativeAccounts {
 		f.workloads = append(f.workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "envelope-" + strconv.Itoa(len(f.workloads)), UID: custodyID()})
 	}
@@ -116,17 +111,7 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal(e)
 	}
 	f.keys = authorityTestKeys{a: aead}
-	observerName := "capacity_observer_" + strings.ReplaceAll(custodyID(), "-", "")
-	qname := pgx.Identifier{observerName}.Sanitize()
-	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO "+qname); e != nil {
-		t.Fatal("fixture observation role unavailable", e)
-	}
 	var err error
-	f.observer, err = postgres.NewFleetObservation(ctx, poolFor(observerName, "synthetic-observer"), scope.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.refreshFleet(t)
 	// The runtime logins come from the same reconciliation `asservat setup`
 	// runs, with fixture-generated passwords.
 	start := time.Now()
@@ -207,69 +192,8 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	return f
 }
 
-func (f *capacitySQLFixture) refreshFleet(t *testing.T) {
-	t.Helper()
-	f.fleetRefreshMu.Lock()
-	defer f.fleetRefreshMu.Unlock()
-	basis := fleetBasisFixture(t, f.ctx, f.observer)
-	a := f.administration
-	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
-	if err := f.observer.ObserveAdministration(f.ctx, basis, a); err != nil {
-		t.Fatal("current original fleet source", err)
-	}
-}
-
-// keepFleetCurrent renews the fixture's fleet observation every second until
-// stopped; it returns the first renewal failure.
-func (f *capacitySQLFixture) keepFleetCurrent() func() error {
-	return keepFixtureFleetCurrent(f.ctx, f.observer, f.administration, &f.fleetRefreshMu)
-}
-
-func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration, serialized ...*sync.Mutex) func() error {
-	var refreshMu *sync.Mutex
-	if len(serialized) > 0 {
-		refreshMu = serialized[0]
-	}
-	stop, done := make(chan struct{}), make(chan error, 1)
-	go func() {
-		tick := time.NewTicker(time.Second)
-		defer tick.Stop()
-		for {
-			select {
-			case <-stop:
-				done <- nil
-				return
-			case <-tick.C:
-				err := func() error {
-					if refreshMu != nil {
-						refreshMu.Lock()
-						defer refreshMu.Unlock()
-					}
-					// One fixture producer owns basis, observation clock and persistence.
-					// Sampling outside this lock could backdate against the other refresher.
-					b, err := observer.ReadAdministrationBasis(ctx)
-					if err != nil {
-						return err
-					}
-					a := administration
-					a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-					a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
-					return observer.ObserveAdministration(ctx, b, a)
-				}()
-				if err != nil {
-					done <- err
-					return
-				}
-			}
-		}
-	}()
-	return func() error { close(stop); return <-done }
-}
-
 func (f *capacitySQLFixture) refreshBase(t *testing.T) {
 	t.Helper()
-	f.refreshFleet(t)
 	fence := cfg.PermissionFence{RootID: f.batch.RootID, Epoch: f.batch.Epoch, TrustDigest: f.batch.TrustDigest, Sequence: f.batch.ExpectedSequence}
 	if _, err := f.permission.RenewPermissions(f.ctx, fence); err != nil {
 		t.Fatal("original permission controller lease", err)

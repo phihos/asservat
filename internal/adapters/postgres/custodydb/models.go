@@ -256,7 +256,6 @@ type CapacitySetting struct {
 	LimitBytes             int64
 	NamespaceLimitBytes    pgtype.Int8
 	MaxConcurrentExpensive int32
-	OnFull                 string
 	Revision               int64
 }
 
@@ -963,7 +962,6 @@ type DownloadWorker struct {
 	RootID                    pgtype.UUID
 	InstallationID            pgtype.UUID
 	AllocationID              pgtype.UUID
-	PrincipalKey              []byte
 	Generation                int64
 	IntentJson                []byte
 	RunUntil                  pgtype.Timestamptz
@@ -1074,31 +1072,14 @@ type FleetInitialActivation struct {
 	ActivatedAt      pgtype.Timestamptz
 }
 
-type FleetObservation struct {
-	InstallationID        pgtype.UUID
-	SemanticVersion       int64
-	IssuerEpoch           pgtype.UUID
-	SourceUid             string
-	SourceGeneration      int64
-	SourceDigest          []byte
-	ActivatedPostmasterAt pgtype.Timestamptz
-	ActivatedDatabaseOid  pgtype.Uint32
-	ObservedAt            pgtype.Timestamptz
-	FreshUntil            pgtype.Timestamptz
-}
-
 type FleetTrust struct {
 	InstallationID        pgtype.UUID
 	IssuerEpoch           pgtype.UUID
 	SourceUid             string
 	SourceGeneration      int64
 	SourceDigest          []byte
-	Suspended             bool
-	ObservedAt            pgtype.Timestamptz
-	FreshUntil            pgtype.Timestamptz
 	ActivatedPostmasterAt pgtype.Timestamptz
 	ActivatedDatabaseOid  pgtype.Uint32
-	SemanticVersion       int64
 }
 
 type HubOwnerCertificate struct {
@@ -1769,4 +1750,10 @@ type RetentionSourceEpoch struct {
 	NamespaceUid string
 	Epoch        pgtype.UUID
 	CreatedAt    pgtype.Timestamptz
+}
+
+type WorkloadName struct {
+	ClusterID   pgtype.UUID
+	WorkloadUid string
+	Ref         string
 }

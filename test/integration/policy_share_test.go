@@ -73,9 +73,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// observation. Model its existing producer under the exact original
 		// installation/epoch/source/incarnation pins before each new operation;
 		// this renews neither a capture's authority nor its writer deadline.
-		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
-			t.Fatal("policy share current original fleet source", err)
-		}
 		b := s.batch
 		b.ObservedAt = clock()
 		b.FreshUntil = b.ObservedAt.Add(5 * time.Second)
@@ -481,9 +478,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// below. Renew it as its producer would, once before and once after.
 	renewFleet := func() {
 		t.Helper()
-		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
-			t.Fatal("renew synthetic fleet observation", err)
-		}
 	}
 	renewFleet()
 	time.Sleep(time.Until(end) + time.Second)

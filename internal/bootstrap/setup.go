@@ -311,9 +311,9 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 	for _, name := range report.Missing {
 		_, _ = fmt.Fprintln(out, "  no credential mounted: "+name)
 	}
-	// P3: trust root, activation and first fleet observation.
+	// P3: static installation trust row.
 	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
-		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, installationTrustAt(ids.InstallationID, ids.IssuerEpoch, time.Now())))
+		return setupStep("seed", postgres.SeedInstallation(ctx, ddlConfig, ids.InstallationID, ids.IssuerEpoch))
 	})
 	if err != nil {
 		return err

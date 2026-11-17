@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -25,6 +26,20 @@ type Targets struct {
 	// Report receives a fixed query outcome key separately from timing text.
 	// Neither argument contains targets, peers or error text.
 	Report func(event, timing string)
+	// Names records each resolved Deployment's or StatefulSet's kind and
+	// name by UID; AccessBindings naming a workload without uid match
+	// through it (ADR-335 D4). A resolution it cannot record is refused.
+	Names interface {
+		RememberWorkload(context.Context, string, configuration.WorkloadRef) error
+	}
+}
+
+// remember records a resolved workload's name; a bare Pod has none.
+func (t Targets) remember(ctx context.Context, cluster string, w configuration.WorkloadRef) error {
+	if t.Names == nil || w.Kind == "Pod" {
+		return nil
+	}
+	return t.Names.RememberWorkload(ctx, cluster, w)
 }
 
 func (t Targets) query(ctx context.Context, cluster, method string, in any, matches func(targets.PodResolution) bool) (targets.PodResolution, error) {
@@ -57,6 +72,8 @@ func (t Targets) query(ctx context.Context, cluster, method string, in any, matc
 		report(queryResultStep(call, regionalUntil, until, now))
 	case !matches(out):
 		report("result/request")
+	case t.remember(ctx, cluster, out.Request.Workload) != nil:
+		report("result/name")
 	default:
 		report("ok")
 		return out, nil
@@ -331,6 +348,10 @@ func (t Targets) resolveRecorder(ctx context.Context, r targets.Request, method 
 	}
 	if out.Recorder.Outcome != targets.RecorderAvailable {
 		return targets.PodResolution{}, targets.ErrUnsupported
+	}
+	if t.remember(ctx, r.ClusterID, out.Target.Request.Workload) != nil {
+		report("result/name")
+		return targets.PodResolution{}, targets.ErrUnavailable
 	}
 	report("ok")
 	return out.Target, nil

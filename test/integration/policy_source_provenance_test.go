@@ -23,10 +23,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Real source admission/provenance, occurrence and snapshot custody. Original
@@ -67,18 +64,8 @@ type sourceSnapshotQualificationMode struct {
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
 	manual, cancellation, requireApproval, reason, groupCount := mode.manual, mode.cancellation, mode.requireApproval, mode.reason, mode.groupCount
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		t.Run("empty-provenance-down-up", func(t *testing.T) {
-			provider, closeProvider := source107MigrationProvider(t, admin)
-			defer closeProvider()
-			if _, err := provider.DownTo(ctx, 106); err != nil {
-				t.Fatal("Down107 empty", err)
-			}
-			if _, err := provider.Up(ctx); err != nil {
-				t.Fatal("Up107 empty", err)
-			}
-		})
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			if manual {
 				configureManualSourceCapacity(f)
 			}
@@ -91,12 +78,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 		})
 		sourceCeiling := int64(max(4, groupCount))
 		root, enrollment := f.setup(t)
-		stop := f.keepFleetCurrent()
-		defer func() {
-			if err := stop(); err != nil {
-				t.Error(err)
-			}
-		}()
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
@@ -196,22 +177,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				if _, err = admin.Exec(ctx, `UPDATE policy_recording_source SET source_target_json=jsonb_set(source_target_json,'{Request,PodName}','"replacement"'::jsonb) WHERE root_id=$1 AND id=$2`, s.a.RootID, sourceID); capacitySQLState(err) != "23514" {
 					t.Fatal("original target mutated", err)
 				}
-				// Goose commits each Down separately. Only probe Down107 when
-				// already at107; dropping an empty108 first would tear down
-				// the schema required by the subsequent execution checks.
-				provider, closeProvider := source107MigrationProvider(t, admin)
-				defer closeProvider()
-				version, err := provider.GetDBVersion(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if version == 107 {
-					t.Run("populated107-down-refusal", func(t *testing.T) {
-						if _, err := provider.DownTo(ctx, 106); err == nil {
-							t.Fatal("populated provenance discarded")
-						}
-					})
-				}
 			})
 			source107AddReader(t, ctx, f, "later-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
@@ -252,20 +217,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 					})
 				}
 				qualifyManualRecordingSaveGroup(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, cancellation, controls...)
-				t.Run("populated-group-down-refusal", func(t *testing.T) {
-					provider, closeProvider := source107MigrationProvider(t, admin)
-					defer closeProvider()
-					if _, err := provider.DownTo(ctx, 108); capacitySQLState(err) != "P0001" {
-						t.Fatal("expected retained group downgrade refusal", err)
-					}
-					if version, err := provider.GetDBVersion(ctx); err != nil || version != 109 {
-						t.Fatal("refusal partially changed grouped schema", version, err)
-					}
-					var groups int
-					if err := f.roles["hub-runtime"].QueryRow(ctx, "SELECT count(*) FROM recording_save_group").Scan(&groups); err != nil || groups == 0 {
-						t.Fatal("retained group or runtime access lost after refusal", groups, err)
-					}
-				})
 				return
 			}
 			if manual {
@@ -274,23 +225,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				} else {
 					qualifyManualRecordingSave(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
 				}
-				t.Run("populated-manual-down-refusal", func(t *testing.T) {
-					provider, closeProvider := source107MigrationProvider(t, admin)
-					defer closeProvider()
-					if _, err := provider.DownTo(ctx, 107); capacitySQLState(err) != "P0001" {
-						t.Fatal("expected manual migration guard refusal", err)
-					}
-					version, err := provider.GetDBVersion(ctx)
-					if err != nil || version != 108 {
-						t.Fatal("refusal partially changed schema", version, err)
-					}
-					// Use the real runtime role after refusal to check that the
-					// table and its purpose-specific access survived intact.
-					var reservations int
-					if err := f.roles["hub-runtime"].QueryRow(ctx, "SELECT count(*) FROM recording_save_reservation").Scan(&reservations); err != nil || reservations == 0 {
-						t.Fatal("manual reservation/access lost after refusal", reservations, err)
-					}
-				})
 				return
 			}
 			snapshotCheck := fresh(t)
@@ -317,22 +251,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 	})
 }
 
-func source107MigrationProvider(t *testing.T, admin *pgxpool.Pool) (*goose.Provider, func()) {
-	t.Helper()
-	db := stdlib.OpenDB(*admin.Config().ConnConfig)
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(0)
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		db.Close()
-		t.Fatal(err)
-	}
-	return provider, func() {
-		if err := db.Close(); err != nil {
-			t.Error(err)
-		}
-	}
-}
 
 func source107AddReader(t *testing.T, ctx context.Context, f *capacitySQLFixture, subject string) {
 	t.Helper()

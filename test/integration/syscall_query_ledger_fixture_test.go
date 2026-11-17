@@ -20,8 +20,8 @@ import (
 // encrypted verified publication and compiled hub/key roles. Payload, target,
 // native Job/Pod/issuer/join facts are synthetic; no collector is invoked.
 func TestRawSyscallQueryLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyPacketQueryManagedLifecycle, false, false, false, false, false, true)
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyPacketQueryManagedLifecycle, false, false, false, false, false, true)
 	})
 }
 func packetQueryFixtureOperation(f *queryLedgerFixture) string {

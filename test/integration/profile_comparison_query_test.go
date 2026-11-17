@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
@@ -46,9 +45,9 @@ func TestProfileComparisonLedgerOriginalQualification(t *testing.T) {
 // C14 ownership/worker pins are explicit fixture facts. Direct key-role writes
 // below qualify SQL masks only, never mTLS/key-service use or native delivery.
 func TestProfileComparisonQueryLedgerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		t.Run("profile-comparison-source-and-ledger", func(t *testing.T) {
-			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyProfileComparisonQueries, true, true)
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyProfileComparisonQueries, true, true)
 		})
 	})
 }
@@ -325,28 +324,13 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 	if total, principal, first, second := snapshot(); total != 40 || principal != 40 || first != 30 || second != 10 {
 		t.Fatal("cross workload not10+10/root20", total, principal, first, second)
 	}
-	// One worker with two allocation references is counted only once in the
-	// global/principal totals and once in each workload's separate ceiling.
+	// One worker row may reference both allocations.
 	intent := value.ContextProjectionWorkerIntent{Query: q, Worker: authorization.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: authorization.AcquisitionParent{Purpose: authorization.AcquisitionProjection, ID: q.ID}, Profile: f.workerProfile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
 	if !intent.Valid() {
 		t.Fatal("synthetic cross worker DTO invalid")
 	}
-	var principalKey []byte
-	if e = admin.QueryRow(ctx, "SELECT principal_key FROM context_query_principal WHERE id=$1", q.Plan.AccountID).Scan(&principalKey); e != nil {
-		t.Fatal(e)
-	}
-	if _, e = admin.Exec(ctx, `INSERT INTO download_worker(id,query_id,root_id,installation_id,query_allocation_id,baseline_query_allocation_id,principal_key,generation,intent_json,run_until) VALUES($1,$2,$3,$4,$5,$6,$7,1,$8,$9)`, q.WorkerID, q.ID, q.Scope.RootID, q.Plan.InstallationID, q.Plan.AllocationID, q.BaselinePlan.AllocationID, principalKey, raw(intent), q.WorkerUntil); e != nil {
+	if _, e = admin.Exec(ctx, `INSERT INTO download_worker(id,query_id,root_id,installation_id,query_allocation_id,baseline_query_allocation_id,generation,intent_json,run_until) VALUES($1,$2,$3,$4,$5,$6,1,$7,$8)`, q.WorkerID, q.ID, q.Scope.RootID, q.Plan.InstallationID, q.Plan.AllocationID, q.BaselinePlan.AllocationID, raw(intent), q.WorkerUntil); e != nil {
 		t.Fatal("two-allocation worker row", e)
-	}
-	for i, p := range []value.ContextQueryPlan{q.Plan, q.BaselinePlan} {
-		counts, err := custodydb.New(admin).AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: capacityProjectionUUID(t, q.Plan.InstallationID), ClusterID: capacityProjectionUUID(t, p.ClusterID), NamespaceUid: p.NamespaceUID, WorkloadUid: p.WorkloadUID, PrincipalKey: principalKey})
-		want := int64(2)
-		if i == 1 {
-			want = 1
-		}
-		if err != nil || counts.Total != 2 || counts.Principal != 2 || counts.Workload != want {
-			t.Fatal("pair worker not counted against both distinct workloads", counts, want, err)
-		}
 	}
 	// Fill only the second allocation with separately audited10-unit summary
 	// rows. These synthetic-source SQL rows do not acquire or expose evidence.

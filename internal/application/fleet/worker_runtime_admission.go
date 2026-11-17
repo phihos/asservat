@@ -10,21 +10,19 @@ import (
 
 // WorkerRuntimeAdmission only schedules the six fixed expensive worker2
 // operations. A ticket supplies no native/SQL/provider proof or new deadline.
-// Independent fleet and owner source observers never enter this queue.
+// The owner source observer never enters this queue.
 type WorkerRuntimeAdmission struct {
-	mu          sync.Mutex
-	self        *WorkerRuntimeAdmission
-	root        context.Context
-	closeOnce   sync.Once
-	closed      bool
-	active      *workerRuntimeTicket
-	queue       []*workerRuntimeTicket
-	slots       [6]*workerRuntimeTicket
-	changed     chan struct{}
-	stop        func() bool
-	done        chan struct{}
-	fleetKnown  *value.Administration
-	fleetNotice *value.Administration
+	mu        sync.Mutex
+	self      *WorkerRuntimeAdmission
+	root      context.Context
+	closeOnce sync.Once
+	closed    bool
+	active    *workerRuntimeTicket
+	queue     []*workerRuntimeTicket
+	slots     [6]*workerRuntimeTicket
+	changed   chan struct{}
+	stop      func() bool
+	done      chan struct{}
 }
 
 type workerRuntimePurpose uint8
@@ -45,7 +43,6 @@ type workerRuntimeTicket struct {
 	ready           chan struct{}
 	granted         bool
 	schedulingUntil time.Time
-	grantedAt       time.Time
 	scheduled       bool
 	ownerAuditTaken bool
 }
@@ -169,7 +166,7 @@ func (s *WorkerRuntimeAdmission) dispatchLocked() {
 			s.removeLocked(next)
 			continue
 		}
-		s.active, next.granted, next.grantedAt = next, true, time.Now()
+		s.active, next.granted = next, true
 		close(next.ready)
 		return
 	}

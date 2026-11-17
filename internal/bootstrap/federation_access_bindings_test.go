@@ -73,7 +73,7 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 		defer server.Close()
 		roots := x509.NewCertPool()
 		roots.AddCert(server.Certificate())
-		client, err := connectorlifecycle.NewClient(server.URL, "example.com", roots, func() ([]byte, error) { return []byte("synthetic"), nil })
+		client, err := connectorlifecycle.NewClient(server.URL, roots, func() ([]byte, error) { return []byte("synthetic"), nil })
 		if err != nil {
 			t.Fatal(err)
 		}

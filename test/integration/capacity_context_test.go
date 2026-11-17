@@ -51,7 +51,7 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root capacityRo
 	retention := retentionFactory(t, f.input.PermissionRootID, target.Target())
 	recovery := &recoveryEffectFixture{installation: f.input.InstallationID}
 	var err error
-	recovery.observation, err = readSyntheticFleetObservationBinding(f.ctx, f.admin, f.input.InstallationID)
+	recovery.observation, err = readSyntheticFleetBinding(f.ctx, f.admin, f.input.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}

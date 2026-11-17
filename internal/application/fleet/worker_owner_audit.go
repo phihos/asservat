@@ -113,7 +113,7 @@ func (s *workerOwnerAudit) run(ctx context.Context) {
 		if err != nil {
 			continue
 		}
-		if lease.AwaitFleetObservation() != nil {
+		if lease.Schedule() != nil {
 			lease.Release()
 			continue
 		}
@@ -153,17 +153,17 @@ func (s *workerOwnerAudit) run(ctx context.Context) {
 }
 
 // RunWithIndependentOwnerAudit is selected only by the fresh worker2 loader.
-// Both source loops retain their one-second-after-completion cadence, while
+// The source loop retains its one-second-after-completion cadence, while
 // the fixed audit actor may wait for the shared expensive-operation admission.
 // It does not implement a generic background task queue.
 func (s *ConfigurationReconciler) RunWithIndependentOwnerAudit(ctx context.Context, admission *WorkerRuntimeAdmission) error {
-	if s == nil || admission == nil || admission.self != admission || ctx == nil || ctx.Err() != nil || s.Fleet == nil || s.Owner == nil || s.Fleet.Settings == nil || s.Fleet.Projection == nil || s.Fleet.Now == nil || s.Owner.Reader == nil || s.Owner.Ledger == nil || s.Owner.Audit == nil || s.Owner.Acknowledgements == nil || s.Owner.Now == nil || !s.running.CompareAndSwap(false, true) {
+	if s == nil || admission == nil || admission.self != admission || ctx == nil || ctx.Err() != nil || s.Owner == nil || s.Owner.Reader == nil || s.Owner.Ledger == nil || s.Owner.Audit == nil || s.Owner.Acknowledgements == nil || s.Owner.Now == nil || !s.running.CompareAndSwap(false, true) {
 		return value.ErrInvalid
 	}
 	root, cancel := context.WithCancel(ctx)
 	defer cancel()
 	audit := &workerOwnerAudit{owner: s.Owner, admission: admission, wake: make(chan struct{}, 1)}
-	done := make(chan struct{}, 3)
+	done := make(chan struct{}, 2)
 	loop := func(observe func(context.Context) error) {
 		defer func() { done <- struct{}{} }()
 		for root.Err() == nil {
@@ -179,7 +179,6 @@ func (s *ConfigurationReconciler) RunWithIndependentOwnerAudit(ctx context.Conte
 			}
 		}
 	}
-	go loop(s.Fleet.Reconcile)
 	go loop(func(ctx context.Context) error {
 		c, ack, err := s.Owner.observeForAuditNotifying(ctx, audit)
 		audit.notify(c, ack, err)
@@ -188,7 +187,7 @@ func (s *ConfigurationReconciler) RunWithIndependentOwnerAudit(ctx context.Conte
 	go func() { defer func() { done <- struct{}{} }(); audit.run(root) }()
 	<-root.Done()
 	cancel()
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 2; i++ {
 		<-done
 	}
 	return root.Err()

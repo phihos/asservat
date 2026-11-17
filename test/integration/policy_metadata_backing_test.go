@@ -23,18 +23,12 @@ import (
 // admission/permit/stored graph samples; no publication/native/physical-bloat/
 // backup result is inferred, nor is the synthetic guard a native installer.
 func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
 		profile := installedMetadataProfile
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			policyMetadataProfile(&f.qualification, &f.values)
 		})
 		root, enrollment := f.setup(t)
-		stop := f.keepFleetCurrent()
-		defer func() {
-			if err := stop(); err != nil {
-				t.Error(err)
-			}
-		}()
 		var metadata app.RootMetadataQualification
 		var raw []byte
 		if err := admin.QueryRow(ctx, "SELECT qualification->'RootBacking'->'Metadata' FROM capacity_settings WHERE root_id=$1", f.input.PermissionRootID).Scan(&raw); err != nil || json.Unmarshal(raw, &metadata) != nil {

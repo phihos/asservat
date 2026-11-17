@@ -272,11 +272,6 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			return s.refusal(requestID, name, until, failure, status, operationEffectNone, true)
 		}
 	}
-	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
-		// ADR-282: the live worker caps are full; the query was not admitted
-		// or charged, and a later page request may succeed.
-		return s.refusal(requestID, name, until, httpHeaderNotAvailable, operationAuditDenied, operationEffectNone, false)
-	}
 	if d == nil && name == "get_pcap_summary" && analysisapp.PacketSummaryUnavailableBeforeAdmission(err) {
 		return s.refusal(requestID, name, until, packetSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
 	}

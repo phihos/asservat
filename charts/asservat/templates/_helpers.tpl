@@ -298,14 +298,13 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- mulf $n $m -}}
 {{- end -}}
 
-{{/* ADR-334: the audience of the connector's ServiceAccount token, the hub
-     URL it dials: in mode=cluster the hub's remote.federation (set as
-     region.hub.federation), otherwise the in-cluster federation Service. */}}
+{{/* ADR-334: the hub URL the connector dials and its token's audience:
+     in mode=cluster hub.url, otherwise the in-cluster federation Service. */}}
 {{- define "asservat.connectorAudience" -}}
 {{- if eq .Values.mode "cluster" -}}
-{{- required "region.hub.federation is the hub's remote.federation URL, the connector's token audience" .Values.region.hub.federation -}}
+{{- required "mode=cluster needs hub.url, the hub to join" .Values.hub.url | trimSuffix "/" -}}
 {{- else -}}
-{{- .Values.region.hub.federation | default (printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace) -}}
+{{- printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace -}}
 {{- end -}}
 {{- end -}}
 
@@ -320,7 +319,7 @@ their tokens are refused).
 {{- $clusters := list -}}
 {{- range .Values.clusters -}}
 {{- if not .revoked -}}
-{{- $c := dict "name" .name "clusterID" .clusterID "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) -}}
+{{- $c := dict "name" .name "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) -}}
 {{- with .jwks }}{{ $_ := set $c "jwks" (ternary . (toJson .) (kindIs "string" .)) }}{{ end -}}
 {{- $clusters = append $clusters $c -}}
 {{- end -}}
@@ -333,7 +332,6 @@ their tokens are refused).
 {{/* The token audiences the hub's federation accepts (JSON list). */}}
 {{- define "asservat.federationAudiences" -}}
 {{- $out := list (printf "https://%s-federation.%s.svc:9446" (include "asservat.name" .) .Release.Namespace) -}}
-{{- with .Values.remote.federation }}{{ $out = append $out . }}{{ end -}}
-{{- if and (eq .Values.mode "combined") .Values.region.hub.federation }}{{ $out = append $out .Values.region.hub.federation }}{{ end -}}
+{{- with .Values.hub.url }}{{ $out = append $out (trimSuffix "/" .) }}{{ end -}}
 {{- toJson (uniq $out) -}}
 {{- end -}}

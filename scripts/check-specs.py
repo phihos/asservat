@@ -1287,7 +1287,7 @@ def main() -> None:
     rejects(examples["manifest.json"], "manifest", lambda d: d["retention"].pop("parentExpiresAt"), True)
     rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"limit": "1%"}), True)
     rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"limit": 1}))
-    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"onFull": "EvictOtherWorkload"}))
+    rejects(examples["capacity-values.yaml"], "capacity", lambda d: d["workload"].update({"onFull": "RejectNewExpensive"}))
     rejects(examples["capacity-values.yaml"], "capacity", lambda d: d.update({"protectedAllocations": []}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"futureCaptures": {"enabled": True, "maxCaptures": 10}}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"owner": intent["spec"]["createdBy"]}))

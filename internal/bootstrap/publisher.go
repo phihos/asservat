@@ -192,8 +192,8 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 			return nil, mounts.ErrUnavailable
 		}
 	}
-	for _, cluster := range c.RemoteClusters {
-		if err = topologies.AddRemoteTopology(observer, root, cluster); err != nil {
+	for _, name := range c.RemoteClusters {
+		if err = topologies.AddRemoteTopology(observer, root, contracts.RemoteClusterID(installation, name)); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}

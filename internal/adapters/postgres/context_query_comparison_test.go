@@ -130,7 +130,7 @@ func TestComparisonFullWorkerIntentCleanupUsesPurposeBound(t *testing.T) {
 		}
 		encoded := comparisonJSON(t, intent)
 		encoded = append(encoded, bytes.Repeat([]byte{' '}, (64<<10)+1-len(encoded))...)
-		row := custodydb.DownloadWorker{ID: id(selected.WorkerID), QueryID: id(selected.ID), RootID: id(selected.Scope.RootID), InstallationID: id(selected.Plan.InstallationID), QueryAllocationID: id(selected.Plan.AllocationID), BaselineQueryAllocationID: id(selected.BaselinePlan.AllocationID), PrincipalKey: principalKey(selected.Scope.Principal), Generation: 1, IntentJson: encoded, RunUntil: ts(selected.WorkerUntil)}
+		row := custodydb.DownloadWorker{ID: id(selected.WorkerID), QueryID: id(selected.ID), RootID: id(selected.Scope.RootID), InstallationID: id(selected.Plan.InstallationID), QueryAllocationID: id(selected.Plan.AllocationID), BaselineQueryAllocationID: id(selected.BaselinePlan.AllocationID), Generation: 1, IntentJson: encoded, RunUntil: ts(selected.WorkerUntil)}
 		workers := &ProjectionWorkers{queries: &ContextQueries{root: selected.Scope.RootID}, profile: profile}
 		got, err := workers.cleanupState(row)
 		if legacy && err == nil {

@@ -310,7 +310,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	queries := contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused")}
+	queries := contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused"), Names: previews}
 	reviewStore, err := postgres.NewAccessReviews(ctx, sql["access-review"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

@@ -150,7 +150,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 		}
 		return nil
 	})
-	want := []string{"ReadFleetTrust", "CurrentTime", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
+	want := []string{"ReadFleetTrust", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
 	if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 		t.Fatalf("identity enrollment: err=%v effects=%d calls=%v", err, effects, rows.calls)
 	}
@@ -278,7 +278,7 @@ func admittedProjectionIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *
 	receipt := audit.Receipt{Key: audit.ProjectionWorkerKey(i), Version: "original", ETag: "original", Bytes: 17, SHA256: artifact.Digest{8}}
 	rows.worker.SessionID, rows.worker.AllocationID = pgtype.UUID{}, pgtype.UUID{}
 	rows.worker.QueryID, rows.worker.QueryAllocationID = id(q.ID), id(q.Plan.AllocationID)
-	rows.worker.PrincipalKey, rows.worker.RunUntil, rows.worker.ClaimedAt = principalKey(q.Scope.Principal), ts(w.Intent.RunUntil), ts(created)
+	rows.worker.RunUntil, rows.worker.ClaimedAt = ts(w.Intent.RunUntil), ts(created)
 	rows.worker.IntentJson, rows.worker.JobJson, rows.worker.BindingJson, rows.worker.AuditReceiptJson = encode(i), encode(w.Job), encode(w.Binding), encode(receipt)
 	return s, rows, w, started
 }
@@ -333,7 +333,7 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 				return nil
 			})
 			if mode == "valid" {
-				want := []string{"ReadFleetTrust", "CurrentTime", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
+				want := []string{"ReadFleetTrust", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
 				if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 					t.Fatal("query identity failed or requested public authority", err, effects, rows.calls)
 				}
