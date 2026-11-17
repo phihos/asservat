@@ -70,7 +70,7 @@ func TestPolicyDeactivationOperationContract(t *testing.T) {
 		t.Fatal("deactivation reply", out, f.named)
 	}
 	// An unknown cluster name is a domain refusal; nothing is dispatched.
-	if out = policyCall(t, s, f, "deactivate_policy", `{"cluster":"elsewhere","namespace":"apps","policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "TargetGone" || f.stopped != 1 {
+	if out = policyCall(t, s, f, "deactivate_policy", `{"cluster":"elsewhere","namespace":"apps","policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "UnknownCluster" || f.stopped != 1 {
 		t.Fatal("unknown cluster", out)
 	}
 	if out = policyCall(t, s, f, "deactivate_policy", in); out["data"].(map[string]any)["replay"] != true {
