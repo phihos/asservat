@@ -1,7 +1,5 @@
 // Generated from canonical browser OpenAPI. Run npm run generate; do not edit.
 import type { components } from './approvals';
-export declare function validInput_request_policy_grant(value: unknown): value is components['schemas']['McpInput_request_policy_grant'];
-export declare function validOutput_request_policy_grant(value: unknown): value is components['schemas']['McpOutput_request_policy_grant'];
 export declare function validInput_request_raw_access(value: unknown): value is components['schemas']['McpInput_request_raw_access'];
 export declare function validOutput_request_raw_access(value: unknown): value is components['schemas']['McpOutput_request_raw_access'];
 export declare function validInput_get_grant(value: unknown): value is components['schemas']['McpInput_get_grant'];

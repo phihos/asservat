@@ -7,12 +7,10 @@ import { operations as defaultOperations, type Grant, type Operations, type Revi
 const date = (value: string) => new Date(value).toLocaleString();
 const reasons: Record<string, string> = {
   rawBytePredicate: 'a raw byte comparison in the packet filter can test payload bytes',
-  logs: 'the selected log window may contain sensitive user data; saved-log queries and native downloads have separate bounded permissions',
   syscallArguments: 'the recording captures approved scalar values and bounded reads of user memory; arguments may contain sensitive user data',
   liveProfile: 'live profiling can affect the application and records raw user data',
   rawPackets: 'the recording keeps payload prefixes up to the approved per-transport caps',
   httpHeaders: 'the recording reads payload to project HTTP/1 method, status, Content-Type and Content-Length; bodies, URLs and credentials are discarded',
-  recordingApprovalRequired: 'this installation requires approval for every recording',
   policyCollection: 'recurring policy collection uses a separate finite approval and shared budgets',
 };
 const accessOperation = (operation: string) => operation === 'get_logs' ? 'Saved log queries' : operation === 'pcap_query' ? 'Saved packet queries' : operation === 'syscall_query' ? 'Saved syscall argument queries' : operation === 'download_artifact' ? 'whole-file downloads' : operation;
@@ -23,13 +21,17 @@ const phases: Record<string, string> = {
 };
 const bytes = (n: number) => n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(n % (1 << 20) ? 1 : 0)} MiB` : `${n} bytes`;
 
-function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label: string }) {
-  if (!rows) return null;
+type Page = { rows: ReviewRow[]; next: string | null };
+
+function Rows({ page, empty, label, busy, onMore }: { page?: Page; empty: string; label: string; busy: boolean; onMore: () => void }) {
+  if (!page) return null;
+  const rows = page.rows;
   if (rows.length === 0) return <p>{empty}</p>;
-  return <ul className="progress-actions" aria-label={label}>{rows.map(row => <li key={row.grant_id}>
+  return <><ul className="progress-actions" aria-label={label}>{rows.map(row => <li key={row.grant_id}>
     <span><a href={'/approvals/' + row.grant_id}>{row.kind === 'rawQuery' ? `${hasQueries(row.raw_access.operations) ? 'Inspect' : 'Download'} ${row.raw_access.artifact_count} existing artifacts` : `${row.target.workload_kind} ${row.target.workload_name}`}</a>{row.kind !== 'rawQuery' && <> in {row.target.namespace}</>} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
-      {row.phase === 'Pending' && row.review_until && <> · review until {date(row.review_until)}</>}</span>
-  </li>)}</ul>;
+      {row.phase === 'Pending' && <> · review until {date(row.review_until)}</>}</span>
+  </li>)}</ul>
+  {page.next && <Button className="button secondary" isDisabled={busy} onPress={onMore}>More</Button>}</>;
 }
 
 function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void }) {
@@ -67,19 +69,19 @@ function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boole
           {profile.definition_digest && <details><summary>Reviewed endpoint definition</summary><p>{profile.source_kind === 'templateBinding' ? 'Pod template binding' : 'Administrator endpoint profile'} · <span className="identifier">{profile.definition_digest}</span></p></details>}
         </div>;
       })}
-      {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.{grant.observation_limits.max_observed_events !== undefined && <> {grant.observation_limits.max_observed_events} eligible entry and exit probes in total.</>}</p>}
+      {grant.observation_limits && <p>Observation limit bound by this approval: {bytes(grant.observation_limits.max_bytes_per_second)} per second.</p>}
       {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.map(accessOperation).join(', ')} on any of their clients, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
       {grant.result_access && hasQueries(grant.result_access.operations) && <p>Each paid query page reserves 24 KiB and one operation from that same follow-up pool. Downloaded bytes and query pages share its limit.</p>}
       {policy ? <>
         <p>Team policy <span className="identifier">{policy.uid}</span> runs as <span className="identifier">{policy.executor.subject}</span> under the reviewed team authority from {date(policy.authority_issued_at)} until {date(policy.authority_not_after)}.</p>
-        <p>Grant reservations: {policy.executions_used} of {policy.max_executions} action starts; {bytes(policy.collected_bytes_used)} of {bytes(policy.max_collected_bytes)} output; {bytes(policy.observed_bytes_used)} of {bytes(policy.max_observed_bytes)} sensitive observation.{!!policy.max_observed_events && <> {policy.observed_events_used ?? 0} of {policy.max_observed_events} eligible entry and exit probes.</>} Reservations include uncertain work and are not refunded by replacing an approval. Team, workload and admission limits can further restrict collection.</p>
+        <p>Used so far: {policy.executions_used} executions; {bytes(policy.collected_bytes_used)} of {bytes(policy.max_collected_bytes)} output. Team, workload and admission limits can further restrict collection.</p>
         <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} on {date(grant.requested_at)}. This approval expires {date(grant.not_after!)} from its original request; requester credentials do not renew team execution. Current team authority and permissions still apply.</p>
         <p>This approval grants no evidence access. Inspect or download gathered user data through your current evidence permissions.</p>
       </> : <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}. After approval, the requester submits the same reviewed request again from the capture page; Asservat recomputes the plan and rechecks current access.{grant.capture_deadline_rule === 'acceptanceWithinGrant' && ` Submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.`} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>}
     </section>}
     <section className="review-section" aria-labelledby="approval-state">
       <h2 id="approval-state">Decision</h2>
-      <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && grant.review_until && <> until {date(grant.review_until)}</>}
+      <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && <> until {date(grant.review_until)}</>}
         {grant.decision && <> · {grant.decision.decision} by {grant.decision.decided_by.subject} on {date(grant.decision.decided_at)}: {grant.decision.reason}</>}
         {grant.not_after && (grant.kind === 'policy' || grant.phase === 'Approved') && <> · valid until {date(grant.not_after)}</>}
         {grant.revoked_at && <> · revoked {date(grant.revoked_at)}</>}</p>
@@ -103,8 +105,8 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [pending, setPending] = useState<ReviewRow[]>();
-  const [requested, setRequested] = useState<ReviewRow[]>();
+  const [pending, setPending] = useState<Page>();
+  const [requested, setRequested] = useState<Page>();
   const [grant, setGrant] = useState<Grant>();
   // One key per intended decision, reused only for a retry of the same one.
   const keys = useRef(new Map<string, string>());
@@ -120,13 +122,25 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       }
       const [inbox, own] = await Promise.all([client.call('list_reviews', { view: 'pending' }, session.csrf_token, scope), client.call('list_reviews', { view: 'requested' }, session.csrf_token, scope)]);
       if (scope.aborted) return;
-      if (inbox.status === 'ok') setPending(inbox.data.approvals); else if (inbox.status === 'error') setMessage(inbox.data.message);
-      if (own.status === 'ok') setRequested(own.data.approvals); else if (own.status === 'error') setMessage(own.data.message);
+      if (inbox.status === 'ok') setPending({ rows: inbox.data.approvals, next: inbox.next_cursor }); else if (inbox.status === 'error') setMessage(inbox.data.message);
+      if (own.status === 'ok') setRequested({ rows: own.data.approvals, next: own.next_cursor }); else if (own.status === 'error') setMessage(own.data.message);
     } catch (error) {
       if (!scope.aborted) setMessage(operationMessage(error));
     } finally { if (!scope.aborted) setBusy(false); }
   }, [client, grantID, scope, session.csrf_token]);
   useEffect(() => { heading.current?.focus(); void load(); }, [load]);
+  // Appends the next page of one view; the server's cursor is opaque.
+  const more = async (view: 'pending' | 'requested', page: Page | undefined, set: (page: Page) => void) => {
+    if (!page?.next) return;
+    setBusy(true); setMessage(undefined);
+    try {
+      const result = await client.call('list_reviews', { view, cursor: page.next }, session.csrf_token, scope);
+      if (scope.aborted) return;
+      if (result.status === 'ok') set({ rows: [...page.rows, ...result.data.approvals], next: result.next_cursor }); else if (result.status === 'error') setMessage(result.data.message);
+    } catch (error) {
+      if (!scope.aborted) setMessage(operationMessage(error));
+    } finally { if (!scope.aborted) setBusy(false); }
+  };
   const act = async (call: () => Promise<{ status: string; data: unknown }>) => {
     setBusy(true); setMessage(undefined);
     try {
@@ -149,11 +163,11 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
     {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke}/> : <>
       <section className="review-section" aria-labelledby="to-review" aria-busy={busy}>
         <h2 id="to-review">Waiting for your review</h2>
-        <Rows rows={pending} empty="No requests are waiting for you." label="Requests to review"/>
+        <Rows page={pending} empty="No requests are waiting for you." label="Requests to review" busy={busy} onMore={() => void more('pending', pending, setPending)}/>
       </section>
       <section className="review-section" aria-labelledby="my-requests" aria-busy={busy}>
         <h2 id="my-requests">My requests</h2>
-        <Rows rows={requested} empty="You have not requested an approval." label="My requests"/>
+        <Rows page={requested} empty="You have not requested an approval." label="My requests" busy={busy} onMore={() => void more('requested', requested, setRequested)}/>
       </section>
     </>}
     <Button className="button secondary" isDisabled={busy} onPress={() => void load()}>Refresh</Button>
