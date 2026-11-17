@@ -16,6 +16,9 @@ type RecordingSavePreviewMetadata struct {
 
 // Incident Pod selection is separate from all-authorized source observation.
 // The grouped backend admits at most16 distinct source windows per Save.
+// IncidentPodCap is the most pods one recording save of p may select.
+func IncidentPodCap(p value.RestartPolicy) int { return recordingSaveIncidentPodCap(p) }
+
 func recordingSaveIncidentPodCap(p value.RestartPolicy) int {
 	if !p.Valid() || p.Recorder == nil {
 		return 0

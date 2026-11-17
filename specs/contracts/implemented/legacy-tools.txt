@@ -1,7 +1,6 @@
 activate_policy
 cancel_artifact_download
 cancel_capture
-close_live_watch
 deactivate_policy
 decide_review
 get_artifact_download
@@ -14,16 +13,11 @@ get_policy_status
 list_capture_history
 list_capture_profiles
 list_diagnostics
-list_live_sources
-list_recordings
 list_reviews
-open_live_watch
 prepare_artifact_download
 preview_capture
 preview_recording_save
-read_live_watch
 request_capture
 request_policy_grant
 request_raw_access
 revoke_grant
-update_live_watch

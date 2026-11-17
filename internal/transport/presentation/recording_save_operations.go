@@ -15,13 +15,11 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/targets"
 )
 
 // RecordingSaveUseCase is the existing-source application boundary. Public
 // inputs contain names/opaque selections, never runtime pins or an executor.
 type RecordingSaveUseCase interface {
-	List(context.Context, identities.CurrentIdentity, targets.WorkloadRequest, string, string, int) (app.RecordingPage, error)
 	Preview(context.Context, identities.CurrentIdentity, app.RecordingSavePreviewRequest) (app.ContextPreviewResult, error)
 }
 type RecordingSaveOperationsConfig struct {
@@ -59,7 +57,7 @@ func (s *RecordingSaveOperations) PublicOrigin() string {
 	return s.config.PublicOrigin
 }
 func (s *RecordingSaveOperations) ToolNames() []string {
-	names := []string{"list_recordings", "preview_recording_save"}
+	names := []string{"preview_recording_save"}
 	if s != nil && s.cancellations != nil {
 		names = append(names, "cancel_capture")
 	}
@@ -113,12 +111,6 @@ type RecordingRow struct {
 	IncidentPodCap  int        `json:"incident_pod_cap"`
 	HandleExpiresAt *time.Time `json:"handle_expires_at,omitempty"`
 }
-type RecordingPageData struct {
-	Kind           string         `json:"kind"`
-	Recordings     []RecordingRow `json:"recordings"`
-	ExpiresAt      time.Time      `json:"expires_at"`
-	CaptureEnabled bool           `json:"capture_enabled"`
-}
 type RecordingWindow struct {
 	Handle string `json:"recording_handle"`
 	Before string `json:"before"`
@@ -141,9 +133,6 @@ type recordingSaveInput struct {
 	ExpectedRevision int64                `json:"expected_revision,omitempty"`
 	IdempotencyKey   string               `json:"idempotency_key,omitempty"`
 	Target           WorkloadReference    `json:"target_ref"`
-	PolicyUID        string               `json:"policy_uid,omitempty"`
-	Cursor           string               `json:"cursor,omitempty"`
-	Limit            int                  `json:"limit,omitempty"`
 	Handles          []string             `json:"recording_handles,omitempty"`
 	Before           string               `json:"before,omitempty"`
 	Sharing          *ContextSharingInput `json:"sharing,omitempty"`
@@ -214,31 +203,6 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		} else if operationErr == nil {
 			operationErr = value.ErrChanged
 		}
-	} else if name == "list_recordings" {
-		limit := in.Limit
-		if limit == 0 {
-			limit = 20
-		}
-		// A requested limit is an upper bound. Bound the service page before its
-		// cursor advances so the existing 24 KiB envelope can retain whole rows.
-		limit = min(limit, 20)
-		var page app.RecordingPage
-		page, operationErr = s.saves.List(bounded, current, in.Target.target(), in.PolicyUID, in.Cursor, limit)
-		if operationErr == nil {
-			if page.ValidUntil.IsZero() || !s.config.Now().Before(page.ExpiresAt) || len(page.Rows) > limit {
-				return OperationReply{}, value.ErrUnavailable
-			}
-			until = identity.Earlier(until, page.ValidUntil)
-			rows := make([]RecordingRow, 0, len(page.Rows))
-			for _, row := range page.Rows {
-				rows = append(rows, recordingRow(row, page.ExpiresAt))
-			}
-			out.Data = RecordingPageData{Kind: "recordingPage", Recordings: rows, ExpiresAt: page.ExpiresAt.UTC(), CaptureEnabled: s.config.CollectionEnabled}
-			if page.Cursor != "" {
-				cursor := page.Cursor
-				out.NextCursor = &cursor
-			}
-		}
 	} else {
 		var before time.Duration
 		if in.Before != "" {
@@ -295,7 +259,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
 	}
 	if err == nil && len(b) > limit {
-		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Use a smaller inventory page or recording selection to fit the metadata response.", false}, nil
+		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Select fewer recordings to fit the metadata response.", false}, nil
 		b, err = json.Marshal(out)
 	}
 	if err != nil {

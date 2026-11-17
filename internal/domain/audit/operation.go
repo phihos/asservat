@@ -45,7 +45,6 @@ const (
 // four to six seconds.
 var operations = map[string]operationKind{
 	"cancel_capture":             {contextInput, ordinaryWindow, true, OperationOutputLimit},
-	"close_live_watch":           {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"compare_profiles":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"create_share":               {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"deactivate_policy":          {contextInput, ordinaryWindow, true, OperationOutputLimit},
@@ -68,18 +67,15 @@ var operations = map[string]operationKind{
 	"list_capture_history":       {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_capture_profiles":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_diagnostics":           {contextInput, ordinaryWindow, false, OperationOutputLimit},
-	"list_live_sources":          {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
 	"list_recordings":            {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
 	"list_reviews":               {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_shares":                {contextInput, ordinaryWindow, false, OperationOutputLimit},
-	"open_live_watch":            {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"prepare_artifact_download":  {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"preview_access_change":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"preview_capture":            {contextInput, identity.CapturePreviewRequestWindow, false, OperationOutputLimit},
 	"preview_recording_save":     {contextInput, ordinaryWindow, false, OperationRecordingSavePreviewOutputLimit},
 	"preview_retention_change":   {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"query_artifact":             {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
-	"read_live_watch":            {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"release_processing":         {processingInput, ordinaryWindow, true, OperationOutputLimit},
 	"request_capture":            {contextInput, identity.RecordingSaveRequestWindow, true, OperationOutputLimit},
 	"request_early_erasure":      {processingInput, ordinaryWindow, true, OperationOutputLimit},
@@ -91,7 +87,6 @@ var operations = map[string]operationKind{
 	"search_processing_evidence": {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"stop_future_sharing":        {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"transfer_share":             {contextInput, ordinaryWindow, true, OperationOutputLimit},
-	"update_live_watch":          {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"watch_live":                 {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 }
 

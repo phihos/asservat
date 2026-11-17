@@ -53,8 +53,15 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"live", err}
 	}
-	if liveService != nil {
-		liveOperations, e := presentation.NewLiveOperations(p.Origin, liveService, time.Now)
+	// list_recordings always serves; watch_live only with live viewing.
+	liveConfig := presentation.LiveOperationsConfig{PublicOrigin: p.Origin, Live: liveService, Clusters: clusters, CollectionEnabled: true, Now: time.Now}
+	if pc.recordings != nil {
+		saves := *pc.recordings
+		saves.Inventory.Now, saves.Inventory.NewID = time.Now, ownerRandomID
+		liveConfig.Recordings = saves
+	}
+	if liveConfig.Live != nil || liveConfig.Recordings != nil {
+		liveOperations, e := presentation.NewLiveOperations(liveConfig)
 		if e != nil {
 			return nil, e
 		}

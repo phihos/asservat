@@ -33,7 +33,7 @@ func NewRoutedService(local *Service, lookup OwnerCommandLookup) (*RoutedService
 	}
 	return &RoutedService{local, lookup}, nil
 }
-func (s *RoutedService) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) (v.SourcePage, string, error) {
+func (s *RoutedService) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) ([]v.Listed, string, error) {
 	return s.local.List(ctx, current, target, cursor, limit)
 }
 func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIdentity, c Command) (CommandDelivery, error) {

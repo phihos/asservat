@@ -23,6 +23,11 @@ type Source struct {
 	Blockers                            []string
 	LeaseUntil, HardUntil, PrivacyUntil time.Time
 	Generation                          int64
+	// Display metadata for list_recordings; never authority and not part of
+	// the handle version.
+	PolicyName, PodName, Kind string
+	Before                    time.Duration
+	IncidentPodCap            int
 }
 
 func (s Source) ReferenceValid() bool {
@@ -114,23 +119,13 @@ func (s Source) Clone() Source {
 	return s
 }
 
-type SourceRow struct {
-	Handle      string    `json:"source_handle"`
-	ID          string    `json:"source_session_id"`
-	WorkloadUID string    `json:"workload_uid"`
-	PodUID      string    `json:"pod_uid"`
-	ActionID    string    `json:"action_id"`
-	OwnerKind   string    `json:"owner_kind"`
-	OwnerID     string    `json:"owner_id"`
-	State       string    `json:"state"`
-	Projections []string  `json:"projections"`
-	Eligible    bool      `json:"eligible"`
-	Blockers    []string  `json:"blocker_codes"`
-	SaveVia     string    `json:"save_via"`
-	LeaseUntil  time.Time `json:"lease_until"`
-}
-type SourcePage struct {
-	Sources []SourceRow `json:"sources"`
+// Listed is one inventory source with its principal-bound handle. Live
+// tells whether watch_live can open it now; Blockers explain why not.
+type Listed struct {
+	Handle   string
+	Source   Source
+	Live     bool
+	Blockers []string
 }
 type Open struct {
 	Handles    []string `json:"source_handles"`

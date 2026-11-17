@@ -140,7 +140,8 @@ func (s liveSourceCatalog) records(ctx context.Context, rows []captureapp.Record
 		if p.Policy.RecordingSaves {
 			save = "recordingSave"
 		}
-		source := live.Source{Binding: b, Target: state.Target.Target(), OwnerKind: "policy", OwnerID: b.PolicyUID, State: "Unavailable", SaveVia: save, Projections: []string{}, Blockers: []string{"SourceUnavailable"}, LeaseUntil: state.InitialLeafUntil, HardUntil: state.HardUntil, PrivacyUntil: state.HardUntil}
+		before, _ := time.ParseDuration(rec.Action.Before)
+		source := live.Source{Binding: b, Target: state.Target.Target(), OwnerKind: "policy", OwnerID: b.PolicyUID, State: "Unavailable", SaveVia: save, Projections: []string{}, Blockers: []string{"SourceUnavailable"}, LeaseUntil: state.InitialLeafUntil, HardUntil: state.HardUntil, PrivacyUntil: state.HardUntil, PolicyName: candidate.PolicyName, PodName: state.Target.Request.PodName, Kind: rec.Action.Kind, Before: max(before, 0), IncidentPodCap: captureapp.IncidentPodCap(p.Policy)}
 		if !source.ReferenceValid() {
 			return nil, fmt.Errorf("%w: live_sources:144", live.ErrUnavailable)
 		}
