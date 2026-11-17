@@ -59,6 +59,6 @@ it('refuses malformed changes locally without calling the server', () => {
   expect(screen.getByRole('alert').textContent).toMatch(/not valid JSON/);
   fireEvent.change(screen.getByLabelText(/Changes/), { target: { value: '[]' } });
   fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
-  expect(screen.getByRole('alert').textContent).toMatch(/1 to 16 changes/);
+  expect(screen.getByRole('alert').textContent).toMatch(/JSON list of changes/);
   expect(client.calls).toHaveLength(0);
 });

@@ -3,7 +3,9 @@ import { afterEach, expect, it } from 'vitest';
 import { WhyAccess } from './WhyAccess';
 import type { Client, Input, Output } from './http';
 import { validInput_explain_access, validOutput_explain_access } from '../generated/validate-access';
-import { id, result, session, target } from '../capture/test-fixtures';
+import { id, result, session } from '../capture/test-fixtures';
+
+const target = { cluster: 'prod', namespace: 'payments', kind: 'Deployment' as const, name: 'api' };
 
 // Synthetic, content-free explanation fixtures for unit tests only.
 const deny = { decision: 'Deny', operation: 'capture', unmet: 'ExplicitDeny', required_roles: ['workload-maintainer'], message: 'A deny assignment that names you blocks this operation.', target: { cluster_id: id(1), namespace_uid: 'ns', workload_uid: 'deployment', pod_uid: 'pod' }, assignments: [{ effect: 'deny', assignment_id: id(9), role: 'workload-maintainer', subject_kind: 'Group', basis_kind: 'AccessBinding', basis_uid: 'binding-uid', revision: 'ab'.repeat(32) }], assignments_total: 1 };

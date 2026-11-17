@@ -22,10 +22,11 @@ export interface components {
             after?: components["schemas"]["Contract_processing_discovery_f0d7c9129b200d3a"];
         };
         Contract_processing_discovery_a36954fff1bd9148: {
-            /** Format: uuid */
-            cluster_id: string;
-            namespace_uid: string;
-            workload_uid: string;
+            /** @description Cluster name as configured in the hub (ADR-335 D4). */
+            cluster: string;
+            namespace: string;
+            /** @description Workload name; evidence of earlier workloads with this name matches too. */
+            workload: string;
             /** Format: date-time */
             acquired_from: string;
             /** Format: date-time */
@@ -42,10 +43,11 @@ export interface components {
             /** @default 12 */
             limit: number;
             after?: components["schemas"]["Contract_processing_discovery_f0d7c9129b200d3a"] | components["schemas"]["Contract_processing_discovery_b5f2f60104c78f25"];
-            /** Format: uuid */
-            cluster_id?: string;
-            namespace_uid?: string;
-            workload_uid?: string;
+            /** @description Cluster name as configured in the hub (ADR-335 D4). */
+            cluster?: string;
+            namespace?: string;
+            /** @description Workload (Deployment, StatefulSet, DaemonSet or Pod) name. */
+            workload?: string;
             /** Format: date-time */
             acquired_from?: string;
             /** Format: date-time */
