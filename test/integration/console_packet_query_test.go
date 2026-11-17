@@ -150,7 +150,7 @@ type consoleSyntheticPacketQueryOperations struct {
 
 func (s *consoleSyntheticPacketQueryOperations) PublicOrigin() string { return s.origin }
 func (s *consoleSyntheticPacketQueryOperations) ToolNames() []string {
-	return []string{"get_case", "request_raw_access", "pcap_query", "get_query_result"}
+	return []string{"get_case", "request_raw_access", "query_artifact", "get_query_result"}
 }
 func (s *consoleSyntheticPacketQueryOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	return s.wire.Tool(name)
@@ -181,8 +181,8 @@ func (s *consoleSyntheticPacketQueryOperations) Call(ctx context.Context, curren
 			return presentation.OperationReply{}, contracts.ErrInvestigationWire
 		}
 		envelope["data"] = map[string]any{"grant_id": s.source.GrantID, "phase": "Approved"}
-	case "pcap_query":
-		if s.approvals != map[bool]int{true: 1, false: 0}[s.source.CaptureMode == "rawPackets"] || s.starts != 0 || (s.source.CaptureMode == "rawPackets" && args["grant_id"] != s.source.GrantID || s.source.CaptureMode == "networkHeaders" && args["grant_id"] != nil) || args["case_id"] != s.source.CaseID || args["artifact_id"] != s.source.ArtifactID {
+	case "query_artifact":
+		if args["operation"] != "packets" || s.approvals != map[bool]int{true: 1, false: 0}[s.source.CaptureMode == "rawPackets"] || s.starts != 0 || (s.source.CaptureMode == "rawPackets" && args["grant_id"] != s.source.GrantID || s.source.CaptureMode == "networkHeaders" && args["grant_id"] != nil) || args["case_id"] != s.source.CaseID || args["artifact_id"] != s.source.ArtifactID {
 			return presentation.OperationReply{}, contracts.ErrInvestigationWire
 		}
 		s.starts++
@@ -212,9 +212,9 @@ func (s *consoleSyntheticPacketQueryOperations) Call(ctx context.Context, curren
 		}
 		s.page = map[string]any{"capture_mode": s.source.CaptureMode, "fields": fields, "rows": rows, "scanned_bytes": scanned, "scanned_packets": count, "row_limit_reached": s.limited, "scan_limit_reached": false, "output_limit_reached": false, "query_observed_at": s.observed, "query_expires_at": s.expires}
 		envelope["status"] = "pending"
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "retry_after_seconds": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "revision": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
 	case "get_query_result":
-		if s.starts != 1 || args["query_handle"] != consoleCaptureID(90) {
+		if s.starts != 1 || args["query_handle"] != consoleCaptureID(90) || args["after_revision"] != float64(1) {
 			return presentation.OperationReply{}, contracts.ErrInvestigationWire
 		}
 		s.polls++
@@ -232,7 +232,7 @@ func (s *consoleSyntheticPacketQueryOperations) Call(ctx context.Context, curren
 		}
 		inner["provenance"] = []any{map[string]any{"artifactID": s.source.ArtifactID, "digest": s.source.Version}}
 		envelope["data_class"] = inner["data_class"]
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": "pcap_query", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": "query_artifact", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
 	default:
 		return presentation.OperationReply{}, contracts.ErrInvestigationWire
 	}

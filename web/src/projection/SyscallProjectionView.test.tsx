@@ -36,7 +36,7 @@ it('edits bounded event filters explicitly, displays source metadata and never o
   expect(client.calls).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Inspect saved syscalls' }));
   await screen.findByRole('table', { name: 'Recorded syscall events' });
-  expect(client.calls[0]).toMatchObject({ name: 'get_syscall_events', input: { syscall_names: ['write'], errors_only: true, limit: 100 } });
+  expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'syscallEvents', syscall_names: ['write'], errors_only: true, limit: 100 } });
   expect(screen.getByRole('cell', { name: /Process: p:10:11@boot@epoch/ })).toBeTruthy(); expect(screen.getByRole('cell', { name: /error · ENOENT/ })).toBeTruthy();
   expect([...container.querySelectorAll('option')].map(option => option.value)).toEqual(['summary', 'events']);
   fireEvent.change(screen.getByLabelText('Syscall names, separated by commas'), { target: { value: 'read' } });
@@ -81,6 +81,6 @@ it.each([
   fireEvent.click(screen.getByRole('button', { name: 'Inspect saved syscalls' }));
   await screen.findByRole('table', { name: 'Recorded syscall events' });
   expect(client.calls).toHaveLength(1);
-  expect(client.calls[0]).toMatchObject({ name: 'get_syscall_events', input: { syscall_names: expected } });
+  expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'syscallEvents', syscall_names: expected } });
   expect(screen.queryByRole('alert')).toBeNull();
 });

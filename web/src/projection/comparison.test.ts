@@ -3,7 +3,7 @@ import { ContextProjection } from './projection';
 import { SyntheticProjection, session, id, pending, profileComparison, comparisonResult, incompatibleProfiles, profileVersion, baselineVersion } from './test-fixtures';
 
 const controllers: ContextProjection[] = [];
-const selection = { sample_type: 'cpu', normalization: 'perSecond' as const, top_n: 20 };
+const selection = { sample_type: 'cpu', normalization: 'perSecond' as const, limit: 20 };
 const incident = { caseID: id(2), artifactID: id(3), version: profileVersion };
 const baseline = { caseID: id(2), artifactID: id(4), version: baselineVersion };
 beforeEach(() => vi.useFakeTimers());
@@ -51,7 +51,7 @@ it.each(['incident case', 'incident artifact', 'incident version', 'baseline cas
   if (change === 'raw') value.data_class = 'raw';
   if (change === 'time') value.data.query_expires_at = '2026-10-18T12:00:11Z';
   if (change === 'request') value.request_id = id(99);
-  if (change === 'tool') outer.data.tool_name = 'get_profile_summary';
+  if (change === 'tool') outer.data.tool_name = 'query_artifact';
   if (change === 'handle') outer.data.query_handle = 'replacement';
   client.responder = () => outer; await controller.check(); expect(controller.snapshot()).toEqual({ phase: 'unavailable' });
 });
@@ -74,7 +74,7 @@ it.each(['baseline version', 'baseline ID', 'incident version', 'incident ID', '
   else controller.attachComparison(change === 'session' ? { ...session } : session, scope.signal, { ...incident, ...(change === 'incident version' ? { version: '9'.repeat(64) } : {}), ...(change === 'incident ID' ? { artifactID: id(9) } : {}) }, { ...baseline, ...(change === 'baseline version' ? { version: '9'.repeat(64) } : {}), ...(change === 'baseline ID' ? { artifactID: id(9) } : {}) });
   expect(client.calls[0].signal.aborted).toBe(true); finish(profileComparison()); await work; expect(controller.snapshot()).toEqual({ phase: 'idle' });
 });
-it.each([{ ...selection, sample_type: '' }, { ...selection, sample_type: '\u0000cpu' }, { ...selection, sample_type: 'é'.repeat(33) }, { ...selection, top_n: 101 }])('refuses invalid comparison selection without a call', async invalid => {
+it.each([{ ...selection, sample_type: '' }, { ...selection, sample_type: '\u0000cpu' }, { ...selection, sample_type: 'é'.repeat(33) }, { ...selection, limit: 101 }])('refuses invalid comparison selection without a call', async invalid => {
   const { client, controller } = setup(); await controller.inspectComparison(invalid); expect(client.calls).toHaveLength(0);
 });
 

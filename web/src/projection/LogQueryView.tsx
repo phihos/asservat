@@ -13,7 +13,7 @@ function SavedLogQuery({controller, session, scope, caseID, artifactID, version,
  {state.phase==='loading'&&<p role="status">Checking access and reading the saved logs…</p>}
  {state.phase==='pending'&&<><p role="status">The original saved-log query is being prepared.</p><Button className="button secondary" isDisabled={!state.canCheck} onPress={()=>void controller.check()}>Check log query</Button></>}
  {state.phase==='uncertain'&&<><p role="alert">The response was not received. The query may already be charged. Retry the same frozen request to recover its original result.</p><Button className="button secondary" onPress={()=>void controller.retryBegin()}>Retry same log query</Button></>}
- {state.phase==='approval-required'&&<p role="alert">Current get_logs approval is required. Use the artifact's raw-access review controls.</p>}
+ {state.phase==='approval-required'&&<p role="alert">Current log-query approval is required. Use the artifact's raw-access review controls.</p>}
  {state.phase==='unavailable'&&<p role="alert">The saved-log query is unavailable. Check current access, approval, remaining allowance and source retention.</p>}
  {state.phase==='expired'&&<p role="status">This saved-log view has expired. Inspect explicitly to request a fresh view.</p>}
  {state.phase==='result'&&result&&<><p>Requested log window: <time dateTime={result.window_start}>{result.window_start}</time> to <time dateTime={result.window_end}>{result.window_end}</time>. Pod: {result.pod_uid}. Fetch completion does not prove complete historical coverage.</p>

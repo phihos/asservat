@@ -1,10 +1,10 @@
 import type { Session } from '../auth/session';
-import { validOutput_get_pcap_summary, validOutput_compare_profiles, validOutput_get_file_excerpt, validOutput_get_profile_summary, validOutput_get_query_result, validOutput_get_syscall_summary, validOutput_get_syscall_events } from '../generated/validate-projection';
-import { operations, type Operations, type Excerpt, type Summary, type PacketSummary, type Comparison, type SyscallSummary, type SyscallEvents } from './http';
+import { validOutput_compare_profiles, validOutput_get_query_result } from '../generated/validate-projection';
+import { operations, validExtract, type Operations, type Excerpt, type Summary, type PacketSummary, type Comparison, type SyscallSummary, type SyscallEvents } from './http';
 
-export type State = { phase: 'idle' | 'loading' | 'pending' | 'result' | 'incompatible' | 'expired' | 'unavailable'; excerpt?: Excerpt; summary?: Summary; packetSummary?: PacketSummary; comparison?: Comparison; syscallSummary?: SyscallSummary; syscallEvents?: SyscallEvents; nextCursor?: string; warnings?: string[]; retryAt?: number; canCheck?: boolean };
+export type State = { phase: 'idle' | 'loading' | 'pending' | 'result' | 'incompatible' | 'expired' | 'unavailable'; excerpt?: Excerpt; summary?: Summary; packetSummary?: PacketSummary; comparison?: Comparison; syscallSummary?: SyscallSummary; syscallEvents?: SyscallEvents; nextCursor?: string; warnings?: string[]; canCheck?: boolean };
 export type ProfileSource = { caseID: string; artifactID: string; version: string };
-export type ComparisonSelection = { sample_type: string; normalization: 'none' | 'perSecond'; top_n: number };
+export type ComparisonSelection = { sample_type: string; normalization: 'none' | 'perSecond'; limit: number };
 export type SyscallSelection = { view: 'summary' | 'events'; limit: number; names: string[]; errorsOnly: boolean };
 export type PacketCaptureMode = 'networkHeaders' | 'rawPackets';
 type Timing = { query_observed_at: string; query_expires_at: string };
@@ -32,7 +32,7 @@ export class ContextProjection {
   private packetCaptureMode: PacketCaptureMode = 'networkHeaders';
   private baseline?: ProfileSource;
   private comparisonSelection?: ComparisonSelection;
-  private selection = { sample_type: 'cpu', top_n: 20 };
+  private selection = { sample_type: 'cpu', limit: 20 };
   private syscallSelection?: SyscallSelection;
   private syscallCursor?: string;
   private detach?: () => void;
@@ -40,8 +40,8 @@ export class ContextProjection {
   private generation = 0;
   private cutoff = Infinity;
   private handle?: string;
+  private revision = 1;
   private timer?: ReturnType<typeof setTimeout>;
-  private pollTimer?: ReturnType<typeof setTimeout>;
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   constructor(private client: Operations = operations, private now: () => number = () => performance.now(), private kind: 'pod-status' | 'profile' | 'syscalls' | 'comparison' | 'packet' = 'pod-status') {}
@@ -52,7 +52,7 @@ export class ContextProjection {
   private publish(state: State) { this.state = state; for (const listener of this.listeners) listener(); }
   private clear(phase: State['phase']) {
     ++this.generation; this.active?.abort(); this.active = undefined;
-    clearTimeout(this.timer); clearTimeout(this.pollTimer); this.timer = undefined; this.pollTimer = undefined; this.handle = undefined; this.cutoff = Infinity;
+    clearTimeout(this.timer); this.timer = undefined; this.handle = undefined; this.revision = 1; this.cutoff = Infinity;
     this.syscallSelection = undefined; this.syscallCursor = undefined; this.comparisonSelection = undefined;
     this.publish({ phase });
   }
@@ -88,7 +88,7 @@ export class ContextProjection {
   inspectComparison = async (selection: ComparisonSelection) => {
     if (this.kind !== 'comparison' || !this.target || !this.baseline || !this.session || this.scope?.aborted || this.state.phase === 'loading') return;
     this.close();
-    if (!selection.sample_type || new TextEncoder().encode(selection.sample_type).length > 64 || /[\u0000-\u001f\u007f-\u009f]/u.test(selection.sample_type) || !['none', 'perSecond'].includes(selection.normalization) || !Number.isInteger(selection.top_n) || selection.top_n < 1 || selection.top_n > 100 || !/^[0-9a-f]{64}$/.test(this.version ?? '') || !/^[0-9a-f]{64}$/.test(this.baseline.version) || this.baseline.artifactID === this.target.artifact_id && (this.baseline.caseID !== this.target.case_id || this.baseline.version !== this.version)) { this.clear('unavailable'); return; }
+    if (!selection.sample_type || new TextEncoder().encode(selection.sample_type).length > 64 || /[\u0000-\u001f\u007f-\u009f]/u.test(selection.sample_type) || !['none', 'perSecond'].includes(selection.normalization) || !Number.isInteger(selection.limit) || selection.limit < 1 || selection.limit > 100 || !/^[0-9a-f]{64}$/.test(this.version ?? '') || !/^[0-9a-f]{64}$/.test(this.baseline.version) || this.baseline.artifactID === this.target.artifact_id && (this.baseline.caseID !== this.target.case_id || this.baseline.version !== this.version)) { this.clear('unavailable'); return; }
     this.comparisonSelection = { ...selection };
     await this.read(false);
   };
@@ -103,13 +103,13 @@ export class ContextProjection {
     this.timer = setTimeout(() => this.clear('expired'), Math.max(0, this.cutoff - this.now()));
     return true;
   }
-  inspect = async (selection?: { sample_type: string; top_n: number }) => {
+  inspect = async (selection?: { sample_type: string; limit: number }) => {
     if (this.state.phase === 'loading' || !this.target || !this.session || this.scope?.aborted) return;
     this.close();
     if (this.kind === 'syscalls' || this.kind === 'comparison') { this.clear('unavailable'); return; }
     if (this.kind === 'packet' && !/^[0-9a-f]{64}$/.test(this.version ?? '')) { this.clear('unavailable'); return; }
     if (this.kind === 'profile') {
-      if (!selection || !selection.sample_type || new TextEncoder().encode(selection.sample_type).length > 64 || /[\u0000-\u001f\u007f-\u009f]/u.test(selection.sample_type) || !Number.isInteger(selection.top_n) || selection.top_n < 1 || selection.top_n > 100 || !/^[0-9a-f]{64}$/.test(this.version ?? '')) { this.clear('unavailable'); return; }
+      if (!selection || !selection.sample_type || new TextEncoder().encode(selection.sample_type).length > 64 || /[\u0000-\u001f\u007f-\u009f]/u.test(selection.sample_type) || !Number.isInteger(selection.limit) || selection.limit < 1 || selection.limit > 100 || !/^[0-9a-f]{64}$/.test(this.version ?? '')) { this.clear('unavailable'); return; }
       this.selection = { ...selection };
     }
     await this.read(false);
@@ -133,7 +133,7 @@ export class ContextProjection {
     await this.read(false);
   };
   check = async () => {
-    if (this.state.phase !== 'pending' || !this.handle || this.now() < (this.state.retryAt ?? Infinity)) return;
+    if (this.state.phase !== 'pending' || !this.handle) return;
     if (this.now() >= this.cutoff) { this.clear('expired'); return; }
     await this.read(true);
   };
@@ -144,42 +144,40 @@ export class ContextProjection {
     const scope = this.scope;
     const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });
     const started = this.now();
-    clearTimeout(this.pollTimer);
     this.publish({ phase: 'loading' });
     try {
       const response = poll
-        ? await this.client.call('get_query_result', { query_handle: this.handle! }, this.session.csrf_token, request.signal)
+        ? await this.client.call('get_query_result', { query_handle: this.handle!, after_revision: this.revision }, this.session.csrf_token, request.signal)
         : this.kind === 'packet'
-          ? await this.client.call('get_pcap_summary', { ...this.target }, this.session.csrf_token, request.signal)
+          ? await this.client.call('get_extract', { view: 'pcapSummary', ...this.target }, this.session.csrf_token, request.signal)
         : this.kind === 'comparison'
           ? await this.client.call('compare_profiles', { ...this.target, baseline_case_id: this.baseline!.caseID, baseline_artifact_id: this.baseline!.artifactID, ...this.comparisonSelection! }, this.session.csrf_token, request.signal)
           : this.kind === 'profile'
-          ? await this.client.call('get_profile_summary', { ...this.target, ...this.selection }, this.session.csrf_token, request.signal)
+          ? await this.client.call('get_extract', { view: 'profileSummary', ...this.target, ...this.selection }, this.session.csrf_token, request.signal)
           : this.kind === 'syscalls'
             ? await this.readSyscalls(request.signal)
-          : await this.client.call('get_file_excerpt', { ...this.target, line_start: 1, max_lines: 14 }, this.session.csrf_token, request.signal);
+          : await this.client.call('get_extract', { view: 'fileExcerpt', ...this.target, line_start: 1, limit: 14 }, this.session.csrf_token, request.signal);
       if (generation !== this.generation || scope.aborted || request.signal.aborted) return;
-      if (this.kind === 'packet') { this.acceptPacket(response, poll, started, generation, scope); return; }
-      if (this.kind === 'comparison') { this.acceptComparison(response, poll, started, generation, scope); return; }
-      if (this.kind === 'profile') { this.acceptProfile(response, poll, started, generation, scope); return; }
-      if (this.kind === 'syscalls') { this.acceptSyscalls(response, poll, started, generation, scope); return; }
-      if (!validOutput_get_file_excerpt(response) && !validOutput_get_query_result(response)) throw new Error('Unexpected query');
-      const valid = poll ? validOutput_get_query_result(response) : validOutput_get_file_excerpt(response);
+      if (this.kind === 'packet') { this.acceptPacket(response, poll, started); return; }
+      if (this.kind === 'comparison') { this.acceptComparison(response, poll, started); return; }
+      if (this.kind === 'profile') { this.acceptProfile(response, poll, started); return; }
+      if (this.kind === 'syscalls') { this.acceptSyscalls(response, poll, started); return; }
+      const valid = poll ? validOutput_get_query_result(response) : validExtract('fileExcerpt', response);
       if (!valid || response.data_class !== 'metadata' || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Query unavailable');
       if (poll && response.data.query_handle !== this.handle) throw new Error('Query replaced');
       if (!this.acceptTiming(response.data as Timing, started)) return;
       if (response.status === 'pending') {
-        this.acceptPending(response.data, generation, scope);
+        this.acceptPending(response.data);
         return;
       }
       let excerpt: unknown = response;
       if (poll) {
-        if (!('result' in response.data) || response.data.tool_name !== 'get_file_excerpt') throw new Error('Unexpected query');
+        if (!('result' in response.data) || response.data.tool_name !== 'get_extract') throw new Error('Unexpected query');
         excerpt = response.data.result;
-        if (!validOutput_get_file_excerpt(excerpt) || excerpt.request_id !== response.request_id || excerpt.status !== 'ok' ||
+        if (!validExtract('fileExcerpt', excerpt) || excerpt.request_id !== response.request_id || excerpt.status !== 'ok' ||
           excerpt.data.query_observed_at !== response.data.query_observed_at || excerpt.data.query_expires_at !== response.data.query_expires_at) throw new Error('Query association changed');
       }
-      if (!validOutput_get_file_excerpt(excerpt) || excerpt.status !== 'ok' || excerpt.data_class !== 'metadata' || excerpt.truncated || excerpt.next_cursor !== null ||
+      if (!validExtract('fileExcerpt', excerpt) || excerpt.status !== 'ok' || excerpt.data_class !== 'metadata' || excerpt.truncated || excerpt.next_cursor !== null ||
         excerpt.data.logical_path !== 'pod-status.txt' || excerpt.data.line_start !== 1 || excerpt.data.lines.length !== 14) throw new Error('Unexpected projection');
       this.publish({ phase: 'result', excerpt: { ...excerpt.data, lines: [...excerpt.data.lines] } });
     } catch {
@@ -189,31 +187,28 @@ export class ContextProjection {
       if (this.active === request) this.active = undefined;
     }
   }
-  private acceptPending(data: { query_handle: string; retry_after_seconds: number }, generation: number, scope: AbortSignal) {
+  // A check waits server-side for the next revision; no client timer.
+  private acceptPending(data: { query_handle: string; revision: number }) {
     if (this.handle && data.query_handle !== this.handle) throw new Error('Query replaced');
-    this.handle = data.query_handle;
-    const retryAt = this.now() + data.retry_after_seconds * 1000;
-    this.publish({ phase: 'pending', retryAt, canCheck: false });
-    if (retryAt < this.cutoff) this.pollTimer = setTimeout(() => {
-      if (generation === this.generation && this.state.phase === 'pending' && !scope.aborted && this.now() < this.cutoff) this.publish({ phase: 'pending', retryAt, canCheck: true });
-    }, Math.max(0, retryAt - this.now()));
+    this.handle = data.query_handle; this.revision = data.revision;
+    this.publish({ phase: 'pending', canCheck: true });
   }
-  private acceptPacket(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
-    if (!validOutput_get_pcap_summary(response) && !validOutput_get_query_result(response)) throw new Error('Invalid packet summary');
-    if (!(poll ? validOutput_get_query_result(response) : validOutput_get_pcap_summary(response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Packet summary unavailable');
+  private acceptPacket(response: unknown, poll: boolean, started: number) {
+    if (!validExtract('pcapSummary', response) && !validOutput_get_query_result(response)) throw new Error('Invalid packet summary');
+    if (!(poll ? validOutput_get_query_result(response) : validExtract('pcapSummary', response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Packet summary unavailable');
     if (poll && (!('query_handle' in response.data) || response.data.query_handle !== this.handle || response.provenance.length !== 0)) throw new Error('Query replaced');
-    if (!this.acceptTiming(response.data, started)) return;
+    if (!this.acceptTiming(response.data as Timing, started)) return;
     if (response.status === 'pending') {
       if (response.data_class !== 'metadata' || response.provenance.length !== 0) throw new Error('Unexpected pending packet summary');
-      this.acceptPending(response.data, generation, scope); return;
+      this.acceptPending(response.data); return;
     }
     if (response.data_class !== 'extract') throw new Error('Unexpected packet summary class');
     let summary: unknown = response;
     if (poll) {
-      if (!('result' in response.data) || response.data.tool_name !== 'get_pcap_summary') throw new Error('Unexpected packet summary tool');
+      if (!('result' in response.data) || response.data.tool_name !== 'get_extract') throw new Error('Unexpected packet summary tool');
       summary = response.data.result;
     }
-    if (!validOutput_get_pcap_summary(summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version) throw new Error('Packet summary association changed');
+    if (!validExtract('pcapSummary', summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version) throw new Error('Packet summary association changed');
     const data = summary.data;
     const unclassified = this.packetCaptureMode === 'rawPackets' ? data.unclassified_packets ?? NaN : 0;
     if (data.capture_mode !== this.packetCaptureMode || !Number.isSafeInteger(unclassified) || unclassified < 0 || unclassified > data.packets || this.packetCaptureMode === 'networkHeaders' && data.unclassified_packets !== undefined) throw new Error('Packet source mode changed');
@@ -235,28 +230,28 @@ export class ContextProjection {
     this.publish({ phase: 'result', packetSummary: { ...data, conversations: data.conversations.map(row => ({ ...row })) }, warnings: [...summary.warnings] });
   }
 
-  private acceptProfile(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
-    if (!validOutput_get_profile_summary(response) && !validOutput_get_query_result(response)) throw new Error('Invalid summary');
-    if (!(poll ? validOutput_get_query_result(response) : validOutput_get_profile_summary(response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Summary unavailable');
+  private acceptProfile(response: unknown, poll: boolean, started: number) {
+    if (!validExtract('profileSummary', response) && !validOutput_get_query_result(response)) throw new Error('Invalid summary');
+    if (!(poll ? validOutput_get_query_result(response) : validExtract('profileSummary', response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Summary unavailable');
     if (poll && (!('query_handle' in response.data) || response.data.query_handle !== this.handle)) throw new Error('Query replaced');
-    if (!this.acceptTiming(response.data, started)) return;
+    if (!this.acceptTiming(response.data as Timing, started)) return;
     if (response.status === 'pending') {
       if (response.data_class !== 'metadata') throw new Error('Unexpected pending summary');
-      this.acceptPending(response.data, generation, scope); return;
+      this.acceptPending(response.data); return;
     }
     if (response.data_class !== 'extract') throw new Error('Unexpected summary class');
     let summary: unknown = response;
     if (poll) {
-      if (!('result' in response.data) || response.data.tool_name !== 'get_profile_summary') throw new Error('Unexpected summary tool');
+      if (!('result' in response.data) || response.data.tool_name !== 'get_extract') throw new Error('Unexpected summary tool');
       summary = response.data.result;
     }
-    if (!validOutput_get_profile_summary(summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version || summary.data.sample_type !== this.selection.sample_type || summary.data.top.length > this.selection.top_n) throw new Error('Summary association changed');
+    if (!validExtract('profileSummary', summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version || summary.data.sample_type !== this.selection.sample_type || summary.data.top.length > this.selection.limit) throw new Error('Summary association changed');
     if (!Number.isSafeInteger(summary.data.total) || summary.data.top.some(row => !Number.isSafeInteger(row.flat) || !Number.isSafeInteger(row.cumulative))) throw new Error('Inexact summary');
     this.publish({ phase: 'result', summary: { ...summary.data, top: summary.data.top.map(row => ({ ...row })) }, warnings: [...summary.warnings] });
   }
 
-  private acceptComparison(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
-    if (!validOutput_compare_profiles(response) && !validOutput_get_query_result(response)) throw new Error('Invalid comparison');
+  private acceptComparison(response: unknown, poll: boolean, started: number) {
+        if (!validOutput_compare_profiles(response) && !validOutput_get_query_result(response)) throw new Error('Invalid comparison');
     if (!(poll ? validOutput_get_query_result(response) : validOutput_compare_profiles(response)) || response.truncated || response.next_cursor !== null) throw new Error('Comparison unavailable');
     if (response.status === 'error') {
       if (response.data_class === 'metadata' && response.data.code === 'IncompatibleProfiles' && response.provenance.length === 0) {
@@ -268,7 +263,7 @@ export class ContextProjection {
     if (!this.acceptTiming(response.data, started)) return;
     if (response.status === 'pending') {
       if (response.data_class !== 'metadata' || response.provenance.length !== 0) throw new Error('Unexpected pending comparison');
-      this.acceptPending(response.data, generation, scope); return;
+      this.acceptPending(response.data); return;
     }
     if (response.data_class !== 'extract') throw new Error('Unexpected comparison class');
     let result: unknown = response;
@@ -279,7 +274,7 @@ export class ContextProjection {
     if (!validOutput_compare_profiles(result) || result.status !== 'ok' || result.data_class !== 'extract' || result.truncated || result.next_cursor !== null || result.request_id !== response.request_id || result.data.query_observed_at !== response.data.query_observed_at || result.data.query_expires_at !== response.data.query_expires_at) throw new Error('Comparison association changed');
     const data = result.data;
     const baseline = this.baseline!, incident = this.target!, selection = this.comparisonSelection!;
-    if (data.case_id !== incident.case_id || data.artifact_id !== incident.artifact_id || data.source_version !== this.version || data.baseline_case_id !== baseline.caseID || data.baseline_artifact_id !== baseline.artifactID || data.baseline_source_version !== baseline.version || data.sample_type !== selection.sample_type || data.normalization !== selection.normalization || data.rows.length > selection.top_n) throw new Error('Comparison sources or selection changed');
+    if (data.case_id !== incident.case_id || data.artifact_id !== incident.artifact_id || data.source_version !== this.version || data.baseline_case_id !== baseline.caseID || data.baseline_artifact_id !== baseline.artifactID || data.baseline_source_version !== baseline.version || data.sample_type !== selection.sample_type || data.normalization !== selection.normalization || data.rows.length > selection.limit) throw new Error('Comparison sources or selection changed');
     const expected = new Set([incident.artifact_id + ':' + this.version, baseline.artifactID + ':' + baseline.version]);
     const matches = (refs: { artifactID: string; digest: string }[]) => refs.length === expected.size && refs.every(ref => expected.has(ref.artifactID + ':' + ref.digest));
     if (!matches(result.provenance) || poll && response.provenance.length > 0 && !matches(response.provenance)) throw new Error('Comparison provenance changed');
@@ -291,28 +286,28 @@ export class ContextProjection {
     const selection = this.syscallSelection!;
     const input = { ...this.target!, limit: selection.limit, ...(this.syscallCursor ? { cursor: this.syscallCursor } : {}) };
     return selection.view === 'summary'
-      ? this.client.call('get_syscall_summary', input, this.session!.csrf_token, signal)
-      : this.client.call('get_syscall_events', { ...input, errors_only: selection.errorsOnly, ...(selection.names.length ? { syscall_names: [...selection.names] } : {}) }, this.session!.csrf_token, signal);
+      ? this.client.call('get_extract', { view: 'syscallSummary', ...input }, this.session!.csrf_token, signal)
+      : this.client.call('get_extract', { view: 'syscallEvents', ...input, errors_only: selection.errorsOnly, ...(selection.names.length ? { syscall_names: [...selection.names] } : {}) }, this.session!.csrf_token, signal);
   }
-  private acceptSyscalls(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
+  private acceptSyscalls(response: unknown, poll: boolean, started: number) {
     const view = this.syscallSelection!.view;
-    const validTool = view === 'summary' ? validOutput_get_syscall_summary : validOutput_get_syscall_events;
-    if (!validTool(response) && !validOutput_get_query_result(response)) throw new Error('Invalid syscall view');
+    const validTool = (value: unknown) => view === 'summary' ? validExtract('syscallSummary', value) : validExtract('syscallEvents', value);
+    if (!validExtract('syscallSummary', response) && !validExtract('syscallEvents', response) && !validOutput_get_query_result(response)) throw new Error('Invalid syscall view');
     if (!(poll ? validOutput_get_query_result(response) : validTool(response)) || response.status === 'error' || response.truncated) throw new Error('Syscall view unavailable');
     if (poll && (!('query_handle' in response.data) || response.data.query_handle !== this.handle || response.next_cursor !== null)) throw new Error('Query replaced');
     if (typeof response.data.query_observed_at !== 'string' || typeof response.data.query_expires_at !== 'string') throw new Error('Missing query lifetime');
     if (!this.acceptTiming({ query_observed_at: response.data.query_observed_at, query_expires_at: response.data.query_expires_at }, started)) return;
     if (response.status === 'pending') {
       if (response.data_class !== 'metadata' || response.next_cursor !== null) throw new Error('Unexpected pending view');
-      this.acceptPending(response.data, generation, scope); return;
+      this.acceptPending(response.data); return;
     }
     if (response.data_class !== 'extract') throw new Error('Unexpected syscall class');
     let result: unknown = response;
     if (poll) {
-      if (!('result' in response.data) || response.data.tool_name !== (view === 'summary' ? 'get_syscall_summary' : 'get_syscall_events')) throw new Error('Unexpected syscall tool');
+      if (!('result' in response.data) || response.data.tool_name !== 'get_extract') throw new Error('Unexpected syscall tool');
       result = response.data.result;
     }
-    if (!validTool(result) || result.status !== 'ok' || result.data_class !== 'extract' || result.truncated || result.request_id !== response.request_id || result.data.query_observed_at !== response.data.query_observed_at || result.data.query_expires_at !== response.data.query_expires_at || result.provenance.length !== 1 || result.provenance[0].artifactID !== this.target?.artifact_id || result.provenance[0].digest !== this.version) throw new Error('Syscall association changed');
+    if (!(validExtract('syscallSummary', result) || validExtract('syscallEvents', result)) || !validTool(result) || result.status !== 'ok' || result.data_class !== 'extract' || result.truncated || result.request_id !== response.request_id || result.data.query_observed_at !== response.data.query_observed_at || result.data.query_expires_at !== response.data.query_expires_at || result.provenance.length !== 1 || result.provenance[0].artifactID !== this.target?.artifact_id || result.provenance[0].digest !== this.version) throw new Error('Syscall association changed');
     const coverage = result.data.coverage;
     const recorded = coverage.record_count;
     if (!Number.isSafeInteger(recorded) || !Number.isSafeInteger(coverage.unfinished_events) || !Number.isSafeInteger(coverage.unknown_events) || !Number.isSafeInteger(coverage.unmatched_events) || coverage.unmatched_events + coverage.unfinished_events! + coverage.unknown_events! > recorded! || coverage.dropped_events !== null || coverage.truncated !== null) throw new Error('Invalid recorded counts');

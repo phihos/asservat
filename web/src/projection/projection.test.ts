@@ -14,7 +14,7 @@ function setup() {
 it('does no implicit work and requests only exact case/artifact without idempotency', async () => {
   const { controller, client } = setup(); expect(client.calls).toHaveLength(0);
   await controller.inspect(); expect(controller.snapshot().phase).toBe('result');
-  expect(client.calls).toHaveLength(1); expect(client.calls[0].input).toEqual({ case_id: id(2), artifact_id: id(3), line_start: 1, max_lines: 14 });
+  expect(client.calls).toHaveLength(1); expect(client.calls[0].input).toEqual({ view: 'fileExcerpt', case_id: id(2), artifact_id: id(3), line_start: 1, limit: 14 });
 });
 it('includes response delay in the original cutoff and clears without network work', async () => {
   const { controller, client, delay, advance } = setup();
@@ -36,11 +36,10 @@ it('does not use browser wall-clock agreement to accept or extend a result', asy
 });
 it('polls only the acknowledged handle and never automatically creates another query', async () => {
   const { controller, client, advance } = setup(); client.responder = () => pending();
-  await controller.inspect(); await controller.check(); expect(client.calls).toHaveLength(1);
-  await advance(1000); expect(client.calls).toHaveLength(1);
+  await controller.inspect(); await advance(1000); expect(client.calls).toHaveLength(1);
   client.responder = () => result(); await controller.check();
-  expect(client.calls.map(c => c.name)).toEqual(['get_file_excerpt', 'get_query_result']);
-  expect(client.calls[1].input).toEqual({ query_handle: queryHandle });
+  expect(client.calls.map(c => c.name)).toEqual(['get_extract', 'get_query_result']);
+  expect(client.calls[1].input).toEqual({ query_handle: queryHandle, after_revision: 1 });
   expect(controller.snapshot().phase).toBe('result');
   await advance(8999); expect(controller.snapshot().phase).toBe('expired'); expect(client.calls).toHaveLength(2);
 });

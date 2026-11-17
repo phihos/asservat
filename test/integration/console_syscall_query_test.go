@@ -87,7 +87,7 @@ func consoleSyscallQueryWithBuiltPackage(t *testing.T, large bool) {
 	b := &installedBrowser{t: t, client: client, base: origin, csrf: strings.Repeat("C", 43), wire: wire}
 	ctx, stop := context.WithTimeout(t.Context(), time.Minute)
 	defer stop()
-	selection := map[string]any{"case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "not-injected", "limit": 100, "errors_only": false, "syscall_names": []string{"write"}}
+	selection := map[string]any{"operation": "syscalls", "case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "not-injected", "limit": 100, "errors_only": false, "syscall_names": []string{"write"}}
 	observed := 0
 	call, closeBrowser := installedSyscallQueryBrowser(t, ctx, b, server.Listener.Addr().String(), source, selection, func(r installedComparisonReply) {
 		observed++
@@ -98,7 +98,7 @@ func consoleSyscallQueryWithBuiltPackage(t *testing.T, large bool) {
 	defer closeBrowser()
 	var previousKey string
 	for page := 0; page < 2; page++ {
-		reply := call("syscall_query", selection)
+		reply := call("query_artifact", selection)
 		var pending struct {
 			Handle            string    `json:"query_handle"`
 			Observed, Expires time.Time `json:"-"`
@@ -115,10 +115,7 @@ func consoleSyscallQueryWithBuiltPackage(t *testing.T, large bool) {
 			t.Fatal("actual UI fresh key not retained")
 		}
 		previousKey = key
-		if err := installedJourneyPause(ctx, time.Second); err != nil {
-			t.Fatal(err)
-		}
-		ready := call("get_query_result", map[string]string{"query_handle": pending.Handle})
+		ready := call("get_query_result", map[string]any{"query_handle": pending.Handle, "after_revision": 1})
 		var outer struct {
 			Handle, Tool      string
 			Result            json.RawMessage
@@ -143,7 +140,7 @@ func consoleSyscallQueryWithBuiltPackage(t *testing.T, large bool) {
 			Next      *string `json:"next_cursor"`
 			Truncated bool    `json:"truncated"`
 		}
-		if json.Unmarshal(outer.Result, &result) != nil || outer.Handle != pending.Handle || outer.Tool != "syscall_query" || !outer.Expires.Equal(pending.Expires) || !outer.Observed.After(pending.Observed) || !result.Data.Observed.Equal(outer.Observed) || !result.Data.Expires.Equal(outer.Expires) || result.Data.Kind != "syscallQuery" || len(result.Data.Events) == 0 {
+		if json.Unmarshal(outer.Result, &result) != nil || outer.Handle != pending.Handle || outer.Tool != "query_artifact" || !outer.Expires.Equal(pending.Expires) || !outer.Observed.After(pending.Observed) || !result.Data.Observed.Equal(outer.Observed) || !result.Data.Expires.Equal(outer.Expires) || result.Data.Kind != "syscallQuery" || len(result.Data.Events) == 0 {
 			t.Fatal("original source/current response clock binding")
 		}
 		for _, e := range result.Data.Events {
@@ -203,7 +200,7 @@ type consoleSyntheticSyscallQueryOperations struct {
 
 func (s *consoleSyntheticSyscallQueryOperations) PublicOrigin() string { return s.origin }
 func (s *consoleSyntheticSyscallQueryOperations) ToolNames() []string {
-	return []string{"get_case", "request_raw_access", "get_grant", "syscall_query", "get_query_result"}
+	return []string{"get_case", "request_raw_access", "get_grant", "query_artifact", "get_query_result"}
 }
 func (s *consoleSyntheticSyscallQueryOperations) Tool(n string) (contracts.InvestigationTool, bool) {
 	return s.wire.Tool(n)
@@ -246,8 +243,8 @@ func (s *consoleSyntheticSyscallQueryOperations) Call(ctx context.Context, i ide
 		}
 		s.grantReads++
 		envelope["data"] = s.approvedGrant()
-	case "syscall_query":
-		if s.grantReads != 1 || s.starts >= 2 || a["case_id"] != s.source.CaseID || a["artifact_id"] != s.source.ArtifactID || a["grant_id"] != s.source.GrantID {
+	case "query_artifact":
+		if a["operation"] != "syscalls" || s.grantReads != 1 || s.starts >= 2 || a["case_id"] != s.source.CaseID || a["artifact_id"] != s.source.ArtifactID || a["grant_id"] != s.source.GrantID {
 			return bad()
 		}
 		if s.starts == 0 && a["cursor"] != nil || s.starts == 1 && a["cursor"] != s.cursor {
@@ -263,9 +260,9 @@ func (s *consoleSyntheticSyscallQueryOperations) Call(ctx context.Context, i ide
 		s.expires = s.observed.Add(20 * time.Second)
 		s.events = s.fixtureEvents()
 		envelope["status"] = "pending"
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "retry_after_seconds": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "revision": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
 	case "get_query_result":
-		if s.starts < 1 || s.polls != s.starts-1 || a["query_handle"] != consoleCaptureID(90+s.starts) {
+		if s.starts < 1 || s.polls != s.starts-1 || a["query_handle"] != consoleCaptureID(90+s.starts) || a["after_revision"] != float64(1) {
 			return bad()
 		}
 		s.polls++
@@ -288,7 +285,7 @@ func (s *consoleSyntheticSyscallQueryOperations) Call(ctx context.Context, i ide
 			inner["narrowing_hint"] = "Continue with the returned cursor to inspect more recorded calls."
 		}
 		envelope["data_class"] = "raw"
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "tool_name": "syscall_query", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "tool_name": "query_artifact", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
 	default:
 		return bad()
 	}

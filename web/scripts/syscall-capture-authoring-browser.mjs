@@ -114,7 +114,7 @@ try {
   await page.waitForURL(/\/captures\/00000000-0000-4000-8000-000000000008$/);
   assert.equal(calls.filter(c => c.name === 'preview_capture').length, 1);
   assert.equal(calls.filter(c => c.name === 'request_capture').length, 2);
-  assert.equal(calls.filter(c => ['syscall_query', 'get_query_result', 'prepare_artifact_download'].includes(c.name)).length, 0);
+  assert.equal(calls.filter(c => ['query_artifact', 'get_query_result', 'prepare_artifact_download'].includes(c.name)).length, 0);
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ scope: 'compiled arguments capture authoring; synthetic authority, no acquisition', mode, previews: 1, requests: 2, currentClient: 'console', frozenApprovalResume: true }));

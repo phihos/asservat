@@ -156,7 +156,7 @@ type consoleSyntheticPacketOperations struct {
 
 func (s *consoleSyntheticPacketOperations) PublicOrigin() string { return s.origin }
 func (s *consoleSyntheticPacketOperations) ToolNames() []string {
-	return []string{"get_case", "get_pcap_summary", "get_query_result"}
+	return []string{"get_case", "get_extract", "get_query_result"}
 }
 func (s *consoleSyntheticPacketOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	return s.wire.Tool(name)
@@ -173,7 +173,7 @@ func (s *consoleSyntheticPacketOperations) Call(ctx context.Context, current ide
 	if s.wire.ValidateInput(name, input) != nil {
 		return presentation.OperationReply{}, contracts.ErrInvestigationWire
 	}
-	var args map[string]string
+	var args map[string]any
 	if json.Unmarshal(input, &args) != nil {
 		return presentation.OperationReply{}, contracts.ErrInvestigationWire
 	}
@@ -183,15 +183,15 @@ func (s *consoleSyntheticPacketOperations) Call(ctx context.Context, current ide
 		envelope[key] = value
 	}
 	switch name {
-	case "get_pcap_summary":
-		if args["case_id"] != consoleCaptureID(80) || args["artifact_id"] != consoleCaptureID(81) {
+	case "get_extract":
+		if args["view"] != "pcapSummary" || args["case_id"] != consoleCaptureID(80) || args["artifact_id"] != consoleCaptureID(81) {
 			return presentation.OperationReply{}, contracts.ErrInvestigationWire
 		}
 		s.starts++
 		envelope["status"], envelope["data_class"], envelope["provenance"] = "pending", "metadata", []any{}
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "retry_after_seconds": 1, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "revision": 1, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
 	case "get_query_result":
-		if args["query_handle"] != consoleCaptureID(90) || s.starts != 1 {
+		if args["query_handle"] != consoleCaptureID(90) || args["after_revision"] != float64(1) || s.starts != 1 {
 			return presentation.OperationReply{}, contracts.ErrInvestigationWire
 		}
 		s.polls++
@@ -209,7 +209,7 @@ func (s *consoleSyntheticPacketOperations) Call(ctx context.Context, current ide
 		}
 		ready["data"] = readyData
 		envelope["provenance"] = []any{}
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": "get_pcap_summary", "result": ready, "query_observed_at": s.readyObserved, "query_expires_at": data["query_expires_at"]}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": "get_extract", "result": ready, "query_observed_at": s.readyObserved, "query_expires_at": data["query_expires_at"]}
 	default:
 		return presentation.OperationReply{}, contracts.ErrInvestigationWire
 	}

@@ -122,10 +122,10 @@ for (const name of ['prepare_artifact_download', 'get_artifact_download', 'cance
 }
 console.log('Native ESM download terminal-only status and complete native metadata guards passed for all three operations.');
 for (const [file, validator] of [
-  ['mcp-context-excerpt-pending', 'validOutput_get_file_excerpt'],
-  ['mcp-context-excerpt-result', 'validOutput_get_file_excerpt'],
-  ['mcp-profile-result', 'validOutput_get_profile_summary'],
-  ['mcp-profile-delta-result', 'validOutput_get_profile_summary'],
+  ['mcp-context-excerpt-pending', 'validOutput_get_extract'],
+  ['mcp-context-excerpt-result', 'validOutput_get_extract'],
+  ['mcp-profile-result', 'validOutput_get_extract'],
+  ['mcp-profile-delta-result', 'validOutput_get_extract'],
   ['mcp-context-query-pending', 'validOutput_get_query_result'],
   ['mcp-context-query-result', 'validOutput_get_query_result'],
 ]) {

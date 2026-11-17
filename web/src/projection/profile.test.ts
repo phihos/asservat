@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ContextProjection } from './projection';
 import { SyntheticProjection, session, id, pending, profileResult, profileSummary, profileVersion } from './test-fixtures';
 const controllers: ContextProjection[] = [];
-const selection = { sample_type: 'cpu', top_n: 20 };
+const selection = { sample_type: 'cpu', limit: 20 };
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { controllers.forEach(c => c.close()); controllers.length = 0; vi.useRealTimers(); });
 function setup() {
@@ -15,7 +15,7 @@ function setup() {
 it('makes one explicit summary request and retains only the closed result', async () => {
   const { client, controller } = setup(); expect(client.calls).toHaveLength(0);
   await controller.inspect(selection);
-  expect(client.calls[0]).toMatchObject({ name: 'get_profile_summary', input: { case_id: id(2), artifact_id: id(3), ...selection } });
+  expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'profileSummary', case_id: id(2), artifact_id: id(3), ...selection } });
   expect(controller.snapshot().phase).toBe('result'); expect(controller.snapshot().summary?.top[0].fraction).toBe(0.25);
   controller.close(); expect(controller.snapshot()).toEqual({ phase: 'idle' });
 });
@@ -40,11 +40,11 @@ it.each(['artifact', 'version', 'sample', 'selection', 'unsafe integer', 'extra 
   if (change === 'outer class') output.data_class = 'metadata';
   if (change === 'time') value.data.query_expires_at = '2026-10-18T12:00:11Z';
   if (change === 'request') value.request_id = id(99);
-  if (change === 'tool') output.data.tool_name = 'get_file_excerpt';
+  if (change === 'tool') output.data.tool_name = 'query_artifact';
   if (change === 'handle') output.data.query_handle = 'replacement';
   client.responder = () => output; await controller.check(); expect(controller.snapshot()).toEqual({ phase: 'unavailable' });
 });
-it.each([{ sample_type: '', top_n: 20 }, { sample_type: '\u0000cpu', top_n: 20 }, { sample_type: 'é'.repeat(33), top_n: 20 }, { sample_type: 'cpu', top_n: 101 }])('refuses invalid selection without calling the server', async selection => {
+it.each([{ sample_type: '', limit: 20 }, { sample_type: '\u0000cpu', limit: 20 }, { sample_type: 'é'.repeat(33), limit: 20 }, { sample_type: 'cpu', limit: 101 }])('refuses invalid selection without calling the server', async selection => {
   const { client, controller } = setup(); await controller.inspect(selection); expect(client.calls).toHaveLength(0);
 });
 it('discards a late summary after source version replacement or session loss', async () => {

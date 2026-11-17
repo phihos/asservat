@@ -1,17 +1,36 @@
 import type { components } from '../generated/projection';
 import * as validators from '../generated/validate-projection';
 
-export type Operation = 'get_logs' | 'syscall_query' | 'pcap_query' | 'get_file_excerpt' | 'get_pcap_summary' | 'get_profile_summary' | 'compare_profiles' | 'get_syscall_summary' | 'get_syscall_events' | 'get_query_result';
+export type Operation = 'get_extract' | 'query_artifact' | 'compare_profiles' | 'get_query_result';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
-export type Excerpt = Extract<Output<'get_file_excerpt'>, { status: 'ok' }>['data'];
-export type Comparison = Extract<Output<'compare_profiles'>, { status: 'ok' }>['data'];
-export type SyscallQueryData = Extract<Output<'syscall_query'>, { status: 'ok' }>['data'];
-export type PacketQueryData = Extract<Output<'pcap_query'>, { status: 'ok' }>['data'];
-export type PacketSummary = Extract<Output<'get_pcap_summary'>, { status: 'ok' }>['data'];
-export type Summary = Extract<Output<'get_profile_summary'>, { status: 'ok' }>['data'];
-export type SyscallSummary = Extract<Output<'get_syscall_summary'>, { status: 'ok' }>['data'];
-export type SyscallEvents = Extract<Output<'get_syscall_events'>, { status: 'ok' }>['data'];
+type Ok<N extends Operation> = Extract<Output<N>, { status: 'ok' }>;
+type Page<N extends Operation, D> = Exclude<Output<N>, Ok<N>> | (Omit<Ok<N>, 'status' | 'data'> & { status: 'ok'; data: D });
+type ExtractData = Ok<'get_extract'>['data'];
+type QueryData = Ok<'query_artifact'>['data'];
+export type Excerpt = Extract<ExtractData, { logical_path: string }>;
+export type Summary = Extract<ExtractData, { top: unknown }>;
+export type PacketSummary = Extract<ExtractData, { conversations: unknown }>;
+export type SyscallSummary = Extract<ExtractData, { kind: 'syscallSummary' }>;
+export type SyscallEvents = Extract<ExtractData, { kind: 'syscallEvents' }>;
+export type LogQueryData = Extract<ExtractData, { kind: 'logs' }>;
+export type SyscallQueryData = Extract<QueryData, { kind: 'syscallQuery' }>;
+export type PacketQueryData = Extract<QueryData, { scanned_bytes: number }>;
+export type Comparison = Ok<'compare_profiles'>['data'];
+type Views = { fileExcerpt: Excerpt; profileSummary: Summary; pcapSummary: PacketSummary; syscallSummary: SyscallSummary; syscallEvents: SyscallEvents; logs: LogQueryData };
+type Queries = { packets: PacketQueryData; syscalls: SyscallQueryData };
+const viewTests: { [V in keyof Views]: (data: Record<string, unknown>) => boolean } = {
+  fileExcerpt: d => 'logical_path' in d, profileSummary: d => 'top' in d, pcapSummary: d => 'conversations' in d,
+  syscallSummary: d => d.kind === 'syscallSummary', syscallEvents: d => d.kind === 'syscallEvents', logs: d => d.kind === 'logs',
+};
+// The canonical get_extract and query_artifact outputs are unions over every
+// view; these guards also require the data shape of the requested view.
+export function validExtract<V extends keyof Views>(view: V, value: unknown): value is Page<'get_extract', Views[V]> {
+  return validators.validOutput_get_extract(value) && (value.status !== 'ok' || viewTests[view](value.data as Record<string, unknown>));
+}
+export function validQuery<Q extends keyof Queries>(operation: Q, value: unknown): value is Page<'query_artifact', Queries[Q]> {
+  return validators.validOutput_query_artifact(value) && (value.status !== 'ok' || (operation === 'packets') === ('scanned_bytes' in value.data));
+}
 export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }

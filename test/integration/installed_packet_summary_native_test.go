@@ -17,33 +17,26 @@ type installedPacketSummarySource struct {
 
 func queryInstalledPacketSummaryWithCall(t *testing.T, ctx context.Context, source installedPacketSummarySource, call func(string, any) installedComparisonReply, verify func(string, string) func()) query.PacketSummary {
 	t.Helper()
-	result := call("get_pcap_summary", map[string]string{"case_id": source.CaseID, "artifact_id": source.ArtifactID})
+	result := call("get_extract", map[string]string{"view": "pcapSummary", "case_id": source.CaseID, "artifact_id": source.ArtifactID})
 	operation, handle := result.RequestID, ""
-	var observed, until time.Time
+	var until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
 		var p struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &p) != nil || p.Handle == "" || p.Retry < 1 || p.Observed.IsZero() || !p.Expires.After(p.Observed) || p.Expires.After(source.Expires) {
+		if json.Unmarshal(result.Data, &p) != nil || p.Handle == "" || p.Revision < 1 || p.Observed.IsZero() || !p.Expires.After(p.Observed) || p.Expires.After(source.Expires) {
 			t.Fatal("invalid pending packet query")
 		}
 		if poll == 0 {
-			handle, observed, until = p.Handle, p.Observed, p.Expires
+			handle, until = p.Handle, p.Expires
 		}
 		if p.Handle != handle || !p.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("packet query changed original handle/deadline or exhausted polls")
 		}
-		next, err := installedProjectionPollTime(observed, until, time.Now(), time.Duration(p.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal(ctx.Err())
-		}
-		result = call("get_query_result", map[string]string{"query_handle": handle})
+		result = call("get_query_result", map[string]any{"query_handle": handle, "after_revision": p.Revision})
 	}
 	if result.Status != "ok" {
 		t.Fatal("packet summary unavailable", result.Status)
@@ -57,7 +50,7 @@ func queryInstalledPacketSummaryWithCall(t *testing.T, ctx context.Context, sour
 			Observed time.Time                `json:"query_observed_at"`
 			Expires  time.Time                `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "get_pcap_summary" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
+		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "get_extract" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
 			t.Fatal("packet poll changed original association")
 		}
 		finalObserved = nested.Observed

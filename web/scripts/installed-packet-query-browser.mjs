@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
-import { validInput_pcap_query, validOutput_pcap_query, validOutput_get_query_result } from '../src/generated/validate-projection.js';
+import { validInput_query_artifact, validOutput_query_artifact, validOutput_get_query_result } from '../src/generated/validate-projection.js';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 async function command() {
@@ -50,7 +50,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if (/^\/api\/v1\/operations\/(get_case|pcap_query|get_query_result|request_raw_access|get_grant)$/.test(path) && response.status === 200) {
+      if (/^\/api\/v1\/operations\/(get_case|query_artifact|get_query_result|request_raw_access|get_grant)$/.test(path) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -63,11 +63,11 @@ try {
   page.on('pageerror', () => errors.push('pageerror'));
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
-    if (path === '/api/v1/operations/pcap_query') starts++;
+    if (path === '/api/v1/operations/query_artifact') starts++;
     if (path === '/api/v1/operations/get_query_result') polls++;
     if (path === '/api/v1/operations/get_case') cases++;
     if (path.startsWith('/api/v1/operations/')) {
-      if (!['/api/v1/operations/get_case', '/api/v1/operations/pcap_query', '/api/v1/operations/get_query_result', ...(raw ? ['/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant'] : [])].includes(path)) errors.push('unexpected-operation');
+      if (!['/api/v1/operations/get_case', '/api/v1/operations/query_artifact', '/api/v1/operations/get_query_result', ...(raw ? ['/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant'] : [])].includes(path)) errors.push('unexpected-operation');
       timeline.push(`${request.method()} ${path}`);
     }
   });
@@ -149,8 +149,7 @@ try {
   }
   for (const field of wanted.fields) await panel.getByRole('checkbox', { name: field, exact: true }).check();
   await panel.getByLabel('tcpdump/libpcap packet filter', { exact: true }).fill(wanted.packet_filter ?? '');
-  await panel.getByLabel('Maximum returned records', { exact: true }).fill(String(wanted.max_packets));
-  await panel.getByLabel('Maximum saved bytes to scan', { exact: true }).fill(String(wanted.max_scan_bytes));
+  await panel.getByLabel('Maximum returned records', { exact: true }).fill(String(wanted.limit));
   await panel.getByLabel('Start packet time (UTC, optional)', { exact: true }).fill(wanted.start_time ?? '');
   await panel.getByLabel('End packet time (UTC, exclusive, optional)', { exact: true }).fill(wanted.end_time ?? '');
   if (wanted.tcp_flags) {
@@ -165,7 +164,7 @@ try {
   await expect(panel.getByRole('button', { name: 'Run packet query', exact: true })).toBeEnabled();
   assert.equal(starts + polls, 0);
   event({ kind: 'ready' });
-  let handle, expiresAt, uiKey;
+  let handle, revision, expiresAt, uiKey;
   let terminal = false, calls = 0;
   for (;;) {
     const next = await command();
@@ -183,7 +182,7 @@ try {
     }
     assert.equal(next.kind, 'call');
     assert(!terminal && ++calls <= 5, 'bounded original query calls');
-    const name = calls === 1 ? 'pcap_query' : 'get_query_result';
+    const name = calls === 1 ? 'query_artifact' : 'get_query_result';
     assert.equal(next.name, name);
     stage = name;
     const button = panel.getByRole('button', { name: calls === 1 ? 'Run packet query' : 'Check packet query', exact: true });
@@ -195,15 +194,15 @@ try {
     event({ kind: 'operation', ...response }); // Retain original locator before render assertions.
     assert(Object.values(response.transport).every(Boolean), 'original browser transport');
     if (calls === 1) {
-      assert(validInput_pcap_query(response.input));
+      assert(validInput_query_artifact(response.input) && response.input.operation === 'packets');
       assert.match(response.input.idempotency_key, /^[0-9a-f-]{36}$/);
       uiKey = response.input.idempotency_key;
       const actual = { ...response.input }, expected = { ...next.input };
       delete actual.idempotency_key; delete expected.idempotency_key;
       assert.deepEqual(actual, expected, 'actual authored selection and approved source');
       if (raw) assert.equal(response.input.grant_id, config.grantID);
-    } else assert.deepEqual(response.input, { query_handle: handle });
-    assert((calls === 1 ? validOutput_pcap_query : validOutput_get_query_result)(response.reply));
+    } else assert.deepEqual(response.input, { query_handle: handle, after_revision: revision });
+    assert((calls === 1 ? validOutput_query_artifact : validOutput_get_query_result)(response.reply));
     const reply = response.reply;
     const observedAt = reply.data.query_observed_at;
     if (expiresAt === undefined) expiresAt = reply.data.query_expires_at;
@@ -211,12 +210,12 @@ try {
     assert(Number.isFinite(Date.parse(observedAt)) && Date.parse(expiresAt) > Date.parse(observedAt), 'original finite query interval');
     if (reply.status === 'pending') {
       if (handle !== undefined) assert.equal(reply.data.query_handle, handle);
-      handle = reply.data.query_handle;
+      handle = reply.data.query_handle; revision = reply.data.revision;
     } else {
       assert.equal(reply.status, 'ok');
-      if (calls > 1) { assert.equal(reply.data.query_handle, handle); assert.equal(reply.data.tool_name, 'pcap_query'); assert.equal(reply.truncated, false); }
+      if (calls > 1) { assert.equal(reply.data.query_handle, handle); assert.equal(reply.data.tool_name, 'query_artifact'); assert.equal(reply.truncated, false); }
       const result = calls === 1 ? reply : reply.data.result;
-      assert(validOutput_pcap_query(result) && result.status === 'ok');
+      assert(validOutput_query_artifact(result) && result.status === 'ok');
       assert.equal(result.request_id, reply.request_id);
       assert.equal(result.data.query_observed_at, observedAt);
       assert.equal(result.data.query_expires_at, expiresAt);

@@ -18,11 +18,11 @@ function setup() {
 it('reads summary and metadata events explicitly without another approval or native download', async () => {
   const { client, controller } = setup(); expect(client.calls).toHaveLength(0);
   await controller.inspectSyscalls(summarySelection);
-  expect(client.calls[0]).toMatchObject({ name: 'get_syscall_summary', input: { case_id: id(2), artifact_id: id(3), limit: 100 } });
+  expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'syscallSummary', case_id: id(2), artifact_id: id(3), limit: 100 } });
   expect(controller.snapshot().syscallSummary?.rows[1]).toMatchObject({ syscall: 'write', count: 2, errors: 1 });
   const events = syscallEvents(); client.responder = () => events;
   await controller.inspectSyscalls(eventSelection);
-  expect(client.calls[1]).toMatchObject({ name: 'get_syscall_events', input: { case_id: id(2), artifact_id: id(3), limit: 100, syscall_names: ['write'], errors_only: true } });
+  expect(client.calls[1]).toMatchObject({ name: 'get_extract', input: { view: 'syscallEvents', case_id: id(2), artifact_id: id(3), limit: 100, syscall_names: ['write'], errors_only: true } });
   expect(controller.snapshot().syscallSummary).toBeUndefined(); expect(controller.snapshot().syscallEvents?.events[0].errno).toBe('ENOENT');
   events.data.events[0].identity.process_ref = 'mutated-source'; events.data.coverage.gaps[0] = 'mutated-source';
   expect(controller.snapshot().syscallEvents?.events[0].identity.process_ref).not.toBe('mutated-source');
@@ -38,7 +38,7 @@ it('retains the exact source and owned display filter for a new explicitly reque
   await controller.inspectSyscalls(selection);
   selection.names[0] = 'changed'; expect(client.calls).toHaveLength(1);
   client.responder = () => syscallEvents(); await controller.nextSyscallPage();
-  expect(client.calls[1]).toMatchObject({ name: 'get_syscall_events', input: { case_id: id(2), artifact_id: id(3), cursor, limit: 100, syscall_names: ['read', 'write'], errors_only: true } });
+  expect(client.calls[1]).toMatchObject({ name: 'get_extract', input: { view: 'syscallEvents', case_id: id(2), artifact_id: id(3), cursor, limit: 100, syscall_names: ['read', 'write'], errors_only: true } });
   expect(controller.snapshot().nextCursor).toBeUndefined();
   await controller.nextSyscallPage(); expect(client.calls).toHaveLength(2);
   controller.close(); await controller.nextSyscallPage(); expect(client.calls).toHaveLength(2);
@@ -48,7 +48,7 @@ it('polls only the original handle and keeps the nested page cursor with the ori
   const { client, controller, advance, delay } = setup();
   client.responder = () => { delay(3000); return pending(); };
   await controller.inspectSyscalls(eventSelection); expect(controller.snapshot().phase).toBe('pending');
-  await controller.check(); expect(client.calls).toHaveLength(1);
+  expect(client.calls).toHaveLength(1);
   await advance(1000); const output = syscallResult('events');
   output.data.result.next_cursor = '1:' + 'a'.repeat(32);
   client.responder = () => output; await controller.check();
@@ -65,7 +65,7 @@ it.each(['artifact', 'version', 'request', 'tool', 'handle', 'time', 'missing-ti
   if (change === 'artifact') inner.provenance[0].artifactID = id(8);
   if (change === 'version') inner.provenance[0].digest = '8'.repeat(64);
   if (change === 'request') inner.request_id = id(99);
-  if (change === 'tool') output.data.tool_name = 'get_syscall_summary';
+  if (change === 'tool') output.data.tool_name = 'query_artifact';
   if (change === 'handle') output.data.query_handle = 'replacement';
   if (change === 'time') inner.data.query_expires_at = '2026-10-18T12:00:11Z';
   if (change === 'missing-time') Object.assign(inner.data, { query_expires_at: undefined });

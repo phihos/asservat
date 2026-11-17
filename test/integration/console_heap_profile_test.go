@@ -113,7 +113,7 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 			}
 			sessionHandler.ServeHTTP(w, r)
 		} else if strings.HasPrefix(r.URL.Path, "/api/v1/operations/") {
-			if expireDuringNative && r.URL.Path == "/api/v1/operations/get_profile_summary" {
+			if expireDuringNative && r.URL.Path == "/api/v1/operations/get_extract" {
 				comparison.mu.Lock()
 				observed = time.Now().UTC()
 				expires = observed.Add(shortView)
@@ -249,7 +249,7 @@ type consoleHeapOperations struct {
 }
 
 func (s *consoleHeapOperations) ToolNames() []string {
-	return []string{"get_case", "get_profile_summary", "get_query_result", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"}
+	return []string{"get_case", "get_extract", "get_query_result", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"}
 }
 func (s *consoleHeapOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, input json.RawMessage) (presentation.OperationReply, error) {
 	if name == "prepare_artifact_download" || name == "get_artifact_download" || name == "cancel_artifact_download" {

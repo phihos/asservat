@@ -121,4 +121,3 @@ func TestPublicProfileComparisonRequiresInstalledTypedRoute(t *testing.T) {
 		t.Fatal("typed retained comparison missing", err)
 	}
 }
-

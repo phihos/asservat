@@ -14,18 +14,18 @@ it.each(['metadata', 'raw'] as const)('opens both approved syscall views from a 
   artifact.kind = 'syscallTrace'; artifact.data_class = source; artifact.digest = profileVersion;
   artifact.native_format = source === 'raw' ? 'asservat-syscall-arguments/v1' : 'asservat-syscall-events/v1';
   client.responder = () => value;
-  const fetcher = vi.fn(async (url: RequestInfo | URL) => json(String(url).endsWith('get_syscall_events') ? syscallEvents() : syscallSummary()));
+  const fetcher = vi.fn(async (url: RequestInfo | URL) => json(String(url).endsWith('get_extract') && fetcher.mock.calls.length > 1 ? syscallEvents() : syscallSummary()));
   vi.stubGlobal('fetch', fetcher);
   const scope = new AbortController(); const controller = new Evidence(client);
   render(<EvidenceWorkspace controller={controller} session={session} scope={scope.signal} caseID={id(2)}/>);
   const inspect = await screen.findByRole('button', { name: 'Inspect saved syscalls' });
   expect(fetcher).not.toHaveBeenCalled(); fireEvent.click(inspect);
   await screen.findByRole('table', { name: 'Syscall counts' });
-  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_syscall_summary');
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_extract');
   fireEvent.change(screen.getByLabelText('Syscall view'), { target: { value: 'events' } });
   fireEvent.click(screen.getByRole('button', { name: 'Inspect saved syscalls' }));
   await screen.findByRole('table', { name: 'Recorded syscall events' });
-  expect(fetcher.mock.calls[1][0]).toBe('/api/v1/operations/get_syscall_events');
+  expect(fetcher.mock.calls[1][0]).toBe('/api/v1/operations/get_extract');
   expect(client.calls.map(call => call.name)).toEqual(['get_case']);
   // Evidence details disappearing also unmounts and clears these independent
   // managed views, even when the broader browser scope remains alive.

@@ -185,7 +185,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     artifact.kind = 'profile'; artifact.data_class = 'raw'; artifact.native_format = 'pprof';
     let summaryCalls = 0;
     const caseRoute = origin + '/api/v1/operations/get_case';
-    const summaryRoute = origin + '/api/v1/operations/get_profile_summary';
+    const summaryRoute = origin + '/api/v1/operations/get_extract';
     const heapOperations = [];
     const heapRequestListener = request => {
       const path = new URL(request.url()).pathname;
@@ -197,7 +197,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       const heap = artifact.profile_acquisition?.requested_type === 'heap';
       const sampleType = heap ? 'inuse_space' : 'cpu';
       assert.equal(route.request().method(), 'POST');
-      assert.deepEqual(route.request().postDataJSON(), { case_id: caseID, artifact_id: artifact.artifact_id, sample_type: sampleType, top_n: 20 });
+      assert.deepEqual(route.request().postDataJSON(), { view: 'profileSummary', case_id: caseID, artifact_id: artifact.artifact_id, sample_type: sampleType, limit: 20 });
       assert(route.request().headers()['x-csrf-token']);
       assert.equal(route.request().headers().authorization, undefined);
       const now = Date.now();
@@ -242,7 +242,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       await expect(heapView.locator('dl.facts dd')).toHaveText(['inuse_space', 'bytes', '100', 'Unavailable', 'partial']);
       await expect(heapView.locator('img')).toHaveCount(0);
       assert.equal(summaryCalls, 2);
-      assert.deepEqual(heapOperations, ['get_case', 'get_profile_summary'], 'heap inspection makes one selected summary query without acquisition or probes');
+      assert.deepEqual(heapOperations, ['get_case', 'get_extract'], 'heap inspection makes one selected summary query without acquisition or probes');
       await page.evaluate(() => document.fonts.ready);
       for (const width of [375, 320]) {
         await page.setViewportSize({ width, height: 740 });

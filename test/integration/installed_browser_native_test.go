@@ -502,8 +502,8 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 }
 
 // installedBrowserExcerpt runs the console's approved inspection: one
-// get_file_excerpt, then at most four same-handle get_query_result polls on
-// the fixed schedule. Paid polls are not retried on transport failure.
+// get_extract fileExcerpt, then at most four same-handle get_query_result calls;
+// each waits server-side for the next revision and is not retried on transport failure.
 func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrowser, caseID, artifactID string, expires time.Time, diagnose func()) (query.ContextExcerpt, string, string) {
 	t.Helper()
 	once := func(name string, input any) installedJourneyEnvelope {
@@ -515,33 +515,26 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 		}
 		return reply
 	}
-	result := once("get_file_excerpt", map[string]any{"case_id": caseID, "artifact_id": artifactID, "line_start": 1, "max_lines": 14})
+	result := once("get_extract", map[string]any{"view": "fileExcerpt", "case_id": caseID, "artifact_id": artifactID, "line_start": 1, "limit": 14})
 	operation, handle := result.RequestID, ""
-	var first, until time.Time
+	var until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
 		var pending struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
+		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Revision < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
 			t.Fatal("invalid pending browser approved query")
 		}
 		if poll == 0 {
-			handle, first, until = pending.Handle, pending.Observed, pending.Expires
+			handle, until = pending.Handle, pending.Expires
 		}
 		if pending.Handle != handle || !pending.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("browser approved query changed identity/lifetime or exhausted its poll allowance")
 		}
-		next, err := installedProjectionPollTime(first, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal("browser approved poll canceled", ctx.Err())
-		}
-		result = once("get_query_result", map[string]string{"query_handle": handle})
+		result = once("get_query_result", map[string]any{"query_handle": handle, "after_revision": pending.Revision})
 	}
 	if result.Status != "ok" {
 		diagnose()
@@ -554,7 +547,7 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 			Tool   string                   `json:"tool_name"`
 			Result installedJourneyEnvelope `json:"result"`
 		}
-		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != handle || resolved.Tool != "get_file_excerpt" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
+		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != handle || resolved.Tool != "get_extract" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
 			t.Fatal("browser approved result changed original handle/tool")
 		}
 	} else if installedJourneyDecode(result.Data, &excerpt) != nil {
