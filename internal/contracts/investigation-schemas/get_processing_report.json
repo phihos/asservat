@@ -63,7 +63,7 @@
           "ordinal": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -96,7 +96,7 @@
           "ordinal": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -109,8 +109,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           }
         },
         "required": [
@@ -130,7 +129,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -169,7 +168,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -210,7 +209,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -251,7 +250,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -292,7 +291,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -333,7 +332,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -374,7 +373,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -410,69 +409,10 @@
     }
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -482,7 +422,7 @@
                 "const": "ok"
               },
               "data": {
-                "$ref": "#/$defs/d0"
+                "$ref": "#/$defs/d2"
               }
             },
             "required": [
@@ -502,21 +442,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -528,8 +465,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -552,15 +488,141 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
           "uid": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "generation": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 2147483647
+            "maximum": 9007199254740991
           },
           "digest": {
             "type": "string",
@@ -573,7 +635,7 @@
           "digest"
         ]
       },
-      "d4": {
+      "d6": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -596,7 +658,7 @@
           "attempt_id"
         ]
       },
-      "d5": {
+      "d7": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -611,7 +673,7 @@
           "ordinal": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -620,7 +682,7 @@
           "ordinal"
         ]
       },
-      "d6": {
+      "d8": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -633,7 +695,7 @@
           "id"
         ]
       },
-      "d7": {
+      "d9": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -644,28 +706,27 @@
           "ordinal": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 9007199254740991
           }
         },
         "required": [
           "id"
         ]
       },
-      "d8": {
+      "d10": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           }
         },
         "required": [
           "id"
         ]
       },
-      "d3": {
+      "d5": {
         "oneOf": [
           {
             "type": "object",
@@ -678,7 +739,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -690,7 +751,7 @@
                 "pattern": "^[0-9a-f]{64}$"
               },
               "after": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               }
             },
             "required": [],
@@ -717,89 +778,7 @@
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
-                "default": 3
-              },
-              "created_before": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "policy_digest": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "after": {
-                "$ref": "#/$defs/d5"
-              }
-            },
-            "required": [
-              "section"
-            ],
-            "dependentRequired": {
-              "created_before": [
-                "policy_digest"
-              ],
-              "policy_digest": [
-                "created_before"
-              ],
-              "after": [
-                "created_before",
-                "policy_digest"
-              ]
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "section": {
-                "const": "downloads"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3,
-                "default": 3
-              },
-              "created_before": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "policy_digest": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "after": {
-                "$ref": "#/$defs/d6"
-              }
-            },
-            "required": [
-              "section"
-            ],
-            "dependentRequired": {
-              "created_before": [
-                "policy_digest"
-              ],
-              "policy_digest": [
-                "created_before"
-              ],
-              "after": [
-                "created_before",
-                "policy_digest"
-              ]
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "section": {
-                "const": "operations"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -835,94 +814,12 @@
             "additionalProperties": false,
             "properties": {
               "section": {
-                "const": "rules"
+                "const": "downloads"
               },
               "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3,
-                "default": 3
-              },
-              "created_before": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "policy_digest": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "after": {
-                "$ref": "#/$defs/d6"
-              }
-            },
-            "required": [
-              "section"
-            ],
-            "dependentRequired": {
-              "created_before": [
-                "policy_digest"
-              ],
-              "policy_digest": [
-                "created_before"
-              ],
-              "after": [
-                "created_before",
-                "policy_digest"
-              ]
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "section": {
-                "const": "paths"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3,
-                "default": 3
-              },
-              "created_before": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "policy_digest": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              },
-              "after": {
-                "$ref": "#/$defs/d6"
-              }
-            },
-            "required": [
-              "section"
-            ],
-            "dependentRequired": {
-              "created_before": [
-                "policy_digest"
-              ],
-              "policy_digest": [
-                "created_before"
-              ],
-              "after": [
-                "created_before",
-                "policy_digest"
-              ]
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "section": {
-                "const": "processors"
-              },
-              "limit": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3,
+                "maximum": 9007199254740991,
                 "default": 3
               },
               "created_before": {
@@ -952,13 +849,177 @@
                 "policy_digest"
               ]
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "operations"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d9"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "rules"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "paths"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "processors"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d10"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
           }
         ]
       },
-      "d2": {
+      "d4": {
         "allOf": [
           {
-            "$ref": "#/$defs/d3"
+            "$ref": "#/$defs/d5"
           }
         ],
         "required": [
@@ -968,7 +1029,7 @@
           "policy_digest"
         ]
       },
-      "d10": {
+      "d12": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -994,13 +1055,11 @@
           },
           "namespace_uid": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "workload_uid": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "store_id": {
             "type": "string",
@@ -1008,13 +1067,11 @@
           },
           "purpose_ref": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "native_type": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "data_class": {
             "enum": [
@@ -1039,7 +1096,6 @@
               "format": "uuid"
             },
             "minItems": 0,
-            "maxItems": 16,
             "uniqueItems": true
           },
           "anchor_at": {
@@ -1152,7 +1208,7 @@
           }
         ]
       },
-      "d9": {
+      "d11": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1161,7 +1217,7 @@
             "format": "date-time"
           },
           "artifact": {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d12"
           }
         },
         "required": [
@@ -1169,7 +1225,7 @@
           "artifact"
         ]
       },
-      "d12": {
+      "d14": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1189,18 +1245,16 @@
           },
           "recipient_issuer": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 2048
+            "minLength": 1
           },
           "recipient_id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "ordinal": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8
+            "maximum": 9007199254740991
           },
           "created_at": {
             "type": "string",
@@ -1234,7 +1288,7 @@
           "state"
         ]
       },
-      "d11": {
+      "d13": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1243,7 +1297,7 @@
             "format": "date-time"
           },
           "share": {
-            "$ref": "#/$defs/d12"
+            "$ref": "#/$defs/d14"
           }
         },
         "required": [
@@ -1251,7 +1305,7 @@
           "share"
         ]
       },
-      "d14": {
+      "d16": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1265,18 +1319,15 @@
           },
           "issuer": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 2048
+            "minLength": 1
           },
           "subject": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "client_id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "principal_kind": {
             "enum": [
@@ -1308,7 +1359,7 @@
           "emitted_bytes": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 1152921504606846976
+            "maximum": 9007199254740991
           },
           "client_receipt": {
             "const": "unknown"
@@ -1328,7 +1379,7 @@
           "client_receipt"
         ]
       },
-      "d13": {
+      "d15": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1337,7 +1388,7 @@
             "format": "date-time"
           },
           "download": {
-            "$ref": "#/$defs/d14"
+            "$ref": "#/$defs/d16"
           }
         },
         "required": [
@@ -1345,7 +1396,7 @@
           "download"
         ]
       },
-      "d16": {
+      "d18": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1360,30 +1411,26 @@
           "ordinal": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 9007199254740991
           },
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64,
             "not": {
               "const": "get_processing_report"
             }
           },
           "issuer": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 2048
+            "minLength": 1
           },
           "subject": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "client_id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
           "principal_kind": {
             "enum": [
@@ -1414,7 +1461,7 @@
           "output_bytes": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 1152921504606846976
+            "maximum": 9007199254740991
           },
           "client_receipt": {
             "const": "unknown"
@@ -1485,7 +1532,7 @@
           }
         ]
       },
-      "d15": {
+      "d17": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1494,7 +1541,7 @@
             "format": "date-time"
           },
           "operation": {
-            "$ref": "#/$defs/d16"
+            "$ref": "#/$defs/d18"
           }
         },
         "required": [
@@ -1502,7 +1549,7 @@
           "operation"
         ]
       },
-      "d20": {
+      "d22": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1525,7 +1572,7 @@
           "attempt_id"
         ]
       },
-      "d19": {
+      "d21": {
         "oneOf": [
           {
             "type": "object",
@@ -1535,7 +1582,7 @@
                 "const": "artifact"
               },
               "location": {
-                "$ref": "#/$defs/d20"
+                "$ref": "#/$defs/d22"
               }
             },
             "required": [
@@ -1556,13 +1603,11 @@
               },
               "namespace_uid": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "minLength": 1
               },
               "workload_uid": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "minLength": 1
               },
               "acquired_from": {
                 "type": "string",
@@ -1584,7 +1629,7 @@
           }
         ]
       },
-      "d18": {
+      "d20": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1599,7 +1644,7 @@
           "revision": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 16
+            "maximum": 9007199254740991
           },
           "state": {
             "enum": [
@@ -1609,7 +1654,7 @@
             ]
           },
           "scope": {
-            "$ref": "#/$defs/d19"
+            "$ref": "#/$defs/d21"
           },
           "administration_until": {
             "type": "string",
@@ -1629,7 +1674,7 @@
           "retire_by"
         ]
       },
-      "d17": {
+      "d19": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1638,7 +1683,7 @@
             "format": "date-time"
           },
           "rule": {
-            "$ref": "#/$defs/d18"
+            "$ref": "#/$defs/d20"
           }
         },
         "required": [
@@ -1646,7 +1691,7 @@
           "rule"
         ]
       },
-      "d22": {
+      "d24": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1664,8 +1709,7 @@
           },
           "storage_region": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "acquisition_cluster_id": {
             "type": "string",
@@ -1673,8 +1717,7 @@
           },
           "acquisition_region": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "connector_cluster_id": {
             "type": "string",
@@ -1682,8 +1725,7 @@
           },
           "connector_region": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "hub_cluster_id": {
             "type": "string",
@@ -1691,8 +1733,7 @@
           },
           "hub_region": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           }
         },
         "required": [
@@ -1708,7 +1749,7 @@
           "hub_region"
         ]
       },
-      "d21": {
+      "d23": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1717,7 +1758,7 @@
             "format": "date-time"
           },
           "path": {
-            "$ref": "#/$defs/d22"
+            "$ref": "#/$defs/d24"
           }
         },
         "required": [
@@ -1725,40 +1766,34 @@
           "path"
         ]
       },
-      "d24": {
+      "d26": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "name": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 160
+            "minLength": 1
           },
           "activities": {
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "minItems": 1,
-            "maxItems": 8,
             "uniqueItems": true
           },
           "regions": {
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "minLength": 1
             },
             "minItems": 0,
-            "maxItems": 16,
             "uniqueItems": true
           }
         },
@@ -1769,7 +1804,7 @@
           "regions"
         ]
       },
-      "d23": {
+      "d25": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1778,7 +1813,7 @@
             "format": "date-time"
           },
           "processor": {
-            "$ref": "#/$defs/d24"
+            "$ref": "#/$defs/d26"
           }
         },
         "required": [
@@ -1786,7 +1821,7 @@
           "processor"
         ]
       },
-      "d0": {
+      "d2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1817,14 +1852,13 @@
             "format": "date-time"
           },
           "policy_revision": {
-            "$ref": "#/$defs/d1"
+            "$ref": "#/$defs/d3"
           },
           "records": {
-            "type": "array",
-            "maxItems": 3
+            "type": "array"
           },
           "next": {
-            "$ref": "#/$defs/d2"
+            "$ref": "#/$defs/d4"
           },
           "observed_at": {
             "type": "string",
@@ -1871,15 +1905,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d9"
+                  "$ref": "#/$defs/d11"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -1924,15 +1957,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d11"
+                  "$ref": "#/$defs/d13"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -1977,15 +2009,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d13"
+                  "$ref": "#/$defs/d15"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -2030,15 +2061,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d15"
+                  "$ref": "#/$defs/d17"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -2083,15 +2113,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d17"
+                  "$ref": "#/$defs/d19"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -2136,15 +2165,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d21"
+                  "$ref": "#/$defs/d23"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [
@@ -2189,15 +2217,14 @@
               "records": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/$defs/d23"
+                  "$ref": "#/$defs/d25"
                 },
-                "minItems": 0,
-                "maxItems": 3
+                "minItems": 0
               },
               "next": {
                 "allOf": [
                   {
-                    "$ref": "#/$defs/d2"
+                    "$ref": "#/$defs/d4"
                   },
                   {
                     "oneOf": [

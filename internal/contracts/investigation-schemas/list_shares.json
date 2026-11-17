@@ -1,6 +1,6 @@
 {
   "name": "list_shares",
-  "description": "List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). Installation administrators may page through every share management-only with view administration and cursor (IDs, phase, expiry, revision, created_by, managed_by; never recipients or evidence). Most recent first, at most limit (default 20, maximum 100).",
+  "description": "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions. Installation administrators may list every share management-only (view administration: opaque IDs, phase, expiry, revision, creator and managers; never recipients or evidence).",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -12,13 +12,12 @@
     "properties": {
       "cursor": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 4096
+        "minLength": 1
       },
       "limit": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 100
+        "maximum": 9007199254740991
       },
       "view": {
         "type": "string",
@@ -27,85 +26,42 @@
           "received",
           "administration"
         ]
+      },
+      "include_intents": {
+        "type": "boolean",
+        "default": false
       }
     },
     "required": [
       "view"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "view": {
+              "enum": [
+                "received",
+                "administration"
+              ]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "include_intents": {
+              "const": false
+            }
+          }
+        }
+      }
     ]
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "anyOf": [
-          {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
-          },
-          {
-            "type": "null"
-          }
-        ]
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -137,12 +93,8 @@
                           "format": "uuid"
                         },
                         "phase": {
-                          "enum": [
-                            "Active",
-                            "Expired",
-                            "Revoked",
-                            "Suspended"
-                          ]
+                          "type": "string",
+                          "minLength": 1
                         },
                         "expires_at": {
                           "type": "string",
@@ -150,20 +102,40 @@
                         },
                         "revision": {
                           "type": "integer",
-                          "minimum": 1,
-                          "maximum": 1000000000
+                          "minimum": 1
                         },
                         "created_by": {
-                          "$ref": "#/$defs/d0"
+                          "$ref": "#/$defs/d2"
                         },
                         "managed_by": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/$defs/d0"
+                            "$ref": "#/$defs/d2"
                           },
                           "minItems": 1,
-                          "maxItems": 8,
                           "uniqueItems": true
+                        },
+                        "origin": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "sharingIntentID": {
+                              "$ref": "#/$defs/d3"
+                            },
+                            "captureUID": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "selectionID": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                            }
+                          },
+                          "required": [
+                            "sharingIntentID",
+                            "captureUID",
+                            "selectionID"
+                          ]
                         }
                       },
                       "required": [
@@ -172,12 +144,94 @@
                         "phase",
                         "expires_at"
                       ]
+                    }
+                  },
+                  "intents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "sharing_intent_id": {
+                          "$ref": "#/$defs/d3"
+                        },
+                        "source_kind": {
+                          "enum": [
+                            "DebugCapture",
+                            "DebugPolicy"
+                          ]
+                        },
+                        "phase": {
+                          "enum": [
+                            "PendingApproval",
+                            "Active",
+                            "Draining",
+                            "Completed",
+                            "Revoked",
+                            "Expired",
+                            "Denied"
+                          ]
+                        },
+                        "expires_at": {
+                          "$ref": "#/$defs/d4"
+                        },
+                        "registered_captures": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "max_captures": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "sharing_intent_id",
+                        "source_kind",
+                        "phase",
+                        "expires_at",
+                        "registered_captures",
+                        "max_captures"
+                      ]
                     },
-                    "maxItems": 100
+                    "minItems": 0,
+                    "uniqueItems": true
                   }
                 },
                 "required": [
                   "shares"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
                 ]
               }
             },
@@ -198,21 +252,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -224,8 +275,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -244,7 +294,134 @@
       }
     ],
     "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
       "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -261,8 +438,7 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
@@ -270,6 +446,14 @@
           "issuer",
           "id"
         ]
+      },
+      "d3": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "d4": {
+        "type": "string",
+        "format": "date-time"
       }
     }
   }

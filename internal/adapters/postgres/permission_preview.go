@@ -57,9 +57,6 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			if err != nil {
 				return err
 			}
-			if len(reviewRows)+len(rows) > cfg.MaxPreviewTargets {
-				return cfg.ErrLimit
-			}
 			for _, row := range rows {
 				reviewSource[uid(row.ID)] = ref.UID
 			}
@@ -147,13 +144,6 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		slices.SortFunc(namespaces, func(a, b cfg.PreviewNamespace) int {
 			return cmp.Or(cmp.Compare(a.ClusterID, b.ClusterID), cmp.Compare(a.NamespaceUID, b.NamespaceUID))
 		})
-		cells := 0
-		for _, ns := range namespaces {
-			cells += len(named[ns]) + 1
-		}
-		if cells > cfg.MaxPreviewTargets {
-			return cfg.ErrLimit
-		}
 		for _, ns := range namespaces {
 			workloads := slices.Sorted(slices.Values(named[ns]))
 			for _, w := range append(workloads, cfg.OtherWorkloads) {
@@ -167,7 +157,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 						return err
 					}
 				case errors.Is(err, cfg.ErrUnavailable):
-					cell.Unavailable = authorization.UnmetPermissionStale
+					cell.Unavailable = authorization.UnmetClusterNotObserved
 				case errors.Is(err, cfg.ErrLimit):
 					cell.Unavailable = authorization.UnmetServiceUnavailable
 				default:

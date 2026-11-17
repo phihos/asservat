@@ -91,8 +91,8 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	if err != nil {
 		return zero, time.Time{}, err
 	}
-	if len(proposed) < 1 || len(proposed) > cfg.MaxPreviewChanges {
-		return zero, time.Time{}, cfg.ErrLimit
+	if len(proposed) < 1 {
+		return zero, time.Time{}, cfg.ErrInvalid
 	}
 	changes := make([]cfg.AccessChange, len(proposed))
 	for n, p := range proposed {
