@@ -473,7 +473,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "activate_policy" || name == "get_policy_status" || name == "deactivate_policy" {
+	if name == "get_policy_status" || name == "deactivate_policy" {
 		var in PolicyOperationInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -501,7 +501,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "request_raw_access" || name == "request_policy_grant" || name == "get_grant" || name == "list_reviews" || name == "decide_review" || name == "revoke_grant" {
+	if name == "request_raw_access" || name == "get_grant" || name == "list_reviews" || name == "decide_review" || name == "revoke_grant" {
 		var in GrantOperationInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -559,7 +559,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == downloadTool || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_recordings" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == downloadTool || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_recordings" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -663,10 +663,10 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			if refs.ArtifactID != "" {
 				out.ArtifactIDs = append(out.ArtifactIDs, refs.ArtifactID)
 			}
-			if (in.Name == "activate_policy" || in.Name == "deactivate_policy") && refs.Acceptance != "" {
+			if in.Name == "deactivate_policy" && refs.Acceptance != "" {
 				out.Effect = "accepted"
 			}
-			if (in.Name == "request_raw_access" || in.Name == "request_policy_grant" || in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
+			if (in.Name == "request_raw_access" || in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
 				// An acknowledged decision/revocation, including exact idempotent replay,
 				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"

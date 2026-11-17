@@ -25,86 +25,24 @@
       },
       "reason": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 512
+        "minLength": 1
       },
       "idempotency_key": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 128
+        "minLength": 1
       }
     },
     "required": [
       "grant_id",
       "decision",
-      "reason",
       "idempotency_key"
     ]
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -162,18 +100,17 @@
                 "properties": {
                   "query_handle": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 4096
+                    "minLength": 1
                   },
-                  "retry_after_seconds": {
+                  "revision": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 60
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
                   "query_handle",
-                  "retry_after_seconds"
+                  "revision"
                 ]
               }
             },
@@ -194,21 +131,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -220,8 +154,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -238,6 +171,135 @@
           }
         ]
       }
-    ]
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
   }
 }

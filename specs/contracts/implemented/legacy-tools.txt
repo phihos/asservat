@@ -1,9 +1,0 @@
-activate_policy
-deactivate_policy
-decide_review
-get_grant
-get_policy_status
-list_reviews
-request_policy_grant
-request_raw_access
-revoke_grant

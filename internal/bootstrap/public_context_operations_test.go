@@ -262,7 +262,7 @@ func TestPublicRawAccessUsesInitializedSharedCatalogAuthority(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), publicOperationContextKey{}, "original"), time.Second)
 	defer cancel()
 	caller := &publicOperationDeniedIdentity{t: t, original: ctx}
-	_, _, err = grants.RequestRaw(ctx, caller, permissions.RawQueryRequestInput{CaseID: c.RootID, ArtifactDigests: []artifact.Digest{{1}}, Operations: []string{"download_artifact"}, Reason: "inspect", MaxBytes: 1, Lifetime: time.Hour, IdempotencyKey: "key"})
+	_, _, err = grants.RequestRaw(ctx, caller, permissions.RawQueryRequestInput{CaseID: c.RootID, Artifacts: permissions.RawArtifactSelection{Digests: []artifact.Digest{{1}}}, Operations: []string{"download_artifact"}, Reason: "inspect", MaxBytes: 1, Lifetime: time.Hour, IdempotencyKey: "key"})
 	if !errors.Is(err, identity.ErrDenied) || caller.calls != 1 {
 		t.Fatal("identity did not precede private grant/catalog lookup", err, caller.calls)
 	}

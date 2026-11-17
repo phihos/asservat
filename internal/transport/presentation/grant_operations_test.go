@@ -3,6 +3,7 @@ package presentation
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -20,6 +21,7 @@ type grantUseCase struct {
 	decideCalls, revokeCalls int
 	until                    time.Time
 	view                     authapp.GrantView
+	next                     authapp.GrantCursor
 	err                      error
 	decided                  struct {
 		id, reason, key string
@@ -30,8 +32,8 @@ type grantUseCase struct {
 func (g *grantUseCase) Get(context.Context, identities.CurrentIdentity, string) (authapp.GrantView, time.Time, error) {
 	return g.view, g.until, g.err
 }
-func (g *grantUseCase) List(context.Context, identities.CurrentIdentity, string, int) ([]authapp.GrantView, time.Time, error) {
-	return []authapp.GrantView{g.view}, g.until, g.err
+func (g *grantUseCase) List(context.Context, identities.CurrentIdentity, string, authapp.GrantCursor, int) ([]authapp.GrantView, authapp.GrantCursor, time.Time, error) {
+	return []authapp.GrantView{g.view}, g.next, g.until, g.err
 }
 func (g *grantUseCase) Decide(_ context.Context, _ identities.CurrentIdentity, id string, approve bool, reason, key string) (authorization.Grant, bool, error) {
 	g.decideCalls++
@@ -101,7 +103,7 @@ func TestGrantOperationsWire(t *testing.T) {
 	if len(reply.Body) > 24<<10 {
 		t.Fatal("get_grant exceeds the result budget")
 	}
-	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) || strings.Contains(string(reply.Body), `"can_resolve"`) || strings.Contains(string(reply.Body), `"resume_requires_original_client"`) {
+	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) || !strings.Contains(string(reply.Body), `"next_cursor":null`) || strings.Contains(string(reply.Body), `"can_resolve"`) || strings.Contains(string(reply.Body), `"resume_requires_original_client"`) {
 		t.Fatalf("list_reviews: %v %s", err, reply.Body)
 	}
 	if reply, err = s.Call(t.Context(), f, "decide_review", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1","decision":"approve","reason":"incident 42","idempotency_key":"d1"}`)); err != nil || !uc.decided.approve || uc.decided.reason != "incident 42" || !strings.Contains(string(reply.Body), `"revision":2`) {
@@ -176,9 +178,6 @@ func TestPolicyProfileGrantReviewUsesDefinitionWithoutConcretePodEndpoint(t *tes
 			if err != nil || json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Actions) != 1 || out.Data.Actions[0].Profile == nil {
 				t.Fatal("policy profile review", err)
 			}
-			if err := s.contracts.ValidateOutput("request_policy_grant", reply.Body); err != nil {
-				t.Fatal("policy request and get-grant review contracts diverged", err)
-			}
 			got := out.Data.Actions[0].Profile
 			if got.DefinitionDigest != p.DefinitionDigest || got.SourceKind != kind || got.DeclaredPortName != p.DeclaredPortName || got.MinimumPort != p.MinimumPort || got.MaximumPort != p.MaximumPort || got.Port != p.Port || strings.Contains(string(reply.Body), `"endpoint_digest"`) || strings.Contains(string(reply.Body), `"pod_name"`) || strings.Contains(string(reply.Body), `"observation_limits"`) {
 				t.Fatal("policy review lost definition or fabricated concrete source", string(reply.Body))
@@ -195,7 +194,7 @@ func TestPolicyProfileGrantReviewUsesDefinitionWithoutConcretePodEndpoint(t *tes
 	}
 }
 
-func TestGrantReviewPreservesArgumentEventBudget(t *testing.T) {
+func TestGrantReviewShowsArgumentReason(t *testing.T) {
 	base, f := operationFixture(t, true)
 	v := grantView(f.i.VerifiedAt)
 	v.Grant.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "syscallArguments"}}
@@ -210,7 +209,63 @@ func TestGrantReviewPreservesArgumentEventBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := reply.Body
-	if !bytes.Contains(raw, []byte(`"max_observed_events":1234`)) || !bytes.Contains(raw, []byte(`"syscallArguments"`)) {
-		t.Fatalf("event budget/reason lost: %s %v", raw, err)
+	if !bytes.Contains(raw, []byte(`"syscallArguments"`)) || bytes.Contains(raw, []byte(`"max_observed_events"`)) {
+		t.Fatalf("argument reason lost: %s %v", raw, err)
+	}
+}
+
+// policyRequestWireView is a team policy grant view (kind policy).
+func policyRequestWireView(now time.Time, actor identity.Principal) authapp.GrantView {
+	v := grantView(now)
+	g := v.Grant
+	target := g.Target
+	g.Kind, g.PreviewID, g.CaptureID, g.Target = authorization.GrantPolicy, "", "", authorization.Target{}
+	g.Requester = actor
+	g.ResultAccess = nil
+	g.ResultAccessDigest = artifact.Digest{}
+	g.Scope = []byte(`{"format":"synthetic-policy-request-wire/v1"}`)
+	g.ExecutionDigest = sha256.Sum256(g.Scope)
+	revision := identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{1}}
+	owner := artifact.AudienceAssignment{Kind: "Group", Issuer: actor.Issuer, SubjectID: "maintainers", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{1}, AssignmentID: "00000000-0000-4000-8000-000000000901"}
+	a := authorization.AcceptedPolicyAuthority{InstallationID: g.RootID, PolicyUID: "team-policy", Creator: actor, Executor: authorization.PolicyPrincipal(g.RootID, "team-policy"), ScopeDigest: g.ExecutionDigest, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: revision, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 1 << 30}, IssuedAt: now.Add(-time.Hour), NotAfter: now.Add(7 * 24 * time.Hour)}
+	g.Policy = &authorization.PolicyGrantScope{Authority: a, RecipeDigest: artifact.Digest{8}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 64 << 20}, ApprovalPolicyRef: revision, ApprovalMaxAge: 30 * 24 * time.Hour}
+	g.Lifetime = 24 * time.Hour
+	g.PolicyNotAfter = now.Add(24 * time.Hour)
+	g.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "policyCollection"}}
+	v.Grant = g
+	v.Approver = false
+	v.CanRevoke = true
+	v.Review.PodName = ""
+	v.Review.ObservationLimits = nil
+	v.Review.Deadline = a.NotAfter
+	v.Review.Actions[0].ExecutionMode = "onTrigger"
+	v.Review.Actions[0].Before = "0s"
+	v.Review.Actions[0].After = "2s"
+	v.Review.Actions[0].Sensitive = []string{}
+	v.Grant.Review, _ = json.Marshal(v.Review)
+	v.Grant.ReviewDigest = authapp.ReviewDigest(v.Grant, v.Grant.Review)
+	return v
+}
+
+func TestListReviewsCursor(t *testing.T) {
+	base, f := operationFixture(t, true)
+	uc := &grantUseCase{view: grantView(f.i.VerifiedAt), until: f.metadataUntil}
+	uc.next = authapp.GrantCursor{RequestedAt: uc.view.Grant.RequestedAt, ID: uc.view.Grant.ID}
+	s, err := NewGrantOperations("https://console.invalid", base.config.Now, func() string { return "00000000-0000-4000-8000-000000000099" }, uc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending","limit":1}`))
+	var out struct {
+		NextCursor *string `json:"next_cursor"`
+	}
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.NextCursor == nil {
+		t.Fatalf("next cursor: %v %s", err, reply.Body)
+	}
+	if c, ok := decodeGrantCursor(*out.NextCursor); !ok || c != uc.next {
+		t.Fatal("cursor round trip", c, ok)
+	}
+	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending","cursor":"not-a-cursor"}`)); err != nil || !strings.Contains(string(reply.Body), `"code":"InvalidCursor"`) {
+		t.Fatalf("invalid cursor: %v %s", err, reply.Body)
 	}
 }

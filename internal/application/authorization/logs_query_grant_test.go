@@ -74,9 +74,9 @@ type rawLogGrantSelection struct {
 	calls int
 }
 
-func (r *rawLogGrantSelection) ResolveRawLogQuery(ctx context.Context, current identities.CurrentIdentity, caseID string, digests []artifact.Digest) (RawQuerySelection, error) {
+func (r *rawLogGrantSelection) ResolveRawLogQuery(ctx context.Context, current identities.CurrentIdentity, caseID string, sel RawArtifactSelection) (RawQuerySelection, error) {
 	r.calls++
-	out, err := r.ResolveRawQuery(ctx, current, caseID, digests)
+	out, err := r.ResolveRawQuery(ctx, current, caseID, sel)
 	for i := range out.Review {
 		out.Review[i].NativeType = artifact.LogsArtifact
 	}

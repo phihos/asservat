@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -32,17 +33,23 @@ func TestPolicyStatusSharedBudgetsRequireCurrentViewerAfterCreatorDeparture(t *t
 	// The creator has left; another current team maintainer reads the same pool.
 	f.author.Principal.Subject = "current-maintainer"
 	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Now: time.Now}
-	status, until, err := service.Get(context.Background(), f, "restarts")
+	status, until, err := service.Get(context.Background(), f, activationCluster, "apps", "restarts")
 	if err != nil || status.CollectedBytesSpent != 16384 || status.ExecutionsSpent != 5 || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || until.After(f.now.Add(30*time.Second)) {
 		t.Fatal("current manager shared status", status, until, err)
 	}
+	// The policy is named by its target cluster and namespace.
+	for _, where := range [][2]string{{activationCluster, "other"}, {activationHub, "apps"}} {
+		if _, _, err := service.Get(context.Background(), f, where[0], where[1], "restarts"); !errors.Is(err, value.ErrUnavailable) {
+			t.Fatal("policy found outside its cluster and namespace", where, err)
+		}
+	}
 	f.author.Groups = []string{"unrelated"}
-	if out, _, err := service.Get(context.Background(), f, "restarts"); err == nil || out.ActiveID != "" {
+	if out, _, err := service.Get(context.Background(), f, activationCluster, "apps", "restarts"); err == nil || out.ActiveID != "" {
 		t.Fatal("former membership disclosed shared policy metadata", err)
 	}
 	f.author.Groups = []string{"team-a"}
 	service.Permissions = statusPermissionsHook{f: f, after: func() { f.author.ValidUntil = time.Now().Add(-time.Second) }}
-	if out, _, err := service.Get(context.Background(), f, "restarts"); err == nil || out.ActiveID != "" {
+	if out, _, err := service.Get(context.Background(), f, activationCluster, "apps", "restarts"); err == nil || out.ActiveID != "" {
 		t.Fatal("blocking permission read bypassed final identity expiry", err)
 	}
 }

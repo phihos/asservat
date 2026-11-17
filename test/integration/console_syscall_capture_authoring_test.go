@@ -172,8 +172,8 @@ func (g consoleArgumentGrants) Get(ctx context.Context, current identities.Curre
 	}
 	return v, i.ValidUntil, nil
 }
-func (consoleArgumentGrants) List(context.Context, identities.CurrentIdentity, string, int) ([]authapp.GrantView, time.Time, error) {
-	return nil, time.Time{}, authapp.ErrGrantUnavailable
+func (consoleArgumentGrants) List(context.Context, identities.CurrentIdentity, string, authapp.GrantCursor, int) ([]authapp.GrantView, authapp.GrantCursor, time.Time, error) {
+	return nil, authapp.GrantCursor{}, time.Time{}, authapp.ErrGrantUnavailable
 }
 func (consoleArgumentGrants) Decide(context.Context, identities.CurrentIdentity, string, bool, string, string) (authorization.Grant, bool, error) {
 	return authorization.Grant{}, false, authapp.ErrGrantUnavailable

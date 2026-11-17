@@ -124,6 +124,16 @@ type GrantUseRequest struct {
 	Use                          value.GrantUse
 }
 
+// GrantCursor continues a list after the row with this request time and ID
+// (newest first); the zero value starts at the newest row.
+type GrantCursor struct {
+	RequestedAt time.Time
+	ID          string
+}
+
+// grantListBatch is the store page size: one SQL page of grant rows.
+const grantListBatch = 100
+
 // GrantStore is the SQL grant ledger (Migration 00097). A replayed key
 // returns the stored row and replay=true. The store re-checks decision, revocation, expiry, pool and
 // self-approval in SQL; the service's checks come first.
@@ -131,8 +141,8 @@ type GrantStore interface {
 	RequestGrant(context.Context, StoredGrantRequest) (value.Grant, bool, error)
 	Grant(ctx context.Context, grantID string) (value.Grant, error)
 	GrantByCapture(ctx context.Context, captureID string) (value.Grant, error)
-	PendingGrants(ctx context.Context, limit int) ([]value.Grant, error)
-	RequestedGrants(ctx context.Context, requester identity.Principal, limit int) ([]value.Grant, error)
+	PendingGrants(ctx context.Context, after GrantCursor, limit int) ([]value.Grant, error)
+	RequestedGrants(ctx context.Context, requester identity.Principal, after GrantCursor, limit int) ([]value.Grant, error)
 	DecideGrant(context.Context, GrantDecisionInput) (value.Grant, bool, error)
 	RevokeGrant(context.Context, GrantRevocationInput) (value.Grant, bool, error)
 	RegisterGrantArtifact(context.Context, GrantArtifactRequest) (value.GrantArtifact, bool, error)
@@ -585,40 +595,62 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 // other people on targets where the caller is a current approver) or the
 // caller's own requests (view "requested"). Policy requester rows require
 // current collection rights on their exact workload and are omitted otherwise.
-func (s GrantService) List(ctx context.Context, current identities.CurrentIdentity, view string, limit int) ([]GrantView, time.Time, error) {
-	if ctx == nil || ctx.Err() != nil || !s.ready() || limit < 1 || limit > 100 || view != "pending" && view != "requested" {
-		return nil, time.Time{}, value.ErrGrantInvalid
+func (s GrantService) List(ctx context.Context, current identities.CurrentIdentity, view string, after GrantCursor, limit int) ([]GrantView, GrantCursor, time.Time, error) {
+	if ctx == nil || ctx.Err() != nil || !s.ready() || limit < 1 || view != "pending" && view != "requested" {
+		return nil, GrantCursor{}, time.Time{}, value.ErrGrantInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := s.actor(ctx, current)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, GrantCursor{}, time.Time{}, err
 	}
 	if view == "pending" && i.Principal.Kind != identity.Human {
-		return nil, time.Time{}, identity.ErrDenied
+		return nil, GrantCursor{}, time.Time{}, identity.ErrDenied
 	}
 	var rows []value.Grant
-	if view == "pending" {
-		rows, err = s.Store.PendingGrants(ctx, 100)
-	} else {
-		rows, err = s.Store.RequestedGrants(ctx, i.Principal, 100)
+	next := after
+	more := true
+	fetch := func() error {
+		var page []value.Grant
+		if view == "pending" {
+			page, err = s.Store.PendingGrants(ctx, next, grantListBatch)
+		} else {
+			page, err = s.Store.RequestedGrants(ctx, i.Principal, next, grantListBatch)
+		}
+		if err != nil {
+			return ErrGrantUnavailable
+		}
+		more = len(page) == grantListBatch
+		rows = page
+		return nil
 	}
-	if err != nil {
-		return nil, time.Time{}, ErrGrantUnavailable
+	if err = fetch(); err != nil {
+		return nil, GrantCursor{}, time.Time{}, err
 	}
 	until := i.ValidUntil
 	results := map[value.Target]value.Result{}
 	workloadResults := map[value.WorkloadTarget]value.WorkloadProjection{}
-	out := make([]GrantView, 0, min(limit, len(rows)))
-	for _, g := range rows {
-		if len(out) == limit {
-			break
+	out := make([]GrantView, 0, limit)
+	n := 0
+	for ; len(out) < limit; n++ {
+		if n == len(rows) {
+			if !more {
+				next = GrantCursor{}
+				break
+			}
+			if err = fetch(); err != nil {
+				return nil, GrantCursor{}, time.Time{}, err
+			}
+			n = -1
+			continue
 		}
+		g := rows[n]
+		next = GrantCursor{RequestedAt: g.RequestedAt, ID: g.ID}
 		v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
 		if g.Kind == value.GrantPolicy {
 			if g.Policy == nil || s.WorkloadPermissions == nil {
-				return nil, time.Time{}, ErrGrantUnavailable
+				return nil, GrantCursor{}, time.Time{}, ErrGrantUnavailable
 			}
 			if view == "pending" && (sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending) {
 				continue
@@ -654,7 +686,7 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 				v.Approver = true
 				until = identity.Earlier(until, r.ValidUntil)
 			} else if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human {
-				return nil, time.Time{}, ErrGrantUnavailable
+				return nil, GrantCursor{}, time.Time{}, ErrGrantUnavailable
 			}
 		} else if view == "pending" {
 			if sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending {
@@ -673,23 +705,26 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 			}
 			v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
 		} else if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human {
-			return nil, time.Time{}, ErrGrantUnavailable
+			return nil, GrantCursor{}, time.Time{}, ErrGrantUnavailable
 		}
 		if json.Unmarshal(g.Review, &v.Review) != nil {
-			return nil, time.Time{}, ErrGrantUnavailable
+			return nil, GrantCursor{}, time.Time{}, ErrGrantUnavailable
 		}
 		out = append(out, v)
+	}
+	if !more && n >= len(rows) {
+		next = GrantCursor{}
 	}
 	policyMetadata := slices.ContainsFunc(out, func(v GrantView) bool {
 		return v.Grant.Kind == value.GrantPolicy || v.Grant.Kind == value.GrantRawQuery
 	})
 	if err = s.finalGrantMetadata(ctx, current, i, policyMetadata); err != nil {
-		return nil, time.Time{}, err
+		return nil, GrantCursor{}, time.Time{}, err
 	}
 	if policyMetadata && !s.Now().Before(until) {
-		return nil, time.Time{}, ErrGrantUnavailable
+		return nil, GrantCursor{}, time.Time{}, ErrGrantUnavailable
 	}
-	return out, until, nil
+	return out, next, until, nil
 }
 
 // register records one verified committed output of the approved grant

@@ -341,7 +341,7 @@ func TestPolicyGrantRequesterMetadataRequiresCurrentWorkloadRights(t *testing.T)
 	if view, _, err := f.svc.Get(t.Context(), current, g.ID); err != nil || view.Grant.ID != g.ID {
 		t.Fatal("current requester cannot inspect", err)
 	}
-	if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 1 {
+	if rows, _, _, err := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10); err != nil || len(rows) != 1 {
 		t.Fatal("current requests missing", rows, err)
 	}
 	f.requester.Groups = nil
@@ -349,7 +349,7 @@ func TestPolicyGrantRequesterMetadataRequiresCurrentWorkloadRights(t *testing.T)
 	if view, _, err := f.svc.Get(t.Context(), current, g.ID); !errors.Is(err, ErrGrantNotFound) || view.Grant.ID != "" {
 		t.Fatal("departed requester read frozen team metadata", view.Grant.ID, err)
 	}
-	if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 0 {
+	if rows, _, _, err := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10); err != nil || len(rows) != 0 {
 		t.Fatal("departed requester listed team metadata", len(rows), err)
 	}
 }
@@ -389,7 +389,7 @@ func TestPolicyGrantMetadataRechecksIdentityAndOriginalRightsDeadline(t *testing
 						t.Fatal("metadata disclosed after blocking identity/rights check", v.Grant.ID, e)
 					}
 				} else {
-					rows, _, e := f.svc.List(t.Context(), current, "requested", 10)
+					rows, _, _, e := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10)
 					if e == nil || len(rows) != 0 {
 						t.Fatal("list disclosed after blocking identity/rights check", len(rows), e)
 					}
@@ -415,7 +415,7 @@ func TestPolicyGrantServiceRequesterMetadataDoesNotTransferClient(t *testing.T) 
 	if v, _, e := f.svc.Get(t.Context(), other, a.ID); !errors.Is(e, ErrGrantNotFound) || v.Grant.ID != "" {
 		t.Fatal("other service client inherited metadata", v.Grant.ID, e)
 	}
-	if rows, _, e := f.svc.List(t.Context(), other, "requested", 10); e != nil || len(rows) != 0 {
+	if rows, _, _, e := f.svc.List(t.Context(), other, "requested", GrantCursor{}, 10); e != nil || len(rows) != 0 {
 		t.Fatal("other service client inherited request", len(rows), e)
 	}
 	b, replay, err := f.svc.RequestPolicy(t.Context(), other, in)
@@ -426,7 +426,7 @@ func TestPolicyGrantServiceRequesterMetadataDoesNotTransferClient(t *testing.T) 
 		source grantIdentity
 		id     string
 	}{{original, a.ID}, {other, b.ID}} {
-		if rows, _, e := f.svc.List(t.Context(), tc.source, "requested", 10); e != nil || len(rows) != 1 || rows[0].Grant.ID != tc.id {
+		if rows, _, _, e := f.svc.List(t.Context(), tc.source, "requested", GrantCursor{}, 10); e != nil || len(rows) != 1 || rows[0].Grant.ID != tc.id {
 			t.Fatal("full service actor/client filter lost", rows, e)
 		}
 	}
@@ -447,7 +447,7 @@ func TestPolicyGrantRequesterListReadsEachWorkloadOnce(t *testing.T) {
 		reads++
 		return original.WorkloadPermissions(ctx, target)
 	})
-	if rows, _, e := f.svc.List(t.Context(), current, "requested", 10); e != nil || len(rows) != 2 || reads != 1 {
+	if rows, _, _, e := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10); e != nil || len(rows) != 2 || reads != 1 {
 		t.Fatal("policy requester metadata repeated workload read", len(rows), reads, e)
 	}
 }
@@ -476,7 +476,7 @@ func TestPolicyGrantRequesterMetadataRefusesWrongUnavailableOrDeniedProjection(t
 			if v, _, err := f.svc.Get(t.Context(), current, g.ID); !errors.Is(err, ErrGrantNotFound) || v.Grant.ID != "" {
 				t.Fatal("unavailable current rights exposed metadata", v.Grant.ID, err)
 			}
-			if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 0 {
+			if rows, _, _, err := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10); err != nil || len(rows) != 0 {
 				t.Fatal("unavailable current rights exposed request list", len(rows), err)
 			}
 		})
@@ -492,7 +492,7 @@ func TestPolicyGrantMetadataKeepsCurrentApproverAndLegacyAdHocPaths(t *testing.T
 	if v, _, err := f.svc.Get(t.Context(), approver, g.ID); err != nil || !v.Approver {
 		t.Fatal("current independent approver lost metadata", err)
 	}
-	if rows, _, err := f.svc.List(t.Context(), approver, "pending", 10); err != nil || len(rows) != 1 || !rows[0].Approver {
+	if rows, _, _, err := f.svc.List(t.Context(), approver, "pending", GrantCursor{}, 10); err != nil || len(rows) != 1 || !rows[0].Approver {
 		t.Fatal("current approver inbox changed", rows, err)
 	}
 	legacy := newGrantFixture(t)
@@ -503,7 +503,7 @@ func TestPolicyGrantMetadataKeepsCurrentApproverAndLegacyAdHocPaths(t *testing.T
 	if v, _, err := legacy.svc.Get(t.Context(), requester, old.ID); err != nil || v.Grant.ID != old.ID {
 		t.Fatal("legacy requester metadata changed", err)
 	}
-	if rows, _, err := legacy.svc.List(t.Context(), requester, "requested", 10); err != nil || len(rows) != 1 {
+	if rows, _, _, err := legacy.svc.List(t.Context(), requester, "requested", GrantCursor{}, 10); err != nil || len(rows) != 1 {
 		t.Fatal("legacy requester list changed", len(rows), err)
 	}
 }
@@ -613,7 +613,7 @@ func TestPolicyGrantRequesterWithoutPinnedManagementGetsNoRevocationHint(t *test
 		t.Fatal("collection provenance implied current pinned team management", v.CanRevoke, v.Approver, reads, err)
 	}
 	reads = 0
-	rows, _, err := f.svc.List(t.Context(), current, "requested", 10)
+	rows, _, _, err := f.svc.List(t.Context(), current, "requested", GrantCursor{}, 10)
 	if err != nil || len(rows) != 1 || rows[0].CanRevoke || reads != 1 {
 		t.Fatal("requested list offered unavailable revocation", len(rows), reads, err)
 	}

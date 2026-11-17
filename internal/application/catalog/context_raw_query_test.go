@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	permissions "asservat.local/asservat/internal/application/authorization"
 	"context"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func rawCaseFixture() (*caseFixture, ContextCaseService) {
 func TestRawQuerySelectionUsesExactPublishedVersionAndReadableProvenance(t *testing.T) {
 	f, s := rawCaseFixture()
 	f.record.Retained.Effective.ExpiresAt = f.now.Add(10 * time.Minute)
-	got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{f.record.Version})
+	got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: []artifact.Digest{f.record.Version}})
 	if err != nil || len(got.Artifacts) != 1 || got.Artifacts[0].Output.ExecutionDigest != f.record.ExecutionDigest || got.Artifacts[0].NativeBytes != 234 || !got.Artifacts[0].ExpiresAt.Equal(f.record.Retained.Effective.ExpiresAt) || got.Review[0].WorkloadName != "api" || got.Review[0].PodName != "" {
 		t.Fatal("exact selection", got, err)
 	}
@@ -74,7 +75,7 @@ func TestRawQuerySelectionRefusesUnavailableAndChangedFacts(t *testing.T) {
 			case "identity changed":
 				f.afterFinalProcessing = func() { f.i.Principal.ClientID = "other" }
 			}
-			got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{digest})
+			got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: []artifact.Digest{digest}})
 			if err == nil || len(got.Artifacts) != 0 {
 				t.Fatal("admitted invalid selected record", got, err)
 			}
@@ -102,7 +103,7 @@ func TestRawQuerySelectionChecksDownloadRightsBeforeCatalogAndNeverUsesShares(t 
 				r.ArtifactID = caseID(300)
 				f.routes.Routes = append(f.routes.Routes, r)
 			}
-			got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, digests)
+			got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: digests})
 			if err == nil || len(got.Artifacts) != 0 || f.catalogReads != 0 {
 				t.Fatal("unauthorized catalog lookup", got, err, f.catalogReads)
 			}
@@ -119,7 +120,7 @@ func TestRawQuerySelectionDoesNotReadUnselectedTarget(t *testing.T) {
 	r.Target.PodUID = "unrelated"
 	r.Version = artifact.Digest{99}
 	f.routes.Routes = append(f.routes.Routes, r)
-	got, err := s.ResolveRawQuery(context.Background(), f, f.routes.CaseID, []artifact.Digest{f.record.Version})
+	got, err := s.ResolveRawQuery(context.Background(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: []artifact.Digest{f.record.Version}})
 	if err != nil || len(got.Artifacts) != 1 || f.catalogReads != 1 {
 		t.Fatal(got, err)
 	}
@@ -132,7 +133,7 @@ func TestRawQuerySelectionEverySelectedTargetNeedsItsOwnRights(t *testing.T) {
 	r.Target.PodUID = "other"
 	r.Version = artifact.Digest{99}
 	f.routes.Routes = append(f.routes.Routes, r)
-	got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{f.record.Version, r.Version})
+	got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, permissions.RawArtifactSelection{Digests: []artifact.Digest{f.record.Version, r.Version}})
 	if err == nil || len(got.Artifacts) != 0 || f.catalogReads != 1 {
 		t.Fatal("first target authority leaked to second", got, err, f.catalogReads)
 	}

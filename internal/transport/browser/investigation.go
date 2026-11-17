@@ -224,7 +224,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	if name == "download_artifact" {
 		action = presentation.DownloadAction(body)
 	}
-	if name == "download_artifact" && action != "status" || name == "cancel_capture" || name == "request_capture" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" || name == "request_policy_grant" || name == "request_raw_access" {
+	if name == "download_artifact" && action != "status" || name == "cancel_capture" || name == "request_capture" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" || name == "request_raw_access" {
 		var input struct {
 			Key string `json:"idempotency_key"`
 		}
