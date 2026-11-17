@@ -57,7 +57,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	// No missing case or download service may be hidden behind an app-shell
 	// fallback. Capture enablement remains the existing operation set's decision;
 	// a deliberately disabled capture service may still expose retained evidence.
-	for _, name := range []string{"list_diagnostics", "preview_capture", "get_capture", "resolve_capture_request", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"} {
+	for _, name := range []string{"list_diagnostics", "preview_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"} {
 		if _, available := s.Operations.Tool(name); !available {
 			return nil, &fixedStepError{"tools", presentation.ErrOperationsConfiguration}
 		}
