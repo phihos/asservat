@@ -34,7 +34,7 @@ func summaryBridge(t *testing.T) (*AuditedOperations, *bridgeFixture, *presentat
 	return s, f, g, p
 }
 func summaryInput(top int) []byte {
-	b, _ := json.Marshal(ProfileSummaryOperationInput{CaseID: bridgeID, ArtifactID: bridgeID, SampleType: "cpu", TopN: top})
+	b, _ := json.Marshal(projectionInput{View: "profileSummary", CaseID: bridgeID, ArtifactID: bridgeID, SampleType: "cpu", Limit: top})
 	return b
 }
 func TestProfileSummaryQueryRemainsExplicitlyDisabled(t *testing.T) {
@@ -49,11 +49,11 @@ func TestProfileSummaryQueryRemainsExplicitlyDisabled(t *testing.T) {
 func TestProfileSummaryQueryPendingReadyAndOriginalAuditSelection(t *testing.T) {
 	s, f, _, p := summaryBridge(t)
 	f.ready = false
-	first, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
+	first, err := s.Call(t.Context(), f, "get_extract", summaryInput(20))
 	if err != nil {
 		t.Fatal("begin", err)
 	}
-	if s.contracts.ValidateOutput("get_profile_summary", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
+	if s.contracts.ValidateOutput("get_extract", first.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 		t.Fatal("pending summary admission")
 	}
 	if f.q.Scope.Profile.SampleType != "cpu" || f.q.Scope.Profile.TopN != 20 {
@@ -76,7 +76,7 @@ func TestProfileSummaryQueryPendingReadyAndOriginalAuditSelection(t *testing.T) 
 			}
 		}
 	}
-	if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != "get_profile_summary" || out.Data.Result.Data.SampleType != "cpu" || len(out.Data.Result.Warnings) != 2 {
+	if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != "get_extract" || out.Data.Result.Data.SampleType != "cpu" || len(out.Data.Result.Warnings) != 2 {
 		t.Fatalf("closed summary output %s", ready.Body)
 	}
 	if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != "get_profile_summary" {
@@ -104,7 +104,7 @@ func TestProfileSummaryBoundsFullPollEnvelopeWithoutTrimming(t *testing.T) {
 	}
 	f.result = &value.ProjectionResult{Summary: &summary}
 	f.ready = false
-	pending, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(100))
+	pending, err := s.Call(t.Context(), f, "get_extract", summaryInput(100))
 	if err != nil {
 		t.Fatal(err)
 	}

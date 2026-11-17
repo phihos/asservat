@@ -65,7 +65,7 @@ func (q *queryAuditTarget) CallWithContext(ctx context.Context, _ identities.Cur
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	until, _ := ctx.Deadline()
-	x := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "pending", Data: map[string]any{"query_handle": "test-query", "retry_after_seconds": 1, "query_observed_at": now, "query_expires_at": now.Add(10 * time.Second)}, Warnings: []string{}, Provenance: []any{}}
+	x := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "pending", Data: map[string]any{"query_handle": "test-query", "revision": 1, "query_observed_at": now, "query_expires_at": now.Add(10 * time.Second)}, Warnings: []string{}, Provenance: []any{}}
 	// Use the canonical shape directly, independent of a public registration.
 	b, err := json.Marshal(x)
 	if err != nil {
@@ -100,21 +100,21 @@ func queryAuditFixture(t *testing.T) (*AuditedOperations, *contextOperationFixtu
 
 func TestContextQueryAuditNormalization(t *testing.T) {
 	s, _, _, _ := queryAuditFixture(t)
-	a, e := s.normalize("get_file_excerpt", []byte(queryInput))
+	a, e := s.normalize("get_extract", extractInput("fileExcerpt", []byte(queryInput)))
 	if e != nil {
 		t.Fatal(e)
 	}
 	var v map[string]any
 	_ = json.Unmarshal([]byte(queryInput), &v)
-	v["line_start"], v["max_lines"] = 1, 200
+	v["view"], v["limit"] = "fileExcerpt", 500
 	b, _ := json.Marshal(v)
-	b, e = s.normalize("get_file_excerpt", b)
-	if e != nil || !bytes.Equal(a, b) {
-		t.Fatal("omission changed defaults", e)
+	b, e = s.normalize("get_extract", b)
+	if e != nil || bytes.Equal(a, b) {
+		t.Fatal("limit omitted from audit input", e)
 	}
 	v["line_start"] = 2
 	b, _ = json.Marshal(v)
-	b, e = s.normalize("get_file_excerpt", b)
+	b, e = s.normalize("get_extract", b)
 	if e != nil || bytes.Equal(a, b) {
 		t.Fatal("line range omitted from audit input")
 	}
@@ -126,8 +126,8 @@ func TestContextQueryAuditNormalization(t *testing.T) {
 	if e != nil || bytes.Equal(p, r) {
 		t.Fatal("query handle omitted")
 	}
-	if !bytes.Contains(a, []byte("approved-pod-status-display/v1")) {
-		t.Fatal("display version omitted")
+	if !bytes.Contains(a, []byte(`"Tool":"get_file_excerpt"`)) {
+		t.Fatal("internal operation omitted")
 	}
 }
 
@@ -135,7 +135,7 @@ func TestContextQueryAuditPendingEffectsAndOwnedReply(t *testing.T) {
 	for _, effect := range []operationAuditEffect{operationEffectNone, operationEffectAccepted, operationEffectUnknown} {
 		s, f, g, q := queryAuditFixture(t)
 		q.effect = effect
-		reply, err := s.Call(context.Background(), f, "get_file_excerpt", []byte(queryInput))
+		reply, err := s.Call(context.Background(), f, "get_extract", extractInput("fileExcerpt", []byte(queryInput)))
 		if err != nil {
 			t.Fatalf("%+v events=%d dispatched=%v", err, len(g.events), q.ctx != nil)
 		}
@@ -181,7 +181,7 @@ func TestContextQueryAuditFailureClosesBeforeDiscard(t *testing.T) {
 			case "missing effect":
 				q.effect = operationEffectUnspecified
 			}
-			if reply, err := s.Call(ctx, f, "get_file_excerpt", []byte(queryInput)); err == nil || len(reply.Body) != 0 {
+			if reply, err := s.Call(ctx, f, "get_extract", extractInput("fileExcerpt", []byte(queryInput))); err == nil || len(reply.Body) != 0 {
 				t.Fatal("failed result escaped")
 			}
 			if !q.noGuard && q.guard.closes.Load() != 1 {
@@ -193,7 +193,7 @@ func TestContextQueryAuditFailureClosesBeforeDiscard(t *testing.T) {
 
 func TestContextQuerySchemasDoNotRegisterTools(t *testing.T) {
 	s, _, _, q := queryAuditFixture(t)
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
+	for _, name := range []string{"get_extract", "get_query_result"} {
 		if _, ok := s.contracts.Tool(name); !ok {
 			t.Fatal("schema absent")
 		}

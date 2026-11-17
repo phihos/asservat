@@ -14,7 +14,6 @@ import (
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
-	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 type packetBridgeCompiler struct{}
@@ -81,7 +80,7 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 		t.Run(map[bool]string{false: "metadata", true: "raw"}[raw], func(t *testing.T) {
 			s, f, g, p := bridgeAuditFixture(t)
 			f.ready = false
-			r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, IdempotencyKey: "originalpacketkey", Fields: []value.PacketQueryField{value.PacketIndex, value.PacketTCPAck}, MaxPackets: 1, MaxScanBytes: 1000}
+			r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, IdempotencyKey: "originalpacketkey", Fields: []value.PacketQueryField{value.PacketIndex, value.PacketTCPAck}, MaxPackets: 1, MaxScanBytes: value.PacketQueryMaxScanBytes}
 			f.a.Scope.NativeType = artifact.PCAPNGArtifact
 			f.a.Scope.SourceFormat = artifact.PCAPNGFormat
 			mode := "networkHeaders"
@@ -113,15 +112,15 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			input, _ := json.Marshal(packetQueryInput(r))
-			first, e := s.Call(t.Context(), f, "pcap_query", input)
+			input, _ := json.Marshal(packetQueryJSON(r))
+			first, e := s.Call(t.Context(), f, "query_artifact", input)
 			if e != nil {
 				t.Fatalf("begin %v %#v", e, e)
 			}
 			if e = first.Close(context.Background()); e != nil {
 				t.Fatal(e)
 			}
-			repeat, e := s.Call(t.Context(), f, "pcap_query", input)
+			repeat, e := s.Call(t.Context(), f, "query_artifact", input)
 			if e != nil {
 				t.Fatalf("replay %v %#v", e, e)
 			}
@@ -154,7 +153,7 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 					} `json:"result"`
 				} `json:"data"`
 			}
-			if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != class || out.Truncated || out.Data.Tool != "pcap_query" || out.Data.Result.DataClass != class || !out.Data.Result.Truncated || out.Data.Result.Data.CaptureMode != mode || out.Data.Result.Data.Rows[0][1] != float64(0) {
+			if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != class || out.Truncated || out.Data.Tool != "query_artifact" || out.Data.Result.DataClass != class || !out.Data.Result.Truncated || out.Data.Result.Data.CaptureMode != mode || out.Data.Result.Data.Rows[0][1] != float64(0) {
 				t.Fatalf("queryenvelope %s", ready.Body)
 			}
 		})
@@ -179,7 +178,7 @@ func (f packetMissingAuthority) ResolveProjectionCurrent(context.Context, identi
 }
 func TestPacketQueryMissingRawGrantIsActionableWithoutEffects(t *testing.T) {
 	s, f, g, p := bridgeAuditFixture(t)
-	r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, IdempotencyKey: "missinggrant", Fields: []value.PacketQueryField{value.PacketIndex}, MaxPackets: 1, MaxScanBytes: 100}
+	r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, IdempotencyKey: "missinggrant", Fields: []value.PacketQueryField{value.PacketIndex}, MaxPackets: 1, MaxScanBytes: value.PacketQueryMaxScanBytes}
 	f.a.Scope.NativeType = artifact.RawPCAPNGArtifact
 	f.a.Scope.SourceFormat = artifact.RawPCAPNGFormat
 	f.a.Scope.DisplayVersion = value.PacketQueryDisplayVersion
@@ -199,8 +198,8 @@ func TestPacketQueryMissingRawGrantIsActionableWithoutEffects(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	input, _ := json.Marshal(packetQueryInput(r))
-	reply, e := s.Call(t.Context(), f, "pcap_query", input)
+	input, _ := json.Marshal(packetQueryJSON(r))
+	reply, e := s.Call(t.Context(), f, "query_artifact", input)
 	if e != nil {
 		t.Fatalf("semanticapproval %v %#v", e, e)
 	}
@@ -224,7 +223,7 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 		t.Run(map[bool]string{false: "direct", true: "nested"}[nested], func(t *testing.T) {
 			s, f, _, p := bridgeAuditFixture(t)
 			fields := []value.PacketQueryField{value.PacketIndex, value.PacketTime, value.PacketCapturedLength, value.PacketWireLength, value.PacketSourceAddress, value.PacketDestinationAddress, value.PacketSourcePort, value.PacketDestinationPort, value.PacketProtocol, value.PacketTCPFlags, value.PacketTCPSeq, value.PacketTCPAck, value.PacketTCPWindow, value.PacketICMPType, value.PacketICMPCode, value.PacketFramePrefixHex}
-			r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, GrantID: f.next(), IdempotencyKey: "maxpage", Fields: fields, MaxPackets: 100, MaxScanBytes: 150000, FramePrefix: &value.PacketQueryFramePrefix{Length: 64}}
+			r := value.PacketQueryRequest{CaseID: bridgeID, ArtifactID: bridgeID, GrantID: f.next(), IdempotencyKey: "maxpage", Fields: fields, MaxPackets: 100, MaxScanBytes: value.PacketQueryMaxScanBytes, FramePrefix: &value.PacketQueryFramePrefix{Length: 64}}
 			page := value.PacketQueryResult{CaptureMode: "rawPackets", Fields: fields, ScannedBytes: 150000, ScannedPackets: 100, OutputLimitReached: true}
 			num := func(n uint32) value.PacketQueryCell { return value.PacketQueryCell{Number: &n} }
 			text := func(s string) value.PacketQueryCell { return value.PacketQueryCell{Text: &s} }
@@ -261,9 +260,9 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 			if e != nil {
 				t.Fatal(e)
 			}
-			input, _ := json.Marshal(packetQueryInput(r))
+			input, _ := json.Marshal(packetQueryJSON(r))
 			f.ready = !nested
-			reply, e := s.Call(t.Context(), f, "pcap_query", input)
+			reply, e := s.Call(t.Context(), f, "query_artifact", input)
 			if e != nil {
 				t.Fatal("begin", e)
 			}
@@ -282,7 +281,7 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 				t.Fatal("shape", len(reply.Body))
 			}
 
-			name := "pcap_query"
+			name := "query_artifact"
 			var envelope struct {
 				Truncated bool    `json:"truncated"`
 				Hint      *string `json:"narrowing_hint"`
@@ -310,65 +309,30 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 			}
 			validatePacketQueryCanonicalOutput(t, name, reply.Body)
 			if nested {
-				validatePacketQueryCanonicalOutput(t, "pcap_query", inner)
+				validatePacketQueryCanonicalOutput(t, "query_artifact", inner)
 			}
 			t.Logf("rows=%d primitive=%d envelope=%d nested=%v", admittedRows, admittedBytes, len(reply.Body), nested)
 		})
 	}
 }
 
-// Validate the actual audited body against the canonical output used by the
-// browser generator as well as the embedded runtime validator used by Call.
+// Validate the actual audited body against the embedded canonical output.
 func validatePacketQueryCanonicalOutput(t *testing.T, name string, body []byte) {
 	t.Helper()
-	c := jsonschema.NewCompiler()
-	c.UseLoader(offlineLoader{})
-	c.AssertFormat()
-	for _, file := range []string{"common.schema.json", "mcp-result.schema.json"} {
-		b, e := readImplementedContract(file)
-		if e != nil {
-			t.Fatal(e)
-		}
-		var doc map[string]any
-		if json.Unmarshal(b, &doc) != nil || c.AddResource(doc["$id"].(string), doc) != nil {
-			t.Fatal("canonical base schema")
-		}
+	wire, e := contracts.NewInvestigationContracts()
+	if e != nil || wire.ValidateOutput(name, body) != nil {
+		t.Fatalf("actual %s body violates canonical output: %s", name, wire.OutputViolation(name, body))
 	}
-	b, e := readImplementedContract("mcp-tools.json")
-	if e != nil {
-		t.Fatal(e)
+}
+
+// packetQueryJSON is the query_artifact packets input of r.
+func packetQueryJSON(r value.PacketQueryRequest) projectionInput {
+	in := projectionInput{Operation: "packets", CaseID: r.CaseID, ArtifactID: r.ArtifactID, GrantID: r.GrantID, IdempotencyKey: r.IdempotencyKey, PacketFilter: r.PacketFilter, Fields: r.Fields, StartTime: r.StartTime, EndTime: r.EndTime, Limit: r.MaxPackets}
+	if r.TCPFlags != nil {
+		in.TCPFlags = &packetQueryFlagInput{r.TCPFlags.Mask, r.TCPFlags.Value}
 	}
-	var tools struct {
-		Tools []struct {
-			Name   string          `json:"name"`
-			Output json.RawMessage `json:"outputSchema"`
-		} `json:"tools"`
+	if r.FramePrefix != nil {
+		in.FramePrefix = &packetQueryPrefixInput{r.FramePrefix.Offset, r.FramePrefix.Length}
 	}
-	if json.Unmarshal(b, &tools) != nil {
-		t.Fatal("canonical tool catalog")
-	}
-	var schema *jsonschema.Schema
-	for _, tool := range tools.Tools {
-		if tool.Name == name {
-			doc, e := jsonschema.UnmarshalJSON(bytes.NewReader(tool.Output))
-			if e != nil || c.AddResource("urn:asservat:test-packet-query-output", doc) != nil {
-				t.Fatal("canonical output resource", e)
-			}
-			schema, e = c.Compile("urn:asservat:test-packet-query-output")
-			if e != nil {
-				t.Fatal(e)
-			}
-			break
-		}
-	}
-	if schema == nil {
-		t.Fatal("missing canonical tool", name)
-	}
-	doc, e := jsonschema.UnmarshalJSON(bytes.NewReader(body))
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e = schema.Validate(doc); e != nil {
-		t.Fatalf("actual %s body violates canonical/browser output: %v", name, e)
-	}
+	return in
 }

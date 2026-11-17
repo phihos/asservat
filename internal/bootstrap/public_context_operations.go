@@ -137,7 +137,7 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 	if err != nil {
 		return nil, err
 	}
-	// ADR-282: get_http_headers is advertised with the approved read path.
+	// ADR-282: the httpHeaders view is served with the approved read path.
 	if headers, ok := q.HTTPHeaders(); ok {
 		if projection, err = projection.WithHTTPHeaders(headers); err != nil {
 			return nil, err

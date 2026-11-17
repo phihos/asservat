@@ -3,7 +3,6 @@ package presentation
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -60,7 +59,7 @@ type (
 )
 
 func headerInput(cursor string, limit int) []byte {
-	b, _ := json.Marshal(HTTPHeaderOperationInput{CaseID: bridgeID, ArtifactID: bridgeID, Cursor: cursor, Limit: limit})
+	b, _ := json.Marshal(projectionInput{View: "httpHeaders", CaseID: bridgeID, ArtifactID: bridgeID, Cursor: cursor, Limit: limit})
 	return b
 }
 
@@ -85,7 +84,7 @@ type headerPageBody struct {
 func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 	s, f, g, p := httpBridge(t, value.HTTPHeaderWindow{Limit: 100})
 	f.ready = false
-	first, err := s.Call(context.Background(), f, "get_http_headers", headerInput("", 0))
+	first, err := s.Call(context.Background(), f, "get_extract", headerInput("", 0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,8 +92,8 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		Status string `json:"status"`
 		Data   map[string]any
 	}
-	if json.Unmarshal(first.Body, &pending) != nil || pending.Status != "pending" || s.contracts.ValidateOutput("get_http_headers", first.Body) != nil ||
-		len(pending.Data) != 2 || pending.Data["query_handle"] != f.q.ID {
+	if json.Unmarshal(first.Body, &pending) != nil || pending.Status != "pending" || s.contracts.ValidateOutput("get_extract", first.Body) != nil ||
+		len(pending.Data) != 4 || pending.Data["query_handle"] != f.q.ID {
 		t.Fatalf("not the canonical pending reply: %s", first.Body)
 	}
 	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.events[0].Effect != "accepted" {
@@ -123,7 +122,7 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		} `json:"data"`
 	}
 	var page headerPageBody
-	if json.Unmarshal(second.Body, &poll) != nil || poll.DataClass != "extract" || poll.Data.ToolName != "get_http_headers" || json.Unmarshal(poll.Data.Result, &page) != nil {
+	if json.Unmarshal(second.Body, &poll) != nil || poll.DataClass != "extract" || poll.Data.ToolName != "get_extract" || json.Unmarshal(poll.Data.Result, &page) != nil {
 		t.Fatalf("wrong poll: %s", second.Body)
 	}
 	if page.Status != "ok" || page.DataClass != "extract" || len(page.Data.Records) != 100 || page.NextCursor == nil ||
@@ -141,7 +140,7 @@ func TestHTTPHeaderPageTrimsToResponseLimitWithoutSkipping(t *testing.T) {
 	w := value.HTTPHeaderWindow{Start: 10, Limit: 100, Binding: strings.Split(value.HTTPHeaderCursor(10, headerDigest), ":")[1]}
 	s, f, _, _ := httpBridge(t, w)
 	f.ready = false
-	first, err := s.Call(context.Background(), f, "get_http_headers", headerInput(value.HTTPHeaderCursor(10, headerDigest), 0))
+	first, err := s.Call(context.Background(), f, "get_extract", headerInput(value.HTTPHeaderCursor(10, headerDigest), 0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +170,7 @@ func TestHTTPHeaderPageTrimsToResponseLimitWithoutSkipping(t *testing.T) {
 func TestHTTPHeaderCursorRefusals(t *testing.T) {
 	t.Run("malformed-before-lookup", func(t *testing.T) {
 		s, f, g, _ := httpBridge(t, value.HTTPHeaderWindow{Limit: 100})
-		reply, err := s.Call(context.Background(), f, "get_http_headers", headerInput("1:zz", 0))
+		reply, err := s.Call(context.Background(), f, "get_extract", headerInput("1:zz", 0))
 		var body headerPageBody
 		if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "InvalidCursor" ||
 			f.admissions != 0 || g.events[0].Effect != "none" || g.events[0].Status != "invalid" {
@@ -182,7 +181,7 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 		w := value.HTTPHeaderWindow{Start: 3, Limit: 5, Binding: strings.Repeat("0", 32)}
 		s, f, g, _ := httpBridge(t, w)
 		f.ready = false
-		first, err := s.Call(context.Background(), f, "get_http_headers", headerInput("3:"+w.Binding, 5))
+		first, err := s.Call(context.Background(), f, "get_extract", headerInput("3:"+w.Binding, 5))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +198,7 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 	t.Run("worker-too-large", func(t *testing.T) {
 		s, f, g, _ := httpBridge(t, value.HTTPHeaderWindow{Limit: 5})
 		f.ready = false
-		first, err := s.Call(context.Background(), f, "get_http_headers", headerInput("", 5))
+		first, err := s.Call(context.Background(), f, "get_extract", headerInput("", 5))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,11 +229,8 @@ func TestHTTPHeaderQueryIsAdvertisedOnlyWhenComposed(t *testing.T) {
 		t.Fatal(err)
 	}
 	plain, err := NewInvestigationProjectionOperations(base, adapter)
-	if err != nil || slices.Contains(plain.ToolNames(), "get_http_headers") {
-		t.Fatal("advertised without composition", err)
-	}
-	if _, ok := plain.Tool("get_http_headers"); ok {
-		t.Fatal("uncomposed tool routed")
+	if err != nil || plain.projection.available("get_http_headers") {
+		t.Fatal("served without composition", err)
 	}
 	f.s.HeaderRoutes = f
 	headers, _ := f.s.HTTPHeaders()
@@ -243,11 +239,8 @@ func TestHTTPHeaderQueryIsAdvertisedOnlyWhenComposed(t *testing.T) {
 		t.Fatal(err)
 	}
 	with, err := NewInvestigationProjectionOperations(base, composed)
-	if err != nil || !slices.Contains(with.ToolNames(), "get_http_headers") {
-		t.Fatal("not advertised when composed", err)
-	}
-	if _, ok := with.Tool("get_http_headers"); !ok || !BrowserOperationSupported(with, "get_http_headers") {
-		t.Fatal("tool missing")
+	if err != nil || !with.projection.available("get_http_headers") || !BrowserOperationSupported(with, "get_extract") {
+		t.Fatal("not served when composed", err)
 	}
 	var _ HTTPHeaderQueryService = analysisapp.HTTPHeaderReads{}
 }

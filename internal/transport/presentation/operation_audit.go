@@ -699,17 +699,19 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 					}
 				}
 			}
-			if in.Name == "get_http_headers" || in.Name == "get_profile_summary" || in.Name == "get_pcap_summary" || in.Name == "pcap_query" || in.Name == "compare_profiles" || syscallQueryOperation(in.Name) {
-				// ADR-282: the disclosed page names its one artifact as provenance.
+			if queryOperation(in.Name) && in.Name != "get_query_result" {
+				// ADR-282: a disclosed page names its source artifacts as provenance.
 				var page struct {
 					Provenance []struct {
 						ArtifactID string `json:"artifactID"`
 					} `json:"provenance"`
 				}
-				if json.Unmarshal(reply.Body, &page) != nil || len(page.Provenance) != 1 {
+				if json.Unmarshal(reply.Body, &page) != nil {
 					return out, auditapp.ErrUnavailable
 				}
-				out.ArtifactIDs = append(out.ArtifactIDs, page.Provenance[0].ArtifactID)
+				for _, p := range page.Provenance {
+					out.ArtifactIDs = append(out.ArtifactIDs, p.ArtifactID)
+				}
 			}
 			if in.Name == "request_capture" && refs.CaptureID != "" {
 				out.Effect = "accepted"

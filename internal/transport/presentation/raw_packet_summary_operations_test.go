@@ -47,7 +47,7 @@ func TestRawPacketSummaryAuditedReadyPollPreservesCoverage(t *testing.T) {
 		t.Run(string(rune('0'+unclassified)), func(t *testing.T) {
 			s, f := rawPacketSummaryBridge(t, unclassified)
 			f.ready = false
-			pending, err := s.Call(t.Context(), f, "get_pcap_summary", bridgeInput())
+			pending, err := s.Call(t.Context(), f, "get_extract", extractInput("pcapSummary", bridgeInput()))
 			if err != nil {
 				t.Fatal("raw begin", err)
 			}
@@ -72,7 +72,7 @@ func TestRawPacketSummaryAuditedReadyPollPreservesCoverage(t *testing.T) {
 					} `json:"result"`
 				} `json:"data"`
 			}
-			if json.Unmarshal(ready.Body, &out) != nil || out.Data.Tool != "get_pcap_summary" || out.Data.Result.DataClass != "extract" ||
+			if json.Unmarshal(ready.Body, &out) != nil || out.Data.Tool != "get_extract" || out.Data.Result.DataClass != "extract" ||
 				!out.Data.Result.Data.Valid() || out.Data.Result.Data.CaptureMode != "rawPackets" ||
 				out.Data.Result.Data.UnclassifiedPackets == nil || *out.Data.Result.Data.UnclassifiedPackets != unclassified || out.Data.Result.Data.Packets != 5 {
 				t.Fatal("raw prefix coverage was changed or omitted")
@@ -84,7 +84,7 @@ func TestRawPacketSummaryAuditedReadyPollPreservesCoverage(t *testing.T) {
 func TestRawPacketSummaryAuditedDeliveryRejectsMetadataResult(t *testing.T) {
 	s, f := rawPacketSummaryBridge(t, 0)
 	f.result.PacketSummary.CaptureMode, f.result.PacketSummary.UnclassifiedPackets = "networkHeaders", nil
-	if reply, err := s.Call(t.Context(), f, "get_pcap_summary", bridgeInput()); err == nil || len(reply.Body) != 0 || f.reads != 1 {
+	if reply, err := s.Call(t.Context(), f, "get_extract", extractInput("pcapSummary", bridgeInput())); err == nil || len(reply.Body) != 0 || f.reads != 1 {
 		t.Fatal("raw source delivered the wrong approved model", err, f.reads)
 	}
 }

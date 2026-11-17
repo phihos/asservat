@@ -44,7 +44,7 @@ func TestRawSyscallQueryMissingApprovalRemedyHasNoEffects(t *testing.T) {
 	}
 	delete(request, "grant_id")
 	input, _ = json.Marshal(request)
-	reply, err := s.Call(t.Context(), f, "syscall_query", input)
+	reply, err := s.Call(t.Context(), f, "query_artifact", input)
 	if err != nil {
 		t.Fatal("approval remedy", err)
 	}
@@ -81,7 +81,7 @@ func TestRawSyscallQueryRejectsWrongSourceAndMalformedPaidResults(t *testing.T) 
 			case "metadata-result":
 				f.result = &value.ProjectionResult{PodStatus: bridgeProjection(f.now)}
 			}
-			reply, err := s.Call(t.Context(), f, "syscall_query", input)
+			reply, err := s.Call(t.Context(), f, "query_artifact", input)
 			if len(reply.Body) != 0 {
 				defer reply.Close(context.Background())
 				var out struct {
@@ -126,20 +126,20 @@ func rawSyscallBridgeFixture(t *testing.T, limit int) (*AuditedOperations, *brid
 	if err != nil {
 		t.Fatal(err)
 	}
-	input, _ := json.Marshal(map[string]any{"case_id": bridgeID, "artifact_id": bridgeID, "grant_id": f.a.Scope.RawGrantID, "idempotency_key": "original-raw-call-page", "limit": limit})
+	input, _ := json.Marshal(map[string]any{"operation": "syscalls", "case_id": bridgeID, "artifact_id": bridgeID, "grant_id": f.a.Scope.RawGrantID, "idempotency_key": "original-raw-call-page", "limit": limit})
 	return s, f, audit, input
 }
 
 func TestRawSyscallQueryActualAuditedBeginReplayAndPoll(t *testing.T) {
 	s, f, audit, input := rawSyscallBridgeFixture(t, 1)
-	first, err := s.Call(t.Context(), f, "syscall_query", input)
+	first, err := s.Call(t.Context(), f, "query_artifact", input)
 	if err != nil {
 		t.Fatal("raw query must reach its actual audited admission", err)
 	}
 	if err = first.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	replay, err := s.Call(t.Context(), f, "syscall_query", input)
+	replay, err := s.Call(t.Context(), f, "query_artifact", input)
 	if err != nil {
 		t.Fatal("same-key replay", err)
 	}
@@ -204,7 +204,7 @@ func TestRawSyscallQueryMaximumAdmittedPageFitsDirectAndNested(t *testing.T) {
 			admitted := len(page.Events)
 			f.result = &value.ProjectionResult{SyscallQuery: &page}
 			f.ready = !nested
-			reply, err := s.Call(t.Context(), f, "syscall_query", input)
+			reply, err := s.Call(t.Context(), f, "query_artifact", input)
 			if err != nil {
 				t.Fatal("begin", err)
 			}

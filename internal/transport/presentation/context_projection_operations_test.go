@@ -56,14 +56,14 @@ func TestContextProjectionBridgeReadyAndPollOwnTheirReads(t *testing.T) {
 	if len(f.i.Scopes) != 1 || f.i.Scopes[0] != "evidence:read" {
 		t.Fatal("fixture added raw/download rights")
 	}
-	first, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput())
+	first, err := s.Call(context.Background(), f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.CheckDisclosure(context.Background()) != nil || f.reads != 1 || f.completions != 0 {
 		t.Fatal("read did not retain ownership")
 	}
-	if s.contracts.ValidateOutput("get_file_excerpt", first.Body) != nil {
+	if s.contracts.ValidateOutput("get_extract", first.Body) != nil {
 		t.Fatal("invalid excerpt")
 	}
 	var initial struct {
@@ -109,8 +109,8 @@ func TestContextProjectionBridgeReadyAndPollOwnTheirReads(t *testing.T) {
 func TestContextProjectionBridgePendingChargesAndNeverStartsOnPoll(t *testing.T) {
 	s, f, g, _ := bridgeAuditFixture(t)
 	f.ready = false
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
-		raw := bridgeInput()
+	for _, name := range []string{"get_extract", "get_query_result"} {
+		raw := extractInput("fileExcerpt", bridgeInput())
 		if name == "get_query_result" {
 			raw = bridgePoll(f.q.ID)
 		}
@@ -164,7 +164,7 @@ func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *test
 			if mode == "uncertain close" {
 				f.closeErr = errors.New("unknown remote closure")
 			}
-			reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
+			reply, err := s.Call(ctx, f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 			if err == nil || len(reply.Body) != 0 || f.reads != 1 || f.lastRead == nil || !f.lastRead.closed {
 				t.Fatal("failed disclosure discarded cleanup", err)
 			}
@@ -189,7 +189,7 @@ func TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite(t *testing.T) 
 	f.a.ValidUntil = time.Now().Add(500 * time.Millisecond)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
+	reply, err := s.Call(ctx, f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite(t *testing.T) 
 
 func TestContextProjectionBridgeRechecksBeforeActualWrite(t *testing.T) {
 	s, f, _, _ := bridgeAuditFixture(t)
-	reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput())
+	reply, err := s.Call(context.Background(), f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,16 @@ func TestContextProjectionBridgeRechecksBeforeActualWrite(t *testing.T) {
 func TestContextProjectionBridgeErrorsAfterDispatchStayUnknown(t *testing.T) {
 	s, f, g, _ := bridgeAuditFixture(t)
 	f.queryErr = errors.New("unknown SQL commit")
-	if reply, err := s.Call(context.Background(), f, "get_file_excerpt", bridgeInput()); err == nil || len(reply.Body) != 0 || f.admissions != 1 || g.events[0].Effect != "unknown" {
+	if reply, err := s.Call(context.Background(), f, "get_extract", extractInput("fileExcerpt", bridgeInput())); err == nil || len(reply.Body) != 0 || f.admissions != 1 || g.events[0].Effect != "unknown" {
 		t.Fatal("uncertain admission reported no effect")
 	}
+}
+
+// extractInput adds the get_extract view to a case/artifact input.
+func extractInput(view string, raw []byte) []byte {
+	var m map[string]any
+	_ = json.Unmarshal(raw, &m)
+	m["view"] = view
+	b, _ := json.Marshal(m)
+	return b
 }
