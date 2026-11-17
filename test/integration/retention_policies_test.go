@@ -124,23 +124,34 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal("stored set with a rejected policy", stored, err)
 		}
 
+		// admit stores another capture of the scenario with the given target
+		// labels and returns its attempt.
+		digestByte := byte(7)
+		admit := func(labels *privacy.TargetLabels) string {
+			t.Helper()
+			next := s.a
+			next.IdempotencyKey = custodyID()
+			next.SubmissionDigest[1] = digestByte
+			digestByte++
+			input := next.Plan.Input
+			input.CaptureID = custodyID()
+			input.Target.Labels = labels
+			var err error
+			if next.Plan, err = planning.CompileContext(input, time.Now().UTC()); err != nil {
+				t.Fatal(err)
+			}
+			next.Registration.Location.ArtifactID = custodyID()
+			next.Registration.Location.AttemptID = custodyID()
+			admitted, err := s.s.AdmitContext(ctx, next)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return admitted.Expectation.Registration.Location.AttemptID
+		}
+
 		// An admission resolved under the older, longer policy set: the
 		// trigger applies the stored stricter policy in its transaction.
-		next := s.a
-		next.IdempotencyKey = custodyID()
-		next.SubmissionDigest[1] = 7
-		input := next.Plan.Input
-		input.CaptureID = custodyID()
-		if next.Plan, err = planning.CompileContext(input, time.Now().UTC()); err != nil {
-			t.Fatal(err)
-		}
-		next.Registration.Location.ArtifactID = custodyID()
-		next.Registration.Location.AttemptID = custodyID()
-		second, err := s.s.AdmitContext(ctx, next)
-		if err != nil {
-			t.Fatal(err)
-		}
-		secondAttempt := second.Expectation.Registration.Location.AttemptID
+		secondAttempt := admit(nil)
 		anchor2, e2, d2 := deadlines(secondAttempt)
 		if d2.After(anchor2.Add(600*time.Second)) || e2.After(anchor2.Add(540*time.Second)) {
 			t.Fatal("admission kept a deadline beyond the stored policy", anchor2, e2, d2)
@@ -191,6 +202,40 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		if _, err = previewPool.Exec(ctx, "UPDATE custody_attempt SET effective_expires_at=effective_expires_at WHERE id=$1", attempt); err == nil {
 			t.Fatal("preview role can change deadlines")
+		}
+
+		// A label-scoped policy shortens only artifacts whose recorded
+		// workload and namespace labels match its selectors. An artifact
+		// without recorded labels takes it cluster-wide (earlier deletion).
+		web := admit(&privacy.TargetLabels{Namespace: map[string]string{"team": "shop"}, Workload: map[string]string{"tier": "web", "app": "checkout"}})
+		db := admit(&privacy.TargetLabels{Namespace: map[string]string{"team": "shop"}, Workload: map[string]string{"tier": "db"}})
+		webAnchor, _, _ := deadlines(web)
+		_, dbExpires, dbDelete := deadlines(db)
+		labeled := retentionPolicyFixture(custodyID(), 1, cluster, 300, 60)
+		labeled.Scope.NamespaceLabels = map[string]string{"team": "shop"}
+		labeled.Scope.WorkloadLabels = map[string]string{"tier": "web"}
+		if err = store.SyncRetentionPolicies(ctx, []privacy.ScopedPolicy{baseline, labeled}); err != nil {
+			t.Fatal(err)
+		}
+		if _, e, d := deadlines(web); !d.Equal(webAnchor.Add(300*time.Second)) || !e.Equal(webAnchor.Add(240*time.Second)) {
+			t.Fatal("labeled policy did not shorten the matching artifact", webAnchor, e, d)
+		}
+		if _, e, d := deadlines(db); !e.Equal(dbExpires) || !d.Equal(dbDelete) {
+			t.Fatal("labeled policy shortened a non-matching artifact")
+		}
+		if _, _, d := deadlines(attempt); !d.Equal(anchor.Add(300 * time.Second)) {
+			t.Fatal("labeled policy skipped an artifact without recorded labels", anchor, d)
+		}
+		if n, shortened := events(labeled.Policy.Revision.UID, "applied"); n != 1 || shortened < 2 {
+			t.Fatal("labeled policy audit row", n, shortened)
+		}
+		// The admission trigger applies the same selectors to a new row.
+		web2, db2 := admit(&privacy.TargetLabels{Namespace: map[string]string{"team": "shop"}, Workload: map[string]string{"tier": "web"}}), admit(&privacy.TargetLabels{Namespace: map[string]string{"team": "other"}, Workload: map[string]string{"tier": "web"}})
+		if a, _, d := deadlines(web2); d.After(a.Add(300 * time.Second)) {
+			t.Fatal("admission kept a deadline beyond the matching labeled policy", a, d)
+		}
+		if a, _, d := deadlines(db2); !d.After(a.Add(300 * time.Second)) {
+			t.Fatal("admission applied a labeled policy to a non-matching row", a, d)
 		}
 	})
 }

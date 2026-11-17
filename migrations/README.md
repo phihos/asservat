@@ -83,3 +83,5 @@ cutoffs, schema floor 102 and privileges stay unchanged. Down restores the old
 no-op rule without narrowing stored projections. See [ADR-200](../docs/decisions/200-on-demand-capacity-refresh.md).
 
 `00190_retention_deadlines.sql` drops the retention source, checkpoint, watch and catch-up tables of 00015, 00017 and 00018 ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D12). It adds the stored policy set (`retention_policy`), one audit row per applied or removed policy (`retention_policy_event`), the shared `retention_policy_effect` and `retention_preview` functions and an admission trigger that applies stored policies to each new capture. Effective deadlines only shorten. See [retention](../docs/architecture/retention-lifecycle.md).
+
+`00198_retention_policy_labels.sql` records the target's namespace and workload labels on `context_capture.target_labels` at admission and makes `retention_policy_effect` match label-scoped policies against them, so such a policy shortens only matching artifacts. Rows without recorded labels take every policy of their cluster scope. Down restores the 00190 function and drops the column.

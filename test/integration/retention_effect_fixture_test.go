@@ -43,7 +43,7 @@ func (f *retentionEffectFixture) caseMetadataPolicies(ctx context.Context) (priv
 
 // RetentionPolicies matches the set for t, as RetentionResolver does.
 func (f *retentionEffectFixture) RetentionPolicies(_ context.Context, t authorization.Target) (privacy.PolicySet, error) {
-	return privacy.MatchPolicies(f.set, t, func(p []privacy.Policy) identity.Revision {
+	return privacy.MatchPolicies(f.set, t, nil, func(p []privacy.Policy) identity.Revision {
 		b, _ := json.Marshal(p)
 		return identity.Revision{UID: t.ClusterID, Generation: 1, Digest: sha256.Sum256(b)}
 	})

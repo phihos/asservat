@@ -45,7 +45,7 @@ func (r RetentionResolver) resolve(ctx context.Context, in value.Input, caseMeta
 			policies[i].Policy = value.CaseMetadataPolicy(p)
 		}
 	}
-	set, err := value.MatchPolicies(policies, in.Target, func(p []value.Policy) identity.Revision {
+	set, err := value.MatchPolicies(policies, in.Target, in.Labels, func(p []value.Policy) identity.Revision {
 		b, _ := json.Marshal(p)
 		return identity.Revision{UID: in.Target.ClusterID, Generation: 1, Digest: sha256.Sum256(b)}
 	})

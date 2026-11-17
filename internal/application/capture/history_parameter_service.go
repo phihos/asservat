@@ -75,11 +75,11 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	if !s.configured() || ctx == nil || !p.Valid() || !acceptedContext(accepted, accepted.SubmissionDigest) || p.OriginalExecutionDigest != accepted.ScopeDigest || accepted.Replay {
 		return value.ErrHistoryUnavailable
 	}
-	original := accepted.Expectation
+	original, labels := accepted.Expectation, accepted.Labels
 	if accepted.Group != nil {
 		// All children independently establish the same selected metadata pool. The
 		// new history object has its own genuine ID; the parent has no artifact.
-		original = accepted.Group.Children[0].Expectation
+		original, labels = accepted.Group.Children[0].Expectation, accepted.Group.Children[0].Labels
 		for _, child := range accepted.Group.Children {
 			e := child.Expectation
 			if e.Registration.Location.ClusterID != original.Registration.Location.ClusterID || e.NamespaceUID != original.NamespaceUID || e.WorkloadUID != original.WorkloadUID || e.Registration.StoreID != original.Registration.StoreID || e.Registration.AllocationID != original.Registration.AllocationID || e.Registration.PoolRevision != original.Registration.PoolRevision || e.Registration.AllocationRevision != original.Registration.AllocationRevision {
@@ -108,7 +108,7 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	// retention selectors cover namespace/workload; all children independently
 	// establish that same workload and remain separately authorized below SQL.
 	stage = markHistoryStage(ctx, "hw-", stage, "retention", &began)
-	retention, err := s.Retention.ResolveCaseMetadata(ctx, privacy.Input{ControlKind: "case-metadata", Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "other", AnchorAt: accepted.CreatedAt})
+	retention, err := s.Retention.ResolveCaseMetadata(ctx, privacy.Input{ControlKind: "case-metadata", Target: target, Labels: labels, PrivacyClass: "potentialPersonalData", EvidenceType: "other", AnchorAt: accepted.CreatedAt})
 	if err != nil {
 		return err
 	}

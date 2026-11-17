@@ -298,7 +298,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if snapshot != nil {
 		evidenceType = e.Type().EvidenceType
 	}
-	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
+	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), Labels: t.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
 		return out, nil, apiCheckStep{"Retention", err}
 	}

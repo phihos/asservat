@@ -179,6 +179,7 @@ func TestPodTargetsMarkNamespacesWithoutEvidence(t *testing.T) {
 				case "/apis/apps/v1/namespaces/" + ns.Name + "/deployments/app":
 					object = targetMetadata("Deployment", "app", "root-uid")
 					object["metadata"].(map[string]any)["namespace"] = ns.Name
+					object["metadata"].(map[string]any)["labels"] = map[string]string{"tier": "web"}
 				default:
 					return false
 				}
@@ -195,6 +196,11 @@ func TestPodTargetsMarkNamespacesWithoutEvidence(t *testing.T) {
 			result, err := reader.ResolvePod(context.Background(), request)
 			if err != nil || result.EvidenceDisabled != (name != "eligible") {
 				t.Fatalf("%+v %v", result, err)
+			}
+			// The resolution carries the namespace and root workload labels
+			// for label-scoped retention.
+			if result.Labels == nil || result.Labels.Workload["tier"] != "web" || name == "labelled" && result.Labels.Namespace["asservat.io/evidence"] != "disabled" {
+				t.Fatalf("labels %+v", result.Labels)
 			}
 		})
 	}

@@ -40,9 +40,10 @@ Collection matches the stored set against the target: every policy whose
 cluster scope covers the target's cluster applies, and the shortest maximum
 wins (`privacy.MatchPolicies`, `privacy.Resolve`). Rules select by privacy
 class and evidence type; every collector records evidence as potential user
-data. Label selectors need the namespace and workload labels, which no reader
-supplies yet: a labeled policy that covers the target's cluster refuses new
-collection there.
+data. Label selectors use matchLabels semantics against the namespace labels
+and the workload labels (Deployment or StatefulSet, or the bare Pod) that
+target resolution reads. A target resolved without labels (a source snapshot)
+refuses new collection under a covering labeled policy.
 
 ## Stored deadlines
 
@@ -59,8 +60,8 @@ exact `retention_decision` row; a policy shortening does not.
 deadlines of every retained artifact it matches: evidence through
 `context_capture` by cluster and native type, capture-history parameters as
 case metadata. The effect parameter is computed in Go from the policy
-(`privacy.Effect`): the cluster scope, the evidence maximum per native type,
-the case-metadata maximum and the deletion budget. Applying it is one
+(`privacy.Effect`): the cluster scope, the label selectors, the evidence
+maximum per native type, the case-metadata maximum and the deletion budget. Applying it is one
 statement:
 
 ```sql
@@ -71,8 +72,11 @@ WHERE a.id = e.attempt_id AND (e.expires_at < a.effective_expires_at OR e.delete
 
 `delete_by = LEAST(old, anchor + maximum)` and `expires_at = LEAST(old,
 anchor + maximum - budget)`, never before the anchor. A longer maximum, a new
-default or a deleted policy changes no row. A labeled policy applies to its
-whole cluster scope: no artifact records labels, and a privacy maximum may
+default or a deleted policy changes no row. Admission records the target's
+labels on `context_capture.target_labels` (all labels: a later policy may
+select any key); a capture-history parameter uses its capture's row. A
+labeled policy matches them by jsonb containment. A row without recorded
+labels takes the policy across its cluster scope, since a privacy maximum may
 only err towards earlier deletion.
 
 An `AFTER INSERT` trigger on `context_capture` and

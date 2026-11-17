@@ -12,7 +12,7 @@ import (
 )
 
 const findContextCapture = `-- name: FindContextCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND request_key=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND request_key=$2
 `
 
 type FindContextCaptureParams struct {
@@ -64,12 +64,13 @@ func (q *Queries) FindContextCapture(ctx context.Context, arg FindContextCapture
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }
 
 const findContextCaptureByPreview = `-- name: FindContextCaptureByPreview :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND preview_id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND preview_id=$2
 `
 
 type FindContextCaptureByPreviewParams struct {
@@ -121,12 +122,13 @@ func (q *Queries) FindContextCaptureByPreview(ctx context.Context, arg FindConte
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }
 
 const findLegacyContextPreviewCapture = `-- name: FindLegacyContextPreviewCapture :many
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND preview_id IS NULL AND submission_digest=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND preview_id IS NULL AND submission_digest=$2
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,issuer}' = $3::text
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,subject}' = $4::text
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,clientID}' = $5::text
@@ -200,6 +202,7 @@ func (q *Queries) FindLegacyContextPreviewCapture(ctx context.Context, arg FindL
 			&i.GroupID,
 			&i.GroupOrdinal,
 			&i.Reason,
+			&i.TargetLabels,
 		); err != nil {
 			return nil, err
 		}
@@ -212,8 +215,8 @@ func (q *Queries) FindLegacyContextPreviewCapture(ctx context.Context, arg FindL
 }
 
 const insertContextCapture = `-- name: InsertContextCapture :one
-INSERT INTO context_capture(id,root_id,request_key,submission_digest,scope_digest,scope_json,expectation_json,pod_pin_json,attempt_id,permission_epoch,permission_sequence,identity_policy_uid,identity_policy_generation,identity_policy_digest,deadline,preview_id,share_instruction,repeated_from_capture_id,repeated_from_expires_at,created_at,group_id,group_ordinal,reason)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,COALESCE($20::timestamptz,clock_timestamp()),$21::uuid,$22::smallint,$23::text) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason
+INSERT INTO context_capture(id,root_id,request_key,submission_digest,scope_digest,scope_json,expectation_json,pod_pin_json,attempt_id,permission_epoch,permission_sequence,identity_policy_uid,identity_policy_generation,identity_policy_digest,deadline,preview_id,share_instruction,repeated_from_capture_id,repeated_from_expires_at,created_at,group_id,group_ordinal,reason,target_labels)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,COALESCE($20::timestamptz,clock_timestamp()),$21::uuid,$22::smallint,$23::text,$24::jsonb) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels
 `
 
 type InsertContextCaptureParams struct {
@@ -240,6 +243,7 @@ type InsertContextCaptureParams struct {
 	GroupID                  pgtype.UUID
 	GroupOrdinal             pgtype.Int2
 	Reason                   pgtype.Text
+	TargetLabels             []byte
 }
 
 func (q *Queries) InsertContextCapture(ctx context.Context, arg InsertContextCaptureParams) (ContextCapture, error) {
@@ -267,6 +271,7 @@ func (q *Queries) InsertContextCapture(ctx context.Context, arg InsertContextCap
 		arg.GroupID,
 		arg.GroupOrdinal,
 		arg.Reason,
+		arg.TargetLabels,
 	)
 	var i ContextCapture
 	err := row.Scan(
@@ -310,6 +315,7 @@ func (q *Queries) InsertContextCapture(ctx context.Context, arg InsertContextCap
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }
@@ -348,7 +354,7 @@ func (q *Queries) InsertContextStorage(ctx context.Context, arg InsertContextSto
 }
 
 const lockContextCapture = `-- name: LockContextCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockContextCaptureParams struct {
@@ -400,6 +406,7 @@ func (q *Queries) LockContextCapture(ctx context.Context, arg LockContextCapture
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }
@@ -439,7 +446,7 @@ func (q *Queries) LockContextStorage(ctx context.Context, arg LockContextStorage
 }
 
 const readExactCaptureIntent = `-- name: ReadExactCaptureIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND id=$2
 `
 
 type ReadExactCaptureIntentParams struct {
@@ -491,6 +498,7 @@ func (q *Queries) ReadExactCaptureIntent(ctx context.Context, arg ReadExactCaptu
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }

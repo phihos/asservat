@@ -334,6 +334,7 @@ type ContextCapture struct {
 	GroupID                   pgtype.UUID
 	GroupOrdinal              pgtype.Int2
 	Reason                    pgtype.Text
+	TargetLabels              []byte
 }
 
 type ContextCaseLocator struct {

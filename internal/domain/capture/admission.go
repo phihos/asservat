@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
 var (
@@ -85,8 +86,10 @@ type Accepted struct {
 	ScopeDigest, SubmissionDigest artifact.Digest
 	Expectation                   artifact.ContextExpectation
 	Pin                           artifact.PinnedPod
-	CreatedAt, Deadline           time.Time
-	Replay                        bool
+	// Labels are the target labels recorded at admission; nil when none were.
+	Labels              *privacy.TargetLabels `json:"-"`
+	CreatedAt, Deadline time.Time
+	Replay              bool
 	// MetadataValidUntil bounds this response only; never persisted or authority for a later request.
 	MetadataValidUntil time.Time `json:"-"`
 }

@@ -362,7 +362,7 @@ func (q *Queries) ReadRecordingSaveGroup(ctx context.Context, arg ReadRecordingS
 }
 
 const readRecordingSaveGroupChildren = `-- name: ReadRecordingSaveGroupChildren :many
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND group_id=$2 ORDER BY group_ordinal
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND group_id=$2 ORDER BY group_ordinal
 `
 
 type ReadRecordingSaveGroupChildrenParams struct {
@@ -420,6 +420,7 @@ func (q *Queries) ReadRecordingSaveGroupChildren(ctx context.Context, arg ReadRe
 			&i.GroupID,
 			&i.GroupOrdinal,
 			&i.Reason,
+			&i.TargetLabels,
 		); err != nil {
 			return nil, err
 		}

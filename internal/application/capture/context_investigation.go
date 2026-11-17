@@ -218,7 +218,7 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 			evidence = intent.Snapshot.ActionKind
 		}
 	}
-	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
+	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, Labels: target.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	auditapp.MarkStep(ctx, "p-retention", mark)
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)

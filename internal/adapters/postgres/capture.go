@@ -21,6 +21,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -156,6 +157,12 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 		return value.Accepted{}, value.ErrUnavailable
 	}
 	out := value.Accepted{CaptureID: uid(row.ID), Expectation: e, Pin: pin, CreatedAt: row.CreatedAt.Time, Deadline: row.Deadline.Time}
+	if row.TargetLabels != nil {
+		out.Labels = &privacy.TargetLabels{}
+		if json.Unmarshal(row.TargetLabels, out.Labels) != nil {
+			return value.Accepted{}, value.ErrUnavailable
+		}
+	}
 	if row.RepeatedFromCaptureID.Valid {
 		out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(row.RepeatedFromCaptureID), ExpiresAt: row.RepeatedFromExpiresAt.Time}
 	}
@@ -660,6 +667,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if err != nil || len(pinJSON) > 4096 {
 			return value.ErrInvalid
 		}
+		// Label-scoped retention policies match these labels later (00198).
+		var labelsJSON []byte
+		if in.Target.Labels != nil {
+			if labelsJSON, err = json.Marshal(in.Target.Labels); err != nil {
+				return value.ErrInvalid
+			}
+		}
 		var repeatedID pgtype.UUID
 		var repeatedUntil pgtype.Timestamptz
 		if a.RepeatedFrom != nil {
@@ -711,7 +725,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			childPreviewID = ""
 			childRequestKey = recordingGroupChildRequestKey(group.Preview.CaptureID, int(ordinal.Int16))
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{Reason: reason, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{Reason: reason, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt, TargetLabels: labelsJSON})
 		if err != nil {
 			return err
 		}
