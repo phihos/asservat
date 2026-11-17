@@ -104,7 +104,8 @@ export class Shares {
     const issuer = this.session.principal.issuer;
     this.pending ??= {
       case_id: caseID, artifacts: [{ artifactID: artifact.artifact_id, digest: artifact.digest }],
-      recipients: recipients.map(r => ({ kind: r.kind, name: r.id })), data_classes: ['metadata'], operations: ['get_case', 'download_artifact'],
+      // Groups by name; users by their stable subject ID (tokens carry no username).
+      recipients: recipients.map(r => r.kind === 'Group' ? { kind: 'Group' as const, name: r.id } : { kind: 'User' as const, issuer, id: r.id }), data_classes: ['metadata'], operations: ['get_case', 'download_artifact'],
       ...(hours ? { expires_at: new Date(Date.now() + hours * 3_600_000).toISOString() } : {}), ...(reason ? { reason } : {}), idempotency_key: this.newID(),
       ...(teams.length ? { management: { mode: 'teams' as const, teams: teams.map(id => ({ kind: 'Group' as const, issuer, id })) } } : {}),
     };

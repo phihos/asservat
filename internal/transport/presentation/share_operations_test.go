@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -239,5 +240,36 @@ func TestShareMutationsCarryServerOperationID(t *testing.T) {
 				t.Fatal("public operation ID accepted")
 			}
 		})
+	}
+}
+
+// Codex review: a recipient named in create_share must be one the read path
+// matches. Groups are matched by their groups-claim name and users by
+// subject (tokens carry no username), so a user is named by subject ID and
+// a user name is refused at the contract.
+func TestShareRecipientsMatchTheirReaders(t *testing.T) {
+	f := &shareOperationsFixture{scopes: []string{"evidence:read", "evidence:share"}}
+	s, err := NewShareOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const issuer = "https://id.example.invalid"
+	body := func(recipients string) string {
+		return `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + strings.Repeat("0a", 32) + `"}],"recipients":` + recipients + `,"data_classes":["metadata"],"operations":["get_case"],"idempotency_key":"m"}`
+	}
+	if out := shareCall(t, s, f, "create_share", body(`[{"kind":"Group","name":"incident"},{"kind":"User","issuer":"`+issuer+`","id":"f3c1-subject"}]`)); out["status"] != "ok" {
+		t.Fatal(out)
+	}
+	readers := []identity.Identity{
+		{Principal: identity.Principal{Issuer: issuer, Subject: "someone", ClientID: "console", Kind: identity.Human}, Groups: []string{"incident"}},
+		{Principal: identity.Principal{Issuer: issuer, Subject: "f3c1-subject", ClientID: "console", Kind: identity.Human}},
+	}
+	for n, reader := range readers {
+		if !slices.Contains(authorization.RecipientKeys(reader), f.input.Recipients[n].Key()) {
+			t.Fatal("recipient never matches its reader", f.input.Recipients[n], reader.Principal)
+		}
+	}
+	if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "create_share", json.RawMessage(body(`[{"kind":"User","name":"alice@example.invalid"}]`))); err == nil {
+		t.Fatal("a user name was accepted although no reader can match it")
 	}
 }

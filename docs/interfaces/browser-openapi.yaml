@@ -2493,14 +2493,13 @@ components:
               additionalProperties: false
               properties:
                 kind:
-                  enum:
-                  - User
-                  - Group
+                  const: Group
                 name:
                   type: string
                   minLength: 1
-                  description: User name, e-mail address or group name known to the
-                    installation.
+                  description: Group name as in the identity provider's groups claim.
+                    A user is named by issuer and stable subject ID, because tokens
+                    carry no username the hub could match.
               required:
               - kind
               - name

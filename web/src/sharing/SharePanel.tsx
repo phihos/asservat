@@ -35,7 +35,7 @@ export function RecipientsEditor({ recipients, onChange }: { recipients: Recipie
   return <>
     <div className="form-row">
       <label>Recipient type<select value={kind} onChange={event => setKind(event.target.value as Recipient['kind'])}><option value="User">User</option><option value="Group">Group</option></select></label>
-      <label>Recipient name<input value={id} autoComplete="off" spellCheck={false} onChange={event => setID(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); add(); } }}/></label>
+      <label>Group name or user ID<input value={id} autoComplete="off" spellCheck={false} onChange={event => setID(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); add(); } }}/></label>
     </div>
     <Button className="button secondary" isDisabled={!id.trim()} onPress={add}>Add recipient</Button>
     {recipients.length > 0 && <ul className="progress-actions" aria-label="Recipients">{recipients.map(r => <li key={r.kind + '\n' + r.id}>
@@ -90,7 +90,7 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
   return <details className="retention-edit" onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>Share this artifact</summary>
     {open && <>
-    <p>Recipients can read and download this artifact in this case until the share ends. Name users or groups of your identity provider ({session.principal.issuer}).</p>
+    <p>Recipients can read and download this artifact in this case until the share ends. Name groups as in your identity provider ({session.principal.issuer}); name users by their stable subject ID, not a display name or e-mail.</p>
     {/* While a request is uncertain the retry must match what the form shows. */}
     <fieldset disabled={state.uncertain}>
     <RecipientsEditor recipients={recipients} onChange={setRecipients}/>

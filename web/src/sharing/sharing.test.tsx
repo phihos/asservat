@@ -58,7 +58,7 @@ function open() {
 }
 function fill(recipient: string, kind = 'User') {
   fireEvent.change(screen.getByLabelText('Recipient type'), { target: { value: kind } });
-  fireEvent.change(screen.getByLabelText('Recipient name'), { target: { value: recipient } });
+  fireEvent.change(screen.getByLabelText('Group name or user ID'), { target: { value: recipient } });
   fireEvent.click(screen.getByRole('button', { name: 'Add recipient' }));
 }
 
@@ -80,7 +80,7 @@ it('shares one artifact with names of the own identity provider, previews the re
   expect(validInput_create_share(input)).toBe(true);
   // Without a duration the share lasts until the artifact's access ends.
   expect(input).toEqual({ case_id: id(2), artifacts: [{ artifactID: id(3), digest: 'ab'.repeat(32) }],
-    recipients: [{ kind: 'User', name: 'user-7' }, { kind: 'Group', name: 'team-9' }],
+    recipients: [{ kind: 'User', issuer: session.principal.issuer, id: 'user-7' }, { kind: 'Group', name: 'team-9' }],
     data_classes: ['metadata'], operations: ['get_case', 'download_artifact'], reason: 'incident review', idempotency_key: id(30) });
   // A successful share clears the form; the next share is a new request.
   await waitFor(() => expect(screen.queryByRole('list', { name: 'Recipients' })).toBeNull());
@@ -111,7 +111,7 @@ it('retries an uncertain share only with the identical request and shows definit
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   const retry = await screen.findByRole('button', { name: 'Retry same share request' });
   // The form is locked: what it shows is exactly what the retry sends.
-  expect(screen.getByLabelText('Recipient name').matches(':disabled')).toBe(true);
+  expect(screen.getByLabelText('Group name or user ID').matches(':disabled')).toBe(true);
   expect(screen.getByLabelText('Reason (optional)').matches(':disabled')).toBe(true);
   client.fail = () => failure('NotAvailable', 'Sharing needs the evidence-owner role on the workload and the evidence:share scope.');
   fireEvent.click(retry);
@@ -129,7 +129,7 @@ it('discards an uncertain share so the form can build a new request', async () =
   fill('user-7'); fireEvent.change(screen.getByLabelText('Reason (optional)'), { target: { value: 'r' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Discard and start over' }));
-  expect(screen.getByLabelText('Recipient name').matches(':disabled')).toBe(false);
+  expect(screen.getByLabelText('Group name or user ID').matches(':disabled')).toBe(false);
   client.fail = undefined;
   fill('user-8');
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));

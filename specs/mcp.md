@@ -29,7 +29,7 @@ The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json); this
 | `get_grant` | Own grant state and remaining quota; optional server-side wait | Requester/approver views; others get the unknown-ID reply (ADR-249). The approval inbox is browser-only |
 | `download_artifact` | `action` = `prepare`, `status` or `cancel` a native download or core bundle | `evidence:download`; metadata, `content_path` and `browser_url`, never bytes ([downloads](artifact-downloads.md)) |
 | `list_shares` | Owned/received shares; optionally the sharing instructions of owned captures and policies | Administrators get a management view without recipients |
-| `create_share` | Share evidence with users or groups by name | Sharing authority; raw sharing may need approval |
+| `create_share` | Share evidence with groups by name or users by subject ID | Sharing authority; raw sharing may need approval |
 | `revoke_share` | Revoke one share or a sharing instruction and its dependent shares | Current managers and administrators; expected revision and idempotency |
 | `transfer_share` | Replace the managing owner teams of one share | Current manager or administrator; creator, recipients and expiry unchanged |
 | `stop_future_sharing` | Stop future sharing of a policy; existing shares stay | Creator, owner-team member or administrator; changes no collection authority |

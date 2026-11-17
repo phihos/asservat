@@ -35,9 +35,9 @@ export interface components {
             artifacts: components["schemas"]["Contract_common_9530994123d918d4"][];
             /** @description No count limit; bounded only by the request body byte limit (memory). */
             recipients: ({
-                /** @enum {unknown} */
-                kind: "User" | "Group";
-                /** @description User name, e-mail address or group name known to the installation. */
+                /** @constant */
+                kind: "Group";
+                /** @description Group name as in the identity provider's groups claim. A user is named by issuer and stable subject ID, because tokens carry no username the hub could match. */
                 name: string;
             } | components["schemas"]["Contract_common_0e44f1278c675a38"])[];
             data_classes: ("metadata" | "extract" | "raw")[];

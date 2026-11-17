@@ -88,10 +88,10 @@ type shareRecipientInput struct {
 	ID     string `json:"id"`
 }
 
-// shareRecipientRef is a create_share recipient: a user or group name of
-// the caller's issuer (ADR-335 D4), or an explicit issuer and ID. A name is
-// the ID the evaluator matches: the username for a user (as AccessBindings
-// match it) and the groups-claim name for a group.
+// shareRecipientRef is a create_share recipient: a group name of the
+// caller's issuer (ADR-335 D4: groups are matched by their groups-claim
+// name), or an explicit issuer and ID. A user is named by stable subject ID:
+// tokens carry no username the evaluator could match.
 type shareRecipientRef struct {
 	Kind   string `json:"kind"`
 	Name   string `json:"name,omitempty"`

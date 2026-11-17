@@ -82,7 +82,7 @@ Given two simultaneous raw requests sharing a 64 KiB remaining budget, when each
 
 ## REQ-SHR-001 — Explicit evidence sharing within the organization
 
-A user holding `evidence-owner` or `workload-maintainer` on the workload, with the `evidence:share` scope (a default scope of the console and bundled MCP clients), may create an `EvidenceShare` for named users or groups of the installation's issuer. Creation requires current access to each included artifact; receiving a share confers no sharing authority.
+A user holding `evidence-owner` or `workload-maintainer` on the workload, with the `evidence:share` scope (a default scope of the console and bundled MCP clients), may create an `EvidenceShare` for groups (by name, as in the groups claim) or users (by stable subject ID; tokens carry no username to match) of the installation's issuer. Creation requires current access to each included artifact; receiving a share confers no sharing authority.
 
 A share binds a snapshot of published artifact versions, recipients, allowed data classes and operations, an optional reason, the immutable creator, its management (REQ-SHR-008) and an expiry that defaults to, and never exceeds, the artifacts' access end. Future artifacts are excluded; capture-time and policy instructions (REQ-SHR-004/005) create ordinary concrete shares at publication. No anonymous links exist. A share includes native download of the shared versions with the `evidence:download` scope ([ADR-233](../docs/decisions/233-recipient-native-download.md)), charged to the workload's transfer allocation.
 
