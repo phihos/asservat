@@ -111,7 +111,7 @@ await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture',
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_extract', 'query_artifact', 'compare_profiles', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
-await operationBundle(['list_recordings', 'preview_recording_save'], 'recordings');
+await operationBundle(['preview_recording_save'], 'recordings');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
@@ -121,7 +121,7 @@ await operationBundle(['get_processing_erasure'], 'processing-erasure');
 await operationBundle(['get_processing_report'], 'processing-report', ['ProcessingReportExport']);
 await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
-await operationBundle(['list_live_sources', 'open_live_watch', 'read_live_watch', 'update_live_watch', 'close_live_watch'], 'live');
+await operationBundle(['list_recordings', 'watch_live'], 'live');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.

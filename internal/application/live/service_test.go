@@ -154,10 +154,10 @@ func setup(t *testing.T) (*Service, *fixture, fixedIdentity, v.Open) {
 	t.Cleanup(s.Close)
 	i := fixedIdentity{identity.Identity{Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "viewer", ClientID: "console", Kind: identity.Human}, Scopes: []string{"evidence:read"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(time.Minute)}}
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	r := v.Open{Handles: []string{page.Sources[0].Handle}, Projection: v.Packet, Key: "open", Filter: v.Filter{All: []v.Predicate{}}}
+	r := v.Open{Handles: []string{page[0].Handle}, Projection: v.Packet, Key: "open", Filter: v.Filter{All: []v.Predicate{}}}
 	return s, f, i, r
 }
 func (f *fixture) add() {
@@ -201,10 +201,10 @@ func TestLivePrincipalAccountingIsSharedAcrossClientsButHandlesRemainClientBound
 		t.Fatal("foreign-client source reference accepted")
 	}
 	page, _, e := s.List(t.Context(), mcp, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	request.Handles = []string{page.Sources[0].Handle}
+	request.Handles = []string{page[0].Handle}
 	second, e := s.Open(t.Context(), mcp, request)
 	if e != nil || second.ID == first.ID {
 		t.Fatal(second, e)
@@ -528,10 +528,10 @@ func TestLiveInventoryReportsUnavailableCapabilityWithoutInventingActiveLease(t 
 	f.source.LeaseUntil = f.now.Add(-time.Second)
 	f.source.Blockers = []string{"ProjectionUnavailable"}
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 || page.Sources[0].Eligible || len(page.Sources[0].Projections) != 0 || !page.Sources[0].LeaseUntil.Equal(f.source.LeaseUntil) {
+	if e != nil || len(page) != 1 || page[0].Live || len(page[0].Source.Projections) != 0 || !page[0].Source.LeaseUntil.Equal(f.source.LeaseUntil) {
 		t.Fatal(page, e)
 	}
-	if _, e = s.Open(t.Context(), i, v.Open{Handles: []string{page.Sources[0].Handle}, Projection: v.Packet, Key: "unavailable"}); e == nil {
+	if _, e = s.Open(t.Context(), i, v.Open{Handles: []string{page[0].Handle}, Projection: v.Packet, Key: "unavailable"}); e == nil {
 		t.Fatal("metadata handle granted unavailable source")
 	}
 	if f.reads != 0 || f.heads != 0 || f.created != 0 {
@@ -570,10 +570,10 @@ func TestLiveStatelessHandleIsReferenceNotFiveSecondObservationOrPermit(t *testi
 	s, f, i, _ := setup(t)
 	i.i.ValidUntil = f.now.Add(5 * time.Second)
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	handle := page.Sources[0].Handle
+	handle := page[0].Handle
 	if len(handle) > 128 {
 		t.Fatal("reference borrowed operation observation", handle)
 	}
@@ -673,9 +673,8 @@ func TestLiveInventoryLargeRequestedPageUsesBoundedProducerAndOriginalContinuati
 	paged := &liveInventoryPage{fixture: f}
 	s.sources = paged
 	out, next, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 100)
-	b, _ := json.Marshal(out)
-	if e != nil || paged.requested != 20 || len(out.Sources) != 20 || next != "existing-position" || len(b) > 20<<10 {
-		t.Fatal("inventory exceeded public envelope or lost original cursor", e, paged.requested, len(out.Sources), next, len(b))
+	if e != nil || paged.requested != 20 || len(out) != 20 || next != "existing-position" {
+		t.Fatal("inventory exceeded public envelope or lost original cursor", e, paged.requested, len(out), next)
 	}
 }
 

@@ -457,10 +457,11 @@ func (s *LiveOperations) listRecordings(ctx context.Context, current identities.
 		return nil, "", errUnknownCluster
 	}
 	target := targets.WorkloadRequest{ClusterID: cluster, Namespace: in.Target.Namespace, Kind: in.Target.Kind, Name: in.Target.Name}
-	// The 24 KiB result envelope holds about twenty rows with handles.
-	limit := min(max(in.Limit, 1), 20)
+	// A row with maximal names and a combined handle encodes to about 1.3 KiB;
+	// sixteen fit the 24 KiB result envelope.
+	limit := min(max(in.Limit, 1), 16)
 	if in.Limit == 0 {
-		limit = 20
+		limit = 16
 	}
 	page := recordingListPage{Kind: "recordingPage", Recordings: []recordingListRow{}, CaptureEnabled: s.config.CollectionEnabled, ExpiresAt: (*until).UTC()}
 	saves := map[string]capture.RecordingRow{}
