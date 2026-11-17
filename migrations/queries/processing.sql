@@ -24,8 +24,6 @@ VALUES($1,$2,$3,$4,sha256(convert_to(sqlc.arg(actor)::jsonb::text,'UTF8')),$5,$6
 -- name: ApplyProcessingDecision :one
 UPDATE processing_decision SET applied_at=clock_timestamp()
 WHERE root_id=$1 AND id=$2 AND applied_at IS NULL RETURNING *;
--- name: ProcessingCatalogEmpty :one
-SELECT NOT EXISTS(SELECT 1 FROM context_catalog WHERE root_id=$1) AS empty;
 
 -- name: ListProcessingInventoryRules :many
 SELECT id,revision,state,scope,valid_until,retire_by FROM processing_rule

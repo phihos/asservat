@@ -43,12 +43,14 @@ func (s *processingService) Change(ctx context.Context, current identities.Curre
 	if s.after != nil {
 		s.after()
 	}
-	state := "initialized"
+	state, rule, revision := "restricted", c.RuleID, c.ExpectedRevision+1
 	if c.Action == value.RequestEarlyErasure {
-		state = "erasureRequested"
+		state, rule, revision = "erasureRequested", "", 0
+	} else if c.Action == "release_processing" {
+		state = "released"
 	}
 	return value.ProcessingReceipt{RootID: "00000000-0000-4000-8000-000000000041", Epoch: "00000000-0000-4000-8000-000000000042", RequestID: c.RequestID,
-		OperationID: "00000000-0000-4000-8000-000000000043", State: state, Sequence: 2, ObservedAt: now, ValidUntil: until}, nil
+		OperationID: "00000000-0000-4000-8000-000000000043", State: state, RuleID: rule, Revision: revision, Sequence: 2, ObservedAt: now, ValidUntil: until}, nil
 }
 
 // ADR-210: the route needs the session, CSRF and one UUID Idempotency-Key,
@@ -83,11 +85,11 @@ func TestProcessingChangeRoute(t *testing.T) {
 		b, _ := io.ReadAll(response.Body)
 		return response.StatusCode, string(b)
 	}
-	body := `{"action":"initialize_processing"}`
+	body := `{"action":"restrict_processing","ruleID":"00000000-0000-4000-8000-000000000047","expectedRevision":0,"artifactID":"00000000-0000-4000-8000-000000000046"}`
 	status, reply := send(body, nil)
 	var out map[string]any
-	if status != http.StatusOK || json.Unmarshal([]byte(reply), &out) != nil || out["state"] != "initialized" || out["revision"] != float64(0) || out["requestID"] != key || len(service.changes) != 1 || service.changes[0].RequestID != key || service.changes[0].Action != "initialize_processing" {
-		t.Fatal("initialization reply", status, reply)
+	if status != http.StatusOK || json.Unmarshal([]byte(reply), &out) != nil || out["state"] != "restricted" || out["revision"] != float64(1) || out["requestID"] != key || len(service.changes) != 1 || service.changes[0].RequestID != key || service.changes[0].Action != "restrict_processing" {
+		t.Fatal("restriction reply", status, reply)
 	}
 	for name, mutate := range map[string]func(*http.Request){
 		"missing CSRF":   func(r *http.Request) { r.Header.Del("X-CSRF-Token") },
@@ -101,7 +103,7 @@ func TestProcessingChangeRoute(t *testing.T) {
 			t.Fatal("request accepted without", name, status)
 		}
 	}
-	for _, bad := range []string{`{"action":"initialize_processing","requestID":"chosen"}`, `{"action":"delete_everything"}`, `{"action":"restrict_processing"}`} {
+	for _, bad := range []string{`{"action":"initialize_processing"}`, `{"action":"delete_everything"}`, `{"action":"restrict_processing"}`} {
 		if status, _ := send(bad, nil); status != http.StatusBadRequest {
 			t.Fatal("invalid change accepted", bad, status)
 		}
@@ -280,7 +282,7 @@ func TestProcessingChangeStalledBodyReleasesSlot(t *testing.T) {
 
 func completeProcessingRequest(t *testing.T, server *httptest.Server) *http.Request {
 	t.Helper()
-	r, err := http.NewRequest(http.MethodPost, server.URL+ProcessingChangesPath, strings.NewReader(`{"action":"initialize_processing"}`))
+	r, err := http.NewRequest(http.MethodPost, server.URL+ProcessingChangesPath, strings.NewReader(`{"action":"restrict_processing","ruleID":"00000000-0000-4000-8000-000000000047","expectedRevision":0,"artifactID":"00000000-0000-4000-8000-000000000046"}`))
 	if err != nil {
 		t.Fatal(err)
 	}

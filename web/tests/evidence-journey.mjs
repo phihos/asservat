@@ -3,8 +3,10 @@
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { syscallJourney } from './syscall-journey.mjs';
+import { captureConsoleResponses } from './console-response.mjs';
 
 export async function evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads }) {
+  const readBody = await captureConsoleResponses(page);
   const caseID = '00000000-0000-4000-8000-000000000080';
   const casePath = '/cases/' + caseID;
   const evidenceControl = async (state, extra = {}) => {
@@ -38,7 +40,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     assert(evidenceLoads.length >= 1, 'case navigation must load the separate actual evidence bundle');
     assert.equal(initialStatus, 200);
     const caseReply = page.waitForResponse(response => response.url() === origin + '/api/v1/operations/get_case' && response.request().method() === 'POST')
-      .then(async response => ({ status: response.status(), wire: await response.json() }));
+      .then(async response => ({ status: response.status(), wire: JSON.parse((await readBody(response)).toString('utf8')) }));
     const [, response] = await Promise.all([
       page.getByRole('button', { name: 'Refresh evidence details', exact: true }).click(),
       caseReply,

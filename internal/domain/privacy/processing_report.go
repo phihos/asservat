@@ -140,21 +140,18 @@ type ProcessingReportDownload struct {
 }
 
 type ProcessingReportOperation struct {
-	Lane                string        `json:"lane"`
-	OperationID         string        `json:"operation_id"`
-	ArtifactID          string        `json:"artifact_id,omitempty"`
-	Ordinal             int64         `json:"ordinal"`
-	Name                string        `json:"name"`
-	Issuer              string        `json:"issuer"`
-	Subject             string        `json:"subject"`
-	ClientID            string        `json:"client_id"`
-	PrincipalKind       identity.Kind `json:"principal_kind"`
-	CreatedAt           time.Time     `json:"created_at"`
-	IntentAcknowledged  bool          `json:"intent_acknowledged"`
-	OutcomeAcknowledged bool          `json:"outcome_acknowledged"`
-	Status              string        `json:"status"`
-	OutputBytes         *int64        `json:"output_bytes,omitempty"`
-	ClientReceipt       string        `json:"client_receipt"`
+	OperationID   string        `json:"operation_id"`
+	ArtifactID    string        `json:"artifact_id,omitempty"`
+	Ordinal       int64         `json:"ordinal"`
+	Name          string        `json:"name"`
+	Issuer        string        `json:"issuer"`
+	Subject       string        `json:"subject"`
+	ClientID      string        `json:"client_id"`
+	PrincipalKind identity.Kind `json:"principal_kind"`
+	CreatedAt     time.Time     `json:"created_at"`
+	Status        string        `json:"status"`
+	OutputBytes   *int64        `json:"output_bytes,omitempty"`
+	ClientReceipt string        `json:"client_receipt"`
 }
 
 // ProcessingReportScope is a report DTO. The immutable processing scope keeps
@@ -391,9 +388,9 @@ func (r ProcessingReportRecord) Valid(section string, now time.Time) bool {
 	case "operations":
 		v := r.Operation
 		return v != nil && authorization.UUID(v.OperationID) && (v.Ordinal == 0 && v.ArtifactID == "" || v.Ordinal >= 1 && v.Ordinal <= 100 && authorization.UUID(v.ArtifactID)) &&
-			slices.Contains([]string{"normal", "resolution", "processing"}, v.Lane) && identity.Text(v.Name, 64) && v.Name != "get_processing_report" &&
+			identity.Text(v.Name, 64) && v.Name != "get_processing_report" &&
 			(identity.Principal{Issuer: v.Issuer, Subject: v.Subject, ClientID: v.ClientID, Kind: v.PrincipalKind}).Valid() &&
-			!v.CreatedAt.IsZero() && (v.OutputBytes == nil || *v.OutputBytes >= 0) && (!v.OutcomeAcknowledged || v.IntentAcknowledged && v.OutputBytes != nil) &&
+			!v.CreatedAt.IsZero() && (v.OutputBytes == nil || *v.OutputBytes >= 0) &&
 			slices.Contains([]string{"unknown", "success", "denied", "invalid", "unavailable", "interrupted"}, v.Status) && v.ClientReceipt == "unknown"
 	case "rules":
 		v := r.Rule

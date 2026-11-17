@@ -127,7 +127,7 @@ func TestProcessingCanonicalScopeAndArtifactSelectorRequests(t *testing.T) {
 	if code := send(release); code != 200 || len(service.changes) != 2 || !service.changes[1].Valid() || service.changes[1].Scope.Location.ArtifactID != artifactID {
 		t.Fatal("canonical release scope", code)
 	}
-	for _, bad := range []string{`{"action":"initialize_processing","scope":{}}`, `{"action":"initialize_processing","expectedRevision":0}`, `{"action":"initialize_processing","artifactID":""}`, `{"action":"initialize_processing","scope":null}`, `{"action":"initialize_processing","expectedRevision":null}`, `{"action":"initialize_processing","ruleID":null}`, `{"action":"initialize_processing","artifactID":null}`, `{"action":"restrict_processing","ruleID":"` + rule + `","expectedRevision":null,"artifactID":"` + artifactID + `"}`, `{"Action":"initialize_processing"}`, `{"action":"release_processing","ruleID":"` + rule + `","expectedRevision":1,"artifactID":"` + artifactID + `"}`, `{"action":"restrict_processing","ruleID":"` + rule + `","artifactID":"` + artifactID + `","scope":` + scope + `}`, release + `{}`} {
+	for _, bad := range []string{`{"action":"restrict_processing","ruleID":"` + rule + `","expectedRevision":null,"artifactID":"` + artifactID + `"}`, `{"action":"release_processing","ruleID":"` + rule + `","expectedRevision":1,"artifactID":"` + artifactID + `"}`, `{"action":"restrict_processing","ruleID":"` + rule + `","artifactID":"` + artifactID + `","scope":` + scope + `}`, release + `{}`} {
 		if code := send(bad); code != 400 {
 			t.Fatal("invalid scope/selector accepted", code)
 		}

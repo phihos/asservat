@@ -163,13 +163,12 @@ func processingReportRecords(ctx context.Context, q *custodydb.Queries, a value.
 			return nil, err
 		}
 		// An audit row has no stored cutoff: retention drops whole partitions.
-		// A row committed with its effect is acknowledged.
 		for _, row := range rows {
 			count := row.OutputBytes
 			v := value.ProcessingReportOperation{
-				OperationID: uid(row.ID), ArtifactID: row.ArtifactID, Ordinal: row.Ordinal, Name: row.OperationName, Lane: "normal",
+				OperationID: uid(row.ID), ArtifactID: row.ArtifactID, Ordinal: row.Ordinal, Name: row.OperationName,
 				Issuer: row.Issuer, Subject: row.Subject, ClientID: row.ClientID, PrincipalKind: identity.Kind(row.IdentityType), CreatedAt: row.CreatedAt.Time.UTC(),
-				IntentAcknowledged: true, OutcomeAcknowledged: true, Status: row.Status, OutputBytes: &count, ClientReceipt: "unknown",
+				Status: row.Status, OutputBytes: &count, ClientReceipt: "unknown",
 			}
 			records = append(records, value.ProcessingReportRecord{VisibleUntil: a.ValidUntil.UTC(), Operation: &v})
 		}

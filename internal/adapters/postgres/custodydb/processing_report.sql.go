@@ -198,7 +198,7 @@ SELECT e.operation_id AS id,e.operation AS operation_name,e.issuer,e.subject,e.c
  COALESCE(ref.ordinality,0)::bigint AS ordinal,COALESCE(ref.value,'')::text AS artifact_id
 FROM audit_event e
 LEFT JOIN LATERAL unnest(e.artifact_ids) WITH ORDINALITY ref(value,ordinality) ON true
-WHERE (e.kind='call' OR e.kind IN ('initialize_processing','restrict_processing','release_processing','request_early_erasure'))
+WHERE (e.kind='call' OR e.kind IN ('restrict_processing','release_processing','request_early_erasure'))
  AND e.operation<>'get_processing_report' AND e.recorded_at<=$1::timestamptz
  AND (e.operation_id,COALESCE(ref.ordinality,0))>($2::uuid,$3::bigint)
 ORDER BY e.operation_id,ordinal LIMIT $4::integer

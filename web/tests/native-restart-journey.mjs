@@ -5,6 +5,7 @@ import axe from 'axe-core';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { captureConsoleResponses } from './console-response.mjs';
 
 const origin = process.argv[2], url = new URL(origin);
 assert.equal(url.protocol, 'https:'); assert.equal(url.hostname, '127.0.0.1');
@@ -13,6 +14,7 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
 const context = await browser.newContext({ ignoreHTTPSErrors: true, acceptDownloads: true, viewport: { width: 1200, height: 900 } });
 const page = await context.newPage(), errors = [], external = [], checks = [], violations = [];
+const readBody = await captureConsoleResponses(page);
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', message => { if (/violates.*Content Security Policy|Refused to (execute|apply|load)/i.test(message.text())) errors.push(message.text()); });
 page.on('request', r => { if (new URL(r.url()).origin !== origin) external.push(r.url()); });
@@ -71,7 +73,7 @@ try {
   checks.push('lost actual Stop reply retains the old key and starts no new preparation or content request');
 
   const positiveStop = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/cancel_artifact_download' && r.status() === 200)
-    .then(async r => ({ wire: await r.json(), body: r.request().postDataJSON() }));
+    .then(async r => ({ wire: JSON.parse((await readBody(r)).toString('utf8')), body: r.request().postDataJSON() }));
   await page.getByRole('button', { name: 'Start a new download', exact: true }).click();
   const stopReply = await positiveStop;
   assert.equal(stopReply.wire.status, 'ok');

@@ -49,7 +49,7 @@ it('requires the exact artifact and request ID for an erasure acknowledgement wi
   expect(fetcher.mock.calls[0][0]).toBe('/api/v1/processing/changes');
   expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', headers: { 'Idempotency-Key': id(8), 'X-CSRF-Token': 'C'.repeat(43) } });
   expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual(input);
-  for (const mismatch of [{ requestID: id(10) }, { revision: 0 }, { ruleID: id(3) }, { state: 'initialized', revision: 0 }]) {
+  for (const mismatch of [{ requestID: id(10) }, { revision: 0 }, { ruleID: id(3) }, { state: 'restricted', revision: 0 }]) {
     fetcher.mockResolvedValueOnce(json({ ...accepted, ...mismatch }));
     await expect(processingClient.change(input, id(8), 'C'.repeat(43), scope.signal)).rejects.toMatchObject({ status: 502 });
   }

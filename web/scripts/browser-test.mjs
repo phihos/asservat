@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { evidenceJourney } from '../tests/evidence-journey.mjs';
+import { captureConsoleResponses } from '../tests/console-response.mjs';
 
 const origin = process.argv[2];
 const url = new URL(origin);
@@ -15,6 +16,7 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
 const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+const readBody = await captureConsoleResponses(page);
 const errors = [], external = [], violations = [], checks = [], evidenceLoads = [];
 let scans = 0;
 page.on('pageerror', error => errors.push(error.message));
@@ -157,7 +159,7 @@ try {
   await page.getByRole('button', { name: 'View settings', exact: true }).click();
   const largeResponse = await largeSettings;
   assert.equal(largeResponse.status(), 200);
-  const settingsBytes = await largeResponse.body();
+  const settingsBytes = await readBody(largeResponse);
   assert(settingsBytes.length > 120 * 1024 && settingsBytes.length <= 160 * 1024);
   assert(settingsBytes.includes(Buffer.from('<é>&')));
   await expect(page.getByRole('heading', { name: 'Saved settings' })).toBeVisible();

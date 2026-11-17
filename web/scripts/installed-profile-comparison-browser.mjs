@@ -3,7 +3,8 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
-import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
+import { readInstalledHistoryResponse } from './installed-history-response.mjs';
+import { captureConsoleResponses } from '../tests/console-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
 import { checkInstalledProfileCaseRefreshes } from './installed-profile-case-proof.mjs';
 
@@ -40,23 +41,8 @@ const started = Date.now();
 try {
   await context.addCookies(config.cookies);
   config.cookies = [];
-  // Same known Chromium workaround as installed history: observe only text the
-  // real page consumed, without replacing any HTTP response or issuing fetches.
-  await context.addInitScript(() => {
-    const original = window.fetch.bind(window);
-    const replies = new Map();
-    Object.defineProperty(window, '__installedReplies', { value: replies });
-    window.fetch = async (input, init) => {
-      const response = await original(input, init);
-      const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_profile_summary|get_query_result|prepare_artifact_download|get_artifact_download)$/.test(path)) && response.status === 200) {
-        const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
-        response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
-      }
-      return response;
-    };
-  });
   page = await context.newPage();
+  const readBody = await captureConsoleResponses(page);
   const seen = [];
   let compareRequests = 0;
   let pollRequests = 0;
@@ -81,21 +67,9 @@ try {
   const responseReads = new WeakMap();
   async function readResponse(response, path) {
     if (responseReads.has(response)) return responseReads.get(response);
-    let read = await readInstalledHistoryResponse(response);
-    let pageConsumed = false;
-    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
-      const key = path + '\n' + (response.request().postData() ?? '');
-      let text = null;
-      for (const until = Date.now() + 2000; Date.now() < until;) {
-        text = await page.evaluate(k => { const value = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return value; }, key);
-        if (text !== null) break;
-        await page.waitForTimeout(100);
-      }
-      if (text === null) return { read, pageConsumed, superseded: true }; // No extra fetch or replay.
-      read = parseInstalledHistoryText(200, text);
-      pageConsumed = true;
-    }
-    const value = { read, pageConsumed };
+    const read = await readInstalledHistoryResponse(response, readBody);
+    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED')) return { read, superseded: true };
+    const value = { read };
     responseReads.set(response, value);
     return value;
   }
@@ -107,7 +81,7 @@ try {
       const path = new URL(response.url()).pathname;
       const operationName = path.split('/').at(-1);
       if (!names.includes(operationName)) continue;
-      const { read, pageConsumed, superseded } = await readResponse(response, path);
+      const { read, superseded } = await readResponse(response, path);
       if (superseded) continue; // Original observer skips a page-superseded reply.
       if (name === 'get_case') {
         const reply = read.reply;
@@ -115,7 +89,7 @@ try {
         const data = reply?.data;
         caseDiagnostic = {
           http: read.http, status: ['ok', 'error', 'pending'].includes(read.status) ? read.status : 'invalid',
-          body: read.body, pageConsumed, schema: validOutput_get_case(reply),
+          body: read.body, schema: validOutput_get_case(reply),
           encodedBytes: reply ? Math.min(32_769, Buffer.byteLength(JSON.stringify(reply))) : 0,
           code: reply?.status === 'error' ? (reply.data?.code === 'NotAvailable' ? 'NotAvailable' : 'other') : 'none',
           caseMatch: data?.case?.case_id === config.caseID,
@@ -386,9 +360,6 @@ try {
     stage = name;
     const button = panel.getByRole('button', { name: heap ? (calls === 1 ? 'Inspect saved profile' : 'Check result') : (calls === 1 ? 'Compare profiles' : 'Check comparison result'), exact: true });
     await expect(button).toBeEnabled({ timeout: 30_000 });
-    // Clear before clicking, so an earlier identical paid poll cannot supply
-    // this attempt's page-consumed response.
-    await page.evaluate(prefix => { for (const key of window.__installedReplies.keys()) if (key.startsWith(prefix)) window.__installedReplies.delete(key); }, '/api/v1/operations/' + name + '\n');
     const from = seen.length;
     await button.click();
     const response = await observed(name, from);

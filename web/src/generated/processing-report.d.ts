@@ -348,16 +348,12 @@ export interface components {
             principal_kind: "human" | "workload";
             /** Format: date-time */
             created_at: string;
-            intent_acknowledged: boolean;
-            outcome_acknowledged: boolean;
             /** @enum {unknown} */
             status: "unknown" | "success" | "denied" | "invalid" | "unavailable" | "interrupted";
             output_bytes?: number;
             /** @constant */
             client_receipt: "unknown";
-            /** @enum {unknown} */
-            lane: "normal" | "resolution" | "processing";
-        } & (unknown & unknown);
+        } & unknown;
         Contract_processing_report_5a3a6a0832c5c9c2: {
             /** Format: date-time */
             visible_until: string;

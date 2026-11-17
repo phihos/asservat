@@ -56,9 +56,6 @@ export interface components {
         ProcessingInventory: components["schemas"]["Contract_processing_fa2777465e6a04e4"];
         Contract_processing_5c4c1b2613c810e5: {
             /** @constant */
-            action: "initialize_processing";
-        } | {
-            /** @constant */
             action: "restrict_processing";
             /** Format: uuid */
             ruleID: string;
@@ -89,11 +86,11 @@ export interface components {
             /** Format: uuid */
             requestID: string;
             /** Format: uuid */
-            ruleID?: string;
+            ruleID: string;
             /** Format: uuid */
             operationID: string;
             /** @enum {unknown} */
-            state: "initialized" | "restricted" | "released";
+            state: "restricted" | "released";
             revision: number;
             sequence: number;
             /** Format: date-time */
