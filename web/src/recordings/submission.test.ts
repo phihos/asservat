@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from '../capture/investigation';
-import { SyntheticOperations, id, session, target, result, progressResult } from '../capture/test-fixtures';
+import { SyntheticOperations, id, session, target, result, progressResult, clusterID, isSettings } from '../capture/test-fixtures';
 
 const controllers: Investigation[] = [];
 const savePreview = { recording_handles: ['source-1'] };
@@ -35,7 +35,7 @@ it('opens only the exact saved capture and requires recordingSave progress', asy
   const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   controller.attach(session, new AbortController().signal); controller.showRecordings();
   await controller.submitRecordingSave(savePreview, digest);
-  expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8), progress: { operation: 'recordingSave', phase: 'Finalizing' } });
+  expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8), progress: { operation: 'recordingSave', phase: 'Running' } });
   expect(client.calls.map(call => call.name)).toEqual(['request_capture', 'get_capture']);
 });
 it('history repeat restores only preferences and requires fresh source selection', async () => {
@@ -44,12 +44,12 @@ it('history repeat restores only preferences and requires fresh source selection
   const saved = JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   saved.data.expires_at = new Date(Date.now() + 60_000).toISOString();
   const client = new SyntheticOperations(); const base = client.responder;
-  client.responder = name => name === 'get_capture_settings' ? saved : base(name);
+  client.responder = (name, input) => isSettings(name, input) ? saved : base(name, input);
   const controller = new Investigation(client); controllers.push(controller);
   controller.attach(session, new AbortController().signal); controller.setDraft({ target, retention: '' });
   await controller.showSettings(saved.data.capture_id); controller.selectRecordingsAgain(controller.snapshot().settings!);
   expect(controller.snapshot()).toMatchObject({ stage: 'recordings', recordingRepeat: { policyUID: saved.data.settings.policy.policyUID, captureID: saved.data.capture_id } });
-  expect(client.calls.map(call => call.name)).toEqual(['get_capture_settings']);
+  expect(client.calls.map(call => call.name)).toEqual(['get_capture']);
   expect(JSON.stringify(controller.snapshot().recordingRepeat)).not.toMatch(/recording_handle|sharing|grant/);
 });
 

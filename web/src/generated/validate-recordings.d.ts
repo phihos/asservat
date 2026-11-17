@@ -1,4 +1,0 @@
-// Generated from canonical browser OpenAPI. Run npm run generate; do not edit.
-import type { components } from './recordings';
-export declare function validInput_preview_recording_save(value: unknown): value is components['schemas']['McpInput_preview_recording_save'];
-export declare function validOutput_preview_recording_save(value: unknown): value is components['schemas']['McpOutput_preview_recording_save'];

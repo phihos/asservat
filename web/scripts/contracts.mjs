@@ -47,13 +47,22 @@ const outputs = {
 // The capture bundle covers the five implemented business operations. The
 // canonical documents remain shared with MCP; this is a code-generation adapter,
 // not another manually maintained wire schema or a network schema loader.
-const registry = new Map();
-const contractFiles = new Set([...(await readdir(resolve(root, 'specs/contracts'))), ...implementedFiles]);
-for (const file of [...contractFiles].filter(file => file.endsWith('.schema.json')).sort()) {
-  const schema = JSON.parse(await readFile(implementedFiles.has(file) ? resolve(implemented, file) : resolve(root, 'specs/contracts', file), 'utf8'));
-  registry.set(schema.$id, { name: 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_'), schema });
+// Legacy operations reference the implemented schema copies; canonical
+// operations reference the canonical schemas. A bundle uses one of the two.
+const legacyRegistry = new Map(), canonicalRegistry = new Map();
+const canonicalFiles = await readdir(resolve(root, 'specs/contracts'));
+for (const file of [...new Set([...canonicalFiles, ...implementedFiles])].filter(file => file.endsWith('.schema.json')).sort()) {
+  const name = 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_');
+  const legacy = JSON.parse(await readFile(implementedFiles.has(file) ? resolve(implemented, file) : resolve(root, 'specs/contracts', file), 'utf8'));
+  legacyRegistry.set(legacy.$id, { name, schema: legacy });
+  if (!canonicalFiles.includes(file)) continue;
+  const canonical = JSON.parse(await readFile(resolve(root, 'specs/contracts', file), 'utf8'));
+  canonicalRegistry.set(canonical.$id, { name, schema: canonical });
 }
 async function operationBundle(names, bundle, direct = []) {
+  const legacy = names.filter(name => legacyTools.has(name));
+  if (legacy.length > 0 && legacy.length < names.length) throw new Error('Bundle ' + bundle + ' mixes legacy and canonical operations');
+  const registry = names.length > 0 && legacy.length === 0 && direct.length === 0 ? canonicalRegistry : legacyRegistry;
   const capture = { openapi: browser.openapi, info: browser.info, paths: {}, components: { schemas: {} } };
   function localSchema(value, base) {
     if (Array.isArray(value)) return value.map(child => localSchema(child, base));
@@ -107,11 +116,10 @@ async function operationBundle(names, bundle, direct = []) {
 
 }
 await operationBundle([], 'processing', ['ProcessingInventory', 'ProcessingChange', 'ProcessingReceipt']);
-await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_settings', 'list_capture_profiles', 'get_capture_profile'], 'capture');
+await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_profile'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_extract', 'query_artifact', 'compare_profiles', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
-await operationBundle(['preview_recording_save'], 'recordings');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
@@ -152,7 +160,6 @@ outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);
 outputs['validate-projection.js'] = browserModules(outputs['validate-projection.js']);
 outputs['validate-policy.js'] = browserModules(outputs['validate-policy.js']);
-outputs['validate-recordings.js'] = browserModules(outputs['validate-recordings.js']);
 outputs['validate-sharing.js'] = browserModules(outputs['validate-sharing.js']);
 outputs['validate-access.js'] = browserModules(outputs['validate-access.js']);
 outputs['validate-access-preview.js'] = browserModules(outputs['validate-access-preview.js']);

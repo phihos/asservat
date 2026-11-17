@@ -35,13 +35,10 @@ export interface components {
             /** @description Kubernetes UID (a UUID; 64 characters leaves room for its textual forms). */
             uid?: string;
         };
+        /** @description Automation envelope on an AccessBinding (ADR-335 D6). Only allowedActions is required; an omitted lifetime is unbounded. Bytes are bounded by the installation's capacity and rate limits, not a lifetime budget. Intrusive actions still need an expiring policy grant. */
         Contract_policy_authority_82c5ee701fbfe76f: {
             allowedActions: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
-            maxLifetimeSeconds: number;
-            maxExecutions: number;
-            maxBytes: number;
-            maxObservedBytes: number;
-            maxObservedEvents?: number;
+            maxLifetimeSeconds?: number;
         };
         Contract_permission_common_94881780cf4467f4: {
             /** @description Kubernetes namespace name (DNS label). */

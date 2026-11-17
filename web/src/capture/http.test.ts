@@ -12,23 +12,23 @@ it('accepts canonical recording extracts and a fixed bounded browser settings re
   Object.assign(settings.data.settings, { recipe_spec: { description: '<é>&', actions: [{ id: 'command', kind: 'command', parameters: { argv: Array.from({ length: 30 }, () => 'a'.repeat(4096)), workingDirectory: '/', adapter: 'podsExec' }, required: true, impact: 'intrusive', limits: { maxBytes: 4096, timeout: '5s' }, executionMode: 'onTrigger' }], maxTotalBytes: 4096, maxDuration: '5s' } });
   expect(new TextEncoder().encode(JSON.stringify(settings)).length).toBeGreaterThan(120 * 1024);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(settings)));
-  expect(await operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).toEqual(settings);
+  expect(await operations.call('get_capture', { capture_id: id(41), view: 'settings' }, 'csrf', new AbortController().signal)).toEqual(settings);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(recordingPreviewResult())));
   await expect(operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', new AbortController().signal)).resolves.toBeDefined();
 });
 it('refuses larger settings and client-selected response budgets', async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(' '.repeat(160 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } }));
   vi.stubGlobal('fetch', fetcher);
-  await expect(operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).rejects.toThrow();
+  await expect(operations.call('get_capture', { capture_id: id(41), view: 'settings' }, 'csrf', new AbortController().signal)).rejects.toThrow();
   fetcher.mockClear();
-  await expect(operations.call('get_capture_settings', { capture_id: id(41), response_budget: 999999 } as never, 'csrf', new AbortController().signal)).rejects.toThrow();
+  await expect(operations.call('get_capture', { capture_id: id(41), view: 'settings', response_budget: 999999 } as never, 'csrf', new AbortController().signal)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
 });
 it('uses canonical finite retention and exact whole-pod preview validation', () => {
-  const input = { target_ref: { cluster_id: id(1), namespace: 'payments', kind: 'Pod', name: 'api' }, preset_ref: { name: 'pod-status', version: 'v1' } };
+  const input = { target_ref: { cluster: 'local', namespace: 'payments', kind: 'Pod', name: 'api' }, preset_ref: { name: 'pod-status', version: 'v1' } };
   expect(validInput_preview_capture(input)).toBe(true);
-  for (const requested_retention_seconds of [1, 3600, 315360000]) expect(validInput_preview_capture({ ...input, requested_retention_seconds })).toBe(true);
-  for (const requested_retention_seconds of [0, -1, 0.5, 315360001, null, true, '3600']) expect(validInput_preview_capture({ ...input, requested_retention_seconds })).toBe(false);
+  for (const requested_retention_seconds of [1, 3600, 315360001]) expect(validInput_preview_capture({ ...input, requested_retention_seconds })).toBe(true);
+  for (const requested_retention_seconds of [0, -1, 0.5, null, true, '3600']) expect(validInput_preview_capture({ ...input, requested_retention_seconds })).toBe(false);
   expect(validInput_preview_capture({ history_capture_id: id(1), requested_retention_seconds: 60 })).toBe(false);
   const reviewed = { preview: input, expected_plan_digest: 'b'.repeat(64), idempotency_key: id(3) };
   expect(validInput_request_capture(reviewed)).toBe(true);
@@ -56,7 +56,7 @@ it.each([
   () => json({ ...progressResult(), extra: 'unexpected' }),
   () => json({ ...progressResult(), data_class: 'raw' }),
   () => json({ ...progressResult(), truncated: true, narrowing_hint: 'more' }),
-  () => new Response(' '.repeat(32769), { headers: { 'Content-Type': 'application/json' } }),
+  () => new Response(' '.repeat(160 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } }),
   () => new Response(new Uint8Array([0xc3, 0x28]), { headers: { 'Content-Type': 'application/json' } }),
 ])('rejects malformed, oversized or nonmetadata responses', async response => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => response()));
@@ -79,7 +79,7 @@ it('accepts a durable cancellation request without treating the capture as termi
   const fetcher = vi.fn().mockResolvedValue(json(progress)); vi.stubGlobal('fetch', fetcher);
   const response = await operations.call('get_capture', { capture_id: id(8) }, 'csrf', new AbortController().signal);
   expect(response).toEqual(progress);
-  if (response.status === 'ok') expect(response.data.phase).toBe('Finalizing');
+  if (response.status === 'ok') expect(response.data.phase).toBe('Running');
 });
 
 it('sends cancellation only to the parent with matching CSRF and stable request identity', async () => {
@@ -94,7 +94,7 @@ it('requires all grouped action identity fields without rejecting repeated confi
  const response=progressResult('Finalizing');if(response.status!=='ok')throw new Error();response.data.operation='recordingSave';
  response.data.actions=[{action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-a',pod_name:'api-a',phase:'Succeeded'},{action_id:'traffic',action_instance_id:id(102),pod_uid:'pod-b',pod_name:'api-b',phase:'Cancelled'}];
  expect(validOutput_get_capture(response)).toBe(true);
- const missing=structuredClone(response);delete missing.data.actions[1].pod_uid;expect(validOutput_get_capture(missing)).toBe(false);
+ const missing=structuredClone(response);delete (missing.data as {actions:{pod_uid?:string}[]}).actions[1].pod_uid;expect(validOutput_get_capture(missing)).toBe(false);
 });
 it('never cancels a fully read response body, only an unfinished one', async () => {
   // Cancelling a finished stream can abort the request in Chromium before its
@@ -104,7 +104,7 @@ it('never cancels a fully read response body, only an unfinished one', async () 
   await operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', new AbortController().signal);
   expect(cancelled).not.toHaveBeenCalled();
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(' '.repeat(160 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } })));
-  await expect(operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).rejects.toThrow();
+  await expect(operations.call('get_capture', { capture_id: id(41), view: 'settings' }, 'csrf', new AbortController().signal)).rejects.toThrow();
   expect(cancelled).toHaveBeenCalled();
   cancelled.mockRestore();
 });

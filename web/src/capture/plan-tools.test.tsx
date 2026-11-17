@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
 import { SaveAsProfile } from './SaveAsProfile';
-import { SyntheticOperations, catalogResult, historyResult, id, profileResult, profilesResult, recordingPreviewResult, result, session, target } from './test-fixtures';
+import { SyntheticOperations, catalogResult, historyResult, id, profileResult, profilesResult, recordingPreviewResult, result, session, target, clusterID, isProfiles, isSettings } from './test-fixtures';
 import type { Preview } from './http';
 
 const controllers: Investigation[] = [];
@@ -19,10 +19,9 @@ function recording(filter: string): ReturnType<typeof recordingPreviewResult> {
 it('returns to the composer with its edits and shows a before/after diff of the re-reviewed plan (REQ-CPR-005)', async () => {
   const client = new SyntheticOperations(); const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   let preview = recording('tcp port 8080');
-  client.responder = name => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([]) : name === 'list_capture_profiles' ? profilesResult()
+  client.responder = (name, input) => isProfiles(name, input) ? profilesResult() : name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([])
     : name === 'get_capture_profile' ? profileResult('network-connections') : preview;
   render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
-  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
   fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
   fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
   fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));
@@ -56,8 +55,8 @@ it('compares an edited history repeat with the saved settings', async () => {
   const original = recording('tcp port 8080');
   if (saved.status !== 'ok' || saved.data.kind !== 'captureSettings' || original.status !== 'ok') throw new Error();
   saved.data.settings.profile_composition = original.data.profile_composition;
-  client.responder = name => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)]) : name === 'list_capture_profiles' ? profilesResult()
-    : name === 'get_capture_settings' ? saved : (() => { const p = recording('tcp port 9090'); if (p.status === 'ok') p.data.repeated_from_capture_id = id(41); return p; })();
+  client.responder = (name, input) => isProfiles(name, input) ? profilesResult() : name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)])
+    : isSettings(name, input) ? saved : (() => { const p = recording('tcp port 9090'); if (p.status === 'ok') p.data.repeated_from_capture_id = id(41); return p; })();
   act(() => controller.setDraft({ target, retention: '' }));
   await act(async () => { await controller.discover(); });
   await act(async () => { await controller.showSettings(id(41)); });
@@ -73,7 +72,7 @@ it('compares an edited history repeat with the saved settings', async () => {
 it('renders a CaptureProfile manifest with a new version and a create-only publish command', async () => {
   const client = new SyntheticOperations();
   client.responder = name => name === 'get_capture_profile' ? profileResult('network-connections')
-    : result<'list_capture_profiles'>({ profiles: ['v1', 'v2'].map(version => ({ profile_ref: { catalog: 'namespace', name: 'network-connections', version }, display_name: 'Local', description: 'Local', available: true, deprecated: false, approval_required: false, blockers: [], execution_modes: ['ongoing'] })) });
+    : result<'list_diagnostics'>({ diagnostics: ['v1', 'v2'].map(version => ({ kind: 'captureProfile', name: 'network-connections', version, profile_ref: { catalog: 'namespace', name: 'network-connections', version }, display_name: 'Local', description: 'Local', available: true, deprecated: false, approval_required: false, blockers: [], execution_modes: ['ongoing'] })) });
   const writeText = vi.fn(async () => {});
   vi.stubGlobal('navigator', { clipboard: { writeText } });
   const composition: NonNullable<Preview['profile_composition']> = {
@@ -85,7 +84,7 @@ it('renders a CaptureProfile manifest with a new version and a create-only publi
   fireEvent.click(screen.getByRole('button', { name: 'Save as profile…' }));
   const version = await screen.findByLabelText('New version');
   expect((version as HTMLInputElement).value).toBe('v3');
-  expect(client.calls.map(c => [c.name, (c.input as { catalog?: string }).catalog])).toEqual([['get_capture_profile', undefined], ['list_capture_profiles', 'namespace']]);
+  expect(client.calls.map(c => [c.name, (c.input as { catalog?: string }).catalog])).toEqual([['get_capture_profile', undefined], ['list_diagnostics', 'namespace']]);
   const manifest = JSON.parse(screen.getByRole('region', { name: 'CaptureProfile manifest' }).textContent!);
   expect(manifest).toMatchObject({ apiVersion: 'asservat.io/v1alpha1', kind: 'CaptureProfile', metadata: { name: 'network-connections.v3', namespace: 'payments' }, spec: { name: 'network-connections', version: 'v3' } });
   expect(manifest.spec.definition.recipe.actions[0].parameters.filter).toBe('tcp port 8443');

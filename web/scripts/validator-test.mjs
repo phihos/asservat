@@ -24,36 +24,38 @@ const session = {
 assert.equal(validSession(session), true);
 assert.equal(validSession({ ...session, expires_at: 'not-a-date' }), false);
 assert.equal(validSession({ ...session, extra: 'unexpected' }), false);
+// The capture operations implement the canonical contracts and their examples.
+const canonicalURL = name => new URL('../../examples/' + name, import.meta.url);
 for (const [file, validator] of [
   ['mcp-pod-status-diagnostics-input', 'validInput_list_diagnostics'],
   ['mcp-pod-status-diagnostics-result', 'validOutput_list_diagnostics'],
   ['mcp-pod-status-preview-input', 'validInput_preview_capture'],
   ['mcp-pod-status-preview-result', 'validOutput_preview_capture'],
 ]) {
-  const value = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
+  const value = JSON.parse(await readFile(canonicalURL(file + '.json'), 'utf8'));
   assert.equal(capture[validator](value), true, file);
   assert.equal(capture[validator]({ ...value, extra: 'unexpected' }), false, file + ' rejects extra field');
 }
 const id = '00000000-0000-4000-8000-000000000008';
-const podStatus = JSON.parse(await readFile(exampleURL('mcp-pod-status-preview-result.json'), 'utf8'));
+const podStatus = JSON.parse(await readFile(canonicalURL('mcp-pod-status-preview-result.json'), 'utf8'));
 for (const anchorRule of ['firstAcquisitionOrEarlierSource', 'uploadCompletion', 'previewCreation']) {
   const wrong = structuredClone(podStatus);
   wrong.data.capture_assessment.actions[0].retention.anchorRule = anchorRule;
   assert.equal(capture.validOutput_preview_capture(wrong), false, 'pod-status rejects ' + anchorRule);
 }
-const otherMechanism = JSON.parse(await readFile(exampleURL('mcp-preview-result.json'), 'utf8'));
+const otherMechanism = JSON.parse(await readFile(canonicalURL('mcp-preview-result.json'), 'utf8'));
 assert.equal(capture.validOutput_preview_capture(otherMechanism), true, 'manual previews retain their submission-preparation anchor');
 const wrongRecorder = structuredClone(otherMechanism);
 wrongRecorder.data.capture_assessment.actions[0].retention.anchorRule = 'firstAcquisitionOrEarlierSource';
 assert.equal(capture.validOutput_preview_capture(wrongRecorder), false, 'manual recorder preview refuses source-snapshot timing');
-const previewInput = JSON.parse(await readFile(exampleURL('mcp-pod-status-preview-input.json'), 'utf8'));
+const previewInput = JSON.parse(await readFile(canonicalURL('mcp-pod-status-preview-input.json'), 'utf8'));
 assert.equal(capture.validInput_request_capture({ preview: previewInput, expected_plan_digest: podStatus.data.plan_digest, idempotency_key: id }), true);
 assert.equal(capture.validInput_request_capture({ preview: previewInput, expected_plan_digest: 'invalid', idempotency_key: id }), false);
 assert.equal(capture.validInput_request_capture({ preview_id: id, idempotency_key: id }), false, 'stateless previews have no preview_id');
 assert.equal(capture.validInput_get_capture({ capture_id: id }), true);
 const result = data => ({ schema_version: 'mcp-result/v1', request_id: id, data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] });
 assert.equal(capture.validOutput_request_capture(result({ capture_id: id, phase: 'Accepted', navigation_uri: 'https://asservat.example.invalid/captures/' + id, operation: 'collect' })), true);
-assert.equal(capture.validOutput_get_capture(result({ capture_id: id, revision: 1, phase: 'Finalizing', actions: [{ action_id: 'pod-status', phase: 'Finalizing' }], navigation_uri: 'https://asservat.example.invalid/captures/' + id, can_cancel: false, blockers: [], retry_after_seconds: 5 })), true);
+assert.equal(capture.validOutput_get_capture(result({ capture_id: id, revision: 1, phase: 'Running', actions: [{ action_id: 'pod-status', phase: 'Finalizing' }], navigation_uri: 'https://asservat.example.invalid/captures/' + id, can_cancel: false, blockers: [] })), true);
 console.log('Native ESM auth and capture operation validators passed positive and negative checks.');
 
 const evidence = await import('../src/generated/validate-evidence.js');
@@ -71,7 +73,7 @@ for (const [file, validator] of [
   assert.equal(evidence[validator]({ ...value, extra: 'unexpected' }), false, file + ' rejects extra field');
 }
 const profilePreview = {
-  target_ref: {cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api'},
+  target_ref: {cluster: 'local', namespace: 'payments', kind: 'Deployment', name: 'api'},
   requested_retention_seconds: 600,
   profile_composition: {components: [{id: 'cpu', profileRef: {catalog: 'builtin', name: 'go-cpu', version: 'v1'}, overrides: [{actionID: 'cpu', field: 'profileDuration', value: '30s'}]}], maxTotalBytes: 16777216, maxDuration: '45s'},
 };
@@ -155,16 +157,12 @@ assert.equal(sharing.validInput_list_shares({ view: 'received', limit: 100 }), t
 console.log('Native ESM share validators passed positive and negative checks.');
 
 // Recording inventory/save uses the same canonical schemas in native ESM.
-const recordings = await import('../src/generated/validate-recordings.js');
 const live = await import('../src/generated/validate-live.js');
 assert.equal(live.validInput_list_recordings({ target_ref: { cluster: 'local', namespace: 'payments', kind: 'Deployment', name: 'api' }, limit: 16 }), true);
 assert.equal(live.validInput_list_recordings({ target_ref: { cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api' } }), false);
 assert.equal(live.validInput_watch_live({ action: 'read', watch_id: id, cursor: 'c', wait_ms: 30000 }), true);
 assert.equal(live.validInput_watch_live({ action: 'read', watch_id: id, cursor: 'c', wait_ms: 30001 }), false);
-assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], before: '10s' }), true);
-for (const extra of [{ after: '5s' }, { t0: '2026-10-30T12:00:00Z' }, { executor: {} }, { recipe: 'core' }]) assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], ...extra }), false);
-const saveExample = JSON.parse(await readFile(exampleURL('mcp-recording-save-preview-result.json'), 'utf8'));
-assert.equal(recordings.validOutput_preview_recording_save(saveExample), true, 'typed recording-save preview');
-const badSource = structuredClone(saveExample); badSource.data.selected_recordings[0].packet_contents = 'not metadata';
-assert.equal(recordings.validOutput_preview_recording_save(badSource), false, 'recording metadata rejects evidence fields');
+// A recording save is previewed by preview_capture with recording_handles.
+assert.equal(capture.validInput_preview_capture({ recording_handles: ['opaque-source'], before: '10s' }), true);
+for (const extra of [{ after: '5s' }, { t0: '2026-10-30T12:00:00Z' }, { executor: {} }, { recipe: 'core' }]) assert.equal(capture.validInput_preview_capture({ recording_handles: ['opaque-source'], ...extra }), false);
 console.log('Native ESM recording inventory/save validators passed positive and negative checks.');

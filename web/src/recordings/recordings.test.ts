@@ -39,16 +39,17 @@ it('sends only exact opaque handles and a shorter positive window, with no recip
   expect(client.calls).toHaveLength(1);
   controller.setBefore('0s'); await controller.review(); expect(client.calls).toHaveLength(1);
   controller.setBefore('10s');
-  client.responder = () => { const value = savePreviewResult(); if (value.status === 'ok') value.data.windows[0].before = '10s'; return value; };
+  client.responder = () => { const value = savePreviewResult(); if (value.status === 'ok') for (const action of value.data.lifecycle_plan.actions) action.requestedBefore = '10s'; return value; };
   await controller.review();
-  expect(client.calls.at(-1)).toMatchObject({ name: 'preview_recording_save', input: { recording_handles: ['source-1'], before: '10s' } });
+  expect(client.calls.at(-1)).toMatchObject({ name: 'preview_capture', input: { recording_handles: ['source-1'], before: '10s' } });
   expect(controller.submittable).toBe(true);
 });
 it('blocks changed source/window reviews and disabled capture rather than submitting an alternative', async () => {
   const { client, controller } = await loaded(); controller.select(recording(), true);
   for (const mutate of [
-    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.selected_recordings[0].pod_uid = 'replacement'; },
-    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.windows[0].recording_handle = 'replacement'; },
+    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.pod_count = 2; },
+    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.capture_assessment.actions[0].recording_handle = 'replacement'; },
+    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.lifecycle_plan.actions[0].requestedBefore = '31s'; },
   ]) {
     client.responder = () => { const value = savePreviewResult(); mutate(value); return value; };
     await controller.review(); expect(controller.submittable).toBe(false); expect(controller.snapshot().error).toMatch(/selection or window changed/);
@@ -86,13 +87,13 @@ it('saves the reviewed preview input and plan digest without another preview', a
   const { client, controller } = await loaded(); controller.select(recording(), true); await controller.review();
   const submit = vi.fn().mockResolvedValue(undefined); await controller.save(submit);
   expect(submit).toHaveBeenCalledWith({ recording_handles: ['source-1'] }, controller.snapshot().preview!.plan_digest);
-  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_recording_save']);
+  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_capture']);
 });
 
 it('preserves reason scalars verbatim, omits empty input and clears it on fresh repeat', async () => {
  const {client,controller,scope}=await loaded();controller.select(recording(),true);
  const reason='  \n'+ '🙂'.repeat(509);controller.setReason(reason);await controller.review();
- expect(client.calls.at(-1)).toMatchObject({name:'preview_recording_save',input:{reason}});
+ expect(client.calls.at(-1)).toMatchObject({name:'preview_capture',input:{reason}});
  controller.setReason('🙂'.repeat(513));const calls=client.calls.length;await controller.review();expect(client.calls).toHaveLength(calls);
  controller.setReason('');await controller.review();expect(client.calls.at(-1)!.input).not.toHaveProperty('reason');
  controller.setReason('old reason');controller.attach(session,scope.signal,target,{captureID:'old',policyUID:'policy'});
