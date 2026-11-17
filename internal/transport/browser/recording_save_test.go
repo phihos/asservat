@@ -56,7 +56,7 @@ func TestRecordingSaveBrowserRoutesPreserveCSRFAndCancellationIdempotency(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"list_recordings", "preview_recording_save", "cancel_capture"} {
+	for _, name := range []string{"preview_recording_save", "cancel_capture"} {
 		if _, ok := composed.Tool(name); !ok {
 			t.Fatal("missing route", name)
 		}

@@ -3,11 +3,13 @@ import { operations } from './http';
 import { inventoryResult, savePreviewResult, recording } from './test-fixtures';
 import { target } from '../capture/test-fixtures';
 import * as validators from '../generated/validate-recordings';
+import { validOutput_list_recordings } from '../generated/validate-live';
+const listRef = { cluster: 'local', namespace: target.namespace, kind: target.kind, name: target.name };
 afterEach(() => vi.unstubAllGlobals());
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 it('uses the same-origin canonical passive operations with CSRF and bounded cursors', async () => {
   const fetcher = vi.fn().mockResolvedValue(json(inventoryResult(undefined, 'opaque-next'))); vi.stubGlobal('fetch', fetcher);
-  const input = { target_ref: target, limit: 20 };
+  const input = { target_ref: listRef, limit: 16 };
   const response = await operations.call('list_recordings', input, 'csrf', new AbortController().signal);
   expect(response.next_cursor).toBe('opaque-next');
   expect(fetcher.mock.calls[0]).toEqual(['/api/v1/operations/list_recordings', expect.objectContaining({ credentials: 'same-origin', cache: 'no-store', redirect: 'error', headers: expect.objectContaining({ 'X-CSRF-Token': 'csrf' }), body: JSON.stringify(input) })]);
@@ -21,15 +23,15 @@ it('rejects future windows, client-chosen sources and untyped coverage before I/
     await expect(operations.call('preview_recording_save', { recording_handles: ['source-1'], ...extra } as never, 'csrf', new AbortController().signal)).rejects.toThrow();
   }
   expect(fetcher).not.toHaveBeenCalled();
-  expect(validators.validOutput_list_recordings(inventoryResult())).toBe(true);
+  expect(validOutput_list_recordings(inventoryResult())).toBe(true);
   const changed = inventoryResult(); if (changed.status !== 'ok') throw new Error('fixture');
   Object.assign(changed.data.recordings[0], { observed_packets: ['payload'] });
-  expect(validators.validOutput_list_recordings(changed)).toBe(false);
+  expect(validOutput_list_recordings(changed)).toBe(false);
 });
 it('rejects oversized metadata and redirected or raw responses without exposing upstream text', async () => {
   for (const response of [new Response(' '.repeat(32769), { headers: { 'Content-Type': 'application/json' } }), json({ ...inventoryResult(), data_class: 'raw' }), new Response('private detail', { status: 503 })]) {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-    await expect(operations.call('list_recordings', { target_ref: target }, 'csrf', new AbortController().signal)).rejects.toThrow();
+    await expect(operations.call('list_recordings', { target_ref: listRef }, 'csrf', new AbortController().signal)).rejects.toThrow();
   }
 });
 
@@ -41,5 +43,5 @@ it('reads all16 source disclosures within the dedicated preview bound and refuse
  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(json(preview)));const response=await operations.call('preview_recording_save',{recording_handles:rows.map(row=>row.recording_handle)},'csrf',new AbortController().signal);if(response.status!=='ok')throw new Error();expect(response.data.selected_recordings).toHaveLength(16);expect(response.data.capture_assessment.actions.every(row=>row.retention.policyDigests.length===64)).toBe(true);
  const exact=body+' '.repeat(128*1024-new TextEncoder().encode(body).length);
  vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(exact+' ',{headers:{'Content-Type':'application/json'}})));await expect(operations.call('preview_recording_save',{recording_handles:rows.map(row=>row.recording_handle)},'csrf',new AbortController().signal)).rejects.toThrow();
- vi.stubGlobal('fetch',vi.fn().mockResolvedValue(json(preview)));await expect(operations.call('list_recordings',{target_ref:target},'csrf',new AbortController().signal)).rejects.toThrow();
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(json(preview)));await expect(operations.call('list_recordings',{target_ref:listRef},'csrf',new AbortController().signal)).rejects.toThrow();
 });

@@ -156,7 +156,11 @@ console.log('Native ESM share validators passed positive and negative checks.');
 
 // Recording inventory/save uses the same canonical schemas in native ESM.
 const recordings = await import('../src/generated/validate-recordings.js');
-assert.equal(recordings.validInput_list_recordings({ target_ref: { cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api' }, limit: 20 }), true);
+const live = await import('../src/generated/validate-live.js');
+assert.equal(live.validInput_list_recordings({ target_ref: { cluster: 'local', namespace: 'payments', kind: 'Deployment', name: 'api' }, limit: 16 }), true);
+assert.equal(live.validInput_list_recordings({ target_ref: { cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api' } }), false);
+assert.equal(live.validInput_watch_live({ action: 'read', watch_id: id, cursor: 'c', wait_ms: 30000 }), true);
+assert.equal(live.validInput_watch_live({ action: 'read', watch_id: id, cursor: 'c', wait_ms: 30001 }), false);
 assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], before: '10s' }), true);
 for (const extra of [{ after: '5s' }, { t0: '2026-10-30T12:00:00Z' }, { executor: {} }, { recipe: 'core' }]) assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], ...extra }), false);
 const saveExample = JSON.parse(await readFile(exampleURL('mcp-recording-save-preview-result.json'), 'utf8'));

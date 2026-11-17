@@ -1,5 +1,6 @@
 import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage, type Target } from '../capture/http';
+import { listTarget } from '../live/http';
 import { operations, type Operations, type Operation, type Input, type Output, type Data, type Recording, type SavePreview } from './http';
 
 export type Repeat = { policyUID: string; captureID: string; before?: string };
@@ -67,20 +68,21 @@ export class Recordings {
   load = async (cursor?: string) => {
     if (!this.target || this.state.busy || cursor && this.state.selected.length > 0) return;
     clearTimeout(this.expiry);
-    const input: Input<'list_recordings'> = { target_ref: structuredClone(this.target), limit: 20, ...(this.repeat && { policy_uid: this.repeat.policyUID }), ...(cursor && { cursor }) };
+    const input: Input<'list_recordings'> = { target_ref: listTarget(this.target), limit: 16, ...(cursor && { cursor }) };
     this.publish({ rows: undefined, selected: [], preview: undefined, expired: false });
     const response = await this.run('list_recordings', input);
     if (!response || response.status !== 'ok') return;
     const page = response.data;
     if (!Number.isFinite(Date.parse(page.expires_at)) || Date.parse(page.expires_at) <= Date.now()) { this.publish({ expired: true }); return; }
-    this.publish({ rows: page.recordings, cursor: response.next_cursor ?? undefined, expiresAt: page.expires_at, captureEnabled: page.capture_enabled });
+    const repeat = this.repeat;
+    this.publish({ rows: repeat ? page.recordings.filter(row => row.policy_uid === repeat.policyUID) : page.recordings, cursor: response.next_cursor ?? undefined, expiresAt: page.expires_at, captureEnabled: page.capture_enabled });
     this.expire(page.expires_at);
   };
   select = (row: Recording, checked: boolean) => {
     if (this.state.busy || !row.recording_handle || this.state.expired) return;
     const selected = this.state.selected.filter(old => old.recording_handle !== row.recording_handle);
     if (checked) {
-      if (!row.save_eligible || row.blockers.length > 0 || durationMilliseconds(row.maximum_before) === undefined) return;
+      if (!row.save_eligible || durationMilliseconds(row.maximum_before) === undefined) return;
       if (selected.some(old => old.policy_uid !== row.policy_uid)) { this.publish({ error: 'Choose recordings from one policy. Clear the current selection before changing policies.' }); return; }
       const cap = Math.min(row.incident_pod_cap, ...selected.map(old => old.incident_pod_cap));
       if (selected.length >= 16 || new Set([...selected.map(old => old.pod_uid), row.pod_uid]).size > cap) { this.publish({ error: `This save supports at most ${cap} ${cap === 1 ? 'pod' : 'pods'} and 16 sources. Remove a selection before adding another.` }); return; }

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { listTarget } from '../live/http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RecordingsPanel } from './RecordingsPanel';
 import { Recordings } from './recordings';
@@ -59,7 +60,7 @@ it('opens recordings from the real target form and hands immediate save into cap
   fireEvent.click(screen.getByRole('button', { name: 'Save existing recordings now' }));
   await screen.findByRole('checkbox', { name: 'api-1 · traffic' });
   expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/list_recordings');
-  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ target_ref: target, limit: 20 });
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ target_ref: listTarget(target), limit: 16 });
   fireEvent.click(screen.getByRole('checkbox', { name: 'api-1 · traffic' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Save last 30s now' }));
   await screen.findByRole('heading', { name: 'Recording save progress' });

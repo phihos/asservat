@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { listTarget } from '../live/http';
 import { waitFor } from '@testing-library/react';
 import { Recordings } from './recordings';
 import { SyntheticRecordings, inventoryResult, recording, savePreviewResult } from './test-fixtures';
@@ -16,10 +17,10 @@ async function loaded(rows = [recording()]) {
 }
 it('lists only actual server metadata, paginates with the original opaque cursor and never submits', async () => {
   const { client, controller } = await loaded();
-  expect(client.calls[0]).toMatchObject({ name: 'list_recordings', input: { target_ref: target, limit: 20 }, csrf: session.csrf_token });
-  expect(controller.snapshot().rows![0]).toMatchObject({ state: 'Unknown', history: 'Unknown' });
+  expect(client.calls[0]).toMatchObject({ name: 'list_recordings', input: { target_ref: listTarget(target), limit: 16 }, csrf: session.csrf_token });
+  expect(controller.snapshot().rows![0]).toMatchObject({ state: 'Ready', history: 'Unknown' });
   await controller.load(controller.snapshot().cursor);
-  expect(client.calls.at(-1)).toMatchObject({ name: 'list_recordings', input: { target_ref: target, cursor: 'opaque-next-page', limit: 20 } });
+  expect(client.calls.at(-1)).toMatchObject({ name: 'list_recordings', input: { target_ref: listTarget(target), cursor: 'opaque-next-page', limit: 16 } });
   expect(client.calls.every(call => call.name === 'list_recordings')).toBe(true);
 });
 it('refuses excess incident pods and mixed policies without dropping the selected source', async () => {
@@ -77,7 +78,7 @@ it('repeats with fresh policy inventory and carries only protected lineage into 
   const client = new SyntheticRecordings(); const controller = new Recordings(client); controllers.push(controller);
   controller.attach(session, new AbortController().signal, target, { policyUID: 'policy-1', captureID: 'old-capture', before: '30s' });
   await waitFor(() => expect(controller.snapshot().rows).toHaveLength(1));
-  expect(client.calls[0].input).toEqual({ target_ref: target, limit: 20, policy_uid: 'policy-1' });
+  expect(client.calls[0].input).toEqual({ target_ref: listTarget(target), limit: 16 });
   controller.select(recording(), true); await controller.review();
   expect(client.calls[1].input).toEqual({ recording_handles: ['source-1'], before: '30s', repeated_from_capture_id: 'old-capture' });
 });
