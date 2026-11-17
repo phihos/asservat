@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Retention as stored deadlines (ADR-330 D12, 2026-11-15)
+
+Branch `clean/retention`. Migration 00190 drops the retention source,
+epoch, checkpoint and catch-up tables; `retention_policy` holds the stored
+policy set, `retention_policy_event` one audit row per applied or removed
+policy. The hub-worker `RetentionFollower` lists and watches
+`EvidenceRetentionPolicy` and stores the set; each new or changed policy
+shortens matching deadlines with one `retention_policy_effect` update in the
+same transaction, and an admission trigger applies stored policies to each new
+capture. `RetentionProof`, `RetentionTransactionGuard`, retention topology
+contracts and schema, accepted-source readiness, per-read re-resolution and
+the key-service/publisher catalog polling loops are gone. Verified: focused custody
+(`^d`, retention, deletion, publication, history: 98 subtests pass), goose
+up/down-to 125/up on PostgreSQL 17, `make go-check pcap-check` and the CI
+gate set.
+Open: label selectors (no label reader; a labeled policy refuses collection in
+its clusters and applies cluster-wide to existing evidence), connector-pushed
+local policies, one-step publication.
+
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
 
 Branch `clean/join`. A workload cluster's release needs only `mode: cluster`,
@@ -184,8 +203,7 @@ function body; its Down restores the 00167 view for downgrade probes.
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
 lock or check the trust row for recovery. Open: the setup recovery step of REQ-DB-005;
-retention topology, proofs and source checkpoints (D12); one-step publication;
-the unused `identity-read` pools that only served recovery reads.
+one-step publication; the unused `identity-read` pools that only served recovery reads.
 
 ## Standing connector identity (ADR-332, 2026-11-14)
 
@@ -393,10 +411,6 @@ implement the canonical contract.
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |
 
-Schemas kept because Go still embeds them with production code paths:
-`retention-topology`
-(`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
-each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
 ## ADR-335 contract divergence (2026-11-14)
 

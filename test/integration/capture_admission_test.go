@@ -193,7 +193,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		// Every pool opened below the shared fixtures above must be closed by
 		// its own subtest or helper; leaked idle connections exhausted the
 		// unchanged 48-connection server for later cases.
-		defer requireOnlySQLRoles(t, ctx, admin, "postgres", "authority_runtime", "capture_runtime", "custody_runtime", "context_control_config_runtime", "capture_audit_runtime", "retention_source_runtime", "retention_source_read_runtime", "peer_read_runtime")
+		defer requireOnlySQLRoles(t, ctx, admin, "postgres", "authority_runtime", "capture_runtime", "custody_runtime", "context_control_config_runtime", "capture_audit_runtime", "peer_read_runtime")
 	}
 	type scenario = captureAdmissionScenario
 	// ADR-248: a recording scenario registers the 8 MiB per-capture limit.
@@ -304,7 +304,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		if _, err = admin.Exec(ctx, "INSERT INTO context_storage_binding(root_id,cluster_id,namespace_uid,workload_uid,allocation_id,source_uid,source_generation,source_digest,observed_at,fresh_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", root, cluster, namespace, workload, allocationID, storage.Revision.UID, storage.Revision.Generation, storage.Revision.Digest[:], now, storage.FreshUntil); err != nil {
 			t.Fatal(err)
 		}
-		s, err := postgres.NewContextAdmissions(ctx, capturePool, root, recoveryFixture.installation, retentionFixture.guard)
+		s, err := postgres.NewContextAdmissions(ctx, capturePool, root, recoveryFixture.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -369,8 +369,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		auditPool.Reset()
 		resetRetention()
 	})
-	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)
-	qualifyRetentionPreview(t, ctx, admin, poolFor, store, keys, create)
+	qualifyRetentionPolicies(t, ctx, admin, poolFor, create)
 	charges := func(t *testing.T, s scenario, want int64) {
 		t.Helper()
 		var count, bytes int64
@@ -455,77 +454,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		})
 	}
 
-	t.Run("capture-retention-proof-required-and-current", func(t *testing.T) {
-		s := create(t, 1)
-		unguarded, err := postgres.NewContextAdmissions(ctx, capturePool, s.a.RootID, s.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = unguarded.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("effect without protected topology")
-		}
-		for _, mutate := range []func(*artifact.RetentionProof){
-			func(p *artifact.RetentionProof) { *p = artifact.RetentionProof{} },
-			func(p *artifact.RetentionProof) { p.Sources[0].Epoch = custodyID() },
-			func(p *artifact.RetentionProof) { p.Sources[0].Acceptance.Digest[0]++ },
-			func(p *artifact.RetentionProof) { p.Sources[0].SnapshotDigest[0]++ },
-			func(p *artifact.RetentionProof) { p.Topology.Digest[0]++ },
-			func(p *artifact.RetentionProof) { p.RootID = custodyID() },
-		} {
-			bad := s.a
-			input := bad.Plan.Input
-			mutate(&input.Retention.Proof)
-			bad.Plan, err = planning.CompileContext(input, time.Now())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err = s.s.AdmitContext(ctx, bad); err == nil {
-				t.Fatal("invalid retention proof authorized capture")
-			}
-			charges(t, s, 0)
-		}
-		if _, err = s.s.AdmitContext(ctx, s.a); err != nil {
-			t.Fatal("valid current proof", err)
-		}
-		if err = s.retention.sources.SuspendRetention(ctx, s.retention.fence); err != nil {
-			t.Fatal(err)
-		}
-		replay, err := s.s.AdmitContext(ctx, s.a)
-		if err != nil || !replay.Replay {
-			t.Fatal("historical replay requires fresh acquisition", err)
-		}
-		charges(t, s, 1)
-	})
-	t.Run("source-restart-invalidates-old-proof-without-new-approval-scope", func(t *testing.T) {
-		s := create(t, 1)
-		if err := s.retention.sources.SuspendRetention(ctx, s.retention.fence); err != nil {
-			t.Fatal(err)
-		}
-		start, err := s.retention.sources.BeginRetention(ctx, s.a.RootID, s.retention.fence.Source, custodyID())
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.retention.fence = start.Fence
-		policies, err := s.retention.policies(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = s.s.AdmitContext(ctx, s.a); err == nil {
-			t.Fatal("old epoch authorized new acquisition")
-		}
-		input := s.a.Plan.Input
-		input.Retention.Proof = policies.Proof
-		input.Retention.ValidUntil = policies.FreshUntil
-		next, err := planning.CompileContext(input, time.Now())
-		if err != nil || next.ScopeDigest != s.a.Plan.ScopeDigest {
-			t.Fatal("restart changed approval identity", err)
-		}
-		s.a.Plan = next
-		if _, err = s.s.AdmitContext(ctx, s.a); err != nil {
-			t.Fatal("fresh proof unavailable", err)
-		}
-		charges(t, s, 1)
-	})
 	t.Run("exhausted-workload-does-not-use-another-allocation", func(t *testing.T) {
 		s := create(t, 0)
 		if _, err := s.s.AdmitContext(ctx, s.a); !errors.Is(err, capture.ErrCapacity) {

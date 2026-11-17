@@ -175,7 +175,7 @@ func qualifyProfileAcquisitionAfterPublication(t *testing.T, f *capacitySQLFixtu
 	}
 	pool := f.fixturePool("context_catalog_read_runtime", "synthetic-context-read")
 	defer pool.Close()
-	catalog, err := postgres.NewContextPublications(ctx, pool, s.a.RootID, s.retention.guard)
+	catalog, err := postgres.NewContextPublications(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,12 @@
 package postgres
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
@@ -8,13 +14,8 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"time"
 )
 
 type DownloadWorkers struct {
@@ -26,11 +27,11 @@ var _ evidence.DownloadWorkerLedger = (*DownloadWorkers)(nil)
 var _ evidence.DownloadWorkerBindings = (*DownloadWorkers)(nil)
 var _ auditapp.DownloadWorkerAcknowledgements = (*DownloadWorkers)(nil)
 
-func NewDownloadWorkers(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, guards ...*RetentionTransactionGuard) (*DownloadWorkers, error) {
+func NewDownloadWorkers(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile) (*DownloadWorkers, error) {
 	if !profile.Valid() {
 		return nil, artifact.ErrInvalid
 	}
-	d, e := NewDownloads(ctx, pool, root, guards...)
+	d, e := NewDownloads(ctx, pool, root)
 	if e != nil {
 		return nil, e
 	}
@@ -61,10 +62,6 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 		return artifact.ErrInvalid
 	}
 	d := s.downloads
-	top, e := d.downloadTopology(ctx, a)
-	if e != nil {
-		return e
-	}
 	return d.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		root, e := q.LockPermissionStream(ctx, id(d.root))
 		if e != nil {
@@ -79,7 +76,7 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 			return sqlStep{"native-session-parent", e}
 		}
 		check := func() (time.Time, error) {
-			if e := d.downloadFence(ctx, q, root, a, top); e != nil {
+			if e := d.downloadFence(ctx, q, root, a); e != nil {
 				return time.Time{}, sqlStep{"native-session-fence", e}
 			}
 			if a.Environment.Path.AcquisitionClusterID != s.profile.ClusterID || a.Environment.Path.WorkerConfiguration != s.profile.Configuration {

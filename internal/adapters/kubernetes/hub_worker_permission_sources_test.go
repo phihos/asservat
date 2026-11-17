@@ -17,10 +17,6 @@ func TestPlainPermissionSourcesUseDeterministicDigests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	retention, err := NewPlainRetentionSource(c)
-	if err != nil || retention.Digest() != artifact.Digest(contracts.RetentionSourceDigest(cluster, ns.Name)) {
-		t.Fatal("retention source digest is not the shared deterministic digest", err)
-	}
 	worker, err := NewPlainWorkerConfigurationProtection(c, "asservat-worker-profile")
 	if err != nil || worker.digest != artifact.Digest(contracts.ConfigMapSourceDigest(cluster, ns.Name, "asservat-worker-profile")) {
 		t.Fatal("worker configuration digest is not the shared deterministic digest", err)

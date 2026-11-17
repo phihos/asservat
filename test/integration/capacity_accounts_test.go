@@ -13,7 +13,6 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -161,9 +160,8 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 	if err != nil {
 		t.Fatal(err)
 	}
-	guards := s.retention.guard
 	publications := func(role, password string) *postgres.ContextPublications {
-		p, err := postgres.NewContextPublications(f.ctx, f.fixturePool(role, password), s.a.RootID, guards)
+		p, err := postgres.NewContextPublications(f.ctx, f.fixturePool(role, password), s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,13 +185,13 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 	}
 	actor := s.a.Eligibility.VerifiedIdentity
 	actor.Scopes = []string{"evidence:read", "evidence:download"}
-	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: nativeDownloadTestIdentity{value: actor, expires: time.Now().Add(2 * time.Minute)}, Permissions: s.p, Catalog: catalog, Environment: authapp.CurrentDownloadEnvironment{RootID: s.a.RootID, InstallationID: f.input.InstallationID, Policies: processingTestPolicy{value: f.processingPolicy}, Processing: processing, Now: time.Now}, Now: time.Now}
 	scope := artifact.DownloadScope{RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(copies), Principal: actor.Principal}
 	authority, err := gate.CheckDownload(f.ctx, "synthetic-reference", scope)
 	if err != nil {
 		t.Fatal("actual managed download authority", err)
 	}
-	downloads, err := postgres.NewDownloads(f.ctx, f.fixturePool("download_runtime", "synthetic-download"), s.a.RootID, guards)
+	downloads, err := postgres.NewDownloads(f.ctx, f.fixturePool("download_runtime", "synthetic-download"), s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

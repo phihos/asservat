@@ -81,7 +81,7 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	denied(admin, "UPDATE custody_attempt SET state='deleted',deleted_at=clock_timestamp() WHERE id=$1", "23514")
 	// The policy input remains synthetic; the actual restrictive retention facet
 	// atomically records its immutable decision and advances the guarded overlay.
-	retention, err := postgres.NewRetention(ctx, newPool("retention_runtime", "synthetic-retention"), s.a.RootID)
+	retention, err := newRetentionShortening(ctx, newPool("retention_runtime", "synthetic-retention"), s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

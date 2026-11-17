@@ -36,7 +36,7 @@ func sourceProvenanceTestRow(t *testing.T, readers int) (custodydb.PolicyRecordi
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := collector.SourceBinding{RootID: in.Retention.Proof.RootID, PolicyUID: in.Authority.PolicyUID, AcceptanceID: in.SourceID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(in.Authority.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: [32]byte{1}, AudienceDigest: [32]byte(digest)}
+	b := collector.SourceBinding{RootID: previewTestValue(t).RootID, PolicyUID: in.Authority.PolicyUID, AcceptanceID: in.SourceID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(in.Authority.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: [32]byte{1}, AudienceDigest: [32]byte(digest)}
 	if !b.Valid() {
 		t.Fatal("source binding fixture")
 	}

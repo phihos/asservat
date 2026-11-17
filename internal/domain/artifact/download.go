@@ -51,7 +51,6 @@ func (s DownloadScope) Valid() bool {
 // Eligibility, current retention/locality and raw coverage must precede it.
 type DownloadAuthority struct {
 	Environment                        DownloadEnvironment `json:",omitzero"`
-	Retention                          RetentionProof      `json:",omitzero"`
 	Scope                              DownloadScope
 	PermissionEpoch                    string
 	PermissionSequence                 int64
@@ -62,8 +61,8 @@ type DownloadAuthority struct {
 	DeleteBy time.Time `json:",omitzero"`
 	// StartedAt is set only on a started response's continuation (ADR-312):
 	// the CheckedAt of the complete check that started the response. When it
-	// is set, CheckedAt/ValidUntil and the embedded Environment, Processing and
-	// Retention ObservedAt/ValidUntil are this lease's interval, not new
+	// is set, CheckedAt/ValidUntil and the embedded Environment and Processing
+	// ObservedAt/ValidUntil are this lease's interval, not new
 	// observations; every proof was last observed by the check at StartedAt,
 	// which DecisionDigest identifies. Audit readers must interpret them so.
 	StartedAt time.Time `json:",omitzero"`
@@ -96,14 +95,11 @@ func (a DownloadAuthority) Continue(now, until time.Time) (DownloadAuthority, bo
 			a.Environment.Processing.ObservedAt, a.Environment.Processing.ValidUntil = now, end
 		}
 	}
-	if a.Retention != (RetentionProof{}) {
-		a.Retention.ObservedAt, a.Retention.ValidUntil = now, end
-	}
 	return a, a.Valid(now)
 }
 
 func (a DownloadAuthority) Valid(now time.Time) bool {
-	return !a.StartedAt.After(a.CheckedAt) && (a.Environment == (DownloadEnvironment{}) || (a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID && a.Environment.Location.ClusterID == a.Scope.ClusterID && a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Principal == a.Scope.Principal && !a.ValidUntil.After(a.Environment.ValidUntil))) && (a.Retention == (RetentionProof{}) || (a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) && !a.ValidUntil.After(a.Retention.ValidUntil))) && a.Scope.Valid() && uuid(a.PermissionEpoch) && a.PermissionSequence > 0 && a.ProjectionDigest != (Digest{}) && a.DecisionDigest != (Digest{}) && a.IdentityRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.AccessUntil) && (a.DeleteBy.IsZero() || a.AccessUntil.Before(a.DeleteBy))
+	return !a.StartedAt.After(a.CheckedAt) && (a.Environment == (DownloadEnvironment{}) || (a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID && a.Environment.Location.ClusterID == a.Scope.ClusterID && a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Principal == a.Scope.Principal && !a.ValidUntil.After(a.Environment.ValidUntil))) && a.Scope.Valid() && uuid(a.PermissionEpoch) && a.PermissionSequence > 0 && a.ProjectionDigest != (Digest{}) && a.DecisionDigest != (Digest{}) && a.IdentityRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.AccessUntil) && (a.DeleteBy.IsZero() || a.AccessUntil.Before(a.DeleteBy))
 }
 
 const (

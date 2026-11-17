@@ -193,10 +193,6 @@ components:
   - PermissionReader
   - NamespaceReader
   - PermissionStore
-  - RetentionSourceReader
-  - RetentionListReader
-  - RetentionWatcher
-  - RetentionWatch
   - BindingWatcher
 - id: C-02
   name: Identity
@@ -228,7 +224,6 @@ components:
   - AuthorizationEvaluator
   - ContextDownloadAuthority
   - ContextDownloadCatalog
-  - DownloadRetentionResolver
   - DownloadEnvironmentReader
   - ReviewService
   - GrantFacet
@@ -457,13 +452,12 @@ components:
   responsibility: Retention resolution, managed-copy registration/lifecycle, restriction, cleanup verification and tombstones.
   provided_ports:
   - RetentionResolver
-  - RetentionShortener
-  - RetentionLedger
+  - RetentionPolicies
+  - RetentionFollower
+  - RetentionSource
+  - RetentionStore
   - LifecyclePublisher
   - LifecycleWriter
-  - RetentionReader
-  - RetainedPolicyReader
-  - PolicySnapshotReader
   - CopyLedger
   - PrivacyService
   - ContextRetirementReader

@@ -71,8 +71,7 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	first := parts[0]
 	process := value.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: policy.Scenario.recovery.observation.issuer, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: first.Admission.Plan.Input.Capability.CollectorImageDigest}
 	facts := &manualSnapshotWorkflowFacts{parts: parts, process: process}
-	guards := policy.Scenario.retention.guard
-	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], first.Admission.RootID, policy.Authority.InstallationID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], first.Admission.RootID, policy.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +80,7 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 		t.Fatal(err)
 	}
 	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: policy.Scenario.p, Now: workflowNow}, Accepted: policy.Reader, Current: current, Now: workflowNow}
-	retained := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: workflowNow}
-	retention := privacyapp.RetentionResolver{Policies: &retained, RetainedPolicies: &retained, Now: workflowNow}
+	retention := privacyapp.RetentionResolver{Policies: policy.Scenario.retention, Now: workflowNow}
 	w := &manualSnapshotWorkflow{Facts: facts, Executions: executions, Eligibility: eligibility, Retention: retention, t: t, f: f, policy: policy, nodes: map[manualSnapshotNodeKey]*manualSnapshotNode{}, stages: map[string]*sourceSnapshotCompletionState{}}
 	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
 	for _, part := range parts {

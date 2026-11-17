@@ -180,7 +180,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if _, err = publisher.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("managed profile capture intent", err)
 	}
-	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
+	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

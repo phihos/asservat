@@ -40,16 +40,15 @@ func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admi
 	// facets. This is a transaction fixture, not a whole-hub load measurement.
 	sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 	shared := sharedPools.ordinary
-	guards := s.retention.guard
-	sessions, err := postgres.NewDownloads(ctx, shared, s.a.RootID, guards)
+	sessions, err := postgres.NewDownloads(ctx, shared, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workers, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile, guards)
+	workers, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ack, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile, guards)
+	ack, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +129,7 @@ func (s *installedPreparationTrace) CheckDownloadCurrent(ctx context.Context, cu
 	// The authorizer may discover an earlier cutoff than this input context;
 	// workerCurrentCheck must impose it on every subsequent effect.
 	s.stage(ctx, "authority", err)
-	s.t.Logf("authority checked=%s valid-until=%s retention-until=%s environment-until=%s", a.CheckedAt.Format(time.RFC3339Nano), a.ValidUntil.Format(time.RFC3339Nano), a.Retention.ValidUntil.Format(time.RFC3339Nano), a.Environment.ValidUntil.Format(time.RFC3339Nano))
+	s.t.Logf("authority checked=%s valid-until=%s environment-until=%s", a.CheckedAt.Format(time.RFC3339Nano), a.ValidUntil.Format(time.RFC3339Nano), a.Environment.ValidUntil.Format(time.RFC3339Nano))
 	return a, err
 }
 

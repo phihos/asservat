@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/privacy"
 )
 
 type comparisonAuthorizationFixture struct {
@@ -34,12 +33,6 @@ func (f *comparisonAuthorizationFixture) ContextProjectionEvidence(ctx context.C
 		return f.baseline.ContextProjectionEvidence(ctx, id)
 	}
 	return f.incident.ContextProjectionEvidence(ctx, id)
-}
-func (f *comparisonAuthorizationFixture) ResolveRetained(ctx context.Context, in privacy.Input, d privacy.Deadlines, o []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	if in.Target == f.baseline.record.Retained.Input.Target {
-		return f.baseline.ResolveRetained(ctx, in, d, o)
-	}
-	return f.incident.ResolveRetained(ctx, in, d, o)
 }
 func (f *comparisonAuthorizationFixture) ProjectionEnvironment(ctx context.Context, r ContextProjectionEvidence, p identity.Principal) (analysis.ContextProjectionEnvironment, error) {
 	if r.Retained.Registration.Location.ArtifactID == f.baseline.record.Retained.Registration.Location.ArtifactID {
@@ -68,12 +61,6 @@ func newComparisonAuthorizationFixture() (*comparisonAuthorizationFixture, Conte
 	i.record.Retained.Registration.Location.ClusterID = is.ClusterID
 	i.record.Retained.Registration.Location.ArtifactID = is.ArtifactID
 	i.record.Retained.Input.Target = i.permission.Target
-	i.retention.Target = i.permission.Target
-	i.retention.Proof.ClusterID = is.ClusterID
-	i.retention.Proof.NamespaceUID = is.NamespaceUID
-	i.retention.Proof.WorkloadUID = is.WorkloadUID
-	i.retention.Proof.PodUID = is.PodUID
-	i.retention.Proof.Sources[0].ClusterID = is.ClusterID
 	i.environment.Location = i.record.Retained.Registration.Location
 	i.environment.Processing.Location = i.environment.Location
 	i.environment.Processing.CaptureID = is.CaptureID
@@ -83,7 +70,7 @@ func newComparisonAuthorizationFixture() (*comparisonAuthorizationFixture, Conte
 	pair.DisplayVersion = analysis.ProfileComparisonDisplayVersion
 	pair.Comparison = analysis.ProfileComparisonWindow{Normalization: analysis.ProfileComparisonRate, Baseline: analysis.ProfileComparisonBaseline{CaseID: bs.CaseID, ArtifactID: bs.ArtifactID, CaptureID: bs.CaptureID, ClusterID: bs.ClusterID, NamespaceUID: bs.NamespaceUID, WorkloadUID: bs.WorkloadUID, PodUID: bs.PodUID, Version: bs.Version}}
 	f := &comparisonAuthorizationFixture{baseline: b, incident: i, now: b.now}
-	return f, ContextProjectionAuthority{RootID: pair.RootID, Permissions: f, Catalog: f, Retention: f, Environment: f, Now: func() time.Time { return f.now }}, pair
+	return f, ContextProjectionAuthority{RootID: pair.RootID, Permissions: f, Catalog: f, Environment: f, Now: func() time.Time { return f.now }}, pair
 }
 
 func TestProfileComparisonAuthorizesBothSourcesAndRechecksFirst(t *testing.T) {
@@ -144,7 +131,7 @@ func TestProfileComparisonEachSourceKeepsOrdinaryRightsAndCurrentBounds(t *testi
 				case "audience":
 					selected.record.Audience = nil
 				case "expiry":
-					selected.retention.ExpiresAt = f.now
+					selected.record.Retained.Effective.ExpiresAt = f.now
 				case "cancel":
 					selected.on = func(_ context.Context, step string, _ int) {
 						if step == "environment" {
@@ -228,8 +215,8 @@ func TestProfileComparisonPreservesOriginalFirstDeadlineAndShortensCutoffs(t *te
 		if step == "environment" && n == 2 {
 			f.now = start.Add(time.Second)
 			f.baseline.record.ValidUntil = start.Add(5 * time.Second)
-			f.baseline.retention.ExpiresAt = start.Add(30 * time.Minute)
-			f.baseline.retention.DeleteBy = start.Add(90 * time.Minute)
+			f.baseline.record.Retained.Effective.ExpiresAt = start.Add(30 * time.Minute)
+			f.baseline.record.Retained.Effective.DeleteBy = start.Add(90 * time.Minute)
 		}
 	}
 	f.baseline.on = func(ctx context.Context, step string, n int) {
@@ -241,7 +228,7 @@ func TestProfileComparisonPreservesOriginalFirstDeadlineAndShortensCutoffs(t *te
 		}
 	}
 	out, err := s.CheckProjectionCurrent(t.Context(), f, pair)
-	if err != nil || !out.Valid(f.now) || !out.ValidUntil.Equal(firstUntil) || !out.CheckedAt.Equal(start) || out.Baseline == nil || !out.Baseline.CheckedAt.Equal(start) || !out.Baseline.ValidUntil.Equal(firstUntil) || !out.AccessUntil.Equal(f.baseline.retention.ExpiresAt) || !out.DeleteBy.Equal(f.baseline.retention.DeleteBy) {
+	if err != nil || !out.Valid(f.now) || !out.ValidUntil.Equal(firstUntil) || !out.CheckedAt.Equal(start) || out.Baseline == nil || !out.Baseline.CheckedAt.Equal(start) || !out.Baseline.ValidUntil.Equal(firstUntil) || !out.AccessUntil.Equal(f.baseline.record.Retained.Effective.ExpiresAt) || !out.DeleteBy.Equal(f.baseline.record.Retained.Effective.DeleteBy) {
 		t.Fatal("original timing or restrictive recheck lost", err, out)
 	}
 	if out.Bound != "comparison/baseline/catalog" || out.Baseline.Bound != "catalog" {
@@ -261,7 +248,7 @@ func TestProfileComparisonPreservesOriginalFirstDeadlineAndShortensCutoffs(t *te
 	if err != nil || string(other) != string(encoded) {
 		t.Fatal("report bound entered authority encoding", err)
 	}
-	if f.baseline.counts["identity"] != 9 || f.baseline.counts["permissions"] != 4 || f.incident.counts["permissions"] != 2 || f.baseline.counts["retention"] != 4 || f.incident.counts["retention"] != 2 || f.baseline.counts["environment"] != 4 || f.incident.counts["environment"] != 2 {
+	if f.baseline.counts["identity"] != 9 || f.baseline.counts["permissions"] != 4 || f.incident.counts["permissions"] != 2 || f.baseline.counts["environment"] != 4 || f.incident.counts["environment"] != 2 {
 		t.Fatal("unexpected source calls", f.baseline.counts, f.incident.counts)
 	}
 }
@@ -393,7 +380,7 @@ func TestProfileComparisonNamesEarliestIncidentOrRecheckedBaseline(t *testing.T)
 	}{
 		{"incident-earlier", 2 * time.Second, false, "comparison/incident/environment/processing", "request"},
 		{"original-baseline-wins-tie", 3 * time.Second, false, "comparison/baseline/catalog", "catalog"},
-		{"baseline-recheck-shorter", 2500 * time.Millisecond, true, "comparison/baseline/retention", "retention"},
+		{"baseline-recheck-shorter", 2500 * time.Millisecond, true, "comparison/baseline/audience", "audience"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f, s, pair := newComparisonAuthorizationFixture()
@@ -403,7 +390,7 @@ func TestProfileComparisonNamesEarliestIncidentOrRecheckedBaseline(t *testing.T)
 			if tc.shortenBaseline {
 				f.incident.on = func(_ context.Context, step string, n int) {
 					if step == "environment" && n == 2 {
-						f.baseline.retention.ValidUntil = f.now.Add(time.Second)
+						f.baseline.record.Retained.Effective.ExpiresAt = f.now.Add(time.Second)
 					}
 				}
 			}

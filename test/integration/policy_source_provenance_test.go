@@ -97,7 +97,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 			source107AddReader(t, ctx, f, "original-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
 			s := accepted.Scenario
-			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
+			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation)
 			if err != nil {
 				t.Fatal(err)
 			}

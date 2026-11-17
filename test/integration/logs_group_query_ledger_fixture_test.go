@@ -279,7 +279,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 			t.Fatal("mixed acknowledged child intent binding changed", n, encodeErr)
 		}
 	}
-	execSQL, err := postgres.NewAPIContextExecutions(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.installation, s.retention.guard)
+	execSQL, err := postgres.NewAPIContextExecutions(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

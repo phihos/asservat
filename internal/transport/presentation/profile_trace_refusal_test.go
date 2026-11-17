@@ -39,9 +39,6 @@ func (p *traceSummaryAuthorityPorts) ContextProjectionEvidence(context.Context, 
 	}
 	return p.record, p.catalogErr
 }
-func (p *traceSummaryAuthorityPorts) ResolveRetained(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	panic("unsupported source reached retention")
-}
 func (p *traceSummaryAuthorityPorts) ProjectionEnvironment(context.Context, authorizationapp.ContextProjectionEvidence, identity.Principal) (value.ContextProjectionEnvironment, error) {
 	panic("unsupported source reached analyzer environment")
 }
@@ -58,7 +55,7 @@ func traceSummaryBridge(t *testing.T) (*AuditedOperations, *bridgeFixture, *pres
 		t.Fatal("invalid synthetic committed source facts")
 	}
 	ports := &traceSummaryAuthorityPorts{bridgeFixture: f, record: record, permissions: auth.Projection{Target: target, Revision: f.i.Policy, ObservedAt: f.now, FreshUntil: f.i.ValidUntil, DeniesComplete: true, DeniesObservedAt: f.now, DeniesFreshUntil: f.i.ValidUntil, Allows: []auth.CurrentAssignment{{Audience: audience, ObservedAt: f.now, FreshUntil: f.i.ValidUntil}}}}
-	f.s.Results.Authority = authorizationapp.ContextProjectionAuthority{RootID: scope.RootID, Permissions: ports, Catalog: ports, Retention: ports, Environment: ports, Now: func() time.Time { return f.now }}
+	f.s.Results.Authority = authorizationapp.ContextProjectionAuthority{RootID: scope.RootID, Permissions: ports, Catalog: ports, Environment: ports, Now: func() time.Time { return f.now }}
 	stage := ""
 	f.s.Results.Refused = func(_ context.Context, _ string, err error) {
 		var fixed interface{ FixedStep() string }

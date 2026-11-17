@@ -15,7 +15,6 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -94,7 +93,7 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal(e)
 	}
 	environment := authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: f.base.input.InstallationID, Policies: f.policies, Processing: processing, Now: time.Now}
-	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
+	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Environment: environment, Now: time.Now}
 	principal := s.a.Plan.Input.Executor
 	scope := value.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceFormat: artifact.PprofFormat, DisplayVersion: value.ProfileComparisonDisplayVersion, NativeType: artifact.PprofArtifact, Profile: value.ProfileSummarySelection{SampleType: "cpu", TopN: 20}, Principal: principal}
 	scope.Comparison = value.ProfileComparisonWindow{Normalization: value.ProfileComparisonRaw, Baseline: value.ProfileComparisonBaseline{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, CaptureID: scope.CaptureID, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID, Version: scope.Version}}
@@ -116,7 +115,7 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 		return a
 	}
 	ownership := &querySQLWorker{}
-	ledger, e := postgres.NewContextQueries(ctx, runtime, root, s.recovery.installation, s.retention.guard, f.current, ownership)
+	ledger, e := postgres.NewContextQueries(ctx, runtime, root, s.recovery.installation, f.current, ownership)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -180,17 +179,13 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	if total, account, allocation := charge(); total != 20 || account != 20 || allocation != 20 {
 		t.Fatal("same workload did not charge20 once", total, account, allocation)
 	}
-	for _, kind := range []string{"baseline-processing", "baseline-retention"} {
+	{
 		changed := a
 		child := *a.Baseline
 		changed.Baseline = &child
-		if kind == "baseline-processing" {
-			child.Environment.Processing.StateDigest[0]++
-		} else {
-			child.Retention.Sources[0].SnapshotDigest[0]++
-		}
+		child.Environment.Processing.StateDigest[0]++
 		if err := ledger.PermitQuery(ctx, q, request, changed); err == nil {
-			t.Fatal("second source current SQL fence omitted", kind)
+			t.Fatal("second source current SQL fence omitted")
 		}
 	}
 	qualifyProfileComparisonNativeSources(t, f, ledger, q, request, authority)
@@ -369,10 +364,6 @@ func qualifyComparisonCrossAllocationSQL(t *testing.T, f *queryLedgerFixture, or
 		b.Environment.Processing.Location = b.Environment.Location
 		b.Environment.Processing.CaptureID = b.Scope.CaptureID
 		b.Environment.Path.TargetClusterID = cluster
-		b.Retention.ClusterID, b.Retention.NamespaceUID, b.Retention.WorkloadUID, b.Retention.PodUID = cluster, namespace, workload, b.Scope.PodUID
-		if b.Retention.SourceCount == 2 {
-			b.Retention.Sources[1].ClusterID = cluster
-		}
 		a.Baseline = &b
 		if !a.Valid(time.Now()) {
 			t.Fatal("explicit synthetic second route DTO invalid")

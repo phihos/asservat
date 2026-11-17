@@ -195,8 +195,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}
 	current := func(now time.Time) bool {
-		p := r.Proof
-		return target.Valid(now) && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == r.PolicyRevision && !r.ValidUntil.After(p.ValidUntil) && now.Before(r.ValidUntil) && now.Before(eligibility.ValidUntil) && eligibility.VerifiedIdentity.Valid(now)
+		return target.Valid(now) && r.Target == t && now.Before(r.ValidUntil) && now.Before(eligibility.ValidUntil) && eligibility.VerifiedIdentity.Valid(now)
 	}
 	if !current(s.Now()) || ctx.Err() != nil {
 		return zero, previewFailure("facts/current", value.ErrChanged)

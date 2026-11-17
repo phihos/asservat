@@ -19,7 +19,6 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -122,7 +121,6 @@ func (g *journeyGateTrace) Report(t *testing.T) {
 func (g *journeyGateTrace) Wrap(in authapp.ContextDownloadAuthority) authapp.ContextDownloadAuthority {
 	in.Permissions = journeyGatePermissions{in.Permissions, g}
 	in.Catalog = journeyGateCatalog{in.Catalog, g}
-	in.Retention = journeyGateRetention{in.Retention, g}
 	in.Environment = journeyGateEnvironment{in.Environment, g}
 	return in
 }
@@ -167,18 +165,6 @@ func (d journeyGateCatalog) ContextDownloadEvidence(c context.Context, id string
 	return v, e
 }
 
-type journeyGateRetention struct {
-	authapp.DownloadRetentionResolver
-	trace *journeyGateTrace
-}
-
-func (d journeyGateRetention) ResolveRetained(c context.Context, in privacy.Input, deadlines privacy.Deadlines, rules []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	started, remaining := time.Now(), journeyGateRemaining(c)
-	v, e := d.DownloadRetentionResolver.ResolveRetained(c, in, deadlines, rules)
-	d.trace.record(2, c, started, remaining, e)
-	return v, e
-}
-
 type journeyGateEnvironment struct {
 	authapp.DownloadEnvironmentReader
 	trace *journeyGateTrace
@@ -201,18 +187,6 @@ func TestPublicJourneyGateTraceLabelsOnly(t *testing.T) {
 	if g.calls[0] != 2 || g.refusals[0] != 1 || g.reasons[0] != "sqlstate-53300" || g.reasons[1] != "other" || g.reasons[2] != "deadline" || g.refusals[3] != 0 {
 		t.Fatal("gate trace classification changed", g.reasons)
 	}
-}
-
-type journeyGateRetainedPolicies struct {
-	privacyapp.RetainedPolicyReader
-	trace *journeyGateTrace
-}
-
-func (d journeyGateRetainedPolicies) RetainedRetentionPolicies(c context.Context, target value.Target, rules []artifact.RetentionRule) (privacy.PolicySet, error) {
-	started, remaining := time.Now(), journeyGateRemaining(c)
-	v, e := d.RetainedPolicyReader.RetainedRetentionPolicies(c, target, rules)
-	d.trace.record(4, c, started, remaining, e)
-	return v, e
 }
 
 // Fixture-only labels for the Stop audit facets (claim, object, acknowledgement).

@@ -7,14 +7,12 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"slices"
 	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/kms"
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -22,7 +20,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -52,11 +49,8 @@ type Publisher struct {
 	scope     authorization.KeyScope
 	providers *kms.InstalledPublisherProviderEffects
 	verifier  *mtls.VerifierCredentials
-	// catalog is the cluster catalog as read at start; a changed digest
-	// restarts the process (ADR-203 decision 6).
-	catalog publicCatalog
-	closers []func()
-	once    sync.Once
+	closers   []func()
+	once      sync.Once
 }
 
 // publisherInputs are the Helm-rendered configuration plus the generated
@@ -84,9 +78,6 @@ func readPublisherInputs(ctx context.Context, files, ids *os.Root) (publisherInp
 	if !validServiceScope(c.Name, c.Namespace) || c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || !pg || !validServiceStore(c.AuditStore) || !validServiceStore(c.Evidence) ||
 		!ownerEndpoint(c.OpenBao) || !artifactScope(v.InstallationID).Valid() {
 		return publisherInputs{}, &fixedStepError{"config", cfg.ErrInvalid}
-	}
-	if _, err = serviceTopologyPins(c.RetentionTopologies, nil); err != nil {
-		return publisherInputs{}, &fixedStepError{"config", err}
 	}
 	return publisherInputs{c, v}, nil
 }
@@ -158,60 +149,12 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 		out.closers = append(out.closers, pool.Close)
 		pools[purpose] = pool
 	}
-	phase = "kubernetes"
-	api, err := serviceKubernetes()
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	namespaceUID, err := kube.NamespaceUID(startup, api, c.Namespace)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	observer, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	phase = "catalog"
-	// ADR-203 decision 6: the catalog adds the joined slots' topologies.
-	if out.catalog, err = readServiceCatalog(startup, observer, api, c.Namespace, c.Name+"-cluster-catalog"); err != nil {
-		return nil, err
-	}
-	phase = "topology"
-	pins, err := serviceTopologyPins(c.RetentionTopologies, out.catalog.catalog.Clusters)
-	if err != nil {
-		return nil, err
-	}
-	topologies, err := kube.NewRetentionTopologies(observer, root, pins)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	// The hub cluster's own captures (mode=combined) use the in-process hub
-	// topology, as in the hub-api, unless a pin names the hub cluster.
-	if !slices.ContainsFunc(pins, func(p kube.RetentionTopologyPin) bool { return p.TargetClusterID == c.ClusterID }) {
-		if err = topologies.AddHubTopology(observer, root); err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-	}
-	for _, name := range c.RemoteClusters {
-		if err = topologies.AddRemoteTopology(observer, root, contracts.RemoteClusterID(installation, name)); err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-	}
-	retentionGuard, err := postgres.NewRetentionTransactionGuard(root, topologies)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	sources, err := postgres.NewRetentionSources(startup, pools["publisher-retention-read"], root)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	phase = "publication"
-	accepted := privacyapp.AcceptedRetentionReader{Topology: topologies, Sources: sources, Now: time.Now}
-	if out.gate, err = postgres.NewAPIContextPublicationGate(startup, pools["publication-gate"], root, retentionGuard, privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}); err != nil {
+	if out.gate, err = postgres.NewAPIContextPublicationGate(startup, pools["publication-gate"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	facet := func(purpose string) (*postgres.ContextPublications, error) {
-		return postgres.NewContextPublications(startup, pools[purpose], root, retentionGuard)
+		return postgres.NewContextPublications(startup, pools[purpose], root)
 	}
 	verify, err := facet("context-verify")
 	if err != nil {
@@ -337,8 +280,7 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 // Run funds the provider purposes and the first verifier certificate, then
 // polls the bounded queue until ctx ends. A failed capture stays queued and
 // is retried within its finite unwrap allowance; nothing is recollected. A
-// stopped provider or verifier supervisor stops the process, and a changed
-// cluster catalog returns errClusterCatalogChanged so the kubelet restarts it.
+// stopped provider or verifier supervisor stops the process.
 func (p *Publisher) Run(ctx context.Context) (err error) {
 	phase := "run"
 	defer func() {
@@ -346,7 +288,7 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 			err = &fixedStepError{"publisher/" + phase, err}
 		}
 	}()
-	if p == nil || p.queue == nil || p.providers == nil || p.verifier == nil || p.catalog.source == nil || ctx == nil {
+	if p == nil || p.queue == nil || p.providers == nil || p.verifier == nil || ctx == nil {
 		return mounts.ErrUnavailable
 	}
 	phase = "prime"
@@ -372,8 +314,6 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 	report := eventLog(os.Stderr, "publisher")
 	poll := time.NewTimer(0)
 	defer poll.Stop()
-	catalog := time.NewTicker(15 * time.Second)
-	defer catalog.Stop()
 	for {
 		select {
 		case <-work.Done():
@@ -382,12 +322,6 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 			}
 			phase = "supervisor"
 			return mounts.ErrUnavailable // a supervisor ended
-		case <-catalog.C:
-			// A failed read is not a change.
-			if p.clusterCatalogChanged(work) {
-				phase = "catalog-changed"
-				return errClusterCatalogChanged
-			}
 		case <-poll.C:
 			read, cancel := context.WithTimeout(work, 5*time.Second)
 			pending, err := p.queue.PendingContextPublications(read, p.config.Batch)
@@ -416,17 +350,6 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 			poll.Reset(time.Duration(p.config.PollSeconds) * time.Second)
 		}
 	}
-}
-
-func (p *Publisher) clusterCatalogChanged(ctx context.Context) bool {
-	call, end := context.WithTimeout(ctx, 10*time.Second)
-	defer end()
-	catalog, err := p.catalog.source.ReadClusterCatalog(call)
-	if err != nil {
-		return false
-	}
-	digest, err := clusterCatalogDigest(catalog)
-	return err == nil && digest != p.catalog.digest
 }
 
 func (p *Publisher) Close() {

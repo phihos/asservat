@@ -95,7 +95,7 @@ func nativeContinuationApplicationServices(t *testing.T, ctx context.Context, n 
 	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: now.Add(time.Hour)}, mac); err != nil {
 		t.Fatal("native capture audit backing", err)
 	}
-	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
+	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac)
 	if err != nil {
 		t.Fatal(err)
 	}

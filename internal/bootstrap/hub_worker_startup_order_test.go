@@ -1,13 +1,11 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
 	"time"
 
-	app "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 )
@@ -76,43 +74,6 @@ func TestPermissionAwaitReadyPollsUntilReady(t *testing.T) {
 	}
 	if !awaitReady(context.Background(), nil) {
 		t.Fatal("a nil prerequisite is ready")
-	}
-}
-
-type observeRetentionStore struct {
-	app.RetentionCheckpointStore
-	err error
-}
-
-func (s observeRetentionStore) ObserveRetention(context.Context, app.RetentionObservation) error {
-	return s.err
-}
-
-func TestRetentionRecoveryLoggedOnceAfterFailure(t *testing.T) {
-	var out bytes.Buffer
-	recovery := &retentionRecovery{out: &out}
-	ok := stagedRetentionStore{observeRetentionStore{}, recovery}
-	if err := ok.ObserveRetention(context.Background(), app.RetentionObservation{}); err != nil {
-		t.Fatal(err)
-	}
-	if out.Len() != 0 {
-		t.Fatalf("logged recovery without a failure: %q", out.String())
-	}
-	recovery.fail()
-	failing := stagedRetentionStore{observeRetentionStore{err: errors.New("down")}, recovery}
-	if err := failing.ObserveRetention(context.Background(), app.RetentionObservation{}); err == nil {
-		t.Fatal("failure hidden")
-	}
-	if out.Len() != 0 {
-		t.Fatalf("a failed observation logged recovery: %q", out.String())
-	}
-	for range 2 {
-		if err := ok.ObserveRetention(context.Background(), app.RetentionObservation{}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := out.String(); got != "hub-worker retention: source observation ok\n" {
-		t.Fatalf("recovery log %q, want one line", got)
 	}
 }
 

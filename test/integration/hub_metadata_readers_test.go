@@ -32,7 +32,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		if err != nil {
 			t.Fatal(err)
 		}
-		retention, err := postgres.NewRetentionSources(f.ctx, pool, s.a.RootID)
+		retention, err := postgres.NewRetentionPolicies(f.ctx, pool)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,9 +59,6 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		// Refresh only independent fixture sources before NEW read operations;
 		// none of the following calls renews its identity or caller.
 		f.refreshBase(t)
-		if err = s.retention.observe(f.ctx); err != nil {
-			t.Fatal(err)
-		}
 		call, cancel := context.WithTimeout(f.ctx, 5*time.Second)
 		defer cancel()
 		query := progressQuery(t, call, s)
@@ -82,10 +79,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 				return err
 			}},
 			{"retention", func() error {
-				out, err := retention.AcceptedRetentionSource(call, s.a.RootID, s.retention.topology.source)
-				if err == nil && (out.RootID != s.a.RootID || !out.Valid(time.Now())) {
-					return errors.New("accepted retention projection mismatch")
-				}
+				_, err := retention.CurrentRetentionPolicies(call)
 				return err
 			}},
 			{"storage", func() error {

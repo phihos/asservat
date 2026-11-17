@@ -26,7 +26,7 @@ func TestProfileProjectionRetainsRawProvenanceAndOrdinaryAudience(t *testing.T) 
 	if err != nil || !out.Valid(f.now) || out.Scope != scope || len(f.evidence) != 2 || f.evidence[0].DataClass != "raw" || f.evidence[0].Retained.Input.EvidenceType != "profile" {
 		t.Fatal("profile summary authority lost original raw provenance", err)
 	}
-	if !out.ValidUntil.Equal(f.record.ValidUntil) || !out.AccessUntil.Equal(f.retention.ExpiresAt) {
+	if !out.ValidUntil.Equal(f.record.ValidUntil) || !out.AccessUntil.Equal(f.record.Retained.Effective.ExpiresAt) {
 		t.Fatal("original authority bounds changed")
 	}
 }
@@ -116,7 +116,7 @@ func TestProfileProjectionRejectsWrongSourceAndExpiredAuthority(t *testing.T) {
 			case "deny":
 				f.permission.Denies = append(f.permission.Denies, f.permission.Allows[0])
 			case "retention":
-				f.retention.ExpiresAt = f.now
+				f.record.Retained.Effective.ExpiresAt = f.now
 			case "after-block":
 				f.on = func(_ context.Context, step string, _ int) {
 					if step == "environment" {

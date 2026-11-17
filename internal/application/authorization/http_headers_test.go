@@ -31,12 +31,12 @@ func TestHTTPHeaderReadAuthorityAdmitsExtractWithReadRights(t *testing.T) {
 	}
 	src, _ := out.Scope.Source()
 	if out.Scope.Candidate() != c || src.Format != artifact.HTTPHeadersFormat || src.DataClass != "extract" || out.Scope.Version != f.record.Version ||
-		out.Scope.CaptureID != f.record.CaptureID || out.Scope.Principal != f.identity.Principal || !out.AccessUntil.Equal(f.retention.ExpiresAt) ||
+		out.Scope.CaptureID != f.record.CaptureID || out.Scope.Principal != f.identity.Principal || !out.AccessUntil.Equal(f.record.Retained.Effective.ExpiresAt) ||
 		out.Scope.DisplayVersion != analysis.HTTPHeadersDisplayVersion || out.Scope.BeginTool() != "get_http_headers" {
 		t.Fatalf("wrong decision: %+v", out)
 	}
 	// The protected catalog read follows ordinary target eligibility.
-	want := []string{"identity", "permissions", "catalog", "retention", "environment", "identity", "permissions", "retention", "environment", "identity"}
+	want := []string{"identity", "permissions", "catalog", "environment", "identity", "permissions", "environment", "identity"}
 	if !slices.Equal(f.calls, want) {
 		t.Fatalf("wrong authority sequence: %v", f.calls)
 	}
@@ -103,7 +103,7 @@ func TestHTTPHeaderReadAuthorityRefusesLostRights(t *testing.T) {
 			case "expired":
 				f.record.Retained.Effective.ExpiresAt = f.now
 			case "retention-lapsed":
-				f.retention.ExpiresAt = f.now
+				f.record.Retained.Effective.ExpiresAt = f.now
 			case "route-substitution":
 				c.ArtifactID = projectionTestID(99)
 			}

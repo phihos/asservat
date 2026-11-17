@@ -26,7 +26,6 @@ type ContextCaseService struct {
 	Routes                 ContextCaseRoutes
 	Permissions            permissions.ProjectionReader
 	Catalog                permissions.ContextDownloadCatalog
-	Retention              permissions.DownloadRetentionResolver
 	Processing             permissions.DownloadProcessingReader
 	// Shares is the ADR-232 recipient branch. It is consulted only after the
 	// ordinary evaluator refuses, keyed by the caller and one artifact, and
@@ -54,7 +53,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 
 func (s ContextCaseService) getContextCase(ctx context.Context, source identities.CurrentIdentity, caseID string, raw *rawCaseSelection) (value.ContextCase, error) {
 	var zero value.ContextCase
-	if ctx == nil || ctx.Err() != nil || source == nil || s.Routes == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Processing == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(caseID) {
+	if ctx == nil || ctx.Err() != nil || source == nil || s.Routes == nil || s.Permissions == nil || s.Catalog == nil || s.Processing == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(caseID) {
 		return zero, value.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -151,15 +150,15 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		if !initial.Eligible {
 			continue
 		}
-		resolved, err := s.Retention.ResolveRetained(ctx, r.Input, r.Effective, slices.Clone(r.OriginPolicies))
-		if err != nil || resolved.Target != route.Target || resolved.PurposeRef != record.PurposeRef || !resolved.Deadlines.ValidRetained() || !resolved.AnchorAt.Equal(r.Effective.AnchorAt) || resolved.ExpiresAt.After(r.Effective.ExpiresAt) || resolved.DeleteBy.After(r.Effective.DeleteBy) || !resolved.PolicyRevision.Valid() || resolved.Proof.Policy != resolved.PolicyRevision || !resolved.Proof.Matches(s.RootID, route.Target.ClusterID, route.Target.NamespaceUID, route.Target.WorkloadUID, route.Target.PodUID) || !resolved.Proof.Valid(s.Now()) || resolved.ValidUntil.After(resolved.Proof.ValidUntil) || !s.Now().Before(resolved.ExpiresAt) {
+		resolved := r.Effective
+		if !resolved.ValidRetained() || !s.Now().Before(resolved.ExpiresAt) {
 			return zero, value.ErrUnavailable
 		}
 		processing, err := s.Processing.ContextProcessing(ctx, record)
 		if err != nil || !processing.Valid(s.Now()) || processing.RootID != s.RootID || processing.CaptureID != record.CaptureID || processing.Location != r.Registration.Location {
 			return zero, value.ErrUnavailable
 		}
-		for _, at := range []time.Time{processing.ValidUntil, eligible.ValidUntil, initial.ValidUntil, record.ValidUntil, resolved.ValidUntil, resolved.ExpiresAt} {
+		for _, at := range []time.Time{processing.ValidUntil, eligible.ValidUntil, initial.ValidUntil, record.ValidUntil, resolved.ExpiresAt} {
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt

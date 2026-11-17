@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,6 +32,7 @@ func TestRetentionWatchKeepsIntermediatePolicyLimits(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"type": "MODIFIED", "object": b})
 			w.(http.Flusher).Flush()
 		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"type": "DELETED", "object": retentionObject("other", "other-uid")})
 		_ = json.NewEncoder(w).Encode(map[string]any{"type": "BOOKMARK", "object": map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceRetentionPolicy", "metadata": map[string]string{"resourceVersion": "opaque:bookmark"}}})
 	}))
 	defer server.Close()
@@ -38,7 +41,7 @@ func TestRetentionWatchKeepsIntermediatePolicyLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	retention, err := NewRetentionClient(c, true)
+	retention, err := NewRetentionClient(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,23 +52,26 @@ func TestRetentionWatchKeepsIntermediatePolicyLimits(t *testing.T) {
 	defer watcher.Close()
 	for _, maximum := range []int{600, 3600} {
 		e, err := watcher.Next(context.Background())
-		if err != nil || e.Type != "MODIFIED" || e.Policy == nil || e.Policy.Policy.MaximumSeconds != int64(maximum) {
+		if err != nil || e.Type != "MODIFIED" || e.Policy.Policy.MaximumSeconds != int64(maximum) {
 			t.Fatalf("lost %d transition: %+v %v", maximum, e, err)
 		}
 	}
 	e, err := watcher.Next(context.Background())
-	if err != nil || e.Policy != nil || e.Type != "BOOKMARK" || e.ResourceVersion != "opaque:bookmark" {
+	if err != nil || e.Type != "DELETED" || e.Policy.Policy.Revision.UID != "other-uid" || e.Policy.Name != "other" {
+		t.Fatalf("deleted %+v %v", e, err)
+	}
+	e, err = watcher.Next(context.Background())
+	if err != nil || e.Policy.Name != "" || e.Type != "BOOKMARK" || e.ResourceVersion != "opaque:bookmark" {
 		t.Fatalf("bookmark %v", err)
 	}
-	if _, err = watcher.Next(context.Background()); err == nil {
-		t.Fatal("closed stream asserted continuity")
+	if _, err = watcher.Next(context.Background()); !errors.Is(err, io.EOF) {
+		t.Fatal("a finished watch is not io.EOF", err)
 	}
 }
 func TestRetentionWatchRejectsMalformedOrExpiredHistory(t *testing.T) {
 	for _, body := range []string{
 		`{"type":"ERROR","object":{"kind":"Status","apiVersion":"v1","reason":"Expired","code":410}}`,
 		`{"type":"BOOKMARK","type":"MODIFIED","object":{}}`,
-		`{"type":"BOOKMARK","object":{"apiVersion":"asservat.io/v1alpha1","kind":"EvidenceRetentionPolicy","metadata":{"ResourceVersion":"wrong-case"}}}`,
 		`{"type":"MODIFIED","object":{"apiVersion":"asservat.io/v1alpha1","kind":"EvidenceRetentionPolicy","metadata":{},"spec":{}}}`,
 	} {
 		t.Run(body[:min(35, len(body))], func(t *testing.T) {
@@ -82,7 +88,7 @@ func TestRetentionWatchRejectsMalformedOrExpiredHistory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			retention, err := NewRetentionClient(c, true)
+			retention, err := NewRetentionClient(c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,8 +97,8 @@ func TestRetentionWatchRejectsMalformedOrExpiredHistory(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer w.Close()
-			if _, err = w.Next(context.Background()); err == nil {
-				t.Fatal("invalid watch became continuity")
+			if _, err = w.Next(context.Background()); err == nil || errors.Is(err, io.EOF) {
+				t.Fatal("invalid watch did not ask for a new list", err)
 			}
 		})
 	}

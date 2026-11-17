@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -192,8 +191,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 				reserved.Close()
 			}
 		})
-		guards := s.retention.guard
-		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, s.recovery.installation, guards)
+		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -331,7 +329,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		// Publication: full verification with the headers-only recheck.
 		publication := func(user, password string) *postgres.ContextPublications {
-			p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, guards)
+			p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -340,7 +338,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		verify := publication("context_verify_runtime", "synthetic-context-verify")
 		audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
 		publish := publication("context_publish_runtime", "synthetic-context-publish")
-		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
+		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}

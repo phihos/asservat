@@ -65,7 +65,7 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root capacityRo
 		t.Fatal(err)
 	}
 	t.Cleanup(mac.Close)
-	admission, err := postgres.NewAuditedContextAdmissions(f.ctx, f.roles["capture-admit"], f.input.PermissionRootID, f.input.InstallationID, mac, retention.guard)
+	admission, err := postgres.NewAuditedContextAdmissions(f.ctx, f.roles["capture-admit"], f.input.PermissionRootID, f.input.InstallationID, mac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,12 +139,8 @@ func (f *capacitySQLFixture) currentManagedPublication(ctx context.Context, s ca
 	if err != nil {
 		return artifact.PublicationAuthority{}, err
 	}
-	retained, err := s.retention.policies(ctx)
-	if err != nil {
-		return artifact.PublicationAuthority{}, err
-	}
 	n := time.Now().UTC()
-	return artifact.PublicationAuthority{Retention: retained.Proof, RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(retained.Proof.ValidUntil, p.FreshUntil)}, nil
+	return artifact.PublicationAuthority{RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(n.Add(5*time.Second), p.FreshUntil)}, nil
 }
 
 // Inspect only the exact original managed account before beginning a new human

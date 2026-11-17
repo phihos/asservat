@@ -185,7 +185,7 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 	if err != nil || status.ActiveID == "" || status.ExecutionsSpent != wantExecutions || status.CollectedBytesSpent != wantTotalBytes || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || status.MaxObservedBytes != a.Limits.MaxObservedBytes {
 		t.Fatal("shared accepted budget status differs from actual charged pool", status, err)
 	}
-	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
+	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

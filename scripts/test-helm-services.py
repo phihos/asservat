@@ -125,11 +125,11 @@ def main():
     assert ("Role", "asservat-key-service") in by
     off = {(d["kind"], d["metadata"]["name"]): d for d in render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": False}}}}))}
     assert ("Role", "asservat-key-service") not in off and "downloads" not in json.loads(off[("ConfigMap", "asservat-key-service-config")]["data"]["config.json"])
-    # Downloads add the acquisition login and the configured topology.
-    docs = render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": True, "retentionTopologies": [{"targetClusterID": "10000000-0000-4000-8000-000000000002", "name": "topology"}]}}}}))
+    # Downloads add the acquisition login.
+    docs = render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": True}}}}))
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}
     config = json.loads(by[("ConfigMap", "asservat-key-service-config")]["data"]["config.json"])
-    assert "retentionTopologies" in config["downloads"] and set(config["downloads"]) <= go_fields("KeyServiceDownloadsConfig") and config["downloads"]["retentionTopologies"][0]["name"] == "topology"
+    assert config["downloads"] == {}
     assert "sql-key-acquisition.json" in files(by[("Deployment", "asservat-key-service")]["spec"]["template"])
     assert ("Role", "asservat-key-service") in by
     # cert-manager issues the serving certificate; an existing Secret wins.

@@ -1,12 +1,13 @@
 package authorization
 
 import (
-	"asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
 )
 
 func rawPacketProjectionFixture() (*projectionFixture, ContextProjectionAuthority, analysis.ContextProjectionScope) {
@@ -16,7 +17,7 @@ func rawPacketProjectionFixture() (*projectionFixture, ContextProjectionAuthorit
 	return f, s, scope
 }
 func TestRawPacketSummaryAuthorityRetainsRawSourceAndNeverUsesShares(t *testing.T) {
-	for _, mode := range []string{"current", "resolve", "permissions", "deny", "permissions-after-block", "audience", "client", "client-after-block", "groups-after-block", "retention-after-block", "cancel-after-block", "expired-after-block", "wrong-kind", "metadata-class", "source-version", "metadata-display", "native-limit"} {
+	for _, mode := range []string{"current", "resolve", "permissions", "deny", "permissions-after-block", "audience", "client", "client-after-block", "groups-after-block", "cancel-after-block", "expired-after-block", "wrong-kind", "metadata-class", "source-version", "metadata-display", "native-limit"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, scope := rawPacketProjectionFixture()
 			shares := &projectionShares{now: func() time.Time { return f.now }}
@@ -48,12 +49,6 @@ func TestRawPacketSummaryAuthorityRetainsRawSourceAndNeverUsesShares(t *testing.
 				f.on = func(_ context.Context, step string, _ int) {
 					if step == "environment" {
 						f.identity.Groups = nil
-					}
-				}
-			case "retention-after-block":
-				f.on = func(_ context.Context, step string, _ int) {
-					if step == "environment" {
-						f.retention.ExpiresAt = f.now
 					}
 				}
 			case "cancel-after-block":

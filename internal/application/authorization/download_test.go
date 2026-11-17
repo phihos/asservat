@@ -14,12 +14,11 @@ import (
 
 type downloadAuthorityFixture struct {
 	*fixture
-	record                                         ContextDownloadEvidence
-	resolved                                       privacy.RetainedResolution
-	environment                                    artifact.DownloadEnvironment
-	catalogReads, retentionReads, environmentReads int
-	fail                                           string
-	afterEnvironment                               func()
+	record                         ContextDownloadEvidence
+	environment                    artifact.DownloadEnvironment
+	catalogReads, environmentReads int
+	fail                           string
+	afterEnvironment               func()
 }
 
 func (f *downloadAuthorityFixture) ContextDownloadEvidence(_ context.Context, id string) (ContextDownloadEvidence, error) {
@@ -28,13 +27,6 @@ func (f *downloadAuthorityFixture) ContextDownloadEvidence(_ context.Context, id
 		return ContextDownloadEvidence{}, errors.New("private catalog details")
 	}
 	return f.record, nil
-}
-func (f *downloadAuthorityFixture) ResolveRetained(_ context.Context, in privacy.Input, old privacy.Deadlines, origins []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	f.retentionReads++
-	if !reflect.DeepEqual(in, f.record.Retained.Input) || old != f.record.Retained.Effective || !reflect.DeepEqual(origins, f.record.Retained.OriginPolicies) || f.fail == "retention" {
-		return privacy.RetainedResolution{}, errors.New("private privacy details")
-	}
-	return f.resolved, nil
 }
 func (f *downloadAuthorityFixture) DownloadEnvironment(_ context.Context, record ContextDownloadEvidence, p identity.Principal) (artifact.DownloadEnvironment, error) {
 	f.environmentReads++
@@ -58,22 +50,21 @@ func newDownloadAuthorityFixture() (*downloadAuthorityFixture, ContextDownloadAu
 	rev := identity.Revision{UID: "retention", Generation: 1, Digest: artifact.Digest{4}}
 	refs := []artifact.RetentionRule{{UID: "baseline", Generation: 1, Digest: artifact.Digest{5}}}
 	deadlines := privacy.Deadlines{AnchorAt: reg.AnchorAt, ExpiresAt: reg.ExpiresAt, DeleteBy: reg.DeleteBy}
-	proof := artifact.RetentionProof{RootID: root, ClusterID: t.ClusterID, NamespaceUID: t.NamespaceUID, WorkloadUID: t.WorkloadUID, PodUID: t.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), Sources: [2]artifact.RetentionSourceVersion{{ClusterID: t.ClusterID, ControlNamespaceUID: "control", Epoch: epoch, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: identity.Revision{UID: epoch, Generation: 1, Digest: artifact.Digest{3}}}}}
-	f := &downloadAuthorityFixture{fixture: base, record: ContextDownloadEvidence{CaptureID: scope.CaptureID, DataClass: "metadata", PurposeRef: "diagnostics", Version: scope.Version, Audience: base.e.Audience, Retained: privacy.RetainedArtifact{RootID: root, Registration: reg, Input: privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: deadlines}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, resolved: privacy.RetainedResolution{Target: t, PolicyRevision: rev, PurposeRef: "diagnostics", Policies: refs, Deadlines: deadlines, Proof: proof, ValidUntil: n.Add(5 * time.Second)}, environment: artifact.DownloadEnvironment{InstallationID: root, RootID: root, Region: "europe", StoreID: reg.StoreID, RecoveryEpoch: epoch, Location: reg.Location, Principal: base.i.Principal, Revision: rev, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}}
-	return f, ContextDownloadAuthority{RootID: root, Identities: f, Permissions: f, Catalog: f, Retention: f, Environment: f, Now: func() time.Time { return f.now }}, scope
+	f := &downloadAuthorityFixture{fixture: base, record: ContextDownloadEvidence{CaptureID: scope.CaptureID, DataClass: "metadata", PurposeRef: "diagnostics", Version: scope.Version, Audience: base.e.Audience, Retained: privacy.RetainedArtifact{RootID: root, Registration: reg, Input: privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: deadlines}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, environment: artifact.DownloadEnvironment{InstallationID: root, RootID: root, Region: "europe", StoreID: reg.StoreID, RecoveryEpoch: epoch, Location: reg.Location, Principal: base.i.Principal, Revision: rev, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}}
+	return f, ContextDownloadAuthority{RootID: root, Identities: f, Permissions: f, Catalog: f, Environment: f, Now: func() time.Time { return f.now }}, scope
 }
 func TestContextDownloadAuthorityUsesCurrentAudienceAndRetentionAfterCapture(t *testing.T) {
 	f, s, scope := newDownloadAuthorityFixture()
 	// Acquisition has closed, but independently authorized native download remains
 	// available for the retained artifact. A shortening is reflected immediately.
-	f.resolved.ExpiresAt = f.now.Add(10 * time.Minute)
-	f.resolved.DeleteBy = f.now.Add(20 * time.Minute)
+	f.record.Retained.Effective.ExpiresAt = f.now.Add(10 * time.Minute)
+	f.record.Retained.Effective.DeleteBy = f.now.Add(20 * time.Minute)
 	f.environment.ValidUntil = f.now.Add(2 * time.Second)
 	out, err := s.CheckDownload(context.Background(), "synthetic-token", scope)
-	if err != nil || !out.Valid(f.now) || out.Scope != scope || !out.ValidUntil.Equal(f.environment.ValidUntil) || out.Retention != f.resolved.Proof || !out.AccessUntil.Equal(f.resolved.ExpiresAt) || !out.DeleteBy.Equal(f.resolved.DeleteBy) {
+	if err != nil || !out.Valid(f.now) || out.Scope != scope || !out.ValidUntil.Equal(f.environment.ValidUntil) || !out.AccessUntil.Equal(f.record.Retained.Effective.ExpiresAt) || !out.DeleteBy.Equal(f.record.Retained.Effective.DeleteBy) {
 		t.Fatal("native disclosure decision", out, err)
 	}
-	if f.catalogReads != 1 || f.retentionReads != 1 || f.environmentReads != 1 || f.policyReads != 2 {
+	if f.catalogReads != 1 || f.environmentReads != 1 || f.policyReads != 2 {
 		t.Fatal("missing independent current checks")
 	}
 }
@@ -95,7 +86,7 @@ func TestContextDownloadAuthorityRefusesBeforeCatalogLookup(t *testing.T) {
 			case "incomplete":
 				f.p.DeniesComplete = false
 			}
-			if _, err := s.CheckDownload(context.Background(), "synthetic-token", scope); err == nil || f.catalogReads != 0 || f.retentionReads != 0 || f.environmentReads != 0 {
+			if _, err := s.CheckDownload(context.Background(), "synthetic-token", scope); err == nil || f.catalogReads != 0 || f.environmentReads != 0 {
 				t.Fatal("unauthorized lookup", err)
 			}
 		})
@@ -109,12 +100,6 @@ func TestContextDownloadAuthorityRefusesMissingChangedAndExpiredInputs(t *testin
 		{"missing-environment", func(f *downloadAuthorityFixture, s *ContextDownloadAuthority, _ *artifact.DownloadScope) {
 			s.Environment = nil
 		}},
-		{"missing-proof", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
-			f.resolved.Proof = artifact.RetentionProof{}
-		}},
-		{"wrong-proof-target", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
-			f.resolved.Proof.PodUID = "other"
-		}},
 		{"reclassified-raw", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
 			f.record.Retained.Input.EvidenceType = "coreDump"
 		}},
@@ -127,14 +112,8 @@ func TestContextDownloadAuthorityRefusesMissingChangedAndExpiredInputs(t *testin
 		{"replacement-capture", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
 			f.record.CaptureID = f.record.Retained.Registration.Location.AttemptID
 		}},
-		{"longer-deadline", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
-			f.resolved.ExpiresAt = f.resolved.ExpiresAt.Add(time.Second)
-		}},
-		{"purpose-substitution", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
-			f.resolved.PurposeRef = "other"
-		}},
 		{"closed-retention", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
-			f.resolved.ExpiresAt = f.now
+			f.record.Retained.Effective.ExpiresAt = f.now
 		}},
 		{"wrong-store", func(f *downloadAuthorityFixture, _ *ContextDownloadAuthority, _ *artifact.DownloadScope) {
 			f.environment.StoreID = f.environment.RootID
@@ -174,7 +153,7 @@ func TestContextDownloadAuthorityRefusesMissingChangedAndExpiredInputs(t *testin
 			}
 		})
 	}
-	for _, source := range []string{"catalog", "retention", "environment"} {
+	for _, source := range []string{"catalog", "environment"} {
 		f, s, scope := newDownloadAuthorityFixture()
 		f.fail = source
 		if _, err := s.CheckDownload(context.Background(), "synthetic-token", scope); !errors.Is(err, artifact.ErrDownloadUnavailable) {

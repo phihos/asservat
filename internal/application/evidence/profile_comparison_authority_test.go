@@ -47,7 +47,6 @@ func TestComparisonAuthorityMatchesDecodedOwnedBaseline(t *testing.T) {
 	decoded.Baseline.CheckedAt = decoded.Baseline.CheckedAt.Add(time.Microsecond)
 	decoded.Baseline.Environment.ObservedAt = decoded.Baseline.Environment.ObservedAt.Add(time.Microsecond)
 	decoded.Baseline.Environment.Processing.ObservedAt = decoded.Baseline.Environment.Processing.ObservedAt.Add(time.Microsecond)
-	decoded.Baseline.Retention.ObservedAt = decoded.Baseline.Retention.ObservedAt.Add(time.Microsecond)
 	if !decoded.Valid(now.Add(time.Microsecond)) || !sameProjectionAuthority(a, decoded) {
 		t.Fatal("baseline original facts changed with observation timing")
 	}

@@ -54,7 +54,7 @@ func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentI
 	a, err := authority.CheckDownloadCurrent(call, source, scope)
 	callErr = call.Err()
 	cancel()
-	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !a.Valid(now()) || !a.Environment.Valid(now()) || !a.Retention.Valid(now()) || a.Scope != scope {
+	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !a.Valid(now()) || !a.Environment.Valid(now()) || a.Scope != scope {
 		return nil, zero, artifact.ErrDownloadUnavailable
 	}
 	c := &workerCurrentCheck{owner: ctx, observation: a, scope: scope, started: started, until: identity.Earlier(until, a.ValidUntil), now: now}
@@ -75,7 +75,7 @@ func newWorkerResponseObservation(ctx context.Context, a artifact.DownloadAuthor
 		return nil, zero, artifact.ErrInvalid
 	}
 	started := now()
-	if !a.Valid(started) || !a.Environment.Valid(started) || !a.Retention.Valid(started) || a.Scope != scope {
+	if !a.Valid(started) || !a.Environment.Valid(started) || a.Scope != scope {
 		return nil, zero, artifact.ErrDownloadUnavailable
 	}
 	until := identity.Earlier(started.Add(artifact.DownloadLease), a.ValidUntil)
@@ -115,7 +115,7 @@ func (c *workerCurrentCheck) Check(ctx context.Context) (artifact.DownloadAuthor
 	n := c.now()
 	a := c.observation
 	a.ValidUntil = c.until
-	if ctx.Err() != nil || c.owner.Err() != nil || n.Before(c.started) || !n.Before(c.until) || !a.Valid(n) || !a.Environment.Valid(n) || !a.Retention.Valid(n) || a.Scope != c.scope {
+	if ctx.Err() != nil || c.owner.Err() != nil || n.Before(c.started) || !n.Before(c.until) || !a.Valid(n) || !a.Environment.Valid(n) || a.Scope != c.scope {
 		return zero, artifact.ErrDownloadExpired
 	}
 	return a, nil

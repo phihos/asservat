@@ -13,7 +13,6 @@ import (
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
@@ -210,7 +209,7 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if err != nil {
 			t.Fatal(err)
 		}
-		cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: f.reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Shares: store, Now: time.Now}
+		cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: f.reader, Processing: processing, Shares: store, Now: time.Now}
 		b := s.batch
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b.ObservedAt, b.FreshUntil = now, now.Add(5*time.Second)

@@ -117,8 +117,6 @@ func (f *downloadControlFixture) refresh(at time.Time) {
 	f.a.ValidUntil = u
 	f.a.Environment.ObservedAt = at
 	f.a.Environment.ValidUntil = u
-	f.a.Retention.ObservedAt = at
-	f.a.Retention.ValidUntil = u
 	f.source.ObservedAt = at
 	f.source.ValidUntil = u
 	f.plan.ObservedAt = at
@@ -130,10 +128,8 @@ func newDownloadControlFixture(t *testing.T) (*downloadControlFixture, ContextDo
 	n := base.now
 	p := base.a.Scope
 	rev := base.a.IdentityRevision
-	proof := artifact.RetentionProof{RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, PodUID: p.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: p.ClusterID, ControlNamespaceUID: "control", Epoch: p.RootID, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: identity.Revision{UID: p.RootID, Generation: 1, Digest: artifact.Digest{3}}}}}
 	f := &downloadControlFixture{now: n, a: base.a, runtimeAvailable: true, pending: true}
 	f.a.Environment = artifact.DownloadEnvironment{RootID: p.RootID, InstallationID: p.RootID, Region: "synthetic", StoreID: r.Expectation.Registration.StoreID, RecoveryEpoch: p.RootID, Location: r.Expectation.Registration.Location, Principal: p.Principal, Revision: rev}
-	f.a.Retention = proof
 	f.i = identity.Identity{Principal: p.Principal, Policy: rev, Scopes: []string{"evidence:read", "evidence:download"}}
 	f.source = ContextDownloadSource{Scope: p, Expectation: r.Expectation, Copies: r.Copies}
 	f.plan = ContextDownloadPlan{Allocation: artifact.DownloadAllocation{ID: p.RootID, RootID: p.RootID, ClusterID: p.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 128 << 20, ValidUntil: n.Add(time.Hour)}, OutputLimit: 8192, ReadLimit: 16 << 20}

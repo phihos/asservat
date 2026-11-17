@@ -3,36 +3,36 @@ package kubernetes
 import (
 	"context"
 	"slices"
+	"strings"
 	"time"
 
 	wire "asservat.local/asservat/api/v1alpha1"
-	configuration "asservat.local/asservat/internal/application/configuration"
 	port "asservat.local/asservat/internal/application/privacy"
 	configvalue "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
-type RetentionClient struct {
-	client *PermissionClient
-	hub    bool
-}
+// RetentionClient lists and watches the EvidenceRetentionPolicy objects of
+// the hub control namespace.
+type RetentionClient struct{ client *PermissionClient }
 
-var _ port.PolicySnapshotReader = (*RetentionClient)(nil)
-var _ configuration.RetentionListReader = (*RetentionClient)(nil)
+var _ port.RetentionSource = (*RetentionClient)(nil)
 
-func NewRetentionClient(client *PermissionClient, hub bool) (*RetentionClient, error) {
+func NewRetentionClient(client *PermissionClient) (*RetentionClient, error) {
 	if client == nil {
 		return nil, value.ErrInvalid
 	}
-	return &RetentionClient{client, hub}, nil
+	return &RetentionClient{client}, nil
 }
-func (c *RetentionClient) RetentionSnapshot(ctx context.Context) (value.PolicySnapshot, error) {
-	l, err := c.RetentionPolicyList(ctx)
-	return l.Snapshot, err
-}
+// policy decodes one observed policy; one the domain rejects (for example a
+// deletion budget not below its maximum) is invalid here, not at storage.
 func (c *RetentionClient) policy(o permissionObject, ref configvalue.Resource) (value.ScopedPolicy, error) {
-	return retentionPolicy(c.client.validator, c.hub, o, ref)
+	p, err := retentionPolicy(c.client.validator, true, o, ref)
+	if err == nil && !p.Valid() {
+		return value.ScopedPolicy{}, value.ErrInvalid
+	}
+	return p, err
 }
 
 // retentionPolicy decodes one EvidenceRetentionPolicy spec with the embedded
@@ -61,49 +61,28 @@ func retentionPolicy(v *permissionValidator, hub bool, o permissionObject, ref c
 	out = value.ScopedPolicy{Name: ref.Name, Policy: policy, Scope: scope, CaseDefaultSeconds: spec.Defaults.CaseMetadataSeconds, CaseMaximumSeconds: spec.Maxima.CaseMetadataSeconds, AuditDefaultSeconds: spec.Defaults.AuditMetadataSeconds, AuditMaximumSeconds: spec.Maxima.AuditMetadataSeconds, LegalExceptions: spec.LegalExceptions}
 	return out, nil
 }
-func (c *RetentionClient) RetentionPolicyList(ctx context.Context) (configuration.PolicyList, error) {
-	var out configuration.PolicyList
+
+// ListRetentionPolicies returns the current policies and the list's
+// resourceVersion to watch from.
+func (c *RetentionClient) ListRetentionPolicies(ctx context.Context) ([]value.ScopedPolicy, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	start := c.client.now()
-	ns, err := c.client.namespace(ctx, c.client.control)
-	if err != nil || ns.Deleting {
-		return out, value.ErrUnavailable
-	}
-	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", start)
+	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", c.client.now())
 	if err != nil {
-		return out, value.ErrUnavailable
+		return nil, "", value.ErrUnavailable
 	}
-	out.ResourceVersion = rv
-	out.Versions = map[string]string{}
-	out.Snapshot = value.PolicySnapshot{SourceClusterID: c.client.clusterID, ControlNamespaceUID: c.client.control.UID, Hub: c.hub, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out := make([]value.ScopedPolicy, 0, len(objects))
 	for i, o := range objects {
-		ref := refs[i]
-		if ref.Deleting {
-			return configuration.PolicyList{}, value.ErrUnavailable
-		}
-		p, err := c.policy(o, ref)
+		p, err := c.policy(o, refs[i])
 		if err != nil {
-			return configuration.PolicyList{}, err
+			return nil, "", err
 		}
-		out.Snapshot.Policies = append(out.Snapshot.Policies, p)
-		out.Versions[ref.UID] = ref.ResourceVersion
+		out = append(out, p)
 	}
-	slices.SortFunc(out.Snapshot.Policies, func(a, b value.ScopedPolicy) int {
-		if a.Policy.Revision.UID < b.Policy.Revision.UID {
-			return -1
-		}
-		if a.Policy.Revision.UID > b.Policy.Revision.UID {
-			return 1
-		}
-		return 0
+	slices.SortFunc(out, func(a, b value.ScopedPolicy) int {
+		return strings.Compare(a.Policy.Revision.UID, b.Policy.Revision.UID)
 	})
-	out.Snapshot.Revision = identity.Revision{UID: out.Snapshot.ControlNamespaceUID, Generation: 1, Digest: configuration.RetentionSnapshotDigest(out.Snapshot)}
-	ns, err = c.client.namespace(ctx, c.client.control)
-	if err != nil || ns.Deleting || c.client.current(ctx, start, 5*time.Second) != nil || !out.Snapshot.Valid(c.client.now()) {
-		return configuration.PolicyList{}, value.ErrUnavailable
-	}
-	return out, nil
+	return out, rv, nil
 }
 
 // RetentionPolicySpecDecoder decodes a proposed EvidenceRetentionPolicy spec

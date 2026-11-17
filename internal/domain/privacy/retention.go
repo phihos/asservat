@@ -37,13 +37,11 @@ type Policy struct {
 	Rules                                                 []Rule
 }
 
+// PolicySet is the current policies matching one target; Revision digests them.
 type PolicySet struct {
-	Target                 authorization.Target
-	Revision               identity.Revision
-	ObservedAt, FreshUntil time.Time
-	Complete               bool
-	Policies               []Policy
-	Proof                  artifact.RetentionProof `json:",omitzero"`
+	Target   authorization.Target
+	Revision identity.Revision
+	Policies []Policy
 }
 
 // Input classifications are derived by the qualified producer, never supplied
@@ -65,20 +63,8 @@ type Resolution struct {
 	RequestedSeconds, MaximumSeconds, DeletionBudgetSeconds int64
 	Policies                                                []artifact.RetentionRule
 	Deadlines
+	// ValidUntil is the access end (ExpiresAt).
 	ValidUntil time.Time
-	Proof      artifact.RetentionProof `json:",omitzero"`
-}
-
-// RetainedResolution is a cleanup/shortening decision, never a collection or
-// disclosure lease. Its cutoffs may already be past; policy freshness is separate.
-type RetainedResolution struct {
-	Target         authorization.Target
-	PolicyRevision identity.Revision
-	PurposeRef     string
-	Policies       []artifact.RetentionRule
-	Deadlines
-	ValidUntil time.Time
-	Proof      artifact.RetentionProof `json:",omitzero"`
 }
 
 func age(n int64) bool { return n >= 1 && n <= MaxAgeSeconds }
@@ -102,7 +88,7 @@ func (d Deadlines) ValidRetained() bool {
 }
 
 func (p Policy) Valid() bool {
-	if !p.Revision.Valid() || !identity.Text(p.PurposeRef, 128) || !age(p.DefaultSeconds) || !age(p.MaximumSeconds) || p.DeletionBudgetSeconds < 1 || p.DeletionBudgetSeconds > 86400 || p.DeletionBudgetSeconds >= p.MaximumSeconds || len(p.Rules) > 64 {
+	if !p.Revision.Valid() || !identity.Text(p.PurposeRef, 128) || !age(p.DefaultSeconds) || !age(p.MaximumSeconds) || p.DeletionBudgetSeconds < 1 || p.DeletionBudgetSeconds >= p.MaximumSeconds {
 		return false
 	}
 	seen := map[string]bool{}
@@ -154,45 +140,12 @@ func Resolve(set PolicySet, in Input, now time.Time) (Resolution, error) {
 	return r, nil
 }
 
-// ResolveRetained retains the original recorded request and acquisition anchor.
-// It computes a known policy shortening even if that makes deletion overdue.
-// Unavailable/conflicting policy is not permission to discard the old ledger
-// obligation, extend its deadline or continue disclosing affected evidence.
-func ResolveRetained(set PolicySet, in Input, previous Deadlines, now time.Time) (RetainedResolution, error) {
-	var out RetainedResolution
-	if !previous.ValidRetained() || !in.AnchorAt.Equal(previous.AnchorAt) || in.RequestedSeconds < 1 {
-		return out, ErrInvalid
-	}
-	r, err := resolveDeadlines(set, in, now)
-	if err != nil {
-		return out, err
-	}
-	cutoffs, err := Tighten(previous, r.Deadlines)
-	if err != nil {
-		return out, err
-	}
-	// The previous hard deadline survives a relaxed maximum. Reserve the new
-	// cleanup budget inside that earlier deadline too. If no readable interval
-	// remains, stop reads from the original anchor; do not invent extra time.
-	readUntil := cutoffs.DeleteBy.Add(-time.Duration(r.DeletionBudgetSeconds) * time.Second)
-	if readUntil.Before(cutoffs.AnchorAt) {
-		readUntil = cutoffs.AnchorAt
-	}
-	cutoffs.ExpiresAt = identity.Earlier(cutoffs.ExpiresAt, readUntil)
-	return RetainedResolution{Target: r.Target, PolicyRevision: r.PolicyRevision, PurposeRef: r.PurposeRef, Policies: r.Policies, Deadlines: cutoffs, ValidUntil: set.FreshUntil, Proof: r.Proof}, nil
-}
-
 func resolveDeadlines(set PolicySet, in Input, now time.Time) (Resolution, error) {
 	var out Resolution
 	if (in.ControlKind != "" && in.ControlKind != "case-metadata") || !in.Target.Valid() || !class(in.PrivacyClass) || !evidenceType(in.EvidenceType) || in.RequestedSeconds < 0 || in.RequestedSeconds > MaxAgeSeconds || !finiteTime(in.AnchorAt) || in.AnchorAt.After(now) || len(in.Parents) > 64 {
 		return out, ErrInvalid
 	}
-	if !set.Complete || set.Target != in.Target || !set.Revision.Valid() || !identity.Fresh(set.ObservedAt, set.FreshUntil, now, 60*time.Second) || len(set.Policies) < 1 || len(set.Policies) > 64 {
-		return out, ErrUnavailable
-	}
-	// Pure deadline calculations remain usable independently of authority.
-	// When present, current proof must exactly cover the resolved target/set.
-	if p := set.Proof; p != (artifact.RetentionProof{}) && (!p.Valid(now) || p.Policy != set.Revision || !p.Matches(p.RootID, set.Target.ClusterID, set.Target.NamespaceUID, set.Target.WorkloadUID, set.Target.PodUID) || set.FreshUntil.After(p.ValidUntil)) {
+	if set.Target != in.Target || !set.Revision.Valid() || len(set.Policies) < 1 {
 		return out, ErrUnavailable
 	}
 	maximum, requested, budget := MaxAgeSeconds, MaxAgeSeconds, int64(0)
@@ -259,16 +212,7 @@ func resolveDeadlines(set PolicySet, in Input, now time.Time) (Resolution, error
 		}
 		return 0
 	})
-	return Resolution{Target: in.Target, PolicyRevision: set.Revision, PurposeRef: purpose, PrivacyClass: in.PrivacyClass, EvidenceType: in.EvidenceType, RequestedSeconds: requested, MaximumSeconds: maximum, DeletionBudgetSeconds: budget, Policies: refs, Deadlines: deadlines, ValidUntil: identity.Earlier(set.FreshUntil, expires), Proof: set.Proof}, nil
-}
-
-// Tighten never lengthens a retained obligation. Existing expired evidence may
-// remain a valid deletion obligation; a policy increase cannot make it readable.
-func Tighten(old, next Deadlines) (Deadlines, error) {
-	if !old.ValidRetained() || !next.ValidRetained() {
-		return Deadlines{}, ErrInvalid
-	}
-	return Deadlines{AnchorAt: identity.Earlier(old.AnchorAt, next.AnchorAt), ExpiresAt: identity.Earlier(old.ExpiresAt, next.ExpiresAt), DeleteBy: identity.Earlier(old.DeleteBy, next.DeleteBy)}, nil
+	return Resolution{Target: in.Target, PolicyRevision: set.Revision, PurposeRef: purpose, PrivacyClass: in.PrivacyClass, EvidenceType: in.EvidenceType, RequestedSeconds: requested, MaximumSeconds: maximum, DeletionBudgetSeconds: budget, Policies: refs, Deadlines: deadlines, ValidUntil: expires}, nil
 }
 
 // CaseMetadataPolicy projects the explicitly configured metadata lifetime.

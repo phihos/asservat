@@ -179,32 +179,3 @@ func TestPKIRootsReadTheMountCA(t *testing.T) {
 		t.Fatal("unsafe mount accepted")
 	}
 }
-
-// Catalog slots add their own topology to the configured ones; a slot for
-// another cluster, or a cluster or name used twice, is refused.
-func TestServiceTopologyPinsUnionCatalogSlots(t *testing.T) {
-	const regional = "10000000-0000-4000-8000-0000000000b1"
-	fixed := []contracts.ServiceTopology{{TargetClusterID: serviceTestIDs.ClusterID, Name: "hub-topology"}}
-	slot := contracts.OwnerPublicCluster{ClusterID: regional, Topology: contracts.OwnerNativeTopology{TargetClusterID: regional, Name: "cluster-1-topology"}}
-	if pins, err := serviceTopologyPins(nil, nil); err != nil || len(pins) != 0 {
-		t.Fatal("empty union", pins, err)
-	}
-	pins, err := serviceTopologyPins(fixed, []contracts.OwnerPublicCluster{slot})
-	if err != nil || len(pins) != 2 || pins[1].TargetClusterID != regional || pins[1].Name != slot.Topology.Name {
-		t.Fatal("union", pins, err)
-	}
-	for name, mutate := range map[string]func(*contracts.OwnerPublicCluster){
-		"other cluster": func(s *contracts.OwnerPublicCluster) { s.Topology.TargetClusterID = serviceTestIDs.ClusterID },
-		"fixed cluster": func(s *contracts.OwnerPublicCluster) {
-			s.ClusterID, s.Topology.TargetClusterID = serviceTestIDs.ClusterID, serviceTestIDs.ClusterID
-		},
-		"fixed topology": func(s *contracts.OwnerPublicCluster) { s.Topology.Name = "hub-topology" },
-		"unsafe name":    func(s *contracts.OwnerPublicCluster) { s.Topology.Name = "../x" },
-	} {
-		changed := slot
-		mutate(&changed)
-		if _, err = serviceTopologyPins(fixed, []contracts.OwnerPublicCluster{changed}); err == nil {
-			t.Fatal("accepted:", name)
-		}
-	}
-}

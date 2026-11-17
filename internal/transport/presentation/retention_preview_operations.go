@@ -145,13 +145,11 @@ func retentionPreviewMessage(p privacy.RetentionPreview) string {
 	case p.Affected == 0:
 		return "No retained artifact's access end or deletion date would become earlier. A longer limit applies only to new collections." + tail
 	}
-	return "The listed artifacts would have their access end or deletion moved earlier once the change is applied and accepted; dates already bound are never extended." + tail
+	return "The listed artifacts would have their access end or deletion moved earlier once the change is applied; dates already bound are never extended." + tail
 }
 
 func retentionPreviewFailure(err error) OperationFailure {
 	switch {
-	case errors.Is(err, privacy.ErrPreviewLimit):
-		return OperationFailure{"PreviewTooLarge", "The proposal exceeds the preview bounds: at most 16 policy objects. Preview fewer objects.", false}
 	case errors.Is(err, privacy.ErrInvalid):
 		return OperationFailure{"InvalidProposal", "A proposed object is not a valid change. Create and update need a complete EvidenceRetentionPolicy spec, update and delete the existing policy's UID, and each policy may appear once.", false}
 	case errors.Is(err, identity.ErrDenied):
@@ -232,7 +230,7 @@ func (s *RetentionPreviewOperations) CallWithContext(ctx context.Context, curren
 }
 
 func retentionPreviewAuditDecision(err error) operationAuditDecision {
-	if errors.Is(err, privacy.ErrInvalid) || errors.Is(err, privacy.ErrPreviewLimit) {
+	if errors.Is(err, privacy.ErrInvalid) {
 		return operationAuditInvalid
 	}
 	return captureAuditDecision(err)

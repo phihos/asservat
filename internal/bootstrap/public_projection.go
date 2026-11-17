@@ -65,7 +65,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	if err != nil {
 		return nil, err
 	}
-	ledger, err := postgres.NewContextQueries(ctx, pool, root, installation, d.shared.retention, plans, nil)
+	ledger, err := postgres.NewContextQueries(ctx, pool, root, installation, plans, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 		return nil, err
 	}
 	pc := d.publicContext
-	authority := authapp.ContextProjectionAuthority{RootID: root, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
+	authority := authapp.ContextProjectionAuthority{RootID: root, Permissions: pc.permissions, Catalog: pc.catalog,
 		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Processing: processing, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, PacketGrants: pc.grants, SyscallGrants: pc.grants, LogGrants: pc.grants, Now: time.Now}
 	origins := d.shared.origins
 	origins.Projection = operations

@@ -104,7 +104,6 @@ func TestAPIContextObservationRetainsBoundsAfterBlockingEffects(t *testing.T) {
 					f.cap.FreshUntil = until
 				case "retention":
 					f.retention.ValidUntil = until
-					f.retention.Proof.ValidUntil = until
 				case "process":
 					p.processUntil = until
 				case "parent":

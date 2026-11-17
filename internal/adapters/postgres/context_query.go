@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,7 +42,6 @@ type ContextQueries struct {
 	ledger       *Ledger
 	root         string
 	installation string
-	retention    *RetentionTransactionGuard
 	backing      ContextQueryBackingGuard
 	workers      ContextQueryWorkerGuard
 }
@@ -51,15 +49,15 @@ type ContextQueries struct {
 var _ app.ContextQueryLedger = (*ContextQueries)(nil)
 var _ app.ContextQueryReplayCalls = (*ContextQueries)(nil)
 
-func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
-	if !authorization.UUID(root) || !authorization.UUID(installation) || retention == nil || retention.root != root || backing == nil {
+func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root, installation string, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) || backing == nil {
 		return nil, value.ErrUnavailable
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &ContextQueries{ledger: l, root: root, installation: installation, retention: retention, backing: backing, workers: workers}, nil
+	return &ContextQueries{ledger: l, root: root, installation: installation, backing: backing, workers: workers}, nil
 }
 
 func queryJSON(v any) ([]byte, error) { return json.Marshal(v) }
@@ -107,21 +105,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 	until := identity.Earlier(query.Deadline, identity.Earlier(request.Call.Until, authority.ValidUntil))
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	topology, e := s.retention.observe(ctx, query.Scope.ClusterID)
-	if e != nil {
-		return queryRefusal("topology", nil)
-	}
-	var baselineTopology privacy.PolicyTopology
-	if query.Scope.Comparison != (value.ProfileComparisonWindow{}) {
-		baselineTopology = topology
-		if query.Scope.Comparison.Baseline.ClusterID != query.Scope.ClusterID {
-			baselineTopology, e = s.retention.observe(ctx, query.Scope.Comparison.Baseline.ClusterID)
-			if e != nil {
-				return queryRefusal("baseline-topology", e)
-			}
-		}
-	}
-	e = queryGuarded(ctx, func(bound context.Context, callback func(context.Context) error) error {
+	e := queryGuarded(ctx, func(bound context.Context, callback func(context.Context) error) error {
 		incidentQuery, incidentAuthority := projectionQuerySource(query, authority, false)
 		return s.backing.WithCurrentQueryBacking(bound, incidentQuery.Plan, incidentAuthority, func(first context.Context) error {
 			if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
@@ -157,14 +141,14 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 				return queryRefusal("allocation-lock", e)
 			}
 			fence := func() error {
-				if e := s.fence(callback, tx, query, request, authority, topology, trust, permissions, backing, allocation); e != nil {
+				if e := s.fence(callback, tx, query, request, authority, trust, permissions, backing, allocation); e != nil {
 					return e
 				}
 				if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
 					return nil
 				}
 				baselineQuery, baselineAuthority := projectionQuerySource(query, authority, true)
-				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, baselineTopology, trust, permissions, backing, baselineAllocation)
+				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, trust, permissions, backing, baselineAllocation)
 			}
 			if e = fence(); e != nil {
 				return e
@@ -184,7 +168,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 	return nil
 }
 
-func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, topology privacy.PolicyTopology, trust custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
+func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, trust custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
 	now, e := tx.CurrentTime(ctx)
 	if e != nil {
 		return queryRefusal("fence-time", e)
@@ -212,9 +196,6 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		if e != nil || !currentAuthorityAudit(proof, p.ID, id(auditID)) {
 			return queryRefusal("fence-audit", nil)
 		}
-	}
-	if e = s.retention.check(ctx, tx, topology, a.Retention, authorization.Target{ClusterID: q.Scope.ClusterID, NamespaceUID: q.Scope.NamespaceUID, WorkloadUID: q.Scope.WorkloadUID, PodUID: q.Scope.PodUID}); e != nil {
-		return queryRefusal("fence-retention", e)
 	}
 	expected := a.Environment.Processing
 	snapshot, processing, e := readProcessingSnapshot(ctx, tx, s.root, q.Plan.InstallationID, q.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
@@ -256,7 +237,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return queryRefusal("fence-allocation", nil)
 	}
 	now, e = tx.CurrentTime(ctx)
-	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
+	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
 		return queryRefusal("fence-final", nil)
 	}
 	return nil

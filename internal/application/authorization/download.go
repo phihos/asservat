@@ -42,9 +42,6 @@ type ContextDownloadEvidence struct {
 type ContextDownloadCatalog interface {
 	ContextDownloadEvidence(context.Context, string) (ContextDownloadEvidence, error)
 }
-type DownloadRetentionResolver interface {
-	ResolveRetained(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error)
-}
 
 // The installation composition must supply current processing and regional/client
 // policy. A static region string or successful SQL read does not
@@ -79,7 +76,6 @@ type ContextDownloadAuthority struct {
 	Identities  identities.Resolver
 	Permissions ProjectionReader
 	Catalog     ContextDownloadCatalog
-	Retention   DownloadRetentionResolver
 	Environment DownloadEnvironmentReader
 	// Shares is the ADR-233 recipient branch: consulted only when ordinary
 	// target eligibility refuses, before the catalog read, and re-read at the
@@ -114,7 +110,7 @@ func (s ContextDownloadAuthority) CheckDownloadPreparation(ctx context.Context, 
 // admitting share's or raw grant's end.
 func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, preparing bool) (artifact.DownloadAuthority, error) {
 	var out artifact.DownloadAuthority
-	if !value.UUID(s.RootID) || source == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil || ctx.Err() != nil {
+	if !value.UUID(s.RootID) || source == nil || s.Permissions == nil || s.Catalog == nil || s.Environment == nil || s.Now == nil || ctx.Err() != nil {
 		return out, downloadRefused("configuration", ctx.Err())
 	}
 	if !scope.Valid() || scope.RootID != s.RootID {
@@ -187,9 +183,10 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if !initial.Eligible {
 		return out, downloadRefused("audience", nil)
 	}
-	resolved, err := s.Retention.ResolveRetained(ctx, r.Input, r.Effective, slices.Clone(r.OriginPolicies))
-	if err != nil || resolved.Target != target || resolved.PurposeRef != record.PurposeRef || !resolved.Deadlines.ValidRetained() || !resolved.AnchorAt.Equal(r.Effective.AnchorAt) || resolved.ExpiresAt.After(r.Effective.ExpiresAt) || resolved.DeleteBy.After(r.Effective.DeleteBy) || !resolved.PolicyRevision.Valid() || resolved.Proof.Policy != resolved.PolicyRevision || !resolved.Proof.Matches(s.RootID, scope.ClusterID, scope.NamespaceUID, scope.WorkloadUID, scope.PodUID) || !resolved.Proof.Valid(s.Now()) || resolved.ValidUntil.After(resolved.Proof.ValidUntil) {
-		return out, downloadRefused("retention", err)
+	// The stored deadlines are the retention decision (ADR-330 D12).
+	resolved := r.Effective
+	if !resolved.ValidRetained() || !s.Now().Before(resolved.ExpiresAt) {
+		return out, downloadRefused("retention", nil)
 	}
 	environment, err := s.Environment.DownloadEnvironment(ctx, record, i.Principal)
 	if err != nil || !environment.Valid(s.Now()) || environment.RootID != s.RootID || environment.Location != r.Registration.Location || environment.StoreID != r.Registration.StoreID || environment.Principal != i.Principal {
@@ -242,7 +239,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 				// checks retain their original intervals after the blocking lookup.
 				now := s.Now()
 				fresh := ctx.Err() == nil && current.Valid(now) && now.Before(started.Add(5*time.Second))
-				for _, end := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, resolved.ValidUntil, environment.ValidUntil, resolved.ExpiresAt} {
+				for _, end := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, environment.ValidUntil, resolved.ExpiresAt} {
 					fresh = fresh && now.Before(end)
 				}
 				if fresh {
@@ -266,10 +263,10 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		access = identity.Earlier(access, share.ExpiresAt)
 	}
 	until := identity.Earlier(started.Add(5*time.Second), access)
-	for _, at := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, resolved.ValidUntil, environment.ValidUntil} {
+	for _, at := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, environment.ValidUntil} {
 		until = identity.Earlier(until, at)
 	}
-	out = artifact.DownloadAuthority{Environment: environment, Scope: scope, PermissionEpoch: permission.UID, PermissionSequence: permission.Generation, ProjectionDigest: permission.Digest, IdentityRevision: current.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: access, DeleteBy: resolved.DeleteBy, Retention: resolved.Proof}
+	out = artifact.DownloadAuthority{Environment: environment, Scope: scope, PermissionEpoch: permission.UID, PermissionSequence: permission.Generation, ProjectionDigest: permission.Digest, IdentityRevision: current.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: access, DeleteBy: resolved.DeleteBy}
 	// This digest describes the current decision; it is neither an approval nor
 	// an authentication token. Native hashes, credentials and evidence stay out.
 	// A shared decision also binds the admitting share and its revision.

@@ -14,7 +14,6 @@ import (
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	identities "asservat.local/asservat/internal/application/identity"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -56,7 +55,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Shares: store, Now: time.Now}
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Processing: processing, Shares: store, Now: time.Now}
 	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
 	issuer := s.a.Eligibility.VerifiedIdentity.Principal.Issuer
 	batch := s.batch
@@ -117,8 +116,8 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 
 	// ADR-233: the actual download authorizer with the real share ledger, and
 	// the SQL download fence over a share-admitted decision.
-	download := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, pool, s, e.Registration), Shares: store, Now: time.Now}
-	ledger, err := postgres.NewDownloads(ctx, pool, s.a.RootID, s.retention.guard)
+	download := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: reader, Environment: newDownloadTestEnvironment(t, ctx, pool, s, e.Registration), Shares: store, Now: time.Now}
+	ledger, err := postgres.NewDownloads(ctx, pool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

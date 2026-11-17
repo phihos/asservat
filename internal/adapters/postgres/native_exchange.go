@@ -1,20 +1,21 @@
 package postgres
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"time"
 )
 
 // NativeOwners is a purpose-separated worker rendezvous. Its deployment chooses
@@ -25,8 +26,8 @@ type NativeOwners struct{ workers *DownloadWorkers }
 var _ evidence.NativeOperations = (*NativeOwners)(nil)
 var _ evidence.NativeOperationRenewer = (*NativeOwners)(nil)
 
-func NewNativeOwners(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g *RetentionTransactionGuard) (*NativeOwners, error) {
-	w, e := NewDownloadWorkers(ctx, pool, root, p, g)
+func NewNativeOwners(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile) (*NativeOwners, error) {
+	w, e := NewDownloadWorkers(ctx, pool, root, p)
 	if e != nil {
 		return nil, e
 	}

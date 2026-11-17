@@ -169,7 +169,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 					t.Fatal(err)
 				}
-				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
+				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -81,7 +81,7 @@
 {{- end -}}
 {{- $_ := set $c "observation" $obs -}}
 {{- $_ := set $c "connectorTokens" (include "asservat.connectorTokens" . | fromJson) -}}
-{{- $_ := set $c "native" (dict "workerNamespaces" (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) "retentionTopologies" (default list $h.retentionTopologies)) -}}
+{{- $_ := set $c "native" (dict "workerNamespaces" (include "asservat.hubApi.workerNamespaces" . | fromJsonArray)) -}}
 {{- if .Values.origin -}}
 {{- $u := $h.public -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}

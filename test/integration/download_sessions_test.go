@@ -23,7 +23,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -121,7 +120,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		allocation             artifact.DownloadAllocation
 		authority              func() artifact.DownloadAuthority
 		gate                   authorizationapp.ContextDownloadAuthority
-		guards                 *postgres.RetentionTransactionGuard
 		installation           string
 	}
 	setupWithKeys := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener)) fixture {
@@ -132,12 +130,11 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			ctx = s.nativeSources.ctx
 		}
 		f := fixture{s: s, p: p, installation: s.recovery.installation}
-		f.guards = s.retention.guard
 		for _, pair := range []struct {
 			pool *pgxpool.Pool
 			dst  **postgres.Downloads
 		}{{runtimePool, &f.runtime}, {auditPool, &f.audit}, {configPool, &f.config}} {
-			v, err := postgres.NewDownloads(ctx, pair.pool, s.a.RootID, f.guards)
+			v, err := postgres.NewDownloads(ctx, pair.pool, s.a.RootID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -157,7 +154,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 		actor := s.a.Eligibility.VerifiedIdentity
 		actor.Scopes = []string{"evidence:read", "evidence:download"}
-		f.gate = authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: downloadTestIdentity{actor}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureRetainedPolicies(s), Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, s, e.Registration), Now: time.Now}
+		f.gate = authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: downloadTestIdentity{actor}, Permissions: s.p, Catalog: catalog, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, s, e.Registration), Now: time.Now}
 		if provider != nil {
 			// The login has one fixed end. Every observed identity and request
 			// retains its own original short interval through blocking work.
@@ -190,7 +187,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
 	})
 
-	modes := []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "expired-claim", "cancelled-parent"}
+	modes := []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "expired-claim", "cancelled-parent"}
 	for _, mode := range modes {
 		t.Run("download-worker-"+mode, func(t *testing.T) {
 			ctx := ctx // This subtest owns any native source-observer cancellation.
@@ -223,10 +220,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				ctx = f.s.nativeSources.ctx
 				defer f.s.nativeSources.Close()
 			}
-			if mode == "native-retention-observation" {
-				qualifyNativeRetentionObservation(t, admin, f.s, f.gate)
-				return
-			}
 			profile := syntheticWorkerProfile(f.installation)
 			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" && mode != "native-owner-renewal" {
 				// Protected native credential projection pins remain explicit synthetic inputs.
@@ -241,15 +234,15 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			defer auditPool.Close()
 			identityPool := poolFor("download_worker_identity_runtime", "synthetic-download-worker-identity")
 			defer identityPool.Close()
-			ledger, e := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, profile, f.guards)
+			ledger, e := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, profile)
 			if e != nil {
 				t.Fatal(e)
 			}
-			ack, e := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, profile, f.guards)
+			ack, e := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, profile)
 			if e != nil {
 				t.Fatal(e)
 			}
-			identities, e := postgres.NewDownloadWorkers(ctx, identityPool, f.s.a.RootID, profile, f.guards)
+			identities, e := postgres.NewDownloadWorkers(ctx, identityPool, f.s.a.RootID, profile)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -602,11 +595,11 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				p2 := syntheticWorkerProfile(f.installation)
 				_, _, observer2, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, p2, a.Environment.RecoveryEpoch)
-				secondLedger, err := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, p2, f.guards)
+				secondLedger, err := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, p2)
 				if err != nil {
 					t.Fatal(err)
 				}
-				secondAck, err := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, p2, f.guards)
+				secondAck, err := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, p2)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -724,22 +717,22 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); !errors.Is(e, pgx.ErrNoRows) {
 				t.Fatal("unregistered certificate must reject the absent enrollment", e)
 			}
-			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, f.guards, store, keys, f.gate)
+			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, store, keys, f.gate)
 			if strings.HasPrefix(mode, "native-") {
 				var content *nativeContextFixture
 				if mode != "native-exchange" && mode != "native-owner-renewal" {
 					service.CurrentAuthority = f.gate
 					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader}
 				}
-				qualifyNativeExchange(t, ctx, nativeExchangeFixture{sources: f.s.nativeSources, renewOnly: mode == "native-owner-renewal", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+				qualifyNativeExchange(t, ctx, nativeExchangeFixture{sources: f.s.nativeSources, renewOnly: mode == "native-owner-renewal", content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
 				return
 			}
 			if mode == "enrollment-audit-versions" {
-				qualifyWorkerHistoricalVersions(t, ctx, nativeExchangeFixture{worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, admin: admin, poolFor: poolFor}, configurationReader, func() error { return observer.Observe(ctx) })
+				qualifyWorkerHistoricalVersions(t, ctx, nativeExchangeFixture{worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, authority: f.authority, store: store, keys: keys, admin: admin, poolFor: poolFor}, configurationReader, func() error { return observer.Observe(ctx) })
 				return
 			}
 			if mode == "request-owners" {
-				qualifyWorkerOwners(t, ctx, w, enrollment, f.guards, f.authority, func() error { return observer.Observe(ctx) }, func() error { _, err := f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); return err }, admin, poolFor)
+				qualifyWorkerOwners(t, ctx, w, enrollment, f.authority, func() error { return observer.Observe(ctx) }, func() error { _, err := f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); return err }, admin, poolFor)
 				return
 			}
 			if workerEnrollmentCase(t, ctx, mode, w, enrollment, f.authority, func() error { return observer.Observe(ctx) }, admin, poolFor) {
@@ -881,36 +874,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		return s
 	}
 
-	t.Run("download-retention-source-fences-prepaid-output", func(t *testing.T) {
-		f := setup(t)
-		a := f.authority()
-		r := request(f, a)
-		bad := r
-		bad.Authority.Retention = artifact.RetentionProof{}
-		if _, err := f.runtime.ReserveDownload(ctx, bad); err == nil {
-			t.Fatal("session without retention proof")
-		}
-		session := prepare(t, f, r)
-		batch := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 1024, ReadBytes: 2 << 20}
-		intent, err := f.runtime.BeginDownloadBatch(ctx, session.ID, a, batch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ackIntent(t, f, intent)
-		if err = f.s.retention.sources.SuspendRetention(ctx, f.s.retention.fence); err != nil {
-			t.Fatal(err)
-		}
-		if err = f.runtime.PermitDownloadBatch(ctx, session.ID, a, batch.ID, intent.Batch.Generation); err == nil {
-			t.Fatal("revoked retention permits content")
-		}
-		if _, err = f.runtime.ReserveDownload(ctx, r); err == nil {
-			t.Fatal("revoked retention permits session replay")
-		}
-		current, err := f.runtime.LookupDownload(ctx, session.ID, a.Scope.Principal)
-		if err != nil || current.ChargedOutput != 1024 || current.EmittedBytes != 0 {
-			t.Fatal("failure refunded uncertain spend", current, err)
-		}
-	})
 	t.Run("download-retention-shortening-fences-an-active-transfer", func(t *testing.T) {
 		f := setup(t)
 		a := f.authority()
@@ -926,7 +889,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 		pool := poolFor("retention_runtime", "synthetic-retention")
 		defer pool.Close()
-		retention, err := postgres.NewRetention(ctx, pool, f.s.a.RootID)
+		retention, err := newRetentionShortening(ctx, pool, f.s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -988,7 +951,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		if err := admin.QueryRow(ctx, "SELECT reserved_output,reserved_read FROM download_allocation WHERE id=$1", f.allocation.ID).Scan(&output, &read); err != nil || output != r.Session.OutputLimit || read != r.Session.ReadLimit {
 			t.Fatal(output, read, err)
 		}
-		again, err := postgres.NewDownloads(ctx, runtimePool, f.s.a.RootID, f.guards)
+		again, err := postgres.NewDownloads(ctx, runtimePool, f.s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1080,12 +1043,12 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			defer bindPool.Close()
 			readPool := poolFor("download_key_read_runtime", "synthetic-download-key-read")
 			defer readPool.Close()
-			bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope, f.guards)
+			bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope)
 			if err != nil {
 				t.Fatal(err)
 			}
 			binder := fixtureAttestedDownloadGrants(bindings)
-			resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope, f.guards)
+			resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1214,7 +1177,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			if mode == "retention-shortened" {
 				retentionPool := poolFor("retention_runtime", "synthetic-retention")
 				defer retentionPool.Close()
-				retention, err := postgres.NewRetention(ctx, retentionPool, f.s.a.RootID)
+				retention, err := newRetentionShortening(ctx, retentionPool, f.s.a.RootID)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1346,12 +1309,12 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		defer bindPool.Close()
 		readPool := poolFor("download_key_read_runtime", "synthetic-download-key-read")
 		defer readPool.Close()
-		bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope, f.guards)
+		bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope)
 		if err != nil {
 			t.Fatal(err)
 		}
 		binder := fixtureAttestedDownloadGrants(bindings)
-		resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope, f.guards)
+		resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope)
 		if err != nil {
 			t.Fatal(err)
 		}

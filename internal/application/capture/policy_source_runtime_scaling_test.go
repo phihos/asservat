@@ -384,7 +384,7 @@ func (s sourceCohortShortRetention) Resolve(ctx context.Context, in privacy.Inpu
 	if err != nil {
 		return privacy.Resolution{}, err
 	}
-	set := privacy.PolicySet{Target: in.Target, Revision: base.Proof.Policy, Complete: true, ObservedAt: s.f.now, FreshUntil: base.Proof.ValidUntil, Proof: base.Proof, Policies: []privacy.Policy{{Revision: base.Proof.Policy, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 10, MaximumSeconds: 40, DeletionBudgetSeconds: 20}}}
+	set := privacy.PolicySet{Target: in.Target, Revision: base.PolicyRevision, Policies: []privacy.Policy{{Revision: base.PolicyRevision, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 10, MaximumSeconds: 40, DeletionBudgetSeconds: 20}}}
 	return privacy.Resolve(set, in, s.f.now)
 }
 

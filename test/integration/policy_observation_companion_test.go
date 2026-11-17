@@ -74,7 +74,7 @@ func policyRawCompileOne(raw json.RawMessage) (value.PolicyRecorderConfiguration
 func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, admissions *postgres.ContextAdmissions, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample, protected ...policyRecorderProtectedCase) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, authority.InstallationID, s.retention.guard)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}

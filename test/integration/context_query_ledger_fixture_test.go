@@ -382,7 +382,6 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	} else if profileSource {
 		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
 	}
-	guards := s.retention.guard
 	var publicationPools []*pgxpool.Pool
 	defer func() {
 		for _, p := range publicationPools {
@@ -392,7 +391,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	publication := func(role, password string) *postgres.ContextPublications {
 		p := f.fixturePool(role, password)
 		publicationPools = append(publicationPools, p)
-		ledger, err := postgres.NewContextPublications(f.ctx, p, s.a.RootID, guards)
+		ledger, err := postgres.NewContextPublications(f.ctx, p, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -408,7 +407,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	if profileSource || packetSource || rawSyscall || isLogs {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
-		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
+		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}

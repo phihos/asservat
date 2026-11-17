@@ -347,7 +347,6 @@ func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 		v.CheckedAt, v.ValidUntil = time.Time{}, time.Time{}
 		v.Environment.ObservedAt, v.Environment.ValidUntil = time.Time{}, time.Time{}
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = time.Time{}, time.Time{}
-		v.Retention.ObservedAt, v.Retention.ValidUntil = time.Time{}, time.Time{}
 		v.AccessUntil, v.DeleteBy = v.AccessUntil.UTC(), v.DeleteBy.UTC()
 		v.Bound = "" // operator diagnostics are neither serialized nor authority
 		return v

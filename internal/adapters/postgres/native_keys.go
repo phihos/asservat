@@ -1,21 +1,22 @@
 package postgres
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"strings"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"io"
-	"strings"
-	"time"
 )
 
 // NativeKeys consumes three purpose-specific window slots. The original
@@ -26,11 +27,11 @@ type NativeKeys struct {
 	scope  value.KeyScope
 }
 
-func NewNativeKeys(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, scope value.KeyScope, g *RetentionTransactionGuard) (*NativeKeys, error) {
+func NewNativeKeys(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, scope value.KeyScope) (*NativeKeys, error) {
 	if !scope.Valid() || scope.Purpose != "artifact" || scope.InstallationID != p.InstallationID {
 		return nil, artifact.ErrInvalid
 	}
-	owners, e := NewNativeOwners(ctx, pool, root, p, g)
+	owners, e := NewNativeOwners(ctx, pool, root, p)
 	if e != nil {
 		return nil, e
 	}
