@@ -387,8 +387,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// acknowledge audit; the revision insert names no receipt column.
 		read("fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("download_worker_configuration", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "observed_at", "fresh_until")
-		add("download_worker_configuration", "UPDATE", "generation", "observed_at", "fresh_until")
+		add("download_worker_configuration", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "observed_at")
+		add("download_worker_configuration", "UPDATE", "generation", "observed_at")
 		add("download_worker_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
 	case "worker-config-audit":
 		// The acknowledgement only: one receipt on an unacknowledged revision.

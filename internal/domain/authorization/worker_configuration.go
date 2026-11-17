@@ -19,13 +19,16 @@ func (s DownloadWorkerConfiguration) Valid() bool {
 	return s.Profile.Valid() && UUID(s.RecoveryEpoch) && s.ProtectionDigest != (artifact.Digest{})
 }
 
+// DownloadWorkerObservation is one read of the worker profile. An accepted
+// revision stays current until a later observation replaces it; it has no
+// expiry (AGENTS.md: cached state remains valid until replaced).
 type DownloadWorkerObservation struct {
-	Configuration          DownloadWorkerConfiguration
-	ObservedAt, FreshUntil time.Time
+	Configuration DownloadWorkerConfiguration
+	ObservedAt    time.Time
 }
 
-func (o DownloadWorkerObservation) Valid(now time.Time) bool {
-	return o.Configuration.Valid() && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second)
+func (o DownloadWorkerObservation) Valid() bool {
+	return o.Configuration.Valid() && !o.ObservedAt.IsZero()
 }
 
 type DownloadWorkerIdentity struct {

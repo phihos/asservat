@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 )
@@ -94,7 +93,7 @@ func TestWorkerConfigurationV3FillsIDsAndUIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, p := o.Configuration, o.Configuration.Profile
-	if c.RecoveryEpoch != workerTestEpoch || c.Suspended || c.ProtectionDigest != s.protection.digest || !o.FreshUntil.Equal(start.Add(5*time.Second)) {
+	if c.RecoveryEpoch != workerTestEpoch || c.Suspended || c.ProtectionDigest != s.protection.digest || !o.ObservedAt.Equal(start) {
 		t.Fatal("configuration", c)
 	}
 	if p.InstallationID != workerTestInstallation || p.ClusterID != permissionCluster || p.Namespace != permissionControl.Name || p.NamespaceUID != permissionControl.UID || p.Configuration.UID != workerTestSource || p.Configuration.Generation != 1 {

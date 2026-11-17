@@ -85,7 +85,7 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 			// A started response keeps the worker configuration it started under
 			// (ADR-312); its worker certificate and native owner remain fenced.
 			if !a.Started() {
-				if _, e := currentWorkerConfiguration(ctx, q, s.profile); e != nil {
+				if e := currentWorkerConfiguration(ctx, q, s.profile); e != nil {
 					return time.Time{}, sqlStep{"native-session-configuration", e}
 				}
 			}

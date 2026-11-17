@@ -55,31 +55,9 @@ func (q *Queries) CountWorkerConfigurationRevisions(ctx context.Context, arg Cou
 	return count, err
 }
 
-const fenceWorkerConfiguration = `-- name: FenceWorkerConfiguration :exec
-UPDATE download_worker_configuration SET fresh_until=least(fresh_until,clock_timestamp())
-WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND observed_at<=$4
-`
-
-type FenceWorkerConfigurationParams struct {
-	InstallationID pgtype.UUID
-	ClusterID      pgtype.UUID
-	SourceUid      pgtype.UUID
-	ObservedAt     pgtype.Timestamptz
-}
-
-func (q *Queries) FenceWorkerConfiguration(ctx context.Context, arg FenceWorkerConfigurationParams) error {
-	_, err := q.db.Exec(ctx, fenceWorkerConfiguration,
-		arg.InstallationID,
-		arg.ClusterID,
-		arg.SourceUid,
-		arg.ObservedAt,
-	)
-	return err
-}
-
 const insertWorkerConfiguration = `-- name: InsertWorkerConfiguration :exec
-INSERT INTO download_worker_configuration(installation_id,cluster_id,source_uid,generation,observed_at,fresh_until)
-VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING
+INSERT INTO download_worker_configuration(installation_id,cluster_id,source_uid,generation,observed_at)
+VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING
 `
 
 type InsertWorkerConfigurationParams struct {
@@ -88,7 +66,6 @@ type InsertWorkerConfigurationParams struct {
 	SourceUid      pgtype.UUID
 	Generation     int64
 	ObservedAt     pgtype.Timestamptz
-	FreshUntil     pgtype.Timestamptz
 }
 
 func (q *Queries) InsertWorkerConfiguration(ctx context.Context, arg InsertWorkerConfigurationParams) error {
@@ -98,7 +75,6 @@ func (q *Queries) InsertWorkerConfiguration(ctx context.Context, arg InsertWorke
 		arg.SourceUid,
 		arg.Generation,
 		arg.ObservedAt,
-		arg.FreshUntil,
 	)
 	return err
 }
@@ -128,7 +104,7 @@ func (q *Queries) InsertWorkerConfigurationRevision(ctx context.Context, arg Ins
 }
 
 const lockWorkerConfiguration = `-- name: LockWorkerConfiguration :one
-SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR UPDATE
+SELECT installation_id, cluster_id, source_uid, generation, observed_at FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR UPDATE
 `
 
 type LockWorkerConfigurationParams struct {
@@ -146,13 +122,12 @@ func (q *Queries) LockWorkerConfiguration(ctx context.Context, arg LockWorkerCon
 		&i.SourceUid,
 		&i.Generation,
 		&i.ObservedAt,
-		&i.FreshUntil,
 	)
 	return i, err
 }
 
 const observeWorkerConfiguration = `-- name: ObserveWorkerConfiguration :exec
-UPDATE download_worker_configuration SET generation=$4,observed_at=$5,fresh_until=$6 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
+UPDATE download_worker_configuration SET generation=$4,observed_at=$5 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
 `
 
 type ObserveWorkerConfigurationParams struct {
@@ -161,7 +136,6 @@ type ObserveWorkerConfigurationParams struct {
 	SourceUid      pgtype.UUID
 	Generation     int64
 	ObservedAt     pgtype.Timestamptz
-	FreshUntil     pgtype.Timestamptz
 }
 
 func (q *Queries) ObserveWorkerConfiguration(ctx context.Context, arg ObserveWorkerConfigurationParams) error {
@@ -171,7 +145,6 @@ func (q *Queries) ObserveWorkerConfiguration(ctx context.Context, arg ObserveWor
 		arg.SourceUid,
 		arg.Generation,
 		arg.ObservedAt,
-		arg.FreshUntil,
 	)
 	return err
 }
@@ -207,7 +180,7 @@ func (q *Queries) ReadWorkerConfigurationRevision(ctx context.Context, arg ReadW
 }
 
 const shareWorkerConfiguration = `-- name: ShareWorkerConfiguration :one
-SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR SHARE
+SELECT installation_id, cluster_id, source_uid, generation, observed_at FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR SHARE
 `
 
 type ShareWorkerConfigurationParams struct {
@@ -225,7 +198,6 @@ func (q *Queries) ShareWorkerConfiguration(ctx context.Context, arg ShareWorkerC
 		&i.SourceUid,
 		&i.Generation,
 		&i.ObservedAt,
-		&i.FreshUntil,
 	)
 	return i, err
 }

@@ -106,8 +106,8 @@ type fixtureWorkerIdentity struct {
 
 func (f fixtureWorkerIdentity) ReadDownloadWorkerIdentity(ctx context.Context, _ string, _ value.KeyPeer) (value.DownloadWorkerIdentity, error) {
 	start := time.Now().UTC()
-	until, e := f.configuration.CurrentWorkerConfiguration(ctx, f.worker.Intent.Profile)
-	return value.DownloadWorkerIdentity{Worker: f.worker, ObservedAt: start, FreshUntil: identity.Earlier(until, identity.Earlier(start.Add(5*time.Second), f.worker.Intent.RunUntil))}, e
+	e := f.configuration.CurrentWorkerConfiguration(ctx, f.worker.Intent.Profile)
+	return value.DownloadWorkerIdentity{Worker: f.worker, ObservedAt: start, FreshUntil: identity.Earlier(start.Add(5*time.Second), f.worker.Intent.RunUntil)}, e
 }
 
 func TestDownloadJobsWithRealKubernetes(t *testing.T) {

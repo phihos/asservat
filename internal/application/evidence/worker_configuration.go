@@ -2,7 +2,6 @@ package evidence
 
 import (
 	"context"
-	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -15,32 +14,30 @@ type WorkerConfigurationReader interface {
 }
 type WorkerConfigurationLedger interface {
 	ObserveWorkerConfiguration(context.Context, value.DownloadWorkerObservation) (audit.Receipt, bool, error)
-	FenceWorkerConfiguration(context.Context, time.Time) error
 }
 type WorkerConfigurationGuard interface {
-	CurrentWorkerConfiguration(context.Context, value.DownloadWorkerProfile) (time.Time, error)
+	// CurrentWorkerConfiguration fails unless the profile is the current
+	// accepted, audited and unsuspended revision.
+	CurrentWorkerConfiguration(context.Context, value.DownloadWorkerProfile) error
 }
 
 // A constructor profile does not activate dispatch. This observer requires
-// qualified Kubernetes input and separate encrypted audit.
+// qualified Kubernetes input and separate encrypted audit. A failed read
+// leaves the last accepted revision current: it stays valid until a later
+// observation replaces it.
 type WorkerConfigurationObserver struct {
 	Reader           WorkerConfigurationReader
 	Ledger           WorkerConfigurationLedger
 	Audit            auditapp.WorkerConfigurationWriter
 	Acknowledgements auditapp.WorkerConfigurationAcknowledgements
-	Now              func() time.Time
 }
 
 func (s *WorkerConfigurationObserver) Observe(ctx context.Context) error {
-	if s == nil || ctx == nil || s.Reader == nil || s.Ledger == nil || s.Audit == nil || s.Acknowledgements == nil || s.Now == nil {
+	if s == nil || ctx == nil || s.Reader == nil || s.Ledger == nil || s.Audit == nil || s.Acknowledgements == nil {
 		return artifact.ErrInvalid
 	}
-	start := s.Now()
 	o, e := s.Reader.ReadWorkerConfiguration(ctx)
-	if e != nil || !o.Valid(s.Now()) || ctx.Err() != nil {
-		cleanup, end := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer end()
-		_ = s.Ledger.FenceWorkerConfiguration(cleanup, start)
+	if e != nil || !o.Valid() || ctx.Err() != nil {
 		return artifact.ErrDownloadUnavailable
 	}
 	r, ok, e := s.Ledger.ObserveWorkerConfiguration(ctx, o)

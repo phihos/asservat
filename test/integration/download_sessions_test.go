@@ -187,7 +187,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
 	})
 
-	modes := []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "expired-claim", "cancelled-parent"}
+	modes := []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-rollback", "configuration-suspended", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "expired-claim", "cancelled-parent"}
 	for _, mode := range modes {
 		t.Run("download-worker-"+mode, func(t *testing.T) {
 			ctx := ctx // This subtest owns any native source-observer cancellation.
@@ -295,7 +295,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				return
 			}
 			configuration, configurationReader, observer, settings := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, profile, a.Environment.RecoveryEpoch)
-			if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e != nil {
+			if e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e != nil {
 				t.Fatal("current accepted worker configuration", e)
 			}
 
@@ -312,7 +312,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if e = observer.Observe(ctx); e == nil {
 					t.Fatal("same-revision replacement accepted")
 				}
-				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
+				if e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
 					t.Fatal("mutated configuration authorized")
 				}
 				return
@@ -328,14 +328,14 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					t.Fatal("staging new revision", e)
 				}
 				for _, p := range []authorization.DownloadWorkerProfile{profile, settings.Profile} {
-					if _, e = configurationReader.CurrentWorkerConfiguration(ctx, p); e == nil {
+					if e = configurationReader.CurrentWorkerConfiguration(ctx, p); e == nil {
 						t.Fatal("unaudited rollout authorized old or new revision")
 					}
 				}
 				if e = observer.Observe(ctx); e != nil {
 					t.Fatal(e)
 				}
-				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
+				if e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
 					t.Fatal("audited rollout", e)
 				}
 				return
@@ -353,19 +353,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				return
 			}
-			if mode == "configuration-fence-order" {
-				olderFailure := time.Now().UTC()
-				if e = observer.Observe(ctx); e != nil {
-					t.Fatal(e)
-				}
-				if e = configuration.FenceWorkerConfiguration(ctx, olderFailure); e != nil {
-					t.Fatal(e)
-				}
-				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e != nil {
-					t.Fatal("old failed observer fenced newer success", e)
-				}
-				return
-			}
 			if mode == "configuration-roles" {
 				for _, role := range [][2]string{{"worker_configuration_runtime", "synthetic-worker-configuration"}, {"worker_configuration_audit_runtime", "synthetic-worker-configuration-audit"}, {"worker_configuration_read_runtime", "synthetic-worker-configuration-read"}, {"download_worker_runtime", "synthetic-download-worker"}, {"download_worker_identity_runtime", "synthetic-download-worker-identity"}} {
 					rp := poolFor(role[0], role[1])
@@ -380,8 +367,8 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 						}
 					}
 					if role[0] != "worker_configuration_runtime" {
-						if _, e = rp.Exec(ctx, "UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1", profile.InstallationID); e == nil {
-							t.Fatal("consumer refreshed authority", role[0])
+						if _, e = rp.Exec(ctx, "UPDATE download_worker_configuration SET observed_at=clock_timestamp() WHERE installation_id=$1", profile.InstallationID); e == nil {
+							t.Fatal("consumer replaced configuration observation", role[0])
 						}
 					}
 					if role[0] != "worker_configuration_audit_runtime" {
@@ -400,53 +387,22 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if e = observer.Observe(ctx); e != nil {
 					t.Fatal(e)
 				}
-				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e == nil {
+				if e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e == nil {
 					t.Fatal("stale configuration remained current")
 				}
 				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, f.authority(), profile); e == nil {
 					t.Fatal("stale dispatcher reserved a worker")
 				}
 				if mode == "configuration-rollback" {
-					if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
+					if e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
 						t.Fatal(e)
 					}
 					*settings = original
 					if e = observer.Observe(ctx); e == nil {
 						t.Fatal("accepted configuration rolled back")
 					}
-				} else if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
+				} else if e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
 					t.Fatal("suspended configuration remained current")
-				}
-				return
-			}
-			if mode == "configuration-fenced" {
-				if e = configuration.FenceWorkerConfiguration(ctx, time.Now().UTC()); e != nil {
-					t.Fatal(e)
-				}
-				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, f.authority(), profile); e == nil {
-					t.Fatal("fenced source still dispatched")
-				}
-				return
-			}
-			if mode == "configuration-lock-expired" {
-				tx, e := admin.Begin(ctx)
-				if e != nil {
-					t.Fatal(e)
-				}
-				defer tx.Rollback(ctx)
-				if _, e = tx.Exec(ctx, "SELECT source_uid FROM download_worker_configuration WHERE installation_id=$1 FOR UPDATE", profile.InstallationID); e != nil {
-					t.Fatal(e)
-				}
-				now := time.Now().UTC()
-				o := authorization.DownloadWorkerObservation{Configuration: *settings, ObservedAt: now, FreshUntil: now.Add(300 * time.Millisecond)}
-				done := make(chan error, 1)
-				go func() { _, _, e := configuration.ObserveWorkerConfiguration(ctx, o); done <- e }()
-				time.Sleep(400 * time.Millisecond)
-				if e = tx.Commit(ctx); e != nil {
-					t.Fatal(e)
-				}
-				if e = <-done; e == nil {
-					t.Fatal("expired profile observation accepted after lock")
 				}
 				return
 			}
@@ -590,7 +546,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					t.Fatal(err)
 				}
 				p2 := syntheticWorkerProfile(f.installation)
-				_, _, observer2, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, p2, a.Environment.RecoveryEpoch)
+				acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, p2, a.Environment.RecoveryEpoch)
 				secondLedger, err := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, p2)
 				if err != nil {
 					t.Fatal(err)
@@ -656,21 +612,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					if _, err = rp.Exec(ctx, query, id); err == nil {
 						t.Fatal("routing role performed mutation", query)
 					}
-				}
-				if err = configuration.FenceWorkerConfiguration(ctx, time.Now()); err != nil {
-					t.Fatal(err)
-				}
-				if _, err = routing.ReadDownloadWorkerEnrollment(ctx, session.ID, w.Intent.ID); err == nil {
-					t.Fatal("fenced profile accepted")
-				}
-				if err = observer2.Observe(ctx); err != nil {
-					t.Fatal(err)
-				}
-				if _, err = routing.ReadDownloadWorkerEnrollment(ctx, s2.ID, w2.Intent.ID); err != nil {
-					t.Fatal("one cluster fencing denied unrelated worker", err)
-				}
-				if err = observer.Observe(ctx); err != nil {
-					t.Fatal(err)
 				}
 				tx, err := admin.Begin(ctx)
 				if err != nil {
@@ -744,29 +685,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				t.Fatal("worker identity", e)
 			}
 
-			if mode == "configuration-identity-expired" {
-				now := time.Now().UTC()
-				o := authorization.DownloadWorkerObservation{Configuration: *settings, ObservedAt: now, FreshUntil: now.Add(300 * time.Millisecond)}
-				if _, _, e = configuration.ObserveWorkerConfiguration(ctx, o); e != nil {
-					t.Fatal(e)
-				}
-				bounded, e := identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer)
-				if e != nil || bounded.FreshUntil.After(o.FreshUntil) {
-					t.Fatal("identity extended original configuration deadline", e)
-				}
-				time.Sleep(400 * time.Millisecond)
-				if bounded.Valid(time.Now()) {
-					t.Fatal("expired observation still valid")
-				}
-				if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
-					t.Fatal("expired configuration yielded new worker identity")
-				}
-				jobs.stopped = true
-				if e = service.Retire(ctx, w); e != nil {
-					t.Fatal("expired configuration prevented historical cleanup", e)
-				}
-				return
-			}
 			if mode == "binding-replacement" {
 				changed := w
 				changed.Binding.PodUID = custodyID()

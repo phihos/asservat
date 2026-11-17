@@ -251,12 +251,9 @@ func (s *DownloadWorkerJobs) CreateAcquisitionWorker(ctx context.Context, l valu
 	}
 	ctx, end := context.WithDeadline(ctx, l.Until)
 	defer end()
-	until, e := s.configuration.CurrentWorkerConfiguration(ctx, l.Intent.Profile)
-	if e != nil || !s.client.now().Before(until) {
+	if s.configuration.CurrentWorkerConfiguration(ctx, l.Intent.Profile) != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	ctx, finish := context.WithDeadline(ctx, until)
-	defer finish()
 	if s.sources(ctx) != nil || !l.Valid(s.client.now()) || ctx.Err() != nil {
 		return out, artifact.ErrInvalid
 	}
@@ -410,12 +407,9 @@ func (s *DownloadWorkerJobs) ObserveAcquisitionWorker(ctx context.Context, i val
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
-	until, e := s.configuration.CurrentWorkerConfiguration(ctx, i.Profile)
-	if e != nil || !start.Before(until) {
+	if s.configuration.CurrentWorkerConfiguration(ctx, i.Profile) != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	ctx, finish := context.WithDeadline(ctx, until)
-	defer finish()
 	// Observation pins only the already launched Job/Pod. Launch and both
 	// enrollment/key attesters independently verify complete protected sources;
 	// observing an intermediate binding grants neither credential nor evidence.
@@ -434,7 +428,7 @@ func (s *DownloadWorkerJobs) ObserveAcquisitionWorker(ctx context.Context, i val
 		if s.client.current(ctx, start, 5*time.Second) != nil {
 			return out, artifact.ErrDownloadExpired
 		}
-		observed := &app.AcquisitionWorkerPending{Intent: i, Job: receipt, ObservedAt: start, ValidUntil: identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, i.RunUntil))}
+		observed := &app.AcquisitionWorkerPending{Intent: i, Job: receipt, ObservedAt: start, ValidUntil: identity.Earlier(start.Add(5*time.Second), i.RunUntil)}
 		if d, ok := ctx.Deadline(); ok {
 			observed.ValidUntil = identity.Earlier(observed.ValidUntil, d)
 		}

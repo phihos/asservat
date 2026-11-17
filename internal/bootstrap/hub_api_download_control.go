@@ -161,7 +161,7 @@ func (d *OwnerDeployment) hubLocalPathTemplate(ctx context.Context, observer *ku
 		return &fixedStepError{"path-template-source", mounts.ErrUnavailable}
 	}
 	observed, err := source.ReadWorkerConfiguration(ctx)
-	if err != nil || !observed.Valid(time.Now()) {
+	if err != nil || !observed.Valid() {
 		return &fixedStepError{"path-template-profile", mounts.ErrUnavailable}
 	}
 	region := o.store.Region

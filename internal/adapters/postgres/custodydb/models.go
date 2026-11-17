@@ -836,7 +836,6 @@ type DownloadWorkerConfiguration struct {
 	SourceUid      pgtype.UUID
 	Generation     int64
 	ObservedAt     pgtype.Timestamptz
-	FreshUntil     pgtype.Timestamptz
 }
 
 type DownloadWorkerConfigurationRevision struct {

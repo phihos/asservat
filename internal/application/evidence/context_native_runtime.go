@@ -88,8 +88,8 @@ func (r *ContextNativeRuntime) CheckContextDownloadRuntime(ctx context.Context, 
 	if e != nil {
 		return time.Time{}, stepped("serving", e)
 	}
-	until, e := c.Configuration.CurrentWorkerConfiguration(call, c.Profile)
-	until = identity.Earlier(until, identity.Earlier(original, serving))
+	e = c.Configuration.CurrentWorkerConfiguration(call, c.Profile)
+	until := identity.Earlier(original, serving)
 	if e != nil || call.Err() != nil || !c.Now().Before(until) {
 		return time.Time{}, collapsed("worker-configuration", artifact.ErrDownloadUnavailable, e)
 	}

@@ -85,8 +85,7 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 	default:
 		return artifact.ErrInvalid
 	}
-	configurationUntil, err := currentWorkerConfiguration(ctx, tx, s.profile)
-	if err != nil {
+	if err = currentWorkerConfiguration(ctx, tx, s.profile); err != nil {
 		return err
 	}
 	row, err := tx.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(workerID), RootID: id(s.root)})
@@ -121,7 +120,6 @@ func (s *admittedWorkerIdentity) current(ctx context.Context, tx *custodydb.Quer
 		return artifact.ErrDownloadExpired
 	}
 	checked.freshUntil = identity.Earlier(started.Add(5*time.Second), identity.Earlier(parentUntil, checked.worker.Intent.RunUntil))
-	checked.freshUntil = identity.Earlier(checked.freshUntil, configurationUntil)
 	if until, ok := ctx.Deadline(); ok {
 		checked.freshUntil = identity.Earlier(checked.freshUntil, until)
 	}
