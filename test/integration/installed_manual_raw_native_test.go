@@ -48,7 +48,7 @@ func builtinNetworkDefinitionWith(profile map[string]any) (map[string]any, error
 // action, no history, five seconds after start, a reviewed filter.
 func manualRawArguments(cluster, namespace, workload string) map[string]any {
 	return map[string]any{
-		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+		"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 		"requested_retention_seconds": 600,
 		"profile_composition": map[string]any{
 			"components": []any{map[string]any{

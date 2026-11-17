@@ -43,7 +43,7 @@ func (f *mcpCaptureFixture) Preview(context.Context, identities.CurrentIdentity,
 // mcpCaptureRequest is a request_capture input submitting a reviewed
 // pod-status preview.
 func mcpCaptureRequest() map[string]any {
-	return map[string]any{"preview": map[string]any{"target_ref": map[string]any{"cluster_id": "00000000-0000-4000-8000-000000000001", "namespace": "payments", "kind": "Deployment", "name": "api"}, "preset_ref": map[string]any{"name": "pod-status", "version": "v1"}}, "expected_plan_digest": strings.Repeat("11", 32), "idempotency_key": "same-key"}
+	return map[string]any{"preview": map[string]any{"target_ref": map[string]any{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"}, "preset_ref": map[string]any{"name": "pod-status", "version": "v1"}}, "expected_plan_digest": strings.Repeat("11", 32), "idempotency_key": "same-key"}
 }
 
 func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.CurrentIdentity, in app.CaptureRequest) (value.Accepted, error) {
@@ -74,7 +74,7 @@ func TestContextMCPRegistersQualifiedSchemasAndRetainsCurrentIdentity(t *testing
 		defer server.Close()
 		f := &mcpCaptureFixture{}
 		var revoked atomic.Bool
-		ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: enabled, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+		ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: enabled, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +100,7 @@ func TestContextMCPRegistersQualifiedSchemasAndRetainsCurrentIdentity(t *testing
 				t.Fatal(connectErr)
 			}
 			listedTools, listErr := session.ListTools(ctx, &sdk.ListToolsParams{})
-			if listErr != nil || len(listedTools.Tools) < 3 {
+			if listErr != nil || len(listedTools.Tools) == 0 {
 				t.Fatalf("official discovery: %v", listErr)
 			}
 			called, callErr := session.CallTool(ctx, &sdk.CallToolParams{Name: "get_capture", Arguments: map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}})
@@ -109,23 +109,15 @@ func TestContextMCPRegistersQualifiedSchemasAndRetainsCurrentIdentity(t *testing
 			}
 			_ = session.Close()
 			cancel()
-			response, b := send(t, server, rpcRequest(t, server, version, "tools/list", nil))
-			var listed struct {
-				Result sdk.ListToolsResult `json:"result"`
-			}
-			if response.StatusCode != 200 || json.Unmarshal(b, &listed) != nil {
-				t.Fatalf("list: %d %s", response.StatusCode, b)
-			}
 			expected := 3
 			if enabled {
 				expected = 4
 			}
-			if len(listed.Result.Tools) != expected {
-				t.Fatalf("discovery count: %d %s", len(listed.Result.Tools), b)
+			if names := discoveredTools(t, server, version); len(names) != expected {
+				t.Fatal("discovery", names)
 			}
-			if strings.Contains(string(b), `"$ref":"https:`) {
-				t.Fatal("external schema dependency advertised")
-			}
+			var response *http.Response
+			var b []byte
 			response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "get_capture", "arguments": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}}))
 			if response.StatusCode != 200 || !strings.Contains(string(b), `"structuredContent"`) || !strings.Contains(string(b), `"IntentAuditPending"`) {
 				t.Fatalf("progress: %d %s", response.StatusCode, b)
@@ -157,7 +149,7 @@ func TestMCPRetainsOperationDeadlineThroughFinalIdentityCheck(t *testing.T) {
 			var h *Handler
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
 			defer server.Close()
-			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -208,7 +200,7 @@ func TestMCPClampsActualSocketToOriginalOperationDeadline(t *testing.T) {
 	var h *Handler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(operationDeadlineWriter{w, observed}, r) }))
 	defer server.Close()
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +235,7 @@ func TestMCPFinalIdentityShorteningReachesSocket(t *testing.T) {
 			var h *Handler
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(operationDeadlineWriter{w, observed}, r) }))
 			defer server.Close()
-			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -298,7 +290,7 @@ func TestMCPReportsAFailedOperationCall(t *testing.T) {
 	var h *Handler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
 	defer server.Close()
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +310,7 @@ func TestMCPReportsAFailedOperationCall(t *testing.T) {
 		var reasons []string
 		h.Report = func(reason string) { reasons = append(reasons, reason) }
 		response, _ := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "preview_capture", "arguments": map[string]any{
-			"target_ref": map[string]string{"cluster_id": "00000000-0000-4000-8000-000000000001", "namespace": "payments", "kind": "Deployment", "name": "api"},
+			"target_ref": map[string]string{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"},
 			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": 3600}}))
 		if response.StatusCode != 503 || len(reasons) != 1 || reasons[0] != c.want {
 			t.Fatalf("%d %q, want %q", response.StatusCode, reasons, c.want)

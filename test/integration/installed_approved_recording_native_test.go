@@ -47,7 +47,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	if installedJourneyFocus() == "manual-mixed" {
 		// ADR-276: packet and syscall finite recordings of one Pod at once.
 		return map[string]any{
-			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 			"requested_retention_seconds": 600,
 			"profile_composition": map[string]any{
 				"components": []any{
@@ -79,7 +79,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	if installedJourneyFocus() == "manual-syscall" {
 		// B3: one finite manual syscall metadata recording of 5 seconds.
 		return map[string]any{
-			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 			"requested_retention_seconds": 600,
 			"profile_composition": map[string]any{
 				"components": []any{map[string]any{
@@ -98,7 +98,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		}
 	}
 	return map[string]any{
-		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+		"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 		"requested_retention_seconds": 600,
 		"profile_composition": map[string]any{
 			"components": []any{map[string]any{

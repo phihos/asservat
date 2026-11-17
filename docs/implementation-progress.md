@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Capture tools on the canonical contract (ADR-335 D4, 2026-11-17)
+
+Branch `clean/api-capture`. `list_diagnostics`, `preview_capture`,
+`request_capture`, `get_capture`, `cancel_capture`, `list_capture_history`
+and `get_capture_profile` validate against the canonical schemas.
+`target_ref` names its cluster (`local` for the hub's own). Retired names:
+`get_capture_settings` (now `get_capture` `view=settings`),
+`list_capture_profiles` (rows of `list_diagnostics`) and
+`preview_recording_save` (the `recording_handles` branch of
+`preview_capture`). `get_capture` and `preview_capture` may use the 96 KiB
+MCP result bound. Gaps, refused with `CapabilityUnavailable`: `target_handle`,
+`diagnostic_handle`, the `incident-context` preset, ranked recommendations
+(`goal`), recipe and discovery rows, the explicit `request_capture` shape,
+sharing `outputSelection`/`management`/`reason`, pod selectors and UID pins.
+A regional profile LIST still stops at 100 versions.
+
 ## Stateless previews (ADR-330 D9, 2026-11-17)
 
 Branch `clean/previews-api`. A preview stores nothing: `preview_capture` and
@@ -547,7 +563,7 @@ examples go through `readImplementedExample` or the console equivalent.
 
 | Contract | Canonical change | Runtime still implements (code) |
 | --- | --- | --- |
-| `mcp-tools.json`, `browser-openapi.yaml`, `operations.yaml` | 33 MCP tools: `get_extract(view)`, `query_artifact(operation)`, `download_artifact(action)`, `watch_live(action)`; recording-save preview in `preview_capture`; live sources in `list_recordings`; capture profiles in `list_diagnostics`; no `activate_policy`/`request_policy_grant`; every tool enabled by default | `internal/contracts/investigation_schema.go`, `investigation-schemas/*.json`; `internal/domain/audit/operation.go`, `connector_operation.go`; `internal/bootstrap/public_context.go`, `public_http.go`; `internal/application/authorization/policy_grant_attachment.go`; `internal/adapters/postgres/policy_grant_attachment.go` |
+| `mcp-tools.json`, `browser-openapi.yaml`, `operations.yaml` | 33 MCP tools: `get_extract(view)`, `query_artifact(operation)`, `download_artifact(action)`, `watch_live(action)`; live sources in `list_recordings`; no `activate_policy`/`request_policy_grant`; every tool enabled by default | `internal/contracts/investigation_schema.go`, `investigation-schemas/*.json`; `internal/domain/audit/operation.go`, `connector_operation.go`; `internal/bootstrap/public_context.go`, `public_http.go`; `internal/application/authorization/policy_grant_attachment.go`; `internal/adapters/postgres/policy_grant_attachment.go` |
 | `mcp-tools.json` | Names instead of IDs (`cluster`, workload, `policy`, recipe); reasons optional except `request_raw_access`; raw access by `artifact_ids` with defaulted size/expiry | `internal/transport/presentation/*_operations.go` |
 | `artifact-download.schema.json` | Preparing/Ready/Completed/Failed/Cancelled; size and SHA-256 on every status; `content_path`, `browser_url`, `access_until`, bundle `representation`; no `continue_preparation`/`expires_at`/`resume_available` | `internal/transport/presentation/context_download.go`; console `web/src/evidence/evidence.ts` |
 | `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |

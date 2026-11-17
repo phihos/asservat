@@ -53,8 +53,8 @@ func TestBrowserSettingsBudgetUsesCanonicalBytesAndLeavesMCPBounded(t *testing.T
 	s, f, h := historyOperations(t)
 	h.recipe = largeHistoryRecipe()
 	original := bytes.Clone(h.recipe)
-	input := json.RawMessage(`{"capture_id":"` + historyCapture + `"}`)
-	reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture_settings", input)
+	input := json.RawMessage(`{"capture_id":"` + historyCapture + `","view":"settings"}`)
+	reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture", input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,23 +66,23 @@ func TestBrowserSettingsBudgetUsesCanonicalBytesAndLeavesMCPBounded(t *testing.T
 	writeCtx = AuthenticatedBrowserSettingsView(writeCtx)
 	until, _ := writeCtx.Deadline()
 	w := &operationWriter{ResponseRecorder: httptest.NewRecorder()}
-	if sent, e := WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, "get_capture_settings", reply, until); e != nil || !sent || !bytes.Equal(w.Body.Bytes(), reply.Body) {
+	if sent, e := WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, "get_capture", reply, until); e != nil || !sent || !bytes.Equal(w.Body.Bytes(), reply.Body) {
 		t.Fatal("final HTTP write changed or refused canonical settings", e)
 	}
 	if len(reply.Body) < 120<<10 || len(reply.Body) > 160<<10 || !bytes.Contains(reply.Body, []byte("<é>&")) || bytes.Contains(reply.Body, []byte(`\u003c`)) {
 		t.Fatalf("canonical body size/encoding: %d", len(reply.Body))
 	}
-	if s.contracts.ValidateBrowserOutput("get_capture_settings", reply.Body) != nil || s.contracts.ValidateOutput("get_capture_settings", reply.Body) == nil {
+	if s.contracts.ValidateBrowserOutput("get_capture", reply.Body) != nil || s.contracts.ValidateOutput("get_capture", reply.Body) == nil {
 		t.Fatal("browser/MCP budgets not separated")
 	}
-	if reply.preparedOutputLimit("get_capture") != 24<<10 || reply.preparedOutputLimit("get_capture_settings") != 160<<10 {
+	if reply.preparedOutputLimit("get_capture") != 160<<10 || reply.preparedOutputLimit("get_case") != 24<<10 || (OperationReply{}).preparedOutputLimit("get_capture") != 96<<10 {
 		t.Fatal("budget escaped operation binding")
 	}
-	_, _, _, directErr := s.historyCall(t.Context(), f, f.i, "get_capture_settings", ContextOperationInput{CaptureID: historyCapture})
+	_, _, directErr := s.settings(t.Context(), f, historyCapture)
 	if directErr != value.ErrSettingsTooLarge {
 		t.Fatalf("unexpected direct settings result: %v", directErr)
 	}
-	ordinary, err := s.Call(t.Context(), f, "get_capture_settings", input)
+	ordinary, err := s.Call(t.Context(), f, "get_capture", input)
 	if err != nil || !bytes.Contains(ordinary.Body, []byte(`"SettingsTooLarge"`)) || len(ordinary.Body) > 24<<10 {
 		t.Fatalf("MCP should return bounded narrowing error: %v %s", err, ordinary.Body)
 	}
@@ -95,7 +95,7 @@ func TestLargeBrowserSettingsKeepExistingAudit(t *testing.T) {
 		h := &historyFixture{ops: f, accepted: f.i.VerifiedAt.Add(-time.Hour), untilList: f.metadataUntil, recipe: largeHistoryRecipe()}
 		inner.history = h
 		s.inner, _ = NewInvestigationOperations(inner, nil)
-		reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture_settings", []byte(`{"capture_id":"`+historyCapture+`"}`))
+		reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture", []byte(`{"capture_id":"`+historyCapture+`","view":"settings"}`))
 		if len(gate.events) != 1 || !gate.events[0].Valid() {
 			t.Fatal("existing audit path not used", err)
 		}
@@ -159,14 +159,14 @@ func historyOperations(t *testing.T) (*ContextOperations, *contextOperationFixtu
 
 func TestContextHistoryToolsOnlyWithHistoryService(t *testing.T) {
 	base, _ := operationFixture(t, true)
-	if slices.Contains(base.ToolNames(), "list_capture_history") || slices.Contains(base.ToolNames(), "get_capture_settings") {
+	if slices.Contains(base.ToolNames(), "list_capture_history") {
 		t.Fatal("history tools advertised without a history service")
 	}
 	if _, err := base.Call(t.Context(), &contextOperationFixture{}, "preview_capture", []byte(`{"history_capture_id":"`+historyCapture+`"}`)); err == nil {
 		t.Fatal("repeat branch served without a history service")
 	}
 	s, _, _ := historyOperations(t)
-	if !slices.Contains(s.ToolNames(), "list_capture_history") || !slices.Contains(s.ToolNames(), "get_capture_settings") {
+	if !slices.Contains(s.ToolNames(), "list_capture_history") {
 		t.Fatal("history tools missing")
 	}
 }
@@ -212,13 +212,13 @@ func TestContextHistoryWireIsCanonical(t *testing.T) {
 	if out["status"] != "ok" || h.after == nil || !h.after.AcceptedAt.Equal(h.accepted) || h.after.CaptureID != historyCapture {
 		t.Fatal("cursor did not continue", out, h.after)
 	}
-	for _, other := range []string{`{` + wireTarget + `,"cursor":"` + cursor + `"}`, `{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"web"},"origin":"all","cursor":"` + cursor + `"}`, `{` + wireTarget + `,"cursor":"forged"}`} {
+	for _, other := range []string{`{` + wireTarget + `,"cursor":"` + cursor + `"}`, `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"web"},"origin":"all","cursor":"` + cursor + `"}`, `{` + wireTarget + `,"cursor":"forged"}`} {
 		if out := call("list_capture_history", other); out["status"] != "error" || out["data"].(map[string]any)["code"] != "UnsupportedRequest" {
 			t.Fatal("cursor reused for another list", other, out)
 		}
 	}
 	// Settings: the canonical record, extract class and an exact digest.
-	out = call("get_capture_settings", `{"capture_id":"`+historyCapture+`"}`)
+	out = call("get_capture", `{"capture_id":"`+historyCapture+`","view":"settings"}`)
 	data := out["data"].(map[string]any)
 	if out["data_class"] != "extract" || data["kind"] != "captureSettings" {
 		t.Fatal("settings", out)
@@ -257,8 +257,8 @@ func TestContextHistoryWireIsCanonical(t *testing.T) {
 		t.Fatal("replaced target", out)
 	}
 	h.err = value.ErrDenied
-	for _, name := range []string{"list_capture_history", "get_capture_settings", "preview_capture"} {
-		in := `{"capture_id":"` + historyCapture + `"}`
+	for _, name := range []string{"list_capture_history", "get_capture", "preview_capture"} {
+		in := `{"capture_id":"` + historyCapture + `","view":"settings"}`
 		if name == "list_capture_history" {
 			in = `{` + wireTarget + `}`
 		} else if name == "preview_capture" {

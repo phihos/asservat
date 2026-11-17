@@ -35,7 +35,7 @@ func TestRecordingSaveBrowserRoutesPreserveCSRFAndCancellationIdempotency(t *tes
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	ordinary := &investigationCalls{}
-	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, browserGroupedProgress{})
+	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, browserGroupedProgress{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRecordingSaveBrowserRoutesPreserveCSRFAndCancellationIdempotency(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"preview_recording_save", "cancel_capture"} {
+	for _, name := range []string{"preview_capture", "cancel_capture"} {
 		if _, ok := composed.Tool(name); !ok {
 			t.Fatal("missing route", name)
 		}

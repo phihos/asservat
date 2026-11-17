@@ -200,7 +200,7 @@ type ContextOperationInput struct {
 	// the plan digest its preview returned.
 	Preview            *ContextOperationInput `json:"preview,omitempty"`
 	ExpectedPlanDigest string                 `json:"expected_plan_digest,omitempty"`
-	// A recording-save preview (preview_recording_save input).
+	// A save of existing recordings (REQ-SAV-004).
 	RecordingHandles []string `json:"recording_handles,omitempty"`
 	Before           string   `json:"before,omitempty"`
 	Reason           *string  `json:"reason,omitempty"`
@@ -213,7 +213,7 @@ type ContextOperationInput struct {
 	// ADR-243: one builtin packet or syscall capture profile with typed edits.
 	Composition *CompositionInput `json:"profile_composition,omitempty"`
 	Origin      string            `json:"origin,omitempty"`
-	// REQ-CPR-001: list_capture_profiles / get_capture_profile.
+	// REQ-CPR-001: list_diagnostics catalog filter and get_capture_profile.
 	Catalog    string          `json:"catalog,omitempty"`
 	ProfileRef *ProfileRefData `json:"profile_ref,omitempty"`
 	Cursor     string          `json:"cursor,omitempty"`
@@ -530,9 +530,10 @@ func captureAuditDecision(err error) operationAuditDecision {
 	}
 }
 
-// Call is shared by browser and MCP after their respective authentication. Its
-// inputs are strictly the implemented canonical subset (sharing: ADR-235). No
-// unsupported reason, history, raw-access or composition field is silently ignored.
+// Call is shared by browser and MCP after their respective authentication.
+// Inputs follow the canonical contract; an input this runtime cannot serve
+// returns CapabilityUnavailable and is never silently ignored. after_revision
+// waits belong to the shared wrapper.
 func (s *ContextOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil {
 		return OperationReply{}, ErrOperationsConfiguration
@@ -787,6 +788,10 @@ func unsupportedPreview(in ContextOperationInput) error {
 		return capabilityError("preset " + in.Preset.Name)
 	case in.Reason != nil && len(in.RecordingHandles) == 0:
 		return capabilityError("reason outside a recording save")
+	case in.ResultAccess != nil && in.ResultAccess.NotAfter.IsZero():
+		return capabilityError("result_access without notAfter")
+	case in.ResultAccess != nil && (slices.Contains(in.ResultAccess.Operations, "read_memory") || slices.Contains(in.ResultAccess.Operations, "debugger_command")):
+		return capabilityError("result_access memory and debugger operations")
 	}
 	return in.Sharing.unsupported()
 }
@@ -824,7 +829,11 @@ func (s *ContextOperations) previewCapture(ctx context.Context, current identiti
 		}
 	}
 	if in.Composition != nil && in.RepeatedFromCaptureID == "" {
-		// ADR-243: a reviewed packet/syscall plan.
+		// ADR-243: a reviewed packet/syscall plan; recorder plans take no
+		// capture-time sharing yet.
+		if in.Sharing != nil {
+			return nil, time.Time{}, zero, capabilityError("sharing with profile_composition")
+		}
 		use, ok := s.captures.(RecorderPreviewUseCase)
 		if !ok {
 			return nil, time.Time{}, zero, capabilityError("profile_composition")
@@ -911,6 +920,9 @@ func (s *ContextOperations) request(ctx context.Context, current identities.Curr
 		return value.Accepted{}, value.ErrInvalid
 	}
 	preview := *in.Preview
+	if err := unsupportedPreview(preview); err != nil {
+		return value.Accepted{}, err
+	}
 	submission, err := json.Marshal(ContextOperationInput{Preview: in.Preview, ExpectedPlanDigest: in.ExpectedPlanDigest, IdempotencyKey: in.IdempotencyKey})
 	if err != nil {
 		return value.Accepted{}, value.ErrInvalid

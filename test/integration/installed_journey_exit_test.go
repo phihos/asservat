@@ -190,7 +190,7 @@ func installedJourneyResumeSpent(t *testing.T, ctx context.Context, admin *pgxpo
 // schema-valid error identical to the same call about an absent counterpart,
 // so the reply discloses neither existence nor detail (specs/mcp.md: uniform
 // not-found/not-authorized projection before access is established).
-func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, outsider *installedIdentity, transport http.RoundTripper, origin string, target map[string]string, previewID, caseID, artifactID string) {
+func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, outsider *installedIdentity, transport http.RoundTripper, origin string, target map[string]string, clusterID, previewID, caseID, artifactID string) {
 	t.Helper()
 	client := sdk.NewClient(&sdk.Implementation{Name: "installed-unrelated", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
 	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, outsider.mcpTokenSource(origin).Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
@@ -216,7 +216,7 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 		}
 		return data, nil
 	}
-	absent := map[string]string{"cluster_id": target["cluster_id"], "namespace": target["namespace"], "kind": target["kind"], "name": "absent-" + uuid.NewString()[:8]}
+	absent := map[string]string{"cluster": target["cluster"], "namespace": target["namespace"], "kind": target["kind"], "name": "absent-" + uuid.NewString()[:8]}
 	preset := map[string]string{"name": "pod-status", "version": "v1"}
 	key := "installed-unrelated-" + uuid.NewString()
 	for _, c := range []struct {

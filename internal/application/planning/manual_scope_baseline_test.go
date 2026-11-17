@@ -20,7 +20,7 @@ func TestRecorderManualScopeCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := map[string]string{"network": "82e99d313bf0bb5d44b3bfd41418d51cbc075b0ee24b6fbc062d1c200a2ca60b", "syscalls": "5b9a6bbcf15963efdbe370f607605681e7e267927c9c6504ae948a294085e1c0"}[name]
+		want := map[string]string{"network": "6814f11145ba9f9cfc4ee71b93d3398dc67a865f1bcc76dd8a4d82d8da3d967d", "syscalls": "5b9a6bbcf15963efdbe370f607605681e7e267927c9c6504ae948a294085e1c0"}[name]
 		if got := fmt.Sprintf("%x", p.ScopeDigest); got != want {
 			t.Fatalf("existing %s scope changed: got %s want %s", name, got, want)
 		}

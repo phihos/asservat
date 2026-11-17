@@ -105,22 +105,22 @@ func TestRecordingSaveOperationsUseExistingAuditAndPassiveNamedTarget(t *testing
 }
 func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
 	audited, _, actor, f, gate := recordingOperationTestFixture(t)
-	reply, err := audited.Call(t.Context(), actor, "preview_recording_save", []byte(`{"recording_handles":["opaque-recording-handle"],"before":"30s"}`))
+	reply, err := audited.Call(t.Context(), actor, "preview_capture", []byte(`{"recording_handles":["opaque-recording-handle"],"before":"30s"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var out struct {
 		Status string
-		Data   RecordingSavePreviewData
+		Data   ContextPreviewData
 	}
-	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Operation != "recordingSave" || out.Data.CaptureEnabled || out.Data.IncidentPodCap != 3 || len(out.Data.Selected) != 1 || out.Data.Windows[0].Before != "30s" || out.Data.Windows[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0] != "CollectionDisabled" || f.request.Before != 30*time.Second {
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.CaptureEnabled || out.Data.PodCount != 1 || out.Data.MaxProcessStarts != 0 || len(out.Data.Lifecycle.Actions) != 1 || out.Data.Lifecycle.Actions[0].RequestedBefore != "30s" || out.Data.Lifecycle.Actions[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0].Code != "CollectionDisabled" || f.request.Before != 30*time.Second {
 		t.Fatal("preview became ordinary capture or invented coverage", string(reply.Body))
 	}
 	if len(out.Data.PlanDigest) != 64 || len(gate.events) != 1 || actor.requests != 0 {
 		t.Fatal("preview lost its plan digest or started acquisition", out.Data)
 	}
 	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
-		if _, err = audited.Call(t.Context(), actor, "preview_recording_save", []byte(bad)); err == nil || f.previewCalls != 1 {
+		if _, err = audited.Call(t.Context(), actor, "preview_capture", []byte(bad)); err == nil || f.previewCalls != 1 {
 			t.Fatal("unsupported input reached source use case", bad, err, f.previewCalls)
 		}
 	}
@@ -143,14 +143,15 @@ func TestRecordingSaveMetadataRechecksIdentityAndDoesNotLeakProviderErrors(t *te
 	}
 }
 func TestRecordingSaveToolsRequireExplicitComposition(t *testing.T) {
-	base, _ := operationFixture(t, false)
-	for _, name := range []string{"list_recordings", "preview_recording_save"} {
-		if _, ok := base.Tool(name); ok {
-			t.Fatal("schema registration enabled source service")
-		}
+	base, current := operationFixture(t, false)
+	if _, ok := base.Tool("list_recordings"); ok {
+		t.Fatal("schema registration enabled source service")
+	}
+	if reply, err := base.Call(t.Context(), current, "preview_capture", []byte(`{"recording_handles":["opaque-recording-handle"]}`)); err != nil || !strings.Contains(string(reply.Body), "CapabilityUnavailable") {
+		t.Fatal("recording save preview served without the source service", err, string(reply.Body))
 	}
 	audited, _, _, _, _ := recordingOperationTestFixture(t)
-	for _, name := range []string{"list_recordings", "preview_recording_save"} {
+	for _, name := range []string{"list_recordings", "preview_capture"} {
 		if _, ok := audited.Tool(name); !ok {
 			t.Fatal("explicitly composed passive route missing", name)
 		}
@@ -261,7 +262,7 @@ func TestRecordingCancellationRespectsOrdinaryCompositionGate(t *testing.T) {
 	if _, err = composed.Call(t.Context(), actor, "cancel_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030","expected_revision":1,"idempotency_key":"same"}`)); err == nil {
 		t.Fatal("disabled cancellation reached service")
 	}
-	for _, name := range []string{"preview_recording_save"} {
+	for _, name := range []string{"preview_capture"} {
 		if _, ok := composed.Tool(name); !ok {
 			t.Fatal("passive tool disappeared", name)
 		}

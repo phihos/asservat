@@ -67,7 +67,7 @@ func (a ProfileCatalogAnswer) Answers(r ProfileCatalogRequest) bool {
 	return true
 }
 
-// MaxListedProfiles bounds one catalog listing (list_capture_profiles limit).
+// MaxListedProfiles bounds one regional catalog LIST behind list_diagnostics.
 const MaxListedProfiles = 100
 
 // ErrProfileLimit is a catalog with more than MaxListedProfiles versions. It is

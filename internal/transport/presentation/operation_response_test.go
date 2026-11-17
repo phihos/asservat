@@ -12,7 +12,7 @@ import (
 )
 
 func TestBrowserSettingsWriterRequiresBothPrivateBindings(t *testing.T) {
-	for _, mode := range []string{"authorized", "no browser", "no prepared reply", "other operation", "over limit", "cancelled"} {
+	for _, mode := range []string{"authorized", "no browser", "no prepared reply", "over limit", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
@@ -20,10 +20,7 @@ func TestBrowserSettingsWriterRequiresBothPrivateBindings(t *testing.T) {
 			if mode != "no browser" {
 				ctx = AuthenticatedBrowserSettingsView(ctx)
 			}
-			name := "get_capture_settings"
-			if mode == "other operation" {
-				name = "get_capture"
-			}
+			name := "get_capture"
 			size := 128 << 10
 			if mode == "over limit" {
 				size = 160<<10 + 1

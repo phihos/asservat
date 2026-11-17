@@ -10,22 +10,16 @@ import (
 	"time"
 )
 
-func TestRecordingSavePreviewDeliveryBudgetRequiresPrivateProducer(t *testing.T) {
-	for _, kind := range []string{"browser", "MCP", "ordinary", "wrong name", "one over browser", "one over MCP", "cancelled"} {
+func TestResultBoundDeliveryBudgetRequiresPrivateProducer(t *testing.T) {
+	for _, kind := range []string{"browser", "MCP", "ordinary", "one over browser", "one over MCP", "cancelled"} {
 		t.Run(kind, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
 			until, _ := ctx.Deadline()
-			reply := OperationReply{Body: bytes.Repeat([]byte{'x'}, contracts.InvestigationRecordingSavePreviewOutputLimit), ValidUntil: until, recordingSavePreview: kind != "ordinary"}
-			name := "preview_recording_save"
-			if kind == "one over browser" {
-				reply.Body = append(reply.Body, 'x')
-			}
-			if kind == "one over MCP" {
-				reply.Body = bytes.Repeat([]byte{'x'}, OperationRecordingSavePreviewFrameLimit+1)
-			}
-			if kind == "wrong name" {
-				name = "get_capture"
+			reply := OperationReply{Body: bytes.Repeat([]byte{'x'}, 2*contracts.InvestigationResultBound), ValidUntil: until, resultBound: kind != "ordinary"}
+			name := "preview_capture"
+			if kind == "one over browser" || kind == "one over MCP" {
+				reply.Body = bytes.Repeat([]byte{'x'}, OperationResultBoundFrameLimit+1)
 			}
 			if kind == "cancelled" {
 				cancel()
@@ -48,24 +42,24 @@ func TestRecordingSavePreviewDeliveryBudgetRequiresPrivateProducer(t *testing.T)
 		})
 	}
 }
-func TestRecordingSavePreviewRawBudgetRejectsOneOverWithoutChangingOtherContracts(t *testing.T) {
+func TestResultBoundRejectsOneOverWithoutChangingOtherContracts(t *testing.T) {
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, ops, current, _, _ := recordingOperationTestFixture(t)
-	reply, err := ops.Call(t.Context(), current, "preview_recording_save", []byte(`{"recording_handles":["opaque-recording-handle"]}`))
+	ops, _, current, _, _ := recordingOperationTestFixture(t)
+	reply, err := ops.Call(t.Context(), current, "preview_capture", []byte(`{"recording_handles":["opaque-recording-handle"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	exact := append(append([]byte(nil), reply.Body...), bytes.Repeat([]byte{' '}, contracts.InvestigationRecordingSavePreviewOutputLimit-len(reply.Body))...)
-	if wire.ValidateOutput("preview_recording_save", exact) != nil {
-		t.Fatal("valid JSON at exact preview bound refused")
+	exact := append(append([]byte(nil), reply.Body...), bytes.Repeat([]byte{' '}, contracts.InvestigationResultBound-len(reply.Body))...)
+	if wire.ValidateOutput("preview_capture", exact) != nil {
+		t.Fatalf("valid JSON at exact preview bound refused: %s", reply.Body)
 	}
-	if wire.ValidateOutput("preview_recording_save", append(exact, ' ')) == nil {
+	if wire.ValidateOutput("preview_capture", append(exact, ' ')) == nil {
 		t.Fatal("valid JSON one over preview bound admitted")
 	}
-	for _, name := range []string{"list_recordings", "get_capture", "cancel_capture"} {
+	for _, name := range []string{"list_recordings", "list_capture_history", "cancel_capture"} {
 		if wire.ValidateOutput(name, bytes.Repeat([]byte{' '}, contracts.InvestigationOutputLimit+1)) == nil {
 			t.Fatal("ordinary output limit widened", name)
 		}

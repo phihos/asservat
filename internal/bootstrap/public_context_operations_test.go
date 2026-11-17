@@ -58,7 +58,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 	const root = "10000000-0000-4000-8000-000000000001"
 	const installation = "10000000-0000-4000-8000-000000000002"
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	c := PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: "https://asservat.example", CollectionEnabled: true, Now: func() time.Time { return now }, NewID: func() string { return "10000000-0000-4000-8000-000000000003" }}
+	c := PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: "https://asservat.example", CollectionEnabled: true, Now: func() time.Time { return now }, NewID: func() string { return "10000000-0000-4000-8000-000000000003" }, Clusters: presentation.NewClusterNames(map[string]string{"local": "10000000-0000-4000-8000-000000000003"})}
 	p := &publicContextOperationPorts{}
 	mac, e := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{1}, 32), "account-v1", bytes.Repeat([]byte{2}, 32))
 	if e != nil {
@@ -96,7 +96,7 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_capture_profiles", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture"}
+	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture"}
 	if operations.PublicOrigin() != c.PublicOrigin || !slices.Equal(operations.ToolNames(), want) {
 		t.Fatal("incomplete shared operation set", operations.ToolNames())
 	}
@@ -213,11 +213,10 @@ func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testin
 	}
 	const id = "10000000-0000-4000-8000-000000000003"
 	inputs := map[string]string{
-		"list_diagnostics":          `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
-		"list_capture_profiles":     `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
-		"get_capture_profile":       `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
-		"preview_capture":           `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
-		"request_capture":           `{"preview":{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"` + strings.Repeat("a", 64) + `","idempotency_key":"same-original-key"}`,
+		"list_diagnostics":          `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}}`,
+		"get_capture_profile":       `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
+		"preview_capture":           `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
+		"request_capture":           `{"preview":{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"` + strings.Repeat("a", 64) + `","idempotency_key":"same-original-key"}`,
 		"get_capture":               `{"capture_id":"` + id + `"}`,
 		"get_case":                  `{"case_id":"` + id + `"}`,
 		"prepare_artifact_download": `{"artifact_id":"` + id + `","idempotency_key":"download-key"}`,

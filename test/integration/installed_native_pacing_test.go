@@ -38,11 +38,11 @@ func nativePacingArguments(cluster, namespace, workload string) map[string]any {
 
 func TestNativePacingReviewedCaptureInput(t *testing.T) {
 	const cluster = "00000000-0000-4000-8000-000000000001"
-	ordinary, err := json.Marshal(approvedRecordingArguments(cluster, "payments", "api"))
+	ordinary, err := json.Marshal(approvedRecordingArguments("local", "payments", "api"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := nativePacingArguments(cluster, "payments", "api")
+	input := nativePacingArguments("local", "payments", "api")
 	raw, err := json.Marshal(input)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestNativePacingReviewedCaptureInput(t *testing.T) {
 	if err != nil || recording.DurationMillis != 10000 || recording.MaxBytes != artifact.RecordingNativeLimit || !recording.RequireApproval {
 		t.Fatal("pacing plan lost its reviewed duration, native cap or approval", recording, err)
 	}
-	after, _ := json.Marshal(approvedRecordingArguments(cluster, "payments", "api"))
+	after, _ := json.Marshal(approvedRecordingArguments("local", "payments", "api"))
 	if string(after) != string(ordinary) {
 		t.Fatal("pacing request changed the original approved-recording fixture")
 	}
