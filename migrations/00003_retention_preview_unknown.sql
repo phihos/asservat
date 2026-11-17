@@ -1,8 +1,8 @@
 -- +goose Up
 -- The retention preview (ADR-240) reports Unknown instead of assuming a
 -- label match. retention_policy_effect lets a row without recorded labels
--- (admitted before 00198) take a label-scoped policy, so reconciliation
--- errs towards earlier deletion. The preview does not count that as
+-- take a label-scoped policy, so reconciliation errs towards earlier
+-- deletion. The preview does not count that as
 -- affected: a row whose earliest deadlines come only from label-scoped
 -- effects it has no labels for is Unknown. Affected, read_closed,
 -- deletion_due and the earliest dates use only the effects that need no
@@ -41,7 +41,8 @@ $$;
 -- +goose StatementEnd
 
 -- +goose Down
--- Restore the 00190 function. Rerunning either section changes nothing.
+-- Restore the function as 00001_baseline.sql defines it. Rerunning either
+-- section changes nothing.
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.retention_preview(effects jsonb) RETURNS jsonb
 LANGUAGE sql STABLE SET search_path=pg_catalog,pg_temp AS $$
