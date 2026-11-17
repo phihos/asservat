@@ -157,26 +157,21 @@ func processingReportRecords(ctx context.Context, q *custodydb.Queries, a value.
 		}
 	case "operations":
 		rows, err := q.ReportProcessingOperations(ctx, custodydb.ReportProcessingOperationsParams{
-			RootID: id(a.Policy.RootID), CreatedBefore: ts(query.CreatedBefore), ObservedAt: ts(now), AfterID: id(after.ID), AfterOrdinal: after.Ordinal, PageLimit: limit,
+			CreatedBefore: ts(query.CreatedBefore), AfterID: id(after.ID), AfterOrdinal: after.Ordinal, PageLimit: limit,
 		})
 		if err != nil {
 			return nil, err
 		}
+		// An audit row has no stored cutoff: retention drops whole partitions.
+		// A row committed with its effect is acknowledged.
 		for _, row := range rows {
-			var principal identity.Principal
-			if json.Unmarshal(row.Actor, &principal) != nil {
-				return nil, value.ErrUnavailable
-			}
+			count := row.OutputBytes
 			v := value.ProcessingReportOperation{
-				OperationID: uid(row.ID), ArtifactID: row.ArtifactID, Ordinal: row.Ordinal, Name: row.OperationName, Lane: row.Lane,
-				Issuer: principal.Issuer, Subject: principal.Subject, ClientID: principal.ClientID, PrincipalKind: principal.Kind, CreatedAt: row.CreatedAt.Time.UTC(),
-				IntentAcknowledged: row.IntentAcknowledged, OutcomeAcknowledged: row.OutcomeAcknowledged, Status: row.Status, ClientReceipt: "unknown",
+				OperationID: uid(row.ID), ArtifactID: row.ArtifactID, Ordinal: row.Ordinal, Name: row.OperationName, Lane: "normal",
+				Issuer: row.Issuer, Subject: row.Subject, ClientID: row.ClientID, PrincipalKind: identity.Kind(row.IdentityType), CreatedAt: row.CreatedAt.Time.UTC(),
+				IntentAcknowledged: true, OutcomeAcknowledged: true, Status: row.Status, OutputBytes: &count, ClientReceipt: "unknown",
 			}
-			if row.OutputBytes >= 0 {
-				count := row.OutputBytes
-				v.OutputBytes = &count
-			}
-			records = append(records, value.ProcessingReportRecord{VisibleUntil: row.VisibleUntil.Time.UTC(), Operation: &v})
+			records = append(records, value.ProcessingReportRecord{VisibleUntil: a.ValidUntil.UTC(), Operation: &v})
 		}
 	case "rules":
 		rows, err := q.ReportProcessingRules(ctx, custodydb.ReportProcessingRulesParams{

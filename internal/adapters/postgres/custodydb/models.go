@@ -1596,20 +1596,15 @@ type ProcessingDecision struct {
 	RootID           pgtype.UUID
 	RuleID           pgtype.UUID
 	ExpectedRevision int64
-	ReleaseAccount   []byte
 	ActorDigest      []byte
 	RequestDigest    []byte
 	Scope            []byte
 	Action           string
-	IntentSeed       []byte
-	DecisionDigest   []byte
 	CreatedAt        pgtype.Timestamptz
 	RequestUntil     pgtype.Timestamptz
 	ValidUntil       pgtype.Timestamptz
 	RetireBy         pgtype.Timestamptz
-	OutcomeJson      []byte
 	AppliedAt        pgtype.Timestamptz
-	AuditDigest      []byte
 	ResultRevision   pgtype.Int8
 	ResultSequence   pgtype.Int8
 	ErasureDecision  []byte
@@ -1623,7 +1618,6 @@ type ProcessingRoot struct {
 	SourceUid          pgtype.UUID
 	ProtectionDigest   []byte
 	Backing            []byte
-	ReleasePolicy      []byte
 	BackingRevision    int64
 	ValidUntil         pgtype.Timestamptz
 	RetireBy           pgtype.Timestamptz
@@ -1641,7 +1635,6 @@ type ProcessingRoot struct {
 type ProcessingRule struct {
 	RootID          pgtype.UUID
 	ID              pgtype.UUID
-	ReleaseAccount  []byte
 	Scope           []byte
 	Revision        int64
 	Decisions       int64

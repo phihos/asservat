@@ -1,27 +1,24 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // The protected installation policy, privacy operator, and measured backing are
-// explicit synthetic qualification inputs. The initialization, encrypted pair,
-// independent acknowledgement, SQL completeness/CAS and subsequent restriction
-// reads use actual product components and separate real database credentials.
+// explicit synthetic qualification inputs. Decisions, their audit rows, SQL
+// CAS and subsequent restriction reads use actual product components and
+// separate real database credentials.
 type processingTestPolicy struct{ value privacyvalue.DownloadPolicy }
 
 func (p processingTestPolicy) DownloadPolicy(ctx context.Context) (privacyvalue.DownloadPolicy, error) {
@@ -54,7 +51,6 @@ type processingTestFixture struct {
 	policy  processingTestPolicy
 	backing privacyvalue.ProcessingBacking
 	pools   []*pgxpool.Pool
-	mac     *auditapp.OperationMAC
 	renew   func() error
 }
 
@@ -62,9 +58,8 @@ func (f *processingTestFixture) Close() {
 	for _, p := range f.pools {
 		p.Close()
 	}
-	f.mac.Close()
 }
-func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation, sharingCohort ...bool) *processingTestFixture {
+func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation) *processingTestFixture {
 	t.Helper()
 	f := &processingTestFixture{}
 	open := func(role, password string) *pgxpool.Pool {
@@ -80,11 +75,6 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	}()
 	configPool := open("processing_config_runtime", "synthetic-processing-config")
 	decisionPool := open("processing_decision_runtime", "synthetic-processing-decision")
-	auditConfigPool := open("operation_audit_config_runtime", "synthetic-operation-config")
-	normalPool := open("operation_audit_runtime", "synthetic-operation-journal")
-	normalAck := open("operation_audit_ack_runtime", "synthetic-operation-ack")
-	releasePool := open("operation_audit_runtime", "synthetic-operation-journal")
-	releaseAck := open("operation_audit_ack_runtime", "synthetic-operation-ack")
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	until := n.Add(time.Hour)
 	if until.Before(e.Registration.DeleteBy.Add(time.Minute)) {
@@ -100,104 +90,13 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if !ok {
 		t.Fatal("fixture processing backing")
 	}
-	auditConfig, err := postgres.New(ctx, auditConfigPool)
-	if err != nil {
-		t.Fatal(err)
-	}
-	shares := len(sharingCohort) > 0 && sharingCohort[0]
-	normalRetained := int64(3600)
-	if shares {
-		normalRetained = 7200
-	}
-	policy := func(lane string, accounts, records int64) audit.OperationLifecyclePolicy {
-		p := audit.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: lane, InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: accounts * records, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: until}
-		layout := audit.OperationVerificationHistoryLayout
-		if lane == "processing" {
-			layout = audit.ProcessingReleaseHistoryLayout
-		} else if shares {
-			layout = audit.ShareOperationHistoryLayout
-		}
-		p.History = &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: layout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
-		if lane == "normal" && shares {
-			// Explicit synthetic per-scenario input. The bounded policy100
-			// measurement and production maximum-width qualification are pending.
-			p.History.MaximumTransitionWALBytes = 2 << 20
-		}
-		bb, ww := p.History.SlotBacking(p.MaxPurgeLeases)
-		p.BackupReservedBytes = bb * p.MetadataSlots
-		p.WALReservedBytes = ww * p.MetadataSlots
-		now := time.Now().UTC().Truncate(time.Microsecond)
-		b := auditapp.OperationAuditPool{RootID: s.a.RootID, Lane: lane, AccountVersion: "accounts-v1", Accounts: accounts, RecordsPerAccount: records, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: until}
-		if lane == "normal" {
-			b.RetainedSeconds = normalRetained
-		}
-		if lane == "processing" {
-			err = auditConfig.ProvisionProcessingReleaseAuditPool(ctx, b, p)
-		} else {
-			err = auditConfig.ProvisionOperationAuditPool(ctx, b)
-		}
-		if err != nil {
-			t.Fatal("processing audit pool", err)
-		}
-		return p
-	}
-	normalAccounts, normalRecords := int64(2), int64(2)
-	if shares {
-		// Original bounded sharing scenario, including negative ingress and
-		// replays; global/default fixture quotas remain unchanged.
-		normalAccounts, normalRecords = 16, 256
-	}
-	normalPolicy := policy("normal", normalAccounts, normalRecords)
-	releasePolicy := policy("processing", f.backing.MaxRules, 16)
-	makeAudit := func(p audit.OperationLifecyclePolicy, jp, ap *pgxpool.Pool) *auditapp.HealthyOperationAuditor {
-		var j *postgres.OperationJournal
-		var a *postgres.OperationAcknowledgements
-		var l *postgres.OperationLifecycles
-		if p.Lane == "processing" {
-			j, err = postgres.NewProcessingReleaseJournal(ctx, jp, p)
-			if err == nil {
-				a, err = postgres.NewProcessingReleaseAcknowledgements(ctx, ap, p)
-			}
-			if err == nil {
-				l, err = postgres.NewProcessingReleaseLifecycles(ctx, jp, p)
-			}
-		} else {
-			j, err = postgres.NewHealthyOperationJournal(ctx, jp, p)
-			if err == nil {
-				a, err = postgres.NewOperationAcknowledgements(ctx, ap, p.RootID, "normal", s.recovery.installation)
-			}
-			if err == nil {
-				l, err = postgres.NewOperationLifecycles(ctx, jp, p.RootID, "normal", s.recovery.installation)
-			}
-		}
-		if err != nil {
-			var count int
-			var names string
-			_ = normalPool.QueryRow(ctx, `SELECT count(*),coalesce(string_agg(DISTINCT usename||'@'||application_name,','),'') FROM pg_stat_activity WHERE datname=current_database()`).Scan(&count, &names)
-			t.Logf("processing audit construction: PostgreSQL connections=%d applications=%s", count, names)
-			t.Fatal(err)
-		}
-		objects, err := objectstore.NewClosedOperationAuditObjects(store, p.StoreID, keys, keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-		g, err := auditapp.NewHealthyOperationAuditor(p, j, a, &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, objects, l, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return g
-	}
-	f.mac, err = auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
 	decisions, err := postgres.NewProcessingDecisions(ctx, decisionPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Decisions: decisions, Audit: makeAudit(normalPolicy, normalPool, normalAck), ReleaseAudit: makeAudit(releasePolicy, releasePool, releaseAck), MAC: f.mac, AuditPolicy: normalPolicy, ReleaseAuditPolicy: releasePolicy, RetainedSeconds: normalRetained, Now: time.Now}
+	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Decisions: decisions, Now: time.Now}
 	epoch := custodyID()
-	config, err := postgres.NewProcessingConfiguration(ctx, configPool, f.backing, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
+	config, err := postgres.NewProcessingConfiguration(ctx, configPool, f.backing, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,6 +107,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if err = config.AcceptCurrent(ctx, p, 0); err != nil {
 		t.Fatal("accept processing backing", err)
 	}
+	revision := int64(1)
 	f.renew = func() error {
 		next := f.backing
 		next.ValidUntil = next.ValidUntil.Add(time.Minute)
@@ -218,14 +118,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		if !ok {
 			return privacyvalue.ErrUnavailable
 		}
-		releasePolicy.BackingRevision++
-		releasePolicy.ValidUntil = next.ValidUntil
-		n := time.Now().UTC().Truncate(time.Microsecond)
-		pool := auditapp.OperationAuditPool{RootID: s.a.RootID, Lane: "processing", AccountVersion: "accounts-v1", Accounts: next.MaxRules, RecordsPerAccount: 16, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: next.ValidUntil, ExpectedRevision: releasePolicy.BackingRevision - 1}
-		if err := auditConfig.ProvisionProcessingReleaseAuditPool(ctx, pool, releasePolicy); err != nil {
-			return err
-		}
-		updated, err := postgres.NewProcessingConfiguration(ctx, configPool, next, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
+		updated, err := postgres.NewProcessingConfiguration(ctx, configPool, next, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest)
 		if err != nil {
 			return err
 		}
@@ -233,12 +126,11 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		if err != nil {
 			return err
 		}
-		if err = updated.AcceptCurrent(ctx, p, releasePolicy.BackingRevision-1); err != nil {
+		if err = updated.AcceptCurrent(ctx, p, revision); err != nil {
 			return err
 		}
+		revision++
 		f.backing = next
-		f.service.ReleaseAuditPolicy = releasePolicy
-		f.service.ReleaseAudit = makeAudit(releasePolicy, releasePool, releaseAck)
 		return nil
 	}
 	failed = false

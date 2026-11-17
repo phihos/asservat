@@ -38,8 +38,8 @@ func TestConsoleProcessingWithBuiltPackage(t *testing.T) {
 	if len(facts.changes) != 2 || facts.rule.State != "released" || facts.rule.Revision != 2 || facts.changes[0].RequestedArtifactID != consoleCaptureID(81) || facts.changes[0].Scope != (value.ProcessingScope{}) || facts.changes[1].Scope != facts.rule.Scope || facts.changes[1].ExpectedRevision != 1 || facts.changes[0].RequestID == facts.changes[1].RequestID {
 		t.Fatal("processing browser changed scope, revision or request identity")
 	}
-	out := facts.searchOutcome
-	if facts.searchReads != 1 || out.Intent.ID != facts.searchIntent.ID || audit.OperationLane(out.Intent.Name) != "normal" || out.Status != "success" || out.Effect != "none" ||
+	out := facts.searchEvent
+	if facts.searchReads != 1 || len(facts.searchEvents) != 1 || out.Status != "success" || out.Effect != "none" ||
 		!slices.Equal(out.CaseIDs, []string{consoleCaptureID(80)}) || !slices.Equal(out.ArtifactIDs, []string{consoleCaptureID(81)}) || !slices.Equal(out.CaptureIDs, []string{consoleCaptureID(8)}) {
 		t.Fatal("discovery did not audit the exact restricted case metadata")
 	}
@@ -58,7 +58,7 @@ func TestConsoleWorkloadProcessingWithBuiltPackage(t *testing.T) {
 		facts.changes[0].RequestID == facts.changes[1].RequestID || facts.rule.State != "released" || facts.rule.Revision != 2 {
 		t.Fatal("workload browser changed the original scope, revision or request identity")
 	}
-	if len(facts.searchQueries) != 3 || facts.searchReads != 3 || len(facts.searchOutcomes) != 3 {
+	if len(facts.searchQueries) != 3 || facts.searchReads != 3 || len(facts.searchEvents) != 3 {
 		t.Fatal("workload restriction requires source case, workload and restricted-case discovery")
 	}
 	first, workload, last := facts.searchQueries[0], facts.searchQueries[1], facts.searchQueries[2]
@@ -69,13 +69,13 @@ func TestConsoleWorkloadProcessingWithBuiltPackage(t *testing.T) {
 		t.Fatal("workload review did not derive the exact interval from accepted candidate metadata")
 	}
 	seen := map[string]bool{}
-	for _, out := range facts.searchOutcomes {
-		if seen[out.Intent.ID] || audit.OperationLane(out.Intent.Name) != "normal" || out.Status != "success" || out.Effect != "none" ||
+	for _, out := range facts.searchEvents {
+		if seen[out.OperationID] || out.Status != "success" || out.Effect != "none" ||
 			!slices.Equal(out.CaseIDs, []string{consoleCaptureID(80)}) || !slices.Equal(out.ArtifactIDs, []string{consoleCaptureID(81)}) ||
 			!slices.Equal(out.CaptureIDs, []string{consoleCaptureID(8)}) {
 			t.Fatal("workload discovery did not independently audit the selected metadata")
 		}
-		seen[out.Intent.ID] = true
+		seen[out.OperationID] = true
 	}
 	t.Log("compiled React reviewed the exact all-purpose workload interval, reloaded its original scope and released the exact revision using synthetic privacy state")
 }
@@ -93,14 +93,14 @@ func TestConsoleErasureWithBuiltPackage(t *testing.T) {
 		change.RuleID != "" || change.ExpectedRevision != 0 || change.Scope != (value.ProcessingScope{}) {
 		t.Fatal("early erasure changed the selected artifact or used a rule")
 	}
-	if facts.searchReads != 1 || facts.searchOutcome.Status != "success" || facts.statusReads != 2 ||
-		len(facts.statusIntents) != 2 || len(facts.statusOutcomes) != 2 || facts.statusIntents[0].ID == facts.statusIntents[1].ID {
+	if facts.searchReads != 1 || facts.searchEvent.Status != "success" || facts.statusReads != 2 ||
+		len(facts.statusEvents) != 2 || facts.statusEvents[0].OperationID == facts.statusEvents[1].OperationID {
 		t.Fatal("early erasure did not use one audited discovery and two explicit audited status reads")
 	}
-	for i, out := range facts.statusOutcomes {
-		if out.Intent.ID != facts.statusIntents[i].ID || audit.OperationLane(out.Intent.Name) != "normal" || out.Status != "success" || out.Effect != "none" ||
+	for _, out := range facts.statusEvents {
+		if out.Status != "success" || out.Effect != "none" ||
 			!slices.Equal(out.ArtifactIDs, []string{consoleCaptureID(81)}) {
-			t.Fatal("erasure status did not audit the exact artifact", i)
+			t.Fatal("erasure status did not audit the exact artifact")
 		}
 	}
 	t.Log("compiled React confirmed exact discovered erasure and read pending and verified managed deletion after reload using synthetic custody state")
@@ -239,61 +239,38 @@ type consoleProcessingFacts struct {
 	rule                value.ProcessingInventoryRule
 	changes             []value.ProcessingChange
 	expires             time.Time
-	searchIntent        audit.OperationIntent
-	searchOutcome       audit.OperationOutcome
+	searchEvent         audit.Event
 	searchReads         int
 	workloadRestriction bool
 	searchQueries       []value.ProcessingDiscoveryQuery
-	searchOutcomes      []audit.OperationOutcome
+	searchEvents        []audit.Event
 	erasure             bool
 	erasureAccepted     time.Time
-	statusIntents       []audit.OperationIntent
-	statusOutcomes      []audit.OperationOutcome
+	statusEvents        []audit.Event
 	statusReads         int
 }
 
 func (s *consoleProcessingFacts) Configured() bool { return s != nil }
 
-func (s *consoleProcessingFacts) Begin(ctx context.Context, intent audit.OperationIntent) error {
-	if ctx.Err() != nil || !intent.Valid() {
+// Record receives the one call row per operation, written after the read.
+func (s *consoleProcessingFacts) Record(ctx context.Context, e audit.Event) error {
+	if ctx.Err() != nil || !e.Valid() {
 		return auditapp.ErrUnavailable
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	switch intent.Name {
+	switch e.Operation {
 	case "search_processing_evidence":
-		if s.searchIntent.ID != "" && s.searchOutcome.Intent.ID != s.searchIntent.ID || !s.erasure && !s.workloadRestriction && s.rule.State != "restricted" {
+		if s.searchReads != len(s.searchEvents)+1 {
 			return auditapp.ErrUnavailable
 		}
-		s.searchIntent = intent
+		s.searchEvent = e
+		s.searchEvents = append(s.searchEvents, e)
 	case "get_processing_erasure":
-		if !s.erasure || s.erasureAccepted.IsZero() || len(s.statusIntents) != len(s.statusOutcomes) || len(s.statusIntents) >= 2 {
+		if s.statusReads != len(s.statusEvents)+1 {
 			return auditapp.ErrUnavailable
 		}
-		s.statusIntents = append(s.statusIntents, intent)
-	}
-	return nil
-}
-
-func (s *consoleProcessingFacts) Finish(ctx context.Context, outcome audit.OperationOutcome) error {
-	if ctx.Err() != nil || !outcome.Valid() {
-		return auditapp.ErrUnavailable
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	switch outcome.Intent.Name {
-	case "search_processing_evidence":
-		if outcome.Intent.ID != s.searchIntent.ID || s.searchReads != len(s.searchOutcomes)+1 {
-			return auditapp.ErrUnavailable
-		}
-		s.searchOutcome = outcome
-		s.searchOutcomes = append(s.searchOutcomes, outcome)
-	case "get_processing_erasure":
-		i := len(s.statusOutcomes)
-		if i+1 != s.statusReads || i+1 != len(s.statusIntents) || outcome.Intent.ID != s.statusIntents[i].ID {
-			return auditapp.ErrUnavailable
-		}
-		s.statusOutcomes = append(s.statusOutcomes, outcome)
+		s.statusEvents = append(s.statusEvents, e)
 	}
 	return nil
 }
@@ -310,7 +287,7 @@ func (s *consoleProcessingFacts) ReadProcessingDiscovery(ctx context.Context, au
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	if ctx.Err() != nil || !authority.Valid(now) || !s.erasure && !s.workloadRestriction && s.rule.State != "restricted" || s.searchIntent.ID == "" || s.searchOutcome.Intent.ID == s.searchIntent.ID {
+	if ctx.Err() != nil || !authority.Valid(now) || !s.erasure && !s.workloadRestriction && s.rule.State != "restricted" || s.searchReads != len(s.searchEvents) {
 		return value.ProcessingDiscoveryPage{}, value.ErrUnavailable
 	}
 	if query.CaseID != consoleCaptureID(80) {
@@ -342,7 +319,7 @@ func (s *consoleProcessingFacts) ReadProcessingErasureStatus(ctx context.Context
 	defer s.mu.Unlock()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	if ctx.Err() != nil || !authority.Valid(now) || !s.erasure || len(s.changes) != 1 || s.changes[0].RequestID != requestID ||
-		s.statusReads+1 != len(s.statusIntents) || s.statusReads != len(s.statusOutcomes) || s.statusReads >= 2 {
+		s.statusReads != len(s.statusEvents) || s.statusReads >= 2 {
 		return value.ProcessingErasureStatus{}, value.ErrUnavailable
 	}
 	s.statusReads++
@@ -380,7 +357,7 @@ func (s *consoleProcessingFacts) Change(ctx context.Context, current app.Current
 	now := time.Now().UTC()
 	switch c.Action {
 	case value.RequestEarlyErasure:
-		if !s.erasure || len(s.changes) != 0 || s.searchOutcome.Status != "success" || c.RequestedArtifactID != consoleCaptureID(81) ||
+		if !s.erasure || len(s.changes) != 0 || s.searchEvent.Status != "success" || c.RequestedArtifactID != consoleCaptureID(81) ||
 			c.RuleID != "" || c.ExpectedRevision != 0 || c.Scope != (value.ProcessingScope{}) {
 			return value.ProcessingReceipt{}, value.ErrConflict
 		}

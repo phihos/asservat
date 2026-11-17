@@ -44,8 +44,8 @@ type LifecycleDecision struct {
 
 const erasureLifecyclePrefix = "erasure:"
 
-// ErasureLifecycleSource binds the signed cutoff to the exact prepared and
-// audited processing decision without changing the canonical record format.
+// ErasureLifecycleSource binds the cutoff to the exact processing request
+// without changing the canonical record format.
 func ErasureLifecycleSource(requestID string, decisionDigest artifact.Digest) identity.Revision {
 	if !authorization.UUID(requestID) || decisionDigest == (artifact.Digest{}) {
 		return identity.Revision{}

@@ -77,7 +77,6 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 		Capture:    lane("capture", capture, p.Accounts, p.Records, l.CaptureRetainedSeconds),
 		Normal:     lane("normal", history(audit.ShareOperationHistoryLayout, p.Footprints.Operation), l.Normal.Accounts, l.Normal.Records, l.Normal.RetainedSeconds),
 		Resolution: lane("resolution", history(audit.OperationVerificationHistoryLayout, p.Footprints.Operation), l.Resolution.Accounts, l.Resolution.Records, l.Resolution.RetainedSeconds),
-		Processing: lane("processing", history(audit.ProcessingReleaseHistoryLayout, p.Footprints.Processing), l.Processing.Accounts, l.Processing.Records, l.Processing.RetainedSeconds),
 	}
 	f := p.Footprints
 	in.ContextHistory = app.ContextBackingHistory{ProfileProtocol: app.ProfileProtocolVersion, Capture: capture, CapturePurgeLeases: p.PurgeLeases,

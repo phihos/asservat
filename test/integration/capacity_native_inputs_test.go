@@ -41,7 +41,7 @@ func capacityNativeBacking(root, installation, accountVersion string) app.RootBa
 	}
 	in := app.RootBackingInput{Format: app.RootBackingFormat, RootID: root, InstallationID: installation, QualificationID: root, QualificationDigest: artifact.Digest{5}, SystemPoolUID: "system-pool", AccountVersion: accountVersion, Accounts: capacityNativeAccounts, RecordsPerAccount: 3,
 		AdmissionSeconds: 60, ProcessingEpoch: root, ProcessingSourceUID: root, ProcessingProtectionDigest: artifact.Digest{1},
-		Capture: lane("capture", audit.CaptureOperationHistoryLayout, capacityNativeAccounts, 3), Normal: lane("normal", audit.OperationVerificationHistoryLayout, 4, 7), Resolution: lane("resolution", audit.OperationVerificationHistoryLayout, 4, 2), Processing: lane("processing", audit.ProcessingReleaseHistoryLayout, 2, 16),
+		Capture: lane("capture", audit.CaptureOperationHistoryLayout, capacityNativeAccounts, 3), Normal: lane("normal", audit.OperationVerificationHistoryLayout, 4, 7), Resolution: lane("resolution", audit.OperationVerificationHistoryLayout, 4, 2),
 		ContextHistory: h, Metadata: app.RootMetadataQualification{ID: root, Layout: app.RootMetadataLayout, Digest: artifact.Digest{9}, FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, BackupCopies: 2, WALCopies: 2, ConfigurationTransitions: 100},
 		Envelope: app.RootBackingEnvelope{SystemObjects: app.BudgetAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
 	}

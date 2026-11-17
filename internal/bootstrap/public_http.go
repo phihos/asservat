@@ -10,10 +10,8 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
@@ -26,68 +24,6 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	root, installation := c.PermissionRootID, c.InstallationID
 	if p == nil || id == nil || pc == nil || dl == nil || d.Runtime == nil {
 		return nil, &fixedStepError{"inputs", mounts.ErrUnavailable}
-	}
-	// ADR-190: the normal and resolution lanes read their current accepted
-	// profile before each new Begin; each policy gets its own auditor.
-	digest, ok := publicDigest(p.Capacity.QualificationDigest)
-	if !ok {
-		return nil, &fixedStepError{"qualification", mounts.ErrUnavailable}
-	}
-	profilePool, err := d.public.open(ctx, "capacity-profile-read")
-	if err != nil {
-		return nil, &fixedStepError{"profiles", err}
-	}
-	profiles, err := postgres.NewCapacityAuditProfiles(ctx, profilePool, root, installation, p.Capacity.QualificationID, digest, p.Capacity.AccountVersion)
-	if err != nil {
-		return nil, &fixedStepError{"profiles", mounts.ErrUnavailable}
-	}
-	auditor := func(lane string) (*auditapp.SelectedOperationAuditor, error) {
-		poolLane := lane
-		if lane == "processing" {
-			poolLane = "normal"
-		}
-		journalPool, err := d.public.open(ctx, "audit-"+poolLane+"-journal")
-		if err != nil {
-			return nil, err
-		}
-		ackPool, err := d.public.open(ctx, "audit-"+poolLane+"-ack")
-		if err != nil {
-			return nil, err
-		}
-		return auditapp.NewSelectedOperationAuditor(lane, profiles, func(call context.Context, policy audit.OperationLifecyclePolicy) (*auditapp.HealthyOperationAuditor, error) {
-			if policy.Lane != lane || policy.RootID != root || policy.InstallationID != installation {
-				return nil, mounts.ErrUnavailable
-			}
-			var journal *postgres.OperationJournal
-			var acks *postgres.OperationAcknowledgements
-			var lifecycle *postgres.OperationLifecycles
-			var err error
-			if lane == "processing" {
-				journal, err = postgres.NewProcessingReleaseJournal(call, journalPool, policy)
-				if err == nil {
-					acks, err = postgres.NewProcessingReleaseAcknowledgements(call, ackPool, policy)
-				}
-				if err == nil {
-					lifecycle, err = postgres.NewProcessingReleaseLifecycles(call, journalPool, policy)
-				}
-			} else {
-				journal, err = postgres.NewHealthyOperationJournal(call, journalPool, policy)
-				if err == nil {
-					acks, err = postgres.NewOperationAcknowledgements(call, ackPool, root, lane, installation)
-				}
-				if err == nil {
-					lifecycle, err = postgres.NewOperationLifecycles(call, journalPool, root, lane, installation)
-				}
-			}
-			if err != nil {
-				return nil, mounts.ErrUnavailable
-			}
-			objects, closed, err := a.operationObjects(policy.StoreID)
-			if err != nil {
-				return nil, mounts.ErrUnavailable
-			}
-			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, objects, closed, lifecycle, time.Now)
-		})
 	}
 	auditPool, err := d.public.open(ctx, "audit")
 	if err != nil {
@@ -184,8 +120,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"grants", mounts.ErrUnavailable}
 	}
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, Audit: recorder, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
-	// ADR-210: privacy changes use the normal lane and its separately reserved
-	// release lane; both audit facets pin their accepted policy through Finish.
+	// ADR-210: privacy changes write their audit row with the decision.
 	if pc.processingPolicy != nil {
 		pool, err := d.public.open(ctx, "processing-decision")
 		if err != nil {
@@ -194,14 +129,6 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root)
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
-		}
-		normal, err := auditor("normal")
-		if err != nil {
-			return nil, &fixedStepError{"audit-normal", mounts.ErrUnavailable}
-		}
-		release, err := auditor("processing")
-		if err != nil {
-			return nil, &fixedStepError{"audit-processing", mounts.ErrUnavailable}
 		}
 		inventory, err := postgres.NewProcessingInventory(ctx, pool, root)
 		if err != nil {
@@ -218,7 +145,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if services.Operations, err = presentation.NewInvestigationProcessingDiscoveryOperations(operations, discovery); err != nil {
 			return nil, &fixedStepError{"processing-discovery", err}
 		}
-		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, policies: pc.processingPolicy, decisions: decisions, artifactScopes: inventory, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	// One LISTEN connection feeds every console status stream (REQ-INT-003).
 	progressPool, err := d.public.open(ctx, "hub-metadata-read")

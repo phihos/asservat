@@ -474,12 +474,12 @@ GRANT SELECT ON goose_db_version,fleet_current_trust,permission_stream,processin
 GRANT UPDATE(installation_id) ON fleet_current_trust TO processing_config_runtime,processing_decision_runtime,processing_read_runtime;
 GRANT UPDATE(id) ON permission_stream TO processing_config_runtime,processing_decision_runtime;
 GRANT INSERT ON processing_root TO processing_config_runtime;
-GRANT UPDATE(backing,release_policy,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions,root_transitions,sequence) ON processing_root TO processing_config_runtime;
+GRANT UPDATE(backing,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions,root_transitions,sequence) ON processing_root TO processing_config_runtime;
 GRANT UPDATE(root_id) ON processing_root TO processing_decision_runtime;
-GRANT SELECT ON context_processing,processing_rule,processing_decision,context_catalog,operation_audit TO processing_decision_runtime;
-GRANT INSERT ON processing_rule,processing_decision TO processing_decision_runtime;
+GRANT SELECT ON context_processing,processing_rule,processing_decision,context_catalog,audit_event TO processing_decision_runtime;
+GRANT INSERT ON processing_rule,processing_decision,audit_event TO processing_decision_runtime;
 GRANT UPDATE(id) ON processing_rule TO processing_decision_runtime;
-GRANT UPDATE(id,applied_at,audit_digest) ON processing_decision TO processing_decision_runtime;
+GRANT UPDATE(id,applied_at) ON processing_decision TO processing_decision_runtime;
 GRANT SELECT ON context_processing,processing_rule TO processing_read_runtime;
 -- Existing effect consumers run the same current processing fence; these are
 -- read-only projections and confer no independent authorization or mutation.

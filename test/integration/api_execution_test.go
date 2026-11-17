@@ -361,7 +361,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				if erasure != nil {
 					erasure.policy.value.Processors = reportFixtureProcessors()
-					unknown := stageProcessingReportUnknown(t, ctx, erasure)
+					unknown := stageProcessingReportCall(t, ctx, sharedPool, erasure, accepted.Expectation)
 					stageProcessingReportRule(t, ctx, erasure, accepted.Expectation)
 					qualifyProcessingReport(t, ctx, sharedPool, s, erasure, accepted.Expectation, artifact.StoredUnpublished, unknown)
 					qualifyProcessingEarlyErasure(t, ctx, admin, sharedPool, poolFor, store, bound, keys, s3admin, bucket, s, erasure, published)

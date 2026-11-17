@@ -110,7 +110,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		f.e = accepted.Expectation
 		var processing *processingTestFixture
 		if initialize {
-			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e, shareCohort...)
+			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
 			defer processing.Close()
 		}
 		for _, pair := range []struct {

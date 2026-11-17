@@ -104,30 +104,6 @@ func (m *OperationMAC) Principal(p identity.Principal) (artifact.Digest, error) 
 	return m.Digest("principal/v1", b)
 }
 
-// ProcessingAccount reserves capacity for a fixed rule, independently of which
-// currently authorized human performs release. Actor remains the actual human
-// in every record. Input MAC rotation and rule toggles never mint new capacity.
-func (m *OperationMAC) ProcessingAccount(installation, root, rule string) (artifact.Digest, error) {
-	if m == nil || !authorization.UUID(installation) || !authorization.UUID(root) || !authorization.UUID(rule) {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	b, e := json.Marshal(struct{ Installation, Root, Rule string }{installation, root, rule})
-	if e != nil {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if len(m.accountKey) != 32 {
-		return artifact.Digest{}, ErrUnavailable
-	}
-	h := hmac.New(sha256.New, m.accountKey)
-	_, _ = h.Write([]byte("asservat-operation-audit/processing-account/v1\x00"))
-	_, _ = h.Write(b)
-	var d artifact.Digest
-	copy(d[:], h.Sum(nil))
-	return d, nil
-}
-
 // CaptureAccount retains the exact workload allocation's capacity across human,
 // client and input-MAC rotations. Account-key migration cannot reset spend.
 func (m *OperationMAC) CaptureAccount(installation, root, allocation string) (artifact.Digest, error) {
