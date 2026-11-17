@@ -2,7 +2,6 @@ activate_policy
 cancel_artifact_download
 cancel_capture
 close_live_watch
-compare_profiles
 deactivate_policy
 decide_review
 get_artifact_download
@@ -10,16 +9,8 @@ get_capture
 get_capture_profile
 get_capture_settings
 get_case
-get_file_excerpt
 get_grant
-get_http_headers
-get_logs
-get_pcap_summary
 get_policy_status
-get_profile_summary
-get_query_result
-get_syscall_events
-get_syscall_summary
 list_capture_history
 list_capture_profiles
 list_diagnostics
@@ -27,7 +18,6 @@ list_live_sources
 list_recordings
 list_reviews
 open_live_watch
-pcap_query
 prepare_artifact_download
 preview_capture
 preview_recording_save
@@ -36,5 +26,4 @@ request_capture
 request_policy_grant
 request_raw_access
 revoke_grant
-syscall_query
 update_live_watch
