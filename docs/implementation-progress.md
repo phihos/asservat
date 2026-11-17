@@ -2,7 +2,7 @@
 
 ## One schema baseline (2026-11-17)
 
-Branch `clean/migration-baseline`. The pre-release chain 00001–00200 is
+Branch `clean/migration-baseline`. The pre-release chain 00001–00201 is
 replaced by `migrations/00001_baseline.sql`, which creates the head schema
 directly; there is no upgrade path from the old chain (nothing was released).
 Schema version 1. Migration numbers below refer to the removed chain. Tests

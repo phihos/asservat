@@ -1,7 +1,7 @@
 -- Asservat hub schema baseline.
 --
 -- Creates the complete schema of an empty database. It replaces the
--- pre-release migration chain (00001-00200); no released database used
+-- pre-release migration chain (00001-00201); no released database used
 -- that chain, so there is no upgrade path from it. There is no Down section:
 -- the schema is never downgraded. Later changes are new numbered migrations.
 --
@@ -75,6 +75,7 @@ CREATE TABLE access_grant (
     policy_observed_bytes_spent bigint DEFAULT 0 NOT NULL,
     policy_observed_events_spent bigint DEFAULT 0 NOT NULL,
     raw_query jsonb,
+    submission jsonb,
     CONSTRAINT access_grant_approver_client_check CHECK (((octet_length(approver_client) >= 1) AND (octet_length(approver_client) <= 256))),
     CONSTRAINT access_grant_approver_issuer_check CHECK (((octet_length(approver_issuer) >= 1) AND (octet_length(approver_issuer) <= 2048))),
     CONSTRAINT access_grant_approver_subject_check CHECK (((octet_length(approver_subject) >= 1) AND (octet_length(approver_subject) <= 256))),
@@ -5377,6 +5378,18 @@ END $$;
 REVOKE ALL ON FUNCTION notify_capture_progress() FROM PUBLIC;
 
 -- +goose StatementBegin
+CREATE FUNCTION notify_grant_capture() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+BEGIN
+ PERFORM pg_notify('asservat_capture_progress',NEW.capture_id::text);
+ RETURN NULL;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION notify_grant_capture() FROM PUBLIC;
+
+-- +goose StatementBegin
 CREATE FUNCTION notify_remote_delivery() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path TO 'pg_catalog', 'pg_temp'
@@ -6540,6 +6553,7 @@ ALTER TABLE ONLY retention_decision ADD CONSTRAINT retention_decision_root_id_fk
 
 CREATE TRIGGER access_grant_child_immutable BEFORE DELETE OR UPDATE ON access_grant_child FOR EACH ROW EXECUTE FUNCTION protect_access_grant_history();
 CREATE TRIGGER access_grant_child_scope_guard BEFORE INSERT ON access_grant_child FOR EACH ROW EXECUTE FUNCTION guard_access_grant_child_scope();
+CREATE TRIGGER access_grant_decision_notify AFTER UPDATE ON access_grant FOR EACH ROW WHEN (((new.capture_id IS NOT NULL) AND (new.decision IS DISTINCT FROM old.decision))) EXECUTE FUNCTION notify_grant_capture();
 CREATE TRIGGER access_grant_immutable BEFORE DELETE OR UPDATE ON access_grant FOR EACH ROW EXECUTE FUNCTION protect_access_grant();
 CREATE TRIGGER access_grant_use_immutable BEFORE DELETE OR UPDATE ON access_grant_use FOR EACH ROW EXECUTE FUNCTION protect_access_grant_history();
 CREATE TRIGGER adhoc_observation_spend_monotonic BEFORE DELETE OR UPDATE ON adhoc_observation_spend FOR EACH ROW EXECUTE FUNCTION protect_adhoc_observation_spend();
