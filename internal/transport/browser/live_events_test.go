@@ -71,6 +71,10 @@ func liveError(code string, retryable bool) string {
 type sse struct{ ID, Event, Data string }
 
 func liveStream(t *testing.T, script *liveScript, last string) (int, []sse, string) {
+	return liveStreamWith(t, script, last, nil)
+}
+
+func liveStreamWith(t *testing.T, script *liveScript, last string, now func() time.Time) (int, []sse, string) {
 	t.Helper()
 	var handler *LiveEventsHandler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
@@ -79,6 +83,9 @@ func liveStream(t *testing.T, script *liveScript, last string) (int, []sse, stri
 	handler, err = NewLiveEventsHandler(SessionHandler{Origin: server.URL, Sessions: &investigationSession{}}, script)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if now != nil {
+		handler.now = now
 	}
 	r, _ := http.NewRequest("GET", server.URL+LiveEventsPrefix+liveWatch+LiveEventsSuffix, nil)
 	r.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
@@ -226,5 +233,31 @@ func TestLiveStreamEndsAtTheSessionDeadline(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("stream outlived the session")
+	}
+}
+
+func TestLiveStreamNeverWritesPastTheReadDeadline(t *testing.T) {
+	// The reply is current when the read returns and lapses before framing:
+	// no event of that read may be written.
+	var mu sync.Mutex
+	checks := 0
+	script := &liveScript{answer: func(string) string {
+		mu.Lock()
+		checks = 0
+		mu.Unlock()
+		return liveOK("Active", "c1", 1, 0)
+	}}
+	now := func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		checks++
+		if checks > 1 {
+			return time.Now().Add(time.Hour)
+		}
+		return time.Now()
+	}
+	_, events, raw := liveStreamWith(t, script, "", now)
+	if len(events) != 0 || len(script.cursors) != 1 {
+		t.Fatal("events written after the read's deadline", raw)
 	}
 }

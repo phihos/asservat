@@ -40,13 +40,23 @@ type LiveEventsHandler struct {
 	operations presentation.Operations
 	// Report receives fixed failure stages (diagnostics only).
 	Report func(string)
+	now    func() time.Time
+}
+
+// delivery keeps one read's reply owned until its events are flushed; every
+// write is checked against and bounded by the reply's original deadline.
+type delivery struct {
+	ctx   context.Context
+	out   presentation.OperationReply
+	until time.Time
+	done  func()
 }
 
 func NewLiveEventsHandler(sessions SessionHandler, operations presentation.Operations) (*LiveEventsHandler, error) {
 	if sessions.Sessions == nil || !sessions.validOrigin() || operations == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	return &LiveEventsHandler{sessions: sessions, operations: operations}, nil
+	return &LiveEventsHandler{sessions: sessions, operations: operations, now: time.Now}, nil
 }
 
 // liveEvent is one live-watch.schema.json#/$defs/event document.
@@ -125,8 +135,8 @@ func (h *LiveEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// then resyncs at the head once. A second conflict in a row ends it.
 	resynced := false
 	revision := int64(1)
-	for r.Context().Err() == nil && time.Now().Before(view.ExpiresAt) {
-		batch, next, failure := h.read(w, r, watch, cursor)
+	for r.Context().Err() == nil && h.now().Before(view.ExpiresAt) {
+		batch, next, failure, d := h.read(w, r, watch, cursor)
 		switch failure {
 		case "":
 		case "Conflict":
@@ -138,7 +148,7 @@ func (h *LiveEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		case "retry":
 			// A temporary miss: the browser reconnects with Last-Event-ID.
-			_ = h.write(w, control, []byte("retry: 2000\n\n"))
+			_ = h.write(w, control, []byte("retry: 2000\n\n"), nil)
 			return
 		case "transport":
 			return
@@ -157,10 +167,15 @@ func (h *LiveEventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if skip > len(events) {
 			skip = len(events)
 		}
+		sent := true
 		for _, e := range events[skip:] {
-			if !h.send(w, control, e) {
-				return
+			if sent = h.send(w, control, e, d); !sent {
+				break
 			}
+		}
+		d.done()
+		if !sent {
+			return
 		}
 		skip = 0
 		if next == "" || batch.State != "Active" && batch.State != "Paused" && batch.State != "Disconnected" {
@@ -185,20 +200,30 @@ func resumePoint(last string) (string, int) {
 
 // read performs one audited watch_live read. failure is "" on success, the
 // error code of a refusal, "retry" for a retryable refusal, or "transport".
-func (h *LiveEventsHandler) read(w http.ResponseWriter, r *http.Request, watch, cursor string) (liveBatch, string, string) {
+func (h *LiveEventsHandler) read(w http.ResponseWriter, r *http.Request, watch, cursor string) (liveBatch, string, string, *delivery) {
 	window := audit.OperationRequestWindow("watch_live")
 	ctx, cancel := context.WithTimeout(r.Context(), window)
-	defer cancel()
 	current, _, err := h.sessions.AuthenticateCurrentWithin(w, r.WithContext(ctx), window)
 	if err != nil {
-		return liveBatch{}, "", "NotAuthorized"
+		cancel()
+		return liveBatch{}, "", "NotAuthorized", nil
 	}
 	input, _ := json.Marshal(map[string]any{"action": "read", "watch_id": watch, "cursor": cursor, "wait_ms": liveStreamWaitMS})
 	out, err := h.operations.Call(ctx, current, "watch_live", input)
-	defer func() { _ = out.Close(ctx); clear(out.Body) }()
-	if err != nil || out.CheckDisclosure(ctx) != nil || !time.Now().Before(out.ValidUntil) {
-		h.report("call")
-		return liveBatch{}, "", "transport"
+	responseCtx, stop := out.ResponseContext(ctx)
+	d := &delivery{ctx: responseCtx, out: out, until: out.ValidUntil, done: func() { _ = out.Close(ctx); clear(out.Body); stop(); cancel() }}
+	if end, ok := ctx.Deadline(); ok && end.Before(d.until) {
+		d.until = end
+	}
+	fail := func(stage, failure string) (liveBatch, string, string, *delivery) {
+		if stage != "" {
+			h.report(stage)
+		}
+		d.done()
+		return liveBatch{}, "", failure, nil
+	}
+	if err != nil || out.CheckDisclosure(responseCtx) != nil || !h.now().Before(d.until) {
+		return fail("call", "transport")
 	}
 	var envelope struct {
 		Status     string          `json:"status"`
@@ -206,8 +231,7 @@ func (h *LiveEventsHandler) read(w http.ResponseWriter, r *http.Request, watch, 
 		Data       json.RawMessage `json:"data"`
 	}
 	if json.Unmarshal(out.Body, &envelope) != nil {
-		h.report("result")
-		return liveBatch{}, "", "transport"
+		return fail("result", "transport")
 	}
 	if envelope.Status != "ok" {
 		var failure struct {
@@ -216,20 +240,19 @@ func (h *LiveEventsHandler) read(w http.ResponseWriter, r *http.Request, watch, 
 		}
 		_ = json.Unmarshal(envelope.Data, &failure)
 		if failure.Retryable {
-			return liveBatch{}, "", "retry"
+			return fail("", "retry")
 		}
-		return liveBatch{}, "", failure.Code
+		return fail("", failure.Code)
 	}
 	var batch liveBatch
 	if json.Unmarshal(envelope.Data, &batch) != nil || batch.WatchID != watch {
-		h.report("batch")
-		return liveBatch{}, "", "transport"
+		return fail("batch", "transport")
 	}
 	next := ""
 	if envelope.NextCursor != nil {
 		next = *envelope.NextCursor
 	}
-	return batch, next, ""
+	return batch, next, "", d
 }
 
 // batchEvents orders a batch as rows, gaps and one closing state event.
@@ -252,20 +275,31 @@ var liveHandling = json.RawMessage(`{"transient":true,"may_contain_user_data":tr
 
 // end sends a closing state event without disclosing anything new.
 func (h *LiveEventsHandler) end(w http.ResponseWriter, control *http.ResponseController, watch string, revision int64, state string) {
-	_ = h.send(w, control, liveEvent{EventID: "end!0", WatchID: watch, Revision: revision, Type: "state", State: &liveState{State: state, Sources: json.RawMessage("[]")}, Handling: liveHandling})
+	_ = h.send(w, control, liveEvent{EventID: "end!0", WatchID: watch, Revision: revision, Type: "state", State: &liveState{State: state, Sources: json.RawMessage("[]")}, Handling: liveHandling}, nil)
 }
 
-func (h *LiveEventsHandler) send(w http.ResponseWriter, control *http.ResponseController, e liveEvent) bool {
+// send writes one event. A disclosing event (d set) is written only while its
+// read's reply is current, and its write deadline never passes that reply's.
+func (h *LiveEventsHandler) send(w http.ResponseWriter, control *http.ResponseController, e liveEvent, d *delivery) bool {
 	data, err := json.Marshal(e)
 	if err != nil {
 		return false
 	}
 	frame := append([]byte("id: "+e.EventID+"\nevent: "+e.Type+"\ndata: "), data...)
-	return h.write(w, control, append(frame, '\n', '\n'))
+	return h.write(w, control, append(frame, '\n', '\n'), d)
 }
 
-func (h *LiveEventsHandler) write(w http.ResponseWriter, control *http.ResponseController, frame []byte) bool {
-	if control.SetWriteDeadline(time.Now().Add(10*time.Second)) != nil {
+func (h *LiveEventsHandler) write(w http.ResponseWriter, control *http.ResponseController, frame []byte, d *delivery) bool {
+	deadline := h.now().Add(10 * time.Second)
+	if d != nil {
+		if d.ctx.Err() != nil || d.out.CheckDisclosure(d.ctx) != nil || !h.now().Before(d.until) {
+			return false
+		}
+		if d.until.Before(deadline) {
+			deadline = d.until
+		}
+	}
+	if control.SetWriteDeadline(deadline) != nil {
 		return false
 	}
 	_, err := w.Write(frame)
