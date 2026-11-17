@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,12 +15,16 @@ import (
 
 type transportSession struct {
 	SessionService
+	// mu serializes Resolve: concurrent event streams resolve in parallel.
+	mu                     sync.Mutex
 	calls, refreshes, csrf int
 	now                    time.Time
 	revoked                bool
 }
 
 func (s *transportSession) Resolve(_ context.Context, _ string, refresh bool) (app.SessionView, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.calls++
 	if refresh {
 		s.refreshes++
