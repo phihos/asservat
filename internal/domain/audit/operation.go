@@ -12,9 +12,9 @@ import (
 const OperationCipherLimit = 64 << 10
 const OperationOutputLimit = 24 << 10
 
-// Sixteen source assessments retain up to64 policy digests per source.
-// Only this passive preview may prepare the bounded larger metadata result.
-const OperationRecordingSavePreviewOutputLimit = 128 << 10
+// OperationResultBound is the MCP result bound (specs/mcp.md) of the
+// settings and preview results.
+const OperationResultBound = 96 << 10
 
 // Only the authenticated browser settings view has this larger prepared-byte
 // maximum. Audit stores the HMAC/count/refs, never the parameter response body.
@@ -53,9 +53,8 @@ var operations = map[string]operationKind{
 	"download_artifact_content":  {nativeInput, ordinaryWindow, false, OperationOutputLimit},
 	"explain_access":             {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"get_artifact_download":      {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
-	"get_capture":                {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_capture":                {contextInput, ordinaryWindow, false, OperationCaptureSettingsOutputLimit},
 	"get_capture_profile":        {contextInput, ordinaryWindow, false, OperationOutputLimit},
-	"get_capture_settings":       {contextInput, ordinaryWindow, false, OperationCaptureSettingsOutputLimit},
 	"get_case":                   {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"get_extract":                {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"get_grant":                  {contextInput, ordinaryWindow, false, OperationGrantReviewOutputLimit},
@@ -65,15 +64,13 @@ var operations = map[string]operationKind{
 	"get_query_result":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"invalid_operation":          {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_capture_history":       {contextInput, ordinaryWindow, false, OperationOutputLimit},
-	"list_capture_profiles":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_diagnostics":           {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_recordings":            {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
 	"list_reviews":               {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"list_shares":                {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"prepare_artifact_download":  {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"preview_access_change":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
-	"preview_capture":            {contextInput, identity.CapturePreviewRequestWindow, false, OperationOutputLimit},
-	"preview_recording_save":     {contextInput, ordinaryWindow, false, OperationRecordingSavePreviewOutputLimit},
+	"preview_capture":            {contextInput, identity.CapturePreviewRequestWindow, false, OperationResultBound},
 	"preview_retention_change":   {contextInput, ordinaryWindow, false, OperationOutputLimit},
 	"query_artifact":             {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"release_processing":         {processingInput, ordinaryWindow, true, OperationOutputLimit},

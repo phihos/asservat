@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"bytes"
 	"crypto/hmac"
 	"encoding/base64"
@@ -28,7 +29,7 @@ func historyOrigin(origin string) string {
 	}
 	return origin
 }
-func (s *ContextOperations) historyCursorBinding(in ContextOperationInput, i identity.Identity) (artifact.Digest, error) {
+func (s *ContextOperations) historyCursorBinding(in ContextOperationInput, target targets.WorkloadRequest, i identity.Identity) (artifact.Digest, error) {
 	if s.config.HistoryCursorKeys == nil || !authorization.UUID(s.config.HistoryRootID) {
 		return artifact.Digest{}, value.ErrHistoryUnavailable
 	}
@@ -40,20 +41,20 @@ func (s *ContextOperations) historyCursorBinding(in ContextOperationInput, i ide
 		Principal      identity.Principal
 		Policy         identity.Revision
 		Groups, Scopes []string
-		Target         WorkloadReference
+		Target         targets.WorkloadRequest
 		Origin         string
-	}{"history-cursor-binding/v2", s.config.HistoryRootID, i.Principal, i.Policy, groups, scopes, in.Target, historyOrigin(in.Origin)})
+	}{"history-cursor-binding/v3", s.config.HistoryRootID, i.Principal, i.Policy, groups, scopes, target, historyOrigin(in.Origin)})
 	if err != nil {
 		return artifact.Digest{}, value.ErrInvalid
 	}
 	defer clear(b)
 	return s.config.HistoryCursorKeys.HistoryDigest("cursor", b)
 }
-func (s *ContextOperations) encodeHistoryCursor(in ContextOperationInput, actor identity.Identity, page value.HistoryPage, after *value.HistoryCursor) (*string, error) {
+func (s *ContextOperations) encodeHistoryCursor(in ContextOperationInput, target targets.WorkloadRequest, actor identity.Identity, page value.HistoryPage, after *value.HistoryCursor) (*string, error) {
 	if page.Next == nil {
 		return nil, nil
 	}
-	binding, err := s.historyCursorBinding(in, actor)
+	binding, err := s.historyCursorBinding(in, target, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -86,14 +87,14 @@ func (s *ContextOperations) encodeHistoryCursor(in ContextOperationInput, actor 
 	}
 	return &token, nil
 }
-func (s *ContextOperations) decodeHistoryCursor(in ContextOperationInput, actor identity.Identity) (*value.HistoryCursor, error) {
+func (s *ContextOperations) decodeHistoryCursor(in ContextOperationInput, target targets.WorkloadRequest, actor identity.Identity) (*value.HistoryCursor, error) {
 	if in.Cursor == "" {
 		return nil, nil
 	}
 	if len(in.Cursor) > 4096 {
 		return nil, value.ErrInvalid
 	}
-	binding, err := s.historyCursorBinding(in, actor)
+	binding, err := s.historyCursorBinding(in, target, actor)
 	if err != nil {
 		return nil, err
 	}

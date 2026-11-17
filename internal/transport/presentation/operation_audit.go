@@ -720,9 +720,9 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 	}
 	var d artifact.Digest
 	var err error
-	if callErr == nil && in.Name == "preview_recording_save" {
-		d, err = s.mac.RecordingSavePreviewResultDigest(body)
-	} else if callErr == nil && in.Name == "get_capture_settings" && reply.browserSettings {
+	if callErr == nil && reply.resultBound && !reply.browserSettings {
+		d, err = s.mac.ResultBoundDigest(body)
+	} else if callErr == nil && in.Name == "get_capture" && reply.browserSettings {
 		d, err = s.mac.BrowserSettingsResultDigest(body)
 	} else {
 		d, err = s.mac.Digest(domain, body)

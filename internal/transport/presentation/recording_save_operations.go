@@ -57,7 +57,7 @@ func (s *RecordingSaveOperations) PublicOrigin() string {
 	return s.config.PublicOrigin
 }
 func (s *RecordingSaveOperations) ToolNames() []string {
-	names := []string{"preview_recording_save"}
+	names := []string{}
 	if s != nil && s.cancellations != nil {
 		names = append(names, "cancel_capture")
 	}
@@ -85,6 +85,7 @@ func NewInvestigationRecordingSaveOperations(base *InvestigationOperations, save
 	if base.captures != nil {
 		capture := *base.captures
 		capture.recordingSaveCancellationEnabled = composed.cancellations != nil
+		capture.recordingSaveCollection = composed.config.CollectionEnabled
 		capture.recordingSaves = saves.saves
 		out.captures = &capture
 		for name, part := range out.routes {
@@ -116,28 +117,11 @@ type RecordingWindow struct {
 	Before string `json:"before"`
 	After  string `json:"after"`
 }
-type RecordingSavePreviewData struct {
-	Kind           string            `json:"kind"`
-	Operation      string            `json:"operation"`
-	PlanDigest     string            `json:"plan_digest"`
-	Selected       []RecordingRow    `json:"selected_recordings"`
-	Windows        []RecordingWindow `json:"windows"`
-	Assessment     CaptureAssessment `json:"capture_assessment"`
-	Blockers       []string          `json:"blockers"`
-	NavigationURI  string            `json:"navigation_uri"`
-	CaptureEnabled bool              `json:"capture_enabled"`
-	IncidentPodCap int               `json:"incident_pod_cap"`
-}
 type recordingSaveInput struct {
 	CaptureID        string               `json:"capture_id,omitempty"`
 	ExpectedRevision int64                `json:"expected_revision,omitempty"`
 	IdempotencyKey   string               `json:"idempotency_key,omitempty"`
 	Target           WorkloadReference    `json:"target_ref"`
-	Handles          []string             `json:"recording_handles,omitempty"`
-	Before           string               `json:"before,omitempty"`
-	Sharing          *ContextSharingInput `json:"sharing,omitempty"`
-	Reason           *string              `json:"reason,omitempty"`
-	RepeatedFrom     string               `json:"repeated_from_capture_id,omitempty"`
 }
 
 func recordingRow(row app.RecordingRow, expires time.Time) RecordingRow {
@@ -195,47 +179,13 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 			if decision.ApplicationStopUnknown {
 				out.Warnings = append(out.Warnings, "Stopping Asservat collection does not confirm that the application stopped profiling.")
 			}
-			out.Data = RecordingCancellationData{decision.CaptureID, decision.Phase, decision.Revision, decision.Requested, s.config.PublicOrigin + "/captures/" + decision.CaptureID}
+			out.Data = RecordingCancellationData{decision.CaptureID, capturePhase(decision.Phase), decision.Revision, decision.Requested, s.config.PublicOrigin + "/captures/" + decision.CaptureID}
 			if operationErr != nil && decision.Requested {
 				out.Warnings = append(out.Warnings, "Cancellation delivery is unconfirmed; the durable request remains pending.")
 				operationErr = nil
 			}
 		} else if operationErr == nil {
 			operationErr = value.ErrChanged
-		}
-	} else {
-		var before time.Duration
-		if in.Before != "" {
-			before, err = time.ParseDuration(in.Before)
-			if err != nil {
-				return OperationReply{}, contracts.ErrInvestigationWire
-			}
-		}
-		planCtx, digest := app.WithPlanScope(bounded)
-		var result app.ContextPreviewResult
-		result, operationErr = s.saves.Preview(planCtx, current, recordingSaveRequest(in.Handles, before, in.Sharing, in.RepeatedFrom, in.Reason))
-		if operationErr == nil {
-			p, m := result.Preview, result.RecordingSave
-			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest {
-				return OperationReply{}, stopped("preview-shape", value.ErrUnavailable)
-			}
-			if !s.config.Now().Before(p.SelectionUntil) {
-				return OperationReply{}, stopped("preview-selection-expired", value.ErrUnavailable)
-			}
-			rows, windows, selectionErr := recordingPreviewSelection(result, in.Handles)
-			if selectionErr != nil {
-				return OperationReply{}, stopped("preview-rows", selectionErr)
-			}
-			assessment, assessmentErr := recordingSaveAssessment(result)
-			if assessmentErr != nil {
-				return OperationReply{}, stopped("preview-assessment", assessmentErr)
-			}
-			until = identity.Earlier(until, result.ValidUntil)
-			blockers := []string{}
-			if !s.config.CollectionEnabled {
-				blockers = append(blockers, "CollectionDisabled")
-			}
-			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PlanDigest: hash(digest(p)), Selected: rows, Windows: windows, Assessment: assessment, Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
 		}
 	}
 	if operationErr != nil {
@@ -254,12 +204,8 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 	}
 	until = identity.Earlier(until, final.ValidUntil)
 	b, err := json.Marshal(out)
-	limit := contracts.InvestigationOutputLimit
-	if name == "preview_recording_save" {
-		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
-	}
-	if err == nil && len(b) > limit {
-		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Select fewer recordings to fit the metadata response.", false}, nil
+	if err == nil && len(b) > contracts.InvestigationOutputLimit {
+		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Use a smaller inventory page or recording selection to fit the metadata response.", false}, nil
 		b, err = json.Marshal(out)
 	}
 	if err != nil {
@@ -272,7 +218,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		clear(b)
 		return OperationReply{}, stopped("reply-interval", value.ErrUnavailable)
 	}
-	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}
+	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr)}
 	var step interface{ FixedStep() string }
 	if errors.As(operationErr, &step) {
 		reply.failureStep = step.FixedStep()

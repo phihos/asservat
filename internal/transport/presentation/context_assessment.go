@@ -82,7 +82,6 @@ type CaptureAssessment struct {
 	AssessmentID       string             `json:"assessmentID"`
 	PlanDigest         string             `json:"planDigest"`
 	GeneratedAt        time.Time          `json:"generatedAt"`
-	ValidUntil         time.Time          `json:"validUntil"`
 	Basis              AssessmentBasis    `json:"basis"`
 	Scope              AssessmentScope    `json:"scope"`
 	CombinedImpact     Impact             `json:"combinedImpact"`
@@ -93,9 +92,12 @@ type CaptureAssessment struct {
 	HandlingCodes      []string           `json:"handlingCodes"`
 }
 type LifecycleAction struct {
-	ActionID      string `json:"actionID"`
-	Kind          string `json:"kind"`
-	ExecutionMode string `json:"executionMode"`
+	ActionID        string `json:"actionID"`
+	Kind            string `json:"kind"`
+	ExecutionMode   string `json:"executionMode"`
+	Activation      string `json:"activation,omitempty"`
+	RequestedBefore string `json:"requestedBefore,omitempty"`
+	After           string `json:"after,omitempty"`
 }
 type LifecyclePlan struct {
 	SchemaVersion   string            `json:"schemaVersion"`
@@ -120,7 +122,7 @@ func ContextAssessment(a value.ContextAssessment) CaptureAssessment {
 	basis := AssessmentBasis{RulesDigest: hash(a.RulesDigest), CapabilityDigest: hash(a.CapabilityDigest)}
 	basis.Metrics.State = "unavailable"
 	return CaptureAssessment{
-		SchemaVersion: "capture-assessment/v1", AssessmentID: a.ID, PlanDigest: hash(a.PlanDigest), GeneratedAt: a.GeneratedAt, ValidUntil: a.ValidUntil,
+		SchemaVersion: "capture-assessment/v1", AssessmentID: a.ID, PlanDigest: hash(a.PlanDigest), GeneratedAt: a.GeneratedAt,
 		Basis: basis, Scope: AssessmentScope{ObservationPods: 0, IncidentPods: 1}, CombinedImpact: impact,
 		Actions: []AssessmentAction{{ActionID: "pod-status", ExecutionMode: "onTrigger", Impact: Impact{impact.Level, impact.HasUnknowns, slices.Clone(impact.Effects), impact.Explanation},
 			Data:       Exposure{a.Exposure.Classification, a.Exposure.Basis, slices.Clone(a.Exposure.RetainedPossible), slices.Clone(a.Exposure.TransientOnly), a.Exposure.UnknownContent},
@@ -134,5 +136,5 @@ func ContextAssessment(a value.ContextAssessment) CaptureAssessment {
 }
 
 func ContextLifecycle() LifecyclePlan {
-	return LifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugCapture", Actions: []LifecycleAction{{"pod-status", "kubernetesSnapshot", "onTrigger"}}, OngoingPodScope: "none"}
+	return LifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugCapture", Actions: []LifecycleAction{{ActionID: "pod-status", Kind: "kubernetesSnapshot", ExecutionMode: "onTrigger"}}, OngoingPodScope: "none"}
 }

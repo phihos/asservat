@@ -273,7 +273,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	var out presentation.OperationReply
-	if name == "get_capture_settings" {
+	if name == "get_capture" {
 		ctx = presentation.AuthenticatedBrowserSettingsView(ctx)
 	}
 	out, err = h.operations.Call(ctx, current, name, body)
