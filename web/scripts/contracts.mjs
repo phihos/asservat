@@ -16,6 +16,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const implemented = resolve(root, 'specs/contracts/implemented');
 const implementedFiles = new Set(await readdir(implemented));
 const browser = parse(await readFile(implementedFiles.has('browser-openapi.yaml') ? resolve(implemented, 'browser-openapi.yaml') : resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
+// Operations listed in implemented/legacy-tools.txt still take their schemas
+// from the implemented copy; the others use the canonical document.
+const canonicalBrowser = parse(await readFile(resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
+const legacyTools = new Set(implementedFiles.has('legacy-tools.txt') ? (await readFile(resolve(implemented, 'legacy-tools.txt'), 'utf8')).split(/\s+/).filter(Boolean) : []);
 const auth = parse(await readFile(implementedFiles.has('browser-auth-openapi.yaml') ? resolve(implemented, 'browser-auth-openapi.yaml') : resolve(root, 'docs/interfaces/browser-auth-openapi.yaml'), 'utf8'));
 auth.components.schemas = { Session: browser.components.schemas.Session };
 auth.paths['/api/v1/session'] = browser.paths['/api/v1/session'];
@@ -84,7 +88,7 @@ async function operationBundle(names, bundle, direct = []) {
   for (const name of names) {
     for (const direction of ['Input', 'Output']) {
       const key = 'Mcp' + direction + '_' + name;
-      const schema = browser.components.schemas[key];
+      const schema = (legacyTools.has(name) ? browser : canonicalBrowser).components.schemas[key];
       capture.components.schemas[key] = localSchema(schema);
       validators.addSchema(schema, key);
       exports['valid' + direction + '_' + name] = key;
