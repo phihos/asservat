@@ -106,4 +106,6 @@ the charge is released when deletion completes.
 `preview_retention_change` ([ADR-240](../decisions/240-retention-impact-preview.md))
 applies the proposal to the stored set and aggregates the effects of the
 created and updated policies with one SQL call (`retention_preview`) over
-stored deadlines. It writes nothing.
+stored deadlines. It writes nothing. An artifact without recorded labels
+that only a label-scoped policy would shorten is counted as Unknown, not
+as affected.

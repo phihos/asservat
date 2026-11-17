@@ -237,5 +237,24 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 		if a, _, d := deadlines(db2); !d.After(a.Add(300 * time.Second)) {
 			t.Fatal("admission applied a labeled policy to a non-matching row", a, d)
 		}
+
+		// The preview of a stricter labeled policy counts the matching
+		// artifacts as affected and the two without recorded labels as
+		// Unknown, never as affected.
+		stricter := retentionPolicyFixture(custodyID(), 1, cluster, 120, 60)
+		stricter.Scope.NamespaceLabels = labeled.Scope.NamespaceLabels
+		stricter.Scope.WorkloadLabels = labeled.Scope.WorkloadLabels
+		if rows, err = preview.PreviewRetentionEffects(ctx, []privacy.PolicyEffect{privacy.Effect(stricter)}); err != nil {
+			t.Fatal(err)
+		}
+		mine = nil
+		for i := range rows {
+			if rows[i].ClusterID == cluster && !rows[i].CaseMetadata {
+				mine = &rows[i]
+			}
+		}
+		if mine == nil || mine.Scanned != 4 || mine.Affected != 2 || mine.Unknown != 2 {
+			t.Fatal("labeled preview aggregate", rows)
+		}
 	})
 }

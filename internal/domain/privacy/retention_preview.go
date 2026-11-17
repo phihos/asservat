@@ -59,11 +59,13 @@ type RetentionChange struct {
 
 // PreviewRow is one aggregate of retention_policy_effect over a proposal:
 // the retained artifacts of one cluster and native type (or case metadata).
+// Unknown counts artifacts that only a label-scoped change would shorten
+// and whose labels were not recorded; they are not counted as affected.
 type PreviewRow struct {
-	ClusterID, NativeType                      string
-	CaseMetadata                               bool
-	Scanned, Affected, ReadClosed, DeletionDue int
-	EarliestExpiresAt, EarliestDeleteBy        time.Time
+	ClusterID, NativeType                               string
+	CaseMetadata                                        bool
+	Scanned, Affected, ReadClosed, DeletionDue, Unknown int
+	EarliestExpiresAt, EarliestDeleteBy                 time.Time
 }
 
 // RetentionPreviewGroup aggregates the artifacts of one cluster and class.
@@ -179,10 +181,12 @@ func SummarizePreview(rows []PreviewRow, skipped []PreviewNotEvaluated, baseline
 		g.Affected += r.Affected
 		g.ReadClosed += r.ReadClosed
 		g.DeletionDue += r.DeletionDue
+		g.Unknown += r.Unknown
 		out.Scanned += r.Scanned
 		out.Affected += r.Affected
 		out.ReadClosed += r.ReadClosed
 		out.DeletionDue += r.DeletionDue
+		out.Unknown += r.Unknown
 		if r.Affected > 0 {
 			g.EarliestExpiresAt = earliest(g.EarliestExpiresAt, r.EarliestExpiresAt)
 			g.EarliestDeleteBy = earliest(g.EarliestDeleteBy, r.EarliestDeleteBy)

@@ -124,6 +124,7 @@ func (s *RetentionPolicies) PreviewRetentionEffects(ctx context.Context, effects
 			Affected     int        `json:"affected"`
 			ReadClosed   int        `json:"read_closed"`
 			DeletionDue  int        `json:"deletion_due"`
+			Unknown      int        `json:"unknown"`
 			Expires      *time.Time `json:"earliest_expires_at"`
 			Delete       *time.Time `json:"earliest_delete_by"`
 		}
@@ -132,7 +133,7 @@ func (s *RetentionPolicies) PreviewRetentionEffects(ctx context.Context, effects
 		}
 		out = make([]value.PreviewRow, 0, len(groups))
 		for _, g := range groups {
-			r := value.PreviewRow{ClusterID: g.ClusterID, NativeType: g.NativeType, CaseMetadata: g.CaseMetadata, Scanned: g.Scanned, Affected: g.Affected, ReadClosed: g.ReadClosed, DeletionDue: g.DeletionDue}
+			r := value.PreviewRow{ClusterID: g.ClusterID, NativeType: g.NativeType, CaseMetadata: g.CaseMetadata, Scanned: g.Scanned, Affected: g.Affected, ReadClosed: g.ReadClosed, DeletionDue: g.DeletionDue, Unknown: g.Unknown}
 			if g.Expires != nil {
 				r.EarliestExpiresAt = g.Expires.UTC()
 			}
