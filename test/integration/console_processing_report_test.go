@@ -56,7 +56,7 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 	facts := &consoleReportFacts{rows: consoleReportRows(time.Now().UTC().Truncate(time.Microsecond)), events: map[string]audit.Event{}}
 	rootID := consoleCaptureID(41)
 	report := &privacyapp.ProcessingReport{RootID: rootID, InstallationID: rootID, Policies: facts, Reports: facts, Now: time.Now}
-	processing, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
+	processing, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, presentation.NewClusterNames(nil), privacyapp.ProcessingEvidenceDiscovery{
 		RootID: rootID, InstallationID: rootID, Policies: facts, Discovery: &facts.consoleProcessingFacts, Now: time.Now,
 	}, nil, report)
 	if err != nil {

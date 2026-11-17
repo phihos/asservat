@@ -63,7 +63,7 @@ func TestConsoleWorkloadProcessingWithBuiltPackage(t *testing.T) {
 	}
 	first, workload, last := facts.searchQueries[0], facts.searchQueries[1], facts.searchQueries[2]
 	if first.CaseID != consoleCaptureID(80) || last.CaseID != first.CaseID || workload.CaseID != "" ||
-		workload.ClusterID != scope.ClusterID || workload.NamespaceUID != scope.NamespaceUID || workload.WorkloadUID != scope.WorkloadUID ||
+		workload.ClusterID != scope.ClusterID || workload.Namespace != "synthetic-namespace" || workload.Workload != "synthetic-workload" ||
 		!workload.AcquiredFrom.Equal(scope.AcquiredFrom) || !workload.AcquiredUntil.Equal(scope.AcquiredUntil) ||
 		workload.PurposeRef != "synthetic-rights-discovery" || workload.Limit != 12 {
 		t.Fatal("workload review did not derive the exact interval from accepted candidate metadata")
@@ -151,7 +151,7 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 	if erasure {
 		status = &privacyapp.ProcessingErasureStatus{RootID: rootID, InstallationID: rootID, Policies: facts, Status: facts, Now: time.Now}
 	}
-	discovery, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
+	discovery, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, presentation.NewClusterNames(map[string]string{"local": consoleCaptureID(1)}), privacyapp.ProcessingEvidenceDiscovery{
 		RootID: rootID, InstallationID: rootID, Policies: facts, Discovery: facts, Now: time.Now,
 	}, status, nil)
 	if err != nil {
@@ -293,7 +293,7 @@ func (s *consoleProcessingFacts) ReadProcessingDiscovery(ctx context.Context, au
 	if query.CaseID != consoleCaptureID(80) {
 		scope := s.workloadScope()
 		if !s.workloadRestriction || query.CaseID != "" || query.ClusterID != scope.ClusterID ||
-			query.NamespaceUID != scope.NamespaceUID || query.WorkloadUID != scope.WorkloadUID ||
+			query.Namespace != "synthetic-namespace" || query.Workload != "synthetic-workload" ||
 			!query.AcquiredFrom.Equal(scope.AcquiredFrom) || !query.AcquiredUntil.Equal(scope.AcquiredUntil) ||
 			query.PurposeRef != "synthetic-rights-discovery" {
 			return value.ProcessingDiscoveryPage{}, value.ErrUnavailable

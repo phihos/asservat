@@ -80,9 +80,9 @@ func TestRetentionPreviewOperationReply(t *testing.T) {
 	}
 }
 
-// The largest reply (32 listed groups, 32 incomplete clusters, 16 changes
-// not evaluated) fits the shared 24 KiB operation reply; totals count all.
-func TestRetentionPreviewOperationLargestReply(t *testing.T) {
+// Groups and incomplete clusters are paged; every page fits the 24 KiB
+// reply target, the pages list every row, and a foreign cursor is refused.
+func TestRetentionPreviewOperationPages(t *testing.T) {
 	f, ops := newRetentionPreviewOps(t)
 	at := f.now.Add(time.Hour).Truncate(time.Microsecond)
 	for i := range 200 {
@@ -94,9 +94,37 @@ func TestRetentionPreviewOperationLargestReply(t *testing.T) {
 		f.preview.NotEvaluated = append(f.preview.NotEvaluated, privacy.PreviewNotEvaluated{Action: "update", SourceClusterID: "22222222-3333-4444-8555-666666666666", UID: fmt.Sprintf("%064d", i), Reason: privacy.PreviewUnknownObject})
 	}
 	f.preview.ObservedAt = f.now
-	data := callRetentionPreview(t, f, ops, `{"changes":[{"action":"delete","uid":"baseline"}]}`)["data"].(map[string]any)
-	if len(data["groups"].([]any)) != 32 || data["groups_total"] != 200.0 || len(data["incomplete_clusters"].([]any)) != 32 || data["incomplete_total"] != 200.0 || len(data["not_evaluated"].([]any)) != 16 {
-		t.Fatalf("%v", data)
+	groups, incomplete, cursor := 0, 0, ""
+	for page := 0; ; page++ {
+		in := `{"changes":[{"action":"delete","uid":"baseline"}]`
+		if cursor != "" {
+			in += `,"cursor":"` + cursor + `"`
+		}
+		reply, err := ops.Call(context.Background(), f, "preview_retention_change", json.RawMessage(in+`}`))
+		if err != nil || len(reply.Body) > contracts.InvestigationOutputLimit {
+			t.Fatal(page, err, len(reply.Body))
+		}
+		var out map[string]any
+		if json.Unmarshal(reply.Body, &out) != nil {
+			t.Fatal("reply")
+		}
+		data := out["data"].(map[string]any)
+		if data["groups_total"] != 200.0 || data["incomplete_total"] != 200.0 || len(data["not_evaluated"].([]any)) != 16 {
+			t.Fatalf("%v", data)
+		}
+		groups += len(data["groups"].([]any))
+		incomplete += len(data["incomplete_clusters"].([]any))
+		next, _ := out["next_cursor"].(string)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+	if groups != 200 || incomplete != 200 {
+		t.Fatal(groups, incomplete)
+	}
+	if _, err := ops.Call(context.Background(), f, "preview_retention_change", json.RawMessage(`{"changes":[{"action":"delete","uid":"other"}],"cursor":"`+cursor+`"}`)); err == nil {
+		t.Fatal("cursor of another proposal accepted")
 	}
 }
 

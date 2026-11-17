@@ -2,9 +2,13 @@ package presentation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
@@ -72,6 +76,7 @@ type retentionPreviewChange struct {
 // the observed schema.
 type RetentionPreviewInput struct {
 	Changes []retentionPreviewChange `json:"changes"`
+	Cursor  string                   `json:"cursor,omitempty"`
 }
 
 type retentionGroupData struct {
@@ -116,12 +121,10 @@ type retentionPreviewData struct {
 	NotEvaluated      []retentionNotEvaluatedData `json:"not_evaluated"`
 }
 
-// Listed rows stay inside the shared 24 KiB operation reply; the totals
-// count every group and cluster.
-const (
-	retentionPreviewGroups     = 32
-	retentionPreviewIncomplete = 32
-)
+// A page lists at most 32 group and incomplete-cluster rows: a group row
+// is at most about 400 bytes, so a page stays inside the 24 KiB reply size
+// target (REQ-MCP-002). The totals count every row.
+const retentionPreviewPageRows = 32
 
 func optionalTime(t time.Time) *time.Time {
 	if t.IsZero() {
@@ -138,8 +141,6 @@ func retentionPreviewMessage(p privacy.RetentionPreview) string {
 		return "Some changes name a policy or source that is not currently accepted and were not evaluated; the counts cover the other changes only." + tail
 	case len(p.Incomplete) > 0:
 		return "The policy source of some clusters is not current: their counts may change once it is, and the listed clusters are incomplete." + tail
-	case p.Truncated:
-		return "More than 10,000 retained artifacts are not yet due for deletion: only the first 10,000 were evaluated, so the counts and earliest dates are lower bounds." + tail
 	case p.Unknown > 0:
 		return "Unknown artifacts would need historical labels that are not recorded for a newly selected label selector; their deadlines after the change are not assumed." + tail
 	case p.Affected == 0:
@@ -158,16 +159,23 @@ func retentionPreviewFailure(err error) OperationFailure {
 	return OperationFailure{"NotAvailable", "The preview is unavailable right now. Retry shortly.", true}
 }
 
-func retentionPreviewReply(p privacy.RetentionPreview) retentionPreviewData {
-	out := retentionPreviewData{Complete: p.Complete(), Message: retentionPreviewMessage(p), ObservedAt: p.ObservedAt.UTC(), ArtifactsScanned: p.Scanned, ScanLimited: p.Truncated,
+// retentionPreviewReply lists the page of groups, then incomplete clusters,
+// that starts at offset.
+func retentionPreviewReply(p privacy.RetentionPreview, offset int) retentionPreviewData {
+	out := retentionPreviewData{Complete: p.Complete(), Message: retentionPreviewMessage(p), ObservedAt: p.ObservedAt.UTC(), ArtifactsScanned: p.Scanned,
 		AffectedTotal: p.Affected, ReadClosedTotal: p.ReadClosed, DeletionDueTotal: p.DeletionDue, UnknownTotal: p.Unknown,
 		EarliestExpiresAt: optionalTime(p.EarliestExpiresAt), EarliestDeleteBy: optionalTime(p.EarliestDeleteBy), BaselineChanged: p.BaselineChanged,
 		Groups: []retentionGroupData{}, GroupsTotal: len(p.Groups), Incomplete: []retentionIncompleteData{}, IncompleteTotal: len(p.Incomplete), NotEvaluated: []retentionNotEvaluatedData{}}
-	for _, g := range p.Groups[:min(len(p.Groups), retentionPreviewGroups)] {
-		out.Groups = append(out.Groups, retentionGroupData{g.ClusterID, g.PrivacyClass, g.EvidenceType, g.Scanned, g.Affected, g.ReadClosed, g.DeletionDue, g.Unknown, optionalTime(g.EarliestExpiresAt), optionalTime(g.EarliestDeleteBy)})
+	end := offset + retentionPreviewPageRows
+	for n, g := range p.Groups {
+		if n >= offset && n < end {
+			out.Groups = append(out.Groups, retentionGroupData{g.ClusterID, g.PrivacyClass, g.EvidenceType, g.Scanned, g.Affected, g.ReadClosed, g.DeletionDue, g.Unknown, optionalTime(g.EarliestExpiresAt), optionalTime(g.EarliestDeleteBy)})
+		}
 	}
-	for _, c := range p.Incomplete[:min(len(p.Incomplete), retentionPreviewIncomplete)] {
-		out.Incomplete = append(out.Incomplete, retentionIncompleteData{c.ClusterID, c.Reason})
+	for n, c := range p.Incomplete {
+		if n += len(p.Groups); n >= offset && n < end {
+			out.Incomplete = append(out.Incomplete, retentionIncompleteData{c.ClusterID, c.Reason})
+		}
 	}
 	for _, c := range p.NotEvaluated {
 		out.NotEvaluated = append(out.NotEvaluated, retentionNotEvaluatedData{c.Action, c.SourceClusterID, c.UID, c.Reason})
@@ -200,6 +208,18 @@ func (s *RetentionPreviewOperations) CallWithContext(ctx context.Context, curren
 	if err != nil || !i.Valid(s.now()) {
 		return OperationReply{}, identity.ErrDenied
 	}
+	// The cursor is the next row offset bound to the caller and the exact
+	// proposal; the preview itself is recomputed for every page.
+	key := sha256.Sum256([]byte(i.Principal.Issuer + "\x00" + i.Principal.Subject + "\x00" + retentionChangesKey(in.Changes)))
+	offset := 0
+	if in.Cursor != "" {
+		head, tail, _ := strings.Cut(in.Cursor, ":")
+		n, err := strconv.Atoi(head)
+		if err != nil || n < 1 || tail != hex.EncodeToString(key[:16]) {
+			return OperationReply{}, contracts.ErrInvestigationWire
+		}
+		offset = n
+	}
 	changes := make([]privacyapp.ProposedRetentionChange, len(in.Changes))
 	for n, c := range in.Changes {
 		changes[n] = privacyapp.ProposedRetentionChange{Action: c.Action, SourceClusterID: c.SourceClusterID, UID: c.UID, Spec: c.Spec}
@@ -211,7 +231,11 @@ func (s *RetentionPreviewOperations) CallWithContext(ctx context.Context, curren
 		out.Status, out.Data = "error", retentionPreviewFailure(operationErr)
 	} else {
 		until = identity.Earlier(until, valid)
-		out.Data = retentionPreviewReply(p)
+		out.Data = retentionPreviewReply(p, offset)
+		if next := offset + retentionPreviewPageRows; next < len(p.Groups)+len(p.Incomplete) {
+			cursor := strconv.Itoa(next) + ":" + hex.EncodeToString(key[:16])
+			out.NextCursor = &cursor
+		}
 	}
 	final, err := current.ResolveIdentity(ctx)
 	if err != nil || ctx.Err() != nil || !final.Valid(s.now()) || final.Principal != i.Principal {
@@ -227,6 +251,11 @@ func (s *RetentionPreviewOperations) CallWithContext(ctx context.Context, curren
 		return OperationReply{}, value.ErrUnavailable
 	}
 	return OperationReply{Body: b, ValidUntil: until, auditDecision: retentionPreviewAuditDecision(operationErr)}, nil
+}
+
+func retentionChangesKey(changes []retentionPreviewChange) string {
+	b, _ := json.Marshal(changes)
+	return string(b)
 }
 
 func retentionPreviewAuditDecision(err error) operationAuditDecision {

@@ -22,7 +22,12 @@ WITH scanned AS MATERIALIZED (
     AND r.cluster_id=p.cluster_id AND r.namespace_uid=p.namespace_uid AND r.workload_uid=p.workload_uid AND r.pod_uid=p.pod_uid
   JOIN custody_attempt a ON a.id=p.attempt_id AND a.artifact_id=p.artifact_id AND a.cluster_id=p.cluster_id
   WHERE sqlc.narg(case_id)::uuid IS NULL AND p.root_id=sqlc.arg(root_id)::uuid
-    AND p.cluster_id=sqlc.narg(cluster_id)::uuid AND p.namespace_uid=sqlc.arg(namespace_uid)::text AND p.workload_uid=sqlc.arg(workload_uid)::text
+    AND p.cluster_id=sqlc.narg(cluster_id)::uuid
+    -- ADR-335 D4: the namespace by its recorded name, the workload by the
+    -- kind/name recorded for its UID, so a recreated workload matches too.
+    AND EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=p.cluster_id AND w.workload_uid=p.workload_uid AND split_part(w.ref,'/',2)=sqlc.arg(workload)::text)
+    AND EXISTS(SELECT 1 FROM context_capture n WHERE n.root_id=p.root_id AND n.id=p.capture_id
+     AND convert_from(n.expectation_json,'UTF8')::jsonb->>'Namespace'=sqlc.arg(namespace)::text)
     AND p.anchor_at>=sqlc.arg(after_anchor_at)::timestamptz AND p.anchor_at<sqlc.arg(acquired_until)::timestamptz
     AND (p.anchor_at,p.artifact_id)>(sqlc.arg(after_anchor_at)::timestamptz,sqlc.arg(after_artifact_id)::uuid)
     AND p.retire_by>sqlc.arg(observed_at)::timestamptz AND a.state<>'deleted'

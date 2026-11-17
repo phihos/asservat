@@ -77,7 +77,14 @@ func qualifyProcessingDiscovery(t *testing.T, ctx context.Context, admin *pgxpoo
 	if len(page.Candidates) != 1 || page.Candidates[0].ArtifactID != high || page.Next.ArtifactID != "" {
 		t.Fatal("case discovery continuation", page)
 	}
-	q = value.ProcessingDiscoveryQuery{ClusterID: first.Registration.Location.ClusterID, NamespaceUID: first.NamespaceUID, WorkloadUID: first.WorkloadUID,
+	// ADR-335 D4: the search names the namespace and workload; the hub
+	// records each resolved workload's kind and name for its UID.
+	for _, e := range []artifact.ContextExpectation{first, second} {
+		if _, err := admin.Exec(ctx, `INSERT INTO workload_name(cluster_id,workload_uid,ref) VALUES($1,$2,'Deployment/synthetic-workload') ON CONFLICT DO NOTHING`, e.Registration.Location.ClusterID, e.WorkloadUID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q = value.ProcessingDiscoveryQuery{ClusterID: first.Registration.Location.ClusterID, Namespace: first.Namespace, Workload: "synthetic-workload",
 		AcquiredFrom: first.Registration.AnchorAt, AcquiredUntil: first.Registration.AnchorAt.Add(time.Microsecond), PurposeRef: first.PurposeRef, Limit: 1}
 	page = read(q)
 	if len(page.Candidates) != 1 || page.Candidates[0].ArtifactID != low || page.Next.ArtifactID != low || !page.Next.AnchorAt.Equal(q.AcquiredFrom) {

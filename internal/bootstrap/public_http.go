@@ -142,7 +142,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"processing-inventory", mounts.ErrUnavailable}
 		}
 		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Inventory: inventory, Now: time.Now}}
-		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID,
+		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID, clusters,
 			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Discovery: inventory, Now: time.Now},
 			&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Status: decisions, Now: time.Now},
 			&privacyapp.ProcessingReport{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Reports: inventory, Now: time.Now})
