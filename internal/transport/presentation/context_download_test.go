@@ -55,12 +55,12 @@ func downloadProjection(t *testing.T) (*ContextDownloadOperations, *downloadProj
 }
 func TestDownloadProjectionUsesOnlyPreparedNativeGroup(t *testing.T) {
 	s, f, current := downloadProjection(t)
-	out, e := s.Call(t.Context(), current, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
+	out, e := s.Call(t.Context(), current, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`"}`))
 	if e != nil || f.prepares != 0 || f.reads != 1 || !out.ValidUntil.Equal(f.view.ValidUntil) {
 		t.Fatalf("status: %s %v", out.Body, e)
 	}
 	var wire struct{ Data ContextDownloadData }
-	if json.Unmarshal(out.Body, &wire) != nil || wire.Data.Filename != "pod-status.json" || wire.Data.SHA256 != hash(f.view.Metadata.SHA256) || wire.Data.ContentPath != "/api/v1/downloads/"+downloadID+"/content" || wire.Data.ContinuePreparation {
+	if json.Unmarshal(out.Body, &wire) != nil || wire.Data.Filename != "pod-status.json" || wire.Data.SHA256 != hash(f.view.Metadata.SHA256) || wire.Data.ContentPath != "/api/v1/downloads/"+downloadID+"/content" || wire.Data.BrowserURL != "/downloads/"+downloadID || wire.Data.State != "Ready" || wire.Data.Revision != 2 || wire.Data.SizeBytes != 42 {
 		t.Fatal("wrong native projection", string(out.Body))
 	}
 	for _, private := range []string{"private-namespace", "private-workload", "private-pod", "Principal", "RequestDigest", "allocation_id", "ReadLimit"} {
@@ -69,50 +69,52 @@ func TestDownloadProjectionUsesOnlyPreparedNativeGroup(t *testing.T) {
 		}
 	}
 }
-func TestDownloadTerminalStatusNeedsNoNativeMetadataAfterTransferExpiry(t *testing.T) {
+
+// Terminal sessions no longer hold the verified size and checksum every
+// canonical status carries; they report the ended state as an error result.
+func TestDownloadTerminalStatusIsCapabilityUnavailable(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.view.Session.State = artifact.DownloadCompleted
 	f.view.Session.Deadline = c.i.VerifiedAt.Add(-time.Second)
 	f.view.Metadata = nil
-	out, e := s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
-	if e != nil || strings.Contains(string(out.Body), "sha256") || strings.Contains(string(out.Body), "content_path") || !strings.Contains(string(out.Body), `"state":"Completed"`) {
+	out, e := s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`","after_revision":3}`))
+	if e != nil || strings.Contains(string(out.Body), "content_path") || !strings.Contains(string(out.Body), `"code":"CapabilityUnavailable"`) || !strings.Contains(string(out.Body), "Completed") {
 		t.Fatal(string(out.Body), e)
 	}
 }
 func TestDownloadInvalidRawOrAmbiguousInputNeverDispatches(t *testing.T) {
-	for _, bad := range []string{`{"artifact_id":"` + artifactID + `","idempotency_key":"key","grant_id":"` + caseID + `"}`, `{"artifact_id":"` + artifactID + `","artifact_id":"` + caseID + `","idempotency_key":"key"}`, `{"artifact_id":"` + artifactID + `","idempotency_key":""}`} {
+	for _, bad := range []string{`{"action":"prepare","artifact_id":"` + artifactID + `","idempotency_key":"key","grant_id":"` + caseID + `"}`, `{"action":"prepare","artifact_id":"` + artifactID + `","artifact_id":"` + caseID + `","idempotency_key":"key"}`, `{"action":"prepare","artifact_id":"` + artifactID + `","idempotency_key":""}`, `{"artifact_id":"` + artifactID + `","idempotency_key":"key"}`, `{"action":"status","artifact_id":"` + artifactID + `","idempotency_key":"key"}`} {
 		s, f, c := downloadProjection(t)
-		if _, e := s.Call(t.Context(), c, "prepare_artifact_download", []byte(bad)); !errors.Is(e, contracts.ErrInvestigationWire) || f.prepares != 0 {
+		if _, e := s.Call(t.Context(), c, "download_artifact", []byte(bad)); !errors.Is(e, contracts.ErrInvestigationWire) || f.prepares != 0 {
 			t.Fatal("raw/ambiguous request dispatched", e)
 		}
 	}
 }
-func TestDownloadContinuationIsPrepareOnly(t *testing.T) {
+
+// Preparing has no canonical state: prepare and status ask the caller to
+// repeat prepare with the same key.
+func TestDownloadPreparingIsRetryLater(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.view.Session.State = artifact.DownloadPreparing
 	f.view.Metadata = nil
-	f.view.ContinuePreparation = true
-	out, e := s.Call(t.Context(), c, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
-	if e != nil || !strings.Contains(string(out.Body), `"continue_preparation":true`) {
-		t.Fatal(string(out.Body), e)
-	}
-	f.view.ContinuePreparation = false
-	out, e = s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
-	if e != nil || strings.Contains(string(out.Body), "continue_preparation") {
-		t.Fatal("status continued work", e)
+	for _, in := range []string{`{"action":"prepare","artifact_id":"` + artifactID + `","idempotency_key":"key","representation":"bundle"}`, `{"action":"status","download_id":"` + downloadID + `"}`} {
+		out, e := s.Call(t.Context(), c, "download_artifact", []byte(in))
+		if e != nil || !strings.Contains(string(out.Body), `"code":"RetryLater"`) {
+			t.Fatal(string(out.Body), e)
+		}
 	}
 }
 func TestDownloadResponseDeniesChangedIdentity(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.after = func() { c.i.Scopes = []string{"evidence:read"} }
-	if _, e := s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`)); e == nil {
+	if _, e := s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`"}`)); e == nil {
 		t.Fatal("lost download scope disclosed metadata")
 	}
 }
 func TestDownloadErrorsDoNotDiscloseNativeOrExistenceDetails(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.err = errors.New("private backend SQL error")
-	out, e := s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
+	out, e := s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"status","download_id":"`+downloadID+`"}`))
 	if e != nil || strings.Contains(string(out.Body), downloadID) || strings.Contains(string(out.Body), "SQL") || strings.Contains(string(out.Body), "filename") {
 		t.Fatal(string(out.Body), e)
 	}
@@ -143,13 +145,13 @@ func TestDownloadStopRunsWithoutReadScopeAndWritesCallRow(t *testing.T) {
 	}
 	audited.inner = combined
 	audited.stopSlots = make(chan struct{}, 4)
-	input := []byte(`{"download_id":"` + downloadID + `","idempotency_key":"same-key"}`)
-	out, e := audited.Call(t.Context(), current, "cancel_artifact_download", input)
-	if e != nil || stop.calls != 1 || len(gate.events) != 1 || gate.events[0].Kind != "call" || gate.events[0].Operation != "cancel_artifact_download" || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
+	input := []byte(`{"action":"cancel","download_id":"` + downloadID + `","idempotency_key":"same-key"}`)
+	out, e := audited.Call(t.Context(), current, "download_artifact", input)
+	if e != nil || stop.calls != 1 || len(gate.events) != 1 || gate.events[0].Kind != "call" || gate.events[0].Operation != "download_artifact" || !strings.Contains(string(out.Body), `"state":"AlreadyTerminal"`) {
 		t.Fatal(string(out.Body), e, gate.events)
 	}
 	gate.fail = true
-	if failed, e := audited.Call(t.Context(), current, "cancel_artifact_download", input); e == nil || len(failed.Body) != 0 {
+	if failed, e := audited.Call(t.Context(), current, "download_artifact", input); e == nil || len(failed.Body) != 0 {
 		t.Fatal("stop reply left without its call row", e)
 	}
 	for _, field := range []string{"artifact_id", "filename", "sha256", "expires_at", "Completed"} {
@@ -169,7 +171,7 @@ func TestDownloadStopMalformedInputCannotUsePrepaidLane(t *testing.T) {
 	}
 	audited.inner = combined
 	audited.stopSlots = make(chan struct{}, 4)
-	_, e = audited.Call(t.Context(), current, "cancel_artifact_download", []byte(`{"download_id":"`+downloadID+`","idempotency_key":"key","actor":"foreign"}`))
+	_, e = audited.Call(t.Context(), current, "download_artifact", []byte(`{"action":"cancel","download_id":"`+downloadID+`","idempotency_key":"key","actor":"foreign"}`))
 	if !errors.Is(e, contracts.ErrInvestigationWire) || stop.calls != 0 || len(gate.events) != 1 || gate.events[0].Operation != "invalid_operation" {
 		t.Fatal("invalid input reached protected stop", e)
 	}
@@ -181,7 +183,7 @@ func TestDownloadWithoutDownloadScopeIsAnAuditedDenialReply(t *testing.T) {
 	for _, scopes := range [][]string{{"evidence:read"}, {"evidence:download"}, nil} {
 		s, f, c := downloadProjection(t)
 		c.i.Scopes = scopes
-		out, e := s.Call(t.Context(), c, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
+		out, e := s.Call(t.Context(), c, "download_artifact", []byte(`{"action":"prepare","artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
 		if e != nil || f.prepares != 0 || out.auditDecision != operationAuditDenied || !strings.Contains(string(out.Body), `"status":"error"`) {
 			t.Fatal(scopes, string(out.Body), e, f.prepares)
 		}

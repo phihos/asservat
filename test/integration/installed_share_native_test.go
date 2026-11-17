@@ -131,28 +131,22 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	}
 	// ADR-233: the recipient prepares the native download through the share and
 	// fetches a byte range with its own download-route token.
-	prepare := map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-share-download"}
+	prepare := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "installed-share-download"}
 	var download installedJourneyDownload
-	if status, code := call(recipient, "prepare_artifact_download", prepare, &download); status != "ok" || download.DownloadID == "" {
-		diagnose()
-		t.Fatal("installed recipient could not prepare the shared download", status, code)
-	}
-	for deadline := time.Now().Add(3 * time.Minute); download.State == "Preparing"; {
-		if time.Now().After(deadline) {
+	// A session still preparing returns RetryLater; repeat prepare with the
+	// same key until it is Ready.
+	for deadline := time.Now().Add(3 * time.Minute); ; {
+		status, code := call(recipient, "download_artifact", prepare, &download)
+		if status == "ok" {
+			break
+		}
+		if code != "RetryLater" || time.Now().After(deadline) {
 			diagnose()
-			t.Fatal("installed recipient download was not prepared in time")
+			t.Fatal("installed recipient could not prepare the shared download", status, code)
 		}
 		time.Sleep(time.Second)
-		name, args := "get_artifact_download", map[string]string{"download_id": download.DownloadID}
-		if download.ContinuePreparation {
-			name, args = "prepare_artifact_download", prepare
-		}
-		if status, code := call(recipient, name, args, &download); status != "ok" {
-			diagnose()
-			t.Fatal("installed recipient download poll", name, code)
-		}
 	}
-	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes != int64(len(native)) || len(native) < 2 {
+	if download.State != "Ready" || download.DownloadID == "" || download.ContentPath == "" || download.SizeBytes != int64(len(native)) || len(native) < 2 {
 		diagnose()
 		t.Fatal("installed recipient download", download.State, download.ContentPath)
 	}
@@ -192,7 +186,7 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	}
 	// The next download request re-reads the share: preparation and the
 	// remaining range of the existing session are refused.
-	if status, _ := call(recipient, "prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-share-download-2"}, nil); status != "error" {
+	if status, _ := call(recipient, "download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "installed-share-download-2"}, nil); status != "error" {
 		t.Fatal("installed recipient prepared a download after revocation")
 	}
 	rest := installedJourneyContent(t, ctx, contentClient, contentURL, recipientDownloads.downloadToken(), map[string]string{"Range": "bytes=" + strconv.FormatInt(half, 10) + "-"})

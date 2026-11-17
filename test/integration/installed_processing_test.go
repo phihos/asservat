@@ -120,7 +120,7 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 		input any
 	}{
 		{"get_case", map[string]string{"case_id": c.CaseID}},
-		{"prepare_artifact_download", map[string]string{"artifact_id": c.ArtifactID, "idempotency_key": "installed-processing-blocked-" + c.ArtifactID}},
+		{"download_artifact", map[string]string{"action": "prepare", "artifact_id": c.ArtifactID, "idempotency_key": "installed-processing-blocked-" + c.ArtifactID}},
 	} {
 		out, err := c.Call(ctx, request.name, request.input)
 		if err != nil || out.Status != "error" {
@@ -181,16 +181,9 @@ func assertInstalledOriginalNative(t *testing.T, ctx context.Context, c installe
 	if code != "" || out.Status != "ok" || json.Unmarshal(out.Data, &restored) != nil || len(restored.Artifacts) != 1 || restored.Artifacts[0].ArtifactID != c.ArtifactID || !restored.Artifacts[0].ExpiresAt.Equal(c.ExpiresAt) {
 		t.Fatal("original artifact or access deadline changed", code)
 	}
-	read := func(name string, input, out any) {
-		t.Helper()
-		reply, code := invoke(name, input)
-		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, out) != nil {
-			t.Fatal("installed processing native preparation status", name, code)
-		}
-	}
 	// The baseline transfer is already Completed. A fresh user-requested native
 	// session is required; neither restriction nor release refills the old one.
-	native, _ := installedNativeDownload(t, ctx, c.Transport, c.Identity, c.Origin, c.ArtifactID, key, invoke, read, c.Diagnose, ".json")
+	native, _ := installedNativeDownload(t, ctx, c.Transport, c.Identity, c.Origin, c.ArtifactID, key, invoke, c.Diagnose, ".json")
 	if !bytes.Equal(native, c.Native) {
 		t.Fatal("original artifact changed its native bytes")
 	}

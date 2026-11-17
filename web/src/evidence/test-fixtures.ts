@@ -1,6 +1,6 @@
 // Synthetic metadata only; these helpers are never imported by product code.
 import { existsSync, readFileSync } from 'node:fs';
-import type { Input, Output, Operations, Operation, Download } from './http';
+import type { Input, Output, Operations, Operation } from './http';
 export { session } from '../capture/test-fixtures';
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
@@ -14,25 +14,23 @@ export function caseResult(): Output<'get_case'> {
   a.handling_notice.asOf = new Date().toISOString();
   return value;
 }
-export function downloadResult(state: Download['state'] = 'Ready'): Output<'get_artifact_download'> {
+export function downloadResult(): Output<'download_artifact'> {
   const value = example('download-ready.json');
   value.warnings = [];
   const d = value.data;
-  d.artifact_id = id(3); d.download_id = id(4); d.state = state;
+  d.artifact_id = id(3); d.download_id = id(4); d.representation = 'file';
   d.filename = 'artifact-3.json'; d.native_format = 'pod-status/v1'; d.size_bytes = 512;
   d.coverage_notice = 'Selected pod-status metadata only; no logs or workload configuration.';
-  d.expires_at = new Date(Date.now() + 1_800_000).toISOString();
-  d.managed_read_until = new Date(Date.now() + 3_600_000).toISOString();
-  d.content_path = `/api/v1/downloads/${id(4)}/content`;
-  d.resume_available = ['Ready', 'Streaming', 'Interrupted'].includes(state);
-  if (!['Ready', 'Streaming', 'Interrupted'].includes(state)) delete d.content_path;
-  if (!['Ready', 'Streaming', 'Interrupted', 'Completed'].includes(state)) for (const key of ['filename', 'native_format', 'size_bytes', 'sha256', 'etag', 'coverage_notice']) delete d[key];
+  d.access_until = new Date(Date.now() + 1_800_000).toISOString();
+  d.content_path = `/api/v1/downloads/${id(4)}/content`; d.browser_url = `/downloads/${id(4)}`;
   return value;
 }
+export const failure = (code: string, message = 'Synthetic failure.', retryable = false) => ({ schema_version: 'mcp-result/v1', request_id: id(9), data_class: 'metadata', status: 'error', data: { code, message, retryable }, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] }) as Output<'download_artifact'>;
+export const cancelled = () => ({ ...downloadResult(), data: { download_id: id(4), state: 'Cancelled' } }) as Output<'download_artifact'>;
 export class SyntheticEvidence implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => name === 'get_case' ? caseResult() : downloadResult(name === 'prepare_artifact_download' ? 'Preparing' : name === 'cancel_artifact_download' ? 'Cancelled' : 'Ready');
+  responder: (name: Operation, input: unknown) => unknown | Promise<unknown> = (name, input) => name === 'get_case' ? caseResult() : (input as { action: string }).action === 'cancel' ? cancelled() : downloadResult();
   async call<N extends Operation>(name: N, input: Input<N>, _csrf: string, signal: AbortSignal): Promise<Output<N>> {
-    this.calls.push({ name, input: structuredClone(input), signal }); return await this.responder(name) as Output<N>;
+    this.calls.push({ name, input: structuredClone(input), signal }); return await this.responder(name, input) as Output<N>;
   }
 }

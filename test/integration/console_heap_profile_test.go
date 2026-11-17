@@ -249,10 +249,10 @@ type consoleHeapOperations struct {
 }
 
 func (s *consoleHeapOperations) ToolNames() []string {
-	return []string{"get_case", "get_extract", "get_query_result", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"}
+	return []string{"get_case", "get_extract", "get_query_result", "download_artifact"}
 }
 func (s *consoleHeapOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, input json.RawMessage) (presentation.OperationReply, error) {
-	if name == "prepare_artifact_download" || name == "get_artifact_download" || name == "cancel_artifact_download" {
+	if name == "download_artifact" {
 		return s.downloads.Call(ctx, current, name, input)
 	}
 	return s.consoleSyntheticComparisonOperations.Call(ctx, current, name, input)
@@ -282,7 +282,6 @@ func (s *consoleHeapDownloads) PrepareContextDownload(ctx context.Context, c ide
 	if e == nil && first && !s.readyImmediately {
 		v.Session.State = artifact.DownloadPreparing
 		v.Metadata = nil
-		v.ContinuePreparation = true
 	}
 	return s.metadata(v), e
 }

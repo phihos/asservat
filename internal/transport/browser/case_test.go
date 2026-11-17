@@ -93,7 +93,7 @@ func TestCaseBrowserUsesCurrentSessionCSRFAndNoUnavailableRoutes(t *testing.T) {
 		"GET":                  func(r *http.Request) { r.Method = "GET" },
 		"query":                func(r *http.Request) { r.URL.RawQuery = "case_id=other" },
 		"capture unavailable":  func(r *http.Request) { r.URL.Path = "/api/v1/operations/request_capture" },
-		"download unavailable": func(r *http.Request) { r.URL.Path = "/api/v1/operations/prepare_artifact_download" },
+		"download unavailable": func(r *http.Request) { r.URL.Path = "/api/v1/operations/download_artifact" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := request()

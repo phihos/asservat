@@ -84,7 +84,7 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 			if len(names) != expected {
 				t.Fatal("discovery", names)
 			}
-			for _, unavailable := range []string{"prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "request_capture"} {
+			for _, unavailable := range []string{"download_artifact", "request_capture"} {
 				if names[unavailable] {
 					t.Fatal("unavailable service advertised", unavailable)
 				}

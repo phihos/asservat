@@ -70,7 +70,7 @@ try {
   assert.deepEqual((await stats()).native_ids, failedState.native_ids);
   checks.push('lost actual Stop reply retains the old key and starts no new preparation or content request');
 
-  const positiveStop = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/cancel_artifact_download' && r.status() === 200)
+  const positiveStop = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/download_artifact' && r.request().postDataJSON()?.action === 'cancel' && r.status() === 200)
     .then(async r => ({ wire: await r.json(), body: r.request().postDataJSON() }));
   await page.getByRole('button', { name: 'Start a new download', exact: true }).click();
   const stopReply = await positiveStop;

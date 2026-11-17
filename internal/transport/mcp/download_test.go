@@ -30,7 +30,9 @@ func (f *mcpDownloadFixture) CancelContextDownload(ctx context.Context, current 
 		return artifact.DownloadStopReceipt{}, e
 	}
 	f.stops.Add(1)
-	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
+	now := time.Now()
+	// Like the stop service: the receipt is one lease long.
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: now, ValidUntil: identity.Earlier(i.ValidUntil, now.Add(artifact.DownloadLease))}, nil
 }
 func TestMCPStopWithoutEvidenceScopesSurvivesNormalExecutionSaturation(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {
@@ -60,7 +62,7 @@ func TestMCPStopWithoutEvidenceScopesSurvivesNormalExecutionSaturation(t *testin
 			if discovery.StatusCode != 200 {
 				t.Fatal("normal work blocked Stop discovery", discovery.StatusCode)
 			}
-			request := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "cancel_artifact_download", "arguments": map[string]any{"download_id": "00000000-0000-4000-8000-000000000090", "idempotency_key": "same-key"}})
+			request := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "download_artifact", "arguments": map[string]any{"action": "cancel", "download_id": "00000000-0000-4000-8000-000000000090", "idempotency_key": "same-key"}})
 			response, body := send(t, server, request)
 			if response.StatusCode != 200 || f.stops.Load() != 1 || !strings.Contains(string(body), "Cancelled") {
 				t.Fatal(response.StatusCode, string(body), f.stops.Load())
@@ -88,7 +90,7 @@ func TestMCPInvalidStopArgumentsDoNotSpendStopExecutionSlot(t *testing.T) {
 	}
 	h.normalWork <- struct{}{}
 	defer func() { <-h.normalWork }()
-	response, _ := send(t, server, rpcRequest(t, server, "2026-07-28", "tools/call", map[string]any{"name": "cancel_artifact_download", "arguments": map[string]any{"actor": "foreign"}}))
+	response, _ := send(t, server, rpcRequest(t, server, "2026-07-28", "tools/call", map[string]any{"name": "download_artifact", "arguments": map[string]any{"action": "cancel", "actor": "foreign"}}))
 	if response.StatusCode != 429 || len(h.stopWork) != 0 || f.stops.Load() != 0 {
 		t.Fatal("invalid stop entered reserved lane", response.StatusCode)
 	}

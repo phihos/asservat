@@ -17,7 +17,7 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
   const calls = [], unrelated = [];
   const requestListener = request => {
     const path = new URL(request.url()).pathname;
-    if (/\/api\/v1\/operations\/(?:request_raw_access|prepare_artifact_download|request_capture|preview_capture|query_artifact)$/.test(path) || /\/api\/v1\/downloads\//.test(path)) unrelated.push(path);
+    if (/\/api\/v1\/operations\/(?:request_raw_access|download_artifact|request_capture|preview_capture|query_artifact)$/.test(path) || /\/api\/v1\/downloads\//.test(path)) unrelated.push(path);
   };
   const times = () => { const now = Date.now(); return { query_observed_at: new Date(now).toISOString(), query_expires_at: new Date(now + 10000).toISOString() }; };
   const envelope = (data, timing, nextCursor = null) => ({ schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000092', data_class: 'extract', status: 'ok', data: { ...data, ...timing }, next_cursor: nextCursor, truncated: false, narrowing_hint: null, warnings: [], provenance: [{ artifactID: artifact.artifact_id, digest: artifact.digest }] });

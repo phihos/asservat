@@ -61,12 +61,11 @@ console.log('Native ESM auth and capture operation validators passed positive an
 const evidence = await import('../src/generated/validate-evidence.js');
 for (const [file, validator] of [
   ['mcp-shared-case-notice-result', 'validOutput_get_case'],
-  ['download-prepare', 'validInput_prepare_artifact_download'],
-  ['download-get', 'validInput_get_artifact_download'],
-  ['download-cancel', 'validInput_cancel_artifact_download'],
-  ['download-ready', 'validOutput_prepare_artifact_download'],
-  ['download-ready', 'validOutput_get_artifact_download'],
-  ['download-cancelled', 'validOutput_cancel_artifact_download'],
+  ['download-prepare', 'validInput_download_artifact'],
+  ['download-get', 'validInput_download_artifact'],
+  ['download-cancel', 'validInput_download_artifact'],
+  ['download-ready', 'validOutput_download_artifact'],
+  ['download-cancelled', 'validOutput_download_artifact'],
 ]) {
   const value = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
   assert.equal(evidence[validator](value), true, file);
@@ -89,40 +88,24 @@ profileCase.data.artifacts[0].endpoint = 'http://unreviewed.invalid';
 assert.equal(evidence.validOutput_get_case(profileCase), false, 'case metadata does not expose arbitrary endpoint fields');
 const ready = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
 delete ready.data.sha256;
-assert.equal(evidence.validOutput_get_artifact_download(ready), false, 'native metadata is an indivisible group');
+assert.equal(evidence.validOutput_download_artifact(ready), false, 'every status carries size and SHA-256');
 console.log('Native ESM case and download validators passed positive and negative checks.');
 
-const nativeFields = ['filename', 'native_format', 'size_bytes', 'sha256', 'etag', 'coverage_notice'];
-const completed = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
-completed.data.state = 'Completed'; completed.data.resume_available = false;
-completed.data.expires_at = '2000-01-01T00:00:00Z';
-delete completed.data.content_path;
-for (const field of nativeFields) delete completed.data[field];
 const full = JSON.parse(await readFile(exampleURL('download-ready.json'), 'utf8'));
-for (const name of ['prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download']) {
-  const validate = evidence['validOutput_' + name];
-  assert.equal(validate(completed), true, name + ' accepts terminal-only Completed after transfer expiry');
-  for (const field of nativeFields) {
-    const partial = structuredClone(completed); partial.data[field] = full.data[field];
-    assert.equal(validate(partial), false, name + ' rejects isolated native field ' + field);
-  }
-  const verified = structuredClone(completed);
-  for (const field of nativeFields) verified.data[field] = full.data[field];
-  assert.equal(validate(verified), true, name + ' retains complete verified metadata');
-  for (const field of nativeFields) {
-    const partial = structuredClone(verified); delete partial.data[field];
-    assert.equal(validate(partial), false, name + ' rejects missing native field ' + field);
-  }
-  for (const [field, value] of [['sha256', 'not-verified'], ['content_path', full.data.content_path], ['resume_available', true]]) {
-    const invalid = structuredClone(verified); invalid.data[field] = value;
-    assert.equal(validate(invalid), false, name + ' rejects terminal ' + field);
-  }
-  for (const state of ['Ready', 'Streaming', 'Interrupted']) {
-    const absent = structuredClone(completed); absent.data.state = state; absent.data.content_path = full.data.content_path;
-    assert.equal(validate(absent), false, name + ' still requires verified metadata for ' + state);
-  }
+const completed = structuredClone(full);
+completed.data.state = 'Completed'; delete completed.data.content_path; delete completed.data.browser_url;
+assert.equal(evidence.validOutput_download_artifact(completed), true, 'terminal status keeps size and SHA-256');
+for (const link of ['content_path', 'browser_url']) {
+  const linked = structuredClone(completed); linked.data[link] = full.data[link];
+  assert.equal(evidence.validOutput_download_artifact(linked), false, 'terminal status carries no ' + link);
+  const missing = structuredClone(full); delete missing.data[link];
+  assert.equal(evidence.validOutput_download_artifact(missing), false, 'Ready requires ' + link);
 }
-console.log('Native ESM download terminal-only status and complete native metadata guards passed for all three operations.');
+for (const state of ['Preparing', 'Streaming', 'Interrupted']) {
+  const legacy = structuredClone(full); legacy.data.state = state;
+  assert.equal(evidence.validOutput_download_artifact(legacy), false, 'no legacy state ' + state);
+}
+console.log('Native ESM download status guards passed.');
 for (const [file, validator] of [
   ['mcp-context-excerpt-pending', 'validOutput_get_extract'],
   ['mcp-context-excerpt-result', 'validOutput_get_extract'],
