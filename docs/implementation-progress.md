@@ -1,5 +1,31 @@
 # Sustained implementation progress
 
+## Audit as a database row, part 1 (ADR-330 D6, REQ-AUT-005, 2026-11-17)
+
+Branch `clean/audit-api`. `audit_event` (00190) holds one append-only row per
+event: one `call` row per admitted public operation, and one row per effect
+written in the effect's own transaction (shares 00191, context queries 00192,
+capture admission 00193, download stop 00194, processing decisions 00195).
+00196 drops the encrypted operation audit: `operation_audit*` tables, the
+`capture_operation_*` views, `capture_audit_root`, their guards and history
+functions. Capacity creates no audit pool and enrollment reserves no audit
+account. Removed in Go: the operation journal/acknowledgement/lifecycle,
+overdue and history cleanup, the hub-worker cleanup child, its four OpenBao
+cleanup roles and the `operation-cleanup`/`operation-verify` S3 principals,
+the capture audit SQL logins (`capture-intent-read`, `capture-journal`,
+`capture-ack`, `capture-cleanup`, `capture-verifier`, `capture-finalizer`)
+and the HTTP audit lanes.
+
+Gaps: the presentation layer still builds an `OperationIntent`/`Outcome`
+before writing the call row; stateless previews and the MCP/browser surface
+of the canonical contracts are the next steps. The capacity root backing still
+carries `Capture`/`Normal`/`Resolution` audit lane qualifications that only
+size `download_control_allocation` and native backing. Other encrypted audit
+receipts (download batches and workers, owner/worker enrollment, retention,
+permission authority, context deletion) are unchanged. A `goose down-to 125`
+probe no longer works: about thirty historical migrations name the dropped
+tables; our migrations have no Down and re-Up of 00190-00196 is safe.
+
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
 
 Branch `clean/join`. A workload cluster's release needs only `mode: cluster`,
