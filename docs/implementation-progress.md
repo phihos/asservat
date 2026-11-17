@@ -79,11 +79,7 @@ trigger shorten only matching artifacts. Policy recorders and saved windows
 use the labels resolved at arming. Rows without recorded labels (older rows)
 take a labeled policy cluster-wide.
 Open: policy status writes (no RBAC or status code yet; the log line is the
-signal), label selectors (no label reader; a labeled policy refuses collection in
-its clusters and applies cluster-wide to existing evidence), connector-pushed
-local policies.
-
-signal), connector-pushed local policies, one-step publication.
+signal), connector-pushed local policies.
 
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
 
