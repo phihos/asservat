@@ -39,6 +39,3 @@ BEGIN
  RETURN NEW;
 END $$;
 -- +goose StatementEnd
-
--- +goose Down
--- No Down: the schema is never downgraded (see 00001).

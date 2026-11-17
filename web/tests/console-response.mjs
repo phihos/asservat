@@ -11,7 +11,7 @@ export async function captureConsoleResponses(page) {
       const url = new URL(typeof input === 'string' ? input : input.url, location.href);
       if (url.origin === location.origin && (url.pathname.startsWith('/api/v1/') || url.pathname === '/auth/refresh') &&
           /^application\/(?:problem\+)?json(?:\s*;|$)/i.test(response.headers.get('Content-Type') ?? '')) {
-        const key = (init?.method ?? 'GET') + '\n' + url.pathname + url.search + '\n' + (init?.body ?? '');
+        const key = (init?.method ?? 'GET').toUpperCase() + '\n' + url.pathname + url.search + '\n' + (init?.body ?? '');
         const body = response.clone().text();
         if (!replies.has(key)) replies.set(key, []);
         replies.get(key).push(body);
