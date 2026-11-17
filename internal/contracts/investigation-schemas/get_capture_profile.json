@@ -10,6 +10,10 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "target_handle": {
+        "type": "string",
+        "minLength": 1
+      },
       "profile_ref": {
         "$ref": "#/$defs/d0"
       },
@@ -17,9 +21,12 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "cluster_id": {
+          "cluster": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Cluster name as configured in the hub (ADR-335 D4)."
           },
           "namespace": {
             "type": "string",
@@ -40,7 +47,7 @@
           }
         },
         "required": [
-          "cluster_id",
+          "cluster",
           "namespace",
           "kind",
           "name"
@@ -48,8 +55,29 @@
       }
     },
     "required": [
-      "target_ref",
       "profile_ref"
+    ],
+    "oneOf": [
+      {
+        "required": [
+          "target_handle"
+        ],
+        "not": {
+          "required": [
+            "target_ref"
+          ]
+        }
+      },
+      {
+        "required": [
+          "target_ref"
+        ],
+        "not": {
+          "required": [
+            "target_handle"
+          ]
+        }
+      }
     ],
     "$defs": {
       "d0": {
@@ -70,84 +98,21 @@
           "version": {
             "type": "string",
             "pattern": "^v[1-9][0-9]*$",
-            "maxLength": 32
+            "description": "Optional; omitted, the hub resolves the current version and records it."
           }
         },
         "required": [
           "catalog",
-          "name",
-          "version"
+          "name"
         ]
       }
     }
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "enum": [
-          "metadata",
-          "extract"
-        ]
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -161,14 +126,14 @@
                 "additionalProperties": false,
                 "properties": {
                   "profile_ref": {
-                    "$ref": "#/$defs/d0"
+                    "$ref": "#/$defs/d2"
                   },
                   "definition_digest": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
                   },
                   "definition": {
-                    "$ref": "#/$defs/d1"
+                    "$ref": "#/$defs/d3"
                   }
                 },
                 "required": [
@@ -190,6 +155,37 @@
             "type": "object",
             "properties": {
               "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
                 "const": "error"
               },
               "data": {
@@ -198,21 +194,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -224,8 +217,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -244,7 +236,134 @@
       }
     ],
     "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
       "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -262,28 +381,26 @@
           "version": {
             "type": "string",
             "pattern": "^v[1-9][0-9]*$",
-            "maxLength": 32
+            "description": "Optional; omitted, the hub resolves the current version and records it."
           }
         },
         "required": [
           "catalog",
-          "name",
-          "version"
+          "name"
         ]
       },
-      "d4": {
+      "d6": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1099511627776
+            "maximum": 9007199254740991
           },
           "timeout": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-            "maxLength": 16
+            "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
           }
         },
         "required": [
@@ -291,12 +408,11 @@
           "timeout"
         ]
       },
-      "d6": {
+      "d8": {
         "type": "string",
-        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-        "maxLength": 16
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
       },
-      "d5": {
+      "d7": {
         "title": "Bounded packet action parameters",
         "type": "object",
         "additionalProperties": false,
@@ -343,39 +459,26 @@
                       "version"
                     ]
                   },
-                  "maxFlows": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1024
-                  },
                   "maxHeaderBytes": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 32768
-                  },
-                  "maxReassemblyBytesPerFlow": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 262144
+                    "maximum": 32768,
+                    "default": 32768,
+                    "description": "Common HTTP server header limits (nginx large_client_header_buffers 4 \u00d7 8 KiB) bound one request header block."
                   },
                   "maxReassemblyBytes": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 16777216
-                  },
-                  "idleTimeout": {
-                    "$ref": "#/$defs/d6"
+                    "default": 16777216,
+                    "description": "Per-target reassembly memory budget; per-flow reassembly is 2 \u00d7 maxHeaderBytes, so tracked flows = maxReassemblyBytes \u00f7 (2 \u00d7 maxHeaderBytes); the default 16 MiB is derived from the node collector memory limit together with the ring budget."
                   }
                 },
                 "required": [
                   "kind",
                   "protocol",
                   "projectionRef",
-                  "maxFlows",
                   "maxHeaderBytes",
-                  "maxReassemblyBytesPerFlow",
-                  "maxReassemblyBytes",
-                  "idleTimeout"
+                  "maxReassemblyBytes"
                 ]
               },
               {
@@ -415,7 +518,6 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 3,
                     "uniqueItems": true
                   }
                 },
@@ -428,13 +530,11 @@
           },
           "before": {
             "type": "string",
-            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-            "maxLength": 16
+            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
           },
           "after": {
             "type": "string",
-            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-            "maxLength": 16
+            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
           },
           "filter": {
             "type": "string",
@@ -447,7 +547,7 @@
             "additionalProperties": false,
             "properties": {
               "maxAge": {
-                "$ref": "#/$defs/d6"
+                "$ref": "#/$defs/d8"
               },
               "maxBytes": {
                 "type": "integer",
@@ -484,11 +584,9 @@
                           "type": "array",
                           "items": {
                             "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
+                            "minLength": 1
                           },
                           "minItems": 1,
-                          "maxItems": 128,
                           "uniqueItems": true
                         }
                       },
@@ -512,7 +610,6 @@
                             "matchLabels": {
                               "type": "object",
                               "minProperties": 1,
-                              "maxProperties": 16,
                               "additionalProperties": {
                                 "type": "string",
                                 "minLength": 1,
@@ -614,7 +711,6 @@
                   ]
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               },
               "protocol": {
@@ -633,7 +729,6 @@
                   "maximum": 65535
                 },
                 "minItems": 1,
-                "maxItems": 32,
                 "uniqueItems": true
               },
               "resolution": {
@@ -641,23 +736,14 @@
                   "frozen",
                   "follow"
                 ]
-              },
-              "maxEndpoints": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 4096
-              },
-              "maxStaleness": {
-                "$ref": "#/$defs/d6"
               }
             },
             "required": [
               "entries",
               "protocol",
-              "resolution",
-              "maxEndpoints",
-              "maxStaleness"
-            ]
+              "resolution"
+            ],
+            "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
           }
         },
         "required": [
@@ -668,11 +754,11 @@
           "peers"
         ]
       },
-      "d7": {
+      "d9": {
         "type": "string",
         "format": "uuid"
       },
-      "d8": {
+      "d10": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -706,11 +792,9 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
+                  "minLength": 1
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               }
             },
@@ -723,7 +807,7 @@
           "maxDepth": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 32
+            "maximum": 9007199254740991
           },
           "resolve": {
             "const": "atDispatch"
@@ -736,25 +820,27 @@
           "resolve"
         ]
       },
-      "d9": {
+      "d11": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxProcesses": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 64
+            "maximum": 9007199254740991,
+            "description": "The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses \u00d7 maxBytesPerProcess \u2264 the action maxBytes and by maxTotalStop."
           },
           "maxBytesPerProcess": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 8589934592
+            "maximum": 9007199254740991,
+            "description": "Bounded only by the action and capture byte budget."
           },
           "maxStopPerProcess": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d8"
           },
           "maxTotalStop": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d8"
           },
           "consistency": {
             "const": "sequential"
@@ -768,12 +854,12 @@
           "consistency"
         ]
       },
-      "d11": {
+      "d13": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxAge": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d8"
           },
           "maxBytes": {
             "type": "integer",
@@ -794,7 +880,7 @@
         ],
         "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
       },
-      "d10": {
+      "d12": {
         "title": "Bounded pod-wide syscall acquisition parameters",
         "type": "object",
         "additionalProperties": false,
@@ -814,7 +900,7 @@
                 "const": "0s"
               },
               {
-                "$ref": "#/$defs/d6"
+                "$ref": "#/$defs/d8"
               }
             ]
           },
@@ -824,7 +910,7 @@
                 "const": "0s"
               },
               {
-                "$ref": "#/$defs/d6"
+                "$ref": "#/$defs/d8"
               }
             ]
           },
@@ -873,7 +959,7 @@
             ]
           },
           "ring": {
-            "$ref": "#/$defs/d11"
+            "$ref": "#/$defs/d13"
           },
           "maxEventsPerSecond": {
             "type": "integer",
@@ -941,7 +1027,7 @@
           }
         ]
       },
-      "d3": {
+      "d5": {
         "title": "Asservat action v1",
         "oneOf": [
           {
@@ -950,8 +1036,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "kubernetesSnapshot"
@@ -972,7 +1057,6 @@
                         "rollout"
                       ]
                     },
-                    "maxItems": 5,
                     "minItems": 1,
                     "uniqueItems": true
                   }
@@ -985,10 +1069,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1004,7 +1086,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1026,8 +1108,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "logs"
@@ -1038,13 +1119,11 @@
                 "properties": {
                   "before": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   },
                   "after": {
                     "type": "string",
-                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                    "maxLength": 16
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                   },
                   "stream": {
                     "type": "string",
@@ -1065,10 +1144,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1084,7 +1161,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1106,8 +1183,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "processSnapshot"
@@ -1131,7 +1207,6 @@
                         "identity"
                       ]
                     },
-                    "maxItems": 8,
                     "minItems": 1,
                     "uniqueItems": true
                   }
@@ -1144,10 +1219,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1163,7 +1236,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1185,8 +1258,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "fileRead"
@@ -1226,10 +1298,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1245,7 +1315,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1267,23 +1337,20 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "packetCapture"
               },
               "parameters": {
-                "$ref": "#/$defs/d5"
+                "$ref": "#/$defs/d7"
               },
               "dependsOn": {
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1299,7 +1366,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "enum": [
@@ -1365,8 +1432,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "networkSnapshot"
@@ -1387,7 +1453,6 @@
                         "socketOwners"
                       ]
                     },
-                    "maxItems": 5,
                     "minItems": 1,
                     "uniqueItems": true
                   }
@@ -1400,10 +1465,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1419,7 +1482,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1441,8 +1504,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "runtimeDiagnostic"
@@ -1476,8 +1538,7 @@
                   },
                   "profileRef": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -1489,10 +1550,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1503,7 +1562,7 @@
                 "const": "intrusive"
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1525,8 +1584,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "kernelCore"
@@ -1537,8 +1595,7 @@
                 "properties": {
                   "profileRef": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -1549,10 +1606,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1568,7 +1623,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1590,8 +1645,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "liveCore"
@@ -1602,8 +1656,7 @@
                 "properties": {
                   "profileRef": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "process": {
                     "type": "string",
@@ -1619,11 +1672,10 @@
                     "properties": {
                       "podUID": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
+                        "minLength": 1
                       },
                       "nodeBootID": {
-                        "$ref": "#/$defs/d7"
+                        "$ref": "#/$defs/d9"
                       },
                       "hostPID": {
                         "type": "integer",
@@ -1644,10 +1696,10 @@
                     ]
                   },
                   "processSelector": {
-                    "$ref": "#/$defs/d8"
+                    "$ref": "#/$defs/d10"
                   },
                   "batch": {
-                    "$ref": "#/$defs/d9"
+                    "$ref": "#/$defs/d11"
                   }
                 },
                 "required": [
@@ -1704,10 +1756,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1718,7 +1768,7 @@
                 "const": "intrusive"
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1740,8 +1790,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "command"
@@ -1755,24 +1804,23 @@
                     "items": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 4096
+                      "maxLength": 131072,
+                      "description": "Linux MAX_ARG_STRLEN (131072 bytes) per argument."
                     },
-                    "maxItems": 64,
                     "minItems": 1
                   },
                   "workingDirectory": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 4096
+                    "maxLength": 4096,
+                    "description": "Linux PATH_MAX (4096 bytes)."
                   },
                   "environmentNames": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
+                      "minLength": 1
                     },
-                    "maxItems": 16,
                     "minItems": 0,
                     "uniqueItems": true
                   },
@@ -1794,10 +1842,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1808,7 +1854,7 @@
                 "const": "intrusive"
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1830,8 +1876,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "httpDiagnostic"
@@ -1842,13 +1887,12 @@
                 "properties": {
                   "endpointRef": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "path": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 1024,
+                    "maxLength": 4096,
                     "pattern": "^/[^?#]*$"
                   },
                   "method": {
@@ -1865,10 +1909,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1884,7 +1926,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1906,8 +1948,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "artifactCollect"
@@ -1934,8 +1975,7 @@
                   },
                   "settleFor": {
                     "type": "string",
-                    "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                    "maxLength": 16
+                    "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                   }
                 },
                 "required": [
@@ -1948,10 +1988,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -1967,7 +2005,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -1989,8 +2027,7 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "profile"
@@ -2042,8 +2079,7 @@
                       },
                       "profileRef": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 63
+                        "minLength": 1
                       }
                     },
                     "required": [
@@ -2077,12 +2113,13 @@
                     ]
                   },
                   "duration": {
-                    "$ref": "#/$defs/d6"
+                    "$ref": "#/$defs/d8"
                   },
                   "frequencyHz": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 999
+                    "maximum": 9007199254740991,
+                    "description": "Bounded by the node's kernel.perf_event_max_sample_rate, which the kernel lowers itself under load."
                   },
                   "forceGC": {
                     "type": "boolean"
@@ -2244,10 +2281,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -2255,10 +2290,15 @@
                 "type": "boolean"
               },
               "impact": {
-                "const": "intrusive"
+                "type": "string",
+                "enum": [
+                  "observe",
+                  "intrusive"
+                ],
+                "description": "observe for pprof GETs and the eBPF sampler; intrusive for forced GC, sampling changes, traces and attached profilers (ADR-335 D5)."
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "const": "onTrigger",
@@ -2280,23 +2320,20 @@
             "properties": {
               "id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "minLength": 1
               },
               "kind": {
                 "const": "syscallTrace"
               },
               "parameters": {
-                "$ref": "#/$defs/d10"
+                "$ref": "#/$defs/d12"
               },
               "dependsOn": {
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
-                "maxItems": 16,
                 "minItems": 0,
                 "uniqueItems": true
               },
@@ -2312,7 +2349,7 @@
                 ]
               },
               "limits": {
-                "$ref": "#/$defs/d4"
+                "$ref": "#/$defs/d6"
               },
               "executionMode": {
                 "enum": [
@@ -2372,97 +2409,9 @@
               }
             ]
           }
-        ],
-        "x-execution-modes": {
-          "kubernetesSnapshot": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "logs": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "processSnapshot": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "fileRead": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "packetCapture": {
-            "default": "ongoing",
-            "allowed": [
-              "onTrigger",
-              "ongoing"
-            ]
-          },
-          "networkSnapshot": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "runtimeDiagnostic": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "kernelCore": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "liveCore": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "command": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "httpDiagnostic": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "artifactCollect": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "profile": {
-            "default": "onTrigger",
-            "allowed": [
-              "onTrigger"
-            ]
-          },
-          "syscallTrace": {
-            "default": "ongoing",
-            "allowed": [
-              "onTrigger",
-              "ongoing"
-            ]
-          }
-        }
+        ]
       },
-      "d2": {
+      "d4": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2473,7 +2422,7 @@
           "actions": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d3"
+              "$ref": "#/$defs/d5"
             },
             "minItems": 1,
             "uniqueItems": true
@@ -2533,103 +2482,20 @@
           "maxDuration"
         ]
       },
-      "d12": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "componentID": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 24
-          },
-          "profileRef": {
-            "$ref": "#/$defs/d0"
-          },
-          "sourceUID": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
-          },
-          "definitionDigest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "sourceClusterID": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "sourceNamespaceUID": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
-          }
-        },
-        "required": [
-          "componentID",
-          "profileRef",
-          "definitionDigest"
-        ],
-        "description": "Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object.",
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "profileRef": {
-                  "properties": {
-                    "catalog": {
-                      "const": "builtin"
-                    }
-                  }
-                }
-              }
-            },
-            "then": {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "sourceUID"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "sourceClusterID"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "sourceNamespaceUID"
-                    ]
-                  }
-                ]
-              }
-            },
-            "else": {
-              "required": [
-                "sourceUID",
-                "sourceClusterID",
-                "sourceNamespaceUID"
-              ]
-            }
-          }
-        ]
-      },
-      "d1": {
+      "d3": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "displayName": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "description": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
+            "minLength": 1
           },
           "recipe": {
-            "$ref": "#/$defs/d2"
+            "$ref": "#/$defs/d4"
           },
           "editableFields": {
             "type": "array",
@@ -2639,8 +2505,7 @@
               "properties": {
                 "actionID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "field": {
                   "enum": [
@@ -2671,13 +2536,11 @@
                 },
                 "label": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
+                  "minLength": 1
                 },
                 "description": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
+                  "minLength": 1
                 }
               },
               "required": [
@@ -2687,13 +2550,6 @@
               ]
             },
             "minItems": 0
-          },
-          "origins": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/d12"
-            },
-            "minItems": 1
           }
         },
         "required": [

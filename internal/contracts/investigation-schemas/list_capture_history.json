@@ -1,6 +1,6 @@
 {
   "name": "list_capture_history",
-  "description": "List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: your own requests and those whose retained audience you currently belong to. Origin manual (default), policy, discovery or all; at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. Repeat one with preview_capture history_capture_id. No evidence or settings are read.",
+  "description": "List bounded accepted capture history for the same currently authorized selector. Default manual origin; retained audience and current rights required. Does not acquire evidence or expose shared-only request settings.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -10,13 +10,20 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "target_handle": {
+        "type": "string",
+        "minLength": 1
+      },
       "target_ref": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "cluster_id": {
+          "cluster": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Cluster name as configured in the hub (ADR-335 D4)."
           },
           "namespace": {
             "type": "string",
@@ -37,11 +44,21 @@
           }
         },
         "required": [
-          "cluster_id",
+          "cluster",
           "namespace",
           "kind",
           "name"
         ]
+      },
+      "cluster": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 63,
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+        "description": "Cluster name as configured in the hub (ADR-335 D4)."
+      },
+      "target": {
+        "$ref": "#/$defs/d0"
       },
       "origin": {
         "enum": [
@@ -53,92 +70,270 @@
       },
       "cursor": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 4096
+        "minLength": 1
       },
       "limit": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 100
+        "maximum": 9007199254740991
       }
     },
-    "required": [
-      "target_ref"
-    ]
-  },
-  "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
+    "required": [],
+    "oneOf": [
+      {
+        "required": [
+          "target_handle"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "cluster"
+              ]
+            },
+            {
+              "required": [
+                "target"
+              ]
+            },
+            {
+              "required": [
+                "target_ref"
+              ]
+            }
+          ]
+        }
       },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
+      {
+        "required": [
+          "target_ref"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "target_handle"
+              ]
+            },
+            {
+              "required": [
+                "cluster"
+              ]
+            },
+            {
+              "required": [
+                "target"
+              ]
+            }
+          ]
+        }
       },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "anyOf": [
-          {
+      {
+        "required": [
+          "cluster",
+          "target"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "target_handle"
+              ]
+            },
+            {
+              "required": [
+                "target_ref"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "title": "Asservat target v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 4096
+            "maxLength": 63,
+            "description": "Defaults to the object's own namespace; must equal it when given."
+          },
+          "workloadRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "apiVersion": {
+                "type": "string",
+                "enum": [
+                  "apps/v1",
+                  "v1"
+                ],
+                "description": "Optional; derived from the kind."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "Deployment",
+                  "StatefulSet",
+                  "Pod"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253
+              },
+              "uid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional pin with adoption: pinUID; otherwise provenance only."
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "const": "Pod"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "apiVersion": {
+                      "const": "v1"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "apiVersion": {
+                      "const": "apps/v1"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "podSelector": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "matchLabels": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                }
+              }
+            },
+            "required": [
+              "matchLabels"
+            ]
+          },
+          "maxPods": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Maximum pods collected per occurrence; never the monitoring coverage limit.",
+            "default": 1
+          },
+          "selection": {
+            "type": "string",
+            "enum": [
+              "oldestReady",
+              "newest",
+              "allWithinLimit",
+              "lowestOrdinal",
+              "triggeringPod"
+            ],
+            "description": "Defaults to triggeringPod for policies and oldestReady for manual captures."
+          },
+          "ordinals": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "adoption": {
+            "type": "string",
+            "enum": [
+              "followName",
+              "pinUID"
+            ],
+            "default": "followName"
+          }
+        },
+        "required": [],
+        "oneOf": [
+          {
+            "required": [
+              "workloadRef"
+            ],
+            "not": {
+              "required": [
+                "podSelector"
+              ]
+            }
           },
           {
-            "type": "null"
+            "required": [
+              "podSelector"
+            ],
+            "not": {
+              "required": [
+                "workloadRef"
+              ]
+            }
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "ordinals"
+              ]
+            },
+            "then": {
+              "required": [
+                "workloadRef"
+              ],
+              "properties": {
+                "workloadRef": {
+                  "properties": {
+                    "kind": {
+                      "const": "StatefulSet"
+                    }
+                  }
+                }
+              }
+            }
           }
         ]
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
       }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
+    }
+  },
+  "outputSchema": {
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -148,10 +343,41 @@
                 "const": "ok"
               },
               "data": {
-                "$ref": "#/$defs/d0"
+                "$ref": "#/$defs/d2"
               },
               "data_class": {
                 "const": "metadata"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
+                ]
               }
             },
             "required": [
@@ -171,21 +397,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -197,8 +420,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -218,6 +440,133 @@
     ],
     "$defs": {
       "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d3": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -243,12 +592,9 @@
           "phase": {
             "enum": [
               "Pending",
-              "Validating",
               "AwaitingApproval",
               "Armed",
-              "Queued",
               "Running",
-              "Finalizing",
               "Succeeded",
               "Partial",
               "Failed",
@@ -277,7 +623,6 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 16,
             "uniqueItems": true
           },
           "evidence_state": {
@@ -308,8 +653,7 @@
           },
           "navigation_uri": {
             "type": "string",
-            "format": "uri",
-            "maxLength": 2048
+            "format": "uri"
           },
           "operation": {
             "enum": [
@@ -323,13 +667,11 @@
             "properties": {
               "issuer": {
                 "type": "string",
-                "format": "uri",
-                "maxLength": 2048
+                "format": "uri"
               },
               "subject_id": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "minLength": 1
               },
               "identity_type": {
                 "enum": [
@@ -408,7 +750,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 2,
                   "uniqueItems": true
                 }
               }
@@ -416,7 +757,7 @@
           }
         ]
       },
-      "d0": {
+      "d2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -426,10 +767,9 @@
           "history": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d1"
+              "$ref": "#/$defs/d3"
             },
-            "minItems": 0,
-            "maxItems": 100
+            "minItems": 0
           },
           "ordering": {
             "const": "acceptedAtDescCaptureIDDesc"
