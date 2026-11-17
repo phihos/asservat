@@ -35,6 +35,12 @@ func assertPacketReplayDelta(t *testing.T, before, after packetReplayState, delt
 }
 func qualifyPacketReplayBindings(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, ledger *postgres.ContextQueries, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) {
 	t.Helper()
+	// The replay application bound this operation with its own call start, so
+	// the same replay is the stored request, not the fixture's earlier draft.
+	var stored []byte
+	if err := admin.QueryRow(ctx, `SELECT request FROM context_query_call WHERE operation_id=$1 AND query_id=$2`, r.Call.ID, q.ID).Scan(&stored); err != nil || json.Unmarshal(stored, &r) != nil {
+		t.Fatal("bound replay request", err)
+	}
 	before := readPacketReplayState(t, ctx, admin, q)
 	if err := ledger.RegisterQueryReplayCall(ctx, q, r, a); err != nil {
 		t.Fatal("same replay registration idempotence", err)
