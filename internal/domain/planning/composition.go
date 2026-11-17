@@ -20,6 +20,8 @@ const maxEditText = 131072
 
 // ProfileRef names one immutable capture profile version. It carries no
 // precedence: builtin, organization and namespace references never shadow each other.
+// An empty Version asks for the profile's current version, which the hub
+// resolves and records (capture-composition.schema.json profileRef).
 type ProfileRef struct {
 	Catalog, Name, Version string
 }
@@ -30,7 +32,7 @@ func (r ProfileRef) Valid() bool {
 	default:
 		return false
 	}
-	return lowerName(r.Name, 63) && len(r.Version) >= 2 && len(r.Version) <= 32 && r.Version[0] == 'v' && r.Version[1] != '0' && digits(r.Version[1:])
+	return lowerName(r.Name, 63) && (r.Version == "" || len(r.Version) >= 2 && len(r.Version) <= 32 && r.Version[0] == 'v' && r.Version[1] != '0' && digits(r.Version[1:]))
 }
 
 // RingSettings is the typed value of a packetRing or syscallRing edit.

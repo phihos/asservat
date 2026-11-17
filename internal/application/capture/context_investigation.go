@@ -931,13 +931,18 @@ type CatalogProfiles interface {
 // withCatalogProfiles attaches the current catalog versions to a copy of c.
 // A composition of builtins only reads nothing.
 func (s ContextInvestigation) withCatalogProfiles(ctx context.Context, c *planning.ProfileComposition, target targets.PodResolution) (*planning.ProfileComposition, error) {
+	out := c.Clone()
 	var refs []planning.ProfileRef
-	for _, component := range c.Components {
-		if component.Profile.Catalog != "builtin" {
-			refs = append(refs, component.Profile)
+	for i, component := range out.Components {
+		current, err := s.currentProfile(ctx, target, component.Profile)
+		if err != nil {
+			return nil, err
+		}
+		out.Components[i].Profile = current
+		if current.Catalog != "builtin" {
+			refs = append(refs, current)
 		}
 	}
-	out := c.Clone()
 	if len(refs) == 0 || s.Profiles == nil {
 		return out, nil
 	}

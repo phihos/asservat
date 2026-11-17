@@ -3,6 +3,8 @@ package planning
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
+	"strings"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/planning"
@@ -46,6 +48,29 @@ func DescribeProfiles(catalog string, published []value.CatalogProfile) []Profil
 		out = append(out, describe(p, c.Enabled))
 	}
 	return out
+}
+
+// CurrentProfileVersion resolves a versionless ref to its profile's current
+// version in list: the highest available version, a non-deprecated one first.
+func CurrentProfileVersion(list []ProfileDescription, ref value.ProfileRef) (value.ProfileRef, bool) {
+	var best *ProfileDescription
+	number := func(v string) int {
+		n, _ := strconv.Atoi(strings.TrimPrefix(v, "v"))
+		return n
+	}
+	for i := range list {
+		p := &list[i]
+		if p.Ref.Catalog != ref.Catalog || p.Ref.Name != ref.Name || !p.Available {
+			continue
+		}
+		if best == nil || best.Deprecated && !p.Deprecated || best.Deprecated == p.Deprecated && number(p.Ref.Version) > number(best.Ref.Version) {
+			best = p
+		}
+	}
+	if best == nil {
+		return ref, false
+	}
+	return best.Ref, true
 }
 
 func describe(p resolvedProfile, available bool) ProfileDescription {
