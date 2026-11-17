@@ -224,10 +224,8 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	defer cases.mu.Unlock()
 	downloads.mu.Lock()
 	defer downloads.mu.Unlock()
-	wantPrepares := 2
-	if expireDuringNative {
-		wantPrepares = 1
-	}
+	// One prepare; a Preparing reply is followed by status with after_revision.
+	wantPrepares := 1
 	wantCases := 1
 	if restoreDuringNative {
 		wantCases = 2
@@ -236,7 +234,7 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	if restoreDuringNative && (!time.Now().Before(expires) || refreshes != 2) {
 		t.Fatal("short current same-human restoration must preserve original unexpired summary cutoff and make exactly two session reads", refreshes)
 	}
-	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != wantCases || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != wantPrepares || wantPrepares == 2 && downloads.stats.PrepareKeys[0] != downloads.stats.PrepareKeys[1] || downloads.nativeCalls != 1 {
+	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != wantCases || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != wantPrepares || downloads.nativeCalls != 1 {
 		t.Fatal("extra synthetic acquisition/query/download", events, comparison.starts, comparison.polls, cases.calls, downloads.stats, downloads.nativeCalls)
 	}
 	t.Logf("summary interval=%s; native body hold=%t", expires.Sub(observed), expireDuringNative)
@@ -271,6 +269,7 @@ func (s *consoleHeapDownloads) metadata(v evidence.ContextDownloadView) evidence
 		v.Metadata.Format = "pprof"
 		v.Metadata.Size = int64(len(s.native))
 		v.Metadata.SHA256 = sha256.Sum256(s.native)
+		v.Session.NativeSize, v.Session.NativeSHA256 = v.Metadata.Size, v.Metadata.SHA256
 	}
 	return v
 }
@@ -282,6 +281,7 @@ func (s *consoleHeapDownloads) PrepareContextDownload(ctx context.Context, c ide
 	if e == nil && first && !s.readyImmediately {
 		v.Session.State = artifact.DownloadPreparing
 		v.Metadata = nil
+		v.Session.NativeSize, v.Session.NativeSHA256 = 0, artifact.Digest{}
 	}
 	return s.metadata(v), e
 }
