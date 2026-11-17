@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
-import { captureConsoleResponses } from './console-response.mjs';
 import { validProcessingChange, validProcessingReceipt } from '../src/generated/validate-processing.js';
 import { validInput_search_processing_evidence, validOutput_search_processing_evidence } from '../src/generated/validate-processing-discovery.js';
 import { validInput_get_processing_erasure, validOutput_get_processing_erasure } from '../src/generated/validate-processing-erasure.js';
@@ -11,7 +10,6 @@ const changePath = '/api/v1/processing/changes';
 const statusPath = '/api/v1/operations/get_processing_erasure';
 
 export async function erasureJourney({ page, origin, casePath, artifactID, accepted, pending, verified, stage = () => {} }) {
-  const readBody = await captureConsoleResponses(page);
   const counts = new Map([[discoveryPath, 0], [changePath, 0], [statusPath, 0]]);
   page.on('request', request => {
     const url = new URL(request.url());
@@ -28,7 +26,7 @@ export async function erasureJourney({ page, origin, casePath, artifactID, accep
     assert.equal(headers.origin, origin, path + ' exact origin');
     assert.equal(headers['x-csrf-token']?.length, 43, path + ' request CSRF length');
     assert(!headers.authorization, path + ' uses the browser session');
-    const body = await readBody(actual), output = JSON.parse(body.toString('utf8'));
+    const body = await actual.body(), output = JSON.parse(body.toString('utf8'));
     assert(outputValid(output), path + ' closed output');
     return { input, output, key: headers['idempotency-key'], responseBytes: body.length };
   };

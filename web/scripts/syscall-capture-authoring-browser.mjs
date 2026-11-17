@@ -1,4 +1,3 @@
-import { captureConsoleResponses } from '../tests/console-response.mjs';
 // Actual built React and Go TLS/session/C20 routes; authority/persistence in
 // the loopback Go fixture is synthetic. No intercepted operation responses.
 import { chromium, expect } from '@playwright/test';
@@ -20,7 +19,23 @@ page.on('request', request => {
   if (url.origin !== origin) external.push(request.url());
   if (url.pathname.startsWith('/api/v1/operations/')) calls.push({ name: url.pathname.split('/').at(-1), input: request.postDataJSON() });
 });
-const readBody = await captureConsoleResponses(page);
+// The console's own fetch keeps a copy of each operation body it consumes.
+// Chromium drops an inspector body after the console's same-document
+// navigation (history.replaceState), so the inspector copy is not read.
+await context.addInitScript(() => {
+  const original = window.fetch.bind(window);
+  const replies = new Map();
+  Object.defineProperty(window, '__operationReplies', { value: replies });
+  window.fetch = async (input, init) => {
+    const response = await original(input, init);
+    const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+    if (path.startsWith('/api/v1/operations/')) {
+      const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
+      response.clone().text().then(text => replies.set(key, text), () => {});
+    }
+    return response;
+  };
+});
 const waitOperation = name => page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/operations/' + name && response.request().method() === 'POST');
 const checked = async (response, validate) => {
   assert.equal(response.status(), 200);
@@ -29,7 +44,8 @@ const checked = async (response, validate) => {
   assert.equal(headers.origin, origin);
   assert.equal(headers['x-csrf-token'], 'C'.repeat(43));
   assert.equal(headers.authorization, undefined);
-  const reply = JSON.parse((await readBody(response)).toString('utf8'));
+  const key = new URL(response.url()).pathname + '\n' + (request.postData() ?? '');
+  const reply = JSON.parse(await (await page.waitForFunction(k => { const text = window.__operationReplies.get(k); window.__operationReplies.delete(k); return text; }, key)).jsonValue());
   assert(validate(reply), 'actual Go response must satisfy generated browser contract');
   return reply;
 };

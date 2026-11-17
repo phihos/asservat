@@ -3,8 +3,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
-import { readInstalledHistoryResponse } from './installed-history-response.mjs';
-import { captureConsoleResponses } from '../tests/console-response.mjs';
+import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
 import { validInput_pcap_query, validOutput_pcap_query, validOutput_get_query_result } from '../src/generated/validate-projection.js';
 
@@ -42,8 +41,23 @@ const timeline = [];
 try {
   await context.addCookies(config.cookies);
   config.cookies = [];
+  // Observe only bodies consumed by the page for Chromium's known aborted
+  // inspector response. This neither replaces responses nor performs a fetch.
+  await context.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    const replies = new Map();
+    Object.defineProperty(window, '__installedReplies', { value: replies });
+    window.fetch = async (input, init) => {
+      const response = await original(input, init);
+      const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+      if (/^\/api\/v1\/operations\/(get_case|pcap_query|get_query_result|request_raw_access|get_grant)$/.test(path) && response.status === 200) {
+        const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
+        response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
+      }
+      return response;
+    };
+  });
   page = await context.newPage();
-  const readBody = await captureConsoleResponses(page);
   const seen = [];
   let starts = 0, polls = 0, cases = 0;
   page.on('pageerror', () => errors.push('pageerror'));
@@ -68,13 +82,25 @@ try {
       const response = seen[index++];
       const path = new URL(response.url()).pathname;
       if (path !== '/api/v1/operations/' + name) continue;
-      const read = await readInstalledHistoryResponse(response, readBody);
-      if (read.requestFailed && read.readFailure.includes('ERR_ABORTED')) continue;
+      let read = await readInstalledHistoryResponse(response);
+      let pageConsumed = false;
+      if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
+        const key = path + '\n' + (response.request().postData() ?? '');
+        let text = null;
+        for (const until = Date.now() + 2000; Date.now() < until;) {
+          text = await page.evaluate(k => { const value = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return value; }, key);
+          if (text !== null) break;
+          await page.waitForTimeout(100);
+        }
+        if (text === null) continue; // No replay of a superseded response.
+        read = parseInstalledHistoryText(200, text);
+        pageConsumed = true;
+      }
       if (name === 'get_case') {
         const data = read.reply?.data;
         const artifacts = Array.isArray(data?.artifacts) ? data.artifacts : [];
         const source = artifacts.find(a => a.artifact_id === config.artifactID);
-        caseDiagnostic = { http: read.http, body: read.body, schema: validOutput_get_case(read.reply), ok: read.status === 'ok', caseMatch: data?.case?.case_id === config.caseID, ordinary: data?.case?.access === 'ordinary', sourceMatch: source?.kind === 'packetCapture' && source?.native_format === (raw ? 'pcapng-raw' : 'pcapng') && source?.data_class === (raw ? 'raw' : 'metadata') && source?.digest === config.version && (!config.podUID || source?.target?.pod_uid === config.podUID) && Date.parse(source?.expires_at) > Date.now() };
+        caseDiagnostic = { http: read.http, body: read.body, pageConsumed, schema: validOutput_get_case(read.reply), ok: read.status === 'ok', caseMatch: data?.case?.case_id === config.caseID, ordinary: data?.case?.access === 'ordinary', sourceMatch: source?.kind === 'packetCapture' && source?.native_format === (raw ? 'pcapng-raw' : 'pcapng') && source?.data_class === (raw ? 'raw' : 'metadata') && source?.digest === config.version && (!config.podUID || source?.target?.pod_uid === config.podUID) && Date.parse(source?.expires_at) > Date.now() };
         process.stderr.write('installed packet case ' + JSON.stringify(caseDiagnostic) + '\n');
       }
       assert.equal(read.http, 200, 'operation HTTP status');
@@ -162,6 +188,7 @@ try {
     stage = name;
     const button = panel.getByRole('button', { name: calls === 1 ? 'Run packet query' : 'Check packet query', exact: true });
     await expect(button).toBeEnabled({ timeout: 30_000 });
+    await page.evaluate(prefix => { for (const key of window.__installedReplies.keys()) if (key.startsWith(prefix)) window.__installedReplies.delete(key); }, '/api/v1/operations/' + name + '\n');
     const from = seen.length;
     await button.click();
     const response = await observed(name, from);
