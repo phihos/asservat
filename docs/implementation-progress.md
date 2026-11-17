@@ -283,7 +283,11 @@ manual sources with `owner_kind`, `save_via`, `live_projections` and
 handle joins the save handle and the live handle (`~`); preview and
 `watch_live` each read their part. Pages hold 16 rows (24 KiB envelope).
 `recordingSaves` defaults to true for a policy with an ongoing recording;
-`NoCurrentSource` replaces `RecordingSelectionRequired`. The implemented
+`NoCurrentSource` replaces `RecordingSelectionRequired`. The console's live view uses
+`GET /api/v1/live/watches/{watch_id}/events`: each batch is one audited
+`watch_live` read (10 s wait); event IDs `<cursor>!<n>` let Last-Event-ID
+reread the cursor; a `head` cursor returns the position without rows; a
+paused read waits for the next update. The implemented
 `live-watch.schema.json` is gone. Gaps: save handles still expire with
 their one-minute SQL selection set (`page.expires_at`); removing that needs
 the preview's handle resolution and the `recording_selections` table to
@@ -594,7 +598,7 @@ implement the canonical contract.
 | Contract | Canonical change | Runtime still implements (code) |
 | --- | --- | --- |
 | `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`download_artifact` status take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | No `after_revision` wait (the request-scoped identity and audit windows end after 5–20 s); query results keep `retry_after_seconds`: `internal/transport/presentation/context_projection_operations.go` |
-| `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events and the live-watch stream are missing; console still polls queries and live watches |
+| `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events are missing; console still polls queries |
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |

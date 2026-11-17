@@ -138,6 +138,7 @@ func (st *session) changes() <-chan struct{} {
 	}
 	return st.changed
 }
+
 type updateReceipt struct {
 	digest [32]byte
 	watch  v.Watch

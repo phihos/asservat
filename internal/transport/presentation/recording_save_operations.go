@@ -118,10 +118,10 @@ type RecordingWindow struct {
 	After  string `json:"after"`
 }
 type recordingSaveInput struct {
-	CaptureID        string               `json:"capture_id,omitempty"`
-	ExpectedRevision int64                `json:"expected_revision,omitempty"`
-	IdempotencyKey   string               `json:"idempotency_key,omitempty"`
-	Target           WorkloadReference    `json:"target_ref"`
+	CaptureID        string            `json:"capture_id,omitempty"`
+	ExpectedRevision int64             `json:"expected_revision,omitempty"`
+	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
+	Target           WorkloadReference `json:"target_ref"`
 }
 
 func recordingRow(row app.RecordingRow, expires time.Time) RecordingRow {

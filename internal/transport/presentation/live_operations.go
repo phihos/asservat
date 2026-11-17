@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/capture"
+	identities "asservat.local/asservat/internal/application/identity"
 	app "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -91,6 +91,7 @@ func (s *LiveOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	}
 	return s.wire.Tool(name)
 }
+
 // Call serves only the passive inventory; watch_live needs the audited path.
 func (s *LiveOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil || s.config.NewID == nil || name != "list_recordings" {

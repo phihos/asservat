@@ -96,9 +96,9 @@ type RecordingRow struct {
 	IncidentPodCap                                               int
 	Handle, SourceID, PolicyUID, PodUID, PodName, ActionID, Kind string
 	PolicyName                                                   string
-	State, History                                     string
-	MaximumBefore                                      time.Duration
-	Blocker                                            string
+	State, History                                               string
+	MaximumBefore                                                time.Duration
+	Blocker                                                      string
 }
 type RecordingPage struct {
 	ValidUntil time.Time // Original current observation bound, not handle expiry.

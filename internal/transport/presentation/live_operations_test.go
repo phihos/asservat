@@ -153,7 +153,6 @@ func (f *liveBoundary) Resolve(context.Context, app.CurrentIdentity, string, str
 
 const liveWireTarget = `"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}`
 
-
 // watchInput adds the watch_live action to a typed live request.
 func watchInput(action string, in any) []byte {
 	b, _ := json.Marshal(in)

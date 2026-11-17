@@ -258,6 +258,10 @@ func TestConsoleLiveObservationWithBuiltPackage(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	lh, e := browser.NewLiveEventsHandler(sh, ops)
+	if e != nil {
+		t.Fatal(e)
+	}
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/test/live-event":
@@ -280,6 +284,8 @@ func TestConsoleLiveObservationWithBuiltPackage(t *testing.T) {
 			sh.ServeHTTP(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/v1/operations/"):
 			bh.ServeHTTP(w, r)
+		case strings.HasPrefix(r.URL.Path, browser.LiveEventsPrefix):
+			lh.ServeHTTP(w, r)
 		default:
 			static.ServeHTTP(w, r)
 		}

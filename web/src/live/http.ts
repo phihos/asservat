@@ -18,13 +18,18 @@ export function listTarget(target: AnyTarget): Target {
   const { cluster_id: id, cluster, ...rest } = structuredClone(target) as Target & { cluster_id?: string };
   return { ...rest, cluster: cluster ?? id ?? '' };
 }
+// EventStream is the part of EventSource the live view uses.
+export interface EventStream { addEventListener(type: string, listener: (event: Event) => void): void; close(): void; onerror: ((event: Event) => void) | null; readonly readyState: number }
 export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
+  // stream opens GET /api/v1/live/watches/{watch_id}/events (same-origin session cookie).
+  stream(url: string): EventStream;
 }
 
 // Generated contracts do not confer availability. Registration requires the
 // protected live source/control/delivery composition; there is no synthetic fallback.
 export const operations: Operations = {
+  stream: url => new EventSource(url),
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     if (!validators[`validInput_${name}`](input) || signal.aborted) throw new Error('Live view unavailable');
     const request = new AbortController();

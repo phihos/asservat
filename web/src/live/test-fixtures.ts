@@ -1,5 +1,5 @@
 // Synthetic boundary fixtures only; never imported by product code.
-import type{Operation,Input,Output,Operations,Watch,Row,Batch,Source}from'./http';
+import type{Operation,Input,Output,Operations,EventStream,Watch,Row,Batch,Source}from'./http';
 export{session,id}from'../evidence/test-fixtures';
 import{id}from'../evidence/test-fixtures';
 export const target={cluster:'local',namespace:'payments',kind:'Deployment' as const,name:'api'};
@@ -13,8 +13,24 @@ export function batch(rows:Row[]=[row()]):Batch{return{watch_id:id(4),revision:1
 export function envelope(data:unknown,read=false){return{schema_version:'mcp-result/v1',request_id:id(8),status:'ok',data_class:read?'extract':'metadata',data,truncated:false,next_cursor:read?'cursor1':null,narrowing_hint:null,warnings:[],provenance:[]}}
 // op names the call: list (list_recordings) or the watch_live action.
 export type Op='list'|'open'|'read'|'update'|'close';
+// SyntheticStream stands in for one EventSource.
+export class SyntheticStream implements EventStream{
+ listeners=new Map<string,((event:Event)=>void)[]>();closed=false;readyState=1;onerror:((event:Event)=>void)|null=null;
+ constructor(readonly url:string){}
+ addEventListener(type:string,listener:(event:Event)=>void){this.listeners.set(type,[...(this.listeners.get(type)??[]),listener])}
+ close(){this.closed=true;this.readyState=2}
+ emit(type:string,data:unknown){for(const l of this.listeners.get(type)??[])l(new MessageEvent(type,{data:JSON.stringify(data)}))}
+ fail(readyState:number){this.readyState=readyState;this.onerror?.(new Event('error'))}
+ // deliver sends one batch as the server does: rows, gaps, then state.
+ deliver(b:Batch){const base={watch_id:b.watch_id,revision:b.revision,handling:b.handling};let n=0;for(const row of b.rows)this.emit('row',{...base,event_id:'c!'+(++n),type:'row',row});for(const gap of b.gaps)this.emit('gap',{...base,event_id:'c!'+(++n),type:'gap',gap});this.emit('state',{...base,event_id:'n!0',type:'state',state:{state:b.state,sources:b.sources,output_bytes_spent:b.output_bytes_spent}})}
+}
 export class SyntheticLive implements Operations{
  calls:{name:Operation;op:Op;input:unknown;signal:AbortSignal}[]=[];
+ streams:SyntheticStream[]=[];
  responder:(op:Op,input:unknown)=>unknown|Promise<unknown>=(op)=>op==='list'?envelope(page()):op==='read'?envelope(batch(),true):envelope(watch());
  async call<N extends Operation>(name:N,input:Input<N>,_csrf:string,signal:AbortSignal):Promise<Output<N>>{const op:Op=name==='list_recordings'?'list':(input as {action:Op}).action;this.calls.push({name,op,input:structuredClone(input),signal});return await this.responder(op,input)as Output<N>}
+ stream(url:string){const s=new SyntheticStream(url);this.streams.push(s);return s}
+ get live(){return this.streams.at(-1)}
+ // push delivers the next server batch (the responder's read answer) on the open stream.
+ async push(){const out=await this.responder('read',{}) as {status:string;data:Batch};const s=this.live;if(out.status==='ok'&&s&&!s.closed)s.deliver(out.data)}
 }
