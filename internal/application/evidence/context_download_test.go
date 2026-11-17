@@ -124,7 +124,7 @@ func (f *downloadWorkerFixture) AcknowledgeDownloadOutcome(context.Context, audi
 	}
 	return nil
 }
-func (f *downloadWorkerFixture) ReadContext(context.Context, artifact.ContextExpectation, artifact.Copies, time.Time) ([]byte, error) {
+func (f *downloadWorkerFixture) ReadContext(context.Context, NativeContextSource, time.Time) ([]byte, error) {
 	if err := f.step("native"); err != nil {
 		return nil, err
 	}

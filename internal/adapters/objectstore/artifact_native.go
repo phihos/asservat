@@ -49,21 +49,22 @@ const nativeWindowReadLimit = 9*(artifact.FrameBytes+artifact.CipherOverhead) + 
 // the caller bounds by the current disclosure authority; the source never
 // outlives the artifact's ExpiresAt. Opening reads only the commit and
 // manifest objects and opens the data and index keys.
-func (v *ContextVerifier) OpenNative(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, readUntil time.Time) (*FramedNativeSource, error) {
-	return v.openNative(ctx, ctx, e, c, readUntil)
+func (v *ContextVerifier) OpenNative(ctx context.Context, s evidence.NativeContextSource, readUntil time.Time) (*FramedNativeSource, error) {
+	return v.openNative(ctx, ctx, s, readUntil)
 }
 
 // openNative separates a finite initial key/metadata phase from the original
 // cursor owner. Canceling opening after acknowledgement never revives or ends
 // a retained cursor; caller cancellation and readUntil still own that cursor.
-func (v *ContextVerifier) openNative(ctx, opening context.Context, e artifact.ContextExpectation, c artifact.Copies, readUntil time.Time) (*FramedNativeSource, error) {
+func (v *ContextVerifier) openNative(ctx, opening context.Context, s evidence.NativeContextSource, readUntil time.Time) (*FramedNativeSource, error) {
+	e, c := s.Expectation, s.Copies
 	until := minDeadline(readUntil, e.Registration.ExpiresAt)
 	if v == nil || ctx == nil || opening == nil || !time.Now().Before(until) {
 		return nil, artifact.ErrInvalid
 	}
 	call, stop := context.WithDeadline(opening, minDeadline(until, time.Now().Add(30*time.Second)))
 	defer stop()
-	reader, m, err := v.open(call, e, c, until)
+	reader, m, err := v.open(call, s, until)
 	if err != nil {
 		return nil, err
 	}

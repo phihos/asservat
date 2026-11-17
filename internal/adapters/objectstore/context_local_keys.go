@@ -41,7 +41,8 @@ func NewLocalKeyContextReader(store *CustodyStore, grants evidence.DownloadKeyGr
 	return &LocalKeyContextReader{store, grants, scope, peer, endpoint, client}, nil
 }
 
-func (r *LocalKeyContextReader) ReadContextBatch(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, i audit.DownloadIntent, a artifact.DownloadAuthority) ([]byte, error) {
+func (r *LocalKeyContextReader) ReadContextBatch(ctx context.Context, s evidence.NativeContextSource, i audit.DownloadIntent, a artifact.DownloadAuthority) ([]byte, error) {
+	e, c := s.Expectation, s.Copies
 	if r == nil || ctx == nil || ctx.Err() != nil || !i.Valid() || e.Validate() != nil || !e.ServedClass() || !a.Valid(time.Now()) || i.Batch.Authority.Scope != a.Scope || a.Scope.ArtifactID != e.Registration.Location.ArtifactID || a.Scope.CaptureID != e.CaptureUID || a.Scope.Version != evidence.ContextCopiesDigest(c) {
 		return nil, artifact.ErrInvalid
 	}
@@ -60,5 +61,5 @@ func (r *LocalKeyContextReader) ReadContextBatch(ctx context.Context, e artifact
 	if err != nil {
 		return nil, err
 	}
-	return reader.ReadContext(ctx, e, c, deadline)
+	return reader.ReadContext(ctx, s, deadline)
 }

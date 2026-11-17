@@ -122,7 +122,7 @@ func TestProfileComparisonEncryptedProcess(t *testing.T) {
 		verifier, opener, blocked, release := profileEncryptedVerifier(t, filepath.Join(dir, side), sources[index], index == 1 && mode == "cancel-second-source")
 		keys[index] = opener
 		until, _ := ctx.Deadline()
-		opened[index], err = verifier.OpenNative(ctx, sources[index].Source.Expectation, sources[index].Source.Copies, until)
+		opened[index], err = verifier.OpenNative(ctx, sources[index].Source, until)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -98,12 +98,12 @@ func prepareSyscallEncryptedFixture(t *testing.T, dir, kind string, maximum, mal
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, wrongHash, sealers...)
-	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
+	source := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, wrongHash, sealers...)
+	f := profileEncryptedFixture{Source: source, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
 	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
-	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(copies), e.NativeType, e.Type().Format, query.SyscallSummaryView.DisplayVersion()
+	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(source.Copies), e.NativeType, e.Type().Format, query.SyscallSummaryView.DisplayVersion()
 	s.Selection, s.SourceProjectionDigest = query.LineSelection{}, artifact.Digest{}
 	s.Syscalls = query.SyscallWindow{View: query.SyscallSummaryView, Limit: 100}
 	if !s.Valid() || !f.Source.Valid(s.Version) {

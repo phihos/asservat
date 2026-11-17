@@ -20,12 +20,13 @@ func NewContextNativeReader(store *CustodyStore, keys evidence.KeyOpener) (*Cont
 	}
 	return &ContextNativeReader{v}, nil
 }
-func (r *ContextNativeReader) ReadContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, leaseUntil time.Time) ([]byte, error) {
+func (r *ContextNativeReader) ReadContext(ctx context.Context, s evidence.NativeContextSource, leaseUntil time.Time) ([]byte, error) {
+	e := s.Expectation
 	now := time.Now()
 	if r == nil || r.verifier == nil || !e.ServedClass() || !now.Before(leaseUntil) || leaseUntil.After(now.Add(5*time.Second)) {
 		return nil, artifact.ErrInvalid
 	}
 	// Downloads remain possible after acquisition's write window closes, but
 	// neither a caller lease nor a successful decrypt can extend read retention.
-	return r.verifier.readContext(ctx, e, c, minDeadline(leaseUntil, e.Registration.ExpiresAt))
+	return r.verifier.readContext(ctx, s, minDeadline(leaseUntil, e.Registration.ExpiresAt))
 }

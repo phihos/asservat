@@ -17,7 +17,42 @@ type publishedContext struct {
 	RootID, CaptureID string
 	Expectation       artifact.ContextExpectation
 	Copies            artifact.Copies
+	Catalog           artifact.CatalogFacts
 	PublishedAt       time.Time
+}
+
+// Source is the stored artifact as a read receives it from the catalog.
+func (p publishedContext) Source() evidence.NativeContextSource {
+	return evidence.NativeContextSource{Expectation: p.Expectation, Copies: p.Copies, Catalog: p.Catalog}
+}
+
+// catalogFactsFixture reads the native size and profile window that the
+// stored outcome wrote into the catalog row.
+func catalogFactsFixture(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, captureID string) (artifact.CatalogFacts, error) {
+	var f artifact.CatalogFacts
+	var started, completed *time.Time
+	if err := q.QueryRow(ctx, "SELECT native_bytes,acquisition_started_at,acquisition_completed_at FROM context_catalog WHERE capture_id=$1", captureID).Scan(&f.NativeBytes, &started, &completed); err != nil {
+		return f, err
+	}
+	if started != nil && completed != nil {
+		f.Acquisition = &artifact.AcquisitionWindow{StartedAt: started.UTC(), CompletedAt: completed.UTC()}
+	}
+	return f, nil
+}
+
+// podStatusSource is a stored pod-status artifact with its catalog native size.
+func podStatusSource(e artifact.ContextExpectation, copies artifact.Copies, native []byte) evidence.NativeContextSource {
+	return evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: artifact.CatalogFacts{NativeBytes: int64(len(native))}}
+}
+
+// storedFacts are the native size and profile window the producer reports
+// with its writer completion, as publication stores them in the catalog row.
+func storedFacts(p *objectstore.PreparedArtifact) artifact.CatalogFacts {
+	var c artifact.ContextWriterCompletion
+	p.AddFacts(&c)
+	return artifact.CatalogFacts{NativeBytes: c.NativeBytes, Acquisition: c.Acquisition}
 }
 
 // publishStoredFixture stands in for the stored-outcome transaction
@@ -26,7 +61,7 @@ type publishedContext struct {
 // inserts the catalog row with the producer's native facts. Replays return the
 // existing row. The administrator pool replaces the API execution role here.
 func publishStoredFixture(ctx context.Context, admin *pgxpool.Pool, e artifact.ContextExpectation, copies artifact.Copies, nativeBytes int64, window *artifact.AcquisitionWindow) (publishedContext, error) {
-	out := publishedContext{CaptureID: e.CaptureUID, Expectation: e, Copies: copies}
+	out := publishedContext{CaptureID: e.CaptureUID, Expectation: e, Copies: copies, Catalog: artifact.CatalogFacts{NativeBytes: nativeBytes, Acquisition: window.Clone()}}
 	if err := copies.Validate(e.Registration); err != nil {
 		return out, err
 	}
@@ -74,8 +109,8 @@ ON CONFLICT (capture_id) DO NOTHING`, e.Registration.Location.ArtifactID, e.Capt
 // readStoredNative reads a stored artifact the way every read does: commit,
 // manifest and index against e, then every frame by its AEAD tag and the
 // whole-file hash. It replaces the removed publication-time verification.
-func readStoredNative(ctx context.Context, v *objectstore.ContextVerifier, e artifact.ContextExpectation, copies artifact.Copies) ([]byte, error) {
-	source, err := v.OpenNative(ctx, e, copies, time.Now().Add(30*time.Second))
+func readStoredNative(ctx context.Context, v *objectstore.ContextVerifier, s evidence.NativeContextSource) ([]byte, error) {
+	source, err := v.OpenNative(ctx, s, time.Now().Add(30*time.Second))
 	if err != nil {
 		return nil, err
 	}

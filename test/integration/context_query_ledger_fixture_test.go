@@ -362,6 +362,9 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 		}
 	}
 	published := publishedContext{RootID: s.a.RootID, CaptureID: e.CaptureUID, Expectation: e, Copies: copies}
+	if published.Catalog, err = catalogFactsFixture(f.ctx, f.admin, e.CaptureUID); err != nil {
+		t.Fatal(err)
+	}
 	if profileSource {
 		qualifyProfileAcquisitionAfterPublication(t, f, s, e, acquisition, legacy)
 	}

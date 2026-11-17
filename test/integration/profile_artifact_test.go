@@ -71,7 +71,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		}
 		return e
 	}
-	store1 := func(t *testing.T, e artifact.ContextExpectation, body []byte) (*objectstore.ContextVerifier, artifact.Copies, error) {
+	store1 := func(t *testing.T, e artifact.ContextExpectation, body []byte) (*objectstore.ContextVerifier, evidence.NativeContextSource, error) {
 		t.Helper()
 		bound, err := store.ForCustody(e.Registration.StoreID)
 		if err != nil {
@@ -107,7 +107,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		started := e.TriggeredAt.Add(time.Second)
 		copies, err := prepared.Store(ctx, bytes.NewReader(body), started, started.Add(time.Second))
 		if err != nil {
-			return nil, copies, err
+			return nil, evidence.NativeContextSource{}, err
 		}
 		if writer != "" {
 			if err = ledger.StoreCopies(ctx, e.Registration, copies); err != nil {
@@ -125,13 +125,13 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		if err != nil {
 			t.Fatal(err)
 		}
-		return verifier, copies, nil
+		return verifier, evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: storedFacts(prepared)}, nil
 	}
-	readBack := func(t *testing.T, v *objectstore.ContextVerifier, e artifact.ContextExpectation, c artifact.Copies) ([]byte, artifact.NativeDownloadMetadata) {
+	readBack := func(t *testing.T, v *objectstore.ContextVerifier, src evidence.NativeContextSource) ([]byte, artifact.NativeDownloadMetadata) {
 		t.Helper()
 		window, stop := context.WithTimeout(ctx, 10*time.Second)
 		defer stop()
-		s, err := v.OpenNative(window, e, c, time.Now().Add(10*time.Second))
+		s, err := v.OpenNative(window, src, time.Now().Add(10*time.Second))
 		if err != nil {
 			t.Fatal("open native", err)
 		}
@@ -157,11 +157,11 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		t.Fatal(err)
 	}
 	e := expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-pprof", EndpointDigest: artifact.Digest{1}, Type: "heap", Mode: "snapshot"})
-	v, copies, err := store1(t, e, heap.Bytes())
+	v, stored, err := store1(t, e, heap.Bytes())
 	if err != nil {
 		t.Fatal("store pprof", err)
 	}
-	got, m := readBack(t, v, e, copies)
+	got, m := readBack(t, v, stored)
 	if !bytes.Equal(got, heap.Bytes()) || m.Format != artifact.PprofFormat || m.Filename != "artifact-"+e.Registration.Location.ArtifactID+".pb.gz" || m.SHA256 != sha256.Sum256(heap.Bytes()) {
 		t.Fatalf("pprof native bytes differ: %d/%d %+v", len(got), heap.Len(), m)
 	}
@@ -193,11 +193,11 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	time.Sleep(20 * time.Millisecond)
 	trace.Stop()
 	e = expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-trace", EndpointDigest: artifact.Digest{4}, Type: "runtimeTrace", Mode: "interval", DurationMillis: 1000})
-	v, copies, err = store1(t, e, tr.Bytes())
+	v, stored, err = store1(t, e, tr.Bytes())
 	if err != nil {
 		t.Fatal("store trace", err)
 	}
-	got, m = readBack(t, v, e, copies)
+	got, m = readBack(t, v, stored)
 	if !bytes.Equal(got, tr.Bytes()) || m.Format != artifact.GoTraceFormat || m.Filename != "artifact-"+e.Registration.Location.ArtifactID+".trace" {
 		t.Fatal("trace native bytes differ", len(got), tr.Len())
 	}
@@ -208,13 +208,12 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		encoded := multiFramePprofFixture(t)
 		large := expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-large", EndpointDigest: artifact.Digest{6}, Type: "heap", Mode: "snapshot"})
 		large.Registration.NativeLimit = 16 << 20
-		verifier, copies, err := store1(t, large, encoded.Bytes())
+		verifier, source, err := store1(t, large, encoded.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, metadata := readBack(t, verifier, large, copies)
-		source := evidence.NativeContextSource{Expectation: large, Copies: copies}
-		if !source.Valid(evidence.ContextCopiesDigest(copies)) || !evidence.ValidNativeSourceMetadata(source, metadata) || !bytes.Equal(got, encoded.Bytes()) || metadata.SHA256 != sha256.Sum256(got) {
+		got, metadata := readBack(t, verifier, source)
+		if !source.Valid(evidence.ContextCopiesDigest(source.Copies)) || !evidence.ValidNativeSourceMetadata(source, metadata) || !bytes.Equal(got, encoded.Bytes()) || metadata.SHA256 != sha256.Sum256(got) {
 			t.Fatal("multi-frame profile bytes/metadata")
 		}
 		path := filepath.Join(t.TempDir(), metadata.Filename)

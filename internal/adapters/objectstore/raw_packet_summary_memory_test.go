@@ -145,7 +145,7 @@ func rawSummaryProbeGenerate(t *testing.T, dir string) {
 		if err = os.WriteFile(filepath.Join(folder, "native.pcapng"), native, 0600); err != nil {
 			t.Fatal(err)
 		}
-		f.Source.Copies = prepareEncryptedProjectionSource(t, folder, bytes.NewReader(native), f.Source.Expectation, false, sealer)
+		f.Source = prepareEncryptedProjectionSource(t, folder, bytes.NewReader(native), f.Source.Expectation, false, sealer)
 		f.Scope.Version = evidence.ContextCopiesDigest(f.Source.Copies)
 		comparisonProbeWrite(t, filepath.Join(folder, "fixture.json"), f)
 		input.NativeSHA256, input.NativeBytes = comparisonProbeDigest(t, filepath.Join(folder, "native.pcapng"))

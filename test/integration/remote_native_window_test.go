@@ -86,10 +86,10 @@ func qualifyRemoteNativeWindow(t *testing.T, ctx context.Context, store *objects
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = readStoredNative(ctx, verifier, e, copies); err != nil {
+	source := evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: storedFacts(prepared)}
+	if _, err = readStoredNative(ctx, verifier, source); err != nil {
 		t.Fatal("full authenticated read", err)
 	}
-	source := evidence.NativeContextSource{Expectation: e, Copies: copies}
 	if !source.Valid(evidence.ContextCopiesDigest(copies)) {
 		t.Fatal("stored pcapng is not a downloadable native source")
 	}
@@ -97,7 +97,7 @@ func qualifyRemoteNativeWindow(t *testing.T, ctx context.Context, store *objects
 		t.Helper()
 		window, stop := context.WithTimeout(ctx, 5*time.Second)
 		defer stop()
-		s, err := verifier.OpenNative(window, e, copies, time.Now().Add(5*time.Second))
+		s, err := verifier.OpenNative(window, source, time.Now().Add(5*time.Second))
 		if err != nil {
 			t.Fatal("open window", err)
 		}

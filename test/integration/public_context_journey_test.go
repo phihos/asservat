@@ -210,6 +210,9 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	publicJourneyRequire(t, "published catalog row", admin.QueryRow(ctx, "SELECT c.expectation_json,(SELECT count(*) FROM context_catalog cat WHERE cat.capture_id=c.id) FROM context_capture c WHERE c.root_id=$1 AND c.id=$2", s.a.RootID, accepted.CaptureID).Scan(&expectation, &catalogued))
 	published := publishedContext{RootID: s.a.RootID, CaptureID: accepted.CaptureID, Copies: copies}
 	publicJourneyRequire(t, "admitted expectation", json.Unmarshal(expectation, &published.Expectation))
+	var catalogErr error
+	published.Catalog, catalogErr = catalogFactsFixture(ctx, admin, accepted.CaptureID)
+	publicJourneyRequire(t, "catalog facts", catalogErr)
 	if catalogued != 1 {
 		t.Fatal("stored outcome did not publish exactly one catalog row", catalogued)
 	}

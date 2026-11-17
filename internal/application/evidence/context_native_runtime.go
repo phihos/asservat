@@ -267,7 +267,7 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 	}
 	preparation := ContextDownloadWorker{Sessions: r.config.Preparation, AuditAcknowledgements: r.config.Acknowledgements, Audit: r.config.Audit, CurrentAuthority: r.config.Authority, RegionalPreparation: native, RawResults: r.config.RawResults, Now: r.config.Now, NewID: r.config.NewID}
 	var retained *artifact.PreparedDownload
-	m, e := preparation.prepareCurrentRetained(call, current, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, func(p artifact.PreparedDownload) error {
+	m, e := preparation.prepareCurrentRetained(call, current, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies, Catalog: source.Catalog}, func(p artifact.PreparedDownload) error {
 		retained = &p
 		return nil
 	})
@@ -453,7 +453,7 @@ func (r *ContextNativeRuntime) remote(ctx context.Context, session artifact.Down
 	}
 	// This constructor retains only immutable copies/expectation/preparation. Its
 	// actual Describe/Read use fresh current callbacks and peer proof at each hop.
-	return NewRemoteContextSource(ctx, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, *observed.Preparation)
+	return NewRemoteContextSource(ctx, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies, Catalog: source.Catalog}, *observed.Preparation)
 }
 
 // readNativeSource consumes the current source observation during setup. Only

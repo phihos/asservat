@@ -997,7 +997,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		if err != nil {
 			t.Fatal(err)
 		}
-		body, err := native.ReadContext(ctx, f.p.Expectation, f.p.Copies, i.Batch.LeaseUntil)
+		body, err := native.ReadContext(ctx, f.p.Source(), i.Batch.LeaseUntil)
 		if err != nil || len(body) == 0 || len(body) > 4096 {
 			t.Fatal("native bytes", err)
 		}
@@ -1331,7 +1331,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal(err)
 		}
 		worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: objects, Authority: f.gate, BatchNative: reader, Now: time.Now, NewID: custodyID}
-		work := evidence.ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies}
+		work := evidence.ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies, Catalog: f.p.Catalog}
 		metadata, err := worker.Prepare(ctx, "synthetic-reference", work)
 		if err != nil {
 			t.Fatal("prepare through local key service", err)
@@ -1369,7 +1369,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal(err)
 		}
 		worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: objects, Authority: f.gate, Native: reader, Now: time.Now, NewID: custodyID}
-		work := evidence.ContextDownloadRequest{SessionID: s.ID, Scope: s.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies}
+		work := evidence.ContextDownloadRequest{SessionID: s.ID, Scope: s.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies, Catalog: f.p.Catalog}
 		metadata, err := worker.Prepare(ctx, "synthetic-reference", work)
 		if err != nil {
 			t.Fatal(err)

@@ -322,6 +322,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if err != nil {
 		t.Fatal("store", err)
 	}
+	catalog := evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: storedFacts(prepared)}
 	stored := time.Since(begin)
 	if err = ledger.StoreCopies(ctx, e.Registration, copies); err != nil {
 		t.Fatal("stored_unpublished", err)
@@ -342,7 +343,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal(err)
 	}
 	begin = time.Now()
-	if _, err = readStoredNative(ctx, verifier, e, copies); err != nil {
+	if _, err = readStoredNative(ctx, verifier, catalog); err != nil {
 		t.Fatal("full authenticated read", err)
 	}
 	verified := time.Since(begin)
@@ -370,7 +371,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if x.Validate() != nil {
 			t.Fatal("mutated expectation invalid before verification", name)
 		}
-		if _, err = readStoredNative(ctx, verifier, x, copies); err == nil {
+		if _, err = readStoredNative(ctx, verifier, evidence.NativeContextSource{Expectation: x, Copies: copies, Catalog: catalog.Catalog}); err == nil {
 			t.Fatal("read accepted a changed expectation", name)
 		}
 	}
@@ -384,7 +385,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	done := make(chan error, 1)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := current
-		source, err := verifier.OpenNative(r.Context(), e, copies, time.Now().Add(time.Hour))
+		source, err := verifier.OpenNative(r.Context(), catalog, time.Now().Add(time.Hour))
 		if err != nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			done <- err

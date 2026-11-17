@@ -24,3 +24,21 @@ func (w *AcquisitionWindow) Clone() *AcquisitionWindow {
 	out := *w
 	return &out
 }
+
+// CatalogFacts are the native size and, for Go profiles, the acquisition
+// window that publication stored in the catalog row. Every read compares
+// them with the authenticated manifest (REQ-EVD-001).
+type CatalogFacts struct {
+	NativeBytes int64
+	Acquisition *AcquisitionWindow `json:",omitempty"`
+}
+
+// Matches reports whether the authenticated manifest size and interval equal
+// the catalog row. Only a Go profile has a stored acquisition window, kept in
+// UTC microseconds.
+func (f CatalogFacts) Matches(profile bool, nativeBytes int64, started, completed time.Time) bool {
+	if f.NativeBytes != nativeBytes || profile != (f.Acquisition != nil) {
+		return false
+	}
+	return !profile || f.Acquisition.Equal(AcquisitionWindow{StartedAt: started.Truncate(time.Microsecond), CompletedAt: completed.Truncate(time.Microsecond)})
+}

@@ -165,7 +165,7 @@ func qualifyDownloadControl(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		objects := &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}
 		worker := evidence.ContextDownloadWorker{Sessions: ledger, AuditAcknowledgements: ack, Audit: objects, Authority: gate, Native: native, Now: time.Now, NewID: custodyID}
-		req := evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies}
+		req := evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies, Catalog: published.Catalog}
 		metadata, err := worker.Prepare(ctx, "synthetic-reference", req)
 		if err != nil {
 			t.Fatal("actual native preparation", err)

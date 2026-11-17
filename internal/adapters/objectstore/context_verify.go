@@ -56,13 +56,14 @@ func (s *Store) readSmall(ctx context.Context, o Object, limit int64) ([]byte, e
 	return b, nil
 }
 
-func (v *ContextVerifier) readContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, cutoff time.Time) ([]byte, error) {
+func (v *ContextVerifier) readContext(ctx context.Context, s evidence.NativeContextSource, cutoff time.Time) ([]byte, error) {
+	e := s.Expectation
 	if e.NativeType != artifact.PodStatusArtifact {
 		return nil, readStage(ctx, "expectation", artifact.ErrInvalid)
 	}
 	ctx, cancel := context.WithDeadline(ctx, minDeadline(cutoff, time.Now().Add(30*time.Second)))
 	defer cancel()
-	reader, m, err := v.open(ctx, e, c, cutoff)
+	reader, m, err := v.open(ctx, s, cutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -84,10 +85,12 @@ func (v *ContextVerifier) readContext(ctx context.Context, e artifact.ContextExp
 }
 
 // open reads and authenticates the exact commit and manifest, matches every
-// control field to the independent expectation and opens the framed reader
+// control field to the independent expectation and the native size and
+// profile acquisition window to the catalog row, and opens the framed reader
 // (one data and one index key). The caller bounds ctx; no bytes are read yet.
-func (v *ContextVerifier) open(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, cutoff time.Time) (*framed.Reader, manifest.ContextManifest, error) {
+func (v *ContextVerifier) open(ctx context.Context, s evidence.NativeContextSource, cutoff time.Time) (*framed.Reader, manifest.ContextManifest, error) {
 	var m manifest.ContextManifest
+	e, c := s.Expectation, s.Copies
 	if e.Validate() != nil || c.Validate(e.Registration) != nil || e.Registration.StoreID != v.store.storeID {
 		return nil, m, readStage(ctx, "expectation", artifact.ErrInvalid)
 	}
@@ -123,6 +126,9 @@ func (v *ContextVerifier) open(ctx context.Context, e artifact.ContextExpectatio
 	}
 	if m.CompletedAt.After(time.Now()) {
 		return nil, m, readStage(ctx, "manifest-time", artifact.ErrIntegrity)
+	}
+	if !s.Catalog.Matches(e.Profile != nil, m.Layout.NativeBytes, m.StartedAt, m.CompletedAt) {
+		return nil, m, readStage(ctx, "manifest-catalog", artifact.ErrIntegrity)
 	}
 	data, err := v.store.store.Pin(object(r.Location, 0, c[0]))
 	if err != nil {

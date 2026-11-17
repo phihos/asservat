@@ -21,6 +21,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -212,7 +213,7 @@ func TestCustodyProfileWriteOnlyWithRealServices(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = readStoredNative(ctx, verifier, e, copies)
+			_, err = readStoredNative(ctx, verifier, evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: storedFacts(prepared)})
 			if (err == nil) != (mode == "valid") {
 				t.Fatal("authenticated read verdict", mode, err)
 			}

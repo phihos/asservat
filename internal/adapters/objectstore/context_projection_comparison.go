@@ -51,7 +51,7 @@ func (r *ContextProjectionReader) ReadProjectionComparisonNative(ctx context.Con
 		if err != nil {
 			return zero, query.ErrUnavailable
 		}
-		opened, err := verifier.openNative(ctx, ctx, sources[n].Expectation, sources[n].Copies, minDeadline(deadline, sources[n].Expectation.Registration.ExpiresAt))
+		opened, err := verifier.openNative(ctx, ctx, sources[n], minDeadline(deadline, sources[n].Expectation.Registration.ExpiresAt))
 		if opened != nil {
 			defer func() {
 				if !handedOff {

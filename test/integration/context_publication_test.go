@@ -179,7 +179,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			if _, err := f.publish(ctx); err != nil {
 				t.Fatal(err)
 			}
-			qualifyProcessingDownloadEffects(t, ctx, poolFor, store, keys, f.scenario, publishedContext{Expectation: f.e, Copies: f.copies}, f.reader, processing)
+			qualifyProcessingDownloadEffects(t, ctx, poolFor, store, keys, f.scenario, publishedContext{Expectation: f.e, Copies: f.copies, Catalog: artifact.CatalogFacts{NativeBytes: f.nativeBytes}}, f.reader, processing)
 		})
 	})
 

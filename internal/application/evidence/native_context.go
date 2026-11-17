@@ -17,6 +17,7 @@ import (
 type NativeContextSource struct {
 	Expectation artifact.ContextExpectation
 	Copies      artifact.Copies
+	Catalog     artifact.CatalogFacts
 }
 
 // Valid admits pod status (the historical 4 KiB type) and any registered
@@ -38,6 +39,7 @@ func cloneNativeSource(s NativeContextSource) NativeContextSource {
 	s.Expectation.SourceSnapshotManifest = s.Expectation.SourceSnapshotManifest.Clone()
 	s.Expectation.RetentionRules = slices.Clone(s.Expectation.RetentionRules)
 	s.Expectation.Profile = s.Expectation.Profile.Clone()
+	s.Catalog.Acquisition = s.Catalog.Acquisition.Clone()
 	if s.Expectation.Snapshot != nil {
 		s.Expectation.Snapshot = s.Expectation.Snapshot.Clone()
 	}

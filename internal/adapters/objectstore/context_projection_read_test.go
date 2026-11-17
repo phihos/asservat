@@ -101,7 +101,7 @@ func TestProjectionReaderVerifiesEntirePinnedSourceBeforeTypedOutput(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := evidence.NativeContextSource{Expectation: e, Copies: copies}
+	source := evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: artifact.CatalogFacts{NativeBytes: int64(len(native))}}
 	scope := testProjectionScope()
 	scope.CaseID, scope.CaptureID = e.CaseID, e.CaptureUID
 	scope.ArtifactID, scope.ClusterID = e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID

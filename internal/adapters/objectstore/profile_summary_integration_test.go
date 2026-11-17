@@ -79,13 +79,13 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, native, e, wrongWholeHash, keys...)
-	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
+	source := prepareEncryptedProjectionSource(t, dir, native, e, wrongWholeHash, keys...)
+	f := profileEncryptedFixture{Source: source, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID = e.CaseID, e.CaptureUID
 	s.ArtifactID, s.ClusterID = e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
 	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
-	s.Version = evidence.ContextCopiesDigest(copies)
+	s.Version = evidence.ContextCopiesDigest(source.Copies)
 	s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileSummaryDisplayVersion
 	s.Selection, s.SourceProjectionDigest, s.Profile = query.LineSelection{}, artifact.Digest{}, query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
 	if !s.Valid() || !f.Source.Valid(s.Version) {
@@ -103,7 +103,7 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 
 // prepareEncryptedProjectionSource shares only synthetic frame/manifest setup;
 // each caller supplies its own exact source expectation and projection scope.
-func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader, e artifact.ContextExpectation, wrongWholeHash bool, keys ...evidence.KeySealer) artifact.Copies {
+func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader, e artifact.ContextExpectation, wrongWholeHash bool, keys ...evidence.KeySealer) evidence.NativeContextSource {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -146,7 +146,8 @@ func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader
 	if err != nil {
 		t.Fatal(err)
 	}
-	plain, err := contracts.MarshalContext(e, layout, copies, e.TriggeredAt, e.TriggeredAt.Add(time.Second))
+	started, completed := e.TriggeredAt, e.TriggeredAt.Add(time.Second)
+	plain, err := contracts.MarshalContext(e, layout, copies, started, completed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +173,16 @@ func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader
 		t.Fatal(err)
 	}
 	put(3, commit)
-	return copies
+	return evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: catalogFixture(e, layout.NativeBytes, started, completed)}
+}
+
+// catalogFixture is the catalog row publication stores for the artifact.
+func catalogFixture(e artifact.ContextExpectation, nativeBytes int64, started, completed time.Time) artifact.CatalogFacts {
+	f := artifact.CatalogFacts{NativeBytes: nativeBytes}
+	if e.Profile != nil {
+		f.Acquisition = &artifact.AcquisitionWindow{StartedAt: started.UTC().Truncate(time.Microsecond), CompletedAt: completed.UTC().Truncate(time.Microsecond)}
+	}
+	return f
 }
 
 // openProfileEncryptedFixture reads only the exact four fixture objects, with
@@ -240,7 +250,7 @@ func openProfileEncryptedFixture(t *testing.T, owner context.Context, dir string
 	t.Helper()
 	verifier, keys, entered, unblock := profileEncryptedVerifier(t, dir, f, block)
 	until, _ := owner.Deadline()
-	opened, err := verifier.OpenNative(owner, f.Source.Expectation, f.Source.Copies, until)
+	opened, err := verifier.OpenNative(owner, f.Source, until)
 	if err != nil {
 		t.Fatal(err)
 	}
