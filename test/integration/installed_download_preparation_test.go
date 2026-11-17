@@ -39,7 +39,7 @@ func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admi
 	// Reuse the actual ordinary hub login and shared pool for these three typed
 	// facets. This is a transaction fixture, not a whole-hub load measurement.
 	sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-	shared := sharedPools.ordinary
+	shared := sharedPools
 	sessions, err := postgres.NewDownloads(ctx, shared, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)

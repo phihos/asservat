@@ -41,7 +41,7 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 			t.Fatal(err)
 		}
 		sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-		sharedPool := sharedPools.ordinary
+		sharedPool := sharedPools
 		executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)

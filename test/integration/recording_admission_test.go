@@ -185,12 +185,9 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
 		sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 		t.Cleanup(func() {
-			sharedPools.ordinary.Close()
-			for _, reserved := range sharedPools.resolution {
-				reserved.Close()
-			}
+			sharedPools.Close()
 		})
-		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools.ordinary, s.a.RootID, s.recovery.installation)
+		executions, err := postgres.NewAPIContextExecutions(ctx, sharedPools, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}

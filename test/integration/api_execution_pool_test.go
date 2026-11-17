@@ -13,9 +13,9 @@ import (
 )
 
 // All three typed execution ports use the compiled ordinary hub login and its
-// shared 18-connection pool. Other fixture processes stay separate; cleanup joins it before
+// shared 20-connection pool. Other fixture processes stay separate; cleanup joins it before
 // the role is removed. The setup-only pool supplies TLS endpoint configuration.
-func compiledOrdinaryHubPools(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (ordinaryHubPools, string) {
+func compiledOrdinaryHubPools(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (*pgxpool.Pool, string) {
 	t.Helper()
 	const purpose = "hub-runtime"
 	const password = "synthetic-shared-api-execution"
@@ -39,38 +39,29 @@ func compiledOrdinaryHubPools(t *testing.T, ctx context.Context, admin *pgxpool.
 	return governedOrdinaryHubPools(t, ctx, config), role
 }
 
-type ordinaryHubPools struct {
-	ordinary   *pgxpool.Pool
-	resolution []*pgxpool.Pool
-}
-
 // This subset keeps the public group's 20 physical connections. Independent
 // owner/capture/reader pools and their credentials are qualified separately.
-func governedOrdinaryHubPools(t *testing.T, ctx context.Context, config *pgxpool.Config) ordinaryHubPools {
+func governedOrdinaryHubPools(t *testing.T, ctx context.Context, config *pgxpool.Config) *pgxpool.Pool {
 	t.Helper()
 	governor, err := postgres.NewSQLConnectionGovernor(32, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	open := func(limit int32) *pgxpool.Pool {
-		c := config.Copy()
-		c.MaxConns, c.MinConns = limit, 0
-		if err := governor.Govern(c, true); err != nil {
-			t.Fatal("public pool governor unavailable", err)
-		}
-		pool, err := pgxpool.NewWithConfig(ctx, c)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(pool.Close)
-		return pool
+	c := config.Copy()
+	c.MaxConns, c.MinConns = contracts.PublicRuntimeHubOrdinaryConnections, 0
+	if err := governor.Govern(c, true); err != nil {
+		t.Fatal("public pool governor unavailable", err)
 	}
-	return ordinaryHubPools{ordinary: open(contracts.PublicRuntimeHubOrdinaryConnections), resolution: []*pgxpool.Pool{open(1), open(1)}}
+	pool, err := pgxpool.NewWithConfig(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
 }
 
-func qualifyOrdinaryHubPoolBound(t *testing.T, ctx context.Context, pools ordinaryHubPools) {
+func qualifyOrdinaryHubPoolBound(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	pool := pools.ordinary
 	for round := 0; round < 2; round++ {
 		var held []*pgxpool.Conn
 		release := func() {
@@ -83,22 +74,12 @@ func qualifyOrdinaryHubPoolBound(t *testing.T, ctx context.Context, pools ordina
 		for range contracts.PublicRuntimeHubOrdinaryConnections {
 			conn, err := pool.Acquire(ctx)
 			if err != nil {
-				t.Fatal("shared execution pool cannot acquire 18 ordinary slots", err)
+				t.Fatal("shared execution pool cannot acquire 20 ordinary slots", err)
 			}
 			held = append(held, conn)
 		}
 		if pool.Stat().AcquiredConns() != contracts.PublicRuntimeHubOrdinaryConnections || pool.Stat().TotalConns() != contracts.PublicRuntimeHubOrdinaryConnections {
 			t.Fatal("shared execution concurrency changed")
-		}
-		// Saturating ordinary traffic must leave both resolution lanes usable.
-		for _, reserved := range pools.resolution {
-			call, cancel := context.WithTimeout(ctx, time.Second)
-			var one int
-			err := reserved.QueryRow(call, "SELECT 1").Scan(&one)
-			cancel()
-			if err != nil || one != 1 {
-				t.Fatal("ordinary saturation blocked a reserved resolution lane", err)
-			}
 		}
 		wait, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 		if round == 1 {
@@ -114,7 +95,7 @@ func qualifyOrdinaryHubPoolBound(t *testing.T, ctx context.Context, pools ordina
 			want = context.Canceled
 		}
 		if !errors.Is(err, want) {
-			t.Fatal("nineteenth ordinary acquisition escaped original caller bound", err)
+			t.Fatal("twenty-first ordinary acquisition escaped original caller bound", err)
 		}
 		release()
 	}

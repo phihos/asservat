@@ -600,6 +600,7 @@ func (nativeContentDeniedBearer) ObserveCredential(context.Context, string) (ide
 
 func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFixture, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer, coordinator evidence.ContextDownloadCoordinator, session artifact.DownloadSession, m artifact.NativeDownloadMetadata) {
 	t.Helper()
+	since := contentAuditStart(t, ctx, f)
 	server := httptest.NewUnstartedServer(nil)
 	defer server.Close()
 	origin := "https://" + server.Listener.Addr().String()
@@ -664,12 +665,31 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 	if e != nil || response.StatusCode != http.StatusOK || int64(len(body)) != m.Size || artifact.Digest(sha256.Sum256(body)) != m.SHA256 {
 		t.Fatal("exact native HTTP bytes", response.StatusCode, len(body), e)
 	}
-	var rows int
-	if e = f.admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call'").Scan(&rows); e != nil || rows != 2 {
-		t.Fatal("conditional/content audit rows", rows, e)
+	if rows := contentAuditRows(t, ctx, f, since); rows != 2 {
+		t.Fatal("conditional/content audit rows", rows)
 	}
 	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both GETs wrote an audit row", len(body))
 }
+// Subtests share one database and run in sequence, so a subtest counts only
+// the content call rows recorded after its own start.
+func contentAuditStart(t *testing.T, ctx context.Context, f nativeExchangeFixture) time.Time {
+	t.Helper()
+	var now time.Time
+	if e := f.admin.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); e != nil {
+		t.Fatal(e)
+	}
+	return now
+}
+
+func contentAuditRows(t *testing.T, ctx context.Context, f nativeExchangeFixture, since time.Time) int {
+	t.Helper()
+	var rows int
+	if e := f.admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call' AND recorded_at>=$1", since).Scan(&rows); e != nil {
+		t.Fatal("content audit rows", e)
+	}
+	return rows
+}
+
 func nativeContentAuditFixture(t *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
 	t.Helper()
 	return nativeContentAuditFixtureOwned(t, t, ctx, f, inner)

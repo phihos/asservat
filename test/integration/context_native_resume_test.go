@@ -84,6 +84,7 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 	if m.Size < 2 || m.Size > artifact.MaxContextBytes || original.ReadLimit != 12<<20 || original.ChargedRead != 4<<20 || original.OutputLimit != 8192 {
 		t.Fatal("original bounded resume fixture backing")
 	}
+	since := contentAuditStart(t, ctx, f)
 	server := httptest.NewUnstartedServer(nil)
 	server.EnableHTTP2 = true
 	defer server.Close()
@@ -220,9 +221,8 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 	if unchanged.Generation != finalSession.Generation || unchanged.ChargedRead != finalSession.ChargedRead || unchanged.ChargedOutput != finalSession.ChargedOutput || unchanged.EmittedBytes != finalSession.EmittedBytes {
 		t.Fatal("denied depleted request changed original spend")
 	}
-	var rows int
-	if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call'`).Scan(&rows); err != nil || rows != 4 {
-		t.Fatal("range/conditional/depleted audit rows", rows, err)
+	if rows := contentAuditRows(t, ctx, f, since); rows != 4 {
+		t.Fatal("range/conditional/depleted audit rows", rows)
 	}
 	t.Logf("actual h2 ranges reconstructed %d original native bytes after expired observation; four Joined worker conversations, one original preparation and two content key bindings (nine individual unwrap slots), no budget refill", len(reconstructed))
 }
