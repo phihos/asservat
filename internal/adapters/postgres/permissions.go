@@ -580,22 +580,61 @@ func (p *Permissions) WorkloadPermissions(ctx context.Context, target authorizat
 // permissionProjection runs with the permission stream already locked. It may
 // be reused by named admission facets after taking their remaining SQL locks.
 func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, target authorization.Target) (authorization.Projection, error) {
-	var out authorization.Projection
-	n, err := q.CurrentTime(ctx)
+	h, err := readProjectionStream(ctx, q, s)
 	if err != nil {
 		return authorization.Projection{}, err
 	}
+	out, err := h.projection(ctx, q, target)
+	if err != nil {
+		return authorization.Projection{}, err
+	}
+	return out, h.stillCurrent(ctx, q)
+}
+
+// projectionStream is the per-stream part of a projection read: the check
+// time and the stream's audit roots. A caller that reads many targets in one
+// transaction (the access preview) reads it once.
+type projectionStream struct {
+	s           custodydb.PermissionStream
+	n           time.Time
+	rootAudited bool
+}
+
+func readProjectionStream(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream) (projectionStream, error) {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return projectionStream{}, err
+	}
 	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
-		return authorization.Projection{}, cfg.ErrUnavailable
+		return projectionStream{}, cfg.ErrUnavailable
 	}
 	reset, err := q.ReadAuthorityAudit(ctx, s.Epoch)
 	if err != nil {
-		return authorization.Projection{}, err
+		return projectionStream{}, err
 	}
 	initial, err := q.ReadAuthorityAudit(ctx, s.InitialAuditID)
 	if err != nil {
-		return authorization.Projection{}, err
+		return projectionStream{}, err
 	}
+	return projectionStream{s: s, n: n.Time, rootAudited: currentAuthorityAudit(reset, s.ID, s.Epoch) && currentAuthorityAudit(initial, s.ID, s.InitialAuditID)}, nil
+}
+
+// stillCurrent rechecks, after the reads, that the stream's lease and
+// freshness have not ended.
+func (h projectionStream) stillCurrent(ctx context.Context, q *custodydb.Queries) error {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	if !n.Time.Before(identity.Earlier(h.s.FreshUntil.Time, h.s.LeaseUntil.Time)) {
+		return cfg.ErrUnavailable
+	}
+	return nil
+}
+
+func (h projectionStream) projection(ctx context.Context, q *custodydb.Queries, target authorization.Target) (authorization.Projection, error) {
+	var out authorization.Projection
+	s, n, rootAudited := h.s, h.n, h.rootAudited
 	rows, err := q.SelectPermissionAssignments(ctx, custodydb.SelectPermissionAssignmentsParams{StreamID: s.ID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column4: target.WorkloadUID})
 	if err != nil {
 		return authorization.Projection{}, err
@@ -603,7 +642,6 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	until := identity.Earlier(s.FreshUntil.Time, s.LeaseUntil.Time)
 	out = authorization.Projection{Target: target, Revision: identity.Revision{UID: uid(s.Epoch), Generation: s.Sequence}, ObservedAt: s.ObservedAt.Time, FreshUntil: until, DeniesComplete: true, DeniesObservedAt: s.ObservedAt.Time, DeniesFreshUntil: until}
 	copy(out.Revision.Digest[:], s.ProjectionDigest)
-	rootAudited := currentAuthorityAudit(reset, s.ID, s.Epoch) && currentAuthorityAudit(initial, s.ID, s.InitialAuditID)
 	for _, a := range rows {
 		if a.SeenSequence != s.Sequence {
 			// Only an unavailable source's kept allow may lag the stream
@@ -618,7 +656,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		if a.NotAfter.Valid {
 			deadline = identity.Earlier(deadline, a.NotAfter.Time)
 		}
-		if !n.Time.Before(deadline) {
+		if !n.Before(deadline) {
 			continue
 		}
 		audience := artifact.AudienceAssignment{Kind: a.SubjectKind, Issuer: a.Issuer, SubjectID: a.SubjectID, Role: a.Role, BasisKind: a.SourceKind, BasisUID: a.SourceUid, AssignmentID: uid(a.ID)}
@@ -644,20 +682,13 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 				break
 			}
 			deadline := identity.Earlier(until, r.FreshUntil.Time)
-			if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
+			if !rootAudited || !n.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
 				continue
 			}
 			audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}
 			copy(audience.BasisDigest[:], r.BasisDigest)
 			out.Allows = append(out.Allows, authorization.CurrentAssignment{Audience: audience, ObservedAt: r.DecidedAt.Time, FreshUntil: deadline, Reviewed: true})
 		}
-	}
-	n, err = q.CurrentTime(ctx)
-	if err != nil {
-		return authorization.Projection{}, err
-	}
-	if !n.Time.Before(until) {
-		return authorization.Projection{}, cfg.ErrUnavailable
 	}
 	return out, nil
 }
