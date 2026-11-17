@@ -107,6 +107,7 @@ exposure:
 # clusters.
 clusters: []
 # - name: payments-eu        # DNS label; how people and policies name it
+#                            # ("local" is the hub's own cluster in combined mode)
 #   issuer: https://eu-apiserver.example  # its ServiceAccount issuer
 #   # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
 #   # connector: asservat-system/asservat-connector  # default <namespace>/<name>-connector
