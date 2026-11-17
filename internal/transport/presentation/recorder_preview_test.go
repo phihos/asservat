@@ -293,7 +293,7 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	}
 	// result_access travels only to the reviewed-plan request.
 	f.err = nil
-	withAccess := `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
+	withAccess := `{"preview":` + wireComposition + `,"expected_plan_digest":"` + wirePlanDigest + `","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
 	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 {
 		t.Fatalf("result access not passed: %v %+v", err, f.access)
 	}
@@ -307,9 +307,9 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	}
 }
 
-func (f *recorderFixture) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (value.Accepted, error) {
-	f.access = access
-	return f.Request(ctx, current, preview, key)
+func (f *recorderFixture) Request(ctx context.Context, current identities.CurrentIdentity, in app.CaptureRequest) (value.Accepted, error) {
+	f.access = in.Access
+	return f.contextOperationFixture.Request(ctx, current, in)
 }
 
 func TestRecorderPreviewOperationalFailureIsTypedUnavailable(t *testing.T) {

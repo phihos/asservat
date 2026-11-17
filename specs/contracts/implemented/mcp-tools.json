@@ -5365,9 +5365,6 @@
                                     ]
                                   },
                                   {
-                                    "required": []
-                                  },
-                                  {
                                     "required": [
                                       "preview_deadline"
                                     ]
@@ -6557,9 +6554,6 @@
                                           "required": [
                                             "capture_id"
                                           ]
-                                        },
-                                        {
-                                          "required": []
                                         },
                                         {
                                           "required": [
@@ -19179,9 +19173,6 @@
                                 "required": [
                                   "capture_id"
                                 ]
-                              },
-                              {
-                                "required": []
                               },
                               {
                                 "required": [

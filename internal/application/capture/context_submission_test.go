@@ -83,12 +83,12 @@ func submissionTest(t *testing.T) (*investigationFixture, *submissionFixture, Co
 func TestContextSubmissionInvokesOriginalAcceptedStart(t *testing.T) {
 	f, x, s, p := submissionTest(t)
 	x.current = f.source(t, context.Background())
-	a, err := s.Request(context.Background(), x.current, p.ID, "original")
+	a, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 	if err != nil || a.CaptureID != p.CaptureID || x.starts != 1 || x.intentReads != 1 || f.admissions.Load() != 1 {
 		t.Fatal("admission did not reach original live start port", err, x.starts, x.intentReads)
 	}
 	x.current = f.source(t, context.Background())
-	again, err := s.Request(context.Background(), x.current, p.ID, "original")
+	again, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 	if err != nil || !again.Replay || again.CaptureID != a.CaptureID || x.starts != 1 || x.intentReads != 1 || f.admissions.Load() != 1 {
 		t.Fatal("same-key replay replaced accepted work", err)
 	}
@@ -116,7 +116,7 @@ func TestContextSubmissionDownstreamFailureKeepsAdmission(t *testing.T) {
 			case "expiry-in-start":
 				x.startHook = func() { f.now = f.now.Add(6 * time.Second) }
 			}
-			a, err := s.Request(ctx, x.current, p.ID, "original")
+			a, err := s.Request(ctx, x.current, reviewed(p, "original"))
 			if err == nil || a.CaptureID != p.CaptureID || f.admissions.Load() != 1 {
 				t.Fatal("failure discarded or denied original admission", err)
 			}
@@ -135,7 +135,7 @@ func TestContextSubmissionDownstreamFailureKeepsAdmission(t *testing.T) {
 			x.startHook = nil
 			x.startErr = nil
 			x.changeIntent = false
-			r, err := f.svc.Request(context.Background(), f.source(t, context.Background()), p.ID, "original")
+			r, err := f.svc.Request(context.Background(), f.source(t, context.Background()), reviewed(p, "original"))
 			if err != nil || !r.Replay || r.CaptureID != a.CaptureID || f.admissions.Load() != 1 || x.starts != want {
 				t.Fatal("read-only admission recovery changed effects", err)
 			}

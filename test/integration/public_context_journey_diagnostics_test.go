@@ -23,8 +23,7 @@ import (
 // performs no additional SQL/API/time read. Every decorator delegates once and
 // returns the original values and error. Report runs only after the call ends.
 const (
-	journeyRequestLookup = 18 + iota
-	journeyRequestPreview
+	journeyRequestLookup = 17 + iota
 	journeyRequestAdmit
 	journeyCaptureIntent
 	journeyRegionalRead
@@ -45,8 +44,8 @@ var journeyDiagnosticNames = [journeyDiagnosticStages]string{
 	"audit-reserve", "audit-claim-intent", "audit-write-intent", "audit-complete-intent", "audit-ack-intent",
 	"audit-freeze", "audit-claim-outcome", "audit-write-outcome", "audit-complete-outcome", "audit-ack-outcome",
 	"preview-workload", "preview-pod", "preview-eligibility", "preview-capability",
-	"preview-retention", "preview-storage", "preview-processing", "preview-create",
-	"request-lookup", "request-preview-read", "request-admit",
+	"preview-retention", "preview-storage", "preview-processing",
+	"request-lookup", "request-admit",
 	"capture-intent",
 	"regional-read", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-record-start", "runner-eligibility-identity",
 }
@@ -159,7 +158,7 @@ func (s *publicJourneyDiagnostics) Report(t *testing.T) {
 // preview starts a fresh request, never replays to manufacture a diagnostic.
 
 func (s *publicJourneyDiagnostics) Investigation(in captureapp.ContextInvestigation) captureapp.ContextInvestigation {
-	p := publicJourneyPreviewDiagnostics{ContextAdmissionReplay: in.Replay, ReviewedAdmissionTransaction: in.Admission, ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, ContextPreviewStore: in.Previews, trace: s}
+	p := publicJourneyPreviewDiagnostics{ContextAdmissionReplay: in.Replay, ReviewedAdmissionTransaction: in.Admission, ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, trace: s}
 	if in.Replay != nil {
 		in.Replay = p
 	}
@@ -184,9 +183,6 @@ func (s *publicJourneyDiagnostics) Investigation(in captureapp.ContextInvestigat
 	if in.Processing != nil {
 		in.Processing = p
 	}
-	if in.Previews != nil {
-		in.Previews = p
-	}
 	return in
 }
 
@@ -199,7 +195,6 @@ type publicJourneyPreviewDiagnostics struct {
 	captureapp.ContextRetentionResolver
 	captureapp.ContextStorageReader
 	captureapp.ContextProcessingCoverageReader
-	captureapp.ContextPreviewStore
 	trace *publicJourneyDiagnostics
 }
 
@@ -241,11 +236,6 @@ func (s publicJourneyPreviewDiagnostics) ContextProcessingCoverage(c context.Con
 	v, e := s.ContextProcessingCoverageReader.ContextProcessingCoverage(c, r)
 	s.trace.record(16, journeyDiagnosticError(e))
 	return v, e
-}
-func (s publicJourneyPreviewDiagnostics) CreateContextPreview(c context.Context, v capturevalue.ContextPreview) error {
-	e := s.ContextPreviewStore.CreateContextPreview(c, v)
-	s.trace.record(17, journeyDiagnosticError(e))
-	return e
 }
 
 // Compare only known sentinels; do not invoke Error, Is, As or Unwrap on a
@@ -375,7 +365,7 @@ func TestPublicJourneyDiagnosticsOriginalPreviewDelegate(t *testing.T) {
 			}}
 			trace := &publicJourneyDiagnostics{}
 			wrapped := trace.Investigation(captureapp.ContextInvestigation{Storage: inner})
-			if wrapped.Targets != nil || wrapped.Previews != nil {
+			if wrapped.Targets != nil || wrapped.Admission != nil {
 				t.Fatal("diagnostics filled absent authority")
 			}
 			got, err := wrapped.Storage.ContextStorage(c, target)

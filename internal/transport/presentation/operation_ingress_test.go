@@ -11,19 +11,19 @@ import (
 func TestIngressRejectionHasNoDispatchAndPreservesFinalDeadline(t *testing.T) {
 	for _, kind := range []IngressRejectionKind{IngressInvalid, IngressDenied} {
 		s, f, g := auditedFixture(t)
-		until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{"resolve_capture_request", []byte("sensitive-user-data"), kind})
-		if err != nil || until.IsZero() || until.After(f.i.ValidUntil) || f.requests != 0 || f.resolutions != 0 || len(g.events) != 1 || g.events[0].Operation != "invalid_operation" || g.events[0].Effect != "none" {
+		until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{"request_capture", []byte("sensitive-user-data"), kind})
+		if err != nil || until.IsZero() || until.After(f.i.ValidUntil) || f.requests != 0 || len(g.events) != 1 || g.events[0].Operation != "invalid_operation" || g.events[0].Effect != "none" {
 			t.Fatal("rejection dispatched or lacks bounded audit", err)
 		}
 		raw, _ := json.Marshal(g.events)
-		if bytes.Contains(raw, []byte("sensitive-user-data")) || bytes.Contains(raw, []byte("resolve_capture_request")) {
+		if bytes.Contains(raw, []byte("sensitive-user-data")) || bytes.Contains(raw, []byte("request_capture")) {
 			t.Fatal("rejected input persisted as plaintext")
 		}
 	}
 	s, f, g := auditedFixture(t)
 	g.fail = true
-	until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{RequestedOperation: "resolve_capture_request", Input: []byte("{}"), Kind: IngressInvalid})
-	if err == nil || !until.IsZero() || len(g.events) != 1 || f.resolutions != 0 {
+	until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{RequestedOperation: "request_capture", Input: []byte("{}"), Kind: IngressInvalid})
+	if err == nil || !until.IsZero() || len(g.events) != 1 {
 		t.Fatal("unaudited rejection disclosed or dispatched")
 	}
 }

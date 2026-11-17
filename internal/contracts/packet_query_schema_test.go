@@ -57,7 +57,7 @@ func TestPacketQueryCombinedReviewChoicesAndCurrentClientDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := []byte(`{"preview_id":"00000000-0000-4000-8000-000000000173","idempotency_key":"review","result_access":{"actionIds":["packets"],"operations":["download_artifact","pcap_query"],"maxArtifacts":1,"maxBytes":9000000,"maxOperations":10,"notAfter":"2026-11-05T10:00:00Z"}}`)
+	input := []byte(`{"preview":{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","idempotency_key":"review","result_access":{"actionIds":["packets"],"operations":["download_artifact","pcap_query"],"maxArtifacts":1,"maxBytes":9000000,"maxOperations":10,"notAfter":"2026-11-05T10:00:00Z"}}`)
 	if err := wire.ValidateInput("request_capture", input); err != nil {
 		t.Fatal("current-client request", err)
 	}

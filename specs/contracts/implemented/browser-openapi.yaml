@@ -5266,7 +5266,6 @@ components:
                             anyOf:
                             - required:
                               - capture_id
-                            - required: []
                             - required:
                               - preview_deadline
                             - required:
@@ -10720,7 +10719,6 @@ components:
                       anyOf:
                       - required:
                         - capture_id
-                      - required: []
                       - required:
                         - preview_deadline
                       - required:
@@ -16366,8 +16364,8 @@ components:
               type: integer
               minimum: 0
               maximum: 1000000000
-              description: Cumulative eligible entry and exit probe ceiling; zero or absent
-                grants no argument observation.
+              description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument
+                observation.
           required:
           - max_executions
           - max_collected_bytes
@@ -17156,7 +17154,6 @@ components:
                     anyOf:
                     - required:
                       - capture_id
-                    - required: []
                     - required:
                       - preview_deadline
                     - required:

@@ -88,13 +88,6 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 	pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-	previews, err := postgres.NewContextPreviews(ctx, pools, p.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(ctx, p); err != nil {
-		t.Fatal("profile preview", err)
-	}
 	grants, err := postgres.NewAccessGrants(ctx, pools, p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +132,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if r.WriteUntil.After(r.ExpiresAt) {
 		r.WriteUntil = r.ExpiresAt
 	}
-	if _, err = s.s.AdmitReviewedContext(ctx, p.ID, s.a); err == nil {
+	if _, err = s.s.AdmitReviewedContext(ctx, p, s.a); err == nil {
 		t.Fatal("pending liveProfile grant admitted with optional recording approval off")
 	}
 	var charged int64
@@ -152,7 +145,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if err != nil {
 		t.Fatal(err)
 	}
-	accepted, err := s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+	accepted, err := s.s.AdmitReviewedContext(ctx, p, s.a)
 	if err != nil {
 		t.Fatal("approved profile admission", err)
 	}

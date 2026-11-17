@@ -13,7 +13,7 @@ func TestDiagnosticCheckDoesNotCreatePreviewOrStartWork(t *testing.T) {
 	if _, err := f.svc.CheckDiagnostic(ctx, f.source(t, ctx), f.intent().Target); err != nil {
 		t.Fatal(err)
 	}
-	if f.newIDs.Load() != 0 || len(f.previews) != 0 || f.admissions.Load() != 0 {
+	if f.newIDs.Load() != 0 || f.admissions.Load() != 0 {
 		t.Fatal("catalog discovery created work or consumed a draft")
 	}
 	f.cap.ExecutionClass = artifact.ContextAPIExecution

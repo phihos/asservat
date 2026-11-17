@@ -20,7 +20,7 @@ type phaseAdmission struct {
 	until time.Time
 }
 
-func (p phaseAdmission) AdmitReviewedContext(ctx context.Context, preview string, in value.Admission) (value.Accepted, error) {
+func (p phaseAdmission) AdmitReviewedContext(ctx context.Context, preview value.ContextPreview, in value.Admission) (value.Accepted, error) {
 	a, err := p.investigationFixture.AdmitReviewedContext(ctx, preview, in)
 	a.MetadataValidUntil = p.until
 	return a, err
@@ -105,7 +105,7 @@ func TestContextSubmissionSlowAdmissionLeavesBoundedStartPhase(t *testing.T) {
 				}
 				return nil
 			}}
-			a, err := s.Request(ctx, x.current, p.ID, "slow-admission")
+			a, err := s.Request(ctx, x.current, reviewed(p, "slow-admission"))
 			if a.CaptureID != p.CaptureID || f.admissions.Load() != 1 || x.intentReads != 1 {
 				t.Fatalf("original admission lost or repeated: err=%v capture=%s admissions=%d intents=%d", err, a.CaptureID, f.admissions.Load(), x.intentReads)
 			}
@@ -152,7 +152,7 @@ func TestContextSubmissionConsumesMetadataBeforeIndependentStart(t *testing.T) {
 				replay := &phaseReplay{investigationFixture: f}
 				s.Replay = replay
 				if continuation {
-					if _, err := f.svc.Request(ctx, x.current, p.ID, "original"); err != nil {
+					if _, err := f.svc.Request(ctx, x.current, reviewed(p, "original")); err != nil {
 						t.Fatal(err)
 					}
 					replay.initialUntil = metadataUntil
@@ -173,9 +173,9 @@ func TestContextSubmissionConsumesMetadataBeforeIndependentStart(t *testing.T) {
 				var a value.Accepted
 				var err error
 				if continuation {
-					a, err = s.Continue(ctx, x.current, p.ID, "original")
+					a, err = s.Continue(ctx, x.current, reviewed(p, "original"))
 				} else {
-					a, err = s.Request(ctx, x.current, p.ID, "original")
+					a, err = s.Request(ctx, x.current, reviewed(p, "original"))
 				}
 				if err != nil || x.starts != 1 || x.intentReads != 1 {
 					t.Fatalf("consumed response metadata blocked independent start: err=%v starts=%d intent=%d", err, x.starts, x.intentReads)
@@ -237,7 +237,7 @@ func TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation(t *testi
 					cancel()
 				}
 			}
-			a, err := s.Request(ctx, x.current, p.ID, "original")
+			a, err := s.Request(ctx, x.current, reviewed(p, "original"))
 			if err == nil || x.starts != 1 || x.intentReads != 1 || replay.acceptedReads != 1 || f.admissions.Load() != 1 || a.CaptureID != p.CaptureID {
 				t.Fatalf("failed final observation changed known admission or repeated effects: err=%v starts=%d intent=%d reads=%d", err, x.starts, x.intentReads, replay.acceptedReads)
 			}
@@ -259,11 +259,11 @@ func TestContextSubmissionPreservesCurrentMetadataWithoutExtraLookup(t *testing.
 			replay := &phaseReplay{investigationFixture: f, initialUntil: cutoff}
 			s.Replay = replay
 			if passive {
-				if _, err := f.svc.Request(context.Background(), x.current, p.ID, "original"); err != nil {
+				if _, err := f.svc.Request(context.Background(), x.current, reviewed(p, "original")); err != nil {
 					t.Fatal(err)
 				}
 			}
-			a, err := s.Request(context.Background(), x.current, p.ID, "original")
+			a, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 			wantReads, wantStarts := 0, 1
 			if passive {
 				wantReads, wantStarts = 1, 0
@@ -309,7 +309,7 @@ func TestContextSubmissionPhaseSeparationKeepsAuthorityCutoffs(t *testing.T) {
 				} // independently current start authority refuses
 				return nil
 			}}
-			_, err := s.Request(ctx, x.current, p.ID, "original")
+			_, err := s.Request(ctx, x.current, reviewed(p, "original"))
 			if err == nil || x.starts != 0 || replay.acceptedReads != 0 || f.admissions.Load() != 1 {
 				t.Fatalf("authority expiry was mistaken for consumed metadata: err=%v starts=%d reads=%d", err, x.starts, replay.acceptedReads)
 			}

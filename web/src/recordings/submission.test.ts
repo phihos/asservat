@@ -3,8 +3,10 @@ import { Investigation } from '../capture/investigation';
 import { SyntheticOperations, id, session, target, result, progressResult } from '../capture/test-fixtures';
 
 const controllers: Investigation[] = [];
+const savePreview = { recording_handles: ['source-1'] };
+const digest = 'b'.repeat(64);
 afterEach(() => { controllers.forEach(controller => controller.reset()); controllers.length = 0; window.history.replaceState(null, '', '/'); });
-it('hands manual save to the same-key uncertain receipt and refuses another capture', async () => {
+it('hands manual save to the same-key uncertain receipt', async () => {
   const client = new SyntheticOperations(); let uncertain = true;
   client.responder = name => {
     if (name === 'request_capture') {
@@ -15,15 +17,14 @@ it('hands manual save to the same-key uncertain receipt and refuses another capt
   };
   const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   controller.attach(session, new AbortController().signal); controller.setDraft({ target, retention: '' }); controller.showRecordings();
-  await controller.submitRecordingSave(id(2), id(8), new Date(Date.now() + 60_000).toISOString());
+  await controller.submitRecordingSave(savePreview, digest);
   expect(controller.snapshot()).toMatchObject({ stage: 'uncertain' });
   uncertain = false; await controller.retrySubmission();
   const submitted = client.calls.filter(call => call.name === 'request_capture');
   expect(submitted).toHaveLength(2);
-  expect(submitted[0].input).toEqual({ preview_id: id(2), idempotency_key: id(6) });
+  expect(submitted[0].input).toEqual({ preview: savePreview, expected_plan_digest: digest, idempotency_key: id(6) });
   expect(submitted[1].input).toEqual(submitted[0].input);
-  expect(controller.snapshot()).toMatchObject({ stage: 'uncertain' });
-  expect(controller.snapshot().error).toMatch(/outcome could not be verified/);
+  expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(9) });
   expect(client.calls.some(call => call.name === 'preview_capture')).toBe(false);
 });
 it('opens only the exact saved capture and requires recordingSave progress', async () => {
@@ -33,15 +34,9 @@ it('opens only the exact saved capture and requires recordingSave progress', asy
     : { ...progressResult('Finalizing'), data: { ...(progressResult('Finalizing').data), operation: 'recordingSave' } };
   const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   controller.attach(session, new AbortController().signal); controller.showRecordings();
-  await controller.submitRecordingSave(id(2), id(8), new Date(Date.now() + 60_000).toISOString());
+  await controller.submitRecordingSave(savePreview, digest);
   expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8), progress: { operation: 'recordingSave', phase: 'Finalizing' } });
   expect(client.calls.map(call => call.name)).toEqual(['request_capture', 'get_capture']);
-});
-it('an expired save preview never creates a receipt or sends a capture request', async () => {
-  const client = new SyntheticOperations(); const controller = new Investigation(client); controllers.push(controller);
-  controller.attach(session, new AbortController().signal); controller.showRecordings();
-  await controller.submitRecordingSave(id(2), id(8), new Date(Date.now() - 1).toISOString());
-  expect(client.calls).toHaveLength(0); expect(controller.snapshot().stage).toBe('recordings');
 });
 it('history repeat restores only preferences and requires fresh source selection', async () => {
   const { readFileSync, existsSync } = await import('node:fs');

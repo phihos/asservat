@@ -726,10 +726,8 @@ export interface components {
             /** @constant */
             status: "ok";
             data: {
-                /** Format: uuid */
-                preview_id: string;
-                /** Format: date-time */
-                expires_at: string;
+                /** @description Digest of the resolved plan: immutable target UIDs, dependencies and the normalized request. Submit it as request_capture expected_plan_digest. */
+                plan_digest: string;
                 execution_digest: string;
                 pod_count: number;
                 max_bytes: number;
@@ -847,14 +845,51 @@ export interface components {
             reason?: string;
             idempotency_key: string;
             sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
-            /** Format: uuid */
-            preview_id?: string;
             result_access?: components["schemas"]["Contract_investigation_access_0d504ecd6bc8c0fd"];
-            /**
-             * @description Explicitly continue acquisition for an already accepted original preview and request key using current permissions. Omission preserves passive accepted replay. This cannot admit a missing request, create another attempt, renew a start interval, or retry uncertain key preparation.
-             * @constant
-             */
-            continue_acquisition?: true;
+            /** @description The preview_capture or preview_recording_save request that was reviewed. Submission recomputes its plan. */
+            preview?: (({
+                target_handle?: string;
+                target_ref?: {
+                    /** Format: uuid */
+                    cluster_id: string;
+                    namespace: string;
+                    /** @enum {unknown} */
+                    kind: "Deployment" | "StatefulSet" | "Pod";
+                    name: string;
+                };
+                diagnostic_handle?: string;
+                preset_ref?: {
+                    /** @enum {unknown} */
+                    name: "incident-context" | "pod-status";
+                    /** @constant */
+                    version: "v1";
+                };
+                reason?: string;
+                sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
+                /** Format: uuid */
+                history_capture_id?: string;
+                /** Format: uuid */
+                repeated_from_capture_id?: string;
+                profile_composition?: components["schemas"]["Contract_capture_composition"];
+                result_access?: components["schemas"]["Contract_investigation_access_0d504ecd6bc8c0fd"];
+                /** @description Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it. */
+                requested_retention_seconds?: number;
+                /**
+                 * @description Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity.
+                 * @enum {unknown}
+                 */
+                history_selection?: "currentEligiblePod";
+            } & unknown) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown)) | {
+                recording_handles: string[];
+                before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                /** @description Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat. */
+                reason?: string;
+                sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
+                /** Format: uuid */
+                repeated_from_capture_id?: string;
+            };
+            /** @description plan_digest of the reviewed preview. A different current plan returns ReviewChanged. */
+            expected_plan_digest?: string;
         } & (unknown | unknown);
         McpOutput_request_capture: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
@@ -882,51 +917,6 @@ export interface components {
                 query_handle: string;
                 retry_after_seconds: number;
             };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_resolve_capture_request: {
-            /** Format: uuid */
-            preview_id: string;
-            idempotency_key: string;
-        };
-        McpOutput_resolve_capture_request: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: {
-                /** Format: uuid */
-                capture_id: string;
-                /** @constant */
-                phase: "Accepted";
-                /** Format: uri */
-                navigation_uri: string;
-                /** @enum {unknown} */
-                operation: "collect" | "recordingSave";
-                /** @constant */
-                state: "accepted";
-            } | {
-                /** @constant */
-                state: "closed";
-            };
-            /** @constant */
-            data_class?: "metadata";
-            /** @constant */
-            truncated?: false;
-            next_cursor?: null;
-            narrowing_hint?: null;
-            warnings?: unknown[];
-            provenance?: unknown[];
         } | {
             /** @constant */
             status: "error";

@@ -28,9 +28,7 @@ var (
 
 const (
 	ContextDiagnosticName  = "builtin-pod-status-v1"
-	MaxContextPreviewBytes = 128 << 10
 	MaxContextPreviewScope = 64 << 10
-	MaxPreviewsPerRoot     = 1000
 )
 
 // ContextIntent is private authored intent for the one implemented diagnostic,

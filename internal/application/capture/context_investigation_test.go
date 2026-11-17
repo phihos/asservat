@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -32,33 +31,32 @@ func fixtureID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d
 // Kubernetes or permission source qualification. Eligibility uses the
 // actual shared evaluator and identity uses an actual request-owned handle.
 type investigationFixture struct {
-	now                                                   time.Time
-	svc                                                   ContextInvestigation
-	target                                                targets.PodResolution
-	actor                                                 identity.Principal
-	audience                                              artifact.AudienceAssignment
-	cap                                                   planning.ContextCapability
-	store                                                 ContextStorageObservation
-	epoch                                                 string
-	denied, missing                                       bool
-	unknownCommit, unknownPreview                         bool
-	afterStore, afterStorage, afterAdmission, afterReplay func()
-	identityChange                                        string
-	newIDs, targetReads, previewReads, admissions         atomic.Int64
-	mu                                                    sync.Mutex
-	previews                                              map[string]value.ContextPreview
-	accepted                                              map[string]value.Accepted
-	policyGeneration                                      int64
+	now                                       time.Time
+	svc                                       ContextInvestigation
+	target                                    targets.PodResolution
+	actor                                     identity.Principal
+	audience                                  artifact.AudienceAssignment
+	cap                                       planning.ContextCapability
+	store                                     ContextStorageObservation
+	epoch                                     string
+	denied, missing                           bool
+	unknownCommit                             bool
+	afterStorage, afterAdmission, afterReplay func()
+	identityChange                            string
+	newIDs, targetReads, admissions           atomic.Int64
+	mu                                        sync.Mutex
+	accepted                                  map[string]value.Accepted
+	policyGeneration                          int64
 }
 
 func newInvestigationFixture() *investigationFixture {
-	f := &investigationFixture{now: time.Now().UTC().Truncate(time.Microsecond), epoch: fixtureID(3), previews: map[string]value.ContextPreview{}, accepted: map[string]value.Accepted{}, policyGeneration: 1}
+	f := &investigationFixture{now: time.Now().UTC().Truncate(time.Microsecond), epoch: fixtureID(3), accepted: map[string]value.Accepted{}, policyGeneration: 1}
 	f.actor = identity.Principal{Issuer: "https://identity.example.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}
 	f.target = targets.PodResolution{Request: targets.Request{ClusterID: fixtureID(4), Namespace: configuration.NamespaceRef{Name: "payments", UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "deployment"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: "payments", NamespaceUID: "ns", Name: "api-a", UID: "pod", NodeName: "worker", ControllerUID: "rs"}, NodeUID: "node", NodeBootID: fixtureID(5), PodResourceVersion: "1", WorkloadResourceVersion: "2"}
 	f.audience = artifact.AudienceAssignment{Kind: "User", Issuer: f.actor.Issuer, SubjectID: f.actor.Subject, Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: fixtureID(6), BasisDigest: artifact.Digest{1}}
 	f.cap = planning.ContextCapability{Enabled: true, Revision: identity.Revision{UID: "capability", Generation: 1, Digest: [32]byte{2}}, CollectorVersion: "test-1", CollectorImageDigest: artifact.Digest{3}, ProjectionDigest: compiler.ProjectionDigest()}
 	f.store = ContextStorageObservation{Selection: value.ContextStorageSelection{StoreID: fixtureID(7), AllocationID: fixtureID(8), PoolRevision: 1, AllocationRevision: 1, BindingRevision: identity.Revision{UID: "binding", Generation: 1, Digest: [32]byte{4}}}, Binding: value.StorageBinding{RootID: fixtureID(1), ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", AllocationID: fixtureID(8), Revision: identity.Revision{UID: "binding", Generation: 1, Digest: [32]byte{4}}}}
-	f.svc = ContextInvestigation{RootID: fixtureID(1), InstallationID: fixtureID(2), Previews: f, Replay: f, Admission: f, Resolution: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: f, Storage: f, Processing: f, Lifetime: 5 * time.Minute, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(100 + int(f.newIDs.Add(1))) }}
+	f.svc = ContextInvestigation{RootID: fixtureID(1), InstallationID: fixtureID(2), Replay: f, Admission: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: f, Storage: f, Processing: f, Lifetime: 5 * time.Minute, Now: func() time.Time { return f.now }, NewID: func() string { return fixtureID(100 + int(f.newIDs.Add(1))) }}
 	return f
 }
 
@@ -136,31 +134,6 @@ func (f *investigationFixture) Resolve(_ context.Context, in privacy.Input) (pri
 	set := privacy.PolicySet{Target: in.Target, Revision: r, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: f.policyGeneration, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
 	return privacy.Resolve(set, in, f.now)
 }
-func (f *investigationFixture) CreateContextPreview(_ context.Context, p value.ContextPreview) error {
-	f.mu.Lock()
-	f.previews[p.ID] = p.Clone()
-	f.mu.Unlock()
-	if f.afterStore != nil {
-		f.afterStore()
-	}
-	if f.unknownPreview {
-		return value.ErrUnavailable
-	}
-	return nil
-}
-func (f *investigationFixture) ReadContextPreview(_ context.Context, root, id string, actor identity.Principal) (value.ContextPreview, error) {
-	f.previewReads.Add(1)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	p, ok := f.previews[id]
-	if !ok || p.RootID != root || p.Actor != actor {
-		return value.ContextPreview{}, value.ErrDenied
-	}
-	if !p.Current(f.now) {
-		return value.ContextPreview{}, value.ErrPreviewExpired
-	}
-	return p.Clone(), nil
-}
 func fixtureKey(i identity.Principal, key string) string {
 	return i.Issuer + "/" + i.Subject + "/" + i.ClientID + "/" + key
 }
@@ -180,7 +153,7 @@ func (f *investigationFixture) LookupContextAdmission(_ context.Context, q value
 	a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))
 	return a, ok, nil
 }
-func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID string, a value.Admission) (value.Accepted, error) {
+func (f *investigationFixture) AdmitReviewedContext(_ context.Context, p value.ContextPreview, a value.Admission) (value.Accepted, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	key := fixtureKey(a.Plan.Input.Executor, a.IdempotencyKey)
@@ -189,11 +162,9 @@ func (f *investigationFixture) AdmitReviewedContext(_ context.Context, previewID
 		old.MetadataValidUntil = identity.Earlier(a.Eligibility.ValidUntil, f.now.Add(5*time.Second))
 		return old, nil
 	}
-	p, ok := f.previews[previewID]
-	if !ok || p.Actor != a.Plan.Input.Executor || !p.Current(f.now) {
+	if p.Actor != a.Plan.Input.Executor {
 		return value.Accepted{}, value.ErrChanged
 	}
-
 	for _, old := range f.accepted {
 		if old.CaptureID == a.Plan.Input.CaptureID {
 			return value.Accepted{}, value.ErrConflict
@@ -223,7 +194,25 @@ func (f *investigationFixture) preview(t *testing.T) value.ContextPreview {
 }
 func (f *investigationFixture) request(t *testing.T, p value.ContextPreview, key string) (value.Accepted, error) {
 	t.Helper()
-	return f.svc.Request(context.Background(), f.source(t, context.Background()), p.ID, key)
+	return f.svc.Request(context.Background(), f.source(t, context.Background()), reviewed(p, key))
+}
+
+// reviewed requests an already computed preview without a plan comparison.
+func reviewed(p value.ContextPreview, key string) CaptureRequest {
+	return CaptureRequest{Key: key, Preview: func(context.Context) (value.ContextPreview, error) { return p, nil }}
+}
+
+// requestDigest is the submission digest a request with key and no plan
+// comparison derives for actor.
+func requestDigest(s ContextInvestigation, actor identity.Principal, key string) artifact.Digest {
+	_, _, _, d := s.requestScope(context.Background(), identity.Identity{Principal: actor}, CaptureRequest{Key: key})
+	return d
+}
+
+func withAccess(p value.ContextPreview, key string, access *authorization.ResultAccess) CaptureRequest {
+	r := reviewed(p, key)
+	r.Access = access
+	return r
 }
 
 func TestContextPreviewPassiveAndAssessment(t *testing.T) {
@@ -232,7 +221,7 @@ func TestContextPreviewPassiveAndAssessment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.admissions.Load() != 0 || f.previewReads.Load() != 0 || len(f.accepted) != 0 || !ValidContextPreview(r.Preview) {
+	if f.admissions.Load() != 0 || len(f.accepted) != 0 || !ValidContextPreview(r.Preview) {
 		t.Fatal("preview executed work or invalid blueprint")
 	}
 	if r.Assessment.PlanDigest != r.Preview.ScopeDigest || r.Assessment.RulesDigest != r.Preview.AssessmentRulesDigest || r.Assessment.ID != r.Preview.AssessmentID || r.Assessment.Retention.AccessAgeSeconds != 60 {
@@ -247,11 +236,6 @@ func TestContextPreviewPassiveAndAssessment(t *testing.T) {
 		if _, ok := object[key]; ok {
 			t.Fatalf("persisted runtime authority %s", key)
 		}
-	}
-	r.Preview.CanonicalScope[0] = '!'
-	r.Preview.Audience[0].SubjectID = "replacement"
-	if !ValidContextPreview(f.previews[r.Preview.ID]) {
-		t.Fatal("returned preview aliases stored blueprint")
 	}
 }
 
@@ -281,16 +265,12 @@ func TestContextUnknownCommitRecoversAfterExpiryAndPodDisappearance(t *testing.T
 	f.missing = true
 	f.cap.Enabled = false
 	f.store = ContextStorageObservation{}
-	delete(f.previews, p.ID)
 	a, err := f.request(t, p, "original")
 	if err != nil || !a.Replay || a.CaptureID != p.CaptureID || f.admissions.Load() != 1 || f.targetReads.Load() != beforeReads || f.newIDs.Load() != beforeIDs {
 		t.Fatal("failed exact recovery without original acquisition facts", err)
 	}
-	if f.previewReads.Load() != 1 {
-		t.Fatal("replay consulted expired preview")
-	}
 	f.denied = true
-	if _, err = f.svc.Request(context.Background(), fixtureIdentityResolverHandle{f}, p.ID, "original"); err == nil {
+	if _, err = f.svc.Request(context.Background(), fixtureIdentityResolverHandle{f}, reviewed(p, "original")); err == nil {
 		t.Fatal("revoked caller read accepted operation")
 	}
 }
@@ -304,26 +284,23 @@ func (h fixtureIdentityResolverHandle) ResolveIdentity(ctx context.Context) (ide
 }
 
 func TestContextMaterialChangesRequireReview(t *testing.T) {
-	for name, change := range map[string]func(*investigationFixture, value.ContextPreview){
-		"pod replacement": func(f *investigationFixture, _ value.ContextPreview) {
+	for name, change := range map[string]func(*investigationFixture, *value.ContextPreview){
+		"pod replacement": func(f *investigationFixture, _ *value.ContextPreview) {
 			f.target.Request.PodUID = "replacement"
 			f.target.Pin.UID = "replacement"
 		},
-		"node reboot": func(f *investigationFixture, _ value.ContextPreview) { f.target.NodeBootID = fixtureID(33) },
-		"collector":   func(f *investigationFixture, _ value.ContextPreview) { f.cap.CollectorImageDigest[0]++ },
-		"ceiling":     func(f *investigationFixture, _ value.ContextPreview) { f.cap.Revision.Digest[0]++ },
-		"retention":   func(f *investigationFixture, _ value.ContextPreview) { f.policyGeneration++ },
-		"audience":    func(f *investigationFixture, _ value.ContextPreview) { f.audience.AssignmentID = fixtureID(34) },
-		"allocation":  func(f *investigationFixture, _ value.ContextPreview) { f.store.Selection.PoolRevision++ },
-		"assessment rules": func(f *investigationFixture, p value.ContextPreview) {
-			p.AssessmentRulesDigest[0]++
-			f.previews[p.ID] = p
-		},
+		"node reboot":      func(f *investigationFixture, _ *value.ContextPreview) { f.target.NodeBootID = fixtureID(33) },
+		"collector":        func(f *investigationFixture, _ *value.ContextPreview) { f.cap.CollectorImageDigest[0]++ },
+		"ceiling":          func(f *investigationFixture, _ *value.ContextPreview) { f.cap.Revision.Digest[0]++ },
+		"retention":        func(f *investigationFixture, _ *value.ContextPreview) { f.policyGeneration++ },
+		"audience":         func(f *investigationFixture, _ *value.ContextPreview) { f.audience.AssignmentID = fixtureID(34) },
+		"allocation":       func(f *investigationFixture, _ *value.ContextPreview) { f.store.Selection.PoolRevision++ },
+		"assessment rules": func(_ *investigationFixture, p *value.ContextPreview) { p.AssessmentRulesDigest[0]++ },
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newInvestigationFixture()
 			p := f.preview(t)
-			change(f, p)
+			change(f, &p)
 			if _, err := f.request(t, p, "one"); !errors.Is(err, value.ErrChanged) {
 				t.Fatal("expected fresh review", err)
 			}
@@ -347,17 +324,10 @@ func TestContextNoBroadPresetSubstitution(t *testing.T) {
 }
 
 func TestContextBlockingWorkKeepsOriginalDeadlines(t *testing.T) {
-	for _, stage := range []string{"draft write", "storage read", "admission reply"} {
+	for _, stage := range []string{"storage read", "admission reply"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newInvestigationFixture()
 			expire := func() { f.now = f.now.Add(5 * time.Second) }
-			if stage == "draft write" {
-				f.afterStore = expire
-				if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil {
-					t.Fatal("expired preview response")
-				}
-				return
-			}
 			p := f.preview(t)
 			if stage == "storage read" {
 				f.afterStorage = expire
@@ -382,17 +352,6 @@ func TestContextBlockingWorkKeepsOriginalDeadlines(t *testing.T) {
 }
 
 func TestContextPreviewExpiryOwnershipAndAdmissionKey(t *testing.T) {
-	t.Run("expiry", func(t *testing.T) {
-		f := newInvestigationFixture()
-		p := f.preview(t)
-		f.now = p.Deadline
-		if _, err := f.request(t, p, "one"); !errors.Is(err, value.ErrPreviewExpired) {
-			t.Fatal(err)
-		}
-		if f.admissions.Load() != 0 {
-			t.Fatal("expired draft admitted")
-		}
-	})
 	t.Run("client", func(t *testing.T) {
 		f := newInvestigationFixture()
 		p := f.preview(t)
@@ -407,20 +366,10 @@ func TestContextPreviewExpiryOwnershipAndAdmissionKey(t *testing.T) {
 		if _, err := f.request(t, p, "one"); err != nil {
 			t.Fatal(err)
 		}
-		other := f.preview(t)
-		reads := f.previewReads.Load()
-		if _, err := f.request(t, other, "one"); !errors.Is(err, value.ErrConflict) || f.previewReads.Load() != reads || f.admissions.Load() != 1 {
-			t.Fatal("conflict consumed new draft", err)
-		}
-	})
-	t.Run("same preview another key", func(t *testing.T) {
-		f := newInvestigationFixture()
-		p := f.preview(t)
-		if _, err := f.request(t, p, "one"); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.request(t, p, "two"); !errors.Is(err, value.ErrConflict) || f.admissions.Load() != 1 {
-			t.Fatal("same draft generated second capture", err)
+		other := reviewed(f.preview(t), "one")
+		other.Plan = artifact.Digest{9}
+		if _, err := f.svc.Request(context.Background(), f.source(t, context.Background()), other); !errors.Is(err, value.ErrConflict) || f.admissions.Load() != 1 {
+			t.Fatal("another plan under the same key was not a conflict", err)
 		}
 	})
 }
@@ -432,22 +381,8 @@ func TestContextRequiresProtectedAuthorityAndNoDetachedContext(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		source := f.source(t, ctx)
 		cancel()
-		if _, err := f.svc.Request(context.Background(), source, p.ID, "one"); err == nil || f.admissions.Load() != 0 {
+		if _, err := f.svc.Request(context.Background(), source, reviewed(p, "one")); err == nil || f.admissions.Load() != 0 {
 			t.Fatal("background detached original request")
-		}
-	})
-	t.Run("revoked during draft write", func(t *testing.T) {
-		f := newInvestigationFixture()
-		f.afterStore = func() { f.denied = true }
-		if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil || f.admissions.Load() != 0 {
-			t.Fatal("revoked preview disclosed")
-		}
-	})
-	t.Run("unknown draft write", func(t *testing.T) {
-		f := newInvestigationFixture()
-		f.unknownPreview = true
-		if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil || len(f.previews) != 1 || f.admissions.Load() != 0 {
-			t.Fatal("unknown passive write executed")
 		}
 	})
 }
@@ -457,8 +392,8 @@ func TestContextPreviewRefusesCallerReason(t *testing.T) {
 	in := f.intent()
 	reason := "caller supplied"
 	in.Reason = &reason
-	if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), in); err == nil || len(f.previews) != 0 {
-		t.Fatal("caller reason accepted or persisted")
+	if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), in); err == nil {
+		t.Fatal("caller reason accepted")
 	}
 }
 
@@ -472,7 +407,7 @@ func TestContextConcurrentSubmissionKeepsOneOperation(t *testing.T) {
 			source, _, err := identities.NewBearerRequest(context.Background(), fixtureIdentityResolver{f}, "test", func() time.Time { return f.now })
 			if err == nil {
 				var a value.Accepted
-				a, err = f.svc.Request(context.Background(), source, p.ID, "one")
+				a, err = f.svc.Request(context.Background(), source, reviewed(p, "one"))
 				if err == nil && a.CaptureID != p.CaptureID {
 					err = errors.New("changed operation")
 				}
@@ -502,23 +437,12 @@ func TestContextPreviewIntegrityAndSerializedBounds(t *testing.T) {
 			p.CanonicalScope = []byte(`not json`)
 			p.ScopeDigest = artifact.Digest(sha256.Sum256(p.CanonicalScope))
 		},
-		"expanded minimized blueprint": func(p *value.ContextPreview) {
-			p.CanonicalScope = []byte(`"` + strings.Repeat("a", value.MaxContextPreviewScope-2) + `"`)
-			p.ScopeDigest = artifact.Digest(sha256.Sum256(p.CanonicalScope))
-			p.Audience = make([]artifact.AudienceAssignment, 32)
-			for n := range p.Audience {
-				a := f.audience
-				a.AssignmentID = fixtureID(500 + n)
-				a.Issuer = strings.Repeat("x", 2048)
-				p.Audience[n] = a
-			}
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			bad := p.Clone()
 			mutate(&bad)
 			if ValidContextPreview(bad) {
-				t.Fatal("invalid persisted integrity accepted")
+				t.Fatal("invalid preview integrity accepted")
 			}
 		})
 	}
@@ -563,24 +487,6 @@ func TestContextPreviewRetainsShorterStorageObservation(t *testing.T) {
 	if !result.ValidUntil.Equal(f.store.Binding.FreshUntil) {
 		t.Fatalf("preview extended storage observation: %s != %s", result.ValidUntil, f.store.Binding.FreshUntil)
 	}
-}
-
-func (f *investigationFixture) ResolveOrCloseContextRequest(_ context.Context, q value.ReplayQuery) (value.ContextRequestDisposition, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if !ValidReplayQuery(q, f.now) || f.denied {
-		return value.ContextRequestDisposition{}, value.ErrDenied
-	}
-	if a, ok := f.accepted[fixtureKey(q.Identity.Principal, q.IdempotencyKey)]; ok {
-		if a.SubmissionDigest != q.SubmissionDigest {
-			return value.ContextRequestDisposition{}, value.ErrConflict
-		}
-		a.MetadataValidUntil = identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))
-		return value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: a.MetadataValidUntil}, nil
-	}
-	// Test-only negative marker; the SQL adapter qualifies durable close semantics.
-	delete(f.previews, q.PreviewID)
-	return value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: identity.Earlier(q.Identity.ValidUntil, f.now.Add(5*time.Second))}, nil
 }
 
 // A namespace that capacity does not cover takes no new collection

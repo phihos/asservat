@@ -192,11 +192,11 @@ func TestSubmissionHistoryOutageKeepsAcceptedCaptureAndStart(t *testing.T) {
 	start.current = f.source(t, t.Context())
 	outage := &historyPersistenceOutage{started: start}
 	svc.History = outage
-	got, err := svc.Request(t.Context(), start.current, p.ID, "history-outage")
+	got, err := svc.Request(t.Context(), start.current, reviewed(p, "history-outage"))
 	if err != nil || got.CaptureID == "" || start.starts != 1 || outage.calls != 1 || !got.HistoryUnavailable || got.HistoryParameters != nil {
 		t.Fatal("history outage changed admission/acquisition", got, err, start.starts, outage.calls)
 	}
-	replay, err := svc.Request(t.Context(), start.current, p.ID, "history-outage")
+	replay, err := svc.Request(t.Context(), start.current, reviewed(p, "history-outage"))
 	if err != nil || replay.CaptureID != got.CaptureID || !replay.Replay || start.starts != 1 || outage.calls != 1 {
 		t.Fatal("history outage replay restarted work", replay, err)
 	}
@@ -352,7 +352,7 @@ func TestSubmissionHistoryHasOwnBudgetAfterSlowStart(t *testing.T) {
 	svc.History = history
 	start.startHook = func() { f.now = elapsed }
 	start.startErr = context.DeadlineExceeded
-	got, err := svc.Request(ctx, start.current, p.ID, "history-after-slow-start")
+	got, err := svc.Request(ctx, start.current, reviewed(p, "history-after-slow-start"))
 	if !errors.Is(err, context.DeadlineExceeded) || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 1 || !got.HistoryRecorded || got.HistoryUnavailable || got.HistoryParameters != nil {
 		t.Fatalf("start starved advisory history: err=%v starts=%d attempts=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
 	}
@@ -368,7 +368,7 @@ func TestSubmissionSlowHistoryAfterStartStaysAdvisory(t *testing.T) {
 	defer cancel()
 	history := &submissionHistoryBudget{f: f, started: start, until: window.Add(-historyReplyReserve), consume: true}
 	svc.History = history
-	got, err := svc.Request(ctx, start.current, p.ID, "history-exhausted-budget")
+	got, err := svc.Request(ctx, start.current, reviewed(p, "history-exhausted-budget"))
 	if err != nil || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 0 || got.HistoryRecorded || !got.HistoryUnavailable || got.HistoryParameters != nil {
 		t.Fatalf("slow history extended the window or failed the start: err=%v starts=%d calls=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
 	}
@@ -404,7 +404,7 @@ func TestHistoryReadReportsClosedStageAndContextState(t *testing.T) {
 func TestHistoryWriteReportsReservationStageWithoutDependencyText(t *testing.T) {
 	svc, h, q := newParameterReadFixture(t)
 	preview := h.f.preview(t)
-	accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), preview.ID, "history-reservation-diagnostic")
+	accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), reviewed(preview, "history-reservation-diagnostic"))
 	if err != nil || accepted.HistoryParameters == nil {
 		t.Fatal("history diagnostic admission", err)
 	}
@@ -433,7 +433,7 @@ func TestHistoryWriteRetriesSessionAndExecutionOnce(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			svc, h, q := newParameterReadFixture(t)
 			preview := h.f.preview(t)
-			accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), preview.ID, "history-retry-"+c.name)
+			accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), reviewed(preview, "history-retry-"+c.name))
 			if err != nil || accepted.HistoryParameters == nil {
 				t.Fatal("admission", err)
 			}

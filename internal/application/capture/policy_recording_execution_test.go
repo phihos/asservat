@@ -76,7 +76,7 @@ func TestTeamRecorderWithoutCreatorCredentials(t *testing.T) {
 	// review. Its separate SQL implementation locks the original policy grant.
 	admission := &retainedRecording{investigationFixture: f}
 	f.svc.Admission = admission
-	_, err = f.svc.Request(context.Background(), current, preview.Preview.ID, fixtureID(900))
+	_, err = f.svc.Request(context.Background(), current, reviewed(preview.Preview, fixtureID(900)))
 	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 || len(grants.requests) != 0 {
 		t.Fatal("team request opened personal review or missed atomic admission", err, len(grants.requests))
 	}
@@ -98,18 +98,19 @@ func TestTeamOngoingRawPredicateDoesNotReachAdmissionOrPersonalReview(t *testing
 	if err != nil || preview.Recordable {
 		t.Fatal("ongoing raw predicate became recordable", err)
 	}
-	if _, err = f.svc.Request(context.Background(), current, preview.Preview.ID, fixtureID(901)); !errors.Is(err, value.ErrRecorderUnavailable) || len(grants.requests) != 0 || f.admissions.Load() != 0 {
+	if _, err = f.svc.Request(context.Background(), current, reviewed(preview.Preview, fixtureID(901))); !errors.Is(err, value.ErrRecorderUnavailable) || len(grants.requests) != 0 || f.admissions.Load() != 0 {
 		t.Fatal("ongoing raw team plan bypassed its unsupported source mode or opened personal review", err)
 	}
 }
 
 type teamRecordingAdmission struct {
 	*investigationFixture
-	seen []value.Admission
+	seen     []value.Admission
+	previews []value.ContextPreview
 }
 
-func (s *teamRecordingAdmission) AdmitReviewedContext(_ context.Context, _ string, a value.Admission) (value.Accepted, error) {
-	s.seen = append(s.seen, a)
+func (s *teamRecordingAdmission) AdmitReviewedContext(_ context.Context, p value.ContextPreview, a value.Admission) (value.Accepted, error) {
+	s.seen, s.previews = append(s.seen, a), append(s.previews, p)
 	return value.Accepted{}, value.ErrCapacity
 }
 
@@ -145,7 +146,7 @@ func TestPolicyTriggerUsesActualRecorderPreviewAndOriginalOccurrenceKey(t *testi
 	if in.IdempotencyKey != occurrence.ID || in.Plan.Input.Executor != a.authority.Executor || in.Plan.Input.Recorder == nil || in.Plan.Input.Target.Target().PodUID != occurrence.PodUID || in.Plan.RecipeDigest != configuration.RecipeDigest {
 		t.Fatal("trigger changed occurrence, real Pod, team executor or frozen recipe", in)
 	}
-	for _, preview := range f.previews {
+	for _, preview := range admission.previews {
 		if preview.Intent.Diagnostic != "" || preview.Intent.Composition == nil || preview.Intent.Target.Kind != "Pod" || preview.Intent.Target.Name != f.target.Request.PodName {
 			t.Fatal("trigger substituted pod-status or invented another Pod", preview.Intent)
 		}
@@ -222,7 +223,7 @@ func TestFinitePolicyRawProducerReachesOnlyOriginalPolicyAdmission(t *testing.T)
 	}
 	admission := &retainedRecording{investigationFixture: f}
 	f.svc.Admission = admission
-	_, err = f.svc.Request(t.Context(), current, preview.Preview.ID, fixtureID(920))
+	_, err = f.svc.Request(t.Context(), current, reviewed(preview.Preview, fixtureID(920)))
 	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 || len(grants.requests) != 0 {
 		t.Fatal("finite policy raw request bypassed admission or opened a human review", err, len(admission.seen), len(grants.requests))
 	}

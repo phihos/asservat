@@ -160,7 +160,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
-  const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : state.stage === 'closed' ? 'Request closed' : 'Collect evidence';
+  const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : 'Collect evidence';
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>{title}</h1>
@@ -215,35 +215,29 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {!state.preview.capture_enabled && state.preview.blockers.length === 0 && <p className="notice">Collection is not enabled for this client. An administrator can check the installation settings.</p>}
       {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; collection starts only after approval and a further submission.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
-      <p role="status">{state.expired ? 'This preview has expired. Refreshing may select a different pod; check the updated selection.' : state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
-      <div className="actions"><CaptureSubmission key={state.preview.preview_id} preview={state.preview} state={state} controller={controller}/>
+      <p role="status">{state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
+      <div className="actions"><CaptureSubmission key={state.preview.plan_digest} preview={state.preview} state={state} controller={controller}/>
         {state.preview.profile_composition && !state.repeatedFrom && <Button className="button secondary" isDisabled={state.busy} onPress={controller.changeProfiles}>Change profiles</Button>}
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
-      {state.preview.profile_composition?.authored.components.length === 1 && <SaveAsProfile key={state.preview.preview_id} session={session} scope={scope} target={draft.target} composition={state.preview.profile_composition} client={controller.client}/>}
+      {state.preview.profile_composition?.authored.components.length === 1 && <SaveAsProfile key={state.preview.plan_digest} session={session} scope={scope} target={draft.target} composition={state.preview.profile_composition} client={controller.client}/>}
     </section>}
     {state.stage === 'reviewed' && <section>
       <p>Your session was checked again, so the previous target details and assessment are hidden. Your original reviewed request is still held in this tab.</p>
-      <p role="status">{state.expired ? 'That preview has expired. Prepare a new review before collecting.' : 'Continue to submit that same reviewed request. Asservat rechecks current access, limits and the exact selected pod before accepting it.'}</p>
-      <div className="actions">{!state.expired && <Button className="button" isDisabled={state.busy} onPress={() => void controller.submit()}>Continue reviewed request</Button>}
-        <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>{state.expired ? 'Prepare new review' : 'Edit request'}</Button></div>
+      <p role="status">Continue to submit that same reviewed request. Asservat recomputes its plan and rechecks current access and limits before accepting it.</p>
+      <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.submit()}>Continue reviewed request</Button>
+        <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
     </section>}
     {state.stage === 'approval' && <section aria-busy={state.busy}>
       <p role="status">The independent review is pending. Collection has not been accepted.</p>
-      <p>After approval, continue this exact request through the client that created it. Asservat checks the original Pod, your current access and the grant again.</p>
+      <p>After approval, submit this same request again from this tab. Asservat recomputes the plan and checks your current access and the grant again.</p>
       {state.approvalURI && <a className="button secondary" href={state.approvalURI}>View approval</a>}
-      <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>Continue after approval</Button>
-      <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.resolveBeforeEditing()}>Close request before editing</Button>
+      <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>Submit after approval</Button>
+      <Button className="button secondary" isDisabled={state.busy} onPress={controller.discardApprovalRequest}>Edit request</Button>
     </section>}
     {state.stage === 'uncertain' && <section aria-busy={state.busy}>
-      <p role="status">{state.busy ? state.resolving ? 'Resolving the original request…' : 'Submitting the same bounded request…' : 'The request may have been accepted, but its outcome is not confirmed. Retrying checks the same request; it does not create another capture.'}</p>
+      <p role="status">{state.busy ? 'Submitting the same bounded request…' : 'The request may have been accepted, but its outcome is not confirmed. Retrying sends the same request and key; it never creates another capture.'}</p>
       <p>Keep this tab open until the result is confirmed. The retry information is held only in this tab.</p>
-      <p>If it was accepted, resolving opens its progress. Otherwise Asservat closes the original request so it cannot start a capture, then you can edit it.</p>
-      <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>{state.busy && !state.resolving ? 'Waiting for confirmation…' : 'Retry same request'}</Button>
-        <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.resolveBeforeEditing()}>{state.resolving ? 'Resolving request…' : 'Resolve before editing'}</Button></div>
-    </section>}
-    {state.stage === 'closed' && <section>
-      <p role="status">The original request is closed and cannot start a capture. You can edit your parameters and prepare a new review.</p>
-      <Button className="button" onPress={controller.editClosedRequest}>Edit request</Button>
+      <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>{state.busy ? 'Waiting for confirmation…' : 'Retry same request'}</Button>
     </section>}
     {state.stage === 'progress' && <section aria-busy={state.busy}>
       <p className="field-help">Capture <span className="identifier">{state.captureID}</span></p>
@@ -267,7 +261,6 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.history_state === 'unavailable' && <p>Saved settings are unavailable. Start a new investigation to prepare a request with your current settings.</p>}
         {state.settings && <><p>Reviewing these settings prepares a new request. The original capture is not cancelled.</p><SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} /></>}
       </> : !state.error && <p role="status">Checking collection status…</p>}
-      {state.canContinue && <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.continueAcquisition()}>{state.continuing ? 'Continuing collection…' : 'Continue collection'}</Button><p>Continues the original capture and checks your current access.</p></div>}
       {state.captureID && <p><a href="/captures/new">Start a new investigation</a>. This does not cancel the original collection.</p>}
       <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.refreshProgress()}>{state.busy ? 'Checking status…' : 'Check status'}</Button>
     </section>}

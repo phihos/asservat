@@ -440,22 +440,15 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			a.Eligibility, a.IdempotencyKey = eligible, rows[0].ID
 			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL && !argumentCompanion, clock(), endpoint)
 			requirePolicyRecorderAdmissionFixture(t, a, preview, clock())
-			previews, err := postgres.NewContextPreviews(ctx, hub, root)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err = previews.CreateContextPreview(ctx, preview); err != nil {
-				t.Fatal("persist actual policy recorder preview", err)
-			}
 			if _, err = reader.AcceptedPolicyAuthority(ctx, authority.PolicyUID); err != nil {
 				t.Fatal(err)
 			}
 			if profilePolicy {
 				qualifyPolicyProfileAdmissionRefusal(t, ctx, admin, admissions, ledger, s, authority, preview, a)
 				grant = attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "profile-positive", *compiled.Recorder)
-				qualifyPolicyProfileChangedDefinition(t, ctx, admin, hub, admissions, previews, ledger, s, authority, grant, compiled.Recorder, a)
+				qualifyPolicyProfileChangedDefinition(t, ctx, admin, hub, admissions, ledger, s, authority, grant, compiled.Recorder, a)
 			}
-			output, err := admissions.AdmitReviewedContext(ctx, preview.ID, a)
+			output, err := admissions.AdmitReviewedContext(ctx, preview, a)
 			if packetPolicy {
 				validNative := output.Expectation.Recording != nil && output.Expectation.Recording.MaxBytes == artifact.RecordingNativeLimit
 				if profilePolicy {
@@ -464,7 +457,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				if err != nil || !validNative || output.Expectation.RecipeDigest != compiled.Recorder.RecipeDigest {
 					t.Fatal("real team recorder admission", err)
 				}
-				again, err := admissions.AdmitReviewedContext(ctx, preview.ID, a)
+				again, err := admissions.AdmitReviewedContext(ctx, preview, a)
 				if err != nil || again.CaptureID != output.CaptureID {
 					t.Fatal("same occurrence replay", err)
 				}
@@ -532,7 +525,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				if err != nil || len(next) != 1 {
 					t.Fatal("second real profile occurrence", next, err)
 				}
-				qualifyPolicyProfileExhaustedGrant(t, ctx, admin, hub, admissions, previews, s, a, compiled.Recorder, next[0].ID, grant)
+				qualifyPolicyProfileExhaustedGrant(t, ctx, admin, hub, admissions, s, a, compiled.Recorder, next[0].ID, grant)
 				qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, output, grant, func() string {
 					return attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "profile-replacement", *compiled.Recorder)
 				}, refresh)

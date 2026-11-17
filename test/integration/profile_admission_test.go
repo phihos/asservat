@@ -66,13 +66,6 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 					Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 					Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 				pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-				previews, err := postgres.NewContextPreviews(ctx, pools, p.RootID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err = previews.CreateContextPreview(ctx, p); err != nil {
-					t.Fatal("profile preview", err)
-				}
 				grants, err := postgres.NewAccessGrants(ctx, pools, p.RootID, s.recovery.installation)
 				if err != nil {
 					t.Fatal(err)
@@ -102,7 +95,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if r.WriteUntil.After(r.ExpiresAt) {
 					r.WriteUntil = r.ExpiresAt
 				}
-				if _, err = s.s.AdmitReviewedContext(ctx, p.ID, s.a); err == nil {
+				if _, err = s.s.AdmitReviewedContext(ctx, p, s.a); err == nil {
 					t.Fatal("pending liveProfile grant admitted with optional recording approval off")
 				}
 				var charged int64
@@ -115,29 +108,23 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err != nil {
 					t.Fatal(err)
 				}
-				accepted, err := s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+				accepted, err := s.s.AdmitReviewedContext(ctx, p, s.a)
 				if err != nil {
 					t.Fatal("approved profile admission", err)
 				}
 				if accepted.Expectation.Profile == nil || accepted.Expectation.Recording != nil || accepted.Expectation.DataClass != "raw" || accepted.Expectation.NativeType != artifact.PprofArtifact {
 					t.Fatal("profile admitted with wrong shape")
 				}
-				// Resolution uses the original approved timing scope rather than
+				// Replay lookup uses the original approved timing scope rather than
 				// comparing its zero review deadline to the accepted write deadline.
-				resolutionPool := poolFor("context_request_resolution_runtime", "synthetic-context-request-resolution")
-				defer resolutionPool.Close()
-				resolver, err := postgres.NewContextRequestResolutions(ctx, resolutionPool, p.RootID, s.recovery.installation)
-				if err != nil {
-					t.Fatal(err)
-				}
 				i := s.a.Eligibility.VerifiedIdentity
 				i.Scopes = append(append([]string(nil), i.Scopes...), "evidence:read")
 				i.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 				i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
 				query := capture.ReplayQuery{RootID: p.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: s.a.SubmissionDigest, Identity: i}
-				resolved, err := resolver.ResolveOrCloseContextRequest(ctx, query)
-				if err != nil || resolved.State != capture.RequestAccepted || resolved.Accepted == nil || resolved.Accepted.CaptureID != accepted.CaptureID || !resolved.Accepted.Deadline.Equal(accepted.Deadline) {
-					t.Fatal("approved profile request resolution", resolved.State, err)
+				resolved, found, err := s.s.LookupContextAdmission(ctx, query)
+				if err != nil || !found || resolved.CaptureID != accepted.CaptureID || !resolved.Deadline.Equal(accepted.Deadline) {
+					t.Fatal("approved profile replay lookup", found, err)
 				}
 				plan := artifact.StreamingPlan{Registration: *r, WriterEpoch: custodyID()}
 				var epoch *string
@@ -149,7 +136,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err = admin.QueryRow(ctx, "SELECT charged_bytes,charged_objects FROM custody_allocation WHERE id=$1", r.AllocationID).Scan(&charged, &objects); err != nil || charged != r.ReservedBytes()+plan.TemporaryBytes() || objects != int64(5+plan.PartLimit()) {
 					t.Fatal("multipart precharge", charged, objects, err)
 				}
-				again, err := s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+				again, err := s.s.AdmitReviewedContext(ctx, p, s.a)
 				if err != nil || !again.Replay {
 					t.Fatal("profile admission replay", err)
 				}

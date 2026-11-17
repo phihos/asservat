@@ -72,7 +72,7 @@ func (r consumptionTarget) ResolvePod(ctx context.Context, target targets.Reques
 	return out, err
 }
 
-func (a *consumptionAdmission) AdmitReviewedContext(ctx context.Context, id string, in value.Admission) (value.Accepted, error) {
+func (a *consumptionAdmission) AdmitReviewedContext(ctx context.Context, p value.ContextPreview, in value.Admission) (value.Accepted, error) {
 	a.got = in
-	return a.investigationFixture.AdmitReviewedContext(ctx, id, in)
+	return a.investigationFixture.AdmitReviewedContext(ctx, p, in)
 }

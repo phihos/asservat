@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -34,9 +33,6 @@ func (p failedPreviewPort) Resolve(context.Context, privacy.Input) (privacy.Reso
 func (p failedPreviewPort) ContextStorage(context.Context, authorization.Target) (ContextStorageObservation, error) {
 	return ContextStorageObservation{}, p.err
 }
-func (p failedPreviewPort) CreateContextPreview(context.Context, value.ContextPreview) error {
-	return p.err
-}
 
 type failedPreviewEligibility string
 
@@ -50,7 +46,7 @@ func (untrustedPreviewError) FixedStep() string { return "private-provider-token
 func (e untrustedPreviewError) Unwrap() error   { return e.error }
 
 func TestContextPreviewFailureReportsFixedDependencyAndPreservesCause(t *testing.T) {
-	for _, stage := range []string{"target", "facts/capability", "facts/retention", "facts/storage", "processing/read", "store"} {
+	for _, stage := range []string{"target", "facts/capability", "facts/retention", "facts/storage", "processing/read"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newInvestigationFixture()
 			ctx := t.Context()
@@ -67,8 +63,6 @@ func TestContextPreviewFailureReportsFixedDependencyAndPreservesCause(t *testing
 				f.svc.Storage = port
 			case "processing/read":
 				f.svc.Processing = &coverageReadFixture{f: f, err: port.err}
-			case "store":
-				f.svc.Previews = port
 			}
 			var reports []string
 			f.svc.ReportPreviewFailure = func(step string) { reports = append(reports, step) }
@@ -81,7 +75,7 @@ func TestContextPreviewFailureReportsFixedDependencyAndPreservesCause(t *testing
 			if !errors.Is(err, value.ErrUnavailable) || !errors.Is(err, cause) || !errors.As(err, &step) || step.FixedStep() != want || !slices.Equal(reports, []string{want}) {
 				t.Fatalf("lost exact private stage or original cause: reports=%v, error=%v", reports, err)
 			}
-			if strings.Contains(err.Error(), "private-") || len(f.previews) != 0 || f.admissions.Load() != 0 {
+			if strings.Contains(err.Error(), "private-") || f.admissions.Load() != 0 {
 				t.Fatal("diagnostic leaked dependency text or performed a later effect")
 			}
 		})
@@ -100,17 +94,6 @@ func TestContextPreviewFailureDoesNotTrustEligibilityReason(t *testing.T) {
 				t.Fatalf("eligibility classification changed: %v %v", reports, err)
 			}
 		})
-	}
-}
-
-func TestContextPreviewFailureReportsExpiryAfterDraftWithoutUndoingIt(t *testing.T) {
-	f := newInvestigationFixture()
-	f.afterStore = func() { f.now = f.now.Add(6 * time.Second) }
-	var reports []string
-	f.svc.ReportPreviewFailure = func(step string) { reports = append(reports, step) }
-	_, err := f.svc.Preview(t.Context(), f.source(t, t.Context()), f.intent())
-	if !errors.Is(err, value.ErrChanged) || !slices.Equal(reports, []string{"after-store/current"}) || len(f.previews) != 1 || f.admissions.Load() != 0 {
-		t.Fatalf("late draft changed original semantics: reports=%v, error=%v", reports, err)
 	}
 }
 

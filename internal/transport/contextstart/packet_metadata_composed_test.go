@@ -41,7 +41,6 @@ type packetMetadataFixture struct {
 	channel                                       fleet.APIContextChannel
 	api                                           *kube.PodTargets
 	svc                                           captureapp.ContextInvestigation
-	preview                                       capture.ContextPreview
 	ids                                           atomic.Int64
 	admission                                     atomic.Int64
 	apiReads                                      atomic.Int64
@@ -127,20 +126,10 @@ func (f *packetMetadataFixture) ContextProcessingCoverage(ctx context.Context, r
 	}
 	return capture.ProcessingCoverage{Request: r, ObservedAt: now, FreshUntil: until}, nil
 }
-func (f *packetMetadataFixture) CreateContextPreview(_ context.Context, p capture.ContextPreview) error {
-	f.preview = p.Clone()
-	return nil
-}
-func (f *packetMetadataFixture) ReadContextPreview(_ context.Context, root, id string, actor identity.Principal) (capture.ContextPreview, error) {
-	if f.preview.RootID != root || f.preview.ID != id || f.preview.Actor != actor {
-		return capture.ContextPreview{}, capture.ErrDenied
-	}
-	return f.preview.Clone(), nil
-}
 func (f *packetMetadataFixture) LookupContextAdmission(context.Context, capture.ReplayQuery) (capture.Accepted, bool, error) {
 	return capture.Accepted{}, false, nil
 }
-func (f *packetMetadataFixture) AdmitReviewedContext(context.Context, string, capture.Admission) (capture.Accepted, error) {
+func (f *packetMetadataFixture) AdmitReviewedContext(context.Context, capture.ContextPreview, capture.Admission) (capture.Accepted, error) {
 	f.admission.Add(1)
 	return capture.Accepted{}, metadataAdmitted
 }
@@ -307,32 +296,46 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 		router.Close()
 	})
 	targetPort := Targets{Router: router, Now: time.Now}
-	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Previews: f, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
+	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
 	return f
 }
 
 func metadataIntent(f *packetMetadataFixture) capture.ContextIntent {
 	return capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: f.channel.Connector.Binding.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}, RequestedSeconds: 60, Composition: &planning.ProfileComposition{Components: []planning.ProfileComponent{{ID: "net", Profile: planning.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}}
 }
+func metadataRequest(f *packetMetadataFixture) captureapp.CaptureRequest {
+	return captureapp.CaptureRequest{Key: "one-intent", Preview: func(ctx context.Context) (capture.ContextPreview, error) {
+		r, err := f.svc.PreviewComposition(ctx, f, metadataIntent(f))
+		return r.Preview, err
+	}}
+}
 func TestPacketMetadataTransportCompletionDoesNotExpireOwnedObservation(t *testing.T) {
 	for _, mode := range []string{"hub-and-region", "hub-only", "region-only"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPacketMetadataFixture(t)
-			p, e := f.svc.PreviewComposition(t.Context(), f, metadataIntent(f))
-			if e != nil || !p.Recordable {
-				t.Fatal("composed preview", e, f.stages)
+			// The request recomputes its preview; its own later observation
+			// then outlives the shortened transport proofs.
+			var short time.Time
+			request := metadataRequest(f)
+			preview := request.Preview
+			request.Preview = func(ctx context.Context) (capture.ContextPreview, error) {
+				p, err := preview(ctx)
+				if err != nil {
+					t.Error("composed preview", err, f.stages)
+				}
+				f.mu.Lock()
+				short = time.Now().Add(250 * time.Millisecond)
+				if mode != "region-only" {
+					f.hubUntil = short
+				}
+				if mode != "hub-only" {
+					f.regionUntil = short
+				}
+				f.storageDelay = 400 * time.Millisecond
+				f.mu.Unlock()
+				return p, err
 			}
-			f.mu.Lock()
-			short := time.Now().Add(250 * time.Millisecond)
-			if mode != "region-only" {
-				f.hubUntil = short
-			}
-			if mode != "hub-only" {
-				f.regionUntil = short
-			}
-			f.storageDelay = 400 * time.Millisecond
-			f.mu.Unlock()
-			_, e = f.svc.Request(t.Context(), f, p.Preview.ID, "one-intent")
+			_, e := f.svc.Request(t.Context(), f, request)
 			if !errors.Is(e, metadataAdmitted) || f.admission.Load() != 1 {
 				t.Fatal("completed transport proof expired before independent admission", e, f.stages)
 			}
@@ -349,10 +352,6 @@ func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) 
 	for _, mode := range []string{"regional-io-expiry", "hub-io-expiry", "caller-io-cancellation", "human-expiry", "current-deny", "request-five-second-bound"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPacketMetadataFixture(t)
-			p, e := f.svc.PreviewComposition(t.Context(), f, metadataIntent(f))
-			if e != nil || !p.Recordable {
-				t.Fatal("composed preview", e, f.stages)
-			}
 			ctx := t.Context()
 			var stop context.CancelFunc
 			f.mu.Lock()
@@ -381,7 +380,7 @@ func TestPacketMetadataComposedOriginalAuthorityAndIOBoundsRefuse(t *testing.T) 
 				defer stop()
 			}
 			started := time.Now()
-			_, e = f.svc.Request(ctx, f, p.Preview.ID, "one-intent")
+			_, e := f.svc.Request(ctx, f, metadataRequest(f))
 			if e == nil || errors.Is(e, metadataAdmitted) || f.admission.Load() != 0 {
 				t.Fatal("expired/withdrawn authority reached admission", mode, e, f.stages)
 			}

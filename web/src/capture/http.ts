@@ -1,7 +1,7 @@
 import type { components } from '../generated/capture';
 import * as validators from '../generated/validate-capture';
 
-export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'cancel_capture' | 'list_capture_history' | 'get_capture_settings' | 'list_capture_profiles' | 'get_capture_profile';
+export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'get_capture' | 'cancel_capture' | 'list_capture_history' | 'get_capture_settings' | 'list_capture_profiles' | 'get_capture_profile';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];
@@ -22,7 +22,7 @@ export interface Operations {
 // previews use the canonical extract class; native transfers remain separate.
 export const operations: Operations = {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
-    const key = name === 'request_capture' || name === 'resolve_capture_request' || name === 'cancel_capture' ? (input as Input<'request_capture'> | Input<'cancel_capture'>).idempotency_key : undefined;
+    const key = name === 'request_capture' || name === 'cancel_capture' ? (input as Input<'request_capture'> | Input<'cancel_capture'>).idempotency_key : undefined;
     return postOperation(name, input, csrf, signal, validators[`validInput_${name}`], validators[`validOutput_${name}`], key, name === 'list_capture_history') as Promise<Output<N>>;
   },
 };

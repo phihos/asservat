@@ -87,7 +87,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 					for _, row := range after.Tables {
 						lane := "separate-purpose/pending"
 						switch row.Table {
-						case "policy_occurrence", "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_charge", "context_catalog", "context_case_locator", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint":
+						case "policy_occurrence", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_charge", "context_catalog", "context_case_locator", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint":
 							lane = "ordinary-record"
 							recordBytes += row.TupleBytes
 							delta := row.TupleBytes - before[row.Table].TupleBytes

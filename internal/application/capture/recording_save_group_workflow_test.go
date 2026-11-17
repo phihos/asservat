@@ -130,7 +130,6 @@ func TestGroupedSubmissionSixteenStartsBeforeAdvisoryHistory(t *testing.T) {
 			ports := &groupedSubmissionPorts{t: t, intents: map[string]audit.CaptureIntent{}, policy: x.policy.Accepted.Authority.Executor, initiator: f.actor, until: original.Add(5 * time.Second)}
 			fixture := &workflowSQL{groupPreviewFixture: &groupPreviewFixture{investigationFixture: f}, ports: ports, sourceRows: x.rows, admissionDelay: tc.admission}
 			f.svc.Targets = fixture
-			f.svc.Previews = fixture
 			f.svc.RecordingGroups = fixture
 			f.svc.RecordingSources = x
 			f.svc.PolicyAccepted = accepted
@@ -160,7 +159,7 @@ func TestGroupedSubmissionSixteenStartsBeforeAdvisoryHistory(t *testing.T) {
 				f.now = next
 				return nil
 			}
-			out, err := submission.Request(t.Context(), current, preview.Preview.ID, "group-timing")
+			out, err := submission.Request(t.Context(), current, reviewed(preview.Preview, "group-timing"))
 			if (err != nil) != tc.closed || tc.closed && !errors.Is(err, value.ErrAcquisitionClosed) || len(ports.starts) != tc.wantStarts || len(fixture.seen) != 1 || history.calls != 1 || !out.HistoryRecorded || !f.now.Before(out.MetadataValidUntil) {
 				t.Fatalf("incomplete composed workflow err=%v starts=%d admission=%d history=%d metadata=%v now=%v", err, len(ports.starts), len(fixture.seen), history.calls, out.MetadataValidUntil, f.now)
 			}
@@ -173,7 +172,7 @@ func TestGroupedSubmissionSixteenStartsBeforeAdvisoryHistory(t *testing.T) {
 			}
 			// New HTTP identity, passive exact replay: no acknowledgement, start, history.
 			reads, starts := len(ports.reads), len(ports.starts)
-			again, err := submission.Request(t.Context(), current, preview.Preview.ID, "group-timing")
+			again, err := submission.Request(t.Context(), current, reviewed(preview.Preview, "group-timing"))
 			if err != nil || !again.Replay || len(ports.reads) != reads || len(ports.starts) != starts || history.calls != 1 {
 				t.Fatal("passive replay acquired effects", err)
 			}

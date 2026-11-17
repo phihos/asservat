@@ -4,7 +4,7 @@ CREATE ROLE custody_runtime LOGIN PASSWORD 'synthetic-runtime'; GRANT CONNECT ON
 
 CREATE ROLE authority_runtime LOGIN PASSWORD 'synthetic-authority'; GRANT CONNECT ON DATABASE custody_test TO authority_runtime; GRANT USAGE ON SCHEMA public TO authority_runtime; GRANT SELECT ON goose_db_version TO authority_runtime; GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,permission_acceptance,authority_audit,workload_name TO authority_runtime; GRANT SELECT ON remote_access_binding_delivery TO authority_runtime; GRANT INSERT ON permission_stream,permission_basis,permission_assignment,permission_acceptance,authority_audit TO authority_runtime; GRANT UPDATE(id,epoch,sequence,initial_audit_id,trust_digest,projection_digest,lease_until,observed_at,fresh_until,suspended) ON permission_stream TO authority_runtime; GRANT UPDATE(generation,resource_version,spec_digest,scope_digest,workload_uids,effect,not_after,seen_sequence,observation_version,automation_json,automation_audit_id) ON permission_basis TO authority_runtime; GRANT UPDATE(retired_at,retirement_audit_id) ON permission_assignment TO authority_runtime; GRANT UPDATE(acknowledged_at,object_key,object_version,object_etag,object_bytes,object_sha256) ON authority_audit TO authority_runtime; -- ADR-189: the union of the product permission-accept and permission-audit grants.
 -- ADR-245: the product permission-accept review-source grants and, for the review store tests, the access-review duty's writes.
-GRANT INSERT,DELETE ON permission_review_source TO authority_runtime; GRANT UPDATE(uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id) ON permission_review_source TO authority_runtime; GRANT INSERT ON permission_review_assignment TO authority_runtime; GRANT UPDATE(retired_at,retirement_audit_id) ON permission_review_assignment TO authority_runtime; GRANT INSERT,DELETE ON permission_review_decision TO authority_runtime; GRANT UPDATE(decided_at,fresh_until) ON permission_review_decision TO authority_runtime; GRANT SELECT ON context_capture,context_preview TO authority_runtime; GRANT EXECUTE ON FUNCTION record_permission_review_audit(uuid,uuid,bytea,jsonb) TO authority_runtime;
+GRANT INSERT,DELETE ON permission_review_source TO authority_runtime; GRANT UPDATE(uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id) ON permission_review_source TO authority_runtime; GRANT INSERT ON permission_review_assignment TO authority_runtime; GRANT UPDATE(retired_at,retirement_audit_id) ON permission_review_assignment TO authority_runtime; GRANT INSERT,DELETE ON permission_review_decision TO authority_runtime; GRANT UPDATE(decided_at,fresh_until) ON permission_review_decision TO authority_runtime; GRANT SELECT ON context_capture TO authority_runtime; GRANT EXECUTE ON FUNCTION record_permission_review_audit(uuid,uuid,bytea,jsonb) TO authority_runtime;
 
 CREATE ROLE capture_runtime LOGIN PASSWORD 'synthetic-capture'; GRANT CONNECT ON DATABASE custody_test TO capture_runtime; GRANT USAGE ON SCHEMA public TO capture_runtime; GRANT SELECT ON goose_db_version,permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,capture_history_parameter,workload_name TO capture_runtime; GRANT UPDATE(id) ON permission_stream TO capture_runtime; GRANT UPDATE(source_uid) ON context_storage_binding TO capture_runtime; GRANT SELECT,INSERT ON context_capture TO capture_runtime; GRANT SELECT,INSERT,UPDATE ON custody_pool,custody_allocation,custody_attempt,custody_copy,custody_event TO capture_runtime;
 
@@ -238,16 +238,6 @@ GRANT UPDATE(source_uid) ON download_worker_configuration TO worker_routing_read
 -- Runtime roles cannot set either activation field or mutate the derived flag.
 GRANT SELECT ON fleet_current_trust TO capture_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
 
--- Private passive previews: no evidence, admission, audit or key authority.
-CREATE ROLE context_preview_runtime LOGIN PASSWORD 'synthetic-context-preview';
-CREATE ROLE context_preview_cleanup_runtime LOGIN PASSWORD 'synthetic-context-preview-cleanup';
-GRANT CONNECT ON DATABASE custody_test TO context_preview_runtime,context_preview_cleanup_runtime;
-GRANT USAGE ON SCHEMA public TO context_preview_runtime,context_preview_cleanup_runtime;
-GRANT SELECT ON goose_db_version,permission_stream,context_preview TO context_preview_runtime,context_preview_cleanup_runtime;
-GRANT UPDATE(id) ON permission_stream TO context_preview_runtime,context_preview_cleanup_runtime;
-GRANT INSERT ON context_preview TO context_preview_runtime;
-GRANT DELETE ON context_preview TO context_preview_runtime,context_preview_cleanup_runtime;
-
 -- Placement observations confer no reservation or configuration authority.
 CREATE ROLE context_storage_read_runtime LOGIN PASSWORD 'synthetic-context-storage-read';
 GRANT CONNECT ON DATABASE custody_test TO context_storage_read_runtime;
@@ -282,25 +272,6 @@ GRANT INSERT(root_id,capture_id,attempt_id,binding_json,process_json,expectation
 GRANT UPDATE(object_uid) ON context_execution TO api_execution_runtime;
 GRANT UPDATE(phase,started_at,acquired_at,completed_at,copies_json,copies_digest) ON context_execution TO api_execution_runtime;
 GRANT SELECT ON context_execution TO context_progress_read_runtime;
-
--- Resolve-or-close is a passive request facet: no accepted capture/custody writes.
-CREATE ROLE context_request_resolution_runtime LOGIN PASSWORD 'synthetic-context-request-resolution';
-GRANT CONNECT ON DATABASE custody_test TO context_request_resolution_runtime;
-GRANT USAGE ON SCHEMA public TO context_request_resolution_runtime;
-GRANT SELECT ON goose_db_version,permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,fleet_current_trust,context_capture,context_preview,context_preview_fence,workload_name TO context_request_resolution_runtime;
-GRANT UPDATE(id) ON permission_stream TO context_request_resolution_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO context_request_resolution_runtime;
-GRANT UPDATE(closed_at,closed_request_key,closed_submission_digest) ON context_preview TO context_request_resolution_runtime;
-GRANT INSERT,DELETE ON context_preview_fence TO context_request_resolution_runtime;
-GRANT DELETE ON context_preview TO context_request_resolution_runtime;
--- ADR-266: resolution reads a recording save group (production capture-resolution).
-GRANT SELECT ON recording_save_group,recording_selection_set TO context_request_resolution_runtime;
-GRANT SELECT ON context_preview,context_preview_fence TO capture_runtime;
-GRANT SELECT,DELETE ON context_preview_fence TO context_preview_runtime,context_preview_cleanup_runtime;
--- 00108: previews create and expire recording selections, as the
--- production capture-preview role (public_runtime_role_plan.go).
-GRANT SELECT,INSERT,DELETE ON recording_selection_set TO context_preview_runtime;
-GRANT SELECT ON policy_recording_source,policy_source TO context_preview_runtime;
 
 -- Migration37: separate protected control backing from immutable capture spend.
 CREATE ROLE context_control_config_runtime LOGIN PASSWORD 'synthetic-context-control-config';
@@ -416,7 +387,7 @@ GRANT EXECUTE ON FUNCTION capacity_managed_admission_until(uuid,uuid,text,timest
 GRANT INSERT ON audit_event TO capture_runtime,capture_operation_admit_runtime;
 -- Admission retains the existing exact authority/custody/control transaction,
 -- without inheriting another role or gaining audit/provider acknowledgement.
-GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence,workload_name TO capture_operation_admit_runtime;
+GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,workload_name TO capture_operation_admit_runtime;
 GRANT UPDATE(id) ON permission_stream TO capture_operation_admit_runtime;
 -- Match the existing admission lock-only column grant; no allocation/freshness writes.
 GRANT UPDATE(source_uid) ON context_storage_binding TO capture_operation_admit_runtime;
@@ -458,8 +429,6 @@ CREATE ROLE retention_preview_read_runtime LOGIN PASSWORD 'synthetic-retention-p
 GRANT SELECT ON goose_db_version,permission_stream,retention_policy,retention_decision,context_capture,custody_attempt TO retention_preview_read_runtime;
 GRANT UPDATE(id) ON permission_stream TO retention_preview_read_runtime;
 
--- ADR-252: fixed read retention and exact current approval; no grant table access.
-GRANT EXECUTE ON FUNCTION context_preview_read_until(uuid,uuid) TO context_preview_runtime,context_preview_cleanup_runtime,context_request_resolution_runtime;
 -- ADR-200: mirror the compiled capture-preview duty; wakeup only, no table grant.
 GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea) TO capture_runtime,api_execution_read_runtime,api_execution_prepare_runtime,api_execution_runtime;
 
@@ -479,7 +448,6 @@ GRANT SELECT,INSERT ON recording_save_group TO capture_runtime;
 GRANT SELECT ON recording_save_group TO capture_operation_admit_runtime;
 GRANT SELECT ON recording_save_group TO context_progress_read_runtime,context_deadline_runtime;
 GRANT UPDATE(id) ON recording_save_group TO context_progress_read_runtime; -- row lock (production hub-metadata-read)
-GRANT SELECT,DELETE ON recording_selection_set TO context_preview_cleanup_runtime;
 
 -- S-05: admission precharges a pending multipart obligation; the accepted
 -- connector preparation alone binds its immutable process, and the separately

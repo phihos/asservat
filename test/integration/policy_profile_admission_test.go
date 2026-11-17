@@ -81,7 +81,7 @@ func readPolicyProfileAdmissionState(t testing.TB, ctx context.Context, admin *p
 func qualifyPolicyProfileAdmissionRefusal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, admissions *postgres.ContextAdmissions, ledger *postgres.PolicyTriggers, s captureAdmissionScenario, authority authorization.AcceptedPolicyAuthority, preview capture.ContextPreview, a capture.Admission) {
 	t.Helper()
 	before := readPolicyProfileAdmissionState(t, ctx, admin, s, a)
-	if _, err := admissions.AdmitReviewedContext(ctx, preview.ID, a); !errors.Is(err, capture.ErrDenied) {
+	if _, err := admissions.AdmitReviewedContext(ctx, preview, a); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("profile without raw recurring approval admitted", err)
 	}
 	if after := readPolicyProfileAdmissionState(t, ctx, admin, s, a); before != after {
@@ -93,7 +93,7 @@ func qualifyPolicyProfileAdmissionRefusal(t *testing.T, ctx context.Context, adm
 	}
 }
 
-func qualifyPolicyProfileChangedDefinition(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, previews *postgres.ContextPreviews, ledger *postgres.PolicyTriggers, s captureAdmissionScenario, authority authorization.AcceptedPolicyAuthority, grant string, recorder *planvalue.PolicyRecorderConfiguration, a capture.Admission) {
+func qualifyPolicyProfileChangedDefinition(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, ledger *postgres.PolicyTriggers, s captureAdmissionScenario, authority authorization.AcceptedPolicyAuthority, grant string, recorder *planvalue.PolicyRecorderConfiguration, a capture.Admission) {
 	t.Helper()
 	changed := recorder.ProfileEndpoint.Clone()
 	changed.Definition.Source.Digest[0]++
@@ -108,9 +108,6 @@ func qualifyPolicyProfileChangedDefinition(t *testing.T, ctx context.Context, ad
 	a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
 	a, preview := buildPolicyRecorderAdmissionFixture(t, a, recorder.Composition, nil, true, time.Now().UTC().Truncate(time.Microsecond), changed)
 	requirePolicyRecorderAdmissionFixture(t, a, preview, time.Now().UTC())
-	if err := previews.CreateContextPreview(ctx, preview); err != nil {
-		t.Fatal("changed definition concrete preview", err)
-	}
 	qualifyPolicyProfileAdmissionRefusal(t, ctx, admin, admissions, ledger, s, authority, preview, a)
 	grants, err := postgres.NewAccessGrants(ctx, hub, a.RootID, s.recovery.installation)
 	if err != nil {
@@ -122,17 +119,14 @@ func qualifyPolicyProfileChangedDefinition(t *testing.T, ctx context.Context, ad
 	}
 }
 
-func qualifyPolicyProfileExhaustedGrant(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, previews *postgres.ContextPreviews, s captureAdmissionScenario, a capture.Admission, recorder *planvalue.PolicyRecorderConfiguration, occurrence, grant string) {
+func qualifyPolicyProfileExhaustedGrant(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, s captureAdmissionScenario, a capture.Admission, recorder *planvalue.PolicyRecorderConfiguration, occurrence, grant string) {
 	t.Helper()
 	a.IdempotencyKey = occurrence
 	a.Plan.Input.CaptureID = custodyID()
 	a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
 	a, preview := buildPolicyRecorderAdmissionFixture(t, a, recorder.Composition, nil, true, time.Now().UTC().Truncate(time.Microsecond), recorder.ProfileEndpoint)
-	if err := previews.CreateContextPreview(ctx, preview); err != nil {
-		t.Fatal(err)
-	}
 	before := readPolicyProfileAdmissionState(t, ctx, admin, s, a)
-	if _, err := admissions.AdmitReviewedContext(ctx, preview.ID, a); !errors.Is(err, capture.ErrCapacity) {
+	if _, err := admissions.AdmitReviewedContext(ctx, preview, a); !errors.Is(err, capture.ErrCapacity) {
 		t.Fatal("exhausted profile grant admitted a second capture", err)
 	}
 	if after := readPolicyProfileAdmissionState(t, ctx, admin, s, a); before != after {

@@ -20,7 +20,6 @@ export function savePreviewResult(rows = [recording()]): Output<'preview_recordi
   data.selected_recordings = rows;
   data.windows = rows.map(row => ({ recording_handle: row.recording_handle, before: '30s', after: '0s' }));
   data.capture_enabled = true; data.incident_pod_cap = 1;
-  data.expires_at = new Date(Date.now() + 60_000).toISOString();
   data.capture_assessment.generatedAt = new Date().toISOString(); data.capture_assessment.validUntil = new Date(Date.now() + 5_000).toISOString();
   data.capture_assessment.actions = [data.capture_assessment.actions[0]];
   return fixture;

@@ -159,13 +159,6 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 		t.Fatal("protected snapshot preview structure")
 	}
 	a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
-	previews, err := postgres.NewContextPreviews(bound, hub, a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(bound, p); err != nil {
-		t.Fatal("persist real snapshot preview", err)
-	}
 	for _, probe := range beforeAdmission {
 		candidate := a
 		candidate.Plan.CanonicalScope = slices.Clone(a.Plan.CanonicalScope)
@@ -178,7 +171,7 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 		}
 		probe(t, candidate, p.Clone())
 	}
-	output, err := admissions.AdmitReviewedContext(bound, p.ID, a)
+	output, err := admissions.AdmitReviewedContext(bound, p, a)
 	if err != nil {
 		t.Fatal("real source snapshot admission", err)
 	}

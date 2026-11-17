@@ -71,7 +71,7 @@ func TestSensitiveRecorderPlanNeedsApprovalBeforeAnything(t *testing.T) {
 		t.Fatal("no review request opened", err)
 	}
 	in := grants.requests[0]
-	if in.CaptureID != p.CaptureID || in.ExecutionDigest != p.ScopeDigest || in.PreviewID != p.ID || in.Actor != f.actor || in.DataClass != "extract" || len(in.Review.Actions) != 1 || in.Review.Actions[0].Filter != "tcp[13] & 2 != 0" || in.Review.ObservationLimits == nil || in.Lifetime != authorization.GrantDefaultLifetime {
+	if in.CaptureID != p.CaptureID || in.ExecutionDigest != p.ScopeDigest || in.Actor != f.actor || in.DataClass != "extract" || len(in.Review.Actions) != 1 || in.Review.Actions[0].Filter != "tcp[13] & 2 != 0" || in.Review.ObservationLimits == nil || in.Lifetime != authorization.GrantDefaultLifetime {
 		t.Fatalf("review request %+v", in)
 	}
 	// A retry while pending names the same request and opens no other.
@@ -80,7 +80,7 @@ func TestSensitiveRecorderPlanNeedsApprovalBeforeAnything(t *testing.T) {
 	}
 	// A different result-access instruction needs a fresh preview.
 	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
-	if _, err = f.svc.RequestWithResultAccess(ctx, f.source(t, ctx), p.ID, "k3", access); !errors.Is(err, value.ErrConflict) {
+	if _, err = f.svc.Request(ctx, f.source(t, ctx), withAccess(p, "k3", access)); !errors.Is(err, value.ErrConflict) {
 		t.Fatal("result access replaced on a pending request", err)
 	}
 	// Denied, revoked and expired grants stay refusals.
@@ -117,7 +117,7 @@ func TestResultAccessRefusedWithoutReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	access := &authorization.ResultAccess{ActionIDs: []string{r.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
-	if _, err = f.svc.RequestWithResultAccess(ctx, f.source(t, ctx), r.Preview.ID, "k", access); !errors.Is(err, value.ErrInvalid) {
+	if _, err = f.svc.Request(ctx, f.source(t, ctx), withAccess(r.Preview, "k", access)); !errors.Is(err, value.ErrInvalid) {
 		t.Fatal("result access on a plan without review", err)
 	}
 	if _, err = f.request(t, r.Preview, "k"); !errors.Is(err, value.ErrRecorderUnavailable) {
@@ -138,7 +138,7 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	retained := &retainedRecording{investigationFixture: f}
 	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
 	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	f.svc.Previews, f.svc.Admission, f.svc.Recorders = retained, retained, bothRecorders{availableRecording{f}}
+	f.svc.Admission, f.svc.Recorders = retained, bothRecorders{availableRecording{f}}
 	f.svc.Filters = &approvalArgumentCompiler{}
 	raw, err := os.ReadFile("../planning/profiles/syscall-activity-v1.json")
 	if err != nil {
@@ -179,7 +179,7 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
 	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
-	_, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access)
+	_, err = f.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(preview.Preview, "argument-review", access))
 	if !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
 		t.Fatal("review request", err)
 	}
@@ -192,16 +192,12 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	}
 	f.now = preview.Preview.Deadline.Add(time.Minute)
 	grants.grant.ExpiresAt, grants.covering = access.NotAfter, nil
-	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access); !errors.Is(err, reachedRecordingAdmission) || len(retained.seen) != 1 {
+	if _, err = f.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(preview.Preview, "argument-review", access)); !errors.Is(err, reachedRecordingAdmission) || len(retained.seen) != 1 {
 		t.Fatal("approved argument assessment changed before admission", err)
 	}
-	stored := f.previews[preview.Preview.ID]
-	if stored.AssessmentRulesDigest != preview.Assessment.RulesDigest || !stored.Deadline.Equal(preview.Preview.Deadline) {
-		t.Fatal("original preview changed")
-	}
+	stored := preview.Preview.Clone()
 	stored.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
-	f.previews[stored.ID] = stored
-	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), stored.ID, "wrong-rules", access); err == nil || len(retained.seen) != 1 {
+	if _, err = f.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(stored, "wrong-rules", access)); err == nil || len(retained.seen) != 1 {
 		t.Fatal("generic rules accepted argument scope", err)
 	}
 }

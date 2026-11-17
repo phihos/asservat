@@ -258,7 +258,7 @@ func newGroupRegionalFixture(t *testing.T, counts ...int) *groupRegionalFixture 
 			t.Fatal("invalid accepted child expectation", i, e.Validate())
 		}
 	}
-	f.parent = capturevalue.Accepted{CaptureID: regionalObservationID(700), ScopeDigest: digest, SubmissionDigest: captureapp.ContextRequestDigest(regionalObservationID(701)), CreatedAt: base.now, Deadline: base.now.Add(30 * time.Second), MetadataValidUntil: base.now.Add(5 * time.Second), Group: &capturevalue.RecordingSaveGroupAccepted{CaseID: base.work.Accepted.Expectation.CaseID}}
+	f.parent = capturevalue.Accepted{CaptureID: regionalObservationID(700), ScopeDigest: digest, CreatedAt: base.now, Deadline: base.now.Add(30 * time.Second), MetadataValidUntil: base.now.Add(5 * time.Second), Group: &capturevalue.RecordingSaveGroupAccepted{CaseID: base.work.Accepted.Expectation.CaseID}}
 	for i := range f.works {
 		w := &f.works[i]
 		w.Initiator = &f.human.Principal
@@ -364,6 +364,13 @@ func (f *groupRegionalFixture) AcceptedPolicyAuthority(ctx context.Context, id s
 	return authorization.AcceptedPolicySnapshot{Authority: f.authority, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), SourceUntil: f.now.Add(5 * time.Second)}, ctx.Err()
 }
 func (f *groupRegionalFixture) LookupContextAdmission(ctx context.Context, q capturevalue.ReplayQuery) (capturevalue.Accepted, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	// The request ID derives from the caller's key and plan digest: the first
+	// lookup fixes it and every later lookup must name the same request.
+	if f.parent.SubmissionDigest == (artifact.Digest{}) {
+		f.parent.SubmissionDigest = q.SubmissionDigest
+	}
 	if q.Identity.Principal != f.human.Principal || q.SubmissionDigest != f.parent.SubmissionDigest {
 		return capturevalue.Accepted{}, false, execution.ErrDenied
 	}
@@ -455,7 +462,7 @@ func TestRegionalGroupRouterQueuesEarlierChildWhileLastAuditBlocked(t *testing.T
 	submission := captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: f, Start: groupRegionalStartOwner{f, regional}}
 	done := make(chan error, 1)
 	go func() {
-		_, err := submission.Continue(caller, current, regionalObservationID(701), "original-group")
+		_, err := submission.Continue(caller, current, captureapp.CaptureRequest{Key: "original-group", Plan: artifact.Digest{7}})
 		done <- err
 	}()
 	select {

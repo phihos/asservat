@@ -4,14 +4,14 @@ import { ApprovalsWorkspace } from './ApprovalsWorkspace';
 import { operations as approvalOperations } from './http';
 import type { Data, Input, Operation, Operations, Output } from './http';
 import { validInput_decide_review, validOutput_get_grant, validOutput_list_reviews, validOutput_decide_review } from '../generated/validate-approvals';
-import { id, result, session, SyntheticOperations, acceptedResult } from '../capture/test-fixtures';
+import { id, result, session } from '../capture/test-fixtures';
 
 // Synthetic, content-free approval fixtures for unit tests only.
 const now = Date.now();
 const iso = (offset: number) => new Date(now + offset).toISOString();
 const principal = (subject: string) => ({ issuer: 'https://identity.invalid', subject, client_id: 'console' });
 const row = {
-  grant_id: id(41), phase: 'Pending', revision: 1, kind: 'adHocCapture', capture_id: id(42), preview_id: id(43), execution_digest: 'ab'.repeat(32), review_digest: 'cd'.repeat(32),
+  grant_id: id(41), phase: 'Pending', revision: 1, kind: 'adHocCapture', capture_id: id(42), execution_digest: 'ab'.repeat(32), review_digest: 'cd'.repeat(32),
   target: { cluster_id: id(1), namespace: 'payments', workload_kind: 'Deployment', workload_name: 'api', pod_name: 'api-a' }, data_class: 'extract',
   reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), preview_deadline: iso(-240_000), capture_deadline_rule: 'acceptanceWithinGrant', capture_window_seconds: 300,
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
@@ -59,7 +59,7 @@ it('shows the exact plan and records one decision with a reason', async () => {
   expect(screen.getByText(/raw byte comparison/)).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Sign in with step-up' }).getAttribute('href')).toBe('/auth/step-up?return_to=' + encodeURIComponent('/approvals/' + id(41)));
   expect(screen.getByText(/Observation limits bound by this approval/)).toBeTruthy();
-  expect(screen.getByText(/submitting this plan starts a capture window of at most 5 minutes/)).toBeTruthy();
+  expect(screen.getByText(/Submitting this plan starts a capture window of at most 5 minutes/)).toBeTruthy();
   expect(screen.queryByText(/plan's start deadline/)).toBeNull();
   const approve = screen.getByRole('button', { name: 'Approve' });
   expect(approve.getAttribute('data-disabled')).not.toBeNull();
@@ -80,38 +80,11 @@ it('explains a step-up refusal without hiding the plan', async () => {
   expect(screen.getByText('tcp[13] & 2 != 0')).toBeTruthy();
 });
 
-it('resumes one exact original preview with the same key after a lost reply and remount', async () => {
+it('offers no resume of a request by preview id; the requester resubmits from the capture page', async () => {
   const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true };
-  const capture = new SyntheticOperations(); capture.responder = () => { throw new Error('lost accepted reply'); };
-  const opened = vi.fn(); const scope = new AbortController();
-  const first = render(<ApprovalsWorkspace session={session} scope={scope.signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Continue approved capture' }));
-  expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('same reviewed request'));
-  const original = capture.calls[0].input;
-  first.unmount(); capture.responder = () => acceptedResult();
-  render(<ApprovalsWorkspace session={session} scope={scope.signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Continue approved capture' }));
-  await waitFor(() => expect(opened).toHaveBeenCalledWith(id(8)));
-  expect(capture.calls.map(c => c.name)).toEqual(['request_capture', 'request_capture']);
-  expect(capture.calls.map(c => c.input)).toEqual([original, original]);
-  expect(original).toMatchObject({ preview_id: id(43), continue_acquisition: true });
-});
-
-
-
-it('cancels resume on unmount and ignores a late accepted reply', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', can_resume: true };
-  const capture = new SyntheticOperations(); let complete!: (value: ReturnType<typeof acceptedResult>) => void;
-  capture.responder = () => new Promise(resolve => { complete = resolve; });
-  const opened = vi.fn();
-  const page = render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Continue approved capture' }));
-  await waitFor(() => expect(capture.calls).toHaveLength(1));
-  page.unmount();
-  expect(capture.calls[0].signal.aborted).toBe(true);
-  complete(acceptedResult());
-  await Promise.resolve();
-  expect(opened).not.toHaveBeenCalled();
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByText(/submits the same reviewed request again from the capture page/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
 });
 
 it('does not tell an independent approved-plan reviewer to continue the requester capture', async () => {
@@ -131,7 +104,7 @@ function teamPolicyGrant(): CollectionGrant {
     decision: { decision: 'approved', decided_by: principal('independent-reviewer'), decided_at: iso(-30_000), reason: 'finite team collection', authentication_context: { acr: 'mfa', authenticated_at: iso(-40_000) } },
     can_resume: false,
   };
-  delete value.capture_id; delete value.preview_id; delete value.preview_deadline; delete value.capture_window_seconds;
+  delete value.capture_id; delete value.preview_deadline; delete value.capture_window_seconds;
   return value;
 }
 
@@ -160,7 +133,7 @@ it('does not infer team revocation from requester provenance and rejects persona
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
   expect(await screen.findByText('team-policy-uid')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Revoke approval' })).toBeNull();
-  for (const patch of [{ capture_id: id(42) }, { preview_id: id(43) }, { preview_deadline: iso(60_000) }, { can_resume: true }, { target: { ...client.detail.target, pod_name: 'invented' } }]) {
+  for (const patch of [{ capture_id: id(42) }, { preview_deadline: iso(60_000) }, { can_resume: true }, { target: { ...client.detail.target, pod_name: 'invented' } }]) {
     expect(validOutput_get_grant(result({ ...client.detail, ...patch }))).toBe(false);
   }
 });
@@ -239,7 +212,7 @@ it('shows cumulative policy argument event reservations independently of bytes',
 });
 
 function rawGrant(artifactCount = 2): Extract<Data<'get_grant'>, { kind: 'rawQuery' }> {
-  const { target: _target, capture_id: _capture, preview_id: _preview, preview_deadline: _deadline, capture_deadline_rule: _rule, capture_window_seconds: _window, ...common } = row;
+  const { target: _target, capture_id: _capture, preview_deadline: _deadline, capture_deadline_rule: _rule, capture_window_seconds: _window, ...common } = row;
   return { ...common, kind: 'rawQuery', data_class: 'raw', reasons: [], raw_access: {
     case_id: id(2), reason: 'Inspect existing incident evidence', operations: ['download_artifact'], max_bytes: artifactCount * 512, max_operations: 10000, not_after: iso(3_600_000), artifact_count: artifactCount, bytes_used: 128, operations_used: 1,
     artifacts: Array.from({ length: artifactCount }, (_, n) => ({ artifact_id: id(100 + n), capture_id: id(42), action_id: 'calls', digest: 'ab'.repeat(32), execution_digest: 'cd'.repeat(32), native_type: 'syscallArguments', native_bytes: 512, expires_at: iso(3_600_000), target: { cluster_id: id(1), namespace_uid: 'namespace-' + n, workload_uid: 'workload-' + n, pod_uid: 'pod-' + n, namespace: 'payments', workload_name: 'api-' + n } })),

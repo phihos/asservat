@@ -126,8 +126,6 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	diagnostic := &publicJourneyDiagnostics{}
 	investigation = diagnostic.Investigation(investigation)
 	intents = diagnostic.Publication(intents)
-	investigation.Resolution, e = postgres.NewContextRequestResolutions(ctx, open("context_request_resolution_runtime", "synthetic-context-request-resolution"), s.a.RootID, s.recovery.installation)
-	publicJourneyRequire(t, "request resolution", e)
 	progress, e := postgres.NewContextProgressReads(ctx, open("context_progress_read_runtime", "synthetic-context-progress-read"), s.a.RootID)
 	publicJourneyRequire(t, "progress", e)
 	casePool := open("context_case_read_runtime", "synthetic-context-case-read")
@@ -170,7 +168,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 		t.Fatal("preview collected or failed to pin one original Pod")
 	}
 	key := "public-journey-original-capture"
-	request := map[string]any{"preview_id": preview.PreviewID, "idempotency_key": key}
+	request := map[string]any{"preview": previewInput, "expected_plan_digest": preview.PlanDigest, "idempotency_key": key}
 	// Observe only the original regional exchange and its original runner ports.
 	// The prepared handle and optional stored-completion facet remain intact.
 	regional.diagnostic = diagnostic
@@ -193,20 +191,11 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	if collector.calls.Load() != 1 || accepted.CaptureID == "" {
 		t.Fatal("first shared request did not collect once")
 	}
-	reply, e = call("resolve_capture_request", request, false)
-	resolved := publicJourneyData[presentation.ContextResolutionData](t, "MCP-shaped accepted resolution", reply, e)
-	if resolved.State != "accepted" || resolved.ContextAcceptedData == nil || resolved.CaptureID != accepted.CaptureID {
-		t.Fatal("resolution replaced the original capture", resolved.State)
-	}
 	reply, e = call("request_capture", request, true)
 	replayed := publicJourneyData[presentation.ContextAcceptedData](t, "passive same-key request", reply, e)
 	if replayed.CaptureID != accepted.CaptureID || collector.calls.Load() != 1 {
 		t.Fatal("same-key request repeated acquisition or changed capture")
 	}
-	// The preview/request/resolution phase is complete; no later journey call
-	// uses these two purposes. Their connections are needed for publication.
-	pools.Retire("context_preview_runtime")
-	pools.Retire("context_request_resolution_runtime")
 	// The public reply carries no object receipt. Read only the original stored
 	// copies from its ordinary SQL read role; the stored outcome published them.
 	var encoded []byte

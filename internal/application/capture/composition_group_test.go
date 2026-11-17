@@ -66,11 +66,11 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 		name      string
 		sensitive bool
 	}{{name: "ordinary"}, {name: "authored-sensitive", sensitive: true}} {
-		reviewed := mode.sensitive
+		approvalNeeded := mode.sensitive
 		t.Run(mode.name, func(t *testing.T) {
 			f := newInvestigationFixture()
 			admission := &logsGroupAdmission{retainedRecording: &retainedRecording{investigationFixture: f}}
-			f.svc.Previews, f.svc.Admission = admission, admission
+			f.svc.Admission = admission
 			f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
 			f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 			f.svc.Recorders, f.svc.Filters = bothRecorders{availableRecording{f}}, &stubFilters{}
@@ -98,12 +98,12 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 			if err != nil {
 				t.Fatal("logs group preview", err)
 			}
-			if !r.Recordable || r.Preview.CompositionGroup == nil || len(r.Preview.CompositionGroup.Children) != 3 || len(r.Plan.Actions) != 3 || len(r.Assessment.Actions) != 3 || (r.Plan.Approval != nil) != reviewed || r.Preview.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(r.Plan.Actions) || r.Assessment.RulesDigest != r.Preview.AssessmentRulesDigest {
+			if !r.Recordable || r.Preview.CompositionGroup == nil || len(r.Preview.CompositionGroup.Children) != 3 || len(r.Plan.Actions) != 3 || len(r.Assessment.Actions) != 3 || (r.Plan.Approval != nil) != approvalNeeded || r.Preview.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(r.Plan.Actions) || r.Assessment.RulesDigest != r.Preview.AssessmentRulesDigest {
 				t.Fatal("mixed group lost combined review")
 			}
 			for n, child := range r.Preview.CompositionGroup.Children {
 				actions, approval, err := compiler.RecorderScopeSummary(child.CanonicalScope)
-				if err != nil || len(actions) != 1 || (approval != nil) != reviewed {
+				if err != nil || len(actions) != 1 || (approval != nil) != approvalNeeded {
 					t.Fatal("child scope changed", n, err)
 				}
 				if actions[0].Kind == "logs" && (actions[0].MaxBytes != 10<<20 || actions[0].Before != "10s" || actions[0].LogStream != "both") {
@@ -111,7 +111,7 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 				}
 			}
 			var access *authorization.ResultAccess
-			if reviewed {
+			if approvalNeeded {
 				grants := &fakeGrants{}
 				f.svc.Grants = grants
 				for _, a := range r.Plan.Actions {
@@ -119,7 +119,7 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 						access = &authorization.ResultAccess{ActionIDs: []string{a.ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 10 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
 					}
 				}
-				if _, err := f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), r.Preview.ID, "mixed-logs", access); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 || len(admission.groups) != 0 {
+				if _, err := f.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(r.Preview, "mixed-logs", access)); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 || len(admission.groups) != 0 {
 					t.Fatal("combined review bypassed", err)
 				}
 				if grants.requests[0].DataClass != "raw" || len(grants.requests[0].Review.Actions) != 3 {
@@ -128,7 +128,7 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 				grants.covering = nil
 				grants.grant.ExpiresAt = f.now.Add(90 * time.Second)
 			}
-			if _, err := f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), r.Preview.ID, "mixed-logs", access); !errors.Is(err, reachedRecordingAdmission) || len(admission.groups) != 1 {
+			if _, err := f.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(r.Preview, "mixed-logs", access)); !errors.Is(err, reachedRecordingAdmission) || len(admission.groups) != 1 {
 				t.Fatal("mixed typed children did not reach atomic admission", err)
 			}
 			group := admission.groups[0]
@@ -191,8 +191,8 @@ func TestArgumentCompositionGroupRefusedBeforePersistence(t *testing.T) {
 				t.Logf("cause: %+v", errors.Unwrap(err))
 				t.Fatalf("unsupported argument group advertised: recordable=%v, error=%v, failure=%+v", got.Recordable, err, failure)
 			}
-			if got.Recordable || len(f.previews) != 0 || f.admissions.Load() != 0 {
-				t.Fatal("unsupported group persisted or admitted")
+			if got.Recordable || f.admissions.Load() != 0 {
+				t.Fatal("unsupported group recordable or admitted")
 			}
 		})
 	}

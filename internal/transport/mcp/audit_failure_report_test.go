@@ -80,11 +80,7 @@ func TestAuditedMCPAuditFailureReportsBeforeFinalIdentity(t *testing.T) {
 						t.Errorf("original audit failure missing before response: %q", reports)
 					}
 				}}
-				req := rpcRequest(t, server, version, "tools/call", map[string]any{
-					"name": "request_capture", "arguments": map[string]any{
-						"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key",
-					},
-				}).WithContext(ctx)
+				req := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": mcpCaptureRequest()}).WithContext(ctx)
 				req.TLS = &tls.ConnectionState{}
 				req.RequestURI = req.URL.RequestURI()
 				req.URL.Scheme, req.URL.Host = "", ""
@@ -101,7 +97,7 @@ func TestAuditedMCPAuditFailureReportsBeforeFinalIdentity(t *testing.T) {
 				if !w.read.Equal(original) || !w.write.Equal(original) {
 					t.Fatal("failure reporting changed original socket bounds")
 				}
-				if rows.count() != 1 || capture.calls.Load() != 1 || capture.continuations.Load() != 0 {
+				if rows.count() != 1 || capture.calls.Load() != 1 {
 					t.Fatal("failure reporting repeated audit or service work")
 				}
 				if strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "credentials") {

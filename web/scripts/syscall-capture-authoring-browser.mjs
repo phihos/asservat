@@ -72,7 +72,8 @@ try {
   assert.equal(pending.status, 'error');
   assert.equal(pending.data.code, 'ApprovalRequired');
   const first = firstResponse.request().postDataJSON();
-  assert.equal(first.preview_id, preview.data.preview_id);
+  assert.equal(first.expected_plan_digest, preview.data.plan_digest);
+  assert.equal(typeof first.preview, 'object');
   assert.equal(typeof first.idempotency_key, 'string');
   assert.deepEqual(first.result_access.actionIds, [choices[0].action_id]);
   assert.deepEqual(first.result_access.operations, mode === 'query' ? ['syscall_query'] : ['download_artifact', 'syscall_query']);
@@ -86,11 +87,11 @@ try {
   const approved = await page.request.post(origin + '/test/argument-approve', { headers: { Origin: origin } });
   assert.equal(approved.status(), 204);
   const resumedWait = waitOperation('request_capture');
-  await page.getByRole('button', { name: 'Continue after approval', exact: true }).click();
+  await page.getByRole('button', { name: 'Submit after approval', exact: true }).click();
   const resumedResponse = await resumedWait;
   const accepted = await checked(resumedResponse, validOutput_request_capture);
   assert.equal(accepted.status, 'ok');
-  assert.deepEqual(resumedResponse.request().postDataJSON(), first, 'approval resume must retain original body/key/absolute expiry');
+  assert.deepEqual(resumedResponse.request().postDataJSON(), first, 'approval resubmission must retain the original request and key');
   await page.waitForURL(/\/captures\/00000000-0000-4000-8000-000000000008$/);
   assert.equal(calls.filter(c => c.name === 'preview_capture').length, 1);
   assert.equal(calls.filter(c => c.name === 'request_capture').length, 2);

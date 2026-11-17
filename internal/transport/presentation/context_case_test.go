@@ -255,7 +255,7 @@ func TestInvestigationCompositionExposesOnlyConfiguredCapabilities(t *testing.T)
 	captures, _ := operationFixture(t, false)
 	cases, _, current := caseOperationsFixture(t)
 	both, err := NewInvestigationOperations(captures, cases)
-	if err != nil || len(both.ToolNames()) != 5 {
+	if err != nil || len(both.ToolNames()) != 4 {
 		t.Fatal("composition failed", err)
 	}
 	if _, ok := both.Tool("request_capture"); ok {

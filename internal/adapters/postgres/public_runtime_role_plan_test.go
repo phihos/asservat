@@ -82,41 +82,11 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		publicRuntimeGrant{"table", "recording_selection_set", "", "DELETE"},
 		publicRuntimeGrant{"table", "policy_recording_source", "", "SELECT"},
 		publicRuntimeGrant{"table", "policy_source", "", "SELECT"},
-		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},
-		publicRuntimeGrant{"table", "context_preview", "", "SELECT"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_stream", "id", "UPDATE"},
-		publicRuntimeGrant{"table", "context_preview", "", "INSERT"},
-		publicRuntimeGrant{"table", "context_preview", "", "DELETE"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "DELETE"},
 		publicRuntimeGrant{"table", "workload_name", "", "SELECT"},
 		publicRuntimeGrant{"table", "workload_name", "", "INSERT"})
-	resolution := append(slices.Clone(common),
-		publicRuntimeGrant{"table", "recording_save_group", "", "SELECT"},
-		publicRuntimeGrant{"table", "recording_selection_set", "", "SELECT"},
-		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
-		publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_basis", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_assignment", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_review_source", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_review_assignment", "", "SELECT"},
-		publicRuntimeGrant{"table", "permission_review_decision", "", "SELECT"},
-		publicRuntimeGrant{"table", "workload_name", "", "SELECT"},
-		publicRuntimeGrant{"table", "authority_audit", "", "SELECT"},
-		publicRuntimeGrant{"table", "context_capture", "", "SELECT"},
-		publicRuntimeGrant{"table", "context_preview", "", "SELECT"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "SELECT"},
-		publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"},
-		publicRuntimeGrant{"table", "permission_stream", "id", "UPDATE"},
-		publicRuntimeGrant{"table", "context_preview", "closed_at", "UPDATE"},
-		publicRuntimeGrant{"table", "context_preview", "closed_request_key", "UPDATE"},
-		publicRuntimeGrant{"table", "context_preview", "closed_submission_digest", "UPDATE"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "INSERT"},
-		publicRuntimeGrant{"table", "context_preview", "", "DELETE"},
-		publicRuntimeGrant{"table", "context_preview_fence", "", "DELETE"})
-	for purpose, want := range map[string][]publicRuntimeGrant{"capture-preview": previews, "capture-resolution": resolution} {
+	for purpose, want := range map[string][]publicRuntimeGrant{"capture-preview": previews} {
 		t.Run(purpose, func(t *testing.T) {
 			got, ok := publicRuntimeDutyGrants(purpose)
 			keys := func(v []publicRuntimeGrant) []string {

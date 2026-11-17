@@ -104,7 +104,7 @@ func TestHistoryDraftPreservesAuthoredPolicyInsteadOfTriggeringPod(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	accepted, err := f.svc.Request(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "policy-history-draft")
+	accepted, err := f.svc.Request(t.Context(), f.source(t, t.Context()), reviewed(preview.Preview, "policy-history-draft"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -196,13 +196,6 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 	if !commit {
 		return policySourceSnapshotAdmissionFixture{Admission: a, Preview: p, Source: *source}
 	}
-	previews, err := postgres.NewContextPreviews(bound, hub, a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(bound, p); err != nil {
-		t.Fatal("persist real snapshot preview", err)
-	}
 	for _, probe := range beforeAdmission {
 		candidate := a
 		manual := *a.RecordingSave
@@ -219,7 +212,7 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 		}
 		probe(t, candidate, p.Clone())
 	}
-	output, err := admissions.AdmitReviewedContext(bound, p.ID, a)
+	output, err := admissions.AdmitReviewedContext(bound, p, a)
 	if err != nil {
 		t.Fatal("real manual source snapshot admission", err)
 	}

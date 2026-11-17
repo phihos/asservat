@@ -15,24 +15,15 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
 type groupPreviewFixture struct {
 	*investigationFixture
-	groups  int
 	batches int
 	seen    []value.RecordingSaveGroupAdmission
 }
 
-func (f *groupPreviewFixture) CreateRecordingGroupPreview(ctx context.Context, p value.ContextPreview) error {
-	f.groups++
-	return f.CreateContextPreview(ctx, p)
-}
-func (f *groupPreviewFixture) ReadRecordingGroupPreview(ctx context.Context, root, id string, actor identity.Principal) (value.ContextPreview, error) {
-	return f.ReadContextPreview(ctx, root, id, actor)
-}
 func (f *groupPreviewFixture) ResolveSourceSnapshots(ctx context.Context, original []targets.SourceSnapshotTarget) ([]targets.SourceSnapshotResolution, error) {
 	f.batches++
 	resolver := retainedSourceTargetsFixture{ContextTargets: f.investigationFixture, now: func() time.Time { return f.now }}
@@ -91,7 +82,6 @@ func TestRecordingSaveGroupUsesOneReviewAndOneAdmission(t *testing.T) {
 			}
 			fixture := &groupPreviewFixture{investigationFixture: f}
 			f.svc.Targets = fixture
-			f.svc.Previews = fixture
 			f.svc.RecordingGroups = fixture
 			f.svc.RecordingSources = x
 			f.svc.PolicyAccepted = accepted
@@ -121,35 +111,35 @@ func TestRecordingSaveGroupUsesOneReviewAndOneAdmission(t *testing.T) {
 				t.Fatal("group repeats per-child checks before the final cohort check", count, counting.calls)
 			}
 			t.Logf("sources=%d preview_eligibility_calls=%d", count, counting.calls)
-			if preview.Preview.Group == nil || fixture.groups != 1 || len(f.previews) != 1 || fixture.batches != 1 || len(preview.RecordingSave.Assessments) != count || preview.Assessment.OutputLimit != int64(count)*preview.RecordingSave.Assessments[0].Assessment.OutputLimit {
-				t.Fatal("independent reviews or first-child aggregate", fixture.groups, fixture.batches)
+			if preview.Preview.Group == nil || fixture.batches != 1 || len(preview.RecordingSave.Assessments) != count || preview.Assessment.OutputLimit != int64(count)*preview.RecordingSave.Assessments[0].Assessment.OutputLimit {
+				t.Fatal("independent reviews or first-child aggregate", fixture.batches)
 			}
 			// A stale source reference refuses the entire cohort before another journal.
 			denied := service
 			denied.Investigation.Eligibility = groupSelectiveEligibility{base: f.svc.Eligibility, deniedPod: x.rows[len(x.rows)-1].Source.Binding.PodUID}
-			if _, e := denied.Preview(t.Context(), current, RecordingSavePreviewRequest{Handles: handles}); e == nil || fixture.groups != 1 {
+			if _, e := denied.Preview(t.Context(), current, RecordingSavePreviewRequest{Handles: handles}); e == nil {
 				t.Fatal("denied selected source silently dropped or journaled", e)
 			}
 			originalFence := x.rows[0].Source.Binding.Fence
 			x.rows[0].Source.Binding.Fence = fixtureID(9999)
-			if _, e := service.Preview(t.Context(), current, RecordingSavePreviewRequest{Handles: handles}); e == nil || fixture.groups != 1 {
+			if _, e := service.Preview(t.Context(), current, RecordingSavePreviewRequest{Handles: handles}); e == nil {
 				t.Fatal("changed member silently dropped or journaled", e)
 			}
 			x.rows[0].Source.Binding.Fence = originalFence
 			f.svc.RecordingSaveEnabled = false
-			if _, e := f.svc.Request(t.Context(), current, preview.Preview.ID, "group-key"); !errors.Is(e, value.ErrUnavailable) || len(fixture.seen) != 0 {
+			if _, e := f.svc.Request(t.Context(), current, reviewed(preview.Preview, "group-key")); !errors.Is(e, value.ErrUnavailable) || len(fixture.seen) != 0 {
 				t.Fatal("passive group bypassed trusted acquisition gate", e)
 			}
 			f.svc.RecordingSaveEnabled = true
 			baseEligibility := f.svc.Eligibility
 			f.svc.Eligibility = groupSelectiveEligibility{base: baseEligibility, deniedPod: x.rows[len(x.rows)-1].Source.Binding.PodUID}
-			if _, e := f.svc.Request(t.Context(), current, preview.Preview.ID, "group-key"); e == nil || len(fixture.seen) != 0 {
+			if _, e := f.svc.Request(t.Context(), current, reviewed(preview.Preview, "group-key")); e == nil || len(fixture.seen) != 0 {
 				t.Fatal("denied group member admitted a partial cohort", e)
 			}
 			f.svc.Eligibility = baseEligibility
 			counting.calls = 0
 			f.now = f.now.Add(100 * time.Millisecond)
-			_, err = f.svc.Request(t.Context(), current, preview.Preview.ID, "group-key")
+			_, err = f.svc.Request(t.Context(), current, reviewed(preview.Preview, "group-key"))
 			if !errors.Is(err, reachedRecordingAdmission) || len(fixture.seen) != 1 || len(fixture.seen[0].Children) != count || fixture.batches != 4 {
 				t.Fatal("not one grouped admission", err, len(fixture.seen), fixture.batches)
 			}
@@ -167,9 +157,6 @@ func TestRecordingSaveGroupUsesOneReviewAndOneAdmission(t *testing.T) {
 			changed.Plan.Input.Snapshot.Request.Before += time.Millisecond
 			if ReviewedRecordingSaveGroupChild(preview.Preview, changed) {
 				t.Fatal("changed reviewed child window accepted")
-			}
-			if len(f.previews) != 1 {
-				t.Fatal("request created child journals")
 			}
 		})
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
@@ -92,8 +91,8 @@ func TestProfileHistoryNamespaceHeapRepeatRehydratesFreshPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(settingsBefore, settingsAfter) || reader.settings.Composition.Resolved != nil || !reflect.DeepEqual(x.f.previews[original.ID].CanonicalScope, original.CanonicalScope) {
-		t.Fatal("repeat mutated source settings or original preview")
+	if !bytes.Equal(settingsBefore, settingsAfter) || reader.settings.Composition.Resolved != nil {
+		t.Fatal("repeat mutated source settings")
 	}
 }
 

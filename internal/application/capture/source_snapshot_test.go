@@ -117,7 +117,7 @@ func policySourceSnapshotPreview(t *testing.T, composition *planning.ProfileComp
 	f.now = f.now.Add(500 * time.Millisecond)
 	admission := &retainedRecording{investigationFixture: f}
 	f.svc.Admission = admission
-	_, err = f.svc.Request(t.Context(), current, preview.Preview.ID, fixtureID(901))
+	_, err = f.svc.Request(t.Context(), current, reviewed(preview.Preview, fixtureID(901)))
 	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 {
 		t.Fatal("source snapshot failed before shared admission", err, len(admission.seen))
 	}

@@ -10,14 +10,9 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 )
 
-// ValidContextPreview adds serialized bounds and integrity to domain structural
-// validation. It does not restore current authority from a persisted preview.
+// ValidContextPreview adds scope integrity to domain structural validation.
 func ValidContextPreview(p value.ContextPreview) bool {
-	if !p.Valid() || !json.Valid(p.CanonicalScope) || artifact.Digest(sha256.Sum256(p.CanonicalScope)) != p.ScopeDigest {
-		return false
-	}
-	b, err := json.Marshal(p)
-	return err == nil && len(b) <= value.MaxContextPreviewBytes
+	return p.Valid() && json.Valid(p.CanonicalScope) && artifact.Digest(sha256.Sum256(p.CanonicalScope)) == p.ScopeDigest
 }
 
 // ContextRequestDigest is derivable without loading an expired preview. Actor,

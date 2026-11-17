@@ -42,7 +42,6 @@ func crossBatchSaveFixture(t *testing.T, count int) (*inventoryFixture, Recordin
 	}
 	fixture := &groupPreviewFixture{investigationFixture: f}
 	f.svc.Targets = fixture
-	f.svc.Previews = fixture
 	f.svc.RecordingGroups = fixture
 	f.svc.RecordingSources = x
 	f.svc.PolicyAccepted = accepted
@@ -51,7 +50,7 @@ func crossBatchSaveFixture(t *testing.T, count int) (*inventoryFixture, Recordin
 	return x, RecordingSaves{Inventory: inv, Investigation: f.svc}, current, fixture
 }
 func TestRecordingSaveSelectsValidSamePolicyHandlesAcrossInventoryBatches(t *testing.T) {
-	x, service, current, fixture := crossBatchSaveFixture(t, 101)
+	x, service, current, _ := crossBatchSaveFixture(t, 101)
 	original := x.rows[0].Source.Target.Target()
 	target := authorization.WorkloadTarget{ClusterID: original.ClusterID, NamespaceUID: original.NamespaceUID, WorkloadUID: original.WorkloadUID}
 	first, err := service.Inventory.List(t.Context(), current, target, "", "", 100)
@@ -89,8 +88,8 @@ func TestRecordingSaveSelectsValidSamePolicyHandlesAcrossInventoryBatches(t *tes
 	if err != nil {
 		t.Fatal("two individually valid same-policy/workload handles cannot formoneSave", err)
 	}
-	if preview.Preview.Group == nil || len(preview.Preview.Group.Children) != 2 || len(preview.RecordingSave.Selected) != 2 || fixture.groups != 1 {
-		t.Fatal("cross-batch selection was dropped or split", fixture.groups)
+	if preview.Preview.Group == nil || len(preview.Preview.Group.Children) != 2 || len(preview.RecordingSave.Selected) != 2 {
+		t.Fatal("cross-batch selection was dropped or split")
 	}
 	for id := range sets {
 		set := x.sets[id]
@@ -168,7 +167,7 @@ func (s *crossBatchSelectionStore) ReadRecordingSelection(ctx context.Context, a
 func TestRecordingSaveCrossSetValidationRejectsMixedExpiredAndDuplicateSelections(t *testing.T) {
 	for _, kind := range []string{"policy", "scope", "target", "root", "client", "expired", "duplicate handle", "duplicate source", "expires during later read"} {
 		t.Run(kind, func(t *testing.T) {
-			x, service, current, fixture := crossBatchSaveFixture(t, 2)
+			x, service, current, _ := crossBatchSaveFixture(t, 2)
 			original := x.rows[0].Source.Target.Target()
 			target := authorization.WorkloadTarget{ClusterID: original.ClusterID, NamespaceUID: original.NamespaceUID, WorkloadUID: original.WorkloadUID}
 			first, err := service.Inventory.List(t.Context(), current, target, "", "", 100)
@@ -220,8 +219,8 @@ func TestRecordingSaveCrossSetValidationRejectsMixedExpiredAndDuplicateSelection
 			if _, err = service.Preview(t.Context(), current, RecordingSavePreviewRequest{Handles: handles, Before: time.Second}); err == nil {
 				t.Fatal("invalid cross-set selection accepted", kind)
 			}
-			if fixture.groups != 0 || x.reads != sourceReads || x.writes != selectionWrites {
-				t.Fatal("invalidselection queried sources or persisted preview", kind, fixture.groups, x.reads-sourceReads, x.writes-selectionWrites)
+			if x.reads != sourceReads || x.writes != selectionWrites {
+				t.Fatal("invalidselection queried sources or persisted preview", kind, x.reads-sourceReads, x.writes-selectionWrites)
 			}
 		})
 	}

@@ -15,7 +15,7 @@ func TestDisabledManualSaveRetainsAcceptedReplayButCannotContinue(t *testing.T) 
 	x.current = f.source(t, t.Context())
 	// Seed the normal accepted journal through its real app path, then substitute
 	// a structurally valid snapshot receipt to exercise accepted-only routing.
-	a, err := f.svc.Request(t.Context(), x.current, p.ID, "original")
+	a, err := f.svc.Request(t.Context(), x.current, reviewed(p, "original"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,15 +29,15 @@ func TestDisabledManualSaveRetainsAcceptedReplayButCannotContinue(t *testing.T) 
 	e.SourceSnapshotManifest = &artifact.SourceSnapshotManifest{CanonicalScope: scope, Binding: binding}
 	e.Lifecycle = &artifact.OngoingLifecycle{TriggerKind: "recordingSave", SourceSessionID: q.SourceID, SourceStartedAt: q.SourceStartedAt, SnapshotID: q.SnapshotID, RequestedBefore: q.Before, HistoryCoverage: "unknown", WindowCoverage: "unknown", GapReasons: []string{"unknownLoss"}, Origin: &artifact.RecordingSaveOrigin{PolicyUID: "original-policy", PolicyExecutionDigest: artifact.Digest{1}}}
 	a.Expectation, a.ScopeDigest = e, e.PlanDigest
-	if !acceptedContext(a, ContextRequestDigest(p.ID)) {
+	if !acceptedContext(a, requestDigest(f.svc, f.actor, "original")) {
 		t.Fatal("valid accepted snapshot receipt baseline required", e.Validate(), q.Valid(), e.Lifecycle.Validate(e.TriggeredAt), e.Registration.Validate(), q)
 	}
 	f.accepted[fixtureKey(f.actor, "original")] = a
-	replay, err := s.Request(t.Context(), x.current, p.ID, "original")
+	replay, err := s.Request(t.Context(), x.current, reviewed(p, "original"))
 	if err != nil || !replay.Replay || replay.CaptureID != a.CaptureID || x.starts != 0 || x.intentReads != 0 {
 		t.Fatal("disabled Save hid accepted receipt or started replay", replay, err)
 	}
-	continued, err := s.Continue(t.Context(), x.current, p.ID, "original")
+	continued, err := s.Continue(t.Context(), x.current, reviewed(p, "original"))
 	if !errors.Is(err, value.ErrUnavailable) || continued.CaptureID != a.CaptureID || x.starts != 0 || x.intentReads != 0 {
 		t.Fatal("disabled Save continuation reached active path", continued, err)
 	}

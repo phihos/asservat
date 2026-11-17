@@ -35,7 +35,6 @@ func reserveID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d
 // No SQL, Kubernetes, collector or installed-workflow qualification is claimed.
 type reserveFacts struct {
 	app.ContextAdmissionReplay
-	app.ContextPreviewStore
 	ids, stores, admissions, demands, storageReads, storageActive atomic.Int64
 }
 
@@ -83,11 +82,7 @@ func (f *reserveFacts) ContextProcessingCoverage(ctx context.Context, in value.P
 	}
 	return value.ProcessingCoverage{Request: in, ObservedAt: now, FreshUntil: until}, nil
 }
-func (f *reserveFacts) CreateContextPreview(context.Context, value.ContextPreview) error {
-	f.stores.Add(1)
-	return nil
-}
-func (f *reserveFacts) AdmitReviewedContext(context.Context, string, value.Admission) (value.Accepted, error) {
+func (f *reserveFacts) AdmitReviewedContext(context.Context, value.ContextPreview, value.Admission) (value.Accepted, error) {
 	f.admissions.Add(1)
 	return value.Accepted{}, value.ErrUnavailable
 }
@@ -127,7 +122,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			server.EnableHTTP2 = true
 			server.StartTLS()
 			defer server.Close()
-			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{})
 			if err != nil {
 				t.Fatal(err)
@@ -176,8 +171,8 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			if json.Unmarshal(rpc.Result.StructuredContent, &result) != nil {
 				t.Fatal(string(body))
 			}
-			if result.Status != "ok" || facts.stores.Load() != 1 || facts.demands.Load() != 0 || (facts.storageReads.Load() < 1 || facts.storageReads.Load() > 2) {
-				t.Fatalf("short live parent lost fast fresh result: %s stores=%d reads=%d demands=%d", body, facts.stores.Load(), facts.storageReads.Load(), facts.demands.Load())
+			if result.Status != "ok" || facts.demands.Load() != 0 || (facts.storageReads.Load() < 1 || facts.storageReads.Load() > 2) {
+				t.Fatalf("short live parent lost fast fresh result: %s reads=%d demands=%d", body, facts.storageReads.Load(), facts.demands.Load())
 			}
 			if gate.records.Load() != 1 || facts.admissions.Load() != 0 || facts.storageActive.Load() != 0 {
 				t.Fatalf("audit/effect/owned I/O mismatch: audit rows %d admission=%d active=%d", gate.records.Load(), facts.admissions.Load(), facts.storageActive.Load())

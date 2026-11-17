@@ -88,7 +88,7 @@ func TestAuditedMCPIngressRejectsOnceBeforeDispatchAcrossRevisions(t *testing.T)
 		for _, mode := range []string{"unknown", "schema", "scope", "sdk-params", "sdk-meta", "request-state", "missing-id", "null-id", "object-id", "oversized-name"} {
 			t.Run(version+"/"+mode, func(t *testing.T) {
 				_, server, capture, rows, denied := auditedMCPFixture(t)
-				params := map[string]any{"name": "resolve_capture_request", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}
+				params := map[string]any{"name": "request_capture", "arguments": mcpCaptureRequest()}
 				switch mode {
 				case "unknown":
 					params["name"] = "private-user-input"
@@ -148,8 +148,7 @@ func TestAuditedMCPValidCallsHaveOneOwnerAndProtocolIsNotAnOperation(t *testing.
 	if rows.count() != 0 {
 		t.Fatal("handshake/list consumed audit")
 	}
-	args := map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}
-	for _, name := range []string{"request_capture", "resolve_capture_request"} {
+	for name, args := range map[string]any{"request_capture": mcpCaptureRequest(), "get_capture": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}} {
 		response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": name, "arguments": args}))
 		if response.StatusCode != 200 || bytes.Contains(b, []byte(`"error"`)) {
 			t.Fatalf("valid call rejected %d %s", response.StatusCode, b)
@@ -175,7 +174,7 @@ func TestAuditedMCPOriginalHTTPCancellationReachesBothRevisions(t *testing.T) {
 			capture.during = func(ctx context.Context) { close(entered); <-ctx.Done(); close(observed) }
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			req := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}).WithContext(ctx)
+			req := rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": mcpCaptureRequest()}).WithContext(ctx)
 			finished := make(chan struct{})
 			go func() {
 				defer close(finished)

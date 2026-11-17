@@ -42,26 +42,22 @@ func TestContextProcessingCoveragePrecedesPreviewAndAdmission(t *testing.T) {
 			source := f.source(t, ctx)
 			reader := &coverageReadFixture{f: f}
 			f.svc.Processing = reader
-			var id string
+			var p ContextPreviewResult
 			if !preview {
-				p, e := f.svc.Preview(ctx, source, f.intent())
-				if e != nil {
+				var e error
+				if p, e = f.svc.Preview(ctx, source, f.intent()); e != nil {
 					t.Fatal(e)
 				}
-				id = p.Preview.ID
 			}
 			reader.err = value.ErrProcessingCoverage
 			var err error
 			if preview {
 				_, err = f.svc.Preview(ctx, source, f.intent())
 			} else {
-				_, err = f.svc.Request(ctx, source, id, "same-original-key")
+				_, err = f.svc.Request(ctx, source, reviewed(p.Preview, "same-original-key"))
 			}
-			if !errors.Is(err, value.ErrProcessingCoverage) || f.admissions.Load() != 0 || len(f.accepted) != 0 || preview && len(f.previews) != 0 {
+			if !errors.Is(err, value.ErrProcessingCoverage) || f.admissions.Load() != 0 || len(f.accepted) != 0 {
 				t.Fatal("known short coverage reached draft/admission", err)
-			}
-			if !preview && f.previews[id].Intent.RequestedSeconds != 60 {
-				t.Fatal("caller retention was silently shortened")
 			}
 		})
 	}
@@ -77,13 +73,13 @@ func TestContextProcessingCoveragePreservesPassiveAcceptedReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := f.svc.Request(ctx, source, p.Preview.ID, "original")
+	a, err := f.svc.Request(ctx, source, reviewed(p.Preview, "original"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	calls := r.calls
 	r.err = value.ErrUnavailable
-	b, err := f.svc.Request(ctx, source, p.Preview.ID, "original")
+	b, err := f.svc.Request(ctx, source, reviewed(p.Preview, "original"))
 	if err != nil || !b.Replay || b.CaptureID != a.CaptureID || r.calls != calls || f.admissions.Load() != 1 {
 		t.Fatal("historical replay attempted fresh processing admission", err)
 	}
@@ -109,7 +105,7 @@ func TestContextProcessingCoverageRejectsMissingChangedLateAndCancelledRead(t *t
 				r.after = func(*value.ProcessingCoverage) { cancel() }
 			}
 			_, err := f.svc.Preview(ctx, source, f.intent())
-			if !errors.Is(err, value.ErrUnavailable) || len(f.previews) != 0 || f.admissions.Load() != 0 {
+			if !errors.Is(err, value.ErrUnavailable) || f.admissions.Load() != 0 {
 				t.Fatal("invalid coverage read reached a draft", err)
 			}
 		})
@@ -123,7 +119,7 @@ func TestContextProcessingCoverageExpiredIdentityMasksKnownLimitation(t *testing
 	reader := &coverageReadFixture{f: f, err: value.ErrProcessingCoverage, after: func(o *value.ProcessingCoverage) { f.now = o.FreshUntil }}
 	f.svc.Processing = reader
 	_, err := f.svc.Preview(ctx, source, f.intent())
-	if !errors.Is(err, value.ErrUnavailable) || errors.Is(err, value.ErrProcessingCoverage) || len(f.previews) != 0 || f.admissions.Load() != 0 {
+	if !errors.Is(err, value.ErrUnavailable) || errors.Is(err, value.ErrProcessingCoverage) || f.admissions.Load() != 0 {
 		t.Fatal("expired identity disclosed known current coverage", err)
 	}
 }

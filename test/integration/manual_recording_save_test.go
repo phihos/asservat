@@ -60,7 +60,7 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 			manual := *a.RecordingSave
 			candidate.RecordingSave = &manual
 			candidate.RecordingSave.Initiator.VerifiedIdentity.Groups = []string{"not-a-current-maintainer"}
-			if _, err := admissions.AdmitReviewedContext(ctx, p.ID, candidate); err == nil {
+			if _, err := admissions.AdmitReviewedContext(ctx, p, candidate); err == nil {
 				t.Fatal("claimed eligibility bypassed current initiator permissions")
 			}
 			if got := readManualSaveCounters(t, ctx, f, policy); got != before {
@@ -72,7 +72,7 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 			manual := *a.RecordingSave
 			candidate.RecordingSave = &manual
 			candidate.RecordingSave.Policy.RecordingSaves = false
-			if _, err := admissions.AdmitReviewedContext(ctx, p.ID, candidate); err == nil {
+			if _, err := admissions.AdmitReviewedContext(ctx, p, candidate); err == nil {
 				t.Fatal("disabled recording save admitted")
 			}
 			if got := readManualSaveCounters(t, ctx, f, policy); got != before {
@@ -85,7 +85,7 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 		if accepted.Expectation.Snapshot == nil || !accepted.Expectation.Snapshot.T0.Equal(accepted.CreatedAt) || !accepted.CreatedAt.After(preview.CreatedAt) || !accepted.CreatedAt.After(preview.Intent.Snapshot.Request.T0) {
 			t.Fatal("manual T0 came from passive preview", accepted.CreatedAt, preview.CreatedAt)
 		}
-		replay, err := admissions.AdmitReviewedContext(ctx, preview.ID, original)
+		replay, err := admissions.AdmitReviewedContext(ctx, preview, original)
 		if err != nil || replay.CaptureID != accepted.CaptureID || !replay.CreatedAt.Equal(accepted.CreatedAt) || replay.Expectation.Snapshot == nil || !replay.Expectation.Snapshot.Equal(*accepted.Expectation.Snapshot) || replay.Expectation.Registration != accepted.Expectation.Registration {
 			t.Fatal("manual replay renewed first acceptance", replay, err)
 		}

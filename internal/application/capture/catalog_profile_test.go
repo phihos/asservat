@@ -96,7 +96,7 @@ func TestCatalogProfileStartFromStoredPreview(t *testing.T) {
 	f := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
+	base.svc.Admission, base.svc.Recorders = f, availableRecording{base}
 	base.svc.Filters = &stubFilters{}
 	ref := planning.ProfileRef{Catalog: "organization", Name: "team-network", Version: "v3"}
 	catalog := &catalogFixture{profiles: []planning.CatalogProfile{{Ref: ref, SourceClusterID: fixtureID(4), SourceNamespaceUID: "hub-ns", SourceUID: "org-profile", Document: organizationDocument(t, "team-network", "v3"), Enabled: true}}}
@@ -109,9 +109,7 @@ func TestCatalogProfileStartFromStoredPreview(t *testing.T) {
 		t.Fatal("preview", err, preview.Recordable)
 	}
 	p := preview.Preview
-	stored := f.previews[p.ID]
-	stored.Intent.Composition.Resolved = nil // as persisted (json:"-")
-	f.previews[p.ID] = stored
+	p.Intent.Composition.Resolved = nil // as serialized (json:"-")
 	if _, err = f.request(t, p, "start"); !errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 || catalog.reads != 2 {
 		t.Fatal("start from stored preview", err, catalog.reads)
 	}

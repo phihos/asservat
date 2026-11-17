@@ -39,8 +39,6 @@ type captureShareFixture struct {
 // published without one.
 func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario, setup func(*testing.T, func(*testing.T, *captureAdmissionScenario) capture.Accepted) captureShareFixture) {
 	t.Helper()
-	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
-	t.Cleanup(previewPool.Close)
 	hub := narrowRole(t, ctx, admin, "capture_share_hub_", "synthetic-capture-share-hub", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {
@@ -54,7 +52,7 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 	recipient := func(issuer string) []authorization.ShareRecipient {
 		return []authorization.ShareRecipient{{Kind: "User", Issuer: issuer, ID: "synthetic-capture-recipient"}}
 	}
-	// reviewed admits the scenario through a stored preview carrying sharing,
+	// reviewed admits the scenario with a reviewed preview carrying sharing,
 	// as request_capture does; owner adds the evidence-owner group.
 	reviewed := func(t *testing.T, s *captureAdmissionScenario, owner bool, notAfter time.Time) (capture.Accepted, error) {
 		t.Helper()
@@ -78,15 +76,8 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if !captureapp.ValidContextPreview(p) {
 			t.Fatal("invalid synthetic preview")
 		}
-		previews, err := postgres.NewContextPreviews(ctx, previewPool, a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = previews.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal(err)
-		}
 		s.a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
-		return s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+		return s.s.AdmitReviewedContext(ctx, p, s.a)
 	}
 	shares := func(t *testing.T, root string) []struct {
 		ID, Key                string

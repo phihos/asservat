@@ -191,13 +191,8 @@ export interface components {
             kind: "recordingSavePreview";
             /** @constant */
             operation: "recordingSave";
-            /** Format: uuid */
-            preview_id: string;
-            /** Format: uuid */
-            capture_id: string;
-            /** Format: date-time */
-            expires_at: string;
-            save_scope_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+            /** @description Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key. */
+            plan_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
             selected_recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
             windows: {
                 recording_handle: string;

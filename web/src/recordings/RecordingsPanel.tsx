@@ -3,7 +3,7 @@ import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import type { Target } from '../capture/http';
 import { Recordings, type Repeat } from './recordings';
-import type { SavePreview } from './http';
+import type { Input, SavePreview } from './http';
 
 const names: Record<string, string> = { packetCapture: 'Packet recording', syscallTrace: 'Syscall recording' };
 const blockers: Record<string, string> = {
@@ -26,7 +26,6 @@ function SaveAssessment({ preview }: { preview: SavePreview }) {
     </div>)}
     <p>Retention already counts the age of saved source data. Current rules and the original source audience still apply. Policy recurring sharing instructions are not inherited. Asservat cannot delete downloaded local copies.</p>
     <p>The preview does not pin history or reserve capacity. Rotation or network delay may produce missing coverage. The saved interval ends at the server’s actual acceptance time, which a retry cannot change.</p>
-    <p>Preview expires at {new Date(preview.expires_at).toLocaleTimeString()}.</p>
     {preview.blockers.map(code => <p className="notice" key={code}>{blockers[code] ?? code}</p>)}
     {!preview.capture_enabled && <p className="notice">Saving is not enabled for this client. An administrator can check the installation settings.</p>}
   </section>;
@@ -34,7 +33,7 @@ function SaveAssessment({ preview }: { preview: SavePreview }) {
 
 export function RecordingsPanel({ session, scope, target, repeat, submit, controller: provided }: {
   session: Session; scope: AbortSignal; target: Target; repeat?: Repeat;
-  submit: (previewID: string, captureID: string, expiresAt: string) => Promise<void>;
+  submit: (preview: Input<'preview_recording_save'>, digest: string) => Promise<void>;
   controller?: Recordings;
 }) {
   const [owned] = useState(() => new Recordings());

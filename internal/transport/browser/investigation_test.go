@@ -39,11 +39,10 @@ func (s *investigationSession) Resolve(ctx context.Context, cookie string, refre
 }
 
 type investigationCalls struct {
-	requests      int
-	collections   int
-	continuations int
-	after         func()
-	validUntil    time.Time
+	requests    int
+	collections int
+	after       func()
+	validUntil  time.Time
 }
 
 func (f *investigationCalls) CheckDiagnostic(context.Context, identities.CurrentIdentity, targets.WorkloadRequest) (time.Time, error) {
@@ -52,24 +51,9 @@ func (f *investigationCalls) CheckDiagnostic(context.Context, identities.Current
 func (f *investigationCalls) Preview(context.Context, identities.CurrentIdentity, value.ContextIntent) (captureapp.ContextPreviewResult, error) {
 	return captureapp.ContextPreviewResult{}, value.ErrUnavailable
 }
-func (f *investigationCalls) Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error) {
+func (f *investigationCalls) Request(context.Context, identities.CurrentIdentity, captureapp.CaptureRequest) (value.Accepted, error) {
 	f.collections++
 	return f.receipt()
-}
-func (f *investigationCalls) Continue(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
-	if _, err := current.ResolveIdentity(ctx); err != nil {
-		return value.Accepted{}, err
-	}
-	if preview != "00000000-0000-4000-8000-000000000020" || key != "stable-key" {
-		return value.Accepted{}, value.ErrInvalid
-	}
-	f.continuations++
-	return f.receipt()
-}
-
-func (f *investigationCalls) ResolveContextRequest(context.Context, identities.CurrentIdentity, string, string) (value.ContextRequestDisposition, error) {
-	a, e := f.receipt()
-	return value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: a.MetadataValidUntil}, e
 }
 func (f *investigationCalls) receipt() (value.Accepted, error) {
 	f.requests++
@@ -83,22 +67,21 @@ func (f *investigationCalls) receipt() (value.Accepted, error) {
 	return value.Accepted{MetadataValidUntil: until, CaptureID: "00000000-0000-4000-8000-000000000030"}, nil
 }
 func (f *investigationCalls) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
-	return value.ContextProgress{ValidUntil: time.Now().Add(time.Second), CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}, nil
+	until := f.validUntil
+	if until.IsZero() {
+		until = time.Now().Add(time.Second)
+	}
+	return value.ContextProgress{ValidUntil: until, CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}, nil
 }
 
 func TestInvestigationBrowserUsesCurrentSessionAndExactIdempotency(t *testing.T) {
-	for _, op := range []string{"request_capture", "resolve_capture_request"} {
-		t.Run(op, func(t *testing.T) { testInvestigationBrowserOperation(t, op, false) })
-	}
-	t.Run("explicit continuation", func(t *testing.T) { testInvestigationBrowserOperation(t, "request_capture", true) })
-}
-func testInvestigationBrowserOperation(t *testing.T, op string, continuation bool) {
+	const op = "request_capture"
 	var handler *InvestigationHandler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
-	sessions := &investigationSession{readOnly: op == "resolve_capture_request"}
+	sessions := &investigationSession{}
 	calls := &investigationCalls{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: op == "request_capture", Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,10 +89,8 @@ func testInvestigationBrowserOperation(t *testing.T, op string, continuation boo
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"stable-key"}`
-	if continuation {
-		body = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"stable-key","continue_acquisition":true}`
-	}
+	const request = `{"preview":{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"stable-key"`
+	body := request + "}"
 	makeRequest := func() *http.Request {
 		r, e := http.NewRequest("POST", server.URL+"/api/v1/operations/"+op, strings.NewReader(body))
 		if e != nil {
@@ -147,7 +128,7 @@ func testInvestigationBrowserOperation(t *testing.T, op string, continuation boo
 		"query":          func(r *http.Request) { r.URL.RawQuery = "x=y" },
 		"encoding":       func(r *http.Request) { r.Header.Set("Content-Encoding", "gzip") },
 		"unknown field": func(r *http.Request) {
-			r.Body = io.NopCloser(strings.NewReader(`{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"stable-key","sharing":{}}`))
+			r.Body = io.NopCloser(strings.NewReader(request + `,"sharing":{}}`))
 			r.ContentLength = -1
 		},
 	} {
@@ -160,15 +141,7 @@ func testInvestigationBrowserOperation(t *testing.T, op string, continuation boo
 			}
 		})
 	}
-	defer func() {
-		if (op == "resolve_capture_request" || continuation) && calls.collections != 0 {
-			t.Fatal("resolution invoked collection")
-		}
-	}()
 	code, b := send(makeRequest())
-	if continuation && calls.continuations != 1 {
-		t.Fatal("explicit continuation did not reach same-key port")
-	}
 	if code != 200 || calls.requests != 1 || !strings.Contains(b, `"phase":"Accepted"`) {
 		t.Fatalf("valid request: %d %s", code, b)
 	}
@@ -231,14 +204,13 @@ func TestInvestigationFinalIdentityShorteningReachesSocket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, err := http.NewRequest("POST", server.URL+"/api/v1/operations/resolve_capture_request", strings.NewReader(`{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"stable-key"}`))
+	req, err := http.NewRequest("POST", server.URL+"/api/v1/operations/get_capture", strings.NewReader(`{"capture_id":"00000000-0000-4000-8000-000000000030"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", server.URL)
 	req.Header.Set("X-CSRF-Token", strings.Repeat("C", 43))
-	req.Header.Set("Idempotency-Key", "stable-key")
 	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
 	// Fixture setup is outside the measured request. Retain the exact
 	// original2s/shorter1s intervals for the actual HTTP invocation.

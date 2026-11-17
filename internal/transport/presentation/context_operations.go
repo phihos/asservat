@@ -344,14 +344,14 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 	case errors.Is(err, value.ErrConflict):
 		return OperationFailure{"Conflict", "This submission conflicts with existing request or admission state. Keep the original preview and request key; do not assume an earlier attempt failed.", false}
 	case errors.Is(err, value.ErrPreviewExpired):
-		return OperationFailure{"PreviewExpired", "This preview is no longer valid for a new capture. An earlier attempt may still have been accepted. Keep the original preview and request key while resolving its outcome.", false}
+		return OperationFailure{"PreviewExpired", "The reviewed plan is no longer valid for a new capture. Retry the same request and key to see whether an earlier attempt was accepted, or preview again.", false}
 	case errors.Is(err, value.ErrChanged) && !request:
 		// A preview has no earlier review to resolve: an observation that
 		// changed or lapsed while it was assembled is a retryable unavailability
 		// (installed native 63/69), not ReviewChanged.
 		return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 	case errors.Is(err, value.ErrChanged):
-		return OperationFailure{"ReviewChanged", "The reviewed scope or current conditions changed. An earlier attempt may still have been accepted. Resolve the original request before reviewing a replacement.", false}
+		return OperationFailure{"ReviewChanged", "The reviewed plan or current conditions changed. Nothing new was accepted. Preview again to review the current plan.", false}
 	case errors.Is(err, value.ErrProcessingCoverage):
 		if request {
 			return OperationFailure{"ProcessingCoverageUnavailable", "Evidence cannot currently be kept for the selected duration. Check the original request's status before trying again; an earlier attempt may have been accepted.", false}
@@ -730,7 +730,7 @@ func (s *ContextOperations) previewCapture(ctx context.Context, current identiti
 // request submits the reviewed preview request of request_capture.
 func (s *ContextOperations) request(ctx context.Context, current identities.CurrentIdentity, in ContextOperationInput) (value.Accepted, error) {
 	plan, err := hex.DecodeString(in.ExpectedPlanDigest)
-	if in.Preview == nil || err != nil || len(plan) != len(artifact.Digest{}) {
+	if in.Preview == nil || err != nil || len(plan) != len(artifact.Digest{}) || artifact.Digest(plan) == (artifact.Digest{}) {
 		return value.Accepted{}, value.ErrInvalid
 	}
 	preview := *in.Preview

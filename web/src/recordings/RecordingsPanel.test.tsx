@@ -21,8 +21,8 @@ it('shows unknown coverage and the real current cap before selection, then sourc
   expect(submit).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Save last 30s now' }));
   const preview = savePreviewResult(); if (preview.status !== 'ok') throw new Error('fixture');
-  await vi.waitFor(() => expect(submit).toHaveBeenCalledWith(preview.data.preview_id, preview.data.capture_id, expect.any(String)));
-  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_recording_save', 'preview_recording_save']);
+  await vi.waitFor(() => expect(submit).toHaveBeenCalledWith({ recording_handles: ['source-1'] }, preview.data.plan_digest));
+  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_recording_save']);
 });
 it('does not silently remove a selected pod to satisfy a cap', async () => {
   const client = new SyntheticRecordings(); client.responder = name => name === 'list_recordings' ? inventoryResult([recording(), recording(2)]) : savePreviewResult();
@@ -49,8 +49,8 @@ it('opens recordings from the real target form and hands immediate save into cap
   vi.stubGlobal('fetch', fetcher);
   const client = new SyntheticOperations();
   client.responder = name => name === 'request_capture'
-    ? result<'request_capture'>({ capture_id: preview.data.capture_id, phase: 'Accepted', operation: 'recordingSave', navigation_uri: 'https://asservat.invalid/captures/' + preview.data.capture_id })
-    : result<'get_capture'>({ capture_id: preview.data.capture_id, revision: 1, phase: 'Finalizing', operation: 'recordingSave', actions: [{ action_id: 'traffic', phase: 'Finalizing' }], can_cancel: false, blockers: [], retry_after_seconds: 5, navigation_uri: 'https://asservat.invalid/captures/' + preview.data.capture_id });
+    ? result<'request_capture'>({ capture_id: id(8), phase: 'Accepted', operation: 'recordingSave', navigation_uri: 'https://asservat.invalid/captures/' + id(8) })
+    : result<'get_capture'>({ capture_id: id(8), revision: 1, phase: 'Finalizing', operation: 'recordingSave', actions: [{ action_id: 'traffic', phase: 'Finalizing' }], can_cancel: false, blockers: [], retry_after_seconds: 5, navigation_uri: 'https://asservat.invalid/captures/' + id(8) });
   const investigation = new Investigation(client, () => id(6));
   const view = render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={investigation}/>);
   fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
@@ -64,8 +64,8 @@ it('opens recordings from the real target form and hands immediate save into cap
   fireEvent.click(await screen.findByRole('button', { name: 'Save last 30s now' }));
   await screen.findByRole('heading', { name: 'Recording save progress' });
   expect(client.calls.map(call => call.name)).toEqual(['request_capture', 'get_capture']);
-  expect(client.calls[0].input).toEqual({ preview_id: preview.data.preview_id, idempotency_key: id(6) });
-  expect(fetcher.mock.calls.map(call => call[0])).toEqual(['/api/v1/operations/list_recordings', '/api/v1/operations/preview_recording_save', '/api/v1/operations/preview_recording_save']);
+  expect(client.calls[0].input).toEqual({ preview: { recording_handles: ['source-1'] }, expected_plan_digest: preview.data.plan_digest, idempotency_key: id(6) });
+  expect(fetcher.mock.calls.map(call => call[0])).toEqual(['/api/v1/operations/list_recordings', '/api/v1/operations/preview_recording_save']);
   view.unmount(); investigation.reset();
 });
 

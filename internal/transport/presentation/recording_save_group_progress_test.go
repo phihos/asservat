@@ -111,7 +111,7 @@ func TestRecordingSaveGroupedPreviewKeepsPerSourceWindowsWithoutParentArtifact(t
 		t.Fatal(err)
 	}
 	var envelope struct{ Data RecordingSavePreviewData }
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Data.CaptureID != f.result.Preview.CaptureID || len(envelope.Data.Selected) != 2 || len(envelope.Data.Windows) != 2 || envelope.Data.Windows[0].Before != "20s" || envelope.Data.Windows[1].Before != "10s" {
+	if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.PlanDigest) != 64 || len(envelope.Data.Selected) != 2 || len(envelope.Data.Windows) != 2 || envelope.Data.Windows[0].Before != "20s" || envelope.Data.Windows[1].Before != "10s" {
 		t.Fatal("grouped preview collapsed windows or parent", string(reply.Body))
 	}
 	f.result.RecordingSave.Windows[1].Before = 11 * time.Second
@@ -152,12 +152,8 @@ func TestRecordingSaveGroupProgressRejectsSubstitutedOrDuplicateInstances(t *tes
 
 type recordingParentCaptureFixture struct{ *contextOperationFixture }
 
-func (f recordingParentCaptureFixture) Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error) {
+func (f recordingParentCaptureFixture) Request(context.Context, identities.CurrentIdentity, app.CaptureRequest) (value.Accepted, error) {
 	return value.Accepted{CaptureID: "00000000-0000-4000-8000-000000000030", MetadataValidUntil: f.metadataUntil, Group: &value.RecordingSaveGroupAccepted{Children: []value.Accepted{{CaptureID: "00000000-0000-4000-8000-000000000101"}, {CaptureID: "00000000-0000-4000-8000-000000000102"}}}}, nil
-}
-func (f recordingParentCaptureFixture) ResolveContextRequest(ctx context.Context, current identities.CurrentIdentity, p, key string) (value.ContextRequestDisposition, error) {
-	a, err := f.Request(ctx, current, p, key)
-	return value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: f.metadataUntil}, err
 }
 func TestRecordingSaveGroupReceiptExposesOnlyParent(t *testing.T) {
 	base, current := operationFixture(t, true)
@@ -166,7 +162,7 @@ func TestRecordingSaveGroupReceiptExposesOnlyParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"request_capture", "resolve_capture_request"} {
+	for _, name := range []string{"request_capture"} {
 		reply, err := ops.Call(t.Context(), current, name, json.RawMessage(wireRequest))
 		if err != nil {
 			t.Fatal(err)
@@ -280,7 +276,7 @@ func TestRecordingSaveSixteenSourcePreviewFitsResponseBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PreviewID: f.result.Preview.ID, CaptureID: f.result.Preview.CaptureID, ExpiresAt: f.result.Preview.SelectionUntil, ScopeDigest: hash(f.result.Preview.ScopeDigest), Selected: rows, Windows: windows, Assessment: assessment, Blockers: []string{}, NavigationURI: ops.PublicOrigin() + "/captures/new", IncidentPodCap: 16})
+	raw, _ := json.Marshal(RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PlanDigest: hash(f.result.Preview.ScopeDigest), Selected: rows, Windows: windows, Assessment: assessment, Blockers: []string{}, NavigationURI: ops.PublicOrigin() + "/captures/new", IncidentPodCap: 16})
 	t.Logf("maximum16-source preview (128handle/128PodUID/63PodName/63actionID/64retention refs perchild) data bytes=%d before envelope; configured bounds, not measured collector overhead", len(raw))
 	input, _ := json.Marshal(map[string]any{"recording_handles": handles})
 	reply, err := ops.Call(t.Context(), current, "preview_recording_save", input)

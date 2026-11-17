@@ -44,9 +44,9 @@ func (c consoleArgumentCurrent) ResolveIdentity(ctx context.Context) (identity.I
 }
 
 type consoleArgumentRequest struct {
-	Preview string                     `json:"preview"`
-	Key     string                     `json:"key"`
-	Access  authorization.ResultAccess `json:"access"`
+	Plan   artifact.Digest            `json:"plan"`
+	Key    string                     `json:"key"`
+	Access authorization.ResultAccess `json:"access"`
 }
 
 type consoleArgumentCaptures struct {
@@ -116,9 +116,6 @@ func (s *consoleArgumentCaptures) PreviewComposition(ctx context.Context, curren
 	s.preview, s.action = consoleCaptureID(50+s.previews), plan.Actions[0].ID
 	preview := capture.ContextPreview{ID: s.preview, Intent: intent, Deadline: now.Add(5 * time.Minute), ScopeDigest: plan.ScopeDigest, Target: target.Request}
 	s.mu.Unlock()
-	s.consoleSyntheticCaptures.mu.Lock()
-	s.drafts = map[string]bool{preview.ID: true}
-	s.consoleSyntheticCaptures.mu.Unlock()
 	return captureapp.RecorderPreviewResult{Preview: preview, Plan: plan, Assessment: assessment, ValidUntil: identity.Earlier(now.Add(5*time.Second), i.ValidUntil), Recordable: true}, nil
 }
 
@@ -126,17 +123,18 @@ func cloneConsoleArgumentAccess(a authorization.ResultAccess) authorization.Resu
 	a.ActionIDs, a.Operations = slices.Clone(a.ActionIDs), slices.Clone(a.Operations)
 	return a
 }
-func (s *consoleArgumentCaptures) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (capture.Accepted, error) {
+func (s *consoleArgumentCaptures) Request(ctx context.Context, current identities.CurrentIdentity, in captureapp.CaptureRequest) (capture.Accepted, error) {
+	access := in.Access
 	_, err := current.ResolveIdentity(ctx)
 	if err != nil || access == nil {
 		return capture.Accepted{}, capture.ErrDenied
 	}
 	s.mu.Lock()
-	if preview != s.preview || !slices.Equal(access.ActionIDs, []string{s.action}) || !slices.Contains(access.Operations, "syscall_query") || len(access.Operations) > 2 || access.MaxArtifacts != 1 || access.MaxBytes < 24576 || access.MaxOperations < 1 || !access.NotAfter.After(time.Now()) {
+	if in.Preview == nil || !slices.Equal(access.ActionIDs, []string{s.action}) || !slices.Contains(access.Operations, "syscall_query") || len(access.Operations) > 2 || access.MaxArtifacts != 1 || access.MaxBytes < 24576 || access.MaxOperations < 1 || !access.NotAfter.After(time.Now()) {
 		s.mu.Unlock()
 		return capture.Accepted{}, authorization.ErrGrantScope
 	}
-	input := consoleArgumentRequest{preview, key, cloneConsoleArgumentAccess(*access)}
+	input := consoleArgumentRequest{in.Plan, in.Key, cloneConsoleArgumentAccess(*access)}
 	if len(s.requests) > 0 && !reflect.DeepEqual(input, s.requests[0]) {
 		s.mu.Unlock()
 		return capture.Accepted{}, authorization.ErrGrantScope
@@ -147,7 +145,7 @@ func (s *consoleArgumentCaptures) RequestWithResultAccess(ctx context.Context, c
 	if !approved {
 		return capture.Accepted{}, authorization.ApprovalPendingError{GrantID: consoleCaptureID(41)}
 	}
-	return s.consoleSyntheticCaptures.Request(ctx, current, preview, key)
+	return s.consoleSyntheticCaptures.Request(ctx, current, in)
 }
 
 func consoleArgumentOperations(t *testing.T, origin string, service *consoleArgumentCaptures) *presentation.ContextOperations {

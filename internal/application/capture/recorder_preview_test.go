@@ -3,7 +3,6 @@ package capture
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -43,24 +42,7 @@ func TestCompositionPreviewIsPlanOnlyAndRequestRefused(t *testing.T) {
 		t.Fatal("composition preview reserved work or is not the reviewed plan")
 	}
 	if r.Assessment.PlanDigest != p.ScopeDigest || p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesDigest() || r.Assessment.ID != p.AssessmentID || p.Retention.Policies[0].UID != "baseline" {
-		t.Fatal("assessment or retention differs from the stored preview")
-	}
-	stored, ok := f.previews[p.ID]
-	if !ok || stored.Intent.Composition == nil {
-		t.Fatal("composition preview not persisted")
-	}
-	// The persisted blueprint survives the SQL adapter's strict decode and
-	// byte-exact re-encode (adapters/postgres previewRecord).
-	b, _ := json.Marshal(stored)
-	var decoded value.ContextPreview
-	d := json.NewDecoder(bytes.NewReader(b))
-	d.DisallowUnknownFields()
-	if d.Decode(&decoded) != nil || !ValidContextPreview(decoded) {
-		t.Fatal("blueprint does not decode strictly")
-	}
-	again, _ := json.Marshal(decoded)
-	if !bytes.Equal(again, b) {
-		t.Fatal("blueprint is not canonical across a round trip")
+		t.Fatal("assessment or retention differs from the preview")
 	}
 	// request_capture: refused before target, storage or admission work.
 	reads := f.targetReads.Load()
@@ -87,9 +69,6 @@ func TestCompositionErrorsFollowEligibility(t *testing.T) {
 	_, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(bad))
 	if !errors.Is(err, value.ErrDenied) || errors.As(err, &refusal) {
 		t.Fatal("composition refusal disclosed before eligibility", err)
-	}
-	if len(f.previews) != 0 {
-		t.Fatal("refused composition stored a preview")
 	}
 }
 
@@ -151,8 +130,8 @@ func TestRecorderPreviewOperationalFailureCannotStorePlanOnlyApproval(t *testing
 			recorder := &refusedRecorderPreview{availableRecording: availableRecording{f}, err: failure}
 			f.svc.Recorders = recorder
 			got, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"})))
-			if !errors.Is(err, failure) || got.Preview.ID != "" || len(f.previews) != 0 || filters.calls != 0 || f.admissions.Load() != 0 || recorder.calls != 1 {
-				t.Fatal("operational failure produced a frozen plan", err, len(f.previews), filters.calls, recorder.calls)
+			if !errors.Is(err, failure) || got.Preview.ID != "" || filters.calls != 0 || f.admissions.Load() != 0 || recorder.calls != 1 {
+				t.Fatal("operational failure produced a frozen plan", err, filters.calls, recorder.calls)
 			}
 		})
 	}
@@ -166,7 +145,7 @@ func TestRecorderPreviewExplicitUnsupportedRemainsPlanOnly(t *testing.T) {
 	recorder := &refusedRecorderPreview{availableRecording: availableRecording{f}, err: targets.ErrUnsupported}
 	f.svc.Recorders = recorder
 	got, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"})))
-	if err != nil || got.Recordable || got.Preview.ID == "" || len(f.previews) != 1 || filters.calls != 1 || got.Preview.Storage != (value.ContextStorageSelection{}) || f.admissions.Load() != 0 || recorder.calls != 1 {
-		t.Fatal("known unsupported capability lost plan-only preview", err, got.Recordable, len(f.previews))
+	if err != nil || got.Recordable || got.Preview.ID == "" || filters.calls != 1 || got.Preview.Storage != (value.ContextStorageSelection{}) || f.admissions.Load() != 0 || recorder.calls != 1 {
+		t.Fatal("known unsupported capability lost plan-only preview", err, got.Recordable)
 	}
 }

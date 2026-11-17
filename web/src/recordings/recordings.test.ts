@@ -43,12 +43,11 @@ it('sends only exact opaque handles and a shorter positive window, with no recip
   expect(client.calls.at(-1)).toMatchObject({ name: 'preview_recording_save', input: { recording_handles: ['source-1'], before: '10s' } });
   expect(controller.submittable).toBe(true);
 });
-it('blocks changed source/window/digest reviews and disabled capture rather than submitting an alternative', async () => {
+it('blocks changed source/window reviews and disabled capture rather than submitting an alternative', async () => {
   const { client, controller } = await loaded(); controller.select(recording(), true);
   for (const mutate of [
     (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.selected_recordings[0].pod_uid = 'replacement'; },
     (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.windows[0].recording_handle = 'replacement'; },
-    (value: ReturnType<typeof savePreviewResult>) => { if (value.status === 'ok') value.data.capture_assessment.planDigest = 'd'.repeat(64); },
   ]) {
     client.responder = () => { const value = savePreviewResult(); mutate(value); return value; };
     await controller.review(); expect(controller.submittable).toBe(false); expect(controller.snapshot().error).toMatch(/selection or window changed/);
@@ -82,23 +81,11 @@ it('repeats with fresh policy inventory and carries only protected lineage into 
   controller.select(recording(), true); await controller.review();
   expect(client.calls[1].input).toEqual({ recording_handles: ['source-1'], before: '30s', repeated_from_capture_id: 'old-capture' });
 });
-it('an immediate save uses a fresh preview identity without another review when disclosures match', async () => {
-  const { id } = await import('../capture/test-fixtures');
-  const { client, controller } = await loaded(); controller.select(recording(), true); let generation = 0;
-  client.responder = () => { const value = savePreviewResult(); if (value.status === 'ok') { value.data.preview_id = id(200 + ++generation); value.data.capture_id = id(300 + generation); } return value; };
-  await controller.review(); const previous = controller.snapshot().preview!;
-  const submit = vi.fn().mockResolvedValue(undefined); await controller.save(submit);
-  expect(submit).toHaveBeenCalledWith(id(202), id(302), expect.any(String));
-  expect(controller.snapshot().preview?.preview_id).not.toBe(previous.preview_id);
-  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_recording_save', 'preview_recording_save']);
-});
-it('a changed handling disclosure stops immediate admission and leaves the new review visible', async () => {
+it('saves the reviewed preview input and plan digest without another preview', async () => {
   const { client, controller } = await loaded(); controller.select(recording(), true); await controller.review();
-  client.responder = () => { const value = savePreviewResult(); if (value.status === 'ok') value.data.capture_assessment.actions[0].retention.accessAgeSeconds--; return value; };
-  const submit = vi.fn(); await controller.save(submit);
-  expect(submit).not.toHaveBeenCalled(); expect(controller.snapshot().preview).toBeDefined();
-  expect(controller.snapshot().error).toMatch(/assessment changed/);
-  expect(client.calls).toHaveLength(3);
+  const submit = vi.fn().mockResolvedValue(undefined); await controller.save(submit);
+  expect(submit).toHaveBeenCalledWith({ recording_handles: ['source-1'] }, controller.snapshot().preview!.plan_digest);
+  expect(client.calls.map(call => call.name)).toEqual(['list_recordings', 'preview_recording_save']);
 });
 
 it('preserves reason scalars verbatim, omits empty input and clears it on fresh repeat', async () => {

@@ -152,13 +152,6 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	if !captureapp.ValidContextPreview(p) {
 		t.Fatal("invalid real mixed preview")
 	}
-	previews, err := postgres.NewContextPreviews(ctx, b.roles["hub-runtime"], p.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(ctx, p); err != nil {
-		t.Fatal("persist mixed preview under compiled hub role", err)
-	}
 	grants, err := postgres.NewAccessGrants(ctx, b.roles["hub-runtime"], p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
