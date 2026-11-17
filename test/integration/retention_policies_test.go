@@ -107,6 +107,23 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal("stricter policy audit row", n, shortened)
 		}
 
+		// A rejected policy next to valid ones is stored with its audit row
+		// and changes no deadline; the valid ones stay in force, and the
+		// admission trigger below skips it.
+		rejected := privacy.ScopedPolicy{Name: "rejected", Policy: privacy.Policy{Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{3}}}, Scope: privacy.PolicyScope{ClusterIDs: []string{cluster}}, Rejected: privacy.RejectedPolicy}
+		if err = store.SyncRetentionPolicies(ctx, []privacy.ScopedPolicy{baseline, strict, rejected}); err != nil {
+			t.Fatal(err)
+		}
+		if n, shortened := events(rejected.Policy.Revision.UID, "rejected"); n != 1 || shortened != 0 {
+			t.Fatal("rejected policy audit row", n, shortened)
+		}
+		if _, e, d := deadlines(attempt); !e.Equal(e1) || !d.Equal(d1) {
+			t.Fatal("rejected policy changed a deadline")
+		}
+		if stored, err = preview.CurrentRetentionPolicies(ctx); err != nil || len(stored) != 3 {
+			t.Fatal("stored set with a rejected policy", stored, err)
+		}
+
 		// An admission resolved under the older, longer policy set: the
 		// trigger applies the stored stricter policy in its transaction.
 		next := s.a

@@ -73,15 +73,22 @@ func (s *RetentionPolicies) SyncRetentionPolicies(ctx context.Context, policies 
 			}
 			delete(stored, rev.UID)
 			policy, _ := json.Marshal(p)
-			effect, _ := json.Marshal(value.Effect(p))
+			// A rejected policy is stored with a JSON null effect: it blocks
+			// new collection in its scope and changes no deadline.
+			effect, change, n := []byte("null"), "rejected", int64(0)
+			if p.Rejected == "" {
+				effect, _ = json.Marshal(value.Effect(p))
+				change = "applied"
+			}
 			if err = q.UpsertRetentionPolicy(ctx, custodydb.UpsertRetentionPolicyParams{Uid: rev.UID, Name: p.Name, Generation: rev.Generation, Digest: rev.Digest[:], Policy: policy, Effect: effect}); err != nil {
 				return err
 			}
-			n, err := q.ApplyRetentionEffect(ctx, effect)
-			if err != nil {
-				return err
+			if p.Rejected == "" {
+				if n, err = q.ApplyRetentionEffect(ctx, effect); err != nil {
+					return err
+				}
 			}
-			if err = q.InsertRetentionPolicyEvent(ctx, custodydb.InsertRetentionPolicyEventParams{Uid: rev.UID, Name: p.Name, Generation: rev.Generation, Digest: rev.Digest[:], Change: "applied", Shortened: n}); err != nil {
+			if err = q.InsertRetentionPolicyEvent(ctx, custodydb.InsertRetentionPolicyEventParams{Uid: rev.UID, Name: p.Name, Generation: rev.Generation, Digest: rev.Digest[:], Change: change, Shortened: n}); err != nil {
 				return err
 			}
 		}

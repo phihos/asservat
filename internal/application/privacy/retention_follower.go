@@ -41,11 +41,14 @@ type RetentionStore interface {
 // deadlines (ADR-330 D12): list, store, then watch from the list's
 // resourceVersion and store the complete set after each event. A failed
 // list, watch or store lists again after a backoff, so an event missed
-// during an outage converges on the next list.
+// during an outage converges on the next list. Each rejected policy
+// generation is reported once.
 type RetentionFollower struct {
 	Source RetentionSource
 	Store  RetentionStore
 	Report func(string, error)
+	// Rejected reports a policy generation the follower stored as rejected.
+	Rejected func(value.ScopedPolicy)
 }
 
 // retentionBackoff bounds retries against an unavailable API server or
@@ -54,12 +57,16 @@ var retentionBackoff = []time.Duration{time.Second, 2 * time.Second, 5 * time.Se
 
 func (f RetentionFollower) Run(ctx context.Context) {
 	failures := 0
+	reported := map[string]int64{}
 	for ctx.Err() == nil {
-		stage, stored, err := f.follow(ctx)
+		stage, progressed, err := f.follow(ctx, reported)
 		if ctx.Err() != nil {
 			return
 		}
-		if stored {
+		// Only a watch that delivered an event or ended normally resets the
+		// backoff: a list and store followed by an immediate watch failure
+		// (410 Gone, malformed event) keeps backing off.
+		if progressed {
 			failures = 0
 		}
 		if f.Report != nil {
@@ -77,8 +84,8 @@ func (f RetentionFollower) Run(ctx context.Context) {
 	}
 }
 
-// follow reports the failed stage and whether the set was stored first.
-func (f RetentionFollower) follow(ctx context.Context) (string, bool, error) {
+// follow reports the failed stage and whether its watch made progress.
+func (f RetentionFollower) follow(ctx context.Context, reported map[string]int64) (string, bool, error) {
 	list, rv, err := f.Source.ListRetentionPolicies(ctx)
 	if err != nil {
 		return "list", false, err
@@ -87,30 +94,35 @@ func (f RetentionFollower) follow(ctx context.Context) (string, bool, error) {
 	for _, p := range list {
 		current[p.Policy.Revision.UID] = p
 	}
-	if err = f.store(ctx, current); err != nil {
+	if err = f.store(ctx, current, reported); err != nil {
 		return "store", false, err
 	}
+	progressed := false
 	for ctx.Err() == nil {
 		w, err := f.Source.WatchRetentionPolicies(ctx, rv)
 		if err != nil {
-			return "watch", true, err
+			return "watch", progressed, err
 		}
-		rv, err = f.drain(ctx, w, rv, current)
+		var events int
+		rv, events, err = f.drain(ctx, w, rv, current, reported)
 		w.Close()
+		progressed = progressed || events > 0 || errors.Is(err, io.EOF)
 		if !errors.Is(err, io.EOF) {
-			return "watch", true, err
+			return "watch", progressed, err
 		}
 	}
-	return "", true, ctx.Err()
+	return "", progressed, ctx.Err()
 }
 
 // drain stores the set after every policy event and returns the last
-// resourceVersion; io.EOF means the watch ended normally.
-func (f RetentionFollower) drain(ctx context.Context, w RetentionWatch, rv string, current map[string]value.ScopedPolicy) (string, error) {
+// resourceVersion and the number of stored events; io.EOF means the watch
+// ended normally.
+func (f RetentionFollower) drain(ctx context.Context, w RetentionWatch, rv string, current map[string]value.ScopedPolicy, reported map[string]int64) (string, int, error) {
+	events := 0
 	for {
 		e, err := w.Next(ctx)
 		if err != nil {
-			return rv, err
+			return rv, events, err
 		}
 		rv = e.ResourceVersion
 		switch e.Type {
@@ -121,13 +133,14 @@ func (f RetentionFollower) drain(ctx context.Context, w RetentionWatch, rv strin
 		default:
 			current[e.Policy.Policy.Revision.UID] = e.Policy
 		}
-		if err = f.store(ctx, current); err != nil {
-			return rv, err
+		if err = f.store(ctx, current, reported); err != nil {
+			return rv, events, err
 		}
+		events++
 	}
 }
 
-func (f RetentionFollower) store(ctx context.Context, current map[string]value.ScopedPolicy) error {
+func (f RetentionFollower) store(ctx context.Context, current map[string]value.ScopedPolicy, reported map[string]int64) error {
 	set := make([]value.ScopedPolicy, 0, len(current))
 	for _, p := range current {
 		set = append(set, p)
@@ -135,5 +148,20 @@ func (f RetentionFollower) store(ctx context.Context, current map[string]value.S
 	slices.SortFunc(set, func(a, b value.ScopedPolicy) int {
 		return strings.Compare(a.Policy.Revision.UID, b.Policy.Revision.UID)
 	})
-	return f.Store.SyncRetentionPolicies(ctx, set)
+	if err := f.Store.SyncRetentionPolicies(ctx, set); err != nil {
+		return err
+	}
+	for _, p := range set {
+		uid, generation := p.Policy.Revision.UID, p.Policy.Revision.Generation
+		if p.Rejected != "" && reported[uid] != generation && f.Rejected != nil {
+			f.Rejected(p)
+		}
+		reported[uid] = generation
+	}
+	for uid := range reported {
+		if _, ok := current[uid]; !ok {
+			delete(reported, uid)
+		}
+	}
+	return nil
 }

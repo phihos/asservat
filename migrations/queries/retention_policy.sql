@@ -4,8 +4,10 @@
 -- name: ListRetentionPolicies :many
 SELECT uid,name,generation,digest,policy FROM retention_policy ORDER BY uid;
 
+-- The follower holds the retention advisory lock exclusively while it
+-- changes and applies policies; admissions hold it shared (00190).
 -- name: LockRetentionPolicies :exec
-LOCK TABLE retention_policy IN SHARE ROW EXCLUSIVE MODE;
+SELECT pg_advisory_xact_lock(hashtext('asservat.retention_policy'));
 
 -- name: UpsertRetentionPolicy :exec
 INSERT INTO retention_policy(uid,name,generation,digest,policy,effect)

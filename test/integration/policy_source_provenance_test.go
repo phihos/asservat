@@ -251,7 +251,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 	})
 }
 
-
 func source107AddReader(t *testing.T, ctx context.Context, f *capacitySQLFixture, subject string) {
 	t.Helper()
 	batch := policyRecorderCloneBatch(f.batch)

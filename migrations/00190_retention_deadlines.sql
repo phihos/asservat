@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS retention_policy_event (
  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  uid text NOT NULL, name text NOT NULL, generation bigint NOT NULL,
  digest bytea NOT NULL CHECK(octet_length(digest)=32),
- change text NOT NULL CHECK(change IN ('applied','removed')),
+ change text NOT NULL CHECK(change IN ('applied','rejected','removed')),
  shortened bigint NOT NULL CHECK(shortened>=0),
  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
@@ -106,20 +106,28 @@ LANGUAGE sql STABLE SET search_path=pg_catalog,pg_temp AS $$
 $$;
 -- +goose StatementEnd
 
--- A new artifact is never longer than any stored policy allows. The hub
--- worker locks retention_policy while it changes policies and applies them;
--- admissions take a share lock here, so a policy committed during an
--- admission either reaches this trigger or sees the admitted row.
+-- A new artifact never outlives the strictest stored policy that covers
+-- its cluster. Why this holds without a table lock: the hub worker takes
+-- the retention advisory lock exclusively for its whole policy transaction
+-- (store, then shorten every matching stored row); this trigger takes it
+-- shared until the admission commits. Admissions never wait for each other.
+-- A policy transaction that commits first is visible to this trigger; an
+-- admission that holds the shared lock first commits before the worker's
+-- shortening statement starts, so that statement sees the admitted row.
+-- Only policies whose cluster scope covers the row are evaluated; their
+-- earliest deadlines are applied in one update. Rejected policies (effect
+-- JSON null) change no deadline.
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION public.apply_retention_policies() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE p jsonb;
+DECLARE c text;
 BEGIN
- LOCK TABLE public.retention_policy IN SHARE MODE;
- FOR p IN SELECT r.effect FROM public.retention_policy r LOOP
-  UPDATE public.custody_attempt a SET effective_expires_at=e.expires_at, effective_delete_by=e.delete_by
-  FROM public.retention_policy_effect(p, NEW.attempt_id) e
-  WHERE a.id=e.attempt_id AND (e.expires_at<a.effective_expires_at OR e.delete_by<a.effective_delete_by);
- END LOOP;
+ PERFORM pg_advisory_xact_lock_shared(hashtext('asservat.retention_policy'));
+ SELECT a.cluster_id::text INTO c FROM public.custody_attempt a WHERE a.id=NEW.attempt_id;
+ UPDATE public.custody_attempt a SET effective_expires_at=e.expires_at, effective_delete_by=e.delete_by
+ FROM (SELECT min(x.expires_at) AS expires_at, min(x.delete_by) AS delete_by
+  FROM public.retention_policy r, LATERAL public.retention_policy_effect(r.effect, NEW.attempt_id) x
+  WHERE jsonb_typeof(r.effect)='object' AND (jsonb_array_length(r.effect->'clusters')=0 OR r.effect->'clusters' ? c)) e
+ WHERE a.id=NEW.attempt_id AND (e.expires_at<a.effective_expires_at OR e.delete_by<a.effective_delete_by);
  RETURN NULL;
 END $$;
 -- +goose StatementEnd

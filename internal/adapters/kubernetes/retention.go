@@ -2,6 +2,8 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"slices"
 	"strings"
 	"time"
@@ -25,14 +27,38 @@ func NewRetentionClient(client *PermissionClient) (*RetentionClient, error) {
 	}
 	return &RetentionClient{client}, nil
 }
-// policy decodes one observed policy; one the domain rejects (for example a
-// deletion budget not below its maximum) is invalid here, not at storage.
-func (c *RetentionClient) policy(o permissionObject, ref configvalue.Resource) (value.ScopedPolicy, error) {
+
+// policy decodes one observed policy. One that fails the schema or the
+// domain rules (for example a deletion budget not below its maximum) is
+// kept as a rejected policy, so the valid ones still apply.
+func (c *RetentionClient) policy(o permissionObject, ref configvalue.Resource) value.ScopedPolicy {
 	p, err := retentionPolicy(c.client.validator, true, o, ref)
-	if err == nil && !p.Valid() {
-		return value.ScopedPolicy{}, value.ErrInvalid
+	if err == nil && p.Valid() {
+		return p
 	}
-	return p, err
+	reason := value.RejectedPolicy
+	if err != nil {
+		reason = value.RejectedSpec
+	}
+	return rejectedPolicy(o.Spec, ref, reason)
+}
+
+// rejectedPolicy keeps the cluster scope of an unusable policy when it is
+// readable; otherwise the policy covers every cluster (fail closed).
+func rejectedPolicy(spec []byte, ref configvalue.Resource, reason string) value.ScopedPolicy {
+	var s struct {
+		Scope struct {
+			ClusterIDs []string `json:"clusterIDs"`
+		} `json:"scope"`
+	}
+	scope := value.PolicyScope{}
+	if json.Unmarshal(spec, &s) == nil {
+		scope.ClusterIDs = s.Scope.ClusterIDs
+	}
+	if !scope.Valid() {
+		scope = value.PolicyScope{}
+	}
+	return value.ScopedPolicy{Name: ref.Name, Policy: value.Policy{Revision: identity.Revision{UID: ref.UID, Generation: ref.Generation, Digest: sha256.Sum256(spec)}}, Scope: scope, Rejected: reason}
 }
 
 // retentionPolicy decodes one EvidenceRetentionPolicy spec with the embedded
@@ -73,11 +99,7 @@ func (c *RetentionClient) ListRetentionPolicies(ctx context.Context) ([]value.Sc
 	}
 	out := make([]value.ScopedPolicy, 0, len(objects))
 	for i, o := range objects {
-		p, err := c.policy(o, refs[i])
-		if err != nil {
-			return nil, "", err
-		}
-		out = append(out, p)
+		out = append(out, c.policy(o, refs[i]))
 	}
 	slices.SortFunc(out, func(a, b value.ScopedPolicy) int {
 		return strings.Compare(a.Policy.Revision.UID, b.Policy.Revision.UID)

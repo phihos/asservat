@@ -75,8 +75,6 @@ func (w *retentionPolicyWatch) Next(ctx context.Context) (port.RetentionEvent, e
 		return out, nil
 	}
 	ref := value.Resource{ClusterID: w.client.client.clusterID, Namespace: m.Namespace, NamespaceUID: w.client.client.control.UID, Kind: "EvidenceRetentionPolicy", Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting}
-	if out.Policy, err = w.client.policy(o, ref); err != nil {
-		return port.RetentionEvent{}, value.ErrChanged
-	}
+	out.Policy = w.client.policy(o, ref)
 	return out, nil
 }

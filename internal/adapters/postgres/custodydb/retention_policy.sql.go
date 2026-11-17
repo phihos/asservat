@@ -99,9 +99,11 @@ func (q *Queries) ListRetentionPolicies(ctx context.Context) ([]ListRetentionPol
 }
 
 const lockRetentionPolicies = `-- name: LockRetentionPolicies :exec
-LOCK TABLE retention_policy IN SHARE ROW EXCLUSIVE MODE
+SELECT pg_advisory_xact_lock(hashtext('asservat.retention_policy'))
 `
 
+// The follower holds the retention advisory lock exclusively while it
+// changes and applies policies; admissions hold it shared (00190).
 func (q *Queries) LockRetentionPolicies(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockRetentionPolicies)
 	return err

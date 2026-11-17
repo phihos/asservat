@@ -41,6 +41,8 @@ func newRetentionWorker(ctx context.Context, root string, pools map[string]*pgxp
 	}
 	worker := &retentionWorker{follower: privacyapp.RetentionFollower{Source: policies, Store: store, Report: func(stage string, err error) {
 		retentionDiagnostic(stage, err)
+	}, Rejected: func(p privacy.ScopedPolicy) {
+		fmt.Fprintf(os.Stderr, "hub-worker retention: EvidenceRetentionPolicy %s generation %d rejected (%s); collection in its clusters is refused until it is fixed\n", p.Name, p.Policy.Revision.Generation, p.Rejected)
 	}}}
 	if signing != nil {
 		lifecycle, err := postgres.NewRetention(ctx, pools["retention-lifecycle-audit"], root)

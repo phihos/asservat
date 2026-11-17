@@ -30,7 +30,7 @@ type bridgeFixture struct {
 	admissions, starts, polls, observations, batches, claims, reads, completions int
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
-	queryErr, claimErr, closeErr, permitErr, errorAfterRead           error
+	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
 	routeHook, planHook, claimHook                                               func(context.Context)

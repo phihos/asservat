@@ -101,3 +101,20 @@ func TestPlanAndSummarizePreview(t *testing.T) {
 		t.Fatal("summary", out)
 	}
 }
+
+// A rejected policy refuses collection in its cluster scope only.
+func TestMatchPoliciesRefusesCoveringRejectedPolicy(t *testing.T) {
+	target := authorization.Target{ClusterID: matchCluster, NamespaceUID: "ns", WorkloadUID: "app", PodUID: "pod"}
+	base := scoped("base", PolicyScope{}, 86400)
+	rejected := ScopedPolicy{Name: "bad", Policy: Policy{Revision: identity.Revision{UID: "bad", Generation: 1, Digest: artifact.Digest{1}}}, Scope: PolicyScope{ClusterIDs: []string{otherCluster}}, Rejected: RejectedSpec}
+	if !rejected.Valid() {
+		t.Fatal("rejected policy invalid")
+	}
+	if set, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); err != nil || len(set.Policies) != 1 {
+		t.Fatal("rejected policy outside the scope blocked collection", err)
+	}
+	rejected.Scope = PolicyScope{}
+	if _, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("covering rejected policy admitted", err)
+	}
+}

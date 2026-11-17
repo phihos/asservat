@@ -9,13 +9,18 @@ policy. The hub-worker `RetentionFollower` lists and watches
 `EvidenceRetentionPolicy` and stores the set; each new or changed policy
 shortens matching deadlines with one `retention_policy_effect` update in the
 same transaction, and an admission trigger applies stored policies to each new
-capture. `RetentionProof`, `RetentionTransactionGuard`, retention topology
+capture (taking a shared advisory lock that the follower holds exclusively,
+and evaluating only policies covering the row's cluster). An invalid policy
+is stored as rejected: the valid ones apply, the rejected one refuses new
+collection in its cluster scope (all clusters when unreadable) and is logged
+once per generation. `RetentionProof`, `RetentionTransactionGuard`, retention topology
 contracts and schema, accepted-source readiness, per-read re-resolution and
 the key-service/publisher catalog polling loops are gone. Verified: focused custody
 (`^d`, retention, deletion, publication, history: 98 subtests pass), goose
 up/down-to 125/up on PostgreSQL 17, `make go-check pcap-check` and the CI
 gate set.
-Open: label selectors (no label reader; a labeled policy refuses collection in
+Open: policy status writes (no RBAC or status code yet; the log line is the
+signal), label selectors (no label reader; a labeled policy refuses collection in
 its clusters and applies cluster-wide to existing evidence), connector-pushed
 local policies, one-step publication.
 

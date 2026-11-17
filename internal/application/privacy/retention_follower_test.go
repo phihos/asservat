@@ -81,3 +81,43 @@ func TestRetentionFollowerAppliesEventsToCompleteSet(t *testing.T) {
 		}
 	}
 }
+
+// Only a watch that delivered an event or ended normally counts as
+// progress, so an immediately failing watch keeps backing off.
+func TestRetentionFollowerProgressNeedsAWatchEvent(t *testing.T) {
+	for name, c := range map[string]struct {
+		watch *followerWatch
+		want  bool
+	}{
+		"immediate-error":  {&followerWatch{end: errors.New("gone")}, false},
+		"event-then-error": {&followerWatch{events: []RetentionEvent{{Type: "ADDED", ResourceVersion: "11", Policy: followerPolicy("b")}}, end: errors.New("gone")}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &followerFixture{cancel: func() {}, queue: []*followerWatch{c.watch}}
+			if _, progressed, err := (RetentionFollower{Source: f, Store: f}).follow(context.Background(), map[string]int64{}); err == nil || progressed != c.want {
+				t.Fatal(progressed, err)
+			}
+		})
+	}
+}
+
+// A rejected policy generation is reported once; a new generation again.
+func TestRetentionFollowerReportsEachRejectedGenerationOnce(t *testing.T) {
+	bad := followerPolicy("bad")
+	bad.Rejected = value.RejectedSpec
+	var got []int64
+	f := &followerFixture{}
+	r := RetentionFollower{Store: f, Rejected: func(p value.ScopedPolicy) { got = append(got, p.Policy.Revision.Generation) }}
+	reported := map[string]int64{}
+	current := map[string]value.ScopedPolicy{"bad": bad}
+	for _, generation := range []int64{1, 1, 2} {
+		bad.Policy.Revision.Generation = generation
+		current["bad"] = bad
+		if err := r.store(context.Background(), current, reported); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !slices.Equal(got, []int64{1, 2}) {
+		t.Fatal(got)
+	}
+}

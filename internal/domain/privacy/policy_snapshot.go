@@ -23,7 +23,17 @@ type ScopedPolicy struct {
 	CaseDefaultSeconds, CaseMaximumSeconds   int64
 	AuditDefaultSeconds, AuditMaximumSeconds int64
 	LegalExceptions                          string
+	// Rejected names why the hub worker could not accept the object
+	// (RejectedSpec: schema; RejectedPolicy: domain rules). A rejected
+	// policy changes no stored deadline and refuses new collection in its
+	// cluster scope, which is every cluster when the scope is unreadable.
+	Rejected string `json:",omitempty"`
 }
+
+const (
+	RejectedSpec   = "RejectedSpec"
+	RejectedPolicy = "RejectedPolicy"
+)
 
 func (s PolicyScope) Empty() bool {
 	return len(s.ClusterIDs) == 0 && len(s.NamespaceLabels) == 0 && len(s.WorkloadLabels) == 0
@@ -54,13 +64,17 @@ func (s PolicyScope) Covers(cluster string) bool {
 }
 
 func (p ScopedPolicy) Valid() bool {
+	if p.Rejected != "" {
+		return identity.Text(p.Name, 253) && p.Policy.Revision.Valid() && p.Scope.Valid() && !p.Policy.Baseline && (p.Rejected == RejectedSpec || p.Rejected == RejectedPolicy)
+	}
 	return identity.Text(p.Name, 253) && p.Policy.Valid() && p.Scope.Valid() && p.Policy.Baseline == p.Scope.Empty() && age(p.CaseDefaultSeconds) && age(p.CaseMaximumSeconds) && age(p.AuditDefaultSeconds) && age(p.AuditMaximumSeconds) && (p.LegalExceptions == "disabled" || p.LegalExceptions == "reviewed")
 }
 
 // MatchPolicies selects the policies of the current set that apply to the
 // target: every policy whose cluster scope covers it. Label selectors need
 // namespace and workload labels that no reader supplies yet, so a covering
-// labeled policy refuses new collection. Exactly one baseline is required.
+// labeled policy refuses new collection, as does a covering rejected policy
+// (it may be stricter than the others). Exactly one baseline is required.
 // revision identifies the matched set; the caller digests it.
 func MatchPolicies(policies []ScopedPolicy, t authorization.Target, revision func([]Policy) identity.Revision) (PolicySet, error) {
 	out := PolicySet{Target: t}
@@ -77,7 +91,7 @@ func MatchPolicies(policies []ScopedPolicy, t authorization.Target, revision fun
 		if !p.Scope.Covers(t.ClusterID) {
 			continue
 		}
-		if p.Scope.Labeled() {
+		if p.Scope.Labeled() || p.Rejected != "" {
 			return out, ErrUnavailable
 		}
 		if p.Policy.Baseline {
