@@ -2,16 +2,11 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/privacy"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -177,102 +172,6 @@ func (p *publicJourneyPools) Snapshot(parent context.Context, admin *pgxpool.Poo
 		return
 	}
 	p.t.Logf("journey SQL phase=%s database-connections=%d maximum=%d reserved=%d superuser-reserved=%d", phase, total, maximum, reserved, superuser)
-}
-
-// One actual ContextPublisher call owns these independent publication facets.
-// Each real adapter is constructed once, at its first use, and its pool closes
-// only after its last use. The gate is separately owned through all three checks.
-// These are finite publisher lifetimes, not changes to the shared public service.
-type publicJourneyPublication struct {
-	ctx    context.Context
-	pools  *publicJourneyPools
-	root   string
-	step   int
-	pool   *pgxpool.Pool
-	verify *postgres.ContextPublications
-	failed string // fixed labels of the first facet failure, diagnostics only
-}
-
-func (p *publicJourneyPublication) note(ctx context.Context, err error) {
-	if err != nil && p.failed == "" {
-		p.failed = fmt.Sprintf("step=%d reason=%s context=%s", p.step, journeyGateReason(err), journeyGateReason(ctx.Err()))
-	}
-}
-
-func newPublicJourneyPublication(ctx context.Context, pools *publicJourneyPools, root string) *publicJourneyPublication {
-	return &publicJourneyPublication{ctx: ctx, pools: pools, root: root}
-}
-func (p *publicJourneyPublication) Close() {
-	if p.pool != nil {
-		p.pool.Close()
-		p.pool = nil
-	}
-}
-func (p *publicJourneyPublication) open(ctx context.Context, role, password string) (*postgres.ContextPublications, error) {
-	if p.ctx.Err() != nil || ctx.Err() != nil || p.pool != nil {
-		return nil, privacy.ErrUnavailable
-	}
-	p.pool = p.pools.Open(role, password)
-	v, err := postgres.NewContextPublications(ctx, p.pool, p.root)
-	if err != nil {
-		p.Close()
-	}
-	return v, err
-}
-func (p *publicJourneyPublication) AcceptedContextForPublication(ctx context.Context, id string) (artifact.ContextExpectation, error) {
-	if p.step != 0 {
-		return artifact.ContextExpectation{}, privacy.ErrUnavailable
-	}
-	p.step = 1
-	v, err := p.open(ctx, "context_verify_runtime", "synthetic-context-verify")
-	if err != nil {
-		return artifact.ContextExpectation{}, err
-	}
-	p.verify = v
-	out, err := v.AcceptedContextForPublication(ctx, id)
-	p.note(ctx, err)
-	if err != nil {
-		p.Close()
-	}
-	return out, err
-}
-func (p *publicJourneyPublication) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, copies artifact.Copies, authority artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (audit.ContextVerification, error) {
-	if p.step != 1 || p.pool == nil || p.verify == nil {
-		return audit.ContextVerification{}, privacy.ErrUnavailable
-	}
-	p.step = 2
-	defer p.Close()
-	out, err := p.verify.RecordContextVerification(ctx, e, copies, authority, verified)
-	p.note(ctx, err)
-	return out, err
-}
-func (p *publicJourneyPublication) AcknowledgeContextVerification(ctx context.Context, v audit.ContextVerification, receipt audit.Receipt) error {
-	if p.step != 2 || p.pool != nil {
-		return privacy.ErrUnavailable
-	}
-	p.step = 3
-	a, err := p.open(ctx, "context_verification_audit_runtime", "synthetic-context-audit")
-	if err != nil {
-		return err
-	}
-	defer p.Close()
-	err = a.AcknowledgeContextVerification(ctx, v, receipt)
-	p.note(ctx, err)
-	return err
-}
-func (p *publicJourneyPublication) PublishContext(ctx context.Context, e artifact.ContextExpectation, copies artifact.Copies, authority artifact.PublicationAuthority) (artifact.PublishedContext, error) {
-	if p.step != 3 || p.pool != nil {
-		return artifact.PublishedContext{}, privacy.ErrUnavailable
-	}
-	p.step = 4
-	v, err := p.open(ctx, "context_publish_runtime", "synthetic-context-publish")
-	if err != nil {
-		return artifact.PublishedContext{}, err
-	}
-	defer p.Close()
-	out, err := v.PublishContext(ctx, e, copies, authority)
-	p.note(ctx, err)
-	return out, err
 }
 
 func TestPublicJourneyPoolRetirementIsFinal(t *testing.T) {

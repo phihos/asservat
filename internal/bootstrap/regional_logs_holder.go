@@ -142,6 +142,7 @@ func (h *ConnectorRecordings) runLogs(ctx context.Context, held *heldLogs, prepa
 	held.joined = true
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	out := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued, Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
+	prepared.AddFacts(&out.Completion)
 	if err != nil || !out.Valid(e.Registration) {
 		out = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "captureFailed"}
 		if errors.Is(err, targets.ErrChanged) {

@@ -62,8 +62,7 @@ func qualifyProfileUnavailableOutcome(t *testing.T, ctx context.Context, admin, 
 	var empty bool
 	var charged int64
 	if err := admin.QueryRow(ctx, `SELECT
- NOT EXISTS(SELECT 1 FROM context_verification WHERE capture_id=$1)
- AND NOT EXISTS(SELECT 1 FROM context_catalog WHERE capture_id=$1)
+ NOT EXISTS(SELECT 1 FROM context_catalog WHERE capture_id=$1)
  AND NOT EXISTS(SELECT 1 FROM context_writer_completion WHERE capture_id=$1)
  AND NOT EXISTS(SELECT 1 FROM custody_copy WHERE attempt_id=$2 AND ciphertext_bytes IS NOT NULL)
  AND NOT EXISTS(SELECT 1 FROM policy_observation_session WHERE capture_id=$1),

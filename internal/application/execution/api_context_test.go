@@ -259,7 +259,7 @@ func TestAPIContextRunnerOneEffectAndClosedKeys(t *testing.T) {
 	for range 8 {
 		wg.Go(func() {
 			out, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
-			if !(errors.Is(err, value.ErrPreparationUncertain) && out.State == "Indeterminate") && (err != nil || out.State != "StoredPendingVerification" && out.State != "AlreadyStarted") {
+			if !(errors.Is(err, value.ErrPreparationUncertain) && out.State == "Indeterminate") && (err != nil || out.State != "Published" && out.State != "AlreadyStarted") {
 				t.Errorf("%s %v", out.State, err)
 			}
 		})
@@ -288,7 +288,7 @@ func TestAPIContextRunnerNextOperationObservesIdentityChange(t *testing.T) {
 			f, s, current := apiRunner(t)
 			f.mode = mode
 			out, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
-			if err != nil || out.State != "StoredPendingVerification" || f.captures.Load() != 1 || f.stores.Load() != 1 {
+			if err != nil || out.State != "Published" || f.captures.Load() != 1 || f.stores.Load() != 1 {
 				t.Fatal("unobserved external change invalidated a live original observation", out, err)
 			}
 			// Both a new deny and an unavailable identity source are observed by
@@ -359,7 +359,7 @@ func TestAPIContextRunnerAcquiringOutputCapturesAtTheOutput(t *testing.T) {
 	f, s, current := apiRunner(t)
 	s.Output, s.Collector = acquiringOutput{f}, refusingCollector{t}
 	out, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
-	if err != nil || out.State != "StoredPendingVerification" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.record.Phase != "stored" || f.prepares.Load() != f.closes.Load() {
+	if err != nil || out.State != "Published" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.record.Phase != "stored" || f.prepares.Load() != f.closes.Load() {
 		t.Fatal("acquiring output", out.State, err, f.record.Phase)
 	}
 	for mode, phase := range map[string]string{"capture": "captureFailed", "write": "storeUnconfirmed"} {

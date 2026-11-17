@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/delivery"
@@ -21,7 +20,6 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/domain/artifact"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	executionvalue "asservat.local/asservat/internal/domain/execution"
@@ -30,65 +28,11 @@ import (
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
-// Test-only fixed-stage error diagnostics. Calls, arguments, contexts and
-// original errors are delegated unchanged; no extra authority or I/O is read.
-type snapshotPublicationTrace struct {
-	stage          string
-	failedAt       time.Time
-	authorityCalls int
-}
-
-func (s *snapshotPublicationTrace) failed(stage string, err error) {
-	if err != nil && s.stage == "" {
-		s.stage = stage
-		s.failedAt = time.Now().UTC().Truncate(time.Microsecond)
-	}
-}
-
-type snapshotPublicationLedgerTrace struct {
-	evidence.ContextPublicationFacets
-	trace *snapshotPublicationTrace
-}
-
-func (s snapshotPublicationLedgerTrace) AcceptedContextForPublication(ctx context.Context, id string) (artifact.ContextExpectation, error) {
-	out, err := s.ContextPublicationFacets.AcceptedContextForPublication(ctx, id)
-	s.trace.failed("accepted", err)
-	return out, err
-}
-func (s snapshotPublicationLedgerTrace) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (auditvalue.ContextVerification, error) {
-	out, err := s.ContextPublicationFacets.RecordContextVerification(ctx, e, c, a, verified)
-	s.trace.failed("record", err)
-	return out, err
-}
-func (s snapshotPublicationLedgerTrace) AcknowledgeContextVerification(ctx context.Context, r auditvalue.ContextVerification, receipt auditvalue.Receipt) error {
-	err := s.ContextPublicationFacets.AcknowledgeContextVerification(ctx, r, receipt)
-	s.trace.failed("acknowledge", err)
-	return err
-}
-func (s snapshotPublicationLedgerTrace) PublishContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (artifact.PublishedContext, error) {
-	out, err := s.ContextPublicationFacets.PublishContext(ctx, e, c, a)
-	s.trace.failed("publish", err)
-	return out, err
-}
-
-type snapshotPublicationGateTrace struct {
-	base  evidence.ContextPublicationGate
-	trace *snapshotPublicationTrace
-}
-
-func (s snapshotPublicationGateTrace) CheckContextPublication(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-	s.trace.authorityCalls++
-	out, err := s.base.CheckContextPublication(ctx, e)
-	s.trace.failed("authority", err)
-	return out, err
-}
-
 // Real SQL and encrypted object-store composition. Target, process and packet
 // observations remain synthetic fixture facts; no collector or native clock
 // qualification follows from this test. The caller supplies genuine reviewed
 // source admission, occurrence and capture acceptance, never hand-inserted rows.
 type sourceSnapshotCompletionState struct {
-	KeyServices       *contextKeyUnwrapServices
 	ObservationBefore int64
 	Executions        *postgres.APIContextExecutions
 	Execution         executionvalue.APIExecution
@@ -260,7 +204,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 
 func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, stage *sourceSnapshotCompletionState, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation)) {
 	t.Helper()
-	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
+	accepted, admission := snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	executions, execution, process := stage.Executions, stage.Execution, stage.Process
@@ -354,51 +298,16 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	if _, err = hub.Exec(ctx, `UPDATE context_capture SET snapshot_coverage=snapshot_coverage || $3 WHERE root_id=$1 AND id=$2`, admission.RootID, accepted.CaptureID, []byte("x")); capacitySQLState(err) != "23514" {
 		t.Fatal("immutable coverage replacement", err)
 	}
-	publications := func(purpose string) *postgres.ContextPublications {
-		p, err := postgres.NewContextPublications(ctx, f.roles[purpose], admission.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	verify, audit, publish := publications("context-verify"), publications("context-verification-audit"), publications("context-publish")
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID)
-	if err != nil {
-		t.Fatal(err)
+	// REQ-EVD-001: the stored snapshot outcome published the catalog row.
+	var catalogued int
+	if err = f.admin.QueryRow(ctx, "SELECT count(*) FROM context_catalog WHERE root_id=$1 AND capture_id=$2", admission.RootID, accepted.CaptureID).Scan(&catalogued); err != nil || catalogued != 1 {
+		t.Fatal("stored snapshot outcome did not publish", catalogued, err)
 	}
 	verifier, err := objectstore.NewContextVerifier(bound, f.keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkedHeaders := 0
-	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck {
-		checkedHeaders++
-		return packets.NewHeadersCheck()
-	})
-	unwrapControlsStarted := time.Now()
-	unwraps := qualifyContextKeyUnwraps(t, ctx, f.admin, f.fixturePool, s, final, accepted.CaptureID, stage.KeyServices)
-	unwrapControlsElapsed := time.Since(unwrapControlsStarted)
-	f.refreshBase(t)
-	trace := &snapshotPublicationTrace{}
-	facets := evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}
-	publisher := evidence.ContextPublisher{Ledger: snapshotPublicationLedgerTrace{ContextPublicationFacets: facets, trace: trace}, Authority: snapshotPublicationGateTrace{base: gate, trace: trace}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	publicationEntry := clock()
-	t.Logf("snapshot_publication_entry now=%s anchor=%s source_started=%s t0=%s write_until=%s expires_at=%s write_remaining_ms=%d read_remaining_ms=%d unwrap_control_us=%d", publicationEntry.Format(time.RFC3339Nano), e.Registration.AnchorAt.Format(time.RFC3339Nano), e.Snapshot.SourceStartedAt.Format(time.RFC3339Nano), e.Snapshot.T0.Format(time.RFC3339Nano), e.Registration.WriteUntil.Format(time.RFC3339Nano), e.Registration.ExpiresAt.Format(time.RFC3339Nano), e.Registration.WriteUntil.Sub(publicationEntry).Milliseconds(), e.Registration.ExpiresAt.Sub(publicationEntry).Milliseconds(), unwrapControlsElapsed.Microseconds())
-	published, err := publisher.Publish(ctx, accepted.CaptureID, execution.Copies)
-	if err != nil {
-		if trace.stage == "" {
-			trace.stage = "publisher-unwrapped"
-			trace.failedAt = clock()
-		}
-		r := e.Registration
-		q := e.Snapshot
-		t.Logf("snapshot_publication_failure stage=%s authority_calls=%d entry_now=%s failure_now=%s anchor=%s source_started=%s t0=%s start_by=%s write_until=%s expires_at=%s delete_by=%s entry_before_write=%t entry_before_expiry=%t failure_before_write=%t failure_before_expiry=%t", trace.stage, trace.authorityCalls, publicationEntry.Format(time.RFC3339Nano), trace.failedAt.Format(time.RFC3339Nano), r.AnchorAt.Format(time.RFC3339Nano), q.SourceStartedAt.Format(time.RFC3339Nano), q.T0.Format(time.RFC3339Nano), q.StartBy.Format(time.RFC3339Nano), r.WriteUntil.Format(time.RFC3339Nano), r.ExpiresAt.Format(time.RFC3339Nano), r.DeleteBy.Format(time.RFC3339Nano), publicationEntry.Before(r.WriteUntil), publicationEntry.Before(r.ExpiresAt), trace.failedAt.Before(r.WriteUntil), trace.failedAt.Before(r.ExpiresAt))
-		t.Fatal("semantic snapshot publication", err)
-	}
-	if checkedHeaders == 0 {
-		t.Fatal("publication skipped independent headers-only privacy check")
-	}
-	unwraps.afterPublication(ctx, accepted.CaptureID)
+	published := publishedContext{RootID: admission.RootID, CaptureID: accepted.CaptureID, Expectation: final, Copies: execution.Copies}
 	// PCAPNG uses the existing bounded framed native source. ReadContext is
 	// deliberately the historical pod-status-only small-buffer reader.
 	source, err := verifier.OpenNative(ctx, published.Expectation, published.Copies, time.Now().Add(4*time.Second))

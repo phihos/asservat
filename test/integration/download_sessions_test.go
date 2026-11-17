@@ -86,7 +86,7 @@ func (e downloadTestEnvironment) DownloadEnvironment(ctx context.Context, record
 // Real PostgreSQL/S3/encrypted audit against actual published synthetic context.
 // Human identity, protected installation observations, regional
 // authorization and capacities remain fixture inputs. This does not confer public download authority or qualify HTTP relay.
-func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext), releaseIdle func()) {
+func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, publishedContext), releaseIdle func()) {
 	t.Helper()
 	runtimePool := poolFor("download_runtime", "synthetic-download")
 	auditPool := poolFor("download_audit_runtime", "synthetic-download-audit")
@@ -115,7 +115,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	type fixture struct {
 		s                      captureAdmissionScenario
-		p                      artifact.PublishedContext
+		p                      publishedContext
 		runtime, audit, config *postgres.Downloads
 		allocation             artifact.DownloadAllocation
 		authority              func() artifact.DownloadAuthority

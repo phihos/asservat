@@ -84,8 +84,7 @@ sequenceDiagram
   participant J as Staged Jobs
   E->>L: Register pending copies and earliest deadlines
   E->>S: Encrypt/upload bounded objects and protected manifest
-  E->>S: Regional reader verifies envelope, manifest and index
-  E->>L: Publish in one transaction; settle charge to actual size
+  E->>L: Record stored outcome and publish in one transaction; settle charge to actual size
   E->>E: Artifact/lineage, audit row, NOTIFY
   A->>L: Register encrypted input/output scratch copies
   A->>J: Acquire exact inputs with scoped credentials
@@ -97,7 +96,7 @@ sequenceDiagram
   A->>L: Schedule independent scratch cleanup
 ```
 
-An uploaded object awaiting commit is an accounted pending copy, not catalog-visible evidence. Publication requires the reader's envelope, manifest and index verification; data frames are authenticated by AEAD on every read. SQL and object storage are not one transaction: an object without a published row is resolved by its operation ID or deleted. C-16 indexes only approved committed projections under current access and region rules.
+An uploaded object awaiting commit is an accounted pending copy, not catalog-visible evidence. hub-api publishes in the same transaction that records the collector's stored outcome; there is no separate verification stage. Every read authenticates the manifest, index and frames and checks the manifest against the catalog row. SQL and object storage are not one transaction: an object without a published row is resolved by its operation ID or deleted. C-16 indexes only approved committed projections under current access and region rules.
 
 A stuck analyzer, unconfirmed volume detach or malicious output tree prevents publication and remains in the copy ledger. C-18 may retry a qualified idempotent offline analysis under the same parent/deadline with a new fenced stage generation; it cannot repeat the original live collection. Raw query grants remain per-principal/purpose/limits. A completed Job does not grant access to raw bytes. See [evidence](../../specs/evidence.md) and [runtime profiles](../../specs/profiles.md).
 

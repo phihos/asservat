@@ -19,7 +19,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
-	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	identities "asservat.local/asservat/internal/application/identity"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
@@ -209,34 +208,21 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	pools.Retire("context_preview_runtime")
 	pools.Retire("context_request_resolution_runtime")
 	// The public reply carries no object receipt. Read only the original stored
-	// copies from its ordinary SQL read role, then publish independently.
+	// copies from its ordinary SQL read role; the stored outcome published them.
 	var encoded []byte
 	publicJourneyRequire(t, "original stored capture", open("api_execution_read_runtime", "synthetic-api-execution-read").QueryRow(ctx, "SELECT copies_json FROM context_execution WHERE root_id=$1 AND capture_id=$2 AND phase='stored'", s.a.RootID, accepted.CaptureID).Scan(&encoded))
 	var copies artifact.Copies
 	publicJourneyRequire(t, "original copies", json.Unmarshal(encoded, &copies))
 	clear(encoded)
-	bound, e := store.ForCustody(s.a.Registration.StoreID)
-	publicJourneyRequire(t, "original custody", e)
-	pools.Snapshot(ctx, admin, "before-publication")
-	publication := newPublicJourneyPublication(ctx, pools, s.a.RootID)
-	defer publication.Close()
-	gatePool := open("api_publication_gate_runtime", "synthetic-api-publication-gate")
-	defer gatePool.Close()
-	gate, e := postgres.NewAPIContextPublicationGate(ctx, gatePool, s.a.RootID)
-	publicJourneyRequire(t, "independent publication gate", e)
-	verifier, e := objectstore.NewContextVerifier(bound, artifactKeys.seal)
-	publicJourneyRequire(t, "original artifact verifier", e)
-	publisher := evidence.ContextPublisher{Ledger: publication, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-	published, e := publisher.Publish(ctx, accepted.CaptureID, copies)
-	publication.Close()
-	gatePool.Close()
-	if e != nil {
-		t.Logf("journey publication step=%d facet-failure=%q publish-reason=%s", publication.step, publication.failed, journeyGateReason(e))
-		native.gateTrace.Report(t)
-	}
-	publicJourneyRequire(t, "independent original publication", e)
-	if publication.step != 4 {
-		t.Fatal("publication did not use each original independent facet once")
+	// REQ-EVD-001: the stored outcome inserted the catalog row in its own
+	// transaction. The fixture reads the admitted expectation back to compare.
+	var expectation []byte
+	var catalogued int
+	publicJourneyRequire(t, "published catalog row", admin.QueryRow(ctx, "SELECT c.expectation_json,(SELECT count(*) FROM context_catalog cat WHERE cat.capture_id=c.id) FROM context_capture c WHERE c.root_id=$1 AND c.id=$2", s.a.RootID, accepted.CaptureID).Scan(&expectation, &catalogued))
+	published := publishedContext{RootID: s.a.RootID, CaptureID: accepted.CaptureID, Copies: copies}
+	publicJourneyRequire(t, "admitted expectation", json.Unmarshal(expectation, &published.Expectation))
+	if catalogued != 1 {
+		t.Fatal("stored outcome did not publish exactly one catalog row", catalogued)
 	}
 	pools.Snapshot(ctx, admin, "published")
 	if published.Expectation.CaptureUID != accepted.CaptureID || published.Expectation.PodUID != preview.SelectedPods[0].UID || published.Copies != copies {

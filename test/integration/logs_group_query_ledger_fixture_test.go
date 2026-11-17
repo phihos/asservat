@@ -317,7 +317,7 @@ func qualifyLogsMixedGroup(t *testing.T, f *queryLedgerFixture) {
 	qualifyPacketQueryManagedLifecycle(t, f)
 }
 
-func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsMixedAccepted, standalone artifact.PublishedContext) {
+func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsMixedAccepted, standalone publishedContext) {
 	t.Helper()
 	ctx := f.base.ctx
 	e := f.published.Expectation

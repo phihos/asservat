@@ -34,7 +34,7 @@ func (s *nativeContinuationStart) StartContext(ctx context.Context, current iden
 		return value.ErrUnavailable
 	}
 	r, err := s.runner.Execute(ctx, current, id)
-	if err == nil && r.State == "StoredPendingVerification" {
+	if err == nil && r.State == "Published" {
 		s.result = r
 	}
 	return err

@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"reflect"
 	"testing"
@@ -27,7 +26,6 @@ import (
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -112,7 +110,7 @@ func TestPolicyArgumentObservationFixtureCompiles(t *testing.T) {
 	if err != nil || replay.ScopeDigest != a.Plan.ScopeDigest {
 		t.Fatal("original namespace profile facts/frozen mechanism", err)
 	}
-	for _, purpose := range []string{"hub-runtime", "capture-admit", "context-verify"} {
+	for _, purpose := range []string{"hub-runtime", "capture-admit"} {
 		if grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, "synthetic_role"); !ok || len(grants) == 0 {
 			t.Fatal("unsupported fixture role purpose", purpose)
 		}
@@ -346,48 +344,5 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 		t.Fatal("argument replay accepted replacement process", first, err)
 	}
 	read(permit.ByteCredit, permit.EventCredit)
-	// Independently credentialed verifier reads the stored source tuple, not the
-	// API expectation's intentionally absent node fields or untrusted header.
-	verifierRole := narrowRole(t, ctx, admin, "argument_verifier_", "synthetic-argument-verifier", func(role string) []string {
-		sql, ok := postgres.PublicRuntimeRoleGrantSQL("context-verify", role)
-		if !ok {
-			t.Fatal("context verifier role")
-		}
-		return sql
-	})
-	verifierPool := poolFor(verifierRole, "synthetic-argument-verifier")
-	defer verifierPool.Close()
-	publications, err := postgres.NewContextPublications(ctx, verifierPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	provenance, err := publications.AcceptedArgumentSource(ctx, e)
-	if err != nil || provenance.NodeUID != node || provenance.BootID != boot || provenance.CollectorEpoch != epoch || provenance.SessionID != permit.Binding.SessionID || provenance.Fence != permit.Binding.Fence {
-		t.Fatal("independent publisher original source", provenance, err)
-	}
-	wrong := e
-	wrong.Registration.Location.AttemptID = custodyID()
-	if _, err = publications.AcceptedArgumentSource(ctx, wrong); err == nil {
-		t.Fatal("publisher accepted wrong attempt")
-	}
-	// A terminal historical session still verifies its retained artifact.
-	if _, err = admin.Exec(ctx, "UPDATE policy_observation_session SET ended_at=clock_timestamp() WHERE root_id=$1 AND capture_id=$2", s.a.RootID, accepted.CaptureID); err != nil {
-		t.Fatal(err)
-	}
-	retained, err := publications.AcceptedArgumentSource(ctx, e)
-	if err != nil || retained != provenance {
-		t.Fatal("ended original provenance lost", retained, err)
-	}
-	read(permit.ByteCredit, permit.EventCredit)
-	for _, statement := range []string{
-		"UPDATE policy_observation_session SET event_credit=event_credit+1 WHERE root_id=$1 AND capture_id=$2",
-		"UPDATE policy_observation_session SET credit=credit+1 WHERE root_id=$1 AND capture_id=$2",
-	} {
-		_, err = verifierPool.Exec(ctx, statement, s.a.RootID, accepted.CaptureID)
-		var pgerr *pgconn.PgError
-		if !errors.As(err, &pgerr) || pgerr.Code != "42501" {
-			t.Fatal("publisher SELECT facet lacks exact permission denial", err)
-		}
-	}
-	t.Log("actual argument compiler -> accepted policy/grant -> admission/intent -> API prepare: expired source rolls entire graph back; exactly one dual debit; exact replay and replacement epoch refusal; historical publisher source uses narrow SELECT")
+	t.Log("actual argument compiler -> accepted policy/grant -> admission/intent -> API prepare: expired source rolls entire graph back; exactly one dual debit; exact replay and replacement epoch refusal")
 }

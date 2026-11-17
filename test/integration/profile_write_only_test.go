@@ -2,7 +2,6 @@ package integration
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -110,11 +109,7 @@ func TestCustodyProfileWriteOnlyWithRealServices(t *testing.T) {
 	if err := check.Close(); err != nil {
 		t.Fatal("fixture profile", err)
 	}
-	var malformed bytes.Buffer
-	gz := gzip.NewWriter(&malformed)
-	_, _ = gz.Write([]byte{0x12, 0x02, 0x08, 0x07, 0x22, 0x02, 0x08, 0x00})
-	_ = gz.Close()
-	for _, mode := range []string{"generic-readback", "valid", "corrupt", "missing", "malformed"} {
+	for _, mode := range []string{"generic-readback", "valid", "corrupt", "missing"} {
 		t.Run(mode, func(t *testing.T) {
 			e := writeOnlyProfileExpectation(cluster)
 			bound, err := output.ForCustody(e.Registration.StoreID)
@@ -144,9 +139,6 @@ func TestCustodyProfileWriteOnlyWithRealServices(t *testing.T) {
 				t.Fatal(err)
 			}
 			body := native.Bytes()
-			if mode == "malformed" {
-				body = malformed.Bytes()
-			}
 			at := e.TriggeredAt.Add(time.Second)
 			copies, err := prepared.Store(ctx, bytes.NewReader(body), at, at.Add(time.Second))
 			if err != nil {
@@ -220,18 +212,14 @@ func TestCustodyProfileWriteOnlyWithRealServices(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
-			_, err = verifier.VerifyContext(ctx, e, copies)
+			_, err = readStoredNative(ctx, verifier, e, copies)
 			if (err == nil) != (mode == "valid") {
-				t.Fatal("independent publisher verdict", mode, err)
+				t.Fatal("authenticated read verdict", mode, err)
 			}
 			if mode == "corrupt" && damagedReads.Load() != 1 {
 				t.Fatal("ciphertext corruption was not exercised", damagedReads.Load())
 			}
-			if mode == "malformed" && !errors.Is(err, artifact.ErrIntegrity) {
-				t.Fatal("profile semantic parser not reached", err)
-			}
-			t.Logf("default16MiB limit, %d native bytes: writer read/list/delete denied; publisher %s verdict accepted=%t", len(body), mode, err == nil)
+			t.Logf("default16MiB limit, %d native bytes: writer read/list/delete denied; reader %s verdict accepted=%t", len(body), mode, err == nil)
 		})
 	}
 }

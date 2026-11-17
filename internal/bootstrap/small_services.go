@@ -299,7 +299,7 @@ const SeaweedBucketPoliciesKey = "bucket-policies.json"
 
 // seaweedEvidencePurposes use the evidence bucket; every other principal
 // uses the audit bucket. Regional history shares the evidence bucket.
-var seaweedEvidencePurposes = []string{"publisher-read", "download-read", "evidence-delete", "regional-write", "regional-history"}
+var seaweedEvidencePurposes = []string{"download-read", "evidence-delete", "regional-write", "regional-history"}
 
 // objectStore creates one credential Secret per bundled SeaweedFS principal
 // and compiles the complete IAM configuration and bucket policies from them.

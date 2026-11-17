@@ -363,6 +363,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	outcome := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued,
 		Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
+	prepared.AddFacts(&outcome.Completion)
 	if held.snapshot != nil && err == nil {
 		coverage := r.Snapshot.SourceSnapshotCoverage
 		outcome.SnapshotCoverage = &coverage

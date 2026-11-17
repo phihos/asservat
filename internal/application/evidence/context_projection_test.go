@@ -63,7 +63,7 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 		HardUntil: f.now.Add(time.Minute), EffectsUntil: f.now.Add(3 * time.Minute), CleanupUntil: f.now.Add(4 * time.Minute), RetireBy: f.now.Add(time.Hour)}
 
 	// Reuse only the neutral registered source/copy fixture, never its download grants.
-	pub, _ := publicationTest(t)
+	pub := newContextFixture(t)
 	f.source = NativeContextSource{Expectation: pub.e, Copies: pub.copies}
 	f.source.Expectation.ActionID = "pod-status"
 	e := f.source.Expectation

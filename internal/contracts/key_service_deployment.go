@@ -10,7 +10,7 @@ const KeyServiceDeploymentRoot = "/run/asservat/key-service"
 // projected only into its own Secret. ADR-204 adds the acquisition unwrap
 // login, which spends download key slots and opens only with Downloads.
 func PublicRuntimeKeyServicePurposes() []string {
-	return []string{"key-configuration", "key-wrap", "key-verify", "key-acquisition"}
+	return []string{"key-configuration", "key-wrap", "key-acquisition"}
 }
 
 // One Recreate replica; a failed process may still close its pools.

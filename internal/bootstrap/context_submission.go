@@ -34,7 +34,7 @@ func (s APIContextStart) StartContext(ctx context.Context, current identities.Cu
 	if err != nil {
 		return err
 	}
-	if r.State != "AlreadyStarted" && r.State != "StoredPendingVerification" {
+	if r.State != "AlreadyStarted" && r.State != "Published" {
 		return value.ErrUnavailable
 	}
 	return nil

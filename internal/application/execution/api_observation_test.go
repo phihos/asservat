@@ -142,7 +142,7 @@ func TestAPIContextObservationRetainsSQLEffectChecks(t *testing.T) {
 			}
 			out, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
 			if mode == "same-observation" {
-				if err != nil || out.State != "StoredPendingVerification" || len(b.checks) != 2 {
+				if err != nil || out.State != "Published" || len(b.checks) != 2 {
 					t.Fatal("effect sequence", out, err, len(b.checks))
 				}
 				for _, c := range b.checks[1:] {
@@ -242,7 +242,7 @@ func TestAPIContextRunnerOneRequestObservation(t *testing.T) {
 	ctx, cancel := context.WithDeadline(t.Context(), f.now.Add(5*time.Second))
 	defer cancel()
 	out, err := runner.Execute(ctx, current, f.work.Accepted.CaptureID)
-	if err != nil || out.State != "StoredPendingVerification" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.prepares.Load() != f.closes.Load() {
+	if err != nil || out.State != "Published" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.prepares.Load() != f.closes.Load() {
 		t.Fatal("fixture did not complete the real runner", out.State, err)
 	}
 	if p.targets != 1 || p.eligibilityReads != 1 || p.capabilities != 1 || p.retention != 1 || p.processes != 2 {

@@ -155,7 +155,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		r.Process = ops
 		result, err := r.CollectRecording(ctx, w, exec, ops)
 		switch {
-		case err == nil && (result.State == "Recording" || result.State == "StoredPendingVerification" || result.State == "Failed" || result.State == "Cancelled"):
+		case err == nil && (result.State == "Recording" || result.State == "Published" || result.State == "Failed" || result.State == "Cancelled"):
 			return result.State, nil
 		}
 		return "Unavailable", err

@@ -4,20 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"reflect"
 	"time"
-
-	executionapp "asservat.local/asservat/internal/application/execution"
-	executionvalue "asservat.local/asservat/internal/domain/execution"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
-	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,11 +24,9 @@ type ContextPublications struct {
 	root   string
 }
 
-var _ evidence.ContextPublicationLedger = (*ContextPublications)(nil)
 var _ authorizationapp.AudienceReader = (*ContextPublications)(nil)
 
-// Instantiate each facet with separate verification, audit, publish or SELECT
-// credentials. Sharing a Go implementation does not combine runtime SQL roles.
+// NewContextPublications reads published catalog rows with SELECT-only credentials.
 func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextPublications, error) {
 	if !authorization.UUID(root) {
 		return nil, artifact.ErrInvalid
@@ -62,285 +56,66 @@ func historicalPublication(row custodydb.ContextCapture) (artifact.ContextExpect
 	}
 	return storedSnapshotProjection(accepted.Expectation, row.SnapshotCoverage, row.SnapshotCoverageDigest, row.SnapshotExpectationDigest)
 }
-func (s *ContextPublications) AcceptedContextForPublication(ctx context.Context, captureID string) (artifact.ContextExpectation, error) {
-	var out artifact.ContextExpectation
-	if !authorization.UUID(captureID) {
-		return out, artifact.ErrInvalid
-	}
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		row, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(captureID), RootID: id(s.root)})
-		if err != nil {
-			return err
-		}
-		out, err = acceptedPublication(row)
-		return err
-	})
-	return out, err
-}
-func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, e artifact.ContextExpectation, a artifact.PublicationAuthority) error {
-	n, err := q.CurrentTime(ctx)
-	if err != nil {
-		return err
-	}
-	if !a.Valid(e, evidence.ContextExpectationDigest(e), n.Time) || stream.ID != id(a.RootID) || stream.Epoch != id(a.PermissionEpoch) || stream.Sequence != a.PermissionSequence || !bytes.Equal(stream.ProjectionDigest, a.ProjectionDigest[:]) || stream.Suspended || !stream.InitialAuditID.Valid || !n.Time.Before(stream.LeaseUntil.Time) || !identity.Fresh(stream.ObservedAt.Time, stream.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
-		return privacy.ErrFence
-	}
-	for _, auditID := range []pgtype.UUID{stream.Epoch, stream.InitialAuditID} {
-		r, err := q.ReadAuthorityAudit(ctx, auditID)
-		if err != nil {
-			return err
-		}
-		if !currentAuthorityAudit(r, stream.ID, auditID) {
-			return privacy.ErrFence
-		}
-	}
-	return nil
-}
 
-// Canonical order: permission root -> storage pool/allocation -> attempt ->
-// capture -> verification/catalog. No external work occurs while locks are held.
-func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (custodydb.PermissionStream, custodydb.CustodyPool, custodydb.CustodyAllocation, custodydb.CustodyAttempt, custodydb.ContextCapture, error) {
-	var stream custodydb.PermissionStream
-	var pool custodydb.CustodyPool
-	var allocation custodydb.CustodyAllocation
-	var attempt custodydb.CustodyAttempt
-	var accepted custodydb.ContextCapture
-	stream, err := q.LockPermissionStream(ctx, id(s.root))
-	if err != nil {
-		return stream, pool, allocation, attempt, accepted, err
+// publishStored is the one publication step (REQ-EVD-001): in the
+// transaction that records the collector's stored outcome it stores the copy
+// receipts, inserts the catalog row from the admitted expectation plus the
+// collector-reported copy digest and native facts, and records the custody
+// event. The catalog INSERT triggers add the case/occurrence association,
+// capture-time shares and the progress notification. A retry finds the row.
+// The caller holds the allocation, attempt and capture locks in that order.
+func publishStored(ctx context.Context, q *custodydb.Queries, p custodydb.CustodyPool, allocation custodydb.CustodyAllocation, attempt custodydb.CustodyAttempt, c custodydb.ContextCapture, e artifact.ContextExpectation, w artifact.ContextWriterCompletion) error {
+	copies := w.Copies
+	if copies.Validate(e.Registration) != nil || !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || c.AttemptID != attempt.ID || w.NativeBytes < 0 || w.NativeBytes > e.Registration.NativeLimit || (e.Profile != nil) != (w.Acquisition != nil) || w.Acquisition != nil && !acquisitionMatchesExpectation(e, w.Acquisition) {
+		return privacy.ErrConflict
 	}
-	pool, allocation, err = lockAllocation(ctx, q, e.Registration.AllocationID)
-	if err != nil {
-		return stream, pool, allocation, attempt, accepted, err
+	if err := current(ctx, q, p, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
+		return err
 	}
-	attempt, err = q.LockAttempt(ctx, id(e.Registration.Location.AttemptID))
-	if err != nil {
-		return stream, pool, allocation, attempt, accepted, err
-	}
-	accepted, err = q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(e.CaptureUID), RootID: id(s.root)})
-	if err != nil {
-		return stream, pool, allocation, attempt, accepted, err
-	}
-	expected, err := acceptedPublication(accepted)
-	if err == nil && (!bytes.Equal(digest(expected), digest(e)) || !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || accepted.AttemptID != attempt.ID || c.Validate(e.Registration) != nil || (attempt.State != artifact.Reserved && attempt.State != artifact.StoredUnpublished)) {
-		err = privacy.ErrConflict
-	}
-	if err == nil && e.ExecutionClass == artifact.ContextAPIExecution {
-		row, readErr := q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: accepted.RootID, CaptureID: accepted.ID})
-		if readErr != nil {
-			err = privacy.ErrFence
-		} else {
-			x, decodeErr := apiExecution(row)
-			if decodeErr != nil || !validCompletedAPICapture(x, e, accepted) || !reflect.DeepEqual(x.Copies, c) || executionapp.APIExecutionDigest(x) != a.AuthorityDigest {
-				err = privacy.ErrFence
-			}
-		}
-	}
-	if err == nil {
-		err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time)
-	}
-	if err == nil {
-		err = s.publicationFence(ctx, q, stream, e, a)
-	}
-	return stream, pool, allocation, attempt, accepted, err
-}
-func verificationRecord(c custodydb.ContextCapture, v custodydb.ContextVerification, executions ...executionvalue.APIExecution) (audit.ContextVerification, error) {
-	e, err := historicalPublication(c)
-	if err != nil {
-		return audit.ContextVerification{}, err
-	}
-	r := audit.ContextVerification{RootID: uid(c.RootID), CaptureID: uid(c.ID), ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: uid(v.PermissionEpoch), PermissionSequence: v.PermissionSequence, ScopeDigest: e.PlanDigest, VerifiedAt: v.VerifiedAt.Time, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
-	r.Acquisition, err = verifiedAcquisition(e, v)
-	if err != nil {
-		return audit.ContextVerification{}, privacy.ErrConflict
-	}
-	if v.NativeBytes.Valid {
-		if v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit {
-			return audit.ContextVerification{}, privacy.ErrConflict
-		}
-		size := v.NativeBytes.Int64
-		r.NativeBytes = &size
-	}
-	for _, pair := range []struct {
-		dst *artifact.Digest
-		src []byte
-	}{{&r.ExpectationDigest, v.ExpectationDigest}, {&r.CopiesDigest, v.CopiesDigest}, {&r.IntentDigest, v.IntentDigest}, {&r.AuthorityDigest, v.AuthorityDigest}} {
-		if len(pair.src) != 32 {
-			return audit.ContextVerification{}, privacy.ErrUnavailable
-		}
-		copy(pair.dst[:], pair.src)
-	}
-	if e.ExecutionClass == artifact.ContextAPIExecution {
-		if len(executions) != 1 || !validCompletedAPICapture(executions[0], e, c) || executionapp.APIExecutionDigest(executions[0]) != r.AuthorityDigest || evidence.ContextCopiesDigest(executions[0].Copies) != r.CopiesDigest {
-			return audit.ContextVerification{}, privacy.ErrFence
-		}
-		x := executions[0]
-		p := x.Process
-		r.APIOutcome = &audit.APIOutcome{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, ExecutorNamespaceUID: p.NamespaceUID, ExecutorAccountUID: p.AccountUID, ExecutorPodUID: p.PodUID, ProcessEpoch: p.ProcessEpoch, StartObjectUID: x.ObjectUID, ExecutionDigest: r.AuthorityDigest, StartupDigest: p.StartupDigest, StartedAt: x.StartedAt, AcquiredAt: x.AcquiredAt, CompletedAt: x.CompletedAt}
-		copy(r.APIOutcome.BindingDigest[:], digest(x.Binding))
-	} else if len(executions) > 0 {
-		return audit.ContextVerification{}, privacy.ErrFence
-	}
-	if v.CaptureID != c.ID || v.RootID != c.RootID || r.ExpectationDigest != evidence.ContextExpectationDigest(e) || !bytes.Equal(v.IntentDigest, captureIntentDigest(c)) || !r.Valid() {
-		return audit.ContextVerification{}, privacy.ErrConflict
-	}
-	return r, nil
-}
-func (s *ContextPublications) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (audit.ContextVerification, error) {
-	var out audit.ContextVerification
-	nativeBytes := verified.NativeBytes
-	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root || nativeBytes < 0 || nativeBytes > e.Registration.NativeLimit || verified.Acquisition != nil && !acquisitionMatchesExpectation(e, verified.Acquisition) {
-		return out, artifact.ErrInvalid
-	}
-	// Own the observation before blocking on SQL; the caller cannot replace
-	// its pair during persistence and audit reconstruction.
-	if verified.Acquisition != nil {
-		window := *verified.Acquisition
-		verified.Acquisition = &window
-	}
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a)
-		if err != nil {
-			return err
-		}
-		if attempt.State == artifact.StoredUnpublished {
-			if !bytes.Equal(attempt.CopiesDigest, digest(c)) {
-				return privacy.ErrConflict
-			}
-		} else {
-			for i, copy := range c {
-				err = q.StoreCopy(ctx, custodydb.StoreCopyParams{AttemptID: attempt.ID, Role: int16(i), CiphertextBytes: pgtype.Int8{Int64: copy.Bytes, Valid: true}, CiphertextSha256: copy.SHA256[:], Etag: pgtype.Text{String: copy.ETag, Valid: true}, VersionID: pgtype.Text{String: copy.VersionID, Valid: copy.VersionID != ""}})
-				if err != nil {
-					return err
-				}
-			}
-			if err = q.MarkStored(ctx, custodydb.MarkStoredParams{ID: attempt.ID, CopiesDigest: digest(c)}); err != nil {
-				return err
-			}
-			if err = q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: attempt.ID, Phase: "stored"}); err != nil {
+	switch attempt.State {
+	case artifact.Reserved:
+		for i, r := range copies {
+			if err := q.StoreCopy(ctx, custodydb.StoreCopyParams{AttemptID: attempt.ID, Role: int16(i), CiphertextBytes: pgtype.Int8{Int64: r.Bytes, Valid: true}, CiphertextSha256: r.SHA256[:], Etag: pgtype.Text{String: r.ETag, Valid: true}, VersionID: pgtype.Text{String: r.VersionID, Valid: r.VersionID != ""}}); err != nil {
 				return err
 			}
 		}
-		row, err := q.ReadContextVerification(ctx, custodydb.ReadContextVerificationParams{CaptureID: accepted.ID, RootID: accepted.RootID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			if e.Profile != nil && verified.Acquisition == nil {
-				return artifact.ErrInvalid
-			}
-			params := custodydb.InsertContextVerificationParams{NativeBytes: pgtype.Int8{Int64: nativeBytes, Valid: true}, CaptureID: accepted.ID, RootID: accepted.RootID, ExpectationDigest: digest(e), CopiesDigest: digest(c), IntentDigest: captureIntentDigest(accepted), AuthorityDigest: a.AuthorityDigest[:], PermissionEpoch: id(a.PermissionEpoch), PermissionSequence: a.PermissionSequence}
-			if verified.Acquisition != nil {
-				params.AcquisitionStartedAt, params.AcquisitionCompletedAt = ts(verified.Acquisition.StartedAt), ts(verified.Acquisition.CompletedAt)
-			}
-			row, err = q.InsertContextVerification(ctx, params)
-		}
-		if err != nil {
+		if err := q.MarkStored(ctx, custodydb.MarkStoredParams{ID: attempt.ID, CopiesDigest: digest(copies)}); err != nil {
 			return err
 		}
-		if !bytes.Equal(row.CopiesDigest, digest(c)) || row.NativeBytes.Valid && row.NativeBytes.Int64 != nativeBytes {
+		if err := q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: attempt.ID, Phase: "stored"}); err != nil {
+			return err
+		}
+	case artifact.StoredUnpublished:
+		if !bytes.Equal(attempt.CopiesDigest, digest(copies)) {
 			return privacy.ErrConflict
 		}
-		window, err := verifiedAcquisition(e, row)
-		if err != nil || window != nil && !sameAcquisition(window, verified.Acquisition) {
-			return privacy.ErrConflict
-		}
-		out, err = currentVerificationRecord(ctx, q, accepted, row)
-		if err != nil {
-			return err
-		}
-		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
-			return err
-		}
-		return s.publicationFence(ctx, q, stream, e, a)
-	})
+	default:
+		return privacy.ErrExpired
+	}
+	params := custodydb.InsertContextCatalogParams{ArtifactID: id(e.Registration.Location.ArtifactID), CaptureID: c.ID, RootID: c.RootID, CopiesDigest: digest(copies), NativeBytes: pgtype.Int8{Int64: w.NativeBytes, Valid: true}}
+	if w.Acquisition != nil {
+		params.AcquisitionStartedAt, params.AcquisitionCompletedAt = ts(w.Acquisition.StartedAt), ts(w.Acquisition.CompletedAt)
+	}
+	row, err := q.ReadContextCatalog(ctx, custodydb.ReadContextCatalogParams{CaptureID: c.ID, RootID: c.RootID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		row, err = q.InsertContextCatalog(ctx, params)
+	}
 	if err != nil {
-		return audit.ContextVerification{}, err
+		return err
 	}
-	return out, nil
-}
-func (s *ContextPublications) AcknowledgeContextVerification(ctx context.Context, r audit.ContextVerification, receipt audit.Receipt) error {
-	if r.RootID != s.root || !r.Valid() || !receipt.ValidContextVerification(r.RootID, r.CaptureID) {
-		return artifact.ErrInvalid
+	if row.ArtifactID != params.ArtifactID || !bytes.Equal(row.CopiesDigest, params.CopiesDigest) {
+		return privacy.ErrConflict
 	}
-	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		// Historical verified facts may be audited after expiry; no publication,
-		// retention extension, refund or new capture follows from this receipt.
-		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
-		}
-		c, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(r.CaptureID), RootID: id(s.root)})
-		if err != nil {
-			return err
-		}
-		v, err := q.LockContextVerification(ctx, custodydb.LockContextVerificationParams{CaptureID: c.ID, RootID: c.RootID})
-		if err != nil {
-			return err
-		}
-		frozen, err := currentVerificationRecord(ctx, q, c, v)
-		if err != nil {
-			return err
-		}
-		if !reflect.DeepEqual(frozen, r) {
-			return privacy.ErrConflict
-		}
-		if v.AuditAcknowledgedAt.Valid {
-			if !bytes.Equal(v.AuditDigest, digest(r)) || v.AuditObjectKey.String != receipt.Key || v.AuditObjectVersion.String != receipt.Version || v.AuditObjectEtag.String != receipt.ETag || v.AuditObjectBytes.Int64 != receipt.Bytes || !bytes.Equal(v.AuditObjectSha256, receipt.SHA256[:]) {
-				return privacy.ErrConflict
-			}
-			return nil
-		}
-		count, err := q.AcknowledgeContextVerification(ctx, custodydb.AcknowledgeContextVerificationParams{CaptureID: c.ID, RootID: c.RootID, AuditDigest: digest(r), AuditObjectKey: pgtype.Text{String: receipt.Key, Valid: true}, AuditObjectVersion: pgtype.Text{String: receipt.Version, Valid: true}, AuditObjectEtag: pgtype.Text{String: receipt.ETag, Valid: true}, AuditObjectBytes: pgtype.Int8{Int64: receipt.Bytes, Valid: true}, AuditObjectSha256: receipt.SHA256[:]})
-		if err != nil {
-			return err
-		}
-		if count != 1 {
-			return privacy.ErrConflict
-		}
-		return nil
-	})
-}
-func (s *ContextPublications) PublishContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (artifact.PublishedContext, error) {
-	var out artifact.PublishedContext
-	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root {
-		return out, artifact.ErrInvalid
+	if attempt.State != artifact.Reserved {
+		return nil // a retry found the published row and its audit row
 	}
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a)
-		if err != nil {
-			return err
-		}
-		if attempt.State != artifact.StoredUnpublished || !bytes.Equal(attempt.CopiesDigest, digest(c)) {
-			return privacy.ErrConflict
-		}
-		v, err := q.ReadContextVerification(ctx, custodydb.ReadContextVerificationParams{CaptureID: accepted.ID, RootID: accepted.RootID})
-		if err != nil {
-			return err
-		}
-		r, err := currentVerificationRecord(ctx, q, accepted, v)
-		if err != nil {
-			return err
-		}
-		if !currentVerificationReceipt(v) || !bytes.Equal(v.AuditDigest, digest(r)) || r.CopiesDigest != evidence.ContextCopiesDigest(c) {
-			return privacy.ErrFence
-		}
-		row, err := q.ReadContextCatalog(ctx, custodydb.ReadContextCatalogParams{CaptureID: accepted.ID, RootID: accepted.RootID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			row, err = q.InsertContextCatalog(ctx, custodydb.InsertContextCatalogParams{ArtifactID: id(e.Registration.Location.ArtifactID), CaptureID: accepted.ID, RootID: accepted.RootID})
-		}
-		if err != nil {
-			return err
-		}
-		if row.ArtifactID != id(e.Registration.Location.ArtifactID) {
-			return privacy.ErrConflict
-		}
-		out = artifact.PublishedContext{RootID: s.root, CaptureID: e.CaptureUID, Expectation: e, Copies: c, VerifiedAt: v.VerifiedAt.Time, PublishedAt: row.PublishedAt.Time}
-		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
-			return err
-		}
-		return s.publicationFence(ctx, q, stream, e, a)
-	})
+	// ADR-330 D6: the publication's audit row commits with the catalog row,
+	// attributed to the capture's requester.
+	intent, err := captureIntent(c)
 	if err != nil {
-		return artifact.PublishedContext{}, err
+		return err
 	}
-	return out, nil
+	return InsertAuditEvent(ctx, q, audit.Event{ID: uuid.NewString(), OperationID: e.CaptureUID, Kind: "capture.publish", Operation: "publish_capture", Actor: intent.Requester(), Status: "success", Effect: "published", CaseIDs: []string{e.CaseID}, ArtifactIDs: []string{e.Registration.Location.ArtifactID}, CaptureIDs: []string{e.CaptureUID}, OutputBytes: w.NativeBytes})
 }
 func (s *ContextPublications) RetainedAudience(ctx context.Context, artifactID string) (authorization.Retained, error) {
 	var out authorization.Retained
@@ -391,7 +166,7 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 		if err != nil {
 			return err
 		}
-		if attempt.State != artifact.StoredUnpublished || !bytes.Equal(attempt.CopiesDigest, row.ContextVerification.CopiesDigest) {
+		if attempt.State != artifact.StoredUnpublished || !bytes.Equal(attempt.CopiesDigest, row.ContextCatalog.CopiesDigest) {
 			return privacy.ErrFence
 		}
 		retained, err := retainedContextOrigins(ctx, q, s.root, capture, attempt)
@@ -412,13 +187,13 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 			return labelErr
 		}
 		out.WorkloadKind, out.WorkloadName, out.PodName = labels.WorkloadKind, labels.WorkloadName, labels.PodName
-		if row.ContextVerification.NativeBytes.Valid {
-			size := row.ContextVerification.NativeBytes.Int64
+		if row.ContextCatalog.NativeBytes.Valid {
+			size := row.ContextCatalog.NativeBytes.Int64
 			out.NativeBytes = &size
 		}
-		copy(out.Version[:], row.ContextVerification.CopiesDigest)
+		copy(out.Version[:], row.ContextCatalog.CopiesDigest)
 		if e.Profile != nil {
-			window, err := verifiedAcquisition(e, row.ContextVerification)
+			window, err := catalogAcquisition(e, row.ContextCatalog.AcquisitionStartedAt, row.ContextCatalog.AcquisitionCompletedAt)
 			if err != nil {
 				return err
 			}

@@ -199,7 +199,7 @@ func qualifyProcessingWorkerFacets(t *testing.T, ctx context.Context, poolFor fu
 // This proves a previously allowed and prepaid transfer cannot bypass a newly
 // committed restriction. Session state and all uncertain charges remain; a
 // release permits the original session to continue under fresh authority.
-func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, published artifact.PublishedContext, catalog *postgres.ContextPublications, f *processingTestFixture) {
+func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, published publishedContext, catalog *postgres.ContextPublications, f *processingTestFixture) {
 	// Keep failures at the exact native qualification phase, rather than hiding
 	// the entire transfer sequence behind the publication caller's source line.
 	runtimePool := poolFor("download_runtime", "synthetic-download")

@@ -38,10 +38,10 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	acquisition := with(read("fleet_current_trust", "permission_stream", "authority_audit", "artifact_download", "download_batch",
 		"processing_root", "context_processing", "processing_rule",
 		"retention_policy", "retention_decision",
-		"context_capture", "context_verification", "download_key_binding", "download_native_key", "download_native_owner",
+		"context_capture", "download_key_binding", "download_native_key", "download_native_owner",
 		"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
 		"download_worker_configuration", "download_worker_configuration_revision")...)
-	acquisition = append(acquisition, columns("context_catalog", "SELECT", "artifact_id", "root_id", "capture_id", "published_at")...)
+	acquisition = append(acquisition, columns("context_catalog", "SELECT", "artifact_id", "root_id", "capture_id", "published_at", "copies_digest", "native_bytes", "acquisition_started_at", "acquisition_completed_at")...)
 	acquisition = append(acquisition, columns("custody_attempt", "SELECT", "id", "artifact_id", "state", "copies_digest", "effective_expires_at", "effective_delete_by")...)
 	acquisition = append(acquisition, publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"})
 	for _, table := range []string{"permission_stream", "artifact_download", "download_response", "download_window", "download_worker"} {
@@ -90,10 +90,10 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	if slices.Contains(observe, publicRuntimeGrant{"table", "download_worker_configuration_revision", "audit_receipt_json", "UPDATE"}) || slices.ContainsFunc(acknowledge, func(g publicRuntimeGrant) bool { return g.column == "fresh_until" || g.privilege == "INSERT" }) {
 		t.Fatal("observer and audit acknowledgement merged")
 	}
-	for _, purpose := range []string{"download-key-bind", "native-key-bind", "key-verify"} {
+	for _, purpose := range []string{"download-key-bind", "native-key-bind"} {
 		got, _ := publicRuntimeDutyGrants(purpose)
 		if slices.ContainsFunc(got, func(g publicRuntimeGrant) bool { return g.column == "used_roles" && g.privilege == "UPDATE" }) {
-			t.Fatal("binding or verifier role can spend download key slots", purpose)
+			t.Fatal("binding role can spend download key slots", purpose)
 		}
 	}
 }

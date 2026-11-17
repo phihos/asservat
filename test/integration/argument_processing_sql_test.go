@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/migrations"
@@ -24,27 +23,12 @@ import (
 // projection. Full runtime verification must independently validate native bytes.
 func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, root string, accepted capture.Accepted) {
 	t.Helper()
-	role := narrowRole(t, ctx, admin, "argument_publisher_", "synthetic-argument-publisher", func(role string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("context-verify", role)
-		if !ok {
-			t.Fatal("missing publisher verifier role")
-		}
-		return grants
-	})
-	reader := poolFor(role, "synthetic-argument-publisher")
-	defer reader.Close()
 	id := func(s string) pgtype.UUID {
 		var out pgtype.UUID
 		if err := out.Scan(s); err != nil {
 			t.Fatal(err)
 		}
 		return out
-	}
-	if row, err := custodydb.New(reader).ReadPolicyObservation(ctx, custodydb.ReadPolicyObservationParams{RootID: id(root), CaptureID: id(accepted.CaptureID)}); err != nil || row.CaptureID != id(accepted.CaptureID) || row.EventCredit == 0 {
-		t.Fatal("scoped publisher cannot read original argument session", err)
-	}
-	if _, err := reader.Exec(ctx, "UPDATE policy_observation_session SET event_credit=event_credit WHERE false"); err == nil {
-		t.Fatal("publisher can mutate original argument credit")
 	}
 	raw, err := fs.ReadFile(migrations.Files(), "00129_syscall_arguments_processing.sql")
 	if err != nil {
@@ -110,15 +94,13 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
 			// bypassed by a runtime credential. Seeding and all effects roll back.
 			exec("SET LOCAL session_replication_role=replica")
 			exec("UPDATE context_capture SET expectation_json=$2 WHERE id=$1", accepted.CaptureID, encoded)
-			exec(`INSERT INTO context_verification(capture_id,root_id,expectation_digest,copies_digest,intent_digest,authority_digest,permission_epoch,permission_sequence)
- SELECT id,root_id,decode(repeat('01',32),'hex'),decode(repeat('02',32),'hex'),decode(repeat('03',32),'hex'),decode(repeat('04',32),'hex'),permission_epoch,permission_sequence FROM context_capture WHERE id=$1`, accepted.CaptureID)
 			if name == "arguments" {
 				now := time.Now().UTC().Truncate(time.Microsecond)
 				exec(`INSERT INTO context_execution(root_id,capture_id,attempt_id,binding_json,process_json,expectation_digest,not_before,not_after,object_uid,phase,started_at)
  VALUES($1,$2,$3,'{}','{}',decode(repeat('01',32),'hex'),$4,$5,$6,'started',$4)`, root, accepted.CaptureID, accepted.Expectation.Registration.Location.AttemptID, now, now.Add(5*time.Second), custodyID())
 			}
 			exec("SET LOCAL session_replication_role=origin")
-			_, err = tx.Exec(ctx, "INSERT INTO context_catalog(artifact_id,capture_id,root_id) VALUES($1,$2,$3)", accepted.Expectation.Registration.Location.ArtifactID, accepted.CaptureID, root)
+			_, err = tx.Exec(ctx, "INSERT INTO context_catalog(artifact_id,capture_id,root_id,copies_digest) VALUES($1,$2,$3,decode(repeat('02',32),'hex'))", accepted.Expectation.Registration.Location.ArtifactID, accepted.CaptureID, root)
 			want := name == "arguments" || name == "metadata" || name == "profile"
 			if !want {
 				if err == nil || !strings.Contains(err.Error(), "unqualified processing lineage") {

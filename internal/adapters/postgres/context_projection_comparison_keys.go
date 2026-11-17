@@ -130,7 +130,7 @@ func projectionPublishedKeyMask(ctx context.Context, tx *custodydb.Queries, scop
 		return 0, e
 	}
 	expected, e := currentPublishedContext(published)
-	if e != nil || !bytes.Equal(published.ContextVerification.CopiesDigest, scope.Version[:]) || !scopeSource(scope, expected) {
+	if e != nil || !bytes.Equal(published.ContextCatalog.CopiesDigest, scope.Version[:]) || !scopeSource(scope, expected) {
 		return 0, auth.ErrKeyDenied
 	}
 	for _, role := range []query.ContextProjectionKeyRole{query.ContextProjectionDataKey, query.ContextProjectionIndexKey, query.ContextProjectionManifestKey} {

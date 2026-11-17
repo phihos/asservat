@@ -44,7 +44,7 @@ func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app
 			return e
 		}
 		original, e := currentPublishedContext(published)
-		if e != nil || original.CaseID != r.CaseID || original.CaptureUID != r.CaptureID || original.Registration != r.Retained.Registration || original.PurposeRef != r.PurposeRef || original.DataClass != r.DataClass || original.NativeType != r.NativeType || artifact.Digest(published.ContextVerification.CopiesDigest) != r.Version {
+		if e != nil || original.CaseID != r.CaseID || original.CaptureUID != r.CaptureID || original.Registration != r.Retained.Registration || original.PurposeRef != r.PurposeRef || original.DataClass != r.DataClass || original.NativeType != r.NativeType || artifact.Digest(published.ContextCatalog.CopiesDigest) != r.Version {
 			return value.ErrUnavailable
 		}
 		out = processingProof(snapshot, p)

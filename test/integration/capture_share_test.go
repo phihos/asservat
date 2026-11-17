@@ -26,7 +26,7 @@ type captureShareFixture struct {
 	scenario captureAdmissionScenario
 	e        artifact.ContextExpectation
 	reader   *postgres.ContextPublications
-	publish  func() (artifact.PublishedContext, error)
+	publish  func() (publishedContext, error)
 	replay   func() error
 }
 

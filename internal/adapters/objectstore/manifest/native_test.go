@@ -141,11 +141,7 @@ func TestPCAPNGStructureCheck(t *testing.T) {
 	le, be := binary.LittleEndian, binary.BigEndian
 	valid := bytes.Join([][]byte{shb(le), idb(le, 128), epb(le, 0, 54, 1500), epb(le, 0, 96, 96), pcapngBlock(le, pcapngISB, make([]byte, 12)), shb(be), idb(be, 0), epb(be, 0, 1000, 1000)}, nil)
 	for _, step := range []int{1, 7, 4096, len(valid)} {
-		c, err := v.NativeCheck(e, ContextManifest{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = runCheck(t, c, valid, step); err != nil {
+		if err := runCheck(t, &pcapngCheck{}, valid, step); err != nil {
 			t.Fatal("valid PCAPNG", step, err)
 		}
 	}
@@ -171,10 +167,18 @@ func TestPCAPNGStructureCheck(t *testing.T) {
 		"truncated stream":         append(shb(le), idb(le, 128)[:10]...),
 		"oversized block":          append(shb(le), huge...),
 	} {
-		c, _ := v.NativeCheck(e, ContextManifest{})
+		c := &pcapngCheck{}
 		if err := runCheck(t, c, b, 5); err == nil {
 			t.Fatal("accepted invalid PCAPNG:", name)
 		}
+	}
+	// The producer's check also requires headers-only packets (ADR-248).
+	c, err := v.NativeCheck(e, ContextManifest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = runCheck(t, c, valid, 4096); err == nil {
+		t.Fatal("producer accepted packets beyond network headers")
 	}
 }
 
@@ -229,7 +233,7 @@ func TestSyscallAndHTTPNativeChecks(t *testing.T) {
 		body string
 		ok   bool
 	}{
-		"object":        {`{"format":"http-response-headers/v1","responses":[]}`, true},
+		"incomplete":    {`{"format":"http-response-headers/v1","responses":[]}`, false},
 		"array":         {`[]`, false},
 		"duplicate key": {`{"a":1,"a":2}`, false},
 		"trailing":      {`{"a":1} {}`, false},

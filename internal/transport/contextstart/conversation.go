@@ -20,7 +20,7 @@ type Stream interface {
 
 func knownResult(state string) bool {
 	switch state {
-	case "StoredPendingVerification", "AlreadyStarted", "PreparationUncertain", "Unavailable", "Recording", "Failed":
+	case "Published", "AlreadyStarted", "PreparationUncertain", "Unavailable", "Recording", "Failed":
 		return true
 	}
 	return false

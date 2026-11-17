@@ -182,7 +182,6 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 			t.Fatalf("accepted recording %+v", e)
 		}
 		initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, e)
-		pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
 		sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 		t.Cleanup(func() {
 			sharedPools.Close()
@@ -305,7 +304,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		runner := executionapp.APIContextRunner{Record: executions, Process: &recordingProcess{process}, Now: time.Now}
 		got, err := runner.CollectRecording(ctx, readWork, readExecution, recordingCollect{holder, signed})
-		if err != nil || got.State != "StoredPendingVerification" {
+		if err != nil || got.State != "Published" {
 			t.Fatal("collect", got, err)
 		}
 		if listed, err = executions.StartedRecordings(ctx, time.Now(), 16); err != nil || len(listed) != 0 {
@@ -316,43 +315,17 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		if err = admin.QueryRow(ctx, "SELECT phase,copies_json FROM context_execution WHERE capture_id=$1", accepted.CaptureID).Scan(&phase, &copies); err != nil || phase != "stored" {
 			t.Fatal("stored phase", phase, err)
 		}
-		// Publication: full verification with the headers-only recheck.
-		publication := func(user, password string) *postgres.ContextPublications {
-			p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID)
-			if e != nil {
-				t.Fatal(e)
-			}
-			return p
-		}
-		verify := publication("context_verify_runtime", "synthetic-context-verify")
-		audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
-		publish := publication("context_publish_runtime", "synthetic-context-publish")
-		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
+		// REQ-EVD-001: the stored outcome published the recording with the
+		// producer-reported native size.
+		var nativeBytes int64
+		if err = admin.QueryRow(ctx, "SELECT native_bytes FROM context_catalog WHERE capture_id=$1", accepted.CaptureID).Scan(&nativeBytes); err != nil || nativeBytes != int64(len(native)) {
+			t.Fatal("stored outcome did not publish the recording", nativeBytes, err)
 		}
 		verifier, err := objectstore.NewContextVerifier(bound, keys)
 		if err != nil {
 			t.Fatal(err)
 		}
-		checked := 0
-		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { checked++; return packets.NewHeadersCheck() })
-		s.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-		s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
-		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
-			t.Fatal(err)
-		}
-		unwraps := qualifyContextKeyUnwraps(t, ctx, admin, poolFor, s, e, accepted.CaptureID)
-		p := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-		col := got.Copies
-		published, err := p.Publish(ctx, accepted.CaptureID, col)
-		if err != nil {
-			t.Fatal("publication of the recording", err)
-		}
-		unwraps.afterPublication(ctx, accepted.CaptureID)
-		if checked != 1 {
-			t.Fatal("headers-only recheck not run", checked)
-		}
+		published := publishedContext{RootID: s.a.RootID, CaptureID: accepted.CaptureID, Expectation: e, Copies: got.Copies}
 		source, err := verifier.OpenNative(ctx, published.Expectation, published.Copies, time.Now().Add(30*time.Second))
 		if err != nil {
 			t.Fatal(err)

@@ -1,12 +1,9 @@
 package postgres
 
 import (
-	"bytes"
-
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 )
 
 // acceptedPublication validates the accepted capture row's durable structure.
@@ -18,28 +15,18 @@ func acceptedPublication(row custodydb.ContextCapture) (artifact.ContextExpectat
 	return e, nil
 }
 
-func currentVerificationReceipt(v custodydb.ContextVerification) bool {
-	if !v.AuditAcknowledgedAt.Valid || !v.VerifiedAt.Valid || v.AuditAcknowledgedAt.Time.Before(v.VerifiedAt.Time) || !v.AuditObjectKey.Valid || !v.AuditObjectVersion.Valid || !v.AuditObjectEtag.Valid || !v.AuditObjectBytes.Valid || len(v.AuditObjectSha256) != 32 || len(v.AuditDigest) != 32 || bytes.Equal(v.AuditDigest, make([]byte, 32)) {
-		return false
-	}
-	r := audit.Receipt{Key: v.AuditObjectKey.String, Version: v.AuditObjectVersion.String, ETag: v.AuditObjectEtag.String, Bytes: v.AuditObjectBytes.Int64}
-	copy(r.SHA256[:], v.AuditObjectSha256)
-	return r.ValidContextVerification(uid(v.RootID), uid(v.CaptureID))
-}
-
-// The query already joins both immutable records. Validate that same snapshot
-// at every current catalog/key/disclosure consumer, retaining its original
-// effective dates. API execution provenance remains the execution gate's job.
+// currentPublishedContext validates the joined capture and catalog row at
+// every current catalog, key and disclosure consumer.
 func currentPublishedContext(row custodydb.ReadPublishedContextRow) (artifact.ContextExpectation, error) {
-	c, v := row.ContextCapture, row.ContextVerification
+	c, cat := row.ContextCapture, row.ContextCatalog
 	e, err := acceptedPublication(c)
 	if err != nil {
 		return artifact.ContextExpectation{}, err
 	}
-	if _, err := verifiedAcquisition(e, v); err != nil {
+	if _, err := catalogAcquisition(e, cat.AcquisitionStartedAt, cat.AcquisitionCompletedAt); err != nil {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
-	if v.NativeBytes.Valid && (v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit) || !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, captureIntentDigest(c)) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
+	if cat.NativeBytes.Valid && (cat.NativeBytes.Int64 < 0 || cat.NativeBytes.Int64 > e.Registration.NativeLimit) || cat.RootID != c.RootID || cat.CaptureID != c.ID || len(cat.CopiesDigest) != 32 || !cat.PublishedAt.Valid || !cat.PublishedAt.Time.Before(e.Registration.WriteUntil) {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
 	return e, nil

@@ -160,7 +160,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		if err != nil {
 			return err
 		}
-		if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextVerification.CopiesDigest) || evidence.ContextCopiesDigest(stored.Copies) != a.Scope.Version {
+		if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextCatalog.CopiesDigest) || evidence.ContextCopiesDigest(stored.Copies) != a.Scope.Version {
 			return privacy.ErrFence
 		}
 		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}

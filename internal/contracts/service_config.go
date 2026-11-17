@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// Helm-native service inputs (federation, key service, publisher). Each
+// Helm-native service inputs (federation, key service). Each
 // component reads only Helm-rendered values from config.json under its fixed
 // root, the generated installation IDs from the <name>-ids Secret mounted at
 // IDsRoot, PEM CA bundles beside config.json and credentials from fixed
@@ -38,13 +38,7 @@ type ServicePostgres struct {
 	Database string `json:"database"`
 }
 
-type ServiceObjectStore struct {
-	Endpoint string `json:"endpoint"`
-	Region   string `json:"region"`
-	Bucket   string `json:"bucket"`
-}
-
-// FederationConfig, KeyServiceConfig and PublisherConfig carry only values
+// FederationConfig and KeyServiceConfig carry only values
 // Helm knows. Name is installation.name: object names (`<name>-<component>`,
 // `<name>-owner-source`, `<name>-cluster-catalog`, ...) and the OpenBao role
 // names (`<name>-<component>-<purpose>`) derive from it. OpenBao mounts are
@@ -109,17 +103,6 @@ type KeyServiceConfig struct {
 // configuration ConfigMap selects the profile SQL must currently audit.
 type KeyServiceDownloadsConfig struct{}
 
-type PublisherConfig struct {
-	Name        string             `json:"name"`
-	Namespace   string             `json:"namespace"`
-	PollSeconds int                `json:"pollSeconds"`
-	Batch       int                `json:"batch"`
-	Postgres    ServicePostgres    `json:"postgres"`
-	AuditStore  ServiceObjectStore `json:"auditStore"`
-	Evidence    ServiceObjectStore `json:"evidence"`
-	OpenBao     string             `json:"openBao"`
-}
-
 // decodeServiceConfig is a closed decode (no unknown fields, one value) that,
 // unlike the RPC codec, accepts Helm's rendering of omitted or reordered keys.
 func decodeServiceConfig[T any](r io.Reader) (T, error) {
@@ -145,7 +128,4 @@ func DecodeFederationConfig(r io.Reader) (FederationConfig, error) {
 }
 func DecodeKeyServiceConfig(r io.Reader) (KeyServiceConfig, error) {
 	return decodeServiceConfig[KeyServiceConfig](r)
-}
-func DecodePublisherConfig(r io.Reader) (PublisherConfig, error) {
-	return decodeServiceConfig[PublisherConfig](r)
 }

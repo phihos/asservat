@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json/jsontext"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/logs"
+	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 )
@@ -40,23 +42,24 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 	case artifact.PodStatusArtifact:
 		return &documentCheck{limit: artifact.MaxContextBytes, final: func(b []byte) error { return v.ValidateNative(b, e, m) }}, nil
 	case artifact.HTTPHeadersArtifact:
-		if e.Snapshot != nil {
-			return httpheaders.NewExpectationCheck(e), nil
-		}
-		return &documentCheck{limit: artifact.HTTPHeadersNativeLimit, final: jsonObject}, nil
+		// Strict canonical document within the accepted limits and only
+		// approved header values (ADR-282).
+		return httpheaders.NewExpectationCheck(e), nil
 	case artifact.PCAPNGArtifact:
+		// Headers-only packets (ADR-248).
 		if e.Snapshot != nil {
-			return &pcapngCheck{window: e.Snapshot, from: m.StartedAt, until: m.CompletedAt}, nil
+			return &pairCheck{first: &pcapngCheck{window: e.Snapshot, from: m.StartedAt, until: m.CompletedAt}, extra: packets.NewHeadersCheck()}, nil
 		}
-		return &pcapngCheck{}, nil
+		return &pairCheck{first: &pcapngCheck{}, extra: packets.NewHeadersCheck()}, nil
 	case artifact.RawPCAPNGArtifact:
-		return &pcapngCheck{}, nil // caps are rechecked by packets.CheckRaw
+		// The accepted per-protocol prefix caps (ADR-279).
+		return &pairCheck{first: &pcapngCheck{}, extra: packets.NewRawCheck(packets.RawLimitsFor(e.Recording))}, nil
 	case artifact.SyscallArgumentsArtifact:
 		return newArgumentsCheck(v, e, m)
 	case artifact.SyscallRecordsArtifact:
 		return &syscallCheck{v: v, pod: e.PodUID, from: m.StartedAt, until: m.CompletedAt}, nil
 	case artifact.PprofArtifact:
-		return &gzipCheck{}, nil // the publisher parses the profile (ADR-284)
+		return &gzipCheck{}, nil
 	case artifact.GoTraceArtifact:
 		return &traceHeaderCheck{}, nil
 	}
@@ -65,9 +68,9 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 
 // gzipCheck bounds a pprof response without decompressing it in the
 // wrapping process: one gzip member header (deflate, no reserved flags) and
-// a trailer whose declared length (ISIZE) is at most the publisher's
-// decompression bound. It keeps the last eight bytes only. The publisher
-// decompresses, verifies CRC and length and parses (ADR-284).
+// a trailer whose declared length (ISIZE) is at most the analyzer's
+// decompression bound. It keeps the last eight bytes only. The isolated
+// analyzer decompresses and parses at read time (ADR-284, ADR-286).
 type gzipCheck struct {
 	failure
 	head  []byte
@@ -107,7 +110,7 @@ func (c *gzipCheck) Close() error {
 }
 
 // traceHeaderCheck requires a version 2 Go execution trace header; the
-// publisher reads every event (ADR-284).
+// isolated analyzer reads every event at read time (ADR-284).
 type traceHeaderCheck struct {
 	failure
 	head []byte
@@ -413,3 +416,28 @@ func (c *syscallCheck) Close() error {
 
 // PacketCount is the structurally validated native packet count.
 func (c *pcapngCheck) PacketCount() uint64 { return c.packets }
+
+// pairCheck runs the structural PCAPNG check and a packet privacy check on
+// the same stream. Close is idempotent; it ends the privacy check's reader.
+type pairCheck struct {
+	first  *pcapngCheck
+	extra  NativeCheck
+	closed bool
+	err    error
+}
+
+func (c *pairCheck) Write(p []byte) error {
+	if err := c.first.Write(p); err != nil {
+		return err
+	}
+	return c.extra.Write(p)
+}
+
+func (c *pairCheck) Close() error {
+	if !c.closed {
+		c.closed, c.err = true, errors.Join(c.first.Close(), c.extra.Close())
+	}
+	return c.err
+}
+
+func (c *pairCheck) PacketCount() uint64 { return c.first.PacketCount() }

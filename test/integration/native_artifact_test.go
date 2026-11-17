@@ -342,8 +342,8 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal(err)
 	}
 	begin = time.Now()
-	if _, err = verifier.VerifyContext(ctx, e, copies); err != nil {
-		t.Fatal("full verification", err)
+	if _, err = readStoredNative(ctx, verifier, e, copies); err != nil {
+		t.Fatal("full authenticated read", err)
 	}
 	verified := time.Since(begin)
 	// The manifest provenance must equal the independent expectation exactly.
@@ -370,8 +370,8 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if x.Validate() != nil {
 			t.Fatal("mutated expectation invalid before verification", name)
 		}
-		if _, err = verifier.VerifyContext(ctx, x, copies); err == nil {
-			t.Fatal("verification accepted a changed expectation", name)
+		if _, err = readStoredNative(ctx, verifier, x, copies); err == nil {
+			t.Fatal("read accepted a changed expectation", name)
 		}
 	}
 

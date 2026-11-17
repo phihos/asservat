@@ -5,27 +5,28 @@ capture visible in the catalog.
 
 ## Publish on commit
 
-The producer validates the native format before encryption and writes the
-data, index and manifest objects with streamed SHA-256 checksums. When it
-reports the stored outcome, the regional reader verifies the commit envelope
-and decrypts and checks the manifest and index against the accepted
-expectation (capture, attempt, scope, reservation;
-[manifest verification](manifest-verification.md)). The hub then publishes in
-one SQL transaction:
+The producer validates the native format before encryption (headers-only or
+capped packets, approved HTTP header values, schema checks;
+[manifest verification](manifest-verification.md)) and writes the data,
+index, manifest and commit objects with streamed SHA-256 checksums. Its writer
+completion carries the copy receipts, the native size and, for Go profiles,
+the acquisition window. When the hub records that stored outcome, the same SQL
+transaction publishes:
 
-1. Insert the catalog entry with the stored effective retention deadlines.
-2. Settle the charge to the actual stored size.
-3. Write the `audit_event` row (D6) and `NOTIFY` capture progress.
+1. Store the copy receipts and mark the attempt stored.
+2. Insert the catalog row from the hub's admitted facts (target, capture,
+   action, audience, deadlines) plus the reported copy digest and native facts.
+   The INSERT triggers add the case/occurrence association, any capture-time
+   share and the progress `NOTIFY`.
+3. Settle the charge to the stored size and write the `audit_event` row.
 
-Data frames are not reread for publication; each read authenticates every
-frame by AEAD. The hub itself never decrypts the artifact. A retry of the same outcome is idempotent on the
-capture and artifact IDs. A failed check leaves the output stored, charged and
-invisible until deletion.
-
-The transaction locks only the capture's attempt and workload rows. Authority
-was checked at admission ([ADR-311](../decisions/311-operation-authority-recheck.md));
-publication checks the stored retention deadline and the capture's
-cancellation state, not a fresh authority proof.
+There is no separate verification stage and the hub never decrypts the
+artifact. Every read authenticates the commit, manifest, index and frames and
+checks the manifest against the catalog row; a mismatch fails the read with
+`Integrity`. A retry of the same outcome finds the row. The transaction locks
+the permission root, allocation, attempt and capture rows in that order.
+Authority was checked at admission
+([ADR-311](../decisions/311-operation-authority-recheck.md)).
 
 `RetainedAudience` reads joined catalog and accepted records and refuses
 deleted or read-expired artifacts. The authorization evaluator checks the

@@ -223,7 +223,6 @@ checksum/config: {{ $sum | sha256sum | quote }}
   "hubWorkerAudience" "asservat-configuration-provider"
   "hubAPIAudience" "asservat-owner-provider"
   "federationAudience" "asservat-federation-provider"
-  "publisherAudience" "asservat-publisher-provider"
 ) -}}
 {{- end -}}
 

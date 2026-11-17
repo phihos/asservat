@@ -6,9 +6,9 @@
 {{- $s3 := eq $s.objectStore.provider "seaweedfs" }}
 {{- $bao := eq $s.keyService.provider "openbao" }}
 {{- $p := include "asservat.providers" . | fromJson }}
-{{- $components := list "hub-api" "hub-worker" "federation" "key-service" "publisher" }}
+{{- $components := list "hub-api" "hub-worker" "federation" "key-service" }}
 {{- $accounts := dict }}
-{{- range list "hub-api" "hub-worker" "federation" "publisher" }}
+{{- range list "hub-api" "hub-worker" "federation" }}
 {{- $_ := set $accounts . (printf "%s-%s" $n .) }}
 {{- end }}
 {{- if and (not $pg) (not $s.postgres.external.adminSecret) }}{{ fail "services.postgres.external.adminSecret is required" }}{{ end }}

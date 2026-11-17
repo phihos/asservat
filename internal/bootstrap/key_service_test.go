@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 	"time"
 
@@ -93,26 +92,21 @@ func (a *recordingKeyAuthority) Resolve(context.Context, authorization.KeyPeer, 
 	return authorization.KeyOperationPermit{}, errors.New("synthetic authority")
 }
 
-// Without downloads the authority map is unchanged: an acquisition peer's
-// unwrap has no entry and never reaches the verifier authority. With them,
+// Without downloads the authority map holds only wraps: an acquisition
+// peer's unwrap has no entry and never reaches the wrap authority. With them,
 // the acquisition role resolves to exactly the native download key authority.
 func TestKeyServiceAuthoritiesAddAcquisitionOnlyWithDownloads(t *testing.T) {
-	wraps, verifier := &recordingKeyAuthority{}, &recordingKeyAuthority{}
-	plain := keyServiceAuthorities(wraps, verifier, nil)
-	keys := make([]string, 0, len(plain))
-	for k := range plain {
-		keys = append(keys, k)
+	wraps := &recordingKeyAuthority{}
+	plain := keyServiceAuthorities(wraps, nil)
+	if len(plain) != 1 || plain["wrap"] != authapp.KeyOperationAuthorizer(wraps) {
+		t.Fatal("authority map without downloads changed", plain)
 	}
-	slices.Sort(keys)
-	if !slices.Equal(keys, []string{"unwrap/verifier", "wrap"}) {
-		t.Fatal("authority map without downloads changed", keys)
-	}
-	if _, err := plain.Resolve(context.Background(), authorization.KeyPeer{Role: "acquisition"}, authorization.KeyRequestInfo{Operation: "unwrap"}); !errors.Is(err, authapp.ErrKeyDenied) || verifier.called || wraps.called {
+	if _, err := plain.Resolve(context.Background(), authorization.KeyPeer{Role: "acquisition"}, authorization.KeyRequestInfo{Operation: "unwrap"}); !errors.Is(err, authapp.ErrKeyDenied) || wraps.called {
 		t.Fatal("acquisition unwrap reached another authority without downloads", err)
 	}
 	native := &postgres.NativeKeyAuthority{}
-	downloads := keyServiceAuthorities(wraps, verifier, native)
-	if len(downloads) != 3 || downloads["unwrap/acquisition"] != authapp.KeyOperationAuthorizer(native) || downloads["unwrap/verifier"] != authapp.KeyOperationAuthorizer(verifier) || downloads["wrap"] != authapp.KeyOperationAuthorizer(wraps) {
+	downloads := keyServiceAuthorities(wraps, native)
+	if len(downloads) != 2 || downloads["unwrap/acquisition"] != authapp.KeyOperationAuthorizer(native) || downloads["wrap"] != authapp.KeyOperationAuthorizer(wraps) {
 		t.Fatal("acquisition unwrap is not the native download key authority")
 	}
 }

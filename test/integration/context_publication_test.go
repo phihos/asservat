@@ -13,57 +13,29 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/planning"
-	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-type contextPublicationTestGate struct {
-	check func(context.Context, artifact.ContextExpectation) (artifact.PublicationAuthority, error)
-}
-
-func (g contextPublicationTestGate) CheckContextPublication(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-	return g.check(ctx, e)
-}
 
 // Real SQL/S3/Tink, separate SQL roles and full native verification. This fixture
 // deliberately synthesizes collector/result/retention authority, not production
 // enrollment or permission to enable the public capture workflow.
 func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, releasePermissionBurst func()) {
 	t.Helper()
-	verifierPool := poolFor("context_verify_runtime", "synthetic-context-verify")
-	auditPool := poolFor("context_verification_audit_runtime", "synthetic-context-audit")
-	publishPool := poolFor("context_publish_runtime", "synthetic-context-publish")
 	readerPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
-	defer verifierPool.Close()
-	defer auditPool.Close()
-	defer publishPool.Close()
 	defer readerPool.Close()
-	for _, role := range []struct {
-		pool  *pgxpool.Pool
-		query string
-	}{
-		{verifierPool, "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0"},
-		{verifierPool, "UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()"},
-		{publishPool, "UPDATE context_verification SET authority_digest=authority_digest"},
-		{publishPool, "UPDATE custody_attempt SET expires_at=expires_at"},
-		{auditPool, "UPDATE context_verification SET expectation_digest=expectation_digest"},
-		{readerPool, "UPDATE context_catalog SET published_at=clock_timestamp()"},
-	} {
-		if _, err := role.pool.Exec(ctx, role.query); err == nil {
-			t.Fatal("publication facet has excess SQL privilege")
-		}
+	if _, err := readerPool.Exec(ctx, "UPDATE context_catalog SET published_at=clock_timestamp()"); err == nil {
+		t.Fatal("catalog reader has excess SQL privilege")
 	}
 	type fixture struct {
-		scenario                       captureAdmissionScenario
-		e                              artifact.ContextExpectation
-		copies                         artifact.Copies
-		nativeBytes                    int64
-		verify, audit, publish, reader *postgres.ContextPublications
-		publisher                      evidence.ContextPublisher
-		gate                           contextPublicationTestGate
+		scenario    captureAdmissionScenario
+		e           artifact.ContextExpectation
+		copies      artifact.Copies
+		nativeBytes int64
+		reader      *postgres.ContextPublications
+		// publish stands in for the stored-outcome transaction (REQ-EVD-001).
+		publish func(context.Context) (publishedContext, error)
 	}
 	var prepareAdmitted func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool, shareCohort ...bool) fixture
 	shareCaptures := map[string]shareCaptureAudit{}
@@ -113,14 +85,8 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
 			defer processing.Close()
 		}
-		for _, pair := range []struct {
-			pool *pgxpool.Pool
-			dst  **postgres.ContextPublications
-		}{{verifierPool, &f.verify}, {auditPool, &f.audit}, {publishPool, &f.publish}, {readerPool, &f.reader}} {
-			*pair.dst, err = postgres.NewContextPublications(ctx, pair.pool, s.a.RootID)
-			if err != nil {
-				t.Fatal(err)
-			}
+		if f.reader, err = postgres.NewContextPublications(ctx, readerPool, s.a.RootID); err != nil {
+			t.Fatal(err)
 		}
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
 			t.Fatal("reservation became evidence")
@@ -149,20 +115,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		verifier, err := objectstore.NewContextVerifier(bound, open)
-		if err != nil {
-			t.Fatal(err)
+		f.publish = func(ctx context.Context) (publishedContext, error) {
+			return publishStoredFixture(ctx, admin, f.e, f.copies, f.nativeBytes, nil)
 		}
-		f.gate = contextPublicationTestGate{check: func(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-			projection, err := s.p.Permissions(ctx, s.a.Eligibility.Target)
-			if err != nil {
-				return artifact.PublicationAuthority{}, publicationStepError("permission gate", err)
-			}
-			now := time.Now().UTC()
-			return artifact.PublicationAuthority{RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: projection.Revision.UID, PermissionSequence: projection.Revision.Generation, ProjectionDigest: artifact.Digest(projection.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{99}, CheckedAt: now, ValidUntil: minPublicationTime(now.Add(5*time.Second), projection.FreshUntil)}, nil
-		}}
-		f.publisher = evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: f.verify, ContextVerificationRecorder: f.verify, ContextVerificationAuditor: f.audit, ContextCatalogPublisher: f.publish}, Authority: f.gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-		f.publisher.Ledger = publicationDiagnosticLedger{f.publisher.Ledger}
 		if processingCheck != nil {
 			processingCheck(f, processing)
 		}
@@ -175,106 +130,30 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	}
 	setup := func(t *testing.T) fixture { return setupWithKeys(t, nil, nil) }
 
-	for _, legacy := range []bool{false, true} {
-		name := "verified-native-length"
-		if legacy {
-			name += "-legacy"
+	t.Run("published-native-length-and-progress", func(t *testing.T) {
+		f := setup(t)
+		if _, err := f.publish(ctx); err != nil {
+			t.Fatal(err)
 		}
-		t.Run(name, func(t *testing.T) {
-			f := setup(t)
-			a, err := f.gate.CheckContextPublication(ctx, f.e)
-			if err != nil {
-				t.Fatal(err)
-			}
-			verified, err := f.publisher.Verifier.VerifyContext(ctx, f.e, f.copies)
-			if err != nil || verified.NativeBytes != f.nativeBytes {
-				t.Fatal("actual native length", verified, f.nativeBytes, err)
-			}
-			record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified)
-			if err != nil || record.NativeBytes == nil || *record.NativeBytes != f.nativeBytes {
-				t.Fatal("recorded native length", record.NativeBytes, err)
-			}
-			if legacy {
-				// Explicit historical fixture: represent a pre-130 verification before
-				// writing its original size-omitting encrypted audit. Runtime cannot do this.
-				tx, err := admin.Begin(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
-				defer tx.Rollback(context.Background())
-				if _, err = tx.Exec(ctx, "ALTER TABLE context_verification DISABLE TRIGGER context_verification_immutable"); err != nil {
-					t.Fatal(err)
-				}
-				if _, err = tx.Exec(ctx, "UPDATE context_verification SET native_bytes=NULL WHERE capture_id=$1", f.e.CaptureUID); err != nil {
-					t.Fatal(err)
-				}
-				if _, err = tx.Exec(ctx, "ALTER TABLE context_verification ENABLE TRIGGER context_verification_immutable"); err != nil {
-					t.Fatal(err)
-				}
-				if err = tx.Commit(ctx); err != nil {
-					t.Fatal(err)
-				}
-				record.NativeBytes = nil
-			} else {
-				if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: verified.NativeBytes + 1}); err == nil {
-					t.Fatal("verification replay changed native length")
-				}
-				// Check immutability before audit acknowledgement as well.
-				if _, err = admin.Exec(ctx, "UPDATE context_verification SET native_bytes=native_bytes+1 WHERE capture_id=$1", f.e.CaptureUID); err == nil {
-					t.Fatal("unaudited native length mutable")
-				}
-			}
-			receipt, err := f.publisher.Audit.WriteContextVerification(ctx, record)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-				t.Fatal(err)
-			}
-			if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err != nil {
-				t.Fatal(err)
-			}
-			progressPool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
-			defer progressPool.Close()
-			progressReader, err := postgres.NewContextProgressReads(ctx, progressPool, f.scenario.a.RootID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			progress, err := progressReader.ReadContextProgress(ctx, progressQuery(t, ctx, f.scenario))
-			if err != nil || progress.Phase != "Succeeded" || progress.ReasonCode != "Published" {
-				t.Fatal("published progress lost verified-size audit", legacy, progress, err)
-			}
-			got, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if legacy {
-				if got.NativeBytes != nil {
-					t.Fatal("legacy unknown length invented", *got.NativeBytes)
-				}
-			} else if got.NativeBytes == nil || *got.NativeBytes != f.nativeBytes {
-				t.Fatal("catalog lost verified length", got.NativeBytes)
-			}
-			// Ordinary replay does not backfill or rewrite the old immutable audit.
-			replay, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified)
-			if err != nil || (replay.NativeBytes == nil) != legacy {
-				t.Fatal("replay changed legacy interpretation", err)
-			}
-			replayReceipt, err := f.publisher.Audit.WriteContextVerification(ctx, replay)
-			if err != nil || replayReceipt != receipt {
-				t.Fatal("immutable verification audit changed", err)
-			}
-			if _, err = admin.Exec(ctx, "UPDATE context_verification SET native_bytes=42 WHERE capture_id=$1", f.e.CaptureUID); err == nil {
-				t.Fatal("acknowledged native length mutable")
-			}
-			if !legacy {
-			}
-		})
-	}
+		progressPool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
+		defer progressPool.Close()
+		progressReader, err := postgres.NewContextProgressReads(ctx, progressPool, f.scenario.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		progress, err := progressReader.ReadContextProgress(ctx, progressQuery(t, ctx, f.scenario))
+		if err != nil || progress.Phase != "Succeeded" || progress.ReasonCode != "Published" {
+			t.Fatal("published progress", progress, err)
+		}
+		got, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
+		if err != nil || got.NativeBytes == nil || *got.NativeBytes != f.nativeBytes {
+			t.Fatal("catalog lost producer-reported native length", got.NativeBytes, err)
+		}
+	})
 
 	t.Run("existing-artifact-raw-grants", func(t *testing.T) {
 		f := setup(t)
-		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
 		record, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
@@ -286,79 +165,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		}, releasePermissionBurst)
 	})
 
-	qualifyPermissionPublicationAuditHistory(t, ctx, admin, func(t *testing.T) permissionPublicationAuditFixture {
-		f := setup(t)
-		return permissionPublicationAuditFixture{nativeBytes: f.nativeBytes, expectation: f.e, copies: f.copies, verify: f.verify, audit: f.audit, publish: f.publish, gate: f.gate, publisher: f.publisher}
-	})
-
-	// Each version case starts with a new genuine published fixture and keeps the
-	// original short authority throughout corruption, denial and exact restore.
-	for _, kind := range []string{"verification"} {
-		for _, version := range []string{"", "null"} {
-			label := version
-			if label == "" {
-				label = "empty"
-			}
-			t.Run("publication-audit-history-"+kind+"-"+label, func(t *testing.T) {
-				f := setup(t)
-				if _, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-					t.Fatal("unpublished custody became an approved projection source")
-				}
-				original, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
-				if err != nil {
-					t.Fatal("original published fixture", err)
-				}
-				authority, err := f.gate.CheckContextPublication(ctx, f.e)
-				if err != nil {
-					t.Fatal("original publication authority", err)
-				}
-				positive := func() {
-					t.Helper()
-					if _, err := f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err != nil {
-						t.Fatal("positive audience", err)
-					}
-					if _, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID); err != nil {
-						t.Fatal("positive download catalog", err)
-					}
-					projection, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID)
-					if err != nil || projection.CaseID != f.e.CaseID || projection.CaptureID != f.e.CaptureUID || projection.Version != evidence.ContextCopiesDigest(f.copies) ||
-						projection.SourceFormat != artifact.ContextFormat || projection.SourceProjectionDigest != analysis.ContextSourceProjectionDigest() || projection.DataClass != "metadata" ||
-						projection.Retained.Registration.Location != f.e.Registration.Location || !projection.Retained.Effective.ExpiresAt.Equal(f.e.Registration.ExpiresAt) ||
-						!projection.ValidUntil.After(projection.ObservedAt) || projection.ValidUntil.After(projection.ObservedAt.Add(identity.EvidenceReadRequestWindow)) {
-						t.Fatal("approved projection lost protected source identity or original bounds", err)
-					}
-					replay, err := f.publish.PublishContext(ctx, f.e, f.copies, authority)
-					if err != nil || !replay.PublishedAt.Equal(original.PublishedAt) {
-						t.Fatal("positive original publication replay", err)
-					}
-				}
-				positive()
-				withPublicationAuditVersion(t, ctx, admin, kind, f.e.CaptureUID, version, func() {
-					if _, err := f.publish.PublishContext(ctx, f.e, f.copies, authority); err == nil {
-						t.Fatal("historical audit authorized publication replay")
-					}
-					if _, err := f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-						t.Fatal("historical audit became current audience")
-					}
-					if _, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-						t.Fatal("historical audit became download catalog authority")
-					}
-					if _, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-						t.Fatal("historical audit became approved projection source authority")
-					}
-					if !authority.Valid(f.e, evidence.ContextExpectationDigest(f.e), time.Now()) {
-						t.Fatal("receipt denial crossed original authority deadline")
-					}
-				})
-				positive()
-			})
-		}
-	}
-
 	t.Run("processing-restrictions-before-publication-and-prepaid-release", func(t *testing.T) {
 		setupWithKeys(t, nil, func(f fixture, processing *processingTestFixture) {
 			qualifyProcessingRestrictions(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, processing, func() error {
-				_, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+				_, err := f.publish(ctx)
 				return err
 			})
 		})
@@ -366,10 +176,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 
 	t.Run("processing-restriction-fences-prepaid-native-output", func(t *testing.T) {
 		setupWithKeys(t, nil, func(f fixture, processing *processingTestFixture) {
-			if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+			if _, err := f.publish(ctx); err != nil {
 				t.Fatal(err)
 			}
-			qualifyProcessingDownloadEffects(t, ctx, poolFor, store, keys, f.scenario, artifact.PublishedContext{Expectation: f.e, Copies: f.copies}, f.reader, processing)
+			qualifyProcessingDownloadEffects(t, ctx, poolFor, store, keys, f.scenario, publishedContext{Expectation: f.e, Copies: f.copies}, f.reader, processing)
 		})
 	})
 
@@ -401,7 +211,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				if err := s.p.RefreshPermissions(ctx, batch); err != nil {
 					t.Fatal("refresh discovery publication permissions", err)
 				}
-				if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+				if _, err := f.publish(ctx); err != nil {
 					t.Fatal("publish discovery fixture", err)
 				}
 			}
@@ -413,14 +223,14 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	t.Run("ordinary-case-metadata-navigation-and-private-routing", func(t *testing.T) {
 		f := setup(t)
 		qualifyContextCase(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, func() error {
-			_, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+			_, err := f.publish(ctx)
 			return err
 		})
 	})
 
 	t.Run("evidence-share-recipient-read-revocation-expiry-and-deny", func(t *testing.T) {
 		f := setupAdmitted(t, nil, nil, nil, true)
-		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
 		publishAuthority := func() error {
@@ -431,7 +241,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 
 	t.Run("access-grant-approval-children-pool-revocation-and-expiry", func(t *testing.T) {
 		f := setup(t)
-		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
 		publishAuthority := func() error {
@@ -443,21 +253,15 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	t.Run("capture-time-share-once-at-publication-and-owner-checked-at-admission", func(t *testing.T) {
 		qualifyCaptureShare(t, ctx, admin, poolFor, create, func(t *testing.T, admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) captureShareFixture {
 			f := setupAdmitted(t, nil, nil, admit, true)
-			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) },
-				replay: func() error {
-					a, err := f.gate.CheckContextPublication(ctx, f.e)
-					if err == nil {
-						_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
-					}
-					return err
-				}}
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (publishedContext, error) { return f.publish(ctx) },
+				replay: func() error { _, err := f.publish(ctx); return err }}
 		})
 	})
 
 	t.Run("policy-share-counter-limit-end-stop-and-revoke-all", func(t *testing.T) {
 		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
 			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize, true)
-			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (publishedContext, error) { return f.publish(ctx) }}
 		}, func(t *testing.T, s *captureAdmissionScenario) shareCaptureAudit {
 			qualified := newShareCaptureAudit(t, ctx, admin, poolFor, store, keys, *s)
 			s.s = qualified.admissions
@@ -469,7 +273,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	t.Run("policy-share-admitted-wide-sample-and-100-batch-cost", func(t *testing.T) {
 		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
 			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize, true)
-			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (publishedContext, error) { return f.publish(ctx) }}
 		}, func(t *testing.T, s *captureAdmissionScenario) shareCaptureAudit {
 			qualified := newShareCaptureAudit(t, ctx, admin, poolFor, store, keys, *s)
 			s.s = qualified.admissions
@@ -478,7 +282,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		}, true)
 	})
 
-	t.Run("progress-revisions-follow-durable-verification-audit-and-publication", func(t *testing.T) {
+	t.Run("progress-revisions-follow-publication", func(t *testing.T) {
 		f := setup(t)
 		pool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
 		t.Cleanup(pool.Close)
@@ -497,51 +301,26 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		check("Pending", "DispatchUnconfirmed", true)
 		check("Pending", "DispatchUnconfirmed", false)
-		a, err := f.gate.CheckContextPublication(ctx, f.e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
-		if err != nil {
-			t.Fatal(err)
-		}
-		check("Finalizing", "VerificationAuditPending", true)
-		if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes}); err != nil {
-			t.Fatal(err)
-		}
-		check("Finalizing", "VerificationAuditPending", false)
-		receipt, err := f.publisher.Audit.WriteContextVerification(ctx, record)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-			t.Fatal(err)
-		}
-		check("Finalizing", "PublicationPending", true)
-		if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-			t.Fatal(err)
-		}
-		check("Finalizing", "PublicationPending", false)
-		if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err != nil {
+		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
 		check("Succeeded", "Published", true)
-		if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err != nil {
+		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
 		check("Succeeded", "Published", false)
 	})
 
-	t.Run("verified-publication-concurrent-idempotent-and-readable", func(t *testing.T) {
+	t.Run("publication-concurrent-idempotent-and-readable", func(t *testing.T) {
 		f := setup(t)
 		var wg sync.WaitGroup
-		out := make(chan artifact.PublishedContext, 8)
+		out := make(chan publishedContext, 8)
 		errs := make(chan error, 8)
 		for i := 0; i < 8; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				r, e := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+				r, e := f.publish(ctx)
 				out <- r
 				errs <- e
 			}()
@@ -584,126 +363,8 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		// Join the eight-way publication burst before the processing and native
 		// download fixtures need the same bounded server connections.
 		releasePermissionBurst()
-		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool} {
+		for _, pool := range []*pgxpool.Pool{readerPool} {
 			pool.Reset()
-		}
-	})
-	t.Run("verification-audit-failure-stays-invisible", func(t *testing.T) {
-		f := setup(t)
-		f.publisher.Audit = &objectstore.ContextVerificationObjects{Store: store, Open: keys}
-		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err == nil {
-			t.Fatal("failed audit published")
-		}
-		if _, err := f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-			t.Fatal("verified without audit became visible")
-		}
-		var before time.Time
-		if err := admin.QueryRow(ctx, "SELECT verified_at FROM context_verification WHERE capture_id=$1", f.e.CaptureUID).Scan(&before); err != nil {
-			t.Fatal(err)
-		}
-		f.publisher.Audit = &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}
-		r, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
-		if err != nil || !r.VerifiedAt.Equal(before) {
-			t.Fatal("retry renewed verification", err)
-		}
-	})
-	t.Run("generic-custody-cannot-publish", func(t *testing.T) {
-		f := setup(t)
-		genericPool := poolFor("custody_runtime", "synthetic-runtime")
-		defer genericPool.Close()
-		generic, err := postgres.New(ctx, genericPool)
-		if err != nil {
-			t.Fatal(err)
-		}
-		bound, err := store.ForCustody(f.e.Registration.StoreID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = (evidence.Custodian{Ledger: generic, Verifier: bound}).VerifyAndStore(ctx, f.e.Registration, f.copies); err != nil {
-			t.Fatal(err)
-		}
-		a, err := f.gate.CheckContextPublication(ctx, f.e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err == nil {
-			t.Fatal("unverified copies published")
-		}
-		bad := f.copies
-		bad[0].SHA256[0]++
-		if _, err = f.publisher.Publish(ctx, f.e.CaptureUID, bad); err == nil {
-			t.Fatal("bad bytes published")
-		}
-		var n int
-		if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_verification WHERE capture_id=$1", f.e.CaptureUID).Scan(&n); err != nil || n != 0 {
-			t.Fatal("failed verifier wrote proof", err)
-		}
-	})
-	t.Run("publication-rechecks-locked-authority-and-expiry", func(t *testing.T) {
-		f := setup(t)
-		a, err := f.gate.CheckContextPublication(ctx, f.e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
-		if err != nil {
-			t.Fatal(err)
-		}
-		objects := &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}
-		receipt, err := objects.WriteContextVerification(ctx, record)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-			t.Fatal(err)
-		}
-		bad := receipt
-		bad.SHA256[0]++
-		if err = f.audit.AcknowledgeContextVerification(ctx, record, bad); err == nil {
-			t.Fatal("audit receipt replaced")
-		}
-		if _, err = admin.Exec(ctx, "UPDATE context_verification SET authority_digest=decode(repeat('01',32),'hex') WHERE capture_id=$1", f.e.CaptureUID); err == nil {
-			t.Fatal("immutable verification replaced")
-		}
-		tx, err := admin.Begin(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer tx.Rollback(ctx)
-		if _, err = tx.Exec(ctx, "SELECT id FROM custody_allocation WHERE id=$1 FOR UPDATE", f.e.Registration.AllocationID); err != nil {
-			t.Fatal(err)
-		}
-		a.CheckedAt = time.Now().UTC()
-		a.ValidUntil = a.CheckedAt.Add(100 * time.Millisecond)
-		done := make(chan error, 1)
-		go func() { _, err := f.publish.PublishContext(ctx, f.e, f.copies, a); done <- err }()
-		time.Sleep(200 * time.Millisecond)
-		if err = tx.Commit(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err = <-done; err == nil {
-			t.Fatal("expired lock waiter published")
-		}
-		a, err = f.gate.CheckContextPublication(ctx, f.e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", f.scenario.a.RootID); err != nil {
-			t.Fatal(err)
-		}
-		if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err == nil {
-			t.Fatal("revoked root published")
-		}
-		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
-			t.Fatal("failed publication became readable")
-		}
-		// Exact historical audit remains idempotent after revocation.
-		if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-			t.Fatal(err)
-		}
-		var charged int64
-		if err = admin.QueryRow(ctx, "SELECT charged_bytes FROM custody_allocation WHERE id=$1", f.e.Registration.AllocationID).Scan(&charged); err != nil || charged != f.e.Registration.ReservedBytes() {
-			t.Fatal("failed publication refunded custody", err)
 		}
 	})
 	// Finished publication bursts must not retain all their idle connections
@@ -714,45 +375,45 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		// Release those idle connections through that owner; keep the server
 		// budget, per-pool ceiling and later eight-way race unchanged.
 		releasePermissionBurst()
-		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool} {
+		for _, pool := range []*pgxpool.Pool{readerPool} {
 			pool.Reset()
 		}
 	}
 	releaseBurstConnections()
-	qualifyDownloadSessions(t, ctx, admin, poolFor, store, keys, func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext) {
+	qualifyDownloadSessions(t, ctx, admin, poolFor, store, keys, func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, publishedContext) {
 		f := setupWithKeys(t, provider, nil)
 		call := ctx
 		if f.scenario.nativeSources != nil {
 			call = f.scenario.nativeSources.ctx
 		}
-		published, err := f.publisher.Publish(call, f.e.CaptureUID, f.copies)
+		published, err := f.publish(call)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return f.scenario, published
 	}, releaseBurstConnections)
 	releaseBurstConnections()
-	qualifyDownloadControl(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
+	qualifyDownloadControl(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, publishedContext) {
 		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+		p, err := f.publish(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return f.scenario, p
 	})
 	releaseBurstConnections()
-	qualifyDownloadResponses(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
+	qualifyDownloadResponses(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, publishedContext) {
 		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+		p, err := f.publish(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return f.scenario, p
 	})
 	releaseBurstConnections()
-	qualifyDownloadStop(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
+	qualifyDownloadStop(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, publishedContext) {
 		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+		p, err := f.publish(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -28,7 +28,7 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		"goose_db_version", "fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit",
 		"retention_policy", "retention_decision",
 		"context_storage_binding", "custody_allocation", "custody_pool",
-		"context_capture", "context_catalog", "custody_attempt", "context_verification", "context_execution", "context_case_locator",
+		"context_capture", "context_catalog", "custody_attempt", "context_execution", "context_case_locator",
 		"processing_root", "context_processing", "processing_rule",
 		// ADR-245: read with the permission projection that joins them.
 		"permission_review_source", "permission_review_assignment", "permission_review_decision",

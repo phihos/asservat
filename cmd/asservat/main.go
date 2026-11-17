@@ -18,12 +18,12 @@ var withArguments = []string{"download-worker", "setup"}
 // One-shot commands report a cancellation as a failure.
 var oneShot = []string{"secrets", "setup"}
 
-var commands = []string{"secrets", "setup", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "publisher", "node"}
+var commands = []string{"secrets", "setup", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "node"}
 
 func main() { os.Exit(run()) }
 func run() int {
 	if len(os.Args) < 2 || !slices.Contains(commands, os.Args[1]) || !slices.Contains(withArguments, os.Args[1]) && len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | publisher | node")
+		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | node")
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -42,8 +42,6 @@ func run() int {
 		err = bootstrap.RunFederation(ctx)
 	case "key-service":
 		err = bootstrap.RunKeyService(ctx)
-	case "publisher":
-		err = bootstrap.RunPublisher(ctx)
 	case "node":
 		err = bootstrap.RunNode(ctx, os.Getenv(contracts.NodePodUIDEnvironment))
 	case "hub-worker":

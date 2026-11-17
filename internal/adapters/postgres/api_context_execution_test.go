@@ -2,10 +2,11 @@ package postgres
 
 import (
 	"encoding/json"
-	"github.com/jackc/pgx/v5/pgtype"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
@@ -39,9 +40,6 @@ func apiCompletedFixture(t *testing.T) (custodydb.ReadContextProgressFactsRow, v
 	for i := range r.Copies {
 		r.Copies[i] = artifact.CopyReceipt{VersionID: "v1", ETag: "synthetic", Bytes: 100, SHA256: artifact.Digest{byte(i + 1)}}
 	}
-	if !validCompletedAPI(r, e) {
-		t.Fatal("invalid completed fixture")
-	}
 	bj, _ := json.Marshal(b)
 	pj, _ := json.Marshal(p)
 	cj, _ := json.Marshal(r.Copies)
@@ -64,38 +62,6 @@ func TestAPIExecutionStoredResultDecodingRejectsSubstitution(t *testing.T) {
 		})
 	}
 }
-func TestAPIVerificationAuditRequiresExactCompletedResult(t *testing.T) {
-	f, r, _ := apiCompletedFixture(t)
-	e, err := acceptedPublication(f.ContextCapture)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ad := app.APIExecutionDigest(r)
-	v := custodydb.ContextVerification{CaptureID: f.ContextCapture.ID, RootID: f.ContextCapture.RootID, VerifiedAt: ts(r.CompletedAt.Add(time.Second)), ExpectationDigest: digest(e), CopiesDigest: digest(r.Copies), IntentDigest: captureIntentDigest(f.ContextCapture), AuthorityDigest: ad[:], PermissionEpoch: f.ContextCapture.PermissionEpoch, PermissionSequence: 1}
-	record, err := verificationRecord(f.ContextCapture, v, r)
-	if err != nil || record.APIOutcome == nil || record.APIOutcome.StartObjectUID != r.ObjectUID || !record.Valid() {
-		t.Fatal("completed provenance omitted", err)
-	}
-	if _, err = verificationRecord(f.ContextCapture, v); err == nil {
-		t.Fatal("missing result accepted")
-	}
-	wrong := r
-	wrong.Process.ProcessEpoch = e.OccurrenceID
-	wrong.Binding.CollectorEpoch = wrong.Process.ProcessEpoch
-	if _, err = verificationRecord(f.ContextCapture, v, wrong); err == nil {
-		t.Fatal("other process outcome accepted")
-	}
-	wrong = r
-	wrong.Copies[0].SHA256[0]++
-	if _, err = verificationRecord(f.ContextCapture, v, wrong); err == nil {
-		t.Fatal("other result accepted")
-	}
-	v.VerifiedAt = ts(r.AcquiredAt)
-	if _, err = verificationRecord(f.ContextCapture, v, r); err == nil {
-		t.Fatal("verification predates completed result")
-	}
-}
-
 func TestAPIProfileUnavailableOutcomeHasNoAcquisitionOrCopies(t *testing.T) {
 	_, terminal, row := apiCompletedFixture(t)
 	terminal.Phase, terminal.AcquiredAt, terminal.Copies = "profileUnavailable", time.Time{}, artifact.Copies{}
@@ -124,7 +90,7 @@ func TestAPIProfileUnavailableOutcomeHasNoAcquisitionOrCopies(t *testing.T) {
 }
 func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 	f, r, _ := apiCompletedFixture(t)
-	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"profilerBusy", "Failed", "ProfilerBusy"}, {"profileUnavailable", "Failed", "ProfileUnavailable"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
+	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"profilerBusy", "Failed", "ProfilerBusy"}, {"profileUnavailable", "Failed", "ProfileUnavailable"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "PublicationPending"}} {
 		t.Run(tc.state, func(t *testing.T) {
 			x := r
 			x.Phase = tc.state

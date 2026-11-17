@@ -13,7 +13,6 @@ import (
 type ContextRetirementDependencies struct {
 	ObservedAt                                                         time.Time
 	CustodyDeleted                                                     bool
-	VerificationAuditPending                                           bool
 	ExecutionUnresolved, RetainedCopyReceipts                          bool
 	DownloadDependents, RetentionAuditPending, RetentionCatchupPending bool
 }

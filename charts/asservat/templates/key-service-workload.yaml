@@ -12,7 +12,7 @@
   "postgres" $p.postgres
   "openBao" $p.openBao.endpoint
   "connectorTokens" (include "asservat.connectorTokens" . | fromJson) }}
-{{- $purposes := list "key-configuration" "key-wrap" "key-verify" }}
+{{- $purposes := list "key-configuration" "key-wrap" }}
 {{- $rules := list }}
 {{- if $d.enabled }}
 {{- $_ := set $config "downloads" dict }}

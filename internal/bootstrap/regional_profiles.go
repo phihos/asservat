@@ -231,6 +231,7 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 	copies, err := p.Store(storeCtx, body, r.Outcome.StartedAt.UTC(), r.Outcome.CompletedAt.UTC())
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	out := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued, Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
+	p.AddFacts(&out.Completion)
 	if err != nil || !out.Valid(e.Registration) {
 		if h.log != nil {
 			stage := "completion"

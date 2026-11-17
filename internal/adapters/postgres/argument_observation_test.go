@@ -1,18 +1,17 @@
 package postgres
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/targets"
-	"bytes"
-	"context"
-	"errors"
-	"github.com/jackc/pgx/v5/pgtype"
-	"testing"
-	"time"
 )
 
 func argumentObservationRowFixture() custodydb.PolicyObservationSession {
@@ -67,29 +66,6 @@ func TestArgumentObservationPinsDistinctOriginalTuple(t *testing.T) {
 		t.Fatal("instant-preserving SQL timezone", err)
 	}
 }
-func TestArgumentHistoricalPublicationSourceDoesNotRenewPermit(t *testing.T) {
-	r := argumentObservationRowFixture()
-	e := artifact.ContextExpectation{CaptureUID: uid(r.CaptureID), ActionID: r.ActionID, PodUID: r.PodUid, Registration: artifact.Registration{Location: artifact.Location{AttemptID: uid(r.AttemptID)}}, Recording: &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: r.DurationMillis, MaxBytes: 65536, Syscalls: &artifact.RecordingSyscalls{Names: []string{"openat"}, MaxEventsPerSecond: r.MaxEventsPerSecond, MaxTrackedThreads: r.MaxTrackedThreads}, Arguments: &artifact.RecordingArguments{MaxProbeBytes: r.MaxProbeBytes, MaxBytesPerEvent: r.MaxBytesPerEvent, MaxBytesPerSecond: r.MaxBytesPerSecond}}}
-	copy(e.Recording.Arguments.ProgramDigest[:], r.ProgramDigest)
-	copy(e.Recording.Arguments.DefinitionDigest[:], r.ArgumentDefinitionDigest)
-	copy(e.Recording.Arguments.AccountingRule[:], r.AccountingRule)
-	d := evidence.ContextExpectationDigest(e)
-	r.ExpectationDigest = d[:]
-	r.BindingScope = argumentObservationScope(r)
-	r.EndedAt = pgtype.Timestamptz{Time: r.SessionUntil.Time, Valid: true}
-	p, err := argumentSourceProvenance(r, e)
-	if err != nil || p.NodeUID != r.NodeUid || p.BootID != r.BootID || p.CollectorEpoch != r.CollectorEpoch || p.SessionID != uid(r.ID) || p.Fence != uid(r.Fence) || !p.Until.Equal(r.SessionUntil.Time) {
-		t.Fatal(p, err)
-	}
-	if _, err = argumentObservationPermit(r); err == nil {
-		t.Fatal("ended historical provenance became active permit")
-	}
-	e.Recording.Arguments.MaxBytesPerEvent++
-	if _, err = argumentSourceProvenance(r, e); err == nil {
-		t.Fatal("different accepted expected receipt admitted")
-	}
-}
-
 func TestArgumentCannotUseOrdinaryOrPacketPreparation(t *testing.T) {
 	r := &artifact.Recording{Kind: "syscallTrace", Profile: "arguments"}
 	if !policyRecordingNeedsGrant(r) {

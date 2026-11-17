@@ -219,7 +219,7 @@ func TestNodeArgumentObservationEndsBeforeDelayedJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = check.Write(native); err != nil {
-		t.Fatalf("bounded artifact rejected by independent publisher: %v\n%s", err, native)
+		t.Fatalf("bounded artifact rejected by the native check: %v\n%s", err, native)
 	}
 	if err = check.Close(); err != nil {
 		t.Fatal(err)

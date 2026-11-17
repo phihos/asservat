@@ -7,13 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"crypto/sha256"
+
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
-	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
-	"crypto/sha256"
 )
 
 func TestStoredSnapshotProjectionKeepsOriginalAcceptance(t *testing.T) {
@@ -114,30 +113,6 @@ func checkSnapshotPublicationDigests(t *testing.T, nativeLimit int64) {
 	facts.ContextCapture.SnapshotCoverage, _ = json.Marshal(coverage)
 	facts.ContextCapture.SnapshotCoverageDigest = digest(coverage)
 	facts.ContextCapture.SnapshotExpectationDigest = digest(final)
-	if !validCompletedAPICapture(execution, final, facts.ContextCapture) {
-		t.Fatal("legitimate final projection rejected")
-	}
-	if validCompletedAPI(execution, final) {
-		t.Fatal("test failed to separate initial and final digests")
-	}
-	authorityDigest := executionapp.APIExecutionDigest(execution)
-	verification := custodydb.ContextVerification{CaptureID: facts.ContextCapture.ID, RootID: facts.ContextCapture.RootID, VerifiedAt: ts(execution.CompletedAt.Add(time.Second)), ExpectationDigest: digest(final), CopiesDigest: digest(execution.Copies), IntentDigest: captureIntentDigest(facts.ContextCapture), AuthorityDigest: authorityDigest[:], PermissionEpoch: facts.ContextCapture.PermissionEpoch, PermissionSequence: 1}
-	record, err := verificationRecord(facts.ContextCapture, verification, execution)
-	if err != nil || record.APIOutcome == nil || record.ExpectationDigest == execution.ExpectationDigest || record.APIOutcome.ExecutionDigest != authorityDigest {
-		t.Fatal("lost original execution versus final manifest audit binding", err)
-	}
-	changed := execution
-	changed.ExpectationDigest = evidence.ContextExpectationDigest(final)
-	if validCompletedAPICapture(changed, final, facts.ContextCapture) {
-		t.Fatal("completion rewrote accepted execution digest")
-	}
-	missing := facts.ContextCapture
-	missing.SnapshotCoverage = nil
-	missing.SnapshotCoverageDigest = nil
-	missing.SnapshotExpectationDigest = nil
-	if validCompletedAPICapture(execution, final, missing) {
-		t.Fatal("snapshot publication lacked retained completion")
-	}
 	observed, err := acceptedPublication(facts.ContextCapture)
 	if err != nil || !reflect.DeepEqual(observed, final) {
 		t.Fatal("publication lost independently derived lifecycle", err)

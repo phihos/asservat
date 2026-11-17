@@ -54,7 +54,7 @@ func TestSmallOpenBaoSetupSudoOnlyTwoExactAuthMounts(t *testing.T) {
 // policy globs are per component.
 func TestSmallOpenBaoSetupPoliciesArePerComponent(t *testing.T) {
 	for path := range smallOpenBaoPolicyPaths(t) {
-		if strings.HasPrefix(path, "sys/policies/acl/") && !slices.ContainsFunc([]string{"hub-api", "hub-worker", "federation", "publisher"}, func(c string) bool { return path == "sys/policies/acl/trial-"+c+"-*" }) {
+		if strings.HasPrefix(path, "sys/policies/acl/") && !slices.ContainsFunc([]string{"hub-api", "hub-worker", "federation"}, func(c string) bool { return path == "sys/policies/acl/trial-"+c+"-*" }) {
 			t.Fatal("policy path outside the component prefixes", path)
 		}
 	}

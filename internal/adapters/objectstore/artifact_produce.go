@@ -54,6 +54,17 @@ type PreparedArtifact struct {
 	encoder          *framed.Encoder
 	metadata         *framed.ManifestWriter
 	used             bool
+	// facts of the stored artifact, reported with the writer completion
+	nativeBytes int64
+	acquisition *artifact.AcquisitionWindow
+}
+
+// AddFacts fills the stored native size and, for Go profiles, the acquisition
+// window into the writer completion (REQ-EVD-001).
+func (a *PreparedArtifact) AddFacts(c *artifact.ContextWriterCompletion) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	c.NativeBytes, c.Acquisition = a.nativeBytes, a.acquisition.Clone()
 }
 
 // Prepare wraps the data, index and manifest keys before the source is read.
@@ -195,6 +206,13 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	if err != nil {
 		return out, fmt.Errorf("%w: native check", err)
 	}
+	// A failed store still ends the check (some checks run a goroutine).
+	checkOpen := liveCheck == nil
+	defer func() {
+		if checkOpen {
+			_ = check.Close()
+		}
+	}()
 	var index, small bytes.Buffer
 	var data io.Writer = &small
 	var stream *privacy.StreamingWriter
@@ -220,6 +238,7 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 			err = liveCheck.CloseAt(completed)
 		}
 	} else {
+		checkOpen = false
 		err = check.Close()
 	}
 	if err != nil {
@@ -293,6 +312,10 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	stage = "completion"
 	if out.Validate(r) != nil || ctx.Err() != nil || !p.now().Before(r.WriteUntil) {
 		return artifact.Copies{}, privacy.ErrExpired
+	}
+	a.nativeBytes = layout.NativeBytes
+	if e.Profile != nil && (e.NativeType == artifact.PprofArtifact || e.NativeType == artifact.GoTraceArtifact) {
+		a.acquisition = &artifact.AcquisitionWindow{StartedAt: started.UTC().Truncate(time.Microsecond), CompletedAt: completed.UTC().Truncate(time.Microsecond)}
 	}
 	return out, nil
 }

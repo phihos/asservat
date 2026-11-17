@@ -226,7 +226,7 @@ func publishedDownloadFence(ctx context.Context, q *custodydb.Queries, a artifac
 		return err
 	}
 	e, err := currentPublishedContext(r)
-	if err != nil || a.Environment.Location != e.Registration.Location || a.Environment.StoreID != e.Registration.StoreID || e.CaptureUID != a.Scope.CaptureID || e.Registration.Location.ArtifactID != a.Scope.ArtifactID || e.Registration.Location.ClusterID != a.Scope.ClusterID || e.NamespaceUID != a.Scope.NamespaceUID || e.WorkloadUID != a.Scope.WorkloadUID || e.PodUID != a.Scope.PodUID || !bytes.Equal(r.ContextVerification.CopiesDigest, a.Scope.Version[:]) || a.AccessUntil.After(r.EffectiveExpiresAt.Time) || a.DeleteBy.After(r.EffectiveDeleteBy.Time) {
+	if err != nil || a.Environment.Location != e.Registration.Location || a.Environment.StoreID != e.Registration.StoreID || e.CaptureUID != a.Scope.CaptureID || e.Registration.Location.ArtifactID != a.Scope.ArtifactID || e.Registration.Location.ClusterID != a.Scope.ClusterID || e.NamespaceUID != a.Scope.NamespaceUID || e.WorkloadUID != a.Scope.WorkloadUID || e.PodUID != a.Scope.PodUID || !bytes.Equal(r.ContextCatalog.CopiesDigest, a.Scope.Version[:]) || a.AccessUntil.After(r.EffectiveExpiresAt.Time) || a.DeleteBy.After(r.EffectiveDeleteBy.Time) {
 		return privacy.ErrFence
 	}
 	n, err := q.CurrentTime(ctx)

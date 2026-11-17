@@ -56,7 +56,7 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		if err != nil {
 			return err
 		}
-		if attempt.State != artifact.StoredUnpublished || !bytes.Equal(attempt.CopiesDigest, row.ContextVerification.CopiesDigest) {
+		if attempt.State != artifact.StoredUnpublished || !bytes.Equal(attempt.CopiesDigest, row.ContextCatalog.CopiesDigest) {
 			return privacy.ErrFence
 		}
 		retained, err := retainedContextOrigins(call, q, s.root, row.ContextCapture, attempt)
@@ -86,7 +86,7 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 			SourceFormat: src.Format, DataClass: e.DataClass,
 			Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until,
 		}
-		copy(out.Version[:], row.ContextVerification.CopiesDigest)
+		copy(out.Version[:], row.ContextCatalog.CopiesDigest)
 		return call.Err()
 	})
 	if err != nil {

@@ -11,148 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acknowledgeContextVerification = `-- name: AcknowledgeContextVerification :execrows
-UPDATE context_verification SET audit_acknowledged_at=clock_timestamp(),audit_digest=$3,audit_object_key=$4,audit_object_version=$5,audit_object_etag=$6,audit_object_bytes=$7,audit_object_sha256=$8
-WHERE capture_id=$1 AND root_id=$2 AND audit_acknowledged_at IS NULL
-`
-
-type AcknowledgeContextVerificationParams struct {
-	CaptureID          pgtype.UUID
-	RootID             pgtype.UUID
-	AuditDigest        []byte
-	AuditObjectKey     pgtype.Text
-	AuditObjectVersion pgtype.Text
-	AuditObjectEtag    pgtype.Text
-	AuditObjectBytes   pgtype.Int8
-	AuditObjectSha256  []byte
-}
-
-func (q *Queries) AcknowledgeContextVerification(ctx context.Context, arg AcknowledgeContextVerificationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, acknowledgeContextVerification,
-		arg.CaptureID,
-		arg.RootID,
-		arg.AuditDigest,
-		arg.AuditObjectKey,
-		arg.AuditObjectVersion,
-		arg.AuditObjectEtag,
-		arg.AuditObjectBytes,
-		arg.AuditObjectSha256,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const insertContextCatalog = `-- name: InsertContextCatalog :one
-INSERT INTO context_catalog(artifact_id,capture_id,root_id) VALUES($1,$2,$3) RETURNING artifact_id, capture_id, root_id, published_at
+INSERT INTO context_catalog(artifact_id,capture_id,root_id,copies_digest,native_bytes,acquisition_started_at,acquisition_completed_at)
+VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING artifact_id, capture_id, root_id, published_at, copies_digest, native_bytes, acquisition_started_at, acquisition_completed_at
 `
 
 type InsertContextCatalogParams struct {
-	ArtifactID pgtype.UUID
-	CaptureID  pgtype.UUID
-	RootID     pgtype.UUID
+	ArtifactID             pgtype.UUID
+	CaptureID              pgtype.UUID
+	RootID                 pgtype.UUID
+	CopiesDigest           []byte
+	NativeBytes            pgtype.Int8
+	AcquisitionStartedAt   pgtype.Timestamptz
+	AcquisitionCompletedAt pgtype.Timestamptz
 }
 
+// REQ-EVD-001: one-step publication in the stored-outcome transaction.
 func (q *Queries) InsertContextCatalog(ctx context.Context, arg InsertContextCatalogParams) (ContextCatalog, error) {
-	row := q.db.QueryRow(ctx, insertContextCatalog, arg.ArtifactID, arg.CaptureID, arg.RootID)
+	row := q.db.QueryRow(ctx, insertContextCatalog,
+		arg.ArtifactID,
+		arg.CaptureID,
+		arg.RootID,
+		arg.CopiesDigest,
+		arg.NativeBytes,
+		arg.AcquisitionStartedAt,
+		arg.AcquisitionCompletedAt,
+	)
 	var i ContextCatalog
 	err := row.Scan(
 		&i.ArtifactID,
 		&i.CaptureID,
 		&i.RootID,
 		&i.PublishedAt,
-	)
-	return i, err
-}
-
-const insertContextVerification = `-- name: InsertContextVerification :one
-INSERT INTO context_verification(capture_id,root_id,expectation_digest,copies_digest,intent_digest,authority_digest,permission_epoch,permission_sequence,native_bytes,acquisition_started_at,acquisition_completed_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING capture_id, root_id, expectation_digest, copies_digest, intent_digest, authority_digest, permission_epoch, permission_sequence, verified_at, audit_acknowledged_at, audit_digest, audit_object_key, audit_object_version, audit_object_etag, audit_object_bytes, audit_object_sha256, native_bytes, acquisition_started_at, acquisition_completed_at
-`
-
-type InsertContextVerificationParams struct {
-	CaptureID              pgtype.UUID
-	RootID                 pgtype.UUID
-	ExpectationDigest      []byte
-	CopiesDigest           []byte
-	IntentDigest           []byte
-	AuthorityDigest        []byte
-	PermissionEpoch        pgtype.UUID
-	PermissionSequence     int64
-	NativeBytes            pgtype.Int8
-	AcquisitionStartedAt   pgtype.Timestamptz
-	AcquisitionCompletedAt pgtype.Timestamptz
-}
-
-func (q *Queries) InsertContextVerification(ctx context.Context, arg InsertContextVerificationParams) (ContextVerification, error) {
-	row := q.db.QueryRow(ctx, insertContextVerification,
-		arg.CaptureID,
-		arg.RootID,
-		arg.ExpectationDigest,
-		arg.CopiesDigest,
-		arg.IntentDigest,
-		arg.AuthorityDigest,
-		arg.PermissionEpoch,
-		arg.PermissionSequence,
-		arg.NativeBytes,
-		arg.AcquisitionStartedAt,
-		arg.AcquisitionCompletedAt,
-	)
-	var i ContextVerification
-	err := row.Scan(
-		&i.CaptureID,
-		&i.RootID,
-		&i.ExpectationDigest,
 		&i.CopiesDigest,
-		&i.IntentDigest,
-		&i.AuthorityDigest,
-		&i.PermissionEpoch,
-		&i.PermissionSequence,
-		&i.VerifiedAt,
-		&i.AuditAcknowledgedAt,
-		&i.AuditDigest,
-		&i.AuditObjectKey,
-		&i.AuditObjectVersion,
-		&i.AuditObjectEtag,
-		&i.AuditObjectBytes,
-		&i.AuditObjectSha256,
-		&i.NativeBytes,
-		&i.AcquisitionStartedAt,
-		&i.AcquisitionCompletedAt,
-	)
-	return i, err
-}
-
-const lockContextVerification = `-- name: LockContextVerification :one
-SELECT capture_id, root_id, expectation_digest, copies_digest, intent_digest, authority_digest, permission_epoch, permission_sequence, verified_at, audit_acknowledged_at, audit_digest, audit_object_key, audit_object_version, audit_object_etag, audit_object_bytes, audit_object_sha256, native_bytes, acquisition_started_at, acquisition_completed_at FROM context_verification WHERE capture_id=$1 AND root_id=$2 FOR UPDATE
-`
-
-type LockContextVerificationParams struct {
-	CaptureID pgtype.UUID
-	RootID    pgtype.UUID
-}
-
-func (q *Queries) LockContextVerification(ctx context.Context, arg LockContextVerificationParams) (ContextVerification, error) {
-	row := q.db.QueryRow(ctx, lockContextVerification, arg.CaptureID, arg.RootID)
-	var i ContextVerification
-	err := row.Scan(
-		&i.CaptureID,
-		&i.RootID,
-		&i.ExpectationDigest,
-		&i.CopiesDigest,
-		&i.IntentDigest,
-		&i.AuthorityDigest,
-		&i.PermissionEpoch,
-		&i.PermissionSequence,
-		&i.VerifiedAt,
-		&i.AuditAcknowledgedAt,
-		&i.AuditDigest,
-		&i.AuditObjectKey,
-		&i.AuditObjectVersion,
-		&i.AuditObjectEtag,
-		&i.AuditObjectBytes,
-		&i.AuditObjectSha256,
 		&i.NativeBytes,
 		&i.AcquisitionStartedAt,
 		&i.AcquisitionCompletedAt,
@@ -161,7 +52,7 @@ func (q *Queries) LockContextVerification(ctx context.Context, arg LockContextVe
 }
 
 const readContextCatalog = `-- name: ReadContextCatalog :one
-SELECT artifact_id, capture_id, root_id, published_at FROM context_catalog WHERE capture_id=$1 AND root_id=$2
+SELECT artifact_id, capture_id, root_id, published_at, copies_digest, native_bytes, acquisition_started_at, acquisition_completed_at FROM context_catalog WHERE capture_id=$1 AND root_id=$2
 `
 
 type ReadContextCatalogParams struct {
@@ -177,39 +68,7 @@ func (q *Queries) ReadContextCatalog(ctx context.Context, arg ReadContextCatalog
 		&i.CaptureID,
 		&i.RootID,
 		&i.PublishedAt,
-	)
-	return i, err
-}
-
-const readContextVerification = `-- name: ReadContextVerification :one
-SELECT capture_id, root_id, expectation_digest, copies_digest, intent_digest, authority_digest, permission_epoch, permission_sequence, verified_at, audit_acknowledged_at, audit_digest, audit_object_key, audit_object_version, audit_object_etag, audit_object_bytes, audit_object_sha256, native_bytes, acquisition_started_at, acquisition_completed_at FROM context_verification WHERE capture_id=$1 AND root_id=$2
-`
-
-type ReadContextVerificationParams struct {
-	CaptureID pgtype.UUID
-	RootID    pgtype.UUID
-}
-
-func (q *Queries) ReadContextVerification(ctx context.Context, arg ReadContextVerificationParams) (ContextVerification, error) {
-	row := q.db.QueryRow(ctx, readContextVerification, arg.CaptureID, arg.RootID)
-	var i ContextVerification
-	err := row.Scan(
-		&i.CaptureID,
-		&i.RootID,
-		&i.ExpectationDigest,
 		&i.CopiesDigest,
-		&i.IntentDigest,
-		&i.AuthorityDigest,
-		&i.PermissionEpoch,
-		&i.PermissionSequence,
-		&i.VerifiedAt,
-		&i.AuditAcknowledgedAt,
-		&i.AuditDigest,
-		&i.AuditObjectKey,
-		&i.AuditObjectVersion,
-		&i.AuditObjectEtag,
-		&i.AuditObjectBytes,
-		&i.AuditObjectSha256,
 		&i.NativeBytes,
 		&i.AcquisitionStartedAt,
 		&i.AcquisitionCompletedAt,
@@ -276,12 +135,11 @@ func (q *Queries) ReadPublicationCapture(ctx context.Context, arg ReadPublicatio
 }
 
 const readPublishedContext = `-- name: ReadPublishedContext :one
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason, c.target_labels, v.capture_id, v.root_id, v.expectation_digest, v.copies_digest, v.intent_digest, v.authority_digest, v.permission_epoch, v.permission_sequence, v.verified_at, v.audit_acknowledged_at, v.audit_digest, v.audit_object_key, v.audit_object_version, v.audit_object_etag, v.audit_object_bytes, v.audit_object_sha256, v.native_bytes, v.acquisition_started_at, v.acquisition_completed_at, cat.published_at, a.effective_expires_at, a.effective_delete_by
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason, c.target_labels, cat.artifact_id, cat.capture_id, cat.root_id, cat.published_at, cat.copies_digest, cat.native_bytes, cat.acquisition_started_at, cat.acquisition_completed_at, a.effective_expires_at, a.effective_delete_by
 FROM context_catalog cat JOIN context_capture c ON c.id=cat.capture_id AND c.root_id=cat.root_id
-JOIN context_verification v ON v.capture_id=c.id AND v.root_id=c.root_id
 JOIN custody_attempt a ON a.id=c.attempt_id AND a.artifact_id=cat.artifact_id
-WHERE cat.artifact_id=$1 AND cat.root_id=$2 AND v.audit_acknowledged_at IS NOT NULL
-AND a.state='stored_unpublished' AND clock_timestamp()<a.effective_expires_at AND a.copies_digest=v.copies_digest
+WHERE cat.artifact_id=$1 AND cat.root_id=$2
+AND a.state='stored_unpublished' AND clock_timestamp()<a.effective_expires_at AND a.copies_digest=cat.copies_digest
 `
 
 type ReadPublishedContextParams struct {
@@ -290,11 +148,10 @@ type ReadPublishedContextParams struct {
 }
 
 type ReadPublishedContextRow struct {
-	ContextCapture      ContextCapture
-	ContextVerification ContextVerification
-	PublishedAt         pgtype.Timestamptz
-	EffectiveExpiresAt  pgtype.Timestamptz
-	EffectiveDeleteBy   pgtype.Timestamptz
+	ContextCapture     ContextCapture
+	ContextCatalog     ContextCatalog
+	EffectiveExpiresAt pgtype.Timestamptz
+	EffectiveDeleteBy  pgtype.Timestamptz
 }
 
 func (q *Queries) ReadPublishedContext(ctx context.Context, arg ReadPublishedContextParams) (ReadPublishedContextRow, error) {
@@ -342,26 +199,14 @@ func (q *Queries) ReadPublishedContext(ctx context.Context, arg ReadPublishedCon
 		&i.ContextCapture.GroupOrdinal,
 		&i.ContextCapture.Reason,
 		&i.ContextCapture.TargetLabels,
-		&i.ContextVerification.CaptureID,
-		&i.ContextVerification.RootID,
-		&i.ContextVerification.ExpectationDigest,
-		&i.ContextVerification.CopiesDigest,
-		&i.ContextVerification.IntentDigest,
-		&i.ContextVerification.AuthorityDigest,
-		&i.ContextVerification.PermissionEpoch,
-		&i.ContextVerification.PermissionSequence,
-		&i.ContextVerification.VerifiedAt,
-		&i.ContextVerification.AuditAcknowledgedAt,
-		&i.ContextVerification.AuditDigest,
-		&i.ContextVerification.AuditObjectKey,
-		&i.ContextVerification.AuditObjectVersion,
-		&i.ContextVerification.AuditObjectEtag,
-		&i.ContextVerification.AuditObjectBytes,
-		&i.ContextVerification.AuditObjectSha256,
-		&i.ContextVerification.NativeBytes,
-		&i.ContextVerification.AcquisitionStartedAt,
-		&i.ContextVerification.AcquisitionCompletedAt,
-		&i.PublishedAt,
+		&i.ContextCatalog.ArtifactID,
+		&i.ContextCatalog.CaptureID,
+		&i.ContextCatalog.RootID,
+		&i.ContextCatalog.PublishedAt,
+		&i.ContextCatalog.CopiesDigest,
+		&i.ContextCatalog.NativeBytes,
+		&i.ContextCatalog.AcquisitionStartedAt,
+		&i.ContextCatalog.AcquisitionCompletedAt,
 		&i.EffectiveExpiresAt,
 		&i.EffectiveDeleteBy,
 	)

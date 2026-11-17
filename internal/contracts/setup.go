@@ -57,7 +57,7 @@ type SetupOpenBao struct {
 	Bundled bool `json:"bundled"`
 	// Accounts are the service account names of the hub components that
 	// authenticate to OpenBao, keyed by component (hub-api, hub-worker,
-	// federation, publisher, key-service).
+	// federation, key-service).
 	Accounts map[string]string `json:"accounts"`
 }
 

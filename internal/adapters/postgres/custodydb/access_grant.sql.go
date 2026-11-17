@@ -958,7 +958,7 @@ SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_
 FROM access_grant_child child
 LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
 LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
-LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
+LEFT JOIN context_catalog v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest
 LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 WHERE child.parent_id=$1 AND child.artifact_id=$2
 `
@@ -1011,7 +1011,7 @@ SELECT child.id, child.root_id, child.parent_id, child.capture_id, child.action_
 FROM access_grant_child child
 LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
 LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
-LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
+LEFT JOIN context_catalog v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest
 LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 WHERE child.root_id=$1 AND child.id=$2
 `
@@ -1570,7 +1570,7 @@ SELECT c.id AS capture_id,(convert_from(c.expectation_json,'UTF8')::jsonb->>'Act
  'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
 FROM context_case_locator l
 JOIN context_capture c ON c.root_id=l.root_id AND c.id=l.capture_id
-JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.audit_acknowledged_at IS NOT NULL
+JOIN context_catalog v ON v.root_id=c.root_id AND v.capture_id=c.id
 JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 JOIN access_grant parent ON parent.root_id=c.root_id AND parent.capture_id=rg.id AND parent.id=$1::uuid
 WHERE l.root_id=$2::uuid AND l.artifact_id=$3::uuid AND l.capture_id=$4::uuid AND v.copies_digest=$5::bytea

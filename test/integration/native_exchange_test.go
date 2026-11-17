@@ -42,7 +42,7 @@ type nativeExchangeFixture struct {
 	content                *nativeContextFixture
 	worker                 value.DownloadWorker
 	enrollment             workerEnrollmentFixture
-	published              artifact.PublishedContext
+	published              publishedContext
 	runtime, audit, config *postgres.Downloads
 	allocation             artifact.DownloadAllocation
 	gate                   authapp.ContextDownloadAuthority
@@ -640,7 +640,7 @@ func nativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
 		"GRANT INSERT ON download_native_backing TO native_history_runtime",
 		"GRANT UPDATE(closed,retired_at,updated_at,updates) ON download_native_owner TO native_history_runtime",
 		"GRANT DELETE ON download_native_backing,download_native_owner,download_native_key TO native_history_runtime",
-		"GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,artifact_download,download_batch,retention_policy,retention_decision,download_worker,download_worker_configuration,download_worker_configuration_revision,download_worker_enrollment,download_worker_certificate,download_key_binding,download_response,download_window,download_control_allocation,download_native_owner,download_native_key,download_native_backing TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,context_catalog,context_capture,custody_attempt,artifact_download,download_batch,retention_policy,retention_decision,download_worker,download_worker_configuration,download_worker_configuration_revision,download_worker_enrollment,download_worker_certificate,download_key_binding,download_response,download_window,download_control_allocation,download_native_owner,download_native_key,download_native_backing TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(installation_id) ON fleet_current_trust TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT SELECT ON processing_root,context_processing,processing_rule TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(id) ON permission_stream,artifact_download,download_worker,download_response,download_window TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",

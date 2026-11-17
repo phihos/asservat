@@ -523,9 +523,33 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
 			return err
 		}
+		// A stored outcome publishes in this transaction; take the custody
+		// locks in the canonical order (allocation, attempt, capture).
+		var pool custodydb.CustodyPool
+		var allocation custodydb.CustodyAllocation
+		var attempt custodydb.CustodyAttempt
+		if completion != nil {
+			unlocked, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(r.Binding.CaptureID), RootID: id(s.root)})
+			if err != nil {
+				return err
+			}
+			admitted, err := admittedRecord(unlocked)
+			if err != nil {
+				return err
+			}
+			if pool, allocation, err = lockAllocation(ctx, q, admitted.Expectation.Registration.AllocationID); err != nil {
+				return err
+			}
+			if attempt, err = q.LockAttempt(ctx, unlocked.AttemptID); err != nil {
+				return err
+			}
+		}
 		c, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(r.Binding.CaptureID), RootID: id(s.root)})
 		if err != nil {
 			return err
+		}
+		if completion != nil && c.AttemptID != attempt.ID {
+			return value.ErrConflict
 		}
 		row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: c.ID})
 		if err != nil {
@@ -656,6 +680,9 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 			err = q.InsertContextWriterCompletion(ctx, custodydb.InsertContextWriterCompletionParams{RootID: id(s.root), CaptureID: c.ID, AttemptID: c.AttemptID, RegistrationDigest: completion.RegistrationDigest[:], ExpectationDigest: completion.ExpectationDigest[:], CopiesDigest: digest(r.Copies), ExecutionDigest: ed[:], CompletionDigest: cd[:], InstallationID: id(s.installation), IssuerEpoch: trust.IssuerEpoch, PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, StoredAt: ts(completion.StoredAt), ClosedAt: ts(completion.ClosedAt)})
 			if err != nil {
 				return err
+			}
+			if err = publishStored(ctx, q, pool, allocation, attempt, c, e, *completion); err != nil {
+				return sqlStep{"publish", err}
 			}
 			now, err = q.CurrentTime(ctx)
 			if err != nil {

@@ -17,7 +17,7 @@ const SeaweedConfigKey = "s3.json"
 const SeaweedConfigLimit = 768 << 10 // Below the existing Kubernetes Secret data limit.
 var ErrSeaweedStorage = errors.New("bundled object store configuration unavailable")
 var seaweedBucket = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete", "regional-write", "regional-history"}
+var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "download-read", "evidence-delete", "regional-write", "regional-history"}
 
 func SeaweedPrincipalName(k contracts.SeaweedPrincipalKey) (string, error) {
 	if !slices.Contains(seaweedPurposes, k.Purpose) || !authorization.UUID(k.ScopeID) {
@@ -219,7 +219,7 @@ func seaweedScope(g contracts.SeaweedGrant) (prefixes []string, read, write, lis
 	case "initial-audit":
 		prefixes = []string{"initial-installation/v1/" + g.InstallationID + "/"}
 		read, write = true, true
-	case "publisher-read", "download-read":
+	case "download-read":
 		prefixes = []string{"v1/"}
 		read = true
 	case "evidence-delete":
@@ -237,7 +237,7 @@ func seaweedScope(g contracts.SeaweedGrant) (prefixes []string, read, write, lis
 		}
 		prefixes = []string{"history/v1/" + g.RootID + "/" + g.ClusterID + "/"}
 		read, write, list = true, true, true
-	case "configuration-audit", "owner-audit", "federation-audit", "publisher-audit":
+	case "configuration-audit", "owner-audit", "federation-audit":
 		allowed := seaweedAuditPrefixes(g)
 		if len(g.Prefixes) == 0 {
 			return fail()
@@ -283,10 +283,6 @@ func seaweedAuditPrefixes(g contracts.SeaweedGrant) []string {
 			p = append(p, "operation-audit/v1/"+r+"/")
 		}
 		return p
-	case "publisher-audit":
-		if r != "" {
-			return []string{"context-verification/v1/" + r + "/"}
-		}
 	}
 	return nil
 }

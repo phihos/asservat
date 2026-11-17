@@ -38,36 +38,14 @@ func progressFactsFixture(t *testing.T, stage string) custodydb.ReadContextProgr
 	if stage == "stored" {
 		return f
 	}
-	f.VerifiedCaptureID = c.ID
-	f.VerifiedRootID = c.RootID
-	f.VerifiedAt = ts(now.Add(2 * time.Second))
-	f.ExpectationDigest = digest(e)
-	f.VerifiedCopiesDigest = f.CopiesDigest
-	f.VerifiedIntentDigest = captureIntentDigest(c)
-	f.AuthorityDigest = digest("authority")
-	f.PermissionEpoch = c.PermissionEpoch
-	f.PermissionSequence = pgtype.Int8{Int64: 1, Valid: true}
-	f.ContextCapture.ProgressRevision++
-	if stage == "verified" {
-		return f
-	}
-	record, err := verificationRecord(c, custodydb.ContextVerification{CaptureID: c.ID, RootID: c.RootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.AuditAcknowledgedAt = ts(now.Add(3 * time.Second))
-	f.AuditDigest = digest(record)
-	f.ContextCapture.ProgressRevision++
-	if stage == "verification-audited" {
-		return f
-	}
 	f.CatalogArtifactID = id(p.ArtifactID)
+	f.CatalogCopiesDigest = f.CopiesDigest
 	f.PublishedAt = ts(now.Add(4 * time.Second))
 	f.ContextCapture.ProgressRevision++
 	return f
 }
 func TestProgressProjectsOnlyDurableFacts(t *testing.T) {
-	for _, tc := range []struct{ stage, phase, reason string }{{"accepted", "Pending", "DispatchUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}, {"verified", "Finalizing", "VerificationAuditPending"}, {"verification-audited", "Finalizing", "PublicationPending"}, {"published", "Succeeded", "Published"}} {
+	for _, tc := range []struct{ stage, phase, reason string }{{"accepted", "Pending", "DispatchUnconfirmed"}, {"stored", "Finalizing", "PublicationPending"}, {"published", "Succeeded", "Published"}} {
 		t.Run(tc.stage, func(t *testing.T) {
 			f := progressFactsFixture(t, tc.stage)
 			got, err := progressFacts(f)
@@ -92,15 +70,12 @@ func TestProgressRejectsIncompletePublicationOrCorruptIdentity(t *testing.T) {
 		"revision-overflow": func(f *custodydb.ReadContextProgressFactsRow) {
 			f.ContextCapture.ProgressRevision = value.MaxProgressRevision + 1
 		},
-		"registration":      func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
-		"scope":             func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
-		"verification":      func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCaptureID = pgtype.UUID{} },
-		"copies":            func(f *custodydb.ReadContextProgressFactsRow) { f.VerifiedCopiesDigest = digest("other") },
-		"outcome-audit":     func(f *custodydb.ReadContextProgressFactsRow) { f.AuditAcknowledgedAt = pgtype.Timestamptz{} },
-		"audit-digest":      func(f *custodydb.ReadContextProgressFactsRow) { f.AuditDigest = digest("other") },
-		"wrong-artifact":    func(f *custodydb.ReadContextProgressFactsRow) { f.CatalogArtifactID = f.ContextCapture.ID },
-		"early-publication": func(f *custodydb.ReadContextProgressFactsRow) { f.PublishedAt = f.ContextCapture.CreatedAt },
-		"late-publication":  func(f *custodydb.ReadContextProgressFactsRow) { f.PublishedAt = f.ContextCapture.Deadline },
+		"registration":     func(f *custodydb.ReadContextProgressFactsRow) { f.RequestDigest = digest("other") },
+		"scope":            func(f *custodydb.ReadContextProgressFactsRow) { f.ContextCapture.ScopeJson = []byte(`{}`) },
+		"copies":           func(f *custodydb.ReadContextProgressFactsRow) { f.CatalogCopiesDigest = digest("other") },
+		"wrong-artifact":   func(f *custodydb.ReadContextProgressFactsRow) { f.CatalogArtifactID = f.ContextCapture.ID },
+		"unpublished":      func(f *custodydb.ReadContextProgressFactsRow) { f.PublishedAt = pgtype.Timestamptz{} },
+		"late-publication": func(f *custodydb.ReadContextProgressFactsRow) { f.PublishedAt = f.ContextCapture.Deadline },
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := progressFactsFixture(t, "published")
@@ -128,25 +103,5 @@ func TestContextMetadataDeadlineIsOriginalAndNotSerialized(t *testing.T) {
 	b, err := json.Marshal(value.Accepted{MetadataValidUntil: now})
 	if err != nil || bytes.Contains(b, []byte("MetadataValidUntil")) {
 		t.Fatal("response-only lease serialized", err)
-	}
-}
-
-func TestProgressPreservesVerifiedNativeSizeAudit(t *testing.T) {
-	for _, size := range []int64{0, 1234} {
-		f := progressFactsFixture(t, "published")
-		f.NativeBytes = pgtype.Int8{Int64: size, Valid: true}
-		record, err := verificationRecord(f.ContextCapture, custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64, NativeBytes: f.NativeBytes})
-		if err != nil {
-			t.Fatal(err)
-		}
-		f.AuditDigest = digest(record)
-		got, err := progressFacts(f)
-		if err != nil || got.Phase != "Succeeded" {
-			t.Fatal("verified size missing from progress audit reconstruction", size, got, err)
-		}
-		f.NativeBytes.Int64++
-		if _, err := progressFacts(f); err == nil {
-			t.Fatal("changed native size accepted")
-		}
 	}
 }

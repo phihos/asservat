@@ -70,6 +70,19 @@ type Recorder struct {
 // redact.
 type RawLimits struct{ Snaplen, TCP, UDP, ICMP int }
 
+// RawLimitsFor returns an accepted rawPackets recording's prefix caps; zero
+// (refused by every check) for anything else.
+func RawLimitsFor(r *artifact.Recording) RawLimits {
+	if r == nil || r.Profile != "rawPackets" {
+		return RawLimits{}
+	}
+	l := RawLimits{Snaplen: r.Snaplen}
+	if c := r.ProtocolSnaplen; c != nil {
+		l.TCP, l.UDP, l.ICMP = c.TCP, c.UDP, c.ICMP
+	}
+	return l
+}
+
 // Max is the longest prefix any frame keeps: the engine and interface
 // snapshot length.
 func (l RawLimits) Max() int { return max(l.Snaplen, l.TCP, l.UDP, l.ICMP) }

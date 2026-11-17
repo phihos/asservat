@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/syscalls"
 	"asservat.local/asservat/internal/application/evidence"
+	planner "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -119,7 +122,7 @@ func TestRegionalArgumentStopNeedsOriginalResult(t *testing.T) {
 // synthetic accepted source identity does not claim native BPF qualification.
 func argumentWriterHolder(t *testing.T, handler http.Handler) (*ConnectorRecordings, artifact.ContextExpectation, collector.Identity, collector.PacketResult, []byte) {
 	t.Helper()
-	e, s, header, footer := publisherArgumentFixture(t)
+	e, s, header, footer := argumentFixture(t)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	header.StartedAt, footer.EndedAt = now.Add(37*time.Nanosecond), now.Add(91*time.Nanosecond)
 	var native bytes.Buffer
@@ -279,4 +282,32 @@ type argumentJoinReader struct {
 func (r *argumentJoinReader) Read(p []byte) (int, error) {
 	r.once.Do(func() { close(r.entered) })
 	return r.Reader.Read(p)
+}
+
+func argumentFixture(t *testing.T) (artifact.ContextExpectation, artifact.ArgumentSourceProvenance, artifact.ArgumentHeader, artifact.ArgumentFooter) {
+	t.Helper()
+	in, now := publicArgumentPlanInput(t, []string{"write"})
+	plan, err := planner.CompileRecorder(in, newPublicRecorderCompiler(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recording, action, err := planner.RecordingFor(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := artifact.Digest{1}
+	anchor := now.Add(-time.Minute)
+	e := artifact.ContextExpectation{ExecutionClass: artifact.ContextAPIExecution, NativeType: artifact.SyscallArgumentsArtifact, Recording: &recording, CaptureUID: runtimeID, PodUID: runtimeID, Namespace: "synthetic", NamespaceUID: runtimeID, WorkloadUID: runtimeID, ActionID: action, CaseID: runtimeID, OccurrenceID: runtimeID, CollectorVersion: "synthetic", CollectorImageDigest: digest, RecipeDigest: plan.RecipeDigest, PlanDigest: plan.ScopeDigest, DataClass: "raw", PurposeRef: "diagnostics", TriggeredAt: anchor,
+		Registration: artifact.Registration{Location: artifact.Location{ClusterID: runtimeID, ArtifactID: runtimeID, AttemptID: runtimeID}, StoreID: runtimeID, AllocationID: runtimeID, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: anchor, WriteUntil: now.Add(time.Minute), ExpiresAt: anchor.Add(180 * time.Second), DeleteBy: anchor.Add(240 * time.Second)},
+		Audience:     []artifact.AudienceAssignment{{Kind: "Group", Issuer: "https://identity.synthetic.invalid", SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: runtimeID, BasisDigest: digest}}, RequestedAgeSeconds: 180, MaximumAgeSeconds: 300, DeletionBudgetSeconds: 60, RetentionRules: []artifact.RetentionRule{{UID: "retention", Generation: 1, Digest: digest}}}
+	if err = e.Validate(); err != nil {
+		t.Fatal("accepted argument expectation", err)
+	}
+	// The source is independent of the native bytes and remains historical:
+	// its original observation session is not another collection lease.
+	source := artifact.ArgumentSourceProvenance{PodUID: e.PodUID, NodeUID: runtimeID, BootID: runtimeID, CollectorPodUID: runtimeID, CollectorEpoch: runtimeID, SessionID: runtimeID, Fence: runtimeID, StartedAt: now.Add(-time.Minute), StartBy: now.Add(-59 * time.Second), Until: now.Add(-57 * time.Second)}
+	a := recording.Arguments
+	h := artifact.ArgumentHeader{Record: "header", Format: syscalls.ArgumentNativeFormat, PodUID: e.PodUID, NodeUID: source.NodeUID, BootID: source.BootID, CollectorPodUID: source.CollectorPodUID, SourceEpoch: source.CollectorEpoch, SessionID: source.SessionID, Fence: source.Fence, EngineDigest: hex.EncodeToString(a.ProgramDigest[:]), DefinitionDigest: hex.EncodeToString(a.DefinitionDigest[:]), AccountingRule: hex.EncodeToString(a.AccountingRule[:]), Decoder: syscalls.ArgumentDecoderVersion, ABI: syscalls.ABI, StartedAt: source.StartedAt}
+	f := artifact.ArgumentFooter{Record: "footer", EndedAt: source.Until, Outcome: "completed", CoverageUnknown: true}
+	return e, source, h, f
 }

@@ -124,7 +124,7 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 			if _, err = recorder.RecordAPIStoredSnapshotCompletion(ctx, result, c.Completion, *c.SnapshotCoverage, process); err != nil {
 				return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredSnapshotCompletion", err}
 			}
-			return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
+			return ContextResult{State: "Published", Copies: result.Copies}, nil
 		}
 		if c.SnapshotCoverage != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCoverage", value.ErrInvalid}
@@ -132,7 +132,7 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		if _, err = completionRecorder.RecordAPIStoredCompletion(ctx, result, c.Completion, process); err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredCompletion", err}
 		}
-		return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
+		return ContextResult{State: "Published", Copies: result.Copies}, nil
 	}
 	result.Phase, result.CompletedAt = c.Failure, s.Now().UTC().Truncate(time.Microsecond)
 	if c.Failure == "storeUnconfirmed" {

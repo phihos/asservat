@@ -39,7 +39,7 @@ func TestReadRuntimeLoginsFollowsSecretVolumeLayout(t *testing.T) {
 	if err != nil || len(logins) != 2 || logins["as_a_cfg_00"] != password {
 		t.Fatal(logins, err)
 	}
-	write("publisher", "sql-hub-runtime.json", contracts.OwnerSQLCredential{Username: "as_a_pub_01", Password: strings.Repeat("q", 43)})
+	write("federation", "sql-hub-runtime.json", contracts.OwnerSQLCredential{Username: "as_a_pub_01", Password: strings.Repeat("q", 43)})
 	if _, err = readRuntimeLogins(root); !errors.Is(err, cfg.ErrInvalid) {
 		t.Fatal("conflicting passwords for one role accepted", err)
 	}

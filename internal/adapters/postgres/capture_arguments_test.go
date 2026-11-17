@@ -21,23 +21,3 @@ func TestRecordingNativeClassPreservesRawArguments(t *testing.T) {
 		})
 	}
 }
-
-func TestArgumentPublicationReadsOnlyHistoricalSession(t *testing.T) {
-	grants, ok := publicRuntimeDutyGrants("context-verify")
-	if !ok {
-		t.Fatal("missing publisher verification credential")
-	}
-	found := false
-	for _, g := range grants {
-		if g.object != "policy_observation_session" {
-			continue
-		}
-		if g.kind != "table" || g.column != "" || g.privilege != "SELECT" {
-			t.Fatalf("publication gained session effect: %+v", g)
-		}
-		found = true
-	}
-	if !found {
-		t.Fatal("publisher cannot independently read original argument provenance")
-	}
-}
