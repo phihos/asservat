@@ -162,13 +162,13 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: planID(ctx, s.NewID), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: planID(ctx, s.NewID), CaseID: planID(ctx, s.NewID), OccurrenceID: planID(ctx, s.NewID), ArtifactID: planID(ctx, s.NewID), AttemptID: planID(ctx, s.NewID), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
-	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
+	p.AssessmentID, p.AssessmentRulesDigest = planID(ctx, s.NewID), compiler.RecorderAssessmentRulesDigest()
 	mark := time.Now()
 	// ADR-283 part 3: Kubernetes peers are resolved once by the target's
 	// region (after eligibility, checked by facts) and frozen in the plan.
@@ -226,17 +226,11 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) {
-		return zero, previewFailure("before-store/current", value.ErrChanged)
-	}
-	mark = time.Now()
-	err = s.Previews.CreateContextPreview(ctx, p.Clone())
-	auditapp.MarkStep(ctx, "p-store", mark)
-	if err != nil {
-		return zero, previewFailure("store", err)
+		return zero, previewFailure("identity/current", value.ErrChanged)
 	}
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
-		return zero, previewFailure("after-store/current", value.ErrChanged)
+		return zero, previewFailure("current", value.ErrChanged)
 	}
 	until := i.ValidUntil
 	for _, bound := range []time.Time{current.ValidUntil, current.VerifiedIdentity.ValidUntil, f.eligibility.ValidUntil, f.eligibility.VerifiedIdentity.ValidUntil, assessment.ValidUntil, plan.ValidUntil, f.storage.Binding.FreshUntil, coverage.FreshUntil} {

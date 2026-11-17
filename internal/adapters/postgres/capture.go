@@ -217,7 +217,7 @@ func (s *ContextAdmissions) LookupContextAdmission(ctx context.Context, in value
 	if s == nil {
 		return value.Accepted{}, false, value.ErrUnavailable
 	}
-	d, err := resolveContextRequest(ctx, s.ledger, s.root, s.installation, in, false)
+	d, err := resolveContextRequest(ctx, s.ledger, s.root, s.installation, in)
 	if err != nil {
 		return value.Accepted{}, false, err
 	}
@@ -228,24 +228,26 @@ func (s *ContextAdmissions) LookupContextAdmission(ctx context.Context, in value
 }
 
 func (s *ContextAdmissions) AdmitContext(ctx context.Context, a value.Admission) (value.Accepted, error) {
-	return s.admitContext(ctx, "", a)
+	return s.admitContext(ctx, nil, a)
 }
 
-func (s *ContextAdmissions) AdmitReviewedContext(ctx context.Context, previewID string, a value.Admission) (value.Accepted, error) {
-	if !authorization.UUID(previewID) || a.SubmissionDigest != captureapp.ContextRequestDigest(previewID) {
+// AdmitReviewedContext admits the plan of p, the preview its request just
+// recomputed; p.ID is the request ID.
+func (s *ContextAdmissions) AdmitReviewedContext(ctx context.Context, p value.ContextPreview, a value.Admission) (value.Accepted, error) {
+	if !authorization.UUID(p.ID) || a.SubmissionDigest != captureapp.ContextRequestDigest(p.ID) || !reviewedContextMatches(p, a) {
 		return value.Accepted{}, value.ErrInvalid
 	}
-	return s.admitContext(ctx, previewID, a)
+	return s.admitContext(ctx, &p, a)
 }
 
-func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, a value.Admission) (value.Accepted, error) {
+func (s *ContextAdmissions) admitContext(ctx context.Context, reviewed *value.ContextPreview, a value.Admission) (value.Accepted, error) {
 	var out value.Accepted
-	if s == nil || s.ledger == nil || a.RootID != s.root || !validAdmission(a) || approvedContextPlan(a) && previewID == "" {
+	if s == nil || s.ledger == nil || a.RootID != s.root || !validAdmission(a) || approvedContextPlan(a) && reviewed == nil {
 		return out, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		var err error
-		out, err = s.admitContextInTransaction(ctx, q, previewID, a, nil)
+		out, err = s.admitContextInTransaction(ctx, q, reviewed, a, nil)
 		return err
 	})
 	if err != nil {
@@ -280,7 +282,11 @@ func (g *contextAdmissionGroupOptions) reviewedGroupChild(a value.Admission) boo
 	return captureapp.ReviewedRecordingSaveGroupChild(g.Preview, a)
 }
 
-func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, previewID string, a value.Admission, group *contextAdmissionGroupOptions) (value.Accepted, error) {
+func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, reviewedIn *value.ContextPreview, a value.Admission, group *contextAdmissionGroupOptions) (value.Accepted, error) {
+	previewID := ""
+	if reviewedIn != nil {
+		previewID = reviewedIn.ID
+	}
 	var out value.Accepted
 	if s == nil || q == nil || a.RootID != s.root || !validAdmission(a) || group == nil && approvedContextPlan(a) && previewID == "" {
 		return out, value.ErrInvalid
@@ -400,8 +406,8 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 					out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil)
 					return ctx.Err()
 				}
-				reviewed, err = readReviewedContext(ctx, q, previewID, a)
-				if err != nil {
+				reviewed = reviewedIn.Clone()
+				if err = currentReviewedContext(ctx, q, reviewed, a); err != nil {
 					return err
 				}
 			}

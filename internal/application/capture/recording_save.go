@@ -182,7 +182,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	return result, err
 }
 
-func (s RecordingSaves) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
+func (s RecordingSaves) Request(ctx context.Context, current identities.CurrentIdentity, in CaptureRequest) (value.Accepted, error) {
 	investigation := s.Investigation
 	investigation.RecordingPolicies = s.Inventory.Policies
 	investigation.PolicyAccepted = s.Inventory.Accepted
@@ -190,5 +190,5 @@ func (s RecordingSaves) Request(ctx context.Context, current identities.CurrentI
 	if investigation.RecordingGroups == nil {
 		investigation.RecordingGroups, _ = investigation.Admission.(RecordingSaveGroupAdmissions)
 	}
-	return investigation.Request(ctx, current, preview, key)
+	return investigation.Request(ctx, current, in)
 }

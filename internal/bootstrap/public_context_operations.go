@@ -185,7 +185,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	if !authorization.UUID(c.RootID) || !authorization.UUID(c.InstallationID) || c.Now == nil || c.NewID == nil ||
 		i.RootID != c.RootID || i.InstallationID != c.InstallationID || p.RootID != c.RootID || p.InstallationID != c.InstallationID ||
 		k.RootID != c.RootID || k.InstallationID != c.InstallationID || d.RootID != c.RootID || d.InstallationID != c.InstallationID ||
-		i.Previews == nil || i.Replay == nil || i.Admission == nil || i.Resolution == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil ||
+		i.Replay == nil || i.Admission == nil || i.Targets == nil || i.Eligibility == nil || i.Capabilities == nil || i.Retention == nil || i.Storage == nil || i.Processing == nil ||
 		i.Lifetime < time.Second || i.Lifetime > 5*time.Minute || i.Lifetime%time.Microsecond != 0 ||
 		a == nil ||
 		!regionalHubRunner(s.Regional.Runner) || s.Regional.Router == nil ||

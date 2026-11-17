@@ -45,22 +45,30 @@ func (t PolicyTrigger) snapshotRecorder(ctx context.Context, current identities.
 	if selected == nil || selected.Target == nil || selected.Target.Request.PodName != pod || selected.Target.Request.ClusterID != o.ClusterID || selected.Target.Request.Namespace != o.Namespace || selected.Target.Request.Workload != o.Workload {
 		return "", "unavailable"
 	}
-	preview, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt})
-	if err != nil {
-		// The closed refusal is the recorded outcome; the fixed preview
-		// stage only names where it failed.
-		t.reportStage("occurrence-preview", err)
-		return "", refusalFor(err)
+	previewed := false
+	preview := func(ctx context.Context) (value.ContextPreview, error) {
+		result, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt})
+		if err != nil {
+			// The closed refusal is the recorded outcome; the fixed preview
+			// stage only names where it failed.
+			t.reportStage("occurrence-preview", err)
+			return value.ContextPreview{}, err
+		}
+		previewed = true
+		r := result.Preview
+		if r.Target.PodUID != occurrence.PodUID || r.Actor != a.Executor || r.Intent.Snapshot == nil || !r.Intent.Snapshot.Request.T0.Equal(occurrence.TriggeredAt) {
+			t.report("occurrence-preview/mismatch")
+			return value.ContextPreview{}, value.ErrUnavailable
+		}
+		return r, nil
 	}
-	if preview.Preview.Target.PodUID != occurrence.PodUID || preview.Preview.Actor != a.Executor || preview.Preview.Intent.Snapshot == nil || !preview.Preview.Intent.Snapshot.Request.T0.Equal(occurrence.TriggeredAt) {
-		t.report("occurrence-preview/mismatch")
-		return "", "unavailable"
-	}
-	admitted, err := t.SourceSnapshots.Request(ctx, current, preview.Preview.ID, key)
+	admitted, err := t.SourceSnapshots.Request(ctx, current, CaptureRequest{Key: key, Preview: preview})
 	if authorization.UUID(admitted.CaptureID) {
 		return admitted.CaptureID, ""
 	}
-	t.reportStage("occurrence-request", err)
+	if previewed {
+		t.reportStage("occurrence-request", err)
+	}
 	return "", refusalFor(err)
 }
 

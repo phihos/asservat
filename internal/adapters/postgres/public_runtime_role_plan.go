@@ -200,7 +200,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_occurrence_capture", "INSERT") // ADR-275 further recorder captures
 		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
 		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
-		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_policy", "retention_decision")
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_policy", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("context_storage_binding", "UPDATE", "source_uid")
@@ -245,7 +245,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// and its accepted review sources under share locks, mints a
 		// principal's assignment once and records or ends a Pod decision; the
 		// capture table only names the Pod of one capture.
-		read("permission_stream", "authority_audit", "permission_review_source", "permission_review_assignment", "permission_review_decision", "context_capture", "context_preview")
+		read("permission_stream", "authority_audit", "permission_review_source", "permission_review_assignment", "permission_review_decision", "context_capture")
 		add("permission_stream", "UPDATE", "id")
 		add("permission_review_source", "UPDATE", "uid")
 		add("permission_review_assignment", "INSERT")
@@ -283,32 +283,14 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
 	case "capture-preview":
-		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
-		// Passive private blueprints only. SQL33/36 prohibit live deletion,
-		// content rewrites and restoring a closed preview. No capture admission.
-		read("permission_stream", "context_preview", "context_preview_fence", "recording_selection_set", "policy_recording_source", "policy_source")
+		// Recording selections and resolved workload names. No capture admission.
+		read("permission_stream", "recording_selection_set", "policy_recording_source", "policy_source")
 		add("permission_stream", "UPDATE", "id")
-		add("context_preview", "INSERT")
-		add("context_preview", "DELETE")
-		add("context_preview_fence", "DELETE")
 		// ADR-335 D4: resolved workload names (ON CONFLICT DO NOTHING).
 		add("workload_name", "SELECT")
 		add("workload_name", "INSERT")
 		add("recording_selection_set", "INSERT")
 		add("recording_selection_set", "DELETE")
-	case "capture-resolution":
-		// Fencing counts the caller's live previews, which include selections.
-		read("recording_save_group", "recording_selection_set")
-		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
-		// Current same-actor request resolution may only close a passive draft
-		// or fence its absent original ID. It cannot admit/cancel accepted work.
-		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "context_preview", "context_preview_fence")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("permission_stream", "UPDATE", "id")
-		add("context_preview", "UPDATE", "closed_at", "closed_request_key", "closed_submission_digest")
-		add("context_preview_fence", "INSERT")
-		add("context_preview", "DELETE")
-		add("context_preview_fence", "DELETE")
 	case "identity-read":
 		read("fleet_current_trust")
 	case "permission-accept":

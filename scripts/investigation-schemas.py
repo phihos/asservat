@@ -15,7 +15,7 @@ import implemented_contracts
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "search_processing_evidence", "get_processing_erasure", "get_processing_report", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "search_processing_evidence", "get_processing_erasure", "get_processing_report", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration", "logBefore", "logAfter", "logStream"]
 
@@ -218,6 +218,7 @@ def main():
         return result
 
     result = {}
+    inputs = {}  # pre-localization preview inputs reused by request_capture's preview
     for name in NAMES:
         tool = catalog[name]
         if name in ("get_file_excerpt", "get_query_result"):
@@ -325,6 +326,7 @@ def main():
                 for k in ("outputSelection", "reason", "management"):
                     sharing["properties"].pop(k)
                 description["inputSchema"]["properties"]["sharing"] = sharing
+                inputs[name] = copy.deepcopy(description["inputSchema"])
             if name in ("cancel_capture", "list_recordings", "preview_recording_save", "list_capture_profiles", "get_capture_profile"):
                 branches = [b for b in branches if b["properties"]["status"].get("const") != "pending"]
             if name in ("list_capture_profiles", "get_capture_profile"):
@@ -362,8 +364,7 @@ def main():
         keys = {
             "list_diagnostics": ["target_ref"],
             "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition"],
-            "request_capture": ["preview_id", "idempotency_key", "continue_acquisition", "result_access"],
-            "resolve_capture_request": ["preview_id", "idempotency_key"],
+            "request_capture": ["preview", "expected_plan_digest", "idempotency_key", "result_access"],
             "get_capture": ["capture_id"],
             "get_case": ["case_id"],
  "prepare_artifact_download": ["artifact_id","idempotency_key"],
@@ -384,6 +385,9 @@ def main():
             props["result_access"] = access
         if "preset_ref" in props:
             props["preset_ref"]["properties"]["name"] = {"const": "pod-status"}
+        if "preview" in props:
+            # ADR-330 D9: the reviewed preview request, recomputed on submission.
+            props["preview"] = {"oneOf": [copy.deepcopy(inputs["preview_capture"]), copy.deepcopy(inputs["preview_recording_save"])]}
         if "sharing" in props:
             # ADR-235: capture-time sharing of the one pod-status result with
             # recipients and an optional absolute end; no output selection,
@@ -393,7 +397,7 @@ def main():
                 sharing["properties"].pop(k)
             props["sharing"] = sharing
         input_schema = {"type": "object", "additionalProperties": False, "properties": props,
-                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition", "result_access")]}
+                        "required": [k for k in keys if k not in ("requested_retention_seconds", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition", "result_access")]}
         if name == "preview_capture":
             # ADR-236: either a named target with the preset, or one history
             # entry whose target and requested retention are restored.
@@ -407,15 +411,15 @@ def main():
             ]
         if name=="preview_capture":
             input_schema["allOf"]=[{"if":{"required":["history_selection"]},"then":{"anyOf":[{"required":["history_capture_id"]},{"required":["repeated_from_capture_id"]}]}}]
+            inputs[name] = copy.deepcopy(input_schema)
         branches = tool["outputSchema"]["allOf"][1]["oneOf"]
         success = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "ok"))
         error = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "error"))
         data = success["properties"]["data"]
         output_keys = {
             "list_diagnostics": ["diagnostics"],
-            "preview_capture": ["preview_id", "expires_at", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
+            "preview_capture": ["plan_digest", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
             "request_capture": ["capture_id", "phase", "navigation_uri", "operation", "repeated_from_capture_id", "history_state"],
-            "resolve_capture_request": None,
             "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing", "repeated_from_capture_id", "history_state", "cancellation_requested", "reason", "reason_state"],
             "get_case": ["case", "artifacts", "timeline"],
  "prepare_artifact_download": None,
@@ -506,8 +510,7 @@ def main():
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
                 "preview_capture": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. On-trigger packet/syscall recording requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
-                "request_capture": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same preview again after approval.",
-                "resolve_capture_request": tool["description"],
+                "request_capture": "Submit the reviewed preview request with its expected_plan_digest and a stable idempotency key. A changed plan returns ReviewChanged. Acceptance is not collection or evidence success. A retry with the same key returns the original capture and never recollects; a different request under that key is Conflict. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same request again after approval.",
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",
                 "prepare_artifact_download": "Prepare a native download using a stable idempotency key. A covering grant proceeds without another review. RawApprovalRequired opens independent whole-file review prefilled from the selected existing artifact and verified size; retain the same download key after approval. Unknown preparation replies retain the same key. Only an acknowledged continuation may repeat preparation automatically.",
  "cancel_artifact_download": tool["description"],

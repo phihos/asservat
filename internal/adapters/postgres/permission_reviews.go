@@ -222,21 +222,6 @@ func (r *AccessReviews) RecordedCaptureReviews(ctx context.Context, p identity.P
 	return out, err
 }
 
-func (r *AccessReviews) RecordedPreviewReviews(ctx context.Context, p identity.Principal, preview string) ([]authapp.RecordedReview, error) {
-	var out []authapp.RecordedReview
-	if r == nil || p.Kind != identity.Human || !authorization.UUID(preview) {
-		return nil, cfg.ErrInvalid
-	}
-	err := permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.SelectRecordedPreviewReviews(ctx, custodydb.SelectRecordedPreviewReviewsParams{StreamID: id(r.root), ID: id(preview), ActorKey: previewActorKey(p), Issuer: p.Issuer, SubjectID: p.Subject})
-		for _, row := range rows {
-			out = append(out, recordedTarget(custodydb.PermissionReviewDecision{AssignmentID: row.AssignmentID, PodUid: row.PodUid, ClusterID: row.ClusterID, NamespaceName: row.NamespaceName, NamespaceUid: row.NamespaceUid, WorkloadKind: row.WorkloadKind, WorkloadName: row.WorkloadName, WorkloadUid: row.WorkloadUid, PodName: row.PodName}, row.SourceUid))
-		}
-		return err
-	}))
-	return out, err
-}
-
 // RecordReview records one outcome under the stream's share lock and the
 // source's row lock, so a concurrent acceptance that retires the source
 // either precedes it (nothing is recorded) or follows it (the new decision is

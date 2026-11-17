@@ -86,10 +86,6 @@ func (s ContextInvestigation) resolveRecordingGroup(ctx context.Context, rows []
 
 func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, set value.RecordingSelectionSet, refs []value.RecordingReference, request RecordingSavePreviewRequest) (ContextPreviewResult, error) {
 	var zero ContextPreviewResult
-	store, ok := s.Investigation.Previews.(RecordingSaveGroupPreviewStore)
-	if !ok {
-		return zero, value.ErrUnavailable
-	}
 	ids := make([]string, len(refs))
 	handles := map[string]string{}
 	for n, ref := range refs {
@@ -154,7 +150,7 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 		}
 		until = identity.Earlier(until, parts[n].ValidUntil)
 	}
-	parent := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: rows[0].PolicyName, PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: s.Investigation.NewID(), RootID: s.Investigation.RootID, InstallationID: s.Investigation.InstallationID, CaptureID: s.Investigation.NewID(), CaseID: s.Investigation.NewID(), AssessmentID: s.Investigation.NewID(), AssessmentRulesDigest: RecordingSaveGroupAssessmentRulesDigest(), Actor: i.Principal, ExecutionClass: artifact.ContextAPIExecution, Storage: parts[0].Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute)}
+	parent := value.ContextPreview{Group: &value.RecordingSaveGroupPreview{Executor: a.Executor, PolicyName: rows[0].PolicyName, PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest}, ID: planID(ctx, s.Investigation.NewID), RootID: s.Investigation.RootID, InstallationID: s.Investigation.InstallationID, CaptureID: planID(ctx, s.Investigation.NewID), CaseID: planID(ctx, s.Investigation.NewID), AssessmentID: planID(ctx, s.Investigation.NewID), AssessmentRulesDigest: RecordingSaveGroupAssessmentRulesDigest(), Actor: i.Principal, ExecutionClass: artifact.ContextAPIExecution, Storage: parts[0].Preview.Storage, CreatedAt: now, SelectionUntil: now.Add(time.Minute)}
 	parent.Target = rows[0].Source.Target.Request
 	parent.Target.PodUID, parent.Target.PodName = "", ""
 	parent.Intent = value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: set.Target.ClusterID, Namespace: parent.Target.Namespace.Name, Kind: parent.Target.Workload.Kind, Name: parent.Target.Workload.Name}, Sharing: request.Sharing, RepeatedFrom: lineage}
@@ -219,9 +215,6 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 	}
 	if !ValidContextPreview(parent) || !s.Inventory.Now().Before(until) {
 		return zero, value.ErrChanged
-	}
-	if err = store.CreateRecordingGroupPreview(ctx, parent.Clone()); err != nil {
-		return zero, err
 	}
 	if _, _, err = s.Inventory.authorize(ctx, current, set.Target); err != nil || ctx.Err() != nil || !s.Inventory.Now().Before(until) {
 		return zero, value.ErrChanged

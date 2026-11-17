@@ -87,6 +87,7 @@ func NewInvestigationRecordingSaveOperations(base *InvestigationOperations, save
 	if base.captures != nil {
 		capture := *base.captures
 		capture.recordingSaveCancellationEnabled = composed.cancellations != nil
+		capture.recordingSaves = saves.saves
 		out.captures = &capture
 		for name, part := range out.routes {
 			if part == base.captures {
@@ -126,10 +127,7 @@ type RecordingWindow struct {
 type RecordingSavePreviewData struct {
 	Kind           string            `json:"kind"`
 	Operation      string            `json:"operation"`
-	PreviewID      string            `json:"preview_id"`
-	CaptureID      string            `json:"capture_id"`
-	ExpiresAt      time.Time         `json:"expires_at"`
-	ScopeDigest    string            `json:"save_scope_digest"`
+	PlanDigest     string            `json:"plan_digest"`
 	Selected       []RecordingRow    `json:"selected_recordings"`
 	Windows        []RecordingWindow `json:"windows"`
 	Assessment     CaptureAssessment `json:"capture_assessment"`
@@ -249,8 +247,9 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 				return OperationReply{}, contracts.ErrInvestigationWire
 			}
 		}
+		planCtx, digest := app.WithPlanScope(bounded)
 		var result app.ContextPreviewResult
-		result, operationErr = s.saves.Preview(bounded, current, app.RecordingSavePreviewRequest{Handles: append([]string(nil), in.Handles...), Before: before, Sharing: in.Sharing.intent(), RepeatedFromCaptureID: in.RepeatedFrom, Reason: in.Reason})
+		result, operationErr = s.saves.Preview(planCtx, current, recordingSaveRequest(in.Handles, before, in.Sharing, in.RepeatedFrom, in.Reason))
 		if operationErr == nil {
 			p, m := result.Preview, result.RecordingSave
 			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest {
@@ -272,7 +271,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 			if !s.config.CollectionEnabled {
 				blockers = append(blockers, "CollectionDisabled")
 			}
-			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PreviewID: p.ID, CaptureID: p.CaptureID, ExpiresAt: p.SelectionUntil.UTC(), ScopeDigest: hash(p.ScopeDigest), Selected: rows, Windows: windows, Assessment: assessment, Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
+			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PlanDigest: hash(digest(p)), Selected: rows, Windows: windows, Assessment: assessment, Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
 		}
 	}
 	if operationErr != nil {
@@ -315,6 +314,10 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		reply.failureStep = step.FixedStep()
 	}
 	return reply, nil
+}
+
+func recordingSaveRequest(handles []string, before time.Duration, sharing *ContextSharingInput, repeated string, reason *string) app.RecordingSavePreviewRequest {
+	return app.RecordingSavePreviewRequest{Handles: append([]string(nil), handles...), Before: before, Sharing: sharing.intent(), RepeatedFromCaptureID: repeated, Reason: reason}
 }
 
 func acceptedRecordingOperation(accepted value.Accepted) string {

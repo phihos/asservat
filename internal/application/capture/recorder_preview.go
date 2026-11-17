@@ -200,13 +200,13 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if !current(s.Now()) || ctx.Err() != nil {
 		return zero, previewFailure("facts/current", value.ErrChanged)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Retention: retentionReview(r), Audience: slices.Clone(eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: planID(ctx, s.NewID), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: planID(ctx, s.NewID), CaseID: planID(ctx, s.NewID), OccurrenceID: planID(ctx, s.NewID), ArtifactID: planID(ctx, s.NewID), AttemptID: planID(ctx, s.NewID), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Retention: retentionReview(r), Audience: slices.Clone(eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
-	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
+	p.AssessmentID, p.AssessmentRulesDigest = planID(ctx, s.NewID), compiler.RecorderAssessmentRulesDigest()
 	mark = time.Now()
 	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline})
 	auditapp.MarkStep(ctx, "p-compile", mark)
@@ -223,17 +223,11 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !current(s.Now()) {
-		return zero, previewFailure("before-store/current", value.ErrChanged)
-	}
-	mark = time.Now()
-	err = s.Previews.CreateContextPreview(ctx, p.Clone())
-	auditapp.MarkStep(ctx, "p-store", mark)
-	if err != nil {
-		return zero, previewFailure("store", err)
+		return zero, previewFailure("identity/current", value.ErrChanged)
 	}
 	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
 	if !final.Eligible || final.Target != t || final.Principal != i.Principal || !final.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(final.DefaultAudience, p.Audience) || !s.Now().Before(final.ValidUntil) || !current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
-		return zero, previewFailure("after-store/current", value.ErrChanged)
+		return zero, previewFailure("current", value.ErrChanged)
 	}
 	until := i.ValidUntil
 	for _, bound := range []time.Time{final.ValidUntil, final.VerifiedIdentity.ValidUntil, eligibility.ValidUntil, eligibility.VerifiedIdentity.ValidUntil, assessment.ValidUntil, plan.ValidUntil} {

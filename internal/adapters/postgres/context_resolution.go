@@ -16,36 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// ContextRequestResolutions uses a separate credential with no custody or
-// accepted-capture writes. Closing an unaccepted preview is its only effect.
-type ContextRequestResolutions struct {
-	ledger       *Ledger
-	root         string
-	installation string
-}
-
-var _ app.ContextRequestResolution = (*ContextRequestResolutions)(nil)
-
-func NewContextRequestResolutions(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*ContextRequestResolutions, error) {
-	if !authorization.UUID(root) || !authorization.UUID(installation) {
-		return nil, value.ErrInvalid
-	}
-	l, err := New(ctx, pool)
-	if err != nil {
-		return nil, value.ErrUnavailable
-	}
-	return &ContextRequestResolutions{ledger: l, root: root, installation: installation}, nil
-}
-
-func (s *ContextRequestResolutions) ResolveOrCloseContextRequest(ctx context.Context, in value.ReplayQuery) (value.ContextRequestDisposition, error) {
-	if s == nil {
-		return value.ContextRequestDisposition{}, value.ErrUnavailable
-	}
-	return resolveContextRequest(ctx, s.ledger, s.root, s.installation, in, true)
-}
 
 // requestRecordScope strictly validates private canonical historical ownership
 // and its accepted target. Neither the row nor its digest supplies fresh rights.
@@ -132,13 +103,10 @@ func findContextRequest(ctx context.Context, q *custodydb.Queries, in value.Repl
 	return zero, false, nil
 }
 
-func resolveContextRequest(ctx context.Context, l *Ledger, root, installation string, in value.ReplayQuery, closeMissing bool) (value.ContextRequestDisposition, error) {
+func resolveContextRequest(ctx context.Context, l *Ledger, root, installation string, in value.ReplayQuery) (value.ContextRequestDisposition, error) {
 	var out value.ContextRequestDisposition
 	if l == nil || !contextRequestQueryShape(root, in) {
 		return out, value.ErrInvalid
-	}
-	if closeMissing && !slices.Contains(in.Identity.Scopes, "evidence:read") {
-		return out, value.ErrDenied
 	}
 	in.Identity.Groups = slices.Clone(in.Identity.Groups)
 	in.Identity.Scopes = slices.Clone(in.Identity.Scopes)
@@ -172,26 +140,14 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root, installation st
 			if err != nil {
 				return err
 			}
-			if closeMissing {
-				eligible := authorization.ScopeEligibility(in.Identity, p, authorization.ReadApproved, target, n.Time)
-				if !eligible.Eligible {
-					return value.ErrDenied
-				}
-				if permissionUntil.IsZero() {
-					permissionUntil = eligible.ValidUntil
-				} else {
-					permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
-				}
+			eligible := contextEligibilityIn(ctx, q, stream, trust, root, installation, in.Identity, p, target, n.Time)
+			if !eligible.Eligible {
+				return value.ErrDenied
+			}
+			if permissionUntil.IsZero() {
+				permissionUntil = eligible.ValidUntil
 			} else {
-				eligible := contextEligibilityIn(ctx, q, stream, trust, root, installation, in.Identity, p, target, n.Time)
-				if !eligible.Eligible {
-					return value.ErrDenied
-				}
-				if permissionUntil.IsZero() {
-					permissionUntil = eligible.ValidUntil
-				} else {
-					permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
-				}
+				permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
 			}
 			return check()
 		}
@@ -263,38 +219,6 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root, installation st
 			out = value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: a.MetadataValidUntil}
 			return check()
 		}
-		if !closeMissing {
-			return check()
-		}
-		preview, err := q.FindContextPreview(ctx, custodydb.FindContextPreviewParams{RootID: id(root), ID: id(in.PreviewID), ActorKey: previewActorKey(in.Identity.Principal)})
-		if err == nil {
-			p, err := previewRecord(preview)
-			if err != nil {
-				return err
-			}
-			if p.Actor != in.Identity.Principal {
-				return value.ErrDenied
-			}
-			// Closing this actor/client's passive review only reduces authority.
-			// It discloses no target fields and remains possible after losing
-			// target permissions; inaccessible accepted work was handled above.
-			if !preview.ClosedAt.Valid {
-				n, err := q.CloseContextPreview(ctx, custodydb.CloseContextPreviewParams{RootID: id(root), ID: id(in.PreviewID), ActorKey: previewActorKey(in.Identity.Principal), ClosedRequestKey: contextRequestKey(in.Identity.Principal, in.IdempotencyKey), ClosedSubmissionDigest: in.SubmissionDigest[:]})
-				if err != nil {
-					return err
-				}
-				if n != 1 {
-					return value.ErrUnavailable
-				}
-			}
-		} else if errors.Is(err, pgx.ErrNoRows) {
-			if err = closeMissingContextPreview(ctx, q, in); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		out = value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: deadline()}
 		return check()
 	})
 	if err != nil {
@@ -303,37 +227,6 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root, installation st
 	return out, nil
 }
 
-func closeMissingContextPreview(ctx context.Context, q *custodydb.Queries, in value.ReplayQuery) error {
-	actor := in.Identity.Principal
-	fence, err := q.FindContextPreviewFence(ctx, custodydb.FindContextPreviewFenceParams{RootID: id(in.RootID), PreviewID: id(in.PreviewID), ActorKey: previewActorKey(actor)})
-	if err == nil {
-		if !bytes.Equal(fence.SubmissionDigest, in.SubmissionDigest[:]) || !bytes.Equal(fence.PrincipalKey, principalKey(actor)) {
-			return value.ErrUnavailable
-		}
-		return nil // also closed for another key of this exact owned preview
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return err
-	}
-	if _, err = q.DeleteExpiredContextPreviews(ctx, id(in.RootID)); err != nil {
-		return err
-	}
-	if _, err = q.DeleteExpiredContextPreviewFences(ctx, id(in.RootID)); err != nil {
-		return err
-	}
-	count, err := q.CountContextPreviews(ctx, id(in.RootID))
-	if err != nil {
-		return err
-	}
-	if count >= value.MaxPreviewsPerRoot {
-		return value.ErrCapacity
-	}
-	_, err = q.InsertContextPreviewFence(ctx, custodydb.InsertContextPreviewFenceParams{RootID: id(in.RootID), PreviewID: id(in.PreviewID), ActorKey: previewActorKey(actor), PrincipalKey: principalKey(actor), RequestKey: contextRequestKey(actor, in.IdempotencyKey), SubmissionDigest: in.SubmissionDigest[:]})
-	return err
-}
-
-// Structural validation uses the identity observation's own original instant.
-// SQL-now is the common freshness instant inside the locked transaction.
 func contextRequestQueryShape(root string, in value.ReplayQuery) bool {
 	return in.RootID == root && authorization.UUID(root) && authorization.UUID(in.PreviewID) && identity.Text(in.IdempotencyKey, 128) && in.SubmissionDigest == app.ContextRequestDigest(in.PreviewID) && in.Identity.Valid(in.Identity.VerifiedAt)
 }

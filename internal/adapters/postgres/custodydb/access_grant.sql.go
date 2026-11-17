@@ -859,6 +859,35 @@ func (q *Queries) ListRequestedGrants(ctx context.Context, arg ListRequestedGran
 	return items, nil
 }
 
+const lockApprovedContextGrant = `-- name: LockApprovedContextGrant :one
+SELECT lock_approved_context_grant($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::bytea)::timestamptz
+`
+
+type LockApprovedContextGrantParams struct {
+	RootID          pgtype.UUID
+	PreviewID       pgtype.UUID
+	CaptureID       pgtype.UUID
+	Issuer          string
+	Subject         string
+	ClientID        string
+	ExecutionDigest []byte
+}
+
+func (q *Queries) LockApprovedContextGrant(ctx context.Context, arg LockApprovedContextGrantParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lockApprovedContextGrant,
+		arg.RootID,
+		arg.PreviewID,
+		arg.CaptureID,
+		arg.Issuer,
+		arg.Subject,
+		arg.ClientID,
+		arg.ExecutionDigest,
+	)
+	var column_1 pgtype.Timestamptz
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const readGrant = `-- name: ReadGrant :one
 SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND id=$2
 `

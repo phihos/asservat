@@ -54,23 +54,24 @@ const historyBudget = 10 * time.Second
 // reply.
 const historyReplyReserve = time.Second
 
-func (s ContextSubmission) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
-	return s.submit(ctx, current, preview, key, false)
+func (s ContextSubmission) Request(ctx context.Context, current identities.CurrentIdentity, in CaptureRequest) (value.Accepted, error) {
+	return s.submit(ctx, current, in, false)
 }
 
-// Continue never admits work or restores a preview. It can reach the original
-// runner only for the same accepted actor/client and request key. Durable
-// execution/start state alone decides whether the original attempt may start.
-func (s ContextSubmission) Continue(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
-	return s.submit(ctx, current, preview, key, true)
+// Continue is internal to policy triggers: it never admits work. It reaches
+// the original runner only for the same accepted actor/client and request.
+// Durable execution/start state alone decides whether the attempt may start.
+func (s ContextSubmission) Continue(ctx context.Context, current identities.CurrentIdentity, in CaptureRequest) (value.Accepted, error) {
+	return s.submit(ctx, current, in, true)
 }
 
-func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, preview, key string, continuation bool) (result value.Accepted, failure error) {
+func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, in CaptureRequest, continuation bool) (result value.Accepted, failure error) {
 	var zero value.Accepted
 	if ctx == nil || ctx.Err() != nil || current == nil || s.Intents == nil || s.Start == nil || !s.ContextInvestigation.configured() {
 		return zero, value.ErrUnavailable
 	}
-	if !authorization.UUID(preview) || !identity.Text(key, 128) {
+	key := in.Key
+	if !identity.Text(key, 128) {
 		return zero, value.ErrInvalid
 	}
 	started := s.Now()
@@ -81,6 +82,7 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if continuation && !slices.Contains(i.Scopes, "evidence:capture") {
 		return zero, value.ErrDenied
 	}
+	_, _, preview, _ := s.requestScope(ctx, i, in)
 	until := identity.Earlier(i.ValidUntil, started.Add(identity.RecordingSaveRequestWindow))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
@@ -144,7 +146,7 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		if !bounds.Valid(s.Now()) {
 			return zero, value.ErrDenied
 		}
-		a, err = s.ContextInvestigation.requestWithGroupBounds(call, current, preview, key, &bounds)
+		a, err = s.ContextInvestigation.requestWithGroupBounds(call, current, in, &bounds)
 		if err != nil {
 			// Fixed label for the content-free timing report; classes kept.
 			return a, staged("request-admit-"+failureClass(err), err)
@@ -448,15 +450,4 @@ func sameAcceptedGroup(a, b value.Accepted) bool {
 		}
 	}
 	return true
-}
-
-// RequestWithResultAccess is ContextInvestigation's result-access review
-// followed by this submission's own Request, which dispatches the start.
-func (s ContextSubmission) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (value.Accepted, error) {
-	if access != nil {
-		if err := s.reviewResultAccess(ctx, current, preview, key, access); err != nil {
-			return value.Accepted{}, err
-		}
-	}
-	return s.Request(ctx, current, preview, key)
 }

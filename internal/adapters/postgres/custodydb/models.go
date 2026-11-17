@@ -408,34 +408,6 @@ type ContextKeyWrap struct {
 	CreatedAt         pgtype.Timestamptz
 }
 
-type ContextPreview struct {
-	ID                     pgtype.UUID
-	RootID                 pgtype.UUID
-	CaptureID              pgtype.UUID
-	AttemptID              pgtype.UUID
-	ActorKey               []byte
-	PrincipalKey           []byte
-	BlueprintJson          []byte
-	BlueprintSha256        []byte
-	CreatedAt              pgtype.Timestamptz
-	Deadline               pgtype.Timestamptz
-	ClosedAt               pgtype.Timestamptz
-	ClosedRequestKey       []byte
-	ClosedSubmissionDigest []byte
-	PreviewKind            string
-}
-
-type ContextPreviewFence struct {
-	RootID           pgtype.UUID
-	PreviewID        pgtype.UUID
-	ActorKey         []byte
-	PrincipalKey     []byte
-	RequestKey       []byte
-	SubmissionDigest []byte
-	CreatedAt        pgtype.Timestamptz
-	ExpiresAt        pgtype.Timestamptz
-}
-
 type ContextProcessing struct {
 	ArtifactID   pgtype.UUID
 	RootID       pgtype.UUID

@@ -1,14 +1,15 @@
 package presentation
 
 import (
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/transport/conversion"
 
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -43,8 +44,7 @@ type RecorderResultAccessAction struct {
 type RecorderPreviewData struct {
 	ResultAccessActions []RecorderResultAccessAction `json:"result_access_actions,omitempty"`
 	RepeatedFrom        string                       `json:"repeated_from_capture_id,omitempty"`
-	PreviewID           string                       `json:"preview_id"`
-	ExpiresAt           time.Time                    `json:"expires_at"`
+	PlanDigest          string                       `json:"plan_digest"`
 	ExecutionDigest     string                       `json:"execution_digest"`
 	PodCount            int                          `json:"pod_count"`
 	MaxBytes            int64                        `json:"max_bytes"`
@@ -163,21 +163,6 @@ func RecorderAssessment(a planning.RecorderAssessment) CaptureAssessment {
 	return out
 }
 
-func (s *ContextOperations) recorderPreview(ctx context.Context, current identities.CurrentIdentity, in ContextOperationInput) (RecorderPreviewData, time.Time, error) {
-	use, ok := s.captures.(RecorderPreviewUseCase)
-	if !ok {
-		return RecorderPreviewData{}, time.Time{}, value.ErrInvalid
-	}
-	composition, err := in.Composition.composition()
-	if err != nil {
-		return RecorderPreviewData{}, time.Time{}, value.ErrInvalid
-	}
-	result, err := use.PreviewComposition(ctx, current, value.ContextIntent{Target: in.Target.target(), RequestedSeconds: in.RequestedSeconds, Composition: composition})
-	if err != nil {
-		return RecorderPreviewData{}, time.Time{}, err
-	}
-	return s.recorderPreviewResult(result, in.Target)
-}
 func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResult, target WorkloadReference) (RecorderPreviewData, time.Time, error) {
 	provenance, err := compiler.CompositionProvenance(result.Plan)
 	if err != nil {
@@ -242,7 +227,7 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 	if !s.config.CollectionEnabled {
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
-	return RecorderPreviewData{ResultAccessActions: recorderResultAccessActions(result.Plan), PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
+	return RecorderPreviewData{ResultAccessActions: recorderResultAccessActions(result.Plan), ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
 		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
 }

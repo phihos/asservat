@@ -199,17 +199,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 		} else if found {
 			return value.ErrConflict
 		}
-		row, err := q.FindContextPreview(ctx, custodydb.FindContextPreviewParams{RootID: id(s.root), ID: id(p.ID), ActorKey: previewActorKey(p.Actor)})
-		if err != nil || row.ClosedAt.Valid {
-			return value.ErrChanged
-		}
-		protected, err := previewRecord(row)
-		if err != nil || protected.Group == nil || !bytes.Equal(digest(protected), digest(p)) {
-			return value.ErrChanged
-		}
-		if err := checkContextPreviewFence(ctx, q, s.root, p.ID, p.Actor); err != nil {
-			return err
-		}
+		protected := p
 		if err := currentPreview(ctx, q, protected); err != nil {
 			return err
 		}
@@ -288,7 +278,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 						return value.ErrCapacity
 					}
 				}
-				if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
+				if _, err := s.admitContextInTransaction(ctx, q, &p, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
 					return err
 				}
 				if err := r.manual.insertReservation(ctx, q, s.root, child.Plan.Input.CaptureID, child, r.grant, r.bytes); err != nil {
@@ -405,25 +395,7 @@ func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, 
 		} else if found {
 			return value.ErrConflict
 		}
-		row, err := q.FindContextPreview(ctx, custodydb.FindContextPreviewParams{RootID: id(s.root), ID: id(p.ID), ActorKey: previewActorKey(p.Actor)})
-		if err != nil || row.ClosedAt.Valid {
-			return value.ErrChanged
-		}
-		protected, err := previewRecord(row)
-		if err != nil || protected.CompositionGroup == nil {
-			return value.ErrChanged
-		}
-		// ADR-252: an approved parent is accepted within its grant (checked
-		// per child below), so only its review window may be reanchored.
-		if approvedContextPlan(children[0]) {
-			protected.CreatedAt, protected.Deadline = p.CreatedAt, p.Deadline
-		}
-		if !bytes.Equal(digest(protected), digest(p)) {
-			return value.ErrChanged
-		}
-		if err := checkContextPreviewFence(ctx, q, s.root, p.ID, p.Actor); err != nil {
-			return err
-		}
+		protected := p
 		if err := currentReviewedComposition(ctx, q, protected, children[0]); err != nil {
 			return err
 		}
@@ -446,7 +418,7 @@ func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, 
 		}
 		permissions := newRecordingGroupFacts(q, stream)
 		for n, child := range children {
-			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, Permissions: permissions, Composition: true, ChildIndex: n, AcceptedAt: acceptedAt}); err != nil {
+			if _, err := s.admitContextInTransaction(ctx, q, &p, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, Permissions: permissions, Composition: true, ChildIndex: n, AcceptedAt: acceptedAt}); err != nil {
 				return err
 			}
 		}
