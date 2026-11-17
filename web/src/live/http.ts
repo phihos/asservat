@@ -12,7 +12,7 @@ export type Row = Batch['rows'][number];
 export type Filter = NonNullable<Input<'watch_live'>['display_filter']>;
 export type Target = Input<'list_recordings'>['target_ref'];
 // Pages whose target still carries a cluster ID pass it through as the name;
-// an unknown name returns TargetGone.
+// an unknown name returns UnknownCluster.
 export type AnyTarget = Target | (Omit<Target, 'cluster'> & { cluster_id: string });
 export function listTarget(target: AnyTarget): Target {
   const { cluster_id: id, cluster, ...rest } = structuredClone(target) as Target & { cluster_id?: string };
