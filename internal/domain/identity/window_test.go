@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"math/rand/v2"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -74,13 +73,12 @@ func TestWindowIntervalsMatchSQLFences(t *testing.T) {
 		name, definition, pattern string
 		interval                  time.Duration
 	}{
-		{"context_execution_check", `ADD CONSTRAINT context_execution_check CHECK\(`, `not_after<=not_before\+interval '(\d+) seconds?'`, AuthorityRecheckInterval},
-		{"capacity_recovery_current", `CREATE (?:OR REPLACE )?FUNCTION (?:public\.)?capacity_recovery_current\(`, `\(a->>'FreshUntil'\)::timestamptz<=\(a->>'ObservedAt'\)::timestamptz\+interval '(\d+) seconds?'`, SQLFencedInterval},
+		{"context_execution_check", `CONSTRAINT context_execution_check CHECK \(`, `not_after <= \(not_before \+ '00:00:(\d+)'::interval\)`, AuthorityRecheckInterval},
 	} {
-		body := latestSQLDefinition(t, regexp.MustCompile(fence.definition))
+		body := sqlDefinition(t, regexp.MustCompile(fence.definition))
 		matches := regexp.MustCompile(fence.pattern).FindAllStringSubmatch(body, -1)
 		if len(matches) == 0 {
-			t.Fatalf("%s: interval pattern not found in its latest definition", fence.name)
+			t.Fatalf("%s: interval pattern not found in its definition", fence.name)
 		}
 		for _, m := range matches {
 			if seconds, _ := strconv.Atoi(m[1]); time.Duration(seconds)*time.Second != fence.interval {
@@ -90,37 +88,25 @@ func TestWindowIntervalsMatchSQLFences(t *testing.T) {
 	}
 }
 
-// latestSQLDefinition returns the statement of the last migration whose Up
-// section defines the object: up to the closing $$; of a function, otherwise
-// to the statement's semicolon.
-func latestSQLDefinition(t *testing.T, header *regexp.Regexp) string {
+// sqlDefinition returns the baseline statement that defines the object: up
+// to the closing $$; of a function, otherwise to the statement's semicolon.
+func sqlDefinition(t *testing.T, header *regexp.Regexp) string {
 	t.Helper()
-	names, err := fs.Glob(migrations.Files(), "*.sql")
+	raw, err := fs.ReadFile(migrations.Files(), "00001_baseline.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	slices.Sort(names)
-	var body string
-	for _, name := range names {
-		raw, err := fs.ReadFile(migrations.Files(), name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		up, _, _ := strings.Cut(string(raw), "-- +goose Down")
-		for _, at := range header.FindAllStringIndex(up, -1) {
-			rest := up[at[0]:]
-			end := ";"
-			if strings.Contains(rest[:at[1]-at[0]], "FUNCTION") {
-				end = "$$;"
-			}
-			if i := strings.Index(rest, end); i >= 0 {
-				rest = rest[:i]
-			}
-			body = rest
-		}
-	}
-	if body == "" {
+	at := header.FindStringIndex(string(raw))
+	if at == nil {
 		t.Fatalf("no definition matches %s", header)
 	}
-	return body
+	rest := string(raw)[at[0]:]
+	end := ";"
+	if strings.Contains(rest[:at[1]-at[0]], "FUNCTION") {
+		end = "$$;"
+	}
+	if i := strings.Index(rest, end); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
 }

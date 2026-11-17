@@ -601,9 +601,8 @@ func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *
 		}
 	}
 	var head int64
-	var comment *string
-	if err := admin.QueryRow(ctx, `SELECT version_id,obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head, &comment); err != nil || comment == nil {
-		t.Fatal("schema floor not recorded", err)
+	if err := admin.QueryRow(ctx, `SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head); err != nil {
+		t.Fatal("schema head", err)
 	}
 	floor := func(v int64) {
 		exec(fmt.Sprintf("COMMENT ON TABLE goose_db_version IS 'asservat:oldest-binary-schema=%d'", v))

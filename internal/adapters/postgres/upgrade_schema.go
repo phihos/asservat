@@ -61,7 +61,7 @@ func schemaBundle(source fs.FS, head int64) (SchemaBundle, error) {
 			return zero, cfg.ErrInvalid
 		}
 		b, e := fs.ReadFile(source, name)
-		if e != nil || len(b) == 0 || len(b) > 512<<10 {
+		if e != nil || len(b) == 0 {
 			return zero, cfg.ErrInvalid
 		}
 		up, down, depth := 0, 0, 0

@@ -2,8 +2,6 @@ package integration
 
 import (
 	"context"
-	"io/fs"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -52,29 +49,9 @@ func qualifyArgumentObservationSQL(t *testing.T, ctx context.Context, admin, hub
 			t.Fatal("dual aggregate spend", pb, pe, gb, ge, want, err)
 		}
 	}
-	raw, err := fs.ReadFile(migrations.Files(), "00128_syscall_observation_events.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, down, _ := strings.Cut(string(raw), "-- +goose Down")
-	// Even a retained session with zero counters blocks rollback. All changes in
-	// this deliberate DDL-only probe roll back; production inserts follow debits.
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = custodydb.New(tx).InsertArgumentObservation(ctx, params()); err != nil {
-		_ = tx.Rollback(ctx)
-		t.Fatal("60-second original argument session", err)
-	}
-	_, err = tx.Exec(ctx, down)
-	_ = tx.Rollback(ctx)
-	if err == nil || !strings.Contains(err.Error(), "retained syscall observation event spend") {
-		t.Fatal("retained session downgrade", err)
-	}
 	read(0)
 	// A downstream insertion refusal rolls BOTH debits back.
-	tx, err = hub.Begin(ctx)
+	tx, err := hub.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,15 +152,6 @@ func qualifyArgumentObservationSQL(t *testing.T, ctx context.Context, admin, hub
 	if _, err = admin.Exec(ctx, "UPDATE access_grant SET policy_observed_events_spent=0 WHERE id=$1", id(grant)); err == nil {
 		t.Fatal("grant counter reset")
 	}
-	tx, err = admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = tx.Exec(ctx, down)
-	_ = tx.Rollback(ctx)
-	if err == nil || !strings.Contains(err.Error(), "retained syscall observation event spend") {
-		t.Fatal("populated event downgrade", err)
-	}
 	read(10)
-	t.Log("SQL128: independent20/10 event ceilings,32 contenders ->10 dual debits, immutable60-second session, failed insert rolls both pools back, retained-state rollback refused")
+	t.Log("SQL128: independent20/10 event ceilings,32 contenders ->10 dual debits, immutable60-second session, failed insert rolls both pools back")
 }

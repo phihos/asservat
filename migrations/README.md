@@ -1,89 +1,23 @@
-# Custody migrations and query bindings
+# Hub schema migrations and query bindings
 
-The paragraphs below describe the migration files as they exist. Many implement mechanisms that [ADR-330](../docs/decisions/330-event-driven-system-design.md) removes: encrypted audit receipts and acknowledgement roles, per-purpose SQL roles, enrollment/issuance and owner registration tables (00006–00011, 00027, 00030), prepaid download batches, key bindings and worker proofs/dispatch (00013, 00022–00026) and signed submission acceptance (00019). The target schema has one SQL login per process, a time-partitioned `audit_event` table written in each effect's transaction, operation-ID idempotency with settlement on known outcome, stored deletion deadlines on artifact rows and a `capture_start` table ([hub persistence](../specs/persistence.md)). Implementation slices replace these migrations; [implementation progress](../docs/implementation-progress.md) records which have landed.
+`00001_baseline.sql` creates the complete hub schema of an empty database
+([hub persistence](../specs/persistence.md)). It replaced the pre-release
+migration chain; no released database used that chain, so there is no upgrade
+path from it and no Down section. Schema changes are new numbered goose
+migrations (`00002_*.sql` and on), transactional and Up-only.
+`currentSchemaVersion` in `internal/adapters/postgres/custody.go` names the
+head; `asservat setup` applies pending migrations as the schema-owning role and
+creates the runtime roles and their grants. Runtime roles never own schema
+objects or modify the goose history.
 
-`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 138; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
+A migration that drops what an older binary still needs records the oldest
+binary schema the database serves with
+`COMMENT ON TABLE goose_db_version IS 'asservat:oldest-binary-schema=N'`
+([ADR-227](../docs/decisions/227-upgrade-and-rollback.md)).
 
-Use `make sql-tools` for pinned sqlc v1.31.1 and goose v3.28.0, with sufficient build space. `make sql-check` regenerates bindings in a private temporary directory and compares them with `internal/adapters/postgres/custodydb`. Intentional query/schema changes use the pinned `sqlc generate`, then review generated code and run the real PostgreSQL test.
-
-`make custody-integration` applies the migration to a new, owned synthetic PostgreSQL container with a separate migration role, repeats `up` to check idempotence, and tests through a restricted runtime role. This fixture uses the goose CLI serially; it does **not** qualify concurrent production migrations. The production migration Job must use goose's PostgreSQL session locker, bounded migration/lock deadlines and a separate credential before runtime rollout. That Job/role composition and N/N-1 rollout are still pending.
-
-Do not run the fixture's plaintext/private endpoint or synthetic role grants against an operator database. Production connections require endpoint-verified TLS, explicit primary/restore readiness and appropriate credential roles. Full grant/configuration/lineage tables, metadata GC and backup/restore policy are subsequent migrations.
-
-`00004_context_admission.sql` adds protected workload storage bindings and immutable pending-audit context admissions. It does not enable execution/publication. The context facet reserves four copy obligations and the accepted manifest scope in one transaction with current permission checks. See [context admission](../docs/architecture/context-admission.md).
-
-`00005_capture_intent.sql` adds complete immutable encrypted-intent receipt fields and the non-executing `intent_audited` state. The capture-audit runtime role may update only those receipt/state columns, not accepted scope/deadlines, custody or permission content.
-
-`00006_peer_identity.sql` adds blocked-by-default current fleet trust, disabled connector registrations and two bounded certificate slots. Its reader has SELECT-only credentials; it does not implement or authorize enrollment/issuance. See [peer identity](../docs/architecture/peer-identity.md).
-
-`00007_enrollment_claim.sql` adds one-use, short-lived bootstrap claims bound to one CSR public key. The claim role cannot issue credentials or activate peers. Claim contract and tests.
-
-`00008_enrollment_audit.sql` adds write-once encrypted claim-audit receipts. `00009_certificate_issuance.sql` adds two bounded signing attempts, immutable public certificate results, encrypted certificate-audit receipts and atomic activation. These runtime facets consume an existing reviewed bootstrap; they do not supply its issuance producer. [Activation contract](../docs/architecture/enrollment-activation.md).
-
-`00010_bootstrap_reservation.sql` adds immutable internal issuance reservations with actor/client idempotency and current serialized capacity checks. It creates no claimable token. See bootstrap reservation.
-
-`00011_bootstrap_issuance.sql` adds immutable credential digests, encrypted issuance-intent audit receipts and final claimable-token activation. The reserve, record, audit and activate roles have separate column/table grants. Provider credential storage alone creates no usable enrollment token. See audited issuance.
-
-`00012_context_publication.sql` adds immutable semantic-verification facts, encrypted verification-audit receipts and unique catalog associations. Narrow verification/audit/publish/read roles preserve the separation from generic ciphertext custody. See [context publication](../docs/architecture/context-publication.md); its external result/privacy gate and public delivery remain separate prerequisites.
-
-`00013_download_sessions.sql` adds immutable per-workload transfer allocations, actor/client-idempotent sessions, prepaid generation-fenced batches and exact encrypted intent/outcome receipts. Read [download sessions](../docs/architecture/download-sessions.md) for authority, accounting and current qualification gaps. This is not an enabled public transfer route.
-
-`00014_retention_lifecycle.sql` separates immutable original registration from monotonic effective cutoffs and appends exact lifecycle decisions with separately acknowledged signed/encrypted journal receipts. Existing attempts initialize from their original cutoffs. Runtime roles gain no deadline-extension or hold capability. [Contract and qualification](../docs/architecture/retention-lifecycle.md).
-
-`00015_retention_sources.sql` persists pinned source identities, non-reusable controller epochs and immutable ordered policy checkpoints. Separate audit acknowledgement cannot mark a source Ready. Recovery blocking is not writable by source runtime roles. Read the checkpoint contract for restart, review and catch-up boundaries.
-
-`00016_closed_retained_interval.sql` permits an effective read cutoff equal to the acquisition anchor when a new cleanup budget consumes the old lifetime. Original registration remains strict and deadlines never extend. See [ADR-055](../docs/decisions/055-retained-evidence-cutoffs.md).
-
-`00017_retention_catchup.sql` adds ordered, non-rewindable context catch-up pages and exact lifecycle-effect links. Bookmarks update a separate fenced resume cursor without scheduling evidence scans. The catch-up contract describes the initial known-scope limit and remaining Ready barrier.
-
-`00018_retention_observation.sql` separates finite complete-source observations from immutable policy history and bookmark progress. Availability is computed from fresh guard/LIST proof, the watch watermark, completed catch-up and exact audit receipts; there is no writable Ready flag. See [ADR-056](../docs/decisions/056-retention-watch-watermark.md).
-
-`00019_policy_authority.sql` retains independently audited automation envelopes, bounded current policy-source observations, immutable accepted scopes, consumed submission nonces and separately acknowledged encrypted acceptance receipts. Current source/head and issuer-epoch checks prevent deletion, replacement, pause, stale observation or restore from silently reviving authority. Control edits retain scope; collection-intent edits advance a monotonic version. These facts are eligibility prerequisites, not execution permits or spending ledgers. See [team automation](../docs/architecture/policy-automation.md).
-
-`00020_browser_sessions.sql` adds protected session roots/epochs, encrypted one-use login state, fixed-lifetime browser sessions, non-reusable refresh claims and bounded logout receipts. These operational credentials never confer policy or evidence authority. See [browser sessions](../docs/architecture/browser-sessions.md).
-
-`00022_download_key_bindings.sql` adds private exact-batch/acquisition-certificate local-key bindings, original finite deadlines and a monotonically spent three-role mask. Coordinator insertion and key-service consumption use separate SQL credentials; current parent download, recovery and privacy fences still apply. It contains no keysets or artifact bytes. See download key authority.
-
-`00023_local_key_configuration.sql` adds protected local key snapshots and immutable version fingerprints, with per-installation key-material uniqueness. No private root bytes enter SQL. Additive rotation and original source freshness are checked under recovery/scope locks; runtime cannot update/delete version history. See local key lifecycle.
-
-`00024_download_worker_proof.sql` binds original finite Kubernetes worker proofs to existing download key children. It stores minimized identities/digests, never bearer tokens; legacy NULL rows deny rather than receiving fabricated proofs. Runtime roles cannot replace proofs or renew deadlines. See worker attestation.
-
-`00025_download_workers.sql` adds immutable dispatch/audit/launch/Job/Pod and termination/retirement transitions, separately counted unresolved workers and no expiry refund. See [worker lifecycle](../docs/architecture/download-worker-dispatch.md).
-
-`00026_worker_configuration.sql` adds the current protected download-worker configuration head and immutable revision/audit history. Column-scoped observer, audit and reader credentials separate acceptance from use; monotonic triggers prohibit identity/revision rollback. Legacy worker records without a qualified configuration remain unavailable rather than receiving fabricated authority. See worker configuration.
-
-`00027_worker_enrollment.sql` records immutable worker public-key enrollment, per-period signing attempts, public certificate/chain, independent encrypted audit acknowledgement and activation. No provider-call refund follows expiry; activation and signing/audit use disjoint roles. Contract.
-
-`00030_owner_enrollment.sql` adds immutable hub Pod/process/key registration, irreversible per-period signing spend, encrypted audit acknowledgements, separate activation/current registry and expiry-safe bounded pruning. Contract.
-
-`00058_audit_retirement_validator_scope.sql` preserves the original deferred
-retirement predicates while allowing their two read-only trigger functions to
-read shared lifecycle/history rows as the migration owner. Runtime capture
-cleanup roles retain only their private filtered views and fixed effects; they
-receive no shared-table or direct-validator execution grant. The fixed search
-path and qualified relation names are retained. See capture-intent lifecycle.
-
-`00100_packet_evidence_backing.sql` corrects the authored context-byte projection
-for supported packet recordings. It atomically validates and adjusts retained
-physical child ceilings and pool totals without changing identities, object
-limits, charges or deadlines. Down refuses when retained charges cannot fit the
-historical ceiling. See [ADR-257](../docs/decisions/257-approved-recording-funding.md).
-
-`00101_history_parameters.sql` follows the packet funding correction without
-changing its arithmetic or retained-graph migration. It adds independently
-retained encrypted settings, keyed lookup, bounded history quotas and typed
-writer/retirement receipts. Settings ciphertext has its own history-prefix
-capability; it is not catalog evidence or regional unwrap authority. See
-[ADR-255](../docs/decisions/255-encrypted-capture-history.md).
-
-`00103_initial_binding_projection.sql` applies the existing original-observation
-30-second projection to the first same-observation Ready refresh. Exact projected
-duplicates retain their row and configuration spend; original proof/receipt
-cutoffs, schema floor 102 and privileges stay unchanged. Down restores the old
-no-op rule without narrowing stored projections. See [ADR-200](../docs/decisions/200-on-demand-capacity-refresh.md).
-
-`00190_retention_deadlines.sql` drops the retention source, checkpoint, watch and catch-up tables of 00015, 00017 and 00018 ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D12). It adds the stored policy set (`retention_policy`), one audit row per applied or removed policy (`retention_policy_event`), the shared `retention_policy_effect` and `retention_preview` functions and an admission trigger that applies stored policies to each new capture. Effective deadlines only shorten. See [retention](../docs/architecture/retention-lifecycle.md).
-
-`00198_retention_policy_labels.sql` records the target's namespace and workload labels on `context_capture.target_labels` at admission and makes `retention_policy_effect` match label-scoped policies against them, so such a policy shortens only matching artifacts. Rows without recorded labels take every policy of their cluster scope. Down restores the 00190 function and drops the column.
-
-`00199_one_step_publication.sql` publishes in the stored-outcome transaction (REQ-EVD-001, [ADR-330](../docs/decisions/330-event-driven-system-design.md)). `context_catalog` gains the copy digest, native size and profile acquisition window that the collector reports; `context_verification`, `context_key_unwrap` and their guard functions are dropped, and the progress, share, grant-scope and early-erasure functions read the catalog row instead. 00130 and 00134 are no-ops now. No Down; Up uses `IF EXISTS`/`IF NOT EXISTS`.
+`queries/` holds the sqlc query definitions. Use `make sql-tools` for pinned
+sqlc and goose. `make sql-check` regenerates the bindings in a private
+temporary directory and compares them with
+`internal/adapters/postgres/custodydb`; after an intentional schema or query
+change, run the pinned `sqlc generate`, review the generated code and run the
+real-PostgreSQL tests (`make custody-integration`).

@@ -160,4 +160,11 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	if e = owned.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('capacity_setup_original_valid','capacity_audit_reader_pin_valid') AND pg_get_functiondef(p.oid) LIKE '%fleet_initial_activation%'`).Scan(&stale); e != nil || stale != 0 {
 		t.Fatal("capacity checks still require the first-installation record", stale, e)
 	}
+	// A version this binary does not know is refused, not skipped.
+	if _, e = owned.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", postgres.CompiledSchemaVersion+1); e != nil {
+		t.Fatal(e)
+	}
+	if _, _, e = schema.Run(ctx); e == nil {
+		t.Fatal("unknown newer history accepted")
+	}
 }
