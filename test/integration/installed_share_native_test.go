@@ -213,7 +213,7 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	}
 	var previewed struct {
 		PlanDigest string   `json:"plan_digest"`
-		Warnings  []string `json:"warnings"`
+		Warnings   []string `json:"warnings"`
 	}
 	var accepted struct {
 		CaptureID string `json:"capture_id"`
