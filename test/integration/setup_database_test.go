@@ -136,8 +136,8 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	if e = postgres.VerifySessionRole(ctx, pool, fleetRole); !errors.Is(e, cfg.ErrDenied) {
 		t.Fatal("another role name accepted", e)
 	}
-	if state, e := postgres.ReadSchemaState(ctx, pool); e != nil || !state.Compatible(postgres.CompiledSchemaVersion) {
-		t.Fatal("runtime schema state", state, e)
+	if head, e := postgres.ReadSchemaHead(ctx, pool); e != nil || head != postgres.CompiledSchemaVersion {
+		t.Fatal("runtime schema head", head, e)
 	}
 
 	// P3: the trust seed activates once; a rerun keeps it, another

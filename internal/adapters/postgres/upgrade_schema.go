@@ -8,9 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io/fs"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -300,71 +298,14 @@ func schemaPrefix(entries []schemaVersion, maximum int64) (int64, error) {
 // CompiledSchemaVersion is this binary's compiled schema head.
 const CompiledSchemaVersion = currentSchemaVersion
 
-// SchemaState is the database's applied head and the oldest binary schema it
-// still serves (ADR-227 decision 1).
-type SchemaState struct{ Head, Floor int64 }
-
-// Compatible applies the runtime rule to a binary compiled at schema.
-func (s SchemaState) Compatible(schema int64) bool {
-	return s.Head >= schema && s.Floor <= schema
-}
-
-// ReadSchemaState reads the head and floor with any role that may read the
-// version table (every runtime role can). It does not require this binary's
-// migrations to be a prefix of the history.
-func ReadSchemaState(ctx context.Context, q interface {
+// ReadSchemaHead reads the applied head with any role that may read the
+// version table (every runtime role can). A head at or above
+// CompiledSchemaVersion serves this binary.
+func ReadSchemaHead(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
-}) (SchemaState, error) {
+}) (int64, error) {
 	if ctx == nil || ctx.Err() != nil || q == nil {
-		return SchemaState{}, cfg.ErrUnavailable
+		return 0, cfg.ErrUnavailable
 	}
-	head, floor, err := schemaState(ctx, q.QueryRow(ctx, schemaStateQuery))
-	return SchemaState{head, floor}, err
-}
-
-// State reads the head and floor through the migrator's connection.
-func (s *UpgradeSchema) State(ctx context.Context) (SchemaState, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil {
-		return SchemaState{}, cfg.ErrUnavailable
-	}
-	head, floor, err := schemaState(ctx, s.db.QueryRowContext(ctx, schemaStateQuery))
-	return SchemaState{head, floor}, err
-}
-
-// PlannedFloor is the floor the database would have after Run: the highest
-// floor a not yet applied embedded migration declares, else the current one.
-func (s *UpgradeSchema) PlannedFloor(current SchemaState) (int64, error) {
-	floor := current.Floor
-	for version := current.Head + 1; version <= s.bundle.Head; version++ {
-		n, err := migrationDeclaredFloor(version)
-		if err != nil {
-			return 0, err
-		}
-		floor = max(floor, n)
-	}
-	return floor, nil
-}
-
-var migrationFloor = regexp.MustCompile(`asservat:oldest-binary-schema=([0-9]+)`)
-
-// migrationDeclaredFloor is the floor one embedded migration sets (0 for an
-// expand migration that leaves it).
-func migrationDeclaredFloor(version int64) (int64, error) {
-	matches, err := fs.Glob(migrations.Files(), fmt.Sprintf("%05d_*.sql", version))
-	if err != nil || len(matches) != 1 {
-		return 0, cfg.ErrInvalid
-	}
-	raw, err := fs.ReadFile(migrations.Files(), matches[0])
-	if err != nil {
-		return 0, cfg.ErrInvalid
-	}
-	var floor int64
-	for _, m := range migrationFloor.FindAllSubmatch(raw, -1) {
-		n, e := strconv.ParseInt(string(m[1]), 10, 64)
-		if e != nil || n < 1 || n > version {
-			return 0, cfg.ErrInvalid
-		}
-		floor = max(floor, n)
-	}
-	return floor, nil
+	return schemaHead(q.QueryRow(ctx, schemaStateQuery))
 }

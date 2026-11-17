@@ -10,10 +10,10 @@ head; `asservat setup` applies pending migrations as the schema-owning role and
 creates the runtime roles and their grants. Runtime roles never own schema
 objects or modify the goose history.
 
-A migration that drops what an older binary still needs records the oldest
-binary schema the database serves with
-`COMMENT ON TABLE goose_db_version IS 'asservat:oldest-binary-schema=N'`
-([ADR-227](../docs/decisions/227-upgrade-and-rollback.md)).
+Upgrades have no downtime ([ADR-335](../docs/decisions/335-usable-by-default.md) D13):
+migrations are expand/contract. A migration only adds or widens, so the
+previous release's binary keeps working against the new schema; removing
+anything it still uses waits one release.
 
 `queries/` holds the sqlc query definitions. Use `make sql-tools` for pinned
 sqlc and goose. `make sql-check` regenerates the bindings in a private

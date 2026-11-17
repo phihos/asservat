@@ -3,6 +3,7 @@ package postgres
 import (
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"asservat.local/asservat/internal/contracts"
 )
@@ -111,5 +112,29 @@ func TestRuntimeRolesCoverEveryMountedComponentLogin(t *testing.T) {
 	}
 	if !grant("capacity-profile-read", publicRuntimeGrant{"function", "read_capacity_qualification_pin(uuid,uuid)", "", "EXECUTE"}) {
 		t.Error("hub-api cannot read the capacity qualification pin")
+	}
+}
+
+func TestSchemaBundleRejectsEmptyOrMalformedMigrations(t *testing.T) {
+	bundle := func(name, body string) error {
+		_, err := schemaBundle(fstest.MapFS{name: {Data: []byte(body)}}, 1)
+		return err
+	}
+	if err := bundle("00001_x.sql", "-- +goose Up\nSELECT 1;\n"); err != nil {
+		t.Fatal("valid migration refused", err)
+	}
+	for name, c := range map[string]struct{ file, body string }{
+		"empty":             {"00001_x.sql", ""},
+		"no Up":             {"00001_x.sql", "SELECT 1;\n"},
+		"two Up":            {"00001_x.sql", "-- +goose Up\n-- +goose Up\n"},
+		"Down before Up":    {"00001_x.sql", "-- +goose Down\n-- +goose Up\n"},
+		"open statement":    {"00001_x.sql", "-- +goose Up\n-- +goose StatementBegin\nSELECT 1;\n"},
+		"unknown directive": {"00001_x.sql", "-- +goose Up\n-- +goose NO TRANSACTION\n"},
+		"wrong number":      {"00002_x.sql", "-- +goose Up\n"},
+		"not sql":           {"00001_x.txt", "-- +goose Up\n"},
+	} {
+		if bundle(c.file, c.body) == nil {
+			t.Fatal("accepted", name)
+		}
 	}
 }

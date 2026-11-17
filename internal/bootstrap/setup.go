@@ -432,14 +432,10 @@ func waitSchema(ctx context.Context, path, credentialPath, caPath string, out io
 	}
 	pg.RuntimeParams = map[string]string{"application_name": "asservat-wait-schema", "statement_timeout": "5000ms"}
 	for {
-		state, err := currentSchema(ctx, pg)
-		if err == nil && state.Compatible(postgres.CompiledSchemaVersion) {
-			_, _ = fmt.Fprintf(out, "schema %d is current\n", state.Head)
+		head, err := currentSchema(ctx, pg)
+		if err == nil && head >= postgres.CompiledSchemaVersion {
+			_, _ = fmt.Fprintf(out, "schema %d is current\n", head)
 			return nil
-		}
-		if errors.Is(err, cfg.ErrChanged) || err == nil && state.Floor > postgres.CompiledSchemaVersion {
-			// A newer database that no longer serves this binary.
-			return setupStep("schema", cfg.ErrChanged)
 		}
 		select {
 		case <-ctx.Done():
@@ -449,18 +445,11 @@ func waitSchema(ctx context.Context, path, credentialPath, caPath string, out io
 	}
 }
 
-func currentSchema(ctx context.Context, c *pgx.ConnConfig) (postgres.SchemaState, error) {
+func currentSchema(ctx context.Context, c *pgx.ConnConfig) (int64, error) {
 	conn, err := pgx.ConnectConfig(ctx, c)
 	if err != nil {
-		return postgres.SchemaState{}, cfg.ErrUnavailable
+		return 0, cfg.ErrUnavailable
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	state, err := postgres.ReadSchemaState(ctx, conn)
-	if errors.Is(err, cfg.ErrChanged) {
-		return state, err
-	}
-	if err != nil {
-		return state, cfg.ErrUnavailable
-	}
-	return state, nil
+	return postgres.ReadSchemaHead(ctx, conn)
 }
