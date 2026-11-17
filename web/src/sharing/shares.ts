@@ -2,6 +2,8 @@ import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage } from '../capture/http';
 import { operations, type Data, type Input, type Operation, type Operations, type Output, type ShareRow } from './http';
 
+// A recipient is a user or group name of the signed-in user's identity
+// provider (ADR-335 D4).
 export type Recipient = { kind: 'User' | 'Group'; id: string };
 export type State = {
   busy: boolean;
@@ -9,18 +11,14 @@ export type State = {
   // ADR-238: the administrator's management-only pages (loaded on demand).
   administered?: ShareRow[]; administeredCursor?: string; administeredMessage?: string;
   ownedMessage?: string; receivedMessage?: string;
-  created?: { shareID: string; expiresAt: string; recipients: number };
+  created?: { shareID: string; expiresAt?: string; recipients: number };
   message?: string;
   // A create whose reply was lost: it may exist, and only the identical
   // request (same idempotency key) may be sent again.
   uncertain?: boolean;
 };
-export const maxRecipients = 8;
-export const maxHours = 7 * 24;
-
 // UI coordination only, never authority: the server checks ownership,
-// recipients, expiry and current rights on every call. Recipients are the
-// stable IDs of the signed-in user's own identity provider.
+// recipients, expiry and current rights on every call.
 export class Shares {
   private state: State = { busy: false };
   private listeners = new Set<() => void>();
@@ -100,13 +98,14 @@ export class Shares {
 
   // teams (ADR-238) optionally names which of the user's own owner teams
   // manage the share; empty keeps the default (all of them).
-  create = async (caseID: string, artifact: { artifact_id: string; digest: string }, recipients: Recipient[], hours: number, reason: string, teams: string[] = []) => {
+  // Without hours the share lasts until the artifact's access ends.
+  create = async (caseID: string, artifact: { artifact_id: string; digest: string }, recipients: Recipient[], hours: number | undefined, reason: string, teams: string[] = []) => {
     if (this.state.busy || !this.session) return;
     const issuer = this.session.principal.issuer;
     this.pending ??= {
       case_id: caseID, artifacts: [{ artifactID: artifact.artifact_id, digest: artifact.digest }],
-      recipients: recipients.map(r => ({ kind: r.kind, issuer, id: r.id })), data_classes: ['metadata'], operations: ['get_case'],
-      expires_at: new Date(Date.now() + hours * 3_600_000).toISOString(), reason, idempotency_key: this.newID(),
+      recipients: recipients.map(r => ({ kind: r.kind, name: r.id })), data_classes: ['metadata'], operations: ['get_case', 'download_artifact'],
+      ...(hours ? { expires_at: new Date(Date.now() + hours * 3_600_000).toISOString() } : {}), ...(reason ? { reason } : {}), idempotency_key: this.newID(),
       ...(teams.length ? { management: { mode: 'teams' as const, teams: teams.map(id => ({ kind: 'Group' as const, issuer, id })) } } : {}),
     };
     const input = this.pending;

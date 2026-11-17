@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { operationMessage } from '../capture/http';
-import { retentionPreviewClient, validRetentionPreviewInput, type RetentionPreview, type RetentionPreviewClient } from './preview-http';
+import { retentionPreviewClient, validRetentionPreviewInput, type RetentionPreview, type RetentionPreviewClient, type RetentionPreviewInput } from './preview-http';
 
 const example = JSON.stringify([{ action: 'update', uid: 'baseline-policy-uid', spec: {
   scope: {}, purposeRef: 'diagnostics',
@@ -30,26 +30,34 @@ export function RetentionPreviewWorkspace({ session, scope, client = retentionPr
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
   const [preview, setPreview] = useState<RetentionPreview>();
+  // Groups and incomplete clusters arrive in pages; the next page repeats
+  // the same changes with the cursor.
+  const [next, setNext] = useState<{ input: RetentionPreviewInput; cursor: string }>();
   useEffect(() => { heading.current?.focus(); }, []);
-  const run = async () => {
-    setMessage(undefined); setPreview(undefined);
-    let changes: unknown;
-    try { changes = JSON.parse(text); } catch { setMessage('The proposed changes are not valid JSON.'); return; }
-    const input = { changes };
-    if (!validRetentionPreviewInput(input)) {
-      setMessage('Enter a JSON list of 1 to 16 changes: create with a complete EvidenceRetentionPolicy spec, update with the policy\'s UID and spec, or delete with its UID. Add source_cluster_id for a cluster\'s local policy.');
-      return;
-    }
+  const load = async (input: RetentionPreviewInput, more: boolean) => {
     setBusy(true);
     try {
-      const result = await client.preview(input, session.csrf_token, scope);
+      const result = await client.preview(more && next ? { ...input, cursor: next.cursor } : input, session.csrf_token, scope);
       if (scope.aborted) return;
-      if (result.status === 'ok') setPreview(result.data);
-      else if (result.status === 'error') setMessage(result.data.message);
+      if (result.status === 'ok') {
+        setPreview(previous => more && previous ? { ...result.data, groups: [...previous.groups, ...result.data.groups], incomplete_clusters: [...previous.incomplete_clusters, ...result.data.incomplete_clusters] } : result.data);
+        setNext(result.next_cursor ? { input, cursor: result.next_cursor } : undefined);
+      } else if (result.status === 'error') setMessage(result.data.message);
       else setMessage('The preview is not ready yet. Try again shortly.');
     } catch (error) {
       if (!scope.aborted) setMessage(operationMessage(error));
     } finally { if (!scope.aborted) setBusy(false); }
+  };
+  const run = async () => {
+    setMessage(undefined); setPreview(undefined); setNext(undefined);
+    let changes: unknown;
+    try { changes = JSON.parse(text); } catch { setMessage('The proposed changes are not valid JSON.'); return; }
+    const input = { changes };
+    if (!validRetentionPreviewInput(input)) {
+      setMessage('Enter a JSON list of changes: create with a complete EvidenceRetentionPolicy spec, update with the policy\'s UID and spec, or delete with its UID. Add source_cluster_id for a cluster\'s local policy.');
+      return;
+    }
+    await load(input, false);
   };
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Preview retention changes</h1>
@@ -65,7 +73,7 @@ export function RetentionPreviewWorkspace({ session, scope, client = retentionPr
     {preview && <section className="review-section" role="status" aria-label="Preview result">
       <h2>Result</h2>
       <p>{preview.message}</p>
-      <p>{preview.artifacts_scanned} stored artifacts evaluated{preview.scan_limited ? ' (limit reached; counts are lower bounds)' : ''}: {preview.affected_total} would be shortened, {preview.read_closed_total} would become unreadable at once, {preview.deletion_due_total} would be due for deletion at once, {preview.unknown_total} unknown.</p>
+      <p>{preview.artifacts_scanned} stored artifacts evaluated: {preview.affected_total} would be shortened, {preview.read_closed_total} would become unreadable at once, {preview.deletion_due_total} would be due for deletion at once, {preview.unknown_total} unknown.</p>
       {preview.affected_total > 0 && <p>Earliest new access end {when(preview.earliest_expires_at)}; earliest new deletion {when(preview.earliest_delete_by)}.</p>}
       {preview.baseline_changed && <p className="notice">The hub would no longer have exactly one baseline policy: new collection would be suspended.</p>}
       {preview.groups.length > 0 && <table>
@@ -78,6 +86,7 @@ export function RetentionPreviewWorkspace({ session, scope, client = retentionPr
         </tr>)}</tbody>
       </table>}
       {preview.groups_total > preview.groups.length && <p>{preview.groups.length} of {preview.groups_total} groups shown, earliest deletions first.</p>}
+      {next && <Button className="button secondary" isDisabled={busy} onPress={() => void load(next.input, true)}>Show more</Button>}
       {preview.incomplete_clusters.length > 0 && <>
         <h3>Incomplete clusters ({preview.incomplete_total})</h3>
         <p>The retention policy source of these clusters is not current; their results may change once it is.</p>

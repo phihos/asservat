@@ -33,12 +33,21 @@ export interface components {
             /** Format: uuid */
             case_id: string;
             artifacts: components["schemas"]["Contract_common_9530994123d918d4"][];
-            recipients: components["schemas"]["Contract_common_0e44f1278c675a38"][];
+            /** @description No count limit; bounded only by the request body byte limit (memory). */
+            recipients: ({
+                /** @enum {unknown} */
+                kind: "User" | "Group";
+                /** @description User name, e-mail address or group name known to the installation. */
+                name: string;
+            } | components["schemas"]["Contract_common_0e44f1278c675a38"])[];
             data_classes: ("metadata" | "extract" | "raw")[];
             operations: string[];
-            /** Format: date-time */
-            expires_at: string;
-            reason: string;
+            /**
+             * Format: date-time
+             * @description Optional earlier end; a share otherwise lasts until the evidence's access end.
+             */
+            expires_at?: string;
+            reason?: string;
             idempotency_key: string;
             management?: components["schemas"]["Contract_management_0d504ecd6bc8c0fd"];
         };
@@ -75,7 +84,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -131,7 +140,7 @@ export interface components {
                     /** @enum {unknown} */
                     source_kind: "DebugCapture" | "DebugPolicy";
                     /** @enum {unknown} */
-                    phase: "PendingApproval" | "Active" | "Draining" | "Completed" | "Suspended" | "Revoked" | "Expired" | "Denied";
+                    phase: "PendingApproval" | "Active" | "Draining" | "Completed" | "Revoked" | "Expired" | "Denied";
                     expires_at: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
                     registered_captures: number;
                     max_captures: number;
@@ -142,7 +151,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -181,7 +190,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -211,8 +220,8 @@ export interface components {
             data: {
                 /** Format: uuid */
                 share_id?: string;
-                /** @enum {string} */
-                phase: "Active" | "Suspended";
+                /** @constant */
+                phase: "Active";
                 revision: number;
                 sharing_intent_id?: components["schemas"]["Contract_common_2224a31324a0c811"];
                 managed_by: components["schemas"]["Contract_common_0e44f1278c675a38"][];
@@ -222,7 +231,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */

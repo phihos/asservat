@@ -26,8 +26,7 @@ export const processingDiscoveryClient: ProcessingDiscoveryClient = {
       if (query.purpose_ref !== undefined && candidate.purpose_ref !== query.purpose_ref) return true;
       if ('case_id' in query) return candidate.case_id !== query.case_id;
       const anchor = Date.parse(candidate.anchor_at);
-      return candidate.cluster_id !== query.cluster_id || candidate.namespace_uid !== query.namespace_uid || candidate.workload_uid !== query.workload_uid ||
-        !(Date.parse(query.acquired_from) <= anchor && anchor < Date.parse(query.acquired_until));
+      return !(Date.parse(query.acquired_from) <= anchor && anchor < Date.parse(query.acquired_until));
     })) throw new OperationFailure(502);
     return reply;
   },

@@ -18,7 +18,7 @@ const artifact = { artifact_id: id(3), digest: 'ab'.repeat(32), expires_at: new 
 
 class SyntheticShares implements Operations {
   calls: { name: Operation; input: unknown; csrf: string }[] = [];
-  owned = [row(10, 'Active'), row(11, 'Suspended')];
+  owned = [row(10, 'Active'), row(11, 'Expired')];
   fail?: () => unknown;
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
@@ -37,7 +37,7 @@ afterEach(() => { cleanup(); for (const c of controllers) c.reset(); controllers
 
 it('fixtures match the canonical share contracts', () => {
   expect(validOutput_create_share(result({ share_id: id(10), phase: 'Active' }))).toBe(true);
-  expect(validOutput_list_shares(result({ shares: [row(10, 'Suspended')] }))).toBe(true);
+  expect(validOutput_list_shares(result({ shares: [row(10, 'Expired')] }))).toBe(true);
   expect(validOutput_revoke_share(result({ share_id: id(10), phase: 'Revoked', revision: 2 }))).toBe(true);
   expect(validOutput_revoke_share(failure('Conflict', 'x'))).toBe(true);
 });
@@ -58,30 +58,30 @@ function open() {
 }
 function fill(recipient: string, kind = 'User') {
   fireEvent.change(screen.getByLabelText('Recipient type'), { target: { value: kind } });
-  fireEvent.change(screen.getByLabelText('Recipient ID'), { target: { value: recipient } });
+  fireEvent.change(screen.getByLabelText('Recipient name'), { target: { value: recipient } });
   fireEvent.click(screen.getByRole('button', { name: 'Add recipient' }));
 }
 
-it('shares one artifact with stable IDs of the own issuer, previews the recipient view and copies the case link', async () => {
+it('shares one artifact with names of the own identity provider, previews the recipient view and copies the case link', async () => {
   const { client } = await mountPanel();
   expect(screen.getByText('Preview body')).toBeTruthy();
   expect(screen.getByText(/Other evidence in this case, further sharing/)).toBeTruthy();
   expect((screen.getByRole('button', { name: 'Share' }) as HTMLButtonElement).disabled).toBe(true);
   fill('user-7'); fill('team-9', 'Group'); fill('user-7');
   expect(within(screen.getByRole('list', { name: 'Recipients' })).getAllByRole('listitem')).toHaveLength(2);
-  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'incident review' } });
-  const before = Date.now();
+  // Reason and duration are optional.
+  expect((screen.getByRole('button', { name: 'Share' }) as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.change(screen.getByLabelText('Reason (optional)'), { target: { value: 'incident review' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   expect(await screen.findByText(/Shared with 2 recipients until/)).toBeTruthy();
   const create = client.calls.find(c => c.name === 'create_share')!;
   expect(create.csrf).toBe(session.csrf_token);
   const input = create.input as Input<'create_share'>;
   expect(validInput_create_share(input)).toBe(true);
-  expect({ ...input, expires_at: undefined }).toEqual({ case_id: id(2), artifacts: [{ artifactID: id(3), digest: 'ab'.repeat(32) }],
-    recipients: [{ kind: 'User', issuer: session.principal.issuer, id: 'user-7' }, { kind: 'Group', issuer: session.principal.issuer, id: 'team-9' }],
-    data_classes: ['metadata'], operations: ['get_case'], expires_at: undefined, reason: 'incident review', idempotency_key: id(30) });
-  // Default expiry: 24 hours.
-  expect(Math.abs(Date.parse(input.expires_at) - before - 24 * hour)).toBeLessThan(5_000);
+  // Without a duration the share lasts until the artifact's access ends.
+  expect(input).toEqual({ case_id: id(2), artifacts: [{ artifactID: id(3), digest: 'ab'.repeat(32) }],
+    recipients: [{ kind: 'User', name: 'user-7' }, { kind: 'Group', name: 'team-9' }],
+    data_classes: ['metadata'], operations: ['get_case', 'download_artifact'], reason: 'incident review', idempotency_key: id(30) });
   // A successful share clears the form; the next share is a new request.
   await waitFor(() => expect(screen.queryByRole('list', { name: 'Recipients' })).toBeNull());
   const writeText = vi.fn().mockResolvedValue(undefined);
@@ -91,24 +91,28 @@ it('shares one artifact with stable IDs of the own issuer, previews the recipien
   expect(writeText).toHaveBeenCalledWith(window.location.origin + '/cases/' + id(2));
 });
 
-it('limits the share to the artifact access and at most seven days', async () => {
-  await mountPanel();
-  fireEvent.change(screen.getByLabelText('Share for (hours)'), { target: { value: '72' } });
+it('limits the share to the artifact access', async () => {
+  const { client } = await mountPanel();
+  fireEvent.change(screen.getByLabelText('Share for (hours, optional)'), { target: { value: '72' } });
   expect(screen.getByText(/the artifact's access ends first/)).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('Share for (hours)'), { target: { value: '169' } });
-  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
-  expect((screen.getByRole('button', { name: 'Share' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Share for (hours, optional)'), { target: { value: '12' } });
+  fill('user-7');
+  const before = Date.now();
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+  await screen.findByText(/Shared with 1 recipient until/);
+  const input = client.calls.find(c => c.name === 'create_share')!.input as Input<'create_share'>;
+  expect(Math.abs(Date.parse(input.expires_at!) - before - 12 * hour)).toBeLessThan(5_000);
 });
 
 it('retries an uncertain share only with the identical request and shows definite refusals', async () => {
   const { client } = await mountPanel();
   client.fail = () => { throw new Error('connection reset'); };
-  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
+  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason (optional)'), { target: { value: 'r' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   const retry = await screen.findByRole('button', { name: 'Retry same share request' });
   // The form is locked: what it shows is exactly what the retry sends.
-  expect(screen.getByLabelText('Recipient ID').matches(':disabled')).toBe(true);
-  expect(screen.getByLabelText('Reason').matches(':disabled')).toBe(true);
+  expect(screen.getByLabelText('Recipient name').matches(':disabled')).toBe(true);
+  expect(screen.getByLabelText('Reason (optional)').matches(':disabled')).toBe(true);
   client.fail = () => failure('NotAvailable', 'Sharing needs the evidence-owner role on the workload and the evidence:share scope.');
   fireEvent.click(retry);
   await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/evidence-owner role/));
@@ -122,10 +126,10 @@ it('retries an uncertain share only with the identical request and shows definit
 it('discards an uncertain share so the form can build a new request', async () => {
   const { client } = await mountPanel();
   client.fail = () => { throw new Error('connection reset'); };
-  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
+  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason (optional)'), { target: { value: 'r' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Discard and start over' }));
-  expect(screen.getByLabelText('Recipient ID').matches(':disabled')).toBe(false);
+  expect(screen.getByLabelText('Recipient name').matches(':disabled')).toBe(false);
   client.fail = undefined;
   fill('user-8');
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
@@ -140,7 +144,7 @@ it('lists received and owned shares and revokes an active one', async () => {
   render(<SharesWorkspace session={session} scope={new AbortController().signal} controller={shares}/>);
   expect((await screen.findByRole('link', { name: 'Open shared case' })).getAttribute('href')).toBe('/cases/' + id(2));
   const owned = within(screen.getByRole('region', { name: 'Shared by me or my teams' }));
-  expect(owned.getByText(/Suspended: no managing team holds the evidence-owner role/)).toBeTruthy();
+  expect(owned.getByText(/Expired/)).toBeTruthy();
   expect(owned.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1);
   fireEvent.click(owned.getByRole('button', { name: 'Revoke' }));
   await waitFor(() => expect(owned.queryAllByRole('button', { name: 'Revoke' })).toHaveLength(0));
@@ -152,8 +156,8 @@ it('lists received and owned shares and revokes an active one', async () => {
 
 it('names managing teams on a share (ADR-238)', async () => {
   const { client } = await mountPanel();
-  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
-  fireEvent.change(screen.getByLabelText('Managing team ID'), { target: { value: 'team-b' } });
+  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason (optional)'), { target: { value: 'r' } });
+  fireEvent.change(screen.getByLabelText('Managing team name'), { target: { value: 'team-b' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add team' }));
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   await screen.findByText(/Shared with 1 recipient until/);
@@ -170,7 +174,7 @@ it('transfers management with the listed revision and revokes with it (ADR-238)'
   render(<SharesWorkspace session={session} scope={new AbortController().signal} controller={shares}/>);
   const owned = within(await screen.findByRole('region', { name: 'Shared by me or my teams' }));
   expect(await owned.findByText(/Created by creator · Managed by team team-a/)).toBeTruthy();
-  fireEvent.change(owned.getByLabelText('New managing team ID'), { target: { value: 'team-b' } });
+  fireEvent.change(owned.getByLabelText('New managing team name'), { target: { value: 'team-b' } });
   fireEvent.click(owned.getByRole('button', { name: 'Add team' }));
   fireEvent.click(owned.getByRole('button', { name: 'Transfer' }));
   expect(await screen.findByText('Management transferred.')).toBeTruthy();
@@ -187,7 +191,7 @@ it('transfers management with the listed revision and revokes with it (ADR-238)'
 it('lists every share management-only for administrators, pages with the cursor, revokes and recovers (ADR-238)', async () => {
   const client = new SyntheticShares(); let n = 60;
   const admin = (k: number, phase: string) => ({ ...row(k, phase), artifact_id: id(3), revision: 2, created_by: { kind: 'User', issuer: session.principal.issuer, id: 'creator' }, managed_by: [{ kind: 'Group', issuer: session.principal.issuer, id: 'team-a' }] });
-  const pages = [{ ...result({ shares: [admin(70, 'Suspended')] }), next_cursor: 's1.1.' + id(70) }, result({ shares: [admin(71, 'Revoked')] })];
+  const pages = [{ ...result({ shares: [admin(70, 'Active')] }), next_cursor: 's1.1.' + id(70) }, result({ shares: [admin(71, 'Revoked')] })];
   expect(pages.every(p => validOutput_list_shares(p))).toBe(true);
   const call = client.call.bind(client);
   client.call = (async (name: Operation, input: unknown, csrf: string, signal: AbortSignal) => {
@@ -203,8 +207,8 @@ it('lists every share management-only for administrators, pages with the cursor,
   fireEvent.click(screen.getByRole('button', { name: 'More shares' }));
   await waitFor(() => expect(all.getAllByRole('listitem')).toHaveLength(2));
   expect(client.calls.filter(c => c.name === 'list_shares' && (c.input as { view: string }).view === 'administration').map(c => c.input)).toEqual([{ view: 'administration', limit: 50 }, { view: 'administration', limit: 50, cursor: 's1.1.' + id(70) }]);
-  // Recovery of the Suspended share assigns current owner teams.
-  fireEvent.change(all.getByLabelText('New managing team ID'), { target: { value: 'team-b' } });
+  // Assigning current owner teams replaces a deleted managing team.
+  fireEvent.change(all.getByLabelText('New managing team name'), { target: { value: 'team-b' } });
   fireEvent.click(all.getByRole('button', { name: 'Add team' }));
   fireEvent.click(all.getByRole('button', { name: 'Transfer' }));
   await waitFor(() => expect(client.calls.find(c => c.name === 'transfer_share')).toBeTruthy());

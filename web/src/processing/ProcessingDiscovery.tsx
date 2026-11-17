@@ -6,10 +6,9 @@ import type { WorkloadScope } from './http';
 import { processingDiscoveryClient, validDiscoveryQuery, type DiscoveryPage, type DiscoveryQuery, type ProcessingDiscoveryClient } from './discovery-http';
 
 const initial = {
-  mode: 'case', caseID: '', clusterID: '', namespaceUID: '', workloadUID: '', from: '', until: '', purposeRef: '',
+  mode: 'case', caseID: '', cluster: '', namespace: '', workload: '', from: '', until: '', purposeRef: '',
 };
 const pageSize = 12;
-const maximumInterval = 3660 * 24 * 60 * 60 * 1000;
 const when = (value: string) => new Date(value).toLocaleString(undefined, { timeZone: 'UTC', timeZoneName: 'short' });
 
 function buildQuery(criteria: typeof initial): unknown {
@@ -20,9 +19,9 @@ function buildQuery(criteria: typeof initial): unknown {
   // same interval when browsers in different time zones review a request.
   const from = Date.parse(criteria.from + 'Z');
   const until = Date.parse(criteria.until + 'Z');
-  if (!Number.isFinite(from) || !Number.isFinite(until) || until <= from || until - from > maximumInterval) return undefined;
+  if (!Number.isFinite(from) || !Number.isFinite(until) || until <= from) return undefined;
   return {
-    ...common, cluster_id: criteria.clusterID, namespace_uid: criteria.namespaceUID, workload_uid: criteria.workloadUID,
+    ...common, cluster: criteria.cluster, namespace: criteria.namespace, workload: criteria.workload,
     acquired_from: new Date(from).toISOString(), acquired_until: new Date(until).toISOString(),
   };
 }
@@ -61,7 +60,7 @@ export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure,
     setMessage(undefined);
     setResult(undefined);
     if (!validDiscoveryQuery(input)) {
-      setMessage(criteria.mode === 'case' ? 'Enter a valid case ID and optional purpose reference.' : 'Enter a valid cluster ID, namespace and workload UIDs, and a UTC acquisition interval with a later end.');
+      setMessage(criteria.mode === 'case' ? 'Enter a valid case ID and optional purpose reference.' : 'Enter the cluster, namespace and workload names and a UTC acquisition interval with a later end.');
       return;
     }
     const request = {};
@@ -88,8 +87,12 @@ export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure,
     void search({ ...result.query, after: result.page.next });
   };
 
-  const workloadScope: WorkloadScope | undefined = result && !('case_id' in result.query) ? {
-    kind: 'workloadInterval', clusterID: result.query.cluster_id, namespaceUID: result.query.namespace_uid, workloadUID: result.query.workload_uid,
+  // A restriction names one workload instance: offered when the page's
+  // candidates all belong to one (a name can match recreated workloads).
+  const instances = new Set(result?.page.candidates.map(c => JSON.stringify([c.cluster_id, c.namespace_uid, c.workload_uid])));
+  const first = result?.page.candidates[0];
+  const workloadScope: WorkloadScope | undefined = result && !('case_id' in result.query) && first && instances.size === 1 ? {
+    kind: 'workloadInterval', clusterID: first.cluster_id, namespaceUID: first.namespace_uid, workloadUID: first.workload_uid,
     acquiredFrom: result.query.acquired_from, acquiredUntil: result.query.acquired_until,
   } : undefined;
 
@@ -108,12 +111,12 @@ export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure,
           <label htmlFor="processing-search-case">Case ID</label>
           <input id="processing-search-case" value={criteria.caseID} maxLength={36} required onChange={event => edit('caseID', event.target.value)}/>
         </> : <>
-          <label htmlFor="processing-search-cluster">Cluster ID</label>
-          <input id="processing-search-cluster" value={criteria.clusterID} maxLength={36} required onChange={event => edit('clusterID', event.target.value)}/>
-          <label htmlFor="processing-search-namespace">Namespace UID</label>
-          <input id="processing-search-namespace" value={criteria.namespaceUID} maxLength={64} required onChange={event => edit('namespaceUID', event.target.value)}/>
-          <label htmlFor="processing-search-workload">Workload UID</label>
-          <input id="processing-search-workload" value={criteria.workloadUID} maxLength={64} required onChange={event => edit('workloadUID', event.target.value)}/>
+          <label htmlFor="processing-search-cluster">Cluster</label>
+          <input id="processing-search-cluster" value={criteria.cluster} maxLength={63} required placeholder="local" onChange={event => edit('cluster', event.target.value)}/>
+          <label htmlFor="processing-search-namespace">Namespace</label>
+          <input id="processing-search-namespace" value={criteria.namespace} maxLength={63} required onChange={event => edit('namespace', event.target.value)}/>
+          <label htmlFor="processing-search-workload">Workload</label>
+          <input id="processing-search-workload" value={criteria.workload} maxLength={253} required onChange={event => edit('workload', event.target.value)}/>
           <label htmlFor="processing-search-from">Acquired from (UTC)</label>
           <input id="processing-search-from" type="datetime-local" step="1" value={criteria.from} required onChange={event => edit('from', event.target.value)}/>
           <label htmlFor="processing-search-until">Acquired until (UTC)</label>

@@ -198,7 +198,7 @@ export interface components {
                     /** @constant */
                     decision: "Indeterminate";
                     /** @enum {unknown} */
-                    unmet: "PermissionObservationStale" | "ServiceUnavailable" | "ClusterUnavailable";
+                    unmet: "ClusterNotObserved" | "ServiceUnavailable" | "ClusterUnavailable";
                 }[];
                 deltas: {
                     /** Format: uuid */
@@ -214,9 +214,9 @@ export interface components {
                     /** @enum {unknown} */
                     after: "Allow" | "Deny" | "Indeterminate";
                     /** @enum {unknown} */
-                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
+                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClusterNotObserved" | "ServiceUnavailable" | "DecisionTimeSource";
                     /** @enum {unknown} */
-                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
+                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClusterNotObserved" | "ServiceUnavailable" | "DecisionTimeSource";
                     before_basis: {
                         /** @enum {unknown} */
                         effect: "allow" | "deny";

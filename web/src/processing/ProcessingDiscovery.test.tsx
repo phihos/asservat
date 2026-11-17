@@ -56,11 +56,11 @@ it('keeps the exact workload and UTC interval across an empty page with a contin
   const cursor = { artifact_id: id(2), anchor_at: '2026-11-10T17:21:00.123456Z' };
   const call = vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValueOnce(reply([], cursor)).mockResolvedValueOnce(reply([candidate()]));
   render(<ProcessingWorkspace session={session} scope={new AbortController().signal} discoveryClient={{ search: call }} artifactID=""/>);
-  fill('Search by', 'workload'); fill('Cluster ID', id(6)); fill('Namespace UID', 'namespace-uid'); fill('Workload UID', 'workload-uid');
+  fill('Search by', 'workload'); fill('Cluster', 'prod'); fill('Namespace', 'payments'); fill('Workload', 'api');
   fill('Acquired from (UTC)', '2026-11-10T17:00'); fill('Acquired until (UTC)', '2026-11-10T18:00');
   search();
   await screen.findByText('No matching candidates on this page.');
-  expect(call.mock.calls[0][0]).toEqual({ cluster_id: id(6), namespace_uid: 'namespace-uid', workload_uid: 'workload-uid', acquired_from: '2026-11-10T17:00:00.000Z', acquired_until: '2026-11-10T18:00:00.000Z', limit: 12 });
+  expect(call.mock.calls[0][0]).toEqual({ cluster: 'prod', namespace: 'payments', workload: 'api', acquired_from: '2026-11-10T17:00:00.000Z', acquired_until: '2026-11-10T18:00:00.000Z', limit: 12 });
   expect(call).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Next evidence page' }));
   await screen.findByRole('article', { name: 'Evidence candidate '+id(3) });
@@ -181,12 +181,12 @@ it('discards erasure status across session scope loss and refuses a mismatched r
   expect(screen.queryByText('Managed deletion verified.')).toBeNull();
 });
 
-it('restricts the full workload interval from an empty successful search and releases its durable scope after reload', async () => {
+it('restricts the workload interval of the instance a search found and releases its durable scope after reload', async () => {
   const workloadScope: Rule['scope'] = {
     kind: 'workloadInterval', clusterID: id(6), namespaceUID: 'namespace-uid', workloadUID: 'workload-uid',
     acquiredFrom: '2026-11-10T17:00:00.000Z', acquiredUntil: '2026-11-10T18:00:00.000Z',
   };
-  const call = vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValue(reply([], { artifact_id: id(2), anchor_at: '2026-11-10T17:21:00Z' }));
+  const call = vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValue(reply([candidate()], { artifact_id: id(2), anchor_at: '2026-11-10T17:21:00Z' }));
   const change = vi.fn<ProcessingClient['change']>().mockImplementation(async (input, key) => {
     if (input.action !== 'restrict_processing' && input.action !== 'release_processing') throw Error('expected rule change');
     return { rootID: id(1), epoch: id(2), requestID: key, operationID: id(8), ruleID: input.ruleID,
@@ -201,12 +201,12 @@ it('restricts the full workload interval from an empty successful search and rel
   const newID = vi.fn(() => id(next++));
   const client = { read, change };
   const view = render(<ProcessingWorkspace session={session} scope={new AbortController().signal} discoveryClient={{ search: call }} client={client} newID={newID}/>);
-  fill('Search by', 'workload'); fill('Cluster ID', id(6)); fill('Namespace UID', 'namespace-uid'); fill('Workload UID', 'workload-uid');
+  fill('Search by', 'workload'); fill('Cluster', 'prod'); fill('Namespace', 'payments'); fill('Workload', 'api');
   fill('Acquired from (UTC)', '2026-11-10T17:00'); fill('Acquired until (UTC)', '2026-11-10T18:00');
   fill('Purpose reference (optional)', 'diagnostics');
   expect(screen.queryByRole('button', { name: 'Review workload restriction' })).toBeNull();
   search();
-  await screen.findByText('No matching candidates on this page.');
+  await screen.findByRole('article', { name: 'Evidence candidate '+id(3) });
   const review = screen.getByRole('button', { name: 'Review workload restriction' });
   fireEvent.click(review);
   let confirmation = screen.getByRole('region', { name: 'Confirm workload restriction' });
@@ -239,7 +239,7 @@ it('restricts the full workload interval from an empty successful search and rel
 });
 
 const fillWorkloadSearch = () => {
-  fill('Search by', 'workload'); fill('Cluster ID', id(6)); fill('Namespace UID', 'namespace-uid'); fill('Workload UID', 'workload-uid');
+  fill('Search by', 'workload'); fill('Cluster', 'prod'); fill('Namespace', 'payments'); fill('Workload', 'api');
   fill('Acquired from (UTC)', '2026-11-10T17:00'); fill('Acquired until (UTC)', '2026-11-10T18:00');
 };
 
@@ -250,9 +250,9 @@ it('offers workload review only after a successful current workload search and c
   render(<ProcessingWorkspace session={session} scope={new AbortController().signal} discoveryClient={{ search: call }}/>);
   fillWorkloadSearch(); search();
   expect(screen.queryByRole('button', { name: 'Review workload restriction' })).toBeNull();
-  await act(async () => finish(reply([])));
+  await act(async () => finish(reply([candidate()])));
   expect(screen.getByRole('button', { name: 'Review workload restriction' })).toBeTruthy();
-  fill('Workload UID', 'edited-workload-uid');
+  fill('Workload', 'edited-api');
   expect(screen.queryByRole('button', { name: 'Review workload restriction' })).toBeNull();
   search(); await screen.findByRole('alert');
   expect(screen.queryByRole('button', { name: 'Review workload restriction' })).toBeNull();
@@ -263,7 +263,7 @@ it('offers workload review only after a successful current workload search and c
 
 it('keeps a reviewed workload request across same-user refresh and drops late mutation results on scope loss', async () => {
   const scope = new AbortController(), nextScope = new AbortController();
-  const call = vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValue(reply([]));
+  const call = vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValue(reply([candidate()]));
   let finish!: (value: Receipt) => void;
   const change = vi.fn<ProcessingClient['change']>().mockRejectedValueOnce(new ProcessingFailure(503))
     .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
@@ -300,7 +300,7 @@ it('keeps a reviewed workload request across same-user refresh and drops late mu
 it('clears a workload confirmation when its session scope ends', async () => {
   const scope = new AbortController();
   const change = vi.fn();
-  render(<ProcessingWorkspace session={session} scope={scope.signal} discoveryClient={{ search: vi.fn().mockResolvedValue(reply([])) }} client={{ read: vi.fn(), change }}/>);
+  render(<ProcessingWorkspace session={session} scope={scope.signal} discoveryClient={{ search: vi.fn().mockResolvedValue(reply([candidate()])) }} client={{ read: vi.fn(), change }}/>);
   fillWorkloadSearch(); search();
   fireEvent.click(await screen.findByRole('button', { name: 'Review workload restriction' }));
   expect(screen.getByRole('region', { name: 'Confirm workload restriction' })).toBeTruthy();
