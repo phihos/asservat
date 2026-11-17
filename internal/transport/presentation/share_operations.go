@@ -121,6 +121,7 @@ func shareUnserved(in ShareOperationInput) bool {
 	}
 	return slices.ContainsFunc(in.Operations, func(op string) bool { return !slices.Contains(shareOperationsServed, op) })
 }
+
 type shareArtifactInput struct {
 	ArtifactID string `json:"artifactID"`
 	Digest     string `json:"digest"`

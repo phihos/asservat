@@ -135,17 +135,24 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "cluster_id": {
+          "cluster": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Cluster name as configured in the hub (ADR-335 D4)."
           },
-          "namespace_uid": {
+          "namespace": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 63
           },
-          "workload_uid": {
+          "workload": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+            "description": "Workload name; evidence of earlier workloads with this name matches too."
           },
           "acquired_from": {
             "type": "string",
@@ -170,9 +177,9 @@
           }
         },
         "required": [
-          "cluster_id",
-          "namespace_uid",
-          "workload_uid",
+          "cluster",
+          "namespace",
+          "workload",
           "acquired_from",
           "acquired_until"
         ]

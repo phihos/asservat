@@ -8,6 +8,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"encoding/json"
 	"errors"
@@ -522,11 +523,14 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		return json.Marshal(input)
 	}
 	if name == processingDiscoveryOperation {
-		query, err := processingDiscoveryQuery(raw)
-		if err != nil {
-			return nil, err
+		var in struct {
+			privacy.ProcessingDiscoveryQuery
+			Cluster string `json:"cluster,omitempty"`
 		}
-		return json.Marshal(query)
+		if json.Unmarshal(raw, &in) != nil {
+			return nil, contracts.ErrInvestigationWire
+		}
+		return json.Marshal(in)
 	}
 	if name == "preview_retention_change" {
 		var in RetentionPreviewInput

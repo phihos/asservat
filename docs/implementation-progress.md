@@ -477,6 +477,24 @@ verifiers, hub-held and connector work trust (sources, guards, catalog
 the key service's `sign` operation, `policy-submission` purpose and request
 `version`. Hub authorization and SQL checks before sending work are unchanged.
 
+## Shares, access, retention preview and processing on the canonical contract (2026-11-17)
+
+Branch `clean/api-shares`. The eleven tools of this group validate inputs and
+outputs against the canonical schemas. `create_share` takes recipients by name
+(the caller's issuer), optional reason and expiry; multiple artifacts,
+extract/raw classes and operations other than `get_case`/`download_artifact`,
+`list_shares(include_intents)` and intent `transfer_share` return
+`CapabilityUnavailable`. `explain_access` names the cluster and reports
+`ClusterNotObserved`; `preview_access_change` pages every row (no object,
+target, delta, 256 KiB or basis caps); `preview_retention_change` pages groups
+with a cursor; `search_processing_evidence` takes cluster, namespace and
+workload names (the namespace name from the capture record, the workload
+through `workload_name`, which target resolution fills). Gaps: processing
+restrictions still name workload UIDs (the console offers one when a search
+page names one instance); the evaluator's 32-assignment audience cap reports
+`ServiceUnavailable`; Pod and DaemonSet names do not match (only
+Deployments/StatefulSets are recorded).
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
@@ -494,7 +512,6 @@ implement the canonical contract.
 | --- | --- | --- |
 | `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`get_artifact_download` take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | No `after_revision` wait (the request-scoped identity and audit windows end after 5–20 s); query results keep `retry_after_seconds`: `internal/transport/presentation/context_projection_operations.go` |
 | `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events and the live-watch stream are missing; console still polls queries and live watches |
-| `mcp-tools.json` | `explain_access`/`preview_access_change`: `ClusterNotObserved` replaces `PermissionObservationStale`; no `valid_until` | `internal/domain/authorization/explain.go`, `internal/transport/presentation/access_preview_operations.go` |
 | `live-watch.schema.json`, `read_live_watch` | `wait_ms` ≤30000; no `retry_after_ms`, `row_max_age_seconds`, `managed_row_max_age_seconds`, source `handle_expires_at`; row expiry is min(privacy, watch deadline) | `internal/domain/live/watch.go`, `internal/domain/live/source.go`, `internal/application/live/service.go` |
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |

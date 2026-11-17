@@ -248,7 +248,9 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 	// ADR-234: the unrelated user's own explanation is the uniform Deny, the
 	// same for the real workload as for an absent one.
 	explain := func(ref map[string]string) (map[string]any, error) {
-		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "explain_access", Arguments: map[string]any{"target_ref": ref, "operation": "capture"}})
+		// ADR-335 D4: explain_access names the cluster; the hub's own is local.
+		named := map[string]string{"cluster": "local", "namespace": ref["namespace"], "kind": ref["kind"], "name": ref["name"]}
+		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "explain_access", Arguments: map[string]any{"target_ref": named, "operation": "capture"}})
 		if err != nil {
 			return nil, err
 		}

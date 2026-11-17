@@ -22,9 +22,9 @@ const (
 
 // Unmet names the evaluator condition that decided a refusal.
 const (
-	UnmetNoMatchingAllow    = "NoMatchingAllow"
-	UnmetExplicitDeny       = "ExplicitDeny"
-	UnmetClientScope        = "ClientScopeMissing"
+	UnmetNoMatchingAllow = "NoMatchingAllow"
+	UnmetExplicitDeny    = "ExplicitDeny"
+	UnmetClientScope     = "ClientScopeMissing"
 	// UnmetClusterNotObserved: the cluster's permission state has not
 	// reached the hub (ADR-330), so the decision is Indeterminate.
 	UnmetClusterNotObserved = "ClusterNotObserved"

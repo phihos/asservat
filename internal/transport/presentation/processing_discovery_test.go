@@ -64,7 +64,7 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 				return page
 			}
 			base := s.inner.(*InvestigationOperations)
-			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Discovery: fixture, Now: s.config.Now}, nil, nil)
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, NewClusterNames(map[string]string{"prod": discoveryID(13)}), privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Discovery: fixture, Now: s.config.Now}, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,6 +80,16 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 				out := audit.events[0]
 				if out.Status != "success" || out.Effect != "none" || len(out.ArtifactIDs) != value.ProcessingDiscoveryLimit || len(out.CaseIDs) != 1 || len(out.CaptureIDs) != value.ProcessingDiscoveryLimit {
 					t.Fatal("discovery audit omitted exact references", out)
+				}
+				// Workload searches name the cluster; an unknown name is a
+				// domain error and reads nothing.
+				q, err := ops.processingDiscoveryQuery([]byte(`{"cluster":"prod","namespace":"payments","workload":"api","acquired_from":"2026-01-01T00:00:00Z","acquired_until":"2026-02-01T00:00:00Z","limit":500}`))
+				if err != nil || q.ClusterID != discoveryID(13) || q.Namespace != "payments" || q.Workload != "api" || q.Limit != value.ProcessingDiscoveryLimit {
+					t.Fatal("named workload search", q, err)
+				}
+				reply, err = s.Call(t.Context(), caller, processingDiscoveryOperation, json.RawMessage(`{"cluster":"staging","namespace":"payments","workload":"api","acquired_from":"2026-01-01T00:00:00Z","acquired_until":"2026-02-01T00:00:00Z"}`))
+				if err != nil || reads != 1 || !strings.Contains(string(reply.Body), `"UnknownCluster"`) {
+					t.Fatal("unknown cluster", reads, string(reply.Body), err)
 				}
 				return
 			}
@@ -133,7 +143,7 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 					ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
 			})
 			base := s.inner.(*InvestigationOperations)
-			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID,
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, NewClusterNames(nil),
 				privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Discovery: fixture, Now: s.config.Now},
 				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Status: reader, Now: s.config.Now}, nil)
 			if err != nil {

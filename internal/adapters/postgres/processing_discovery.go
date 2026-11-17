@@ -29,7 +29,7 @@ func (s *ProcessingInventory) ReadProcessingDiscovery(ctx context.Context, a val
 			afterID, afterAt = "00000000-0000-0000-0000-000000000000", query.AcquiredFrom
 		}
 		rows, err := q.ScanProcessingDiscovery(call, custodydb.ScanProcessingDiscoveryParams{
-			RootID: p.RootID, CaseID: id(query.CaseID), ClusterID: id(query.ClusterID), NamespaceUid: query.NamespaceUID, WorkloadUid: query.WorkloadUID,
+			RootID: p.RootID, CaseID: id(query.CaseID), ClusterID: id(query.ClusterID), Namespace: query.Namespace, Workload: query.Workload,
 			AfterArtifactID: id(afterID), AfterAnchorAt: ts(afterAt), AcquiredUntil: ts(query.AcquiredUntil), ObservedAt: ts(now), ScanLimit: int32(query.Limit + 1),
 		})
 		if err != nil || len(rows) > query.Limit+1 {

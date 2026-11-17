@@ -87,7 +87,6 @@ type RetentionPreview struct {
 	Groups                                              []RetentionPreviewGroup
 	Incomplete                                          []PreviewIncomplete
 	NotEvaluated                                        []PreviewNotEvaluated
-	Truncated                                           bool
 	// BaselineChanged reports that the proposed policy set would no longer
 	// hold exactly one baseline, which suspends new collection.
 	BaselineChanged bool
@@ -96,7 +95,7 @@ type RetentionPreview struct {
 
 // Complete reports whether every change was evaluated.
 func (p RetentionPreview) Complete() bool {
-	return len(p.Incomplete) == 0 && len(p.NotEvaluated) == 0 && !p.Truncated
+	return len(p.Incomplete) == 0 && len(p.NotEvaluated) == 0
 }
 
 // PlanPreview applies the proposal to the current policy set. It returns the

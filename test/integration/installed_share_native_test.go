@@ -106,7 +106,7 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		Phase   string `json:"phase"`
 	}
 	share := map[string]any{"case_id": caseID, "artifacts": []map[string]string{{"artifactID": artifactID, "digest": owned.Artifacts[0].Digest}},
-		"recipients":   []map[string]string{{"kind": "User", "issuer": owner.Issuer, "id": outsiderTokens.subject}},
+		"recipients":   []map[string]string{{"kind": "User", "name": outsiderTokens.subject}},
 		"data_classes": []string{"metadata"}, "operations": []string{"get_case"}, "expires_at": time.Now().Add(10 * time.Minute).UTC().Format(time.RFC3339),
 		"reason": "installed share focus", "idempotency_key": "installed-share-1"}
 	if status, code := call(developer, "create_share", share, &created); status != "ok" || created.ShareID == "" || created.Phase != "Active" {

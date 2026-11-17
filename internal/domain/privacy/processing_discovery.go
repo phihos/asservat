@@ -8,7 +8,9 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ProcessingDiscoveryLimit bounds the scanned page and its audited response.
+// ProcessingDiscoveryLimit is the page size: twelve candidates with their
+// parents fit the 24 KiB reply size target (REQ-MCP-002). A larger
+// requested limit ends the page here.
 const ProcessingDiscoveryLimit = 12
 
 type ProcessingDiscoveryCursor struct {
@@ -17,10 +19,14 @@ type ProcessingDiscoveryCursor struct {
 }
 
 type ProcessingDiscoveryQuery struct {
-	CaseID        string                    `json:"case_id,omitempty"`
-	ClusterID     string                    `json:"cluster_id,omitempty"`
-	NamespaceUID  string                    `json:"namespace_uid,omitempty"`
-	WorkloadUID   string                    `json:"workload_uid,omitempty"`
+	CaseID string `json:"case_id,omitempty"`
+	// ClusterID is resolved from the public cluster name; Namespace and
+	// Workload are names (ADR-335 D4) matched against the recorded
+	// namespace name and workload kind/name, so evidence of a recreated or
+	// deleted workload is found by its name.
+	ClusterID     string                    `json:"-"`
+	Namespace     string                    `json:"namespace,omitempty"`
+	Workload      string                    `json:"workload,omitempty"`
 	AcquiredFrom  time.Time                 `json:"acquired_from,omitzero"`
 	AcquiredUntil time.Time                 `json:"acquired_until,omitzero"`
 	PurposeRef    string                    `json:"purpose_ref,omitempty"`
@@ -33,10 +39,10 @@ func (q ProcessingDiscoveryQuery) Valid() bool {
 		return false
 	}
 	if q.CaseID != "" {
-		return authorization.UUID(q.CaseID) && q.ClusterID == "" && q.NamespaceUID == "" && q.WorkloadUID == "" && q.AcquiredFrom.IsZero() && q.AcquiredUntil.IsZero() && q.validCursor(q.After)
+		return authorization.UUID(q.CaseID) && q.ClusterID == "" && q.Namespace == "" && q.Workload == "" && q.AcquiredFrom.IsZero() && q.AcquiredUntil.IsZero() && q.validCursor(q.After)
 	}
-	scope := ProcessingScope{Kind: "workloadInterval", ClusterID: q.ClusterID, NamespaceUID: q.NamespaceUID, WorkloadUID: q.WorkloadUID, AcquiredFrom: q.AcquiredFrom, AcquiredUntil: q.AcquiredUntil}
-	return scope.Valid() && q.validCursor(q.After)
+	return authorization.UUID(q.ClusterID) && identity.Text(q.Namespace, 63) && identity.Text(q.Workload, 253) && !q.AcquiredFrom.IsZero() && q.AcquiredUntil.After(q.AcquiredFrom) &&
+		q.AcquiredFrom.Nanosecond()%1000 == 0 && q.AcquiredUntil.Nanosecond()%1000 == 0 && q.validCursor(q.After)
 }
 
 func (q ProcessingDiscoveryQuery) validCursor(c ProcessingDiscoveryCursor) bool {
@@ -127,7 +133,7 @@ func (p ProcessingDiscoveryPage) Valid(q ProcessingDiscoveryQuery, now time.Time
 			}
 		} else {
 			cursor.AnchorAt = r.AnchorAt
-			if r.ClusterID != q.ClusterID || r.NamespaceUID != q.NamespaceUID || r.WorkloadUID != q.WorkloadUID || !q.validCursor(cursor) {
+			if r.ClusterID != q.ClusterID || !q.validCursor(cursor) {
 				return false
 			}
 		}
