@@ -119,6 +119,11 @@ func TestPlanAndSummarizePreview(t *testing.T) {
 	if out.Scanned != 4 || out.Affected != 2 || out.Unknown != 1 || out.Groups[1].Unknown != 1 || out.ReadClosed != 1 || out.DeletionDue != 1 || !out.EarliestExpiresAt.Equal(now) || len(out.Groups) != 2 || out.Groups[0].EvidenceType != "context" || out.Groups[1].EvidenceType != "other" || !out.BaselineChanged || out.Complete() {
 		t.Fatal("summary", out)
 	}
+	// Unknown rows alone leave the preview incomplete (ADR-240 §5).
+	onlyUnknown := SummarizePreview([]PreviewRow{{ClusterID: matchCluster, NativeType: artifact.PodStatusArtifact, Scanned: 2, Unknown: 2}}, nil, false, now)
+	if onlyUnknown.Unknown != 2 || onlyUnknown.Complete() {
+		t.Fatal("unknown rows reported complete", onlyUnknown)
+	}
 }
 
 // A rejected policy refuses collection in its cluster scope only.

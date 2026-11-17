@@ -98,7 +98,7 @@ type RetentionPreview struct {
 
 // Complete reports whether every change was evaluated.
 func (p RetentionPreview) Complete() bool {
-	return len(p.Incomplete) == 0 && len(p.NotEvaluated) == 0 && !p.Truncated
+	return len(p.Incomplete) == 0 && len(p.NotEvaluated) == 0 && !p.Truncated && p.Unknown == 0
 }
 
 // PlanPreview applies the proposal to the current policy set. It returns the
