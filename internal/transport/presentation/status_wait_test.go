@@ -45,7 +45,7 @@ func TestQueryResultWaitsForWorkerReadyNotification(t *testing.T) {
 	_ = first.Close(context.Background())
 	go func() {
 		time.Sleep(200 * time.Millisecond)
-		f.ready = true
+		f.setReady(true)
 		changes.Publish(f.q.ID)
 	}()
 	started := time.Now()
