@@ -18,6 +18,7 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 		{"table", "permission_stream", "id", "UPDATE"},
 		{"table", "retention_source", "root_id", "UPDATE"},
+		{"function", "capacity_expensive_admits(uuid)", "", "EXECUTE"},
 		{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"},
 		// On-demand capture account enrollment (capacity_enroll, SECURITY DEFINER).
 		{"function", "capacity_enroll(uuid,uuid,text,text,uuid,uuid,bytea)", "", "EXECUTE"},

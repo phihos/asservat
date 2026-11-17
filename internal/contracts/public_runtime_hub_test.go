@@ -7,8 +7,8 @@ import (
 
 func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	want := []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
-	if len(all) != 35 || !slices.Equal(hub, want) {
+	want := []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
+	if len(all) != 29 || !slices.Equal(hub, want) {
 		t.Fatalf("wrong physical inventory: all=%d hub=%v", len(all), hub)
 	}
 	if n, ok := PublicRuntimeRoleOrdinal("hub-runtime"); !ok || n != 95 {
