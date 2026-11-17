@@ -210,7 +210,7 @@ concurrency limit bound expensive work.
 Branch `clean/api-live`. `watch_live(action)` replaces the five live tools.
 `list_recordings` takes cluster and policy names and lists policy and
 manual sources with `owner_kind`, `save_via`, `live_projections` and
-`hard_end`; without live viewing it lists save rows only. A policy row's
+`hard_end`; an unknown cluster name returns `UnknownCluster`; without live viewing it lists save rows only. A policy row's
 handle joins the save handle and the live handle (`~`); preview and
 `watch_live` each read their part. Pages hold 16 rows (24 KiB envelope).
 `recordingSaves` defaults to true for a policy with an ongoing recording;

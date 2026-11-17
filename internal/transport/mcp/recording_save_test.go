@@ -51,7 +51,7 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := presentation.NewLiveOperations(presentation.LiveOperationsConfig{PublicOrigin: server.URL, Recordings: f, Clusters: presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000010"}), Now: time.Now})
+	list, err := presentation.NewLiveOperations(presentation.LiveOperationsConfig{PublicOrigin: server.URL, Recordings: f, Clusters: presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000010"}), Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000098" }})
 	if err != nil {
 		t.Fatal(err)
 	}
