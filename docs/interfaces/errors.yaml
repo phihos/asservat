@@ -15,6 +15,7 @@ errors:
   - {code: InvalidCursor, http_status: 400, retry: fresh-query, action: restart-list, copy: Refresh this view to continue with current access.}
   - {code: AuditUnavailable, http_status: 503, retry: bounded-backoff, action: contact-operator, copy: Required audit persistence is unavailable; acquisition has not been authorized.}
   - {code: ClusterOffline, http_status: 503, retry: after-reconnect, action: use-stored-evidence, copy: New collection cannot be dispatched to this cluster.}
+  - {code: UnknownCluster, http_status: 404, retry: after-configuration-change, action: check-cluster-name, copy: No cluster of this installation has this name.}
   - {code: RetryLater, http_status: 429, retry: server-bounded-delay, action: wait, copy: This operation is temporarily limited.}
   - {code: Conflict, http_status: 409, retry: refresh-and-review, action: refresh, copy: The request or resource changed; review the current version.}
   - {code: ReviewChanged, http_status: 409, retry: after-fresh-review, action: review-changes, copy: The plan changed since your review; review the differences before submitting again.}
