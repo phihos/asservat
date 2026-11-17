@@ -129,7 +129,6 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
       <Button className="button secondary" isDisabled={locked} onPress={() => void load()}>Refresh processing rules</Button>
       {inventory && <>
         <p>{inventory.initialized ? 'Processing is initialized.' : 'Processing has not been initialized.'} Observed {when(inventory.observedAt)}.</p>
-        {!inventory.initialized && <Button className="button" isDisabled={locked} onPress={() => start({ action: 'initialize_processing' })}>Initialize processing</Button>}
         {inventory.rules.length === 0 && <p>No processing rules on this page.</p>}
         {inventory.rules.map(rule => <section className="review-section" key={rule.id} aria-label={`Processing rule ${rule.id}`}>
           <h3 className="identifier">{describe(rule)}</h3><p>State: {rule.state}. Revision {rule.revision}.</p>
@@ -148,7 +147,7 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
     {busy && <p role="status">Checking processing state…</p>}
     {receipt?.state === 'erasureRequested'
       ? <p role="status">Early erasure request accepted. Use request ID <span className="identifier">{receipt.requestID}</span> to check managed deletion.</p>
-      : receipt && <p role="status">{receipt.state === 'initialized' ? 'Processing initialized.' : receipt.state === 'restricted' ? 'Processing restricted.' : 'Restriction released.'} Refresh processing rules to read the current inventory.</p>}
+      : receipt && <p role="status">{receipt.state === 'restricted' ? 'Processing restricted.' : 'Restriction released.'} Refresh processing rules to read the current inventory.</p>}
     {message && <p role="alert" className="notice">{message}</p>}
     {pending && !busy && <Button className="button" onPress={() => void change(pending)}>{pending.input.action === 'request_early_erasure' ? 'Retry same erasure request' : 'Retry same change'}</Button>}
     <ProcessingErasureStatus session={session} scope={scope} client={erasureClient} disabled={locked}

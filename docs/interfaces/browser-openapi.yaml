@@ -42,7 +42,7 @@ paths:
     post:
       operationId: changeProcessing
       x-effect: command
-      summary: Initialize, restrict or release processing, or request early erasure
+      summary: Restrict or release processing, or request early erasure
         under current privacy authority.
       parameters:
       - name: Idempotency-Key

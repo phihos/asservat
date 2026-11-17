@@ -40,13 +40,12 @@ func processingConfigured(p custodydb.ProcessingRoot, a value.ProcessingAuthorit
 	return a.Valid(now) && a.Policy.RootID == uid(p.RootID) && a.Policy.InstallationID == uid(p.InstallationID) && a.Policy.Revision.UID == uid(p.SourceUid) && bytes.Equal(a.Policy.ProtectionDigest[:], p.ProtectionDigest) && now.Before(p.ValidUntil.Time) && json.Unmarshal(p.Backing, &backing) == nil && backing.Valid() && backing.RootID == uid(p.RootID) && backing.InstallationID == uid(p.InstallationID) && backing.ValidUntil.Equal(p.ValidUntil.Time) && backing.RetireBy.Equal(p.RetireBy.Time)
 }
 func processingReceipt(row custodydb.ProcessingDecision, p custodydb.ProcessingRoot, a value.ProcessingAuthority, now time.Time) (value.ProcessingReceipt, error) {
-	state := "initialized"
+	state := "restricted"
 	rule := ""
 	if row.Action == value.RequestEarlyErasure {
 		state = "erasureRequested"
 	} else if row.RuleID.Valid {
 		rule = uid(row.RuleID)
-		state = "restricted"
 		if row.Action == "release_processing" {
 			state = "released"
 		}
@@ -123,11 +122,6 @@ func (s *ProcessingDecisions) ApplyProcessing(ctx context.Context, a value.Proce
 		var erasure []byte
 		scope, _ := json.Marshal(d.Change.Scope)
 		switch d.Change.Action {
-		case "initialize_processing":
-			empty, e := q.ProcessingCatalogEmpty(ctx, id(s.root))
-			if e != nil || !empty || p.InitializedAt.Valid {
-				return value.ErrUnavailable
-			}
 		case value.RequestEarlyErasure:
 			if p.RootTransitions+2 >= p.MaxRootTransitions {
 				return app.ErrCapacity

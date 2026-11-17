@@ -38,7 +38,7 @@ func operationOutputLimit(name string) int64 {
 // Lane is server-selected from the fixed operation, never supplied by a caller.
 func OperationLane(name string) string {
 	switch name {
-	case "initialize_processing", "restrict_processing", "request_early_erasure":
+	case "restrict_processing", "request_early_erasure":
 		return "normal"
 	case "release_processing":
 		return "processing"
@@ -144,7 +144,7 @@ func humanOperationInputValid(name, format string) bool {
 		return format == "context-input/v1"
 	case "download_artifact_content":
 		return format == "native-content-input/v1"
-	case "initialize_processing", "restrict_processing", "release_processing", "request_early_erasure":
+	case "restrict_processing", "release_processing", "request_early_erasure":
 		return format == "processing-input/v1"
 	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
 		return format == "context-input/v1" || format == "invalid-input/v1"

@@ -69,8 +69,6 @@ func processingExactFields(raw []byte, names ...string) bool {
 }
 func processingChangeShape(raw []byte, in processingChangeInput) bool {
 	switch in.Action {
-	case "initialize_processing":
-		return processingExactFields(raw, "action")
 	case value.RequestEarlyErasure:
 		return jsontext.Value(raw).IsValid() && processingExactFields(raw, "action", "artifactID")
 	}

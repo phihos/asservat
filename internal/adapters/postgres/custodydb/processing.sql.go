@@ -292,17 +292,6 @@ func (q *Queries) LockProcessingRule(ctx context.Context, arg LockProcessingRule
 	return i, err
 }
 
-const processingCatalogEmpty = `-- name: ProcessingCatalogEmpty :one
-SELECT NOT EXISTS(SELECT 1 FROM context_catalog WHERE root_id=$1) AS empty
-`
-
-func (q *Queries) ProcessingCatalogEmpty(ctx context.Context, rootID pgtype.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, processingCatalogEmpty, rootID)
-	var empty bool
-	err := row.Scan(&empty)
-	return empty, err
-}
-
 const readProcessingNode = `-- name: ReadProcessingNode :one
 SELECT artifact_id, root_id, capture_id, attempt_id, cluster_id, namespace_uid, workload_uid, pod_uid, anchor_at, delete_by, retire_by, origin, parents FROM context_processing WHERE root_id=$1 AND artifact_id=$2
 `

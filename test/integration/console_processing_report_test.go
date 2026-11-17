@@ -280,8 +280,8 @@ func consoleReportRows(now time.Time) map[string][]value.ProcessingReportRecord 
 		DownloadID: consoleCaptureID(602), ArtifactID: consoleCaptureID(201), Issuer: "https://identity.invalid", Subject: "synthetic-recipient", ClientID: "console",
 		PrincipalKind: identity.Human, State: artifact.DownloadCompleted, CreatedAt: now.Add(-20 * time.Minute), Deadline: visible, EmittedBytes: 321, ClientReceipt: "unknown"}}}
 	rows["operations"] = []value.ProcessingReportRecord{{VisibleUntil: visible, Operation: &value.ProcessingReportOperation{
-		OperationID: consoleCaptureID(603), Lane: "normal", Name: "get_case", Issuer: "https://identity.invalid", Subject: "synthetic-recipient", ClientID: "console", PrincipalKind: identity.Human,
-		CreatedAt: now.Add(-10 * time.Minute), IntentAcknowledged: true, Status: "unknown", ClientReceipt: "unknown"}}}
+		OperationID: consoleCaptureID(603), Name: "get_case", Issuer: "https://identity.invalid", Subject: "synthetic-recipient", ClientID: "console", PrincipalKind: identity.Human,
+		CreatedAt: now.Add(-10 * time.Minute), Status: "unknown", ClientReceipt: "unknown"}}}
 	scope := value.ProcessingScope{Kind: "workloadInterval", ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace", WorkloadUID: "synthetic-workload",
 		AcquiredFrom: now.Add(-2 * time.Hour), AcquiredUntil: now}
 	rows["rules"] = []value.ProcessingReportRecord{{VisibleUntil: visible, Rule: &value.ProcessingReportRule{

@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestProcessingReportCursorShape(t *testing.T) {
@@ -95,32 +93,5 @@ func TestProcessingReportRuleScopePreservesStoredRepresentation(t *testing.T) {
 	after, _ := json.Marshal(stored)
 	if string(before) != string(after) {
 		t.Fatal("report conversion mutated stored scope")
-	}
-}
-
-func TestProcessingReportClientOperationLanes(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	operation := ProcessingReportOperation{
-		OperationID: processingID(20), Name: "resolve_capture_request", Lane: "resolution",
-		Issuer: "https://identity.invalid", Subject: "synthetic-operator", ClientID: "console",
-		PrincipalKind: identity.Human, CreatedAt: now, Status: "unknown", ClientReceipt: "unknown",
-	}
-	record := ProcessingReportRecord{VisibleUntil: now.Add(time.Second), Operation: &operation}
-	for _, lane := range []string{"normal", "resolution", "processing"} {
-		operation.Lane = lane
-		if !record.Valid("operations", now) {
-			t.Fatal("client operation lane was omitted from inventory", lane)
-		}
-	}
-	for _, lane := range []string{"", "identity", "capture", "arbitrary"} {
-		operation.Lane = lane
-		if record.Valid("operations", now) {
-			t.Fatal("private or unsupported operation lane entered client inventory", lane)
-		}
-	}
-	operation.Lane = "resolution"
-	operation.OutcomeAcknowledged = true
-	if record.Valid("operations", now) {
-		t.Fatal("a missing outcome became an acknowledged zero-byte disclosure")
 	}
 }

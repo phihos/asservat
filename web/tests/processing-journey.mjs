@@ -5,6 +5,26 @@ import { validProcessingChange, validProcessingInventory, validProcessingReceipt
 import { validInput_search_processing_evidence, validOutput_search_processing_evidence } from '../src/generated/validate-processing-discovery.js';
 
 export async function processingJourney({ page, origin, artifactID, casePath, parents = [], workloadRestriction = false, restricted = async () => {}, discovered = async () => {}, released = async () => {}, stage = () => {} }) {
+  // Keep the console's fetch body before same-document navigation can
+  // discard Chromium's inspector copy, as in the syscall authoring journey.
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    const replies = new Map();
+    Object.defineProperty(window, '__operationReplies', { value: replies });
+    window.fetch = async (input, init) => {
+      const response = await original(input, init);
+      const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+      if (path.startsWith('/api/v1/operations/')) {
+        const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
+        response.clone().text().then(text => replies.set(key, text), () => {});
+      }
+      return response;
+    };
+  });
+  const operationBody = async response => {
+    const key = new URL(response.url()).pathname + '\n' + (response.request().postData() ?? '');
+    return (await page.waitForFunction(k => { const text = window.__operationReplies.get(k); window.__operationReplies.delete(k); return text; }, key)).jsonValue();
+  };
   const selected = '/processing/artifacts/' + artifactID;
   stage('case-navigation');
   await page.goto(origin + casePath);
@@ -52,7 +72,7 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     assert.equal(query.case_id, caseID, 'search uses the exact case');
     assert.equal(headers.origin, origin, 'discovery exact origin');
     assert.equal(headers['x-csrf-token'].length, 43, 'discovery CSRF length');
-    const body = await discovery.body(), reply = JSON.parse(body.toString('utf8'));
+    const body = await operationBody(discovery), reply = JSON.parse(body);
     assert(validOutput_search_processing_evidence(reply), 'closed discovery response contract');
     assert.equal(reply.status, 'ok');
     assert.equal(reply.data_class, 'metadata');
@@ -62,7 +82,7 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     assert.equal(candidate.case_id, caseID);
     assert.equal(candidate.origin, parents.length ? 'derived' : 'capture');
     assert.deepEqual(candidate.parents, parents, 'recorded direct lineage');
-    return { requestID: reply.request_id, candidate, responseBytes: body.length };
+    return { requestID: reply.request_id, candidate, responseBytes: Buffer.byteLength(body) };
   };
   stage('initial-inventory');
   const initial = await refresh();
@@ -100,12 +120,12 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
       cluster_id: scope.clusterID, namespace_uid: scope.namespaceUID, workload_uid: scope.workloadUID,
       acquired_from: scope.acquiredFrom, acquired_until: scope.acquiredUntil, purpose_ref: candidate.purpose_ref, limit: 12,
     });
-    const body = await actual.body(), reply = JSON.parse(body.toString('utf8'));
+    const body = await operationBody(actual), reply = JSON.parse(body);
     assert(validOutput_search_processing_evidence(reply), 'closed workload discovery response');
     assert.equal(reply.status, 'ok');
     const matching = reply.data.candidates.find(row => row.artifact_id === artifactID);
     assert(matching, 'selected artifact occurs in original workload interval');
-    workloadDiscovery = { requestID: reply.request_id, candidate: matching, responseBytes: body.length };
+    workloadDiscovery = { requestID: reply.request_id, candidate: matching, responseBytes: Buffer.byteLength(body) };
     stage('workload-review');
     await search.getByRole('button', { name: 'Review workload restriction', exact: true }).click();
     const review = page.getByRole('region', { name: 'Confirm workload restriction', exact: true });

@@ -769,12 +769,6 @@
           "type": "string",
           "format": "date-time"
         },
-        "intent_acknowledged": {
-          "type": "boolean"
-        },
-        "outcome_acknowledged": {
-          "type": "boolean"
-        },
         "status": {
           "enum": [
             "unknown",
@@ -792,13 +786,6 @@
         },
         "client_receipt": {
           "const": "unknown"
-        },
-        "lane": {
-          "enum": [
-            "normal",
-            "resolution",
-            "processing"
-          ]
         }
       },
       "required": [
@@ -810,11 +797,8 @@
         "client_id",
         "principal_kind",
         "created_at",
-        "intent_acknowledged",
-        "outcome_acknowledged",
         "status",
-        "client_receipt",
-        "lane"
+        "client_receipt"
       ],
       "allOf": [
         {
@@ -836,25 +820,6 @@
             "required": [
               "artifact_id"
             ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome_acknowledged": {
-                "const": true
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "output_bytes"
-            ],
-            "properties": {
-              "intent_acknowledged": {
-                "const": true
-              }
-            }
           }
         }
       ]

@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Processing cleanup (2026-11-17)
+
+Branch `codex/processing-cleanup`. Removed the dead manual processing
+initialization action and its receipt state; roots still initialize at creation.
+Migration 00005 removes the live SQL branch while preserving historical
+decisions. Processing report operations no longer expose audit lanes or
+intent/outcome acknowledgement flags. The added fetch-body workaround is confined to the processing journey; other
+browser drivers use their main-branch implementations.
+Canonical, runtime and generated console contracts are updated together.
+Verification: the schema-5 processing/setup SQL fixture and all 14 console
+browser suites pass; owned service cleanup completed. Earlier build/vet, focused
+Go tests, nine static gates and console-check (658 tests) passed. The full Go
+race gate had bootstrap/MCP/presentation deadline failures; its retry was
+interrupted by disk exhaustion and was not repeated in the completion pass.
+Review correction (2026-11-18): removed the shared response helper and restored
+the other browser scripts from main. Both console gates pass under the shared
+integration lock: 658 console tests and all 14 browser suites.
+Next: PR review and the remaining full Go gate. No installed collection
+qualification is claimed.
+
 ## One schema baseline (2026-11-17)
 
 Branch `clean/migration-baseline`. The pre-release chain 00001–00201 is

@@ -176,18 +176,6 @@
           "additionalProperties": false,
           "properties": {
             "action": {
-              "const": "initialize_processing"
-            }
-          },
-          "required": [
-            "action"
-          ]
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "action": {
               "const": "restrict_processing"
             },
             "ruleID": {
@@ -294,14 +282,13 @@
         },
         "state": {
           "enum": [
-            "initialized",
             "restricted",
             "released"
           ]
         },
         "revision": {
           "type": "integer",
-          "minimum": 0,
+          "minimum": 1,
           "maximum": 9007199254740991
         },
         "sequence": {
@@ -322,6 +309,7 @@
         "rootID",
         "epoch",
         "requestID",
+        "ruleID",
         "operationID",
         "state",
         "revision",

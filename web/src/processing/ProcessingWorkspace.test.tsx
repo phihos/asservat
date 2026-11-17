@@ -9,7 +9,6 @@ const page = (revision = 1): Inventory => ({ rootID: id(1), epoch: id(2), initia
 const receipt = (input: Change, key: string): Receipt => {
   const common = { rootID: id(1), epoch: id(2), requestID: key, operationID: id(7), sequence: 3, observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+5000).toISOString() };
   if (input.action === 'request_early_erasure') return { ...common, state: 'erasureRequested' };
-  if (input.action === 'initialize_processing') return { ...common, state: 'initialized', revision: 0 };
   return { ...common, state: input.action === 'release_processing' ? 'released' : 'restricted', revision: input.expectedRevision+1, ruleID: input.ruleID };
 };
 afterEach(cleanup);
@@ -47,11 +46,7 @@ it('clears metadata on scope loss and rejects late read results', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Refresh processing rules' })); act(() => scope.abort()); await act(async () => finish(page()));
   expect(screen.queryByText('State: restricted. Revision 1.')).toBeNull(); expect((screen.getByLabelText('Artifact ID') as HTMLInputElement).value).toBe('');
 });
-it('initializes only after reading server state and permits only one valid artifact path selection', async () => {
-  const change = vi.fn(async (input: Change, key: string) => receipt(input, key));
-  render(<ProcessingWorkspace session={session} scope={new AbortController().signal} client={{ read: async () => ({ ...page(), initialized: false, rules: [] }), change }} newID={() => id(8)}/>);
-  expect(screen.queryByRole('button', { name: 'Initialize processing' })).toBeNull(); fireEvent.click(screen.getByRole('button', { name: 'Refresh processing rules' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Initialize processing' })); await screen.findByText(/Processing initialized\./); expect(change.mock.calls[0][0]).toEqual({ action: 'initialize_processing' });
+it('permits only one valid artifact path selection', () => {
   expect(processingArtifactIDFromPath('/processing/artifacts/'+id(5))).toBe(id(5)); expect(processingArtifactIDFromPath('/processing/artifacts/not-an-id')).toBeUndefined();
 });
 it('retries an uncertain release with its original input/key and refreshed same-user CSRF', async () => {

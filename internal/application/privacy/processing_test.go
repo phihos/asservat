@@ -49,10 +49,10 @@ func (f *processingFixture) ApplyProcessing(_ context.Context, a value.Processin
 	}
 	f.applies++
 	f.prepared = &d
-	f.receipt = &value.ProcessingReceipt{RootID: a.Policy.RootID, Epoch: processingID(7), RequestID: d.Change.RequestID, OperationID: d.Change.RequestID, State: "initialized", Sequence: 2, ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
+	f.receipt = &value.ProcessingReceipt{RootID: a.Policy.RootID, Epoch: processingID(7), RequestID: d.Change.RequestID, OperationID: d.Change.RequestID, Sequence: 2, ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
 	if d.Change.Action == value.RequestEarlyErasure {
 		f.receipt.State = "erasureRequested"
-	} else if d.Change.Action != "initialize_processing" {
+	} else {
 		f.receipt.RuleID = d.Change.RuleID
 		f.receipt.Revision = d.Change.ExpectedRevision + 1
 		f.receipt.State = "restricted"

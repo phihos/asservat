@@ -43,8 +43,6 @@ func (c ProcessingChange) Valid() bool {
 		return false
 	}
 	switch c.Action {
-	case "initialize_processing":
-		return c.RuleID == "" && c.ExpectedRevision == 0 && c.Scope == (ProcessingScope{})
 	case "restrict_processing":
 		return authorization.UUID(c.RuleID) && c.ExpectedRevision >= 0 && c.ExpectedRevision < MaxProcessingChanges-1 && c.ExpectedRevision%2 == 0 && c.Scope.Valid()
 	case "release_processing":
@@ -75,7 +73,7 @@ func (r ProcessingReceipt) Valid(now time.Time) bool {
 	if !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || !authorization.UUID(r.RequestID) || !authorization.UUID(r.OperationID) || r.Sequence < 1 || !identity.Fresh(r.ObservedAt, r.ValidUntil, now, 5*time.Second) {
 		return false
 	}
-	if r.State == "initialized" || r.State == "erasureRequested" {
+	if r.State == "erasureRequested" {
 		return r.RuleID == "" && r.Revision == 0
 	}
 	return authorization.UUID(r.RuleID) && r.Revision > 0 && r.Revision <= MaxProcessingChanges && (r.State == "restricted" && r.Revision%2 == 1 || r.State == "released" && r.Revision%2 == 0)

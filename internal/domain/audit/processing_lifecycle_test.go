@@ -43,7 +43,7 @@ func TestProcessingReleaseHistoryCannotBorrowPublicOrConnectorBacking(t *testing
 	if p.Valid() {
 		t.Fatal("missing retained copy backing accepted")
 	}
-	for name, want := range map[string]string{"initialize_processing": "normal", "restrict_processing": "normal", "release_processing": "processing", "cancel_artifact_download": ""} {
+	for name, want := range map[string]string{"restrict_processing": "normal", "release_processing": "processing", "cancel_artifact_download": ""} {
 		if OperationLane(name) != want {
 			t.Fatalf("wrong lane for %s", name)
 		}
