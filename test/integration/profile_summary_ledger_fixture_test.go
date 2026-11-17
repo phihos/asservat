@@ -88,14 +88,14 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 	pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-	previews, err := postgres.NewContextPreviews(ctx, pools.ordinary, p.RootID)
+	previews, err := postgres.NewContextPreviews(ctx, pools, p.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = previews.CreateContextPreview(ctx, p); err != nil {
 		t.Fatal("profile preview", err)
 	}
-	grants, err := postgres.NewAccessGrants(ctx, pools.ordinary, p.RootID, s.recovery.installation)
+	grants, err := postgres.NewAccessGrants(ctx, pools, p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 	if _, err = publisher.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("managed profile capture intent", err)
 	}
-	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation)
+	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools, p.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

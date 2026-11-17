@@ -67,7 +67,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
 				sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
-				sharedPool := sharedPools.ordinary
+				sharedPool := sharedPools
 				if erasure == nil {
 					qualifyOrdinaryHubPoolBound(t, ctx, sharedPools)
 				}
@@ -368,12 +368,9 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					return
 				}
 				// The completed execution qualifier no longer uses its deliberately
-				// saturated 18+2 hub pools. Join their closure before starting the
+				// saturated 20-connection hub pool. Join its closure before starting the
 				// separate cleaner fixture on the unchanged bounded SQL server.
-				sharedPools.ordinary.Close()
-				for _, reserved := range sharedPools.resolution {
-					reserved.Close()
-				}
+				sharedPools.Close()
 				qualifyPositiveContextDeletion(t, ctx, admin, poolFor, store, bound, keys, s, accepted)
 			})
 		}

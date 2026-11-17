@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Custody fixes after #279 and #283 (2026-11-17)
+
+Branch `clean/main-fixes-downgrade`. The integration hub pool fixture opens the
+one 20-connection ordinary pool (#283 removed the resolution lanes). A first
+API preparation refused for lack of headroom again reports execution
+`ErrUnavailable`/`ErrNotStarted` (#279 renamed the ledger cause). Content
+audit counts are scoped to their subtest. The 00102 Down probe against the
+head schema is deleted; `policy_grant_migration_test` keeps the real
+schema-102 Down. Verified: the native-download subtests, api-execution
+preparation boundaries, custody shard 4.
+
 ## Audit as a database row, part 1 (ADR-330 D6, REQ-AUT-005, 2026-11-17)
 
 Branch `clean/audit-api`. `audit_event` (00191) holds one append-only row per

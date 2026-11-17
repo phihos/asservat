@@ -24,7 +24,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 		// fixture's independent setup pools remain unchanged for later scenarios.
 		config := f.roles["hub-runtime"].Config()
 		pools := governedOrdinaryHubPools(t, f.ctx, config)
-		pool := pools.ordinary
+		pool := pools
 		var err error
 		defer pool.Close() // joins the ordinary pool before this helper ends
 		// The login's grants are the compiled plan: setup reconciled them exactly.

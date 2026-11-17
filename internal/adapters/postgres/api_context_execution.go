@@ -423,10 +423,10 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 }
 
 func apiPreparationRefusalError(err error, headroomRefused bool) error {
-	// Ordinary custody normalization of this known refusal is "client".
+	// The ledger reports this known refusal with its step as the cause.
 	// Expiry during rollback instead reports "deadline" and must survive.
 	var cause ledgerCause
-	if headroomRefused && errors.As(err, &cause) && cause.cause == "client" {
+	if headroomRefused && errors.As(err, &cause) && cause.cause != "deadline" {
 		return errors.Join(value.ErrUnavailable, value.ErrNotStarted)
 	}
 	return err

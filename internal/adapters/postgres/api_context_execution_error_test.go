@@ -11,7 +11,7 @@ import (
 )
 
 func TestAPIPreparationRefusalPreservesRollbackDeadline(t *testing.T) {
-	// Ledger normalizes an ordinary callback refusal as client. If the
+	// Ledger reports the headroom refusal with its step as the cause. If the
 	// original context expires during its bounded rollback, it instead
 	// reports deadline; both match the custody unavailable sentinel.
 	for _, tc := range []struct {
@@ -21,8 +21,8 @@ func TestAPIPreparationRefusalPreservesRollbackDeadline(t *testing.T) {
 		restore bool
 		step    string
 	}{
-		{"headroom-client", true, unavailableCause("client"), true, "effect/headroom"},
-		{"headroom-wrapped-client", true, fmt.Errorf("wrapped: %w", unavailableCause("client")), true, "effect/headroom"},
+		{"headroom", true, unavailableCause("effect/headroom"), true, "effect/headroom"},
+		{"headroom-wrapped", true, fmt.Errorf("wrapped: %w", unavailableCause("effect/headroom")), true, "effect/headroom"},
 		{"deadline-during-rollback", true, unavailableCause("deadline"), false, "effect/headroom/deadline"},
 		{"wrapped-deadline-during-rollback", true, fmt.Errorf("wrapped: %w", unavailableCause("deadline")), false, "effect/headroom/deadline"},
 		{"ordinary-client-failure", false, unavailableCause("client"), false, "effect/headroom/client"},
