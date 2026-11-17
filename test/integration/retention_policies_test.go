@@ -45,7 +45,7 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal(err)
 		}
-		s := create(t, 2)
+		s := create(t, 6) // six admissions below
 		first, err := s.s.AdmitContext(ctx, s.a)
 		if err != nil {
 			t.Fatal(err)
