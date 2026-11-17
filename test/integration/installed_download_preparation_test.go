@@ -24,7 +24,7 @@ import (
 // and the real dispatcher. The existing fixture supplies synthetic protected
 // sources/human identity and actual published evidence. Job creation is a stop
 // boundary, not a simulated Kubernetes success or installed qualification.
-func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, published artifact.PublishedContext, allocation artifact.DownloadAllocation, gate authorizationapp.ContextDownloadAuthority) {
+func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, published publishedContext, allocation artifact.DownloadAllocation, gate authorizationapp.ContextDownloadAuthority) {
 	t.Helper()
 	profile := syntheticWorkerProfile(s.recovery.installation)
 	environment := gate.Environment.(downloadTestEnvironment)

@@ -213,11 +213,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := objectstore.NewContextVerifier(bound, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := (evidence.ContextCustodian{Ledger: ledger, Verifier: verifier}).VerifyAndStore(ctx, e, copies); err != nil {
+	if err := ledger.StoreCopies(ctx, e.Registration, copies); err != nil {
 		t.Fatal(err)
 	}
 	record, err := ledger.Lookup(ctx, e.Registration.Location)
@@ -236,7 +232,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	wrong := e
 	wrong.ExecutionClass = artifact.ContextNodeExecution
 	wrong.NodeUID, wrong.NodeBootID = cluster.NodeUID, cluster.NodeBootID
-	if _, err := verifier.VerifyContext(ctx, wrong, copies); err == nil {
+	if body, err := nativeReader.ReadContext(ctx, wrong, copies, time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
 		t.Fatal("API artifact promoted to node execution identity")
 	}
 	t.Logf("actual unscheduled Pod resolved and captured with Node/exec denied; %d native bytes; encrypted full verification and exact native read; stored_unpublished, synthetic authority remains fixture-only", len(native))

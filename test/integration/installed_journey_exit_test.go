@@ -98,9 +98,8 @@ func installedJourneyCatalogMinimized(t *testing.T, ctx context.Context, admin *
 	var rows string
 	installedJourneyReadOnly(t, ctx, admin, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `
-SELECT concat_ws(' ', row_to_json(c)::text, row_to_json(v)::text, row_to_json(k)::text, row_to_json(a)::text)
+SELECT concat_ws(' ', row_to_json(c)::text, row_to_json(k)::text, row_to_json(a)::text)
 FROM context_catalog c
-JOIN context_verification v ON v.capture_id=c.capture_id AND v.root_id=c.root_id
 JOIN context_capture k ON k.id=c.capture_id AND k.root_id=c.root_id
 JOIN custody_attempt a ON a.id=k.attempt_id
 WHERE c.root_id=$1::uuid AND c.artifact_id=$2::uuid`, root, artifactID).Scan(&rows)

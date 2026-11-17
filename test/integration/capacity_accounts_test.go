@@ -156,27 +156,13 @@ func (f *capacitySQLFixture) managedContextDownload(t *testing.T, root capacityR
 	if err != nil {
 		t.Fatal("managed encrypted synthetic context", err)
 	}
-	verifier, err := objectstore.NewContextVerifier(bound, f.keys)
+	catalog, err := postgres.NewContextPublications(f.ctx, f.fixturePool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	publications := func(role, password string) *postgres.ContextPublications {
-		p, err := postgres.NewContextPublications(f.ctx, f.fixturePool(role, password), s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	check := publications("context_verify_runtime", "synthetic-context-verify")
-	ack := publications("context_verification_audit_runtime", "synthetic-context-audit")
-	publish := publications("context_publish_runtime", "synthetic-context-publish")
-	catalog := publications("context_catalog_read_runtime", "synthetic-context-read")
 	f.refreshBase(t)
-	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-		return f.currentManagedPublication(ctx, s, v)
-	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if _, err = publisher.Publish(f.ctx, e.CaptureUID, copies); err != nil {
-		t.Fatal("managed independent verification/publication", err)
+	if _, err = publishStoredFixture(f.ctx, f.admin, e, copies, int64(len(payload)), nil); err != nil {
+		t.Fatal("managed publication", err)
 	}
 	f.qualifySharedMetadataReaders(t, s, e, enrollment)
 	processing, err := postgres.NewProcessingReads(f.ctx, f.fixturePool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, f.input.InstallationID)

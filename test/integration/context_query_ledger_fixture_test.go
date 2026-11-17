@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
-	"asservat.local/asservat/internal/adapters/packets"
-	"asservat.local/asservat/internal/adapters/syscalls"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/capture"
@@ -67,7 +65,7 @@ type queryLedgerFixture struct {
 	workerObserver       *evidence.WorkerConfigurationObserver
 	workerConfig         *postgres.WorkerConfigurations
 	scenario             captureAdmissionScenario
-	published            artifact.PublishedContext
+	published            publishedContext
 	root                 capacityRoot
 	initialResultGrantID string
 }
@@ -201,7 +199,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 
 // Produce and independently publish an actual managed context. No download
 // session, download policy or download authority supplies query admission.
-func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root capacityRoot, enrollment capacityEnrollment, profileSource bool, legacyTiming ...bool) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root capacityRoot, enrollment capacityEnrollment, profileSource bool, legacyTiming ...bool) (captureAdmissionScenario, publishedContext) {
 	t.Helper()
 	var s captureAdmissionScenario
 	var accepted capture.Accepted
@@ -234,14 +232,14 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root capacit
 	if hook := liveManualFixtureHook(f.ctx); hook != nil {
 		hook.run(t, f, s, accepted, profileSQL, started, refresh)
 		hook.handled = true
-		return s, artifact.PublishedContext{}
+		return s, publishedContext{}
 	}
 	return publishPreparedQueryLedgerContext(t, f, s, accepted, profileSQL, started, refresh, len(legacyTiming) > 0 && legacyTiming[0])
 }
 
 // Reuse the exact existing custody/publication flow for already admitted group
 // children; only their independent admission is different.
-func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, accepted capture.Accepted, profileSQL *postgres.APIContextExecutions, started execution.APIExecution, refresh func() executionapp.APIExecutionCheck, legacy bool) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, accepted capture.Accepted, profileSQL *postgres.APIContextExecutions, started execution.APIExecution, refresh func() executionapp.APIExecutionCheck, legacy bool) (captureAdmissionScenario, publishedContext) {
 	t.Helper()
 	profileSource := accepted.Expectation.Profile != nil
 	packetSource := accepted.Expectation.Recording != nil && accepted.Expectation.Recording.Kind == "packetCapture"
@@ -331,6 +329,8 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 		started.Copies, started.Phase, started.AcquiredAt, started.CompletedAt = copies, "stored", at.Truncate(time.Microsecond), stored
 		c := refresh()
 		completion := artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: evidence.ContextExpectationDigest(e), Copies: copies, StoredAt: stored, ClosedAt: stored}
+		prepared.AddFacts(&completion)
+		f.refreshBase(t)
 		if _, err = profileSQL.RecordAPIStoredCompletion(f.ctx, started, completion, c.Process); err != nil {
 			t.Fatal("managed profile stored completion", err)
 		}
@@ -356,70 +356,14 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 			t.Fatal("managed encrypted query source", err)
 		}
 
-	}
-	verifier, err := objectstore.NewContextVerifier(bound, f.keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rawSyscall {
-		original := installedArgumentsSQLSource(t, f.ctx, f.admin, s.a.RootID)(e.CaptureUID)
-		verifier.WithStreamCheck(artifact.SyscallArgumentsArtifact, func(expected artifact.ContextExpectation) objectstore.StreamCheck {
-			check, err := syscalls.NewArgumentCheck(expected, original.Source)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return check
-		})
-	} else if rawPacket {
-		verifier.WithStreamCheck(artifact.RawPCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck {
-			return packets.NewRawCheck(packets.RawLimits{Snaplen: 96, TCP: manualRawTCPCap})
-		})
-	} else if packetSource {
-		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return packets.NewHeadersCheck() })
-	} else if profileSource {
-		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
-	}
-	var publicationPools []*pgxpool.Pool
-	defer func() {
-		for _, p := range publicationPools {
-			p.Close()
+		f.refreshBase(t)
+		if _, err = publishStoredFixture(f.ctx, f.admin, e, copies, int64(len(payload)), nil); err != nil {
+			t.Fatal("managed query source publication", err)
 		}
-	}()
-	publication := func(role, password string) *postgres.ContextPublications {
-		p := f.fixturePool(role, password)
-		publicationPools = append(publicationPools, p)
-		ledger, err := postgres.NewContextPublications(f.ctx, p, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return ledger
 	}
-	check := publication("context_verify_runtime", "synthetic-context-verify")
-	ack := publication("context_verification_audit_runtime", "synthetic-context-audit")
-	publish := publication("context_publish_runtime", "synthetic-context-publish")
-	f.refreshBase(t)
-	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-		return f.currentManagedPublication(ctx, s, v)
-	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if profileSource || packetSource || rawSyscall || isLogs {
-		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
-		defer gatePool.Close()
-		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		publisher.Authority = gate
-	}
-	var probe profileAcquisitionPublicationProbe
+	published := publishedContext{RootID: s.a.RootID, CaptureID: e.CaptureUID, Expectation: e, Copies: copies}
 	if profileSource {
-		probe = qualifyProfileAcquisitionBeforePublication(t, f, s, publisher, check, e, copies, acquisition, legacy)
-	}
-	published, err := publisher.Publish(f.ctx, e.CaptureUID, copies)
-	if err != nil {
-		t.Fatal("managed independent query source publication", err)
-	}
-	if profileSource {
-		qualifyProfileAcquisitionAfterPublication(t, f, s, publisher, check, e, copies, probe)
+		qualifyProfileAcquisitionAfterPublication(t, f, s, e, acquisition, legacy)
 	}
 	return s, published
 }

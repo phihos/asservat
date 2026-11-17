@@ -104,7 +104,7 @@ func assertLogsOriginalCollectCutoff(t *testing.T, ctx context.Context, store *p
 	}
 }
 
-func publishQueryLedgerLogs(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, accepted capture.Accepted, execSQL *postgres.APIContextExecutions) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishQueryLedgerLogs(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, accepted capture.Accepted, execSQL *postgres.APIContextExecutions) (captureAdmissionScenario, publishedContext) {
 	t.Helper()
 	started, refresh := startQueryLedgerProfile(t, f, s, accepted, execSQL)
 	return publishPreparedQueryLedgerContext(t, f, s, accepted, execSQL, started, refresh, false)

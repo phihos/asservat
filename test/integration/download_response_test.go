@@ -20,7 +20,7 @@ import (
 // records and original published context authority; large response size and
 // emitted byte counts below are explicitly synthetic accounting observations.
 // This does not qualify a large native decoder, I-13 relay or public download.
-func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, artifact.PublishedContext)) {
+func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, publishedContext)) {
 	t.Helper()
 	t.Run("download-response-window-accounting", func(t *testing.T) {
 		scenario, published := create(t)

@@ -1,12 +1,10 @@
 package integration
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -105,15 +103,6 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root capacityRo
 	r := artifact.Registration{Location: artifact.Location{ClusterID: f.input.ControlClusterID, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: selected.Selection.StoreID, AllocationID: selected.Selection.AllocationID, PoolRevision: selected.Selection.PoolRevision, AllocationRevision: selected.Selection.AllocationRevision, NativeLimit: 4096, AnchorAt: retained.AnchorAt, WriteUntil: plan.Input.Deadline, ExpiresAt: retained.ExpiresAt, DeleteBy: retained.DeleteBy}
 	request := capturevalue.Admission{RootID: f.input.PermissionRootID, IdempotencyKey: "capacity-managed-session", SubmissionDigest: artifact.Digest{24}, Plan: plan, Eligibility: eligibility, Storage: selected.Binding, Registration: r, CaseID: custodyID(), OccurrenceID: custodyID()}
 	return captureAdmissionScenario{p: f.permission, s: admission, batch: f.batch, a: request, poolID: f.qualification.Backends[0].PoolID, retention: retention, recovery: recovery}, publisher, policies
-}
-
-func (f *capacitySQLFixture) currentManagedPublication(ctx context.Context, s captureAdmissionScenario, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
-	p, err := s.p.Permissions(ctx, s.a.Eligibility.Target)
-	if err != nil {
-		return artifact.PublicationAuthority{}, err
-	}
-	n := time.Now().UTC()
-	return artifact.PublicationAuthority{RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(n.Add(5*time.Second), p.FreshUntil)}, nil
 }
 
 // Inspect only the exact original managed account before beginning a new human

@@ -32,7 +32,6 @@ import (
 // All admitted work, execution transitions, retention and encrypted output use
 // the real adapters. No fake Start acknowledgment or native provider is used.
 type manualSnapshotWorkflow struct {
-	KeyServices *contextKeyUnwrapServices
 	Facts       *manualSnapshotWorkflowFacts
 	Runner      executionapp.APIContextRunner
 	Executions  *postgres.APIContextExecutions
@@ -238,7 +237,7 @@ func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, par
 		if err != nil {
 			return value.APIExecution{}, err
 		}
-		if result.State != "StoredPendingVerification" || result.Copies != c.Completion.Copies {
+		if result.State != "Published" || result.Copies != c.Completion.Copies {
 			return value.APIExecution{}, fmt.Errorf("real runner did not commit joined completion: %s", result.State)
 		}
 		started.Phase, started.AcquiredAt, started.CompletedAt, started.Copies = "stored", c.Acquired, c.Completion.StoredAt, c.Completion.Copies
@@ -247,7 +246,6 @@ func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, par
 	// The legacy wrapper retains its observer-on-read behavior. This composed
 	// workflow uses the same continuously observed reader for publication too.
 	stage.Retention = &w.Retention
-	stage.KeyServices = w.KeyServices
 	completeSourceSnapshotCompletion(t, ctx, w.f, w.policy, part, stage)
 }
 

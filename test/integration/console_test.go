@@ -497,7 +497,7 @@ func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentI
 		p.HistoryState = "unavailable"
 	}
 	if s.state == "finalizing" {
-		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 2, "Finalizing", "Finalizing", "VerificationPending"
+		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 2, "Finalizing", "Finalizing", "PublicationPending"
 	}
 	if s.state == "evidence-ready" {
 		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 3, "Succeeded", "Succeeded", ""

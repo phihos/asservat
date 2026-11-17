@@ -498,10 +498,10 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 			t.Fatal("regional SQL copies encoding")
 		}
 		clear(raw)
-		result.State = "StoredPendingVerification"
+		result.State = "Published"
 		t.Logf("actual regional signed H2 start elapsed=%s calls=%d", regional.lastDuration, regional.calls)
 	}
-	if result.State != "StoredPendingVerification" || collector.calls.Load() != 1 {
+	if result.State != "Published" || collector.calls.Load() != 1 {
 		t.Fatal("completed result unavailable", result.State)
 	}
 
@@ -558,26 +558,6 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		t.Fatal("deleted executor retained process authority")
 	}
 	refreshPermissions()
-	publication := func(user, password string) *postgres.ContextPublications {
-		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID)
-		if e != nil {
-			t.Fatal(e)
-		}
-		return r
-	}
-	verify, audit, publish := publication("context_verify_runtime", "synthetic-context-verify"), publication("context_verification_audit_runtime", "synthetic-context-audit"), publication("context_publish_runtime", "synthetic-context-publish")
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	verifier, err := objectstore.NewContextVerifier(bound, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-	if _, err = publisher.Publish(ctx, accepted.CaptureID, result.Copies); err != nil {
-		t.Fatal("historical completed API publication", err)
-	}
 	nativeReader, err := objectstore.NewContextNativeReader(bound, keys)
 	if err != nil {
 		t.Fatal(err)

@@ -86,8 +86,8 @@ func qualifyRemoteNativeWindow(t *testing.T, ctx context.Context, store *objects
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = verifier.VerifyContext(ctx, e, copies); err != nil {
-		t.Fatal("full verification", err)
+	if _, err = readStoredNative(ctx, verifier, e, copies); err != nil {
+		t.Fatal("full authenticated read", err)
 	}
 	source := evidence.NativeContextSource{Expectation: e, Copies: copies}
 	if !source.Valid(evidence.ContextCopiesDigest(copies)) {

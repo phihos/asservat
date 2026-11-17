@@ -42,7 +42,6 @@ func installedProfileRefusalSQLCheck(t *testing.T, ctx context.Context, admin *p
  AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Profile,DurationMillis}')::bigint=10000
  AND (SELECT count(*) FROM context_capture WHERE root_id=c.root_id AND preview_id=g.preview_id)=1
  AND (SELECT count(*) FROM context_execution WHERE root_id=c.root_id AND capture_id=c.id)=1
- AND NOT EXISTS(SELECT 1 FROM context_verification WHERE root_id=c.root_id AND capture_id=c.id)
  AND NOT EXISTS(SELECT 1 FROM context_catalog WHERE root_id=c.root_id AND capture_id=c.id)
  AND NOT EXISTS(SELECT 1 FROM context_writer_completion WHERE root_id=c.root_id AND capture_id=c.id)
  AND NOT EXISTS(SELECT 1 FROM custody_copy WHERE attempt_id=a.id AND ciphertext_bytes IS NOT NULL)

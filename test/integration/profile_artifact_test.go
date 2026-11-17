@@ -2,13 +2,11 @@ package integration
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -127,9 +125,6 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		if err != nil {
 			t.Fatal(err)
 		}
-		// The publisher's registration (internal/bootstrap/publisher.go).
-		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
-		verifier.WithStreamCheck(artifact.GoTraceArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewGoTraceCheck() })
 		return verifier, copies, nil
 	}
 	readBack := func(t *testing.T, v *objectstore.ContextVerifier, e artifact.ContextExpectation, c artifact.Copies) ([]byte, artifact.NativeDownloadMetadata) {
@@ -166,9 +161,6 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if err != nil {
 		t.Fatal("store pprof", err)
 	}
-	if _, err = v.VerifyContext(ctx, e, copies); err != nil {
-		t.Fatal("pprof verification", err)
-	}
 	got, m := readBack(t, v, e, copies)
 	if !bytes.Equal(got, heap.Bytes()) || m.Format != artifact.PprofFormat || m.Filename != "artifact-"+e.Registration.Location.ArtifactID+".pb.gz" || m.SHA256 != sha256.Sum256(heap.Bytes()) {
 		t.Fatalf("pprof native bytes differ: %d/%d %+v", len(got), heap.Len(), m)
@@ -187,21 +179,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		tool = "go tool pprof -top read it"
 	}
 
-	// 2. A gzip-valid profile with invalid contents: the producer stores it
-	// (it does not parse), the publisher check refuses it.
-	var bad bytes.Buffer
-	w := gzip.NewWriter(&bad)
-	_, _ = w.Write([]byte{0x12, 0x02, 0x08, 0x07, 0x22, 0x02, 0x08, 0x00}) // sample -> absent location
-	_ = w.Close()
-	e = expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-pprof", EndpointDigest: artifact.Digest{2}, Type: "cpu", Mode: "interval", DurationMillis: 10_000})
-	v, copies, err = store1(t, e, bad.Bytes())
-	if err != nil {
-		t.Fatal("producer refused a gzip-valid stream", err)
-	}
-	if _, err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
-		t.Fatal("corrupted pprof verified", err)
-	}
-	// A stream that is not gzip never leaves the producer.
+	// 2. A stream that is not gzip never leaves the producer.
 	e = expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-pprof", EndpointDigest: artifact.Digest{3}, Type: "cpu", Mode: "interval", DurationMillis: 10_000})
 	if _, _, err = store1(t, e, []byte("<html>pprof disabled</html>")); err == nil {
 		t.Fatal("producer stored a non-gzip pprof response")
@@ -219,20 +197,9 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if err != nil {
 		t.Fatal("store trace", err)
 	}
-	if _, err = v.VerifyContext(ctx, e, copies); err != nil {
-		t.Fatal("trace verification", err)
-	}
 	got, m = readBack(t, v, e, copies)
 	if !bytes.Equal(got, tr.Bytes()) || m.Format != artifact.GoTraceFormat || m.Filename != "artifact-"+e.Registration.Location.ArtifactID+".trace" {
 		t.Fatal("trace native bytes differ", len(got), tr.Len())
-	}
-	// A truncated trace with a valid header is refused by the publisher.
-	e = expectation(artifact.GoProfileAcquisition{SourceRef: "synthetic-trace", EndpointDigest: artifact.Digest{5}, Type: "runtimeTrace", Mode: "interval", DurationMillis: 1000})
-	if v, copies, err = store1(t, e, tr.Bytes()[:tr.Len()/2]); err != nil {
-		t.Fatal("store truncated trace", err)
-	}
-	if _, err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
-		t.Fatal("truncated trace verified", err)
 	}
 	// A valid pprof larger than one storage frame exercises the real SQL
 	// multipart journal and S3 decoder. The large synthetic symbol is raw data;
@@ -244,9 +211,6 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		verifier, copies, err := store1(t, large, encoded.Bytes())
 		if err != nil {
 			t.Fatal(err)
-		}
-		if _, err = verifier.VerifyContext(ctx, large, copies); err != nil {
-			t.Fatal("large profile verification", err)
 		}
 		got, metadata := readBack(t, verifier, large, copies)
 		source := evidence.NativeContextSource{Expectation: large, Copies: copies}

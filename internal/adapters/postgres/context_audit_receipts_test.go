@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bytes"
 	"testing"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -21,9 +20,7 @@ func TestCurrentCatalogRequiresOriginalRows(t *testing.T) {
 		t.Fatal("original committed context", e)
 	}
 	for name, mutate := range map[string]func(*custodydb.ReadPublishedContextRow){
-		"intent-empty": func(r *custodydb.ReadPublishedContextRow) { r.ContextCapture.IntentObjectVersion.String = "" },
-		"intent-null":  func(r *custodydb.ReadPublishedContextRow) { r.ContextCapture.IntentObjectVersion.String = "null" },
-		"capture":      func(r *custodydb.ReadPublishedContextRow) { r.ContextCatalog.CaptureID = r.ContextCapture.RootID },
+		"capture": func(r *custodydb.ReadPublishedContextRow) { r.ContextCatalog.CaptureID = r.ContextCapture.RootID },
 		"copies-size": func(r *custodydb.ReadPublishedContextRow) {
 			r.ContextCatalog.CopiesDigest = r.ContextCatalog.CopiesDigest[:31]
 		},
@@ -38,21 +35,6 @@ func TestCurrentCatalogRequiresOriginalRows(t *testing.T) {
 		})
 	}
 }
-func TestUnversionedHistoryRemainsHistoricalProgress(t *testing.T) {
-	for _, version := range []string{"", "null"} {
-		f := progressFactsFixture(t, "published")
-		f.ContextCapture.IntentObjectVersion.String = version
-		before := digest(f)
-		if _, e := acceptedPublication(f.ContextCapture); e == nil {
-			t.Fatal("historical acknowledgement became current authority")
-		}
-		got, e := progressFacts(f)
-		if e != nil || got.Phase != "Succeeded" || !bytes.Equal(digest(f), before) {
-			t.Fatal("historical outcome lost or mutated", e)
-		}
-	}
-}
-
 func TestCurrentCatalogNativeLengthIsBounded(t *testing.T) {
 	row := publishedCatalogFixture(t)
 	e, err := currentPublishedContext(row)

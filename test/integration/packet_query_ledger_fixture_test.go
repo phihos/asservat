@@ -553,8 +553,8 @@ func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgre
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	output := value.VerifiedOutput{CaptureID: e.CaptureUID, ActionID: e.ActionID, ArtifactID: e.Registration.Location.ArtifactID, ExecutionDigest: e.PlanDigest, ArtifactDigest: version, Target: value.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}}
 	raw := value.RawQueryScope{CaseID: e.CaseID, Artifacts: []value.RawQueryArtifact{{Output: output, NativeBytes: 0, ExpiresAt: e.Registration.ExpiresAt}}, Operations: []string{value.GrantDownloadOperation, packetQueryFixtureOperation(f)}, Reason: "Review existing synthetic packet source", MaxBytes: maxBytes, MaxOperations: ops, NotAfter: now.Add(time.Minute)}
-	// Derive immutable verified length from the already published verification row.
-	if err := f.base.admin.QueryRow(ctx, "SELECT native_bytes FROM context_verification WHERE root_id=$1 AND capture_id=$2", f.base.input.PermissionRootID, e.CaptureUID).Scan(&raw.Artifacts[0].NativeBytes); err != nil {
+	// Derive the native length from the already published catalog row.
+	if err := f.base.admin.QueryRow(ctx, "SELECT native_bytes FROM context_catalog WHERE root_id=$1 AND capture_id=$2", f.base.input.PermissionRootID, e.CaptureUID).Scan(&raw.Artifacts[0].NativeBytes); err != nil {
 		t.Fatal(err)
 	}
 	g := value.Grant{ID: custodyID(), RootID: f.base.input.PermissionRootID, Kind: value.GrantRawQuery, RawQuery: &raw, DataClass: "raw", Requester: actor, Lifetime: time.Minute, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: packetQueryFixtureOperation(f), Code: "rawDisclosure"}}}

@@ -307,12 +307,8 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		t.Fatal("workflow qualifier requires independently configured N2 or N16")
 	}
 	began := time.Now()
-	var keyServices *contextKeyUnwrapServices
 	var history *dispatchHistoryPersistence
 	if requestMode {
-		// Real long-lived verifier services exist before the request's final facts.
-		// Every child still supplies its own fresh peer, binding and bounded controls.
-		keyServices = newContextKeyUnwrapServices(t, ctx, f.admin, f.fixturePool, policy.Scenario.a.RootID, policy.Authority.InstallationID)
 		service, closeHistory := newManualGroupHistoryService(t, ctx, f, policy, policy.Scenario.a.RootID, policy.Authority.InstallationID)
 		defer closeHistory()
 		history = &dispatchHistoryPersistence{service: service}
@@ -384,7 +380,6 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	// They create no preview row, reservation, accepted capture or native keys.
 	_, parts := prepare()
 	workflow := newManualSnapshotWorkflow(t, ctx, f, policy, parts)
-	workflow.KeyServices = keyServices
 	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, history)
 	if !t.Run("legacy-five-second-normal-audit-downgrade", func(t *testing.T) {
 		before := readManualSaveCounters(t, ctx, f, policy)

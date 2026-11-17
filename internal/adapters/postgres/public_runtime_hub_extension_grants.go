@@ -93,6 +93,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "context_catalog", "artifact_id", "INSERT"},
 		{"table", "context_catalog", "capture_id", "INSERT"},
 		{"table", "context_catalog", "root_id", "INSERT"},
+		{"table", "context_catalog", "copies_digest", "INSERT"},
+		{"table", "audit_event", "", "INSERT"},
 		{"table", "context_catalog", "native_bytes", "INSERT"},
 		{"table", "context_catalog", "acquisition_started_at", "INSERT"},
 		{"table", "context_catalog", "acquisition_completed_at", "INSERT"},

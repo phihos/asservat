@@ -29,7 +29,7 @@ import (
 // Starts with an independently verified, published, closed-writer attempt
 // and uses the compiled hub login for erasure and status. Identity, protected
 // privacy policy and signing keys are synthetic inputs in this service fixture.
-func qualifyProcessingEarlyErasure(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, bound *objectstore.CustodyStore, keys authorityTestKeys, s3admin *s3.Client, bucket string, s captureAdmissionScenario, processing *processingTestFixture, published artifact.PublishedContext) {
+func qualifyProcessingEarlyErasure(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, bound *objectstore.CustodyStore, keys authorityTestKeys, s3admin *s3.Client, bucket string, s captureAdmissionScenario, processing *processingTestFixture, published publishedContext) {
 	t.Helper()
 	root, installation := s.a.RootID, s.recovery.installation
 	reg := published.Expectation.Registration

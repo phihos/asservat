@@ -21,7 +21,7 @@ import (
 // Real SQL/publication/S3/audit and native context worker. Human identity,
 // placement/allocation and installation acceptance remain explicit fixture inputs.
 // No public native-work channel, regional cache or download endpoint is faked.
-func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, artifact.PublishedContext)) {
+func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, publishedContext)) {
 	t.Helper()
 	t.Run("download-stop-audit-row-and-original-replay", func(t *testing.T) {
 		scenario, published := create(t)

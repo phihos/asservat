@@ -35,11 +35,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 		// Qualify each compiled publication role independently. Each child gets
 		// a fresh execution and reaches its first publication effects without a
 		// successful fixture-role fallback or a previously recorded verdict.
-		for _, roleCase := range []struct{ name, purpose string }{
-			{"compiled-verifier", "context-verify"},
-			{"compiled-publisher", "context-publish"},
-			{"early-erasure", "context-publish"},
-		} {
+		for _, roleCase := range []struct{ name string }{{"stored-outcome-publishes"}, {"early-erasure"}} {
 			t.Run(roleCase.name, func(t *testing.T) {
 				s := create(t, 1)
 				in := s.a.Plan.Input
@@ -77,9 +73,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					"INSERT INTO context_capture SELECT * FROM context_capture WHERE false",
 					"UPDATE context_capture SET expectation_json=expectation_json WHERE false",
 					"UPDATE fleet_trust SET issuer_epoch=issuer_epoch WHERE false",
-					"INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture WHERE false",
 					"UPDATE custody_copy SET attempt_id=attempt_id WHERE false",
-					"INSERT INTO context_key_unwrap SELECT * FROM context_key_unwrap WHERE false",
 					"DELETE FROM authority_audit WHERE false",
 				} {
 					if _, err = sharedPool.Exec(ctx, query); capacitySQLState(err) != "42501" {
@@ -288,63 +282,21 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if _, err = execute.RecordAPIStoredCompletion(ctx, changed, completion, c.Process); err == nil {
 					t.Fatal("completed result rewritten")
 				}
-				publication := func(user, password string) *postgres.ContextPublications {
-					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID)
-					if e != nil {
-						t.Fatal(e)
-					}
-					return p
-				}
-				const compiledPassword = "synthetic-compiled-publication"
-				compiledRole := narrowRole(t, ctx, admin, "api_"+strings.ReplaceAll(roleCase.purpose, "-", "_")+"_", compiledPassword, func(role string) []string {
-					grants, ok := postgres.PublicRuntimeRoleGrantSQL(roleCase.purpose, role)
-					if !ok {
-						t.Fatal("missing compiled publication grants", roleCase.purpose)
-					}
-					return grants
-				})
-				verifyRole, verifyPassword := "context_verify_runtime", "synthetic-context-verify"
-				publishRole, publishPassword := "context_publish_runtime", "synthetic-context-publish"
-				if roleCase.purpose == "context-verify" {
-					verifyRole, verifyPassword = compiledRole, compiledPassword
-				} else {
-					publishRole, publishPassword = compiledRole, compiledPassword
-				}
-				verify := publication(verifyRole, verifyPassword)
-				audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
-				publish := publication(publishRole, publishPassword)
-				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
+				// REQ-EVD-001: the stored outcome above published the catalog row
+				// with the producer-reported native size; no separate step follows.
+				catalog, err := postgres.NewContextPublications(ctx, pool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
 				if err != nil {
 					t.Fatal(err)
 				}
-				verifier, err := objectstore.NewContextVerifier(bound, keys)
-				if err != nil {
-					t.Fatal(err)
+				catalogued, err := catalog.ContextDownloadEvidence(ctx, accepted.Expectation.Registration.Location.ArtifactID)
+				if err != nil || catalogued.NativeBytes == nil || *catalogued.NativeBytes != int64(len(native)) || catalogued.Version != evidence.ContextCopiesDigest(execution.Copies) {
+					t.Fatal("stored outcome did not publish the producer's facts", catalogued.NativeBytes, err)
 				}
-				p := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-				s.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-				s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
-				if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
-					t.Fatal(err)
+				var catalogRecords int
+				if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_catalog WHERE capture_id=$1", accepted.CaptureID).Scan(&catalogRecords); err != nil || catalogRecords != 1 {
+					t.Fatal("outcome replay duplicated publication", catalogRecords, err)
 				}
-				// No live target or original human request is supplied to the real gate.
-				authority, err := gate.CheckContextPublication(ctx, accepted.Expectation)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if _, err = verify.RecordContextVerification(ctx, accepted.Expectation, changed.Copies, authority, artifact.ContextVerificationResult{NativeBytes: 1}); err == nil {
-					t.Fatal("publication accepted unrecorded copies")
-				}
-				var verificationRecords, catalogRecords int
-				if err = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM context_verification WHERE capture_id=$1), (SELECT count(*) FROM context_catalog WHERE capture_id=$1)", accepted.CaptureID).Scan(&verificationRecords, &catalogRecords); err != nil || verificationRecords != 0 || catalogRecords != 0 {
-					t.Fatal("compiled publication regression would only exercise replay", verificationRecords, catalogRecords, err)
-				}
-				unwraps := qualifyContextKeyUnwraps(t, ctx, admin, poolFor, s, accepted.Expectation, accepted.CaptureID)
-				published, err := p.Publish(ctx, accepted.CaptureID, execution.Copies)
-				if err != nil {
-					t.Fatal(roleCase.purpose, "first publication with compiled grants", err)
-				}
-				unwraps.afterPublication(ctx, accepted.CaptureID)
+				published := publishedContext{RootID: s.a.RootID, CaptureID: accepted.CaptureID, Expectation: accepted.Expectation, Copies: execution.Copies}
 				reader, err := objectstore.NewContextNativeReader(bound, keys)
 				if err != nil {
 					t.Fatal(err)
@@ -464,41 +416,6 @@ func qualifyContextKeyWraps(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	return f
 }
 
-type contextKeyUnwrapFixture struct {
-	t       *testing.T
-	unwraps *postgres.ContextKeyUnwraps
-	queue   *postgres.ContextPublicationQueue
-	peer    authorization.KeyPeer
-	scope   authorization.KeyScope
-	attempt string
-	binding artifact.Binding
-}
-
-func (f contextKeyUnwrapFixture) resolve(ctx context.Context, role string, peer authorization.KeyPeer, attempt string) error {
-	b, err := evidence.ArtifactKeyBinding(f.binding, role)
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	_, err = f.unwraps.Resolve(ctx, peer, authorization.KeyRequestInfo{Scope: f.scope, AuthorityID: attempt, Operation: "unwrap", Binding: b, RequestDigest: artifact.Digest{byte(len(role))}})
-	return err
-}
-
-func (f contextKeyUnwrapFixture) queued(ctx context.Context, capture string) bool {
-	pending, err := f.queue.PendingContextPublications(ctx, 64)
-	if err != nil {
-		f.t.Fatal("publication queue", err)
-	}
-	for _, p := range pending {
-		if p.CaptureID == capture {
-			if p.AttemptID != f.attempt || len(p.Copies) == 0 {
-				f.t.Fatal("queued capture lost its attempt or copies")
-			}
-			return true
-		}
-	}
-	return false
-}
-
 // narrowRole creates a NOINHERIT login with exactly the given grant list; the
 // password is a fixed synthetic literal.
 func narrowRole(t *testing.T, ctx context.Context, admin *pgxpool.Pool, prefix, password string, grants func(string) []string) string {
@@ -518,99 +435,4 @@ func narrowRole(t *testing.T, ctx context.Context, admin *pgxpool.Pool, prefix, 
 		}
 	})
 	return role
-}
-
-type contextKeyUnwrapServices struct {
-	unwraps *postgres.ContextKeyUnwraps
-	queue   *postgres.ContextPublicationQueue
-	scope   authorization.KeyScope
-}
-
-// One real verifier process owns these existing root-scoped roles and pools.
-// Per-attempt authority, bindings, peer observations and allowances stay below.
-func newContextKeyUnwrapServices(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, root, installation string) *contextKeyUnwrapServices {
-	t.Helper()
-	began := time.Now()
-	scope := authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: "fixture"}
-	role := narrowRole(t, ctx, admin, "context_key_unwrap_", "synthetic-key-unwrap", postgres.ContextKeyUnwrapGrantSQL)
-	unwrapPool := poolFor(role, "synthetic-key-unwrap")
-	t.Cleanup(unwrapPool.Close)
-	unwraps, err := postgres.NewContextKeyUnwraps(ctx, unwrapPool, root, custodyID(), scope)
-	if err != nil {
-		t.Fatal(err)
-	}
-	queueRole := narrowRole(t, ctx, admin, "context_publication_queue_", "synthetic-publication-queue", func(r string) []string {
-		grants, _ := postgres.PublicRuntimeRoleGrantSQL("context-verify", r)
-		return grants
-	})
-	queuePool := poolFor(queueRole, "synthetic-publication-queue")
-	t.Cleanup(queuePool.Close)
-	queue, err := postgres.NewContextPublicationQueue(ctx, queuePool, root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("actual_verifier_service_setup_us=%d helper_roles=2 helper_pools=2", time.Since(began).Microseconds())
-	return &contextKeyUnwrapServices{unwraps: unwraps, queue: queue, scope: scope}
-}
-
-// qualifyContextKeyUnwraps checks ADR-181 on real PostgreSQL for a stored,
-// unpublished execution: only a verifier peer may unwrap, only this attempt's
-// keyset bindings, within the bounded allowance; the queue lists the capture.
-func qualifyContextKeyUnwraps(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, capture string, shared ...*contextKeyUnwrapServices) contextKeyUnwrapFixture {
-	var services *contextKeyUnwrapServices
-	if len(shared) > 0 {
-		services = shared[0]
-	}
-	if services == nil {
-		services = newContextKeyUnwrapServices(t, ctx, admin, poolFor, s.a.RootID, s.recovery.installation)
-	}
-	var err error
-	controlsStarted := time.Now()
-	defer func() {
-		t.Logf("actual_verifier_per_attempt_controls_us=%d", time.Since(controlsStarted).Microseconds())
-	}()
-	now := time.Now().UTC()
-	f := contextKeyUnwrapFixture{t: t, unwraps: services.unwraps, queue: services.queue, scope: services.scope, attempt: e.Registration.Location.AttemptID, binding: e.Binding(),
-		peer: authorization.KeyPeer{InstallationID: services.scope.InstallationID, PeerID: custodyID(), Role: "verifier", Certificate: artifact.Digest{0x51}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(50 * time.Minute)}}
-	if !f.queued(ctx, capture) {
-		t.Fatal("stored unpublished capture missing from the publication queue")
-	}
-	if err = f.resolve(ctx, "data-key", f.peer, f.attempt); err != nil {
-		t.Fatal("verifier unwrap of a stored attempt", err)
-	}
-	acquisition := f.peer
-	acquisition.Role = "acquisition"
-	if err = f.resolve(ctx, "index-key", acquisition, f.attempt); err == nil {
-		t.Fatal("acquisition peer used the verification authority")
-	}
-	if err = f.resolve(ctx, "index-key", f.peer, custodyID()); err == nil {
-		t.Fatal("unwrap for an attempt without a stored execution")
-	}
-	// A restarted verifier presents another certificate; the allowance is shared.
-	other := f.peer
-	other.Certificate = artifact.Digest{0x52}
-	for n := 1; n < postgres.ContextKeyUnwrapAllowance; n++ {
-		peer := f.peer
-		if n%2 == 0 {
-			peer = other
-		}
-		if err = f.resolve(ctx, "manifest-key", peer, f.attempt); err != nil {
-			t.Fatal("verification unwrap within the allowance", n, err)
-		}
-	}
-	if err = f.resolve(ctx, "manifest-key", f.peer, f.attempt); err == nil {
-		t.Fatal("unwrap beyond the bounded allowance")
-	}
-	return f
-}
-
-// afterPublication: a published capture leaves the queue and gets no further
-// verification unwrap; its spent allowance is never refunded.
-func (f contextKeyUnwrapFixture) afterPublication(ctx context.Context, capture string) {
-	if f.queued(ctx, capture) {
-		f.t.Fatal("published capture remained queued")
-	}
-	if err := f.resolve(ctx, "data-key", f.peer, f.attempt); err == nil {
-		f.t.Fatal("verification unwrap after publication")
-	}
 }

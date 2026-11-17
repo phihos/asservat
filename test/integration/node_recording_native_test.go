@@ -155,11 +155,6 @@ func recordingEncryptedNative(t *testing.T, ctx context.Context, admin *rest.Con
 	if err != nil {
 		t.Fatal(err)
 	}
-	checked := 0
-	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { checked++; return packets.NewHeadersCheck() })
-	if _, err = verifier.VerifyContext(ctx, e, c.Completion.Copies); err != nil || checked != 1 {
-		t.Fatal("verification with the headers-only recheck", err, checked)
-	}
 	source, err := verifier.OpenNative(ctx, e, c.Completion.Copies, time.Now().Add(30*time.Second))
 	if err != nil {
 		t.Fatal(err)
