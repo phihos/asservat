@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // CaptureHistoryEntry is one canonical capture-history.schema.json entry.
@@ -64,12 +65,15 @@ type CaptureSettingsRecord struct {
 	NavigationURI   string              `json:"navigation_uri"`
 }
 
-// historyCall serves list_capture_history and get_capture_settings.
-func (s *ContextOperations) historyCall(ctx context.Context, current identities.CurrentIdentity, actor identity.Identity, name string, in ContextOperationInput) (any, *string, time.Time, error) {
-	if name == "get_capture_settings" {
-		settings, err := s.history.Settings(ctx, current, in.CaptureID)
+// settings serves get_capture view=settings.
+func (s *ContextOperations) settings(ctx context.Context, current identities.CurrentIdentity, captureID string) (any, time.Time, error) {
+	if s.history == nil {
+		return nil, time.Time{}, capabilityError("capture settings")
+	}
+	{
+		settings, err := s.history.Settings(ctx, current, captureID)
 		if err != nil {
-			return nil, nil, time.Time{}, err
+			return nil, time.Time{}, err
 		}
 		if settings.RecordingSave != nil {
 			return s.recordingSaveSettings(settings)
@@ -87,28 +91,46 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 		}
 		b, err := json.Marshal(view)
 		if err != nil {
-			return nil, nil, time.Time{}, value.ErrUnavailable
+			return nil, time.Time{}, value.ErrUnavailable
 		}
 		canonical := jsontext.Value(b)
 		// Unmarshal into a fresh projection: RawMessage.UnmarshalJSON can reuse
 		// capacity, so filling view again would mutate the caller's snapshot.
 		var canonicalView CaptureSettingsView
 		if canonical.Canonicalize() != nil || json.Unmarshal(canonical, &canonicalView) != nil {
-			return nil, nil, time.Time{}, value.ErrUnavailable
+			return nil, time.Time{}, value.ErrUnavailable
 		}
-		limit := contracts.InvestigationOutputLimit
-		if browserSettingsView(ctx, name) {
+		limit := contracts.InvestigationResultBound
+		if browserSettingsView(ctx) {
 			limit = value.MaxHistoryParameters
 		}
-		if (!browserSettingsView(ctx, name) && len(b) > limit) || len(canonical) > limit {
-			return nil, nil, time.Time{}, value.ErrSettingsTooLarge
+		if (!browserSettingsView(ctx) && len(b) > limit) || len(canonical) > limit {
+			return nil, time.Time{}, value.ErrSettingsTooLarge
 		}
 		d := sha256.Sum256(canonical)
 		if settings.SettingsKey != ([32]byte{}) {
 			d = settings.SettingsKey
 		}
 		return CaptureSettingsRecord{Kind: "captureSettings", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt, ExpiresAt: settings.ExpiresAt,
-			SettingsDigest: hex.EncodeToString(d[:]), ExecutionDigest: hash(settings.ExecutionDigest), Settings: canonicalView, NavigationURI: s.config.PublicOrigin + "/captures/" + settings.CaptureID}, nil, settings.ValidUntil, nil
+			SettingsDigest: hex.EncodeToString(d[:]), ExecutionDigest: hash(settings.ExecutionDigest), Settings: canonicalView, NavigationURI: s.config.PublicOrigin + "/captures/" + settings.CaptureID}, settings.ValidUntil, nil
+	}
+}
+
+// historyCall serves list_capture_history for a target_ref or a
+// cluster/target selector.
+func (s *ContextOperations) historyCall(ctx context.Context, current identities.CurrentIdentity, actor identity.Identity, in ContextOperationInput) (any, *string, time.Time, error) {
+	var target targets.WorkloadRequest
+	var err error
+	switch {
+	case in.TargetHandle != "":
+		err = capabilityError("target_handle")
+	case in.Selector != nil:
+		target, err = s.selector(in.Cluster, in.Selector)
+	default:
+		target, err = s.workload(in.Target)
+	}
+	if err != nil {
+		return nil, nil, time.Time{}, err
 	}
 	origins := []value.HistoryOrigin{value.HistoryManual}
 	switch in.Origin {
@@ -126,11 +148,11 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 	if limit == 0 {
 		limit = value.DefaultHistoryPage
 	}
-	after, err := s.decodeHistoryCursor(in, actor)
+	after, err := s.decodeHistoryCursor(in, target, actor)
 	if err != nil {
 		return nil, nil, time.Time{}, err
 	}
-	page, err := s.history.List(ctx, current, in.Target.target(), origins, after, limit)
+	page, err := s.history.List(ctx, current, target, origins, after, limit)
 	if err != nil {
 		return nil, nil, time.Time{}, err
 	}
@@ -145,7 +167,7 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 		if e.SettingsExpiresAt.IsZero() {
 			e.SettingsExpiresAt = e.ExpiresAt
 		}
-		entry := CaptureHistoryEntry{CaptureID: e.CaptureID, Origin: string(e.Origin), AcceptedAt: e.AcceptedAt, SummaryExpires: e.ExpiresAt, Phase: e.Phase, ActionKinds: e.ActionKinds,
+		entry := CaptureHistoryEntry{CaptureID: e.CaptureID, Origin: string(e.Origin), AcceptedAt: e.AcceptedAt, SummaryExpires: e.ExpiresAt, Phase: capturePhase(e.Phase), ActionKinds: e.ActionKinds,
 			EvidenceState: e.EvidenceState, RepeatState: e.RepeatState, SettingsExpires: e.SettingsExpiresAt, RepeatedFrom: e.RepeatedFrom, NavigationURI: s.config.PublicOrigin + "/captures/" + e.CaptureID, Operation: e.Operation}
 		if entry.Operation == "" {
 			entry.Operation = "collect"
@@ -155,7 +177,7 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 		}
 		out.History = append(out.History, entry)
 	}
-	cursor, err := s.encodeHistoryCursor(in, actor, page, after)
+	cursor, err := s.encodeHistoryCursor(in, target, actor, page, after)
 	if err != nil {
 		return nil, nil, time.Time{}, err
 	}

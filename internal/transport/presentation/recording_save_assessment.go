@@ -1,11 +1,48 @@
 package presentation
 
 import (
+	"fmt"
+	"slices"
+
 	app "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
-	"slices"
 )
+
+// recordingSavePreview projects a Save of existing recordings onto the
+// preview_capture reply (REQ-SAV-004): policy-armed sources, each saved with
+// its window before the request and nothing after.
+func (s *ContextOperations) recordingSavePreview(result app.ContextPreviewResult, handles []string) (ContextPreviewData, error) {
+	p, m := result.Preview, result.RecordingSave
+	if m == nil || p.ScopeDigest != result.Assessment.PlanDigest || !s.config.Now().Before(p.SelectionUntil) {
+		return ContextPreviewData{}, value.ErrUnavailable
+	}
+	rows, windows, err := recordingPreviewSelection(result, handles)
+	if err != nil {
+		return ContextPreviewData{}, err
+	}
+	assessment, err := recordingSaveAssessment(result)
+	if err != nil {
+		return ContextPreviewData{}, err
+	}
+	lifecycle := LifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugPolicy", Actions: []LifecycleAction{}, OngoingPodScope: "none"}
+	warnings := sharingWarning(p.Intent.Sharing)
+	pods := map[string]bool{}
+	for i, row := range rows {
+		pods[row.PodUID] = true
+		action := LifecycleAction{ActionID: row.ActionID, Kind: row.Kind, ExecutionMode: "ongoing", Activation: "policyArming", RequestedBefore: windows[i].Before, After: "0s"}
+		if !slices.Contains(lifecycle.Actions, action) {
+			lifecycle.Actions = append(lifecycle.Actions, action)
+		}
+		warnings = append(warnings, fmt.Sprintf("Saves the last %s of recording %s on pod %s. It starts no recorder and runs none of the policy's other actions.", windows[i].Before, row.ActionID, row.PodName))
+	}
+	enabled := s.config.CollectionEnabled && s.recordingSaveCollection
+	data := ContextPreviewData{ExecutionDigest: hash(p.ScopeDigest), PodCount: len(pods), MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: enabled, Blockers: collectionBlockers(enabled), Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: lifecycle, Assessment: assessment}
+	if p.Intent.RepeatedFrom != nil && p.Intent.RepeatedFrom.Valid(s.config.Now()) {
+		data.RepeatedFrom = p.Intent.RepeatedFrom.CaptureID
+	}
+	return data, nil
+}
 
 // A Save projects each source's assessed snapshot increment. It does not reuse
 // pod-status labels or turn the ongoing recorder baseline into measured cost.
@@ -49,7 +86,6 @@ func recordingSaveAssessment(result app.ContextPreviewResult) (CaptureAssessment
 		projected.RecordingHandle = row.Handle
 		projected.ActionID = a.ActionID
 		projected.ExecutionMode = "ongoing"
-		projected.Retention.AnchorRule = "firstAcquisitionOrEarlierSource"
 		projected.Quantities = []Quantity{{Dimension: "outputBytes", Phase: "perIncident", Scope: "perIncidentPod", Basis: "configuredLimit", Lower: 0, Upper: a.Assessment.OutputLimit, SourceRef: "existing-source-window", Coverage: "Configured native snapshot output only; object/encryption overhead and total collector memory are separate. Ongoing source costs are not added by this Save."}}
 		out.Actions = append(out.Actions, projected)
 		if !slices.Contains(actionIDs, a.ActionID) {

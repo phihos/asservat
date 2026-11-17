@@ -8,21 +8,24 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-func TestHistorySettingsOutputCountDoesNotRaiseOtherAuditLimits(t *testing.T) {
-	in := humanAuditIntent("get_capture_settings", "context-input/v1")
-	out := OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{4}, OutputBytes: OperationCaptureSettingsOutputLimit, MetadataUntil: in.RequestUntil, RecordedAt: in.CreatedAt.Add(time.Second)}
-	if !out.Valid() {
-		t.Fatal("bounded settings count refused")
+func TestLargerOutputCountsStayWithTheirOperations(t *testing.T) {
+	for name, limit := range map[string]int64{"get_capture": OperationCaptureSettingsOutputLimit, "preview_capture": OperationResultBound} {
+		in := humanAuditIntent(name, "context-input/v1")
+		out := OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{4}, OutputBytes: limit, MetadataUntil: in.RequestUntil, RecordedAt: in.CreatedAt.Add(time.Second)}
+		if !out.Valid() {
+			t.Fatal("bounded count refused", name)
+		}
+		out.OutputBytes++
+		if out.Valid() {
+			t.Fatal("unbounded count accepted", name)
+		}
 	}
-	out.OutputBytes++
-	if out.Valid() {
-		t.Fatal("unbounded settings count accepted")
-	}
-	out.OutputBytes = OperationOutputLimit + 1
-	for _, name := range []string{"get_capture", "preview_capture", "get_case"} {
+	in := humanAuditIntent("get_case", "context-input/v1")
+	out := OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{4}, OutputBytes: OperationOutputLimit + 1, MetadataUntil: in.RequestUntil, RecordedAt: in.CreatedAt.Add(time.Second)}
+	for _, name := range []string{"get_case", "list_capture_history", "list_diagnostics"} {
 		out.Intent.Name = name
 		if out.Valid() {
-			t.Fatalf("larger count escaped settings operation: %s", name)
+			t.Fatalf("larger count escaped to %s", name)
 		}
 	}
 }

@@ -85,7 +85,7 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			history = typed
 		}
 	}
-	cfg := presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}
+	cfg := presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID, Clusters: c.Clusters}
 	if s.History != nil {
 		cfg.HistoryRootID = c.RootID
 		cfg.HistoryCursorKeys = s.History.Keys

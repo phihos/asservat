@@ -32,7 +32,7 @@ const (
 	MaxRequestBytes  = 32 << 10
 	MaxResponseBytes = 64 << 10
 	// Only the16-source preview has a larger SDK text+structured result frame.
-	MaxRecordingSavePreviewResponseBytes = presentation.OperationRecordingSavePreviewFrameLimit
+	MaxResultBoundResponseBytes = presentation.OperationResultBoundFrameLimit
 	MaxGrantReviewResponseBytes          = presentation.OperationGrantReviewFrameLimit
 	maxNesting                           = 32
 	// toolsListBudget bounds the encoded tools of one tools/list page. The
@@ -699,9 +699,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The SDK owns revision-specific initialization, metadata and header/body
 	// agreement. Do not emulate future protocol fields or retain transport state.
 	response := newBoundedResponse()
-	if route.Method == "tools/call" && route.Name == "preview_recording_save" && h.operations != nil {
+	if route.Method == "tools/call" && (route.Name == "preview_capture" || route.Name == "get_capture") && h.operations != nil {
 		if _, ok := h.operations.Tool(route.Name); ok {
-			response.limit = MaxRecordingSavePreviewResponseBytes
+			response.limit = MaxResultBoundResponseBytes
 		}
 	}
 	if route.Method == "tools/call" && route.Name == "get_grant" && h.operations != nil {

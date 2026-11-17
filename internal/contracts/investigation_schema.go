@@ -29,8 +29,10 @@ const InvestigationOutputLimit = 24 << 10
 // Up to64 exact artifacts and readable targets in one independent review.
 const InvestigationGrantReviewOutputLimit = 256 << 10
 
-// Bounded disclosures for16 selected source snapshots with64 retention refs each.
-const InvestigationRecordingSavePreviewOutputLimit = 128 << 10
+// InvestigationResultBound is the MCP result bound of specs/mcp.md (96 KiB,
+// from the common client tool-output limit). get_capture and preview_capture
+// may use it; other results keep the 24 KiB target.
+const InvestigationResultBound = 96 << 10
 
 // The sole browser settings budget; audit independently bounds its minimized
 // output byte count. Wire contracts do not import domain behavior.
@@ -147,8 +149,8 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 		if name == "get_grant" {
 			limit = InvestigationGrantReviewOutputLimit
 		}
-		if name == "preview_recording_save" {
-			limit = InvestigationRecordingSavePreviewOutputLimit
+		if name == "get_capture" || name == "preview_capture" {
+			limit = InvestigationResultBound
 		}
 	}
 	return v.validateBound(name, b, output, limit)
@@ -180,7 +182,7 @@ func (v *InvestigationContracts) ValidateInput(name string, b []byte) error {
 // ValidateBrowserOutput uses the identical canonical schema. Only this fixed
 // server-owned operation has a larger browser body; MCP uses ValidateOutput.
 func (v *InvestigationContracts) ValidateBrowserOutput(name string, b []byte) error {
-	if name == "get_capture_settings" {
+	if name == "get_capture" {
 		return v.validateBound(name, b, true, InvestigationBrowserSettingsOutputLimit)
 	}
 	return v.ValidateOutput(name, b)
@@ -203,8 +205,8 @@ func (v *InvestigationContracts) OutputViolation(name string, b []byte) string {
 	if name == "get_grant" {
 		limit = InvestigationGrantReviewOutputLimit
 	}
-	if name == "preview_recording_save" {
-		limit = InvestigationRecordingSavePreviewOutputLimit
+	if name == "get_capture" || name == "preview_capture" {
+		limit = InvestigationResultBound
 	}
 	out, err := investigationJSON(b, limit)
 	if err != nil {
