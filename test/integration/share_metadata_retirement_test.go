@@ -155,7 +155,7 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := postgres.NewContextPublications(ctx, hub, s.a.RootID, s.retention.guard)
+	catalog, err := postgres.NewContextPublications(ctx, hub, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,6 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -82,8 +81,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		}
 		return pool
 	}
-	guards := s.retention.guard
-	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, base.input.InstallationID, guards, f.current, nil)
+	ledger, err := postgres.NewContextQueries(ctx, compiled("hub-runtime"), root, base.input.InstallationID, f.current, nil)
 	if err != nil {
 		t.Fatal("compiled query ledger", err)
 	}
@@ -102,7 +100,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal("compiled key-service backing", err)
 	}
-	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, base.input.InstallationID, guards, keyPlans, nil)
+	keyLedger, err := postgres.NewContextQueries(ctx, keyPool, root, base.input.InstallationID, keyPlans, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +114,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	// Match key-service startup's actual closed dispatcher. Calling the
 	// projection delegate alone misses classification of compact child IDs.
-	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, s.retention.guard)
+	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope)
 	if err != nil || keys.WithProjectionKeys(projectionKeys) != nil {
 		t.Fatal("compiled native key authority composition", err)
 	}
@@ -137,7 +135,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: queryPolicies, Processing: processing, Now: time.Now}, Now: time.Now}
+	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: queryPolicies, Processing: processing, Now: time.Now}, Now: time.Now}
 	expected := f.published.Expectation
 	scope := query.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceProjectionDigest: query.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: query.ContextDisplayVersion, Selection: query.LineSelection{LineStart: 1, MaxLines: 14}, Principal: s.a.Plan.Input.Executor}
 

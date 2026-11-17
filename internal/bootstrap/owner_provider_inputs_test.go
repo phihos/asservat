@@ -65,8 +65,7 @@ func TestInstalledOwnerPromotionInputs(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			c.Native = &contracts.OwnerNativeDeployment{Connections: 2, Concurrency: 1,
-				WorkerAPIs:          []contracts.OwnerNativeWorkerAPI{{ClusterID: c.ClusterID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}},
-				RetentionTopologies: []contracts.OwnerNativeTopology{{TargetClusterID: runtimeID, Name: "topology", UID: runtimeID, SHA256: strings.Repeat("1", 64)}}}
+				WorkerAPIs: []contracts.OwnerNativeWorkerAPI{{ClusterID: c.ClusterID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}}}
 			if mode != "backend" {
 				c.Public = &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: "https://asservat.example.test",
 					BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
@@ -88,7 +87,7 @@ func TestInstalledOwnerPromotionInputs(t *testing.T) {
 			case "public-changed-pki":
 				c.Public.WorkerPKI.Role = "other"
 			case "public-empty-lists":
-				c.Native.WorkerAPIs, c.Native.RetentionTopologies = []contracts.OwnerNativeWorkerAPI{}, []contracts.OwnerNativeTopology{}
+				c.Native.WorkerAPIs = []contracts.OwnerNativeWorkerAPI{}
 			case "public-no-projection":
 				c.Public.RuntimeProjection = contracts.WorkerObjectReference{}
 			case "public-other-projection":

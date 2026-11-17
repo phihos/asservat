@@ -258,7 +258,7 @@ func (s ContextInvestigation) nonStorageFactsCurrent(f contextFacts, now time.Ti
 // Closed private labels identify the existing first failed predicate without
 // copying provider/error text or changing any authority/deadline decision.
 func (s ContextInvestigation) nonStorageFactsFailure(f contextFacts, now time.Time) string {
-	t, p := f.target.Target(), f.retention.Proof
+	t := f.target.Target()
 	for _, check := range []struct {
 		failed bool
 		name   string
@@ -267,10 +267,7 @@ func (s ContextInvestigation) nonStorageFactsFailure(f contextFacts, now time.Ti
 		{!f.capability.Valid(now), "capability"},
 		{f.target.ExecutionClass != f.capability.ExecutionClass, "capability-class"},
 		{f.capability.ProjectionDigest != compiler.ProjectionDigest(), "capability-projection"},
-		{!p.Valid(now), "retention-proof"},
-		{!p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID), "retention-target"},
-		{p.Policy != f.retention.PolicyRevision, "retention-policy"},
-		{f.retention.ValidUntil.After(p.ValidUntil), "retention-bound"},
+		{f.retention.Target != t, "retention-target"},
 		{!now.Before(f.retention.ValidUntil), "retention"},
 		{!now.Before(f.eligibility.ValidUntil), "eligibility"},
 		{!f.eligibility.VerifiedIdentity.Valid(now), "identity"},
@@ -876,14 +873,7 @@ func (s ContextInvestigation) reportRequestFailure(err error) {
 
 // retentionFailure names a closed retention failure class for diagnostics.
 func retentionFailure(err error) string {
-	var read interface{ RetentionRead() string }
 	switch {
-	case errors.As(err, &read):
-		switch step := read.RetentionRead(); step {
-		case "topology", "source-hub", "source-region", "selector-limit", "selectors-absent", "selectors", "final-topology", "final-sources", "final-source", "fresh":
-			return "read/" + step
-		}
-		return "read"
 	case errors.Is(err, privacy.ErrInvalid):
 		return "invalid"
 	case errors.Is(err, privacy.ErrConflict):

@@ -140,12 +140,7 @@ type HubAPILocalCapacity struct {
 // HubAPINative: WorkerNamespaces are download-worker namespaces in the hub
 // cluster.
 type HubAPINative struct {
-	WorkerNamespaces    []string         `json:"workerNamespaces"`
-	RetentionTopologies []HubAPITopology `json:"retentionTopologies"`
-}
-type HubAPITopology struct {
-	TargetClusterID string `json:"targetClusterID"`
-	Name            string `json:"name"`
+	WorkerNamespaces []string `json:"workerNamespaces"`
 }
 
 // HubAPIPublic enables the browser/MCP/download layer. Its sources are the

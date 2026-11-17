@@ -98,8 +98,7 @@ func (f *packetMetadataFixture) ContextCapability(_ context.Context, _ auth.Targ
 func (f *packetMetadataFixture) Resolve(_ context.Context, in privacy.Input) (privacy.Resolution, error) {
 	now := time.Now()
 	r := identity.Revision{UID: metadataID(40), Generation: 1, Digest: artifact.Digest{6}}
-	set := privacy.PolicySet{Target: in.Target, Revision: r, Complete: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{7}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
-	set.Proof = artifact.RetentionProof{RootID: f.channel.RootID, ClusterID: in.Target.ClusterID, NamespaceUID: in.Target.NamespaceUID, WorkloadUID: in.Target.WorkloadUID, PodUID: in.Target.PodUID, Topology: r, Policy: r, Selectors: r, ObservedAt: now, ValidUntil: set.FreshUntil, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: in.Target.ClusterID, ControlNamespaceUID: "control", Epoch: f.channel.Hub.IssuerEpoch, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: r}}}
+	set := privacy.PolicySet{Target: in.Target, Revision: r, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{7}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
 	return privacy.Resolve(set, in, now)
 }
 func (f *packetMetadataFixture) ContextStorage(ctx context.Context, t auth.Target) (captureapp.ContextStorageObservation, error) {

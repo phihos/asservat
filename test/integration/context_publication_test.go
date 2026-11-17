@@ -119,7 +119,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			pool *pgxpool.Pool
 			dst  **postgres.ContextPublications
 		}{{verifierPool, &f.verify}, {auditPool, &f.audit}, {publishPool, &f.publish}, {readerPool, &f.reader}} {
-			*pair.dst, err = postgres.NewContextPublications(ctx, pair.pool, s.a.RootID, s.retention.guard)
+			*pair.dst, err = postgres.NewContextPublications(ctx, pair.pool, s.a.RootID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -177,12 +177,8 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			if err != nil {
 				return artifact.PublicationAuthority{}, publicationStepError("permission gate", err)
 			}
-			policies, err := nativeFixturePublicationPolicies(ctx, s)
-			if err != nil {
-				return artifact.PublicationAuthority{}, publicationStepError("retention gate", err)
-			}
 			now := time.Now().UTC()
-			return artifact.PublicationAuthority{Retention: policies.Proof, RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: projection.Revision.UID, PermissionSequence: projection.Revision.Generation, ProjectionDigest: artifact.Digest(projection.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{99}, CheckedAt: now, ValidUntil: minPublicationTime(policies.Proof.ValidUntil, projection.FreshUntil)}, nil
+			return artifact.PublicationAuthority{RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: projection.Revision.UID, PermissionSequence: projection.Revision.Generation, ProjectionDigest: artifact.Digest(projection.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{99}, CheckedAt: now, ValidUntil: minPublicationTime(now.Add(5*time.Second), projection.FreshUntil)}, nil
 		}}
 		f.publisher = evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: f.verify, ContextVerificationRecorder: f.verify, ContextVerificationAuditor: f.audit, ContextCatalogPublisher: f.publish}, Authority: f.gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
 		f.publisher.Ledger = publicationDiagnosticLedger{f.publisher.Ledger}
@@ -561,44 +557,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		check("Succeeded", "Published", false)
 	})
 
-	for _, phase := range []string{"verification", "publication"} {
-		t.Run("retention-source-fences-"+phase, func(t *testing.T) {
-			f := setup(t)
-			a, err := f.gate.CheckContextPublication(ctx, f.e)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if phase == "publication" {
-				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
-				if err != nil {
-					t.Fatal(err)
-				}
-				receipt, err := f.publisher.Audit.WriteContextVerification(ctx, record)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err = f.scenario.retention.sources.SuspendRetention(ctx, f.scenario.retention.fence); err != nil {
-				t.Fatal(err)
-			}
-			if phase == "verification" {
-				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
-			} else {
-				_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
-			}
-			if err == nil {
-				t.Fatal("stale retention authorized effect")
-			}
-			var count int
-			if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_catalog WHERE capture_id=$1", f.e.CaptureUID).Scan(&count); err != nil || count != 0 {
-				t.Fatal("unauthorized publication", count, err)
-			}
-		})
-	}
-
 	t.Run("verified-publication-concurrent-idempotent-and-readable", func(t *testing.T) {
 		f := setup(t)
 		var wg sync.WaitGroup
@@ -835,16 +793,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		return f.scenario, p
 	})
 	releaseBurstConnections()
-	qualifyRetentionLifecycle(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
-		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f.scenario, p
-	})
-	releaseBurstConnections()
-	qualifyRetentionSources(t, ctx, admin, poolFor, store, keys)
 	// Construction with a SELECT role cannot silently obtain mutation authority.
 	if _, err := postgres.NewContextPublications(ctx, readerPool, "invalid"); err == nil || errors.Is(err, context.Canceled) {
 		t.Fatal("invalid publication root")

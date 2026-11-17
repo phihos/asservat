@@ -23,7 +23,6 @@ func (r DownloadIntent) Equal(other DownloadIntent) bool {
 		for _, at := range []*time.Time{
 			&b.StartedAt, &b.LeaseUntil,
 			&a.CheckedAt, &a.ValidUntil, &a.AccessUntil, &a.DeleteBy,
-			&a.Retention.ObservedAt, &a.Retention.ValidUntil,
 			&a.Environment.ObservedAt, &a.Environment.ValidUntil,
 			&a.Environment.Processing.ObservedAt, &a.Environment.Processing.ValidUntil,
 		} {

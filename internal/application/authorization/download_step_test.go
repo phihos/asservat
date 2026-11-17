@@ -12,7 +12,7 @@ import (
 // Each refusing authority reader is named by a closed stage; the returned
 // class is unchanged and the dependency text is never part of the label.
 func TestContextDownloadAuthorityNamesTheRefusingReader(t *testing.T) {
-	for _, stage := range []string{"catalog", "retention", "environment"} {
+	for _, stage := range []string{"catalog", "environment"} {
 		f, s, scope := newDownloadAuthorityFixture()
 		f.fail = stage
 		_, err := s.CheckDownload(context.Background(), "synthetic-token", scope)

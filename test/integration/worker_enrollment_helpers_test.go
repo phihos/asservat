@@ -98,15 +98,15 @@ type workerEnrollmentFixture struct {
 	csr                       []byte
 }
 
-func newWorkerEnrollmentFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, root string, w value.DownloadWorker, g *postgres.RetentionTransactionGuard, store *objectstore.Store, keys authorityTestKeys, authority evidence.DownloadAuthorityGate) workerEnrollmentFixture {
+func newWorkerEnrollmentFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, root string, w value.DownloadWorker, store *objectstore.Store, keys authorityTestKeys, authority evidence.DownloadAuthorityGate) workerEnrollmentFixture {
 	t.Helper()
-	return newWorkerEnrollmentServices(t, ctx, poolFor, root, w.Binding.InstallationID, w.Intent.Profile, syntheticWorkerEnrollmentProof{w}, g, store, keys, authority)
+	return newWorkerEnrollmentServices(t, ctx, poolFor, root, w.Binding.InstallationID, w.Intent.Profile, syntheticWorkerEnrollmentProof{w}, store, keys, authority)
 }
 
 // Profile-scoped SQL/issuer services can exist before a worker is dispatched.
 // The supplied test-only Pod-proof reader still has to resolve the exact
 // subsequently bound worker; this helper allocates no session or worker identity.
-func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, root, installation string, profile value.DownloadWorkerProfile, proof evidence.WorkerEnrollmentProofReader, g *postgres.RetentionTransactionGuard, store *objectstore.Store, keys authorityTestKeys, authority evidence.DownloadAuthorityGate) workerEnrollmentFixture {
+func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, root, installation string, profile value.DownloadWorkerProfile, proof evidence.WorkerEnrollmentProofReader, store *objectstore.Store, keys authorityTestKeys, authority evidence.DownloadAuthorityGate) workerEnrollmentFixture {
 	t.Helper()
 	var bindings *postgres.DownloadWorkers
 	ledger := func(role, password string) *postgres.WorkerEnrollments {
@@ -114,7 +114,7 @@ func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func
 		t.Cleanup(pool.Close)
 		if role == "worker_enrollment_runtime" {
 			var err error
-			bindings, err = postgres.NewDownloadWorkers(ctx, pool, root, profile, g)
+			bindings, err = postgres.NewDownloadWorkers(ctx, pool, root, profile)
 			if err != nil {
 				t.Fatal(err)
 			}

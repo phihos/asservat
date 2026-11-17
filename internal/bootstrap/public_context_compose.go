@@ -21,7 +21,6 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
-	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -94,9 +93,9 @@ type publicContext struct {
 	// ADR-249 individual approvals (the AccessGrant ledger and its service).
 	grants     authapp.GrantService
 	caseRoutes *postgres.ContextCaseReads
-	// retentionSources is the hub metadata reader of retention sources and
-	// the retained catalog (ADR-240 retention impact preview).
-	retentionSources *postgres.RetentionSources
+	// retentionPolicies is the hub metadata reader of the stored policy set
+	// and its preview (ADR-240).
+	retentionPolicies *postgres.RetentionPolicies
 	// reviews are the ADR-245 decision-time reviews: the target cluster's
 	// connector reviews the request's principal before a permission read.
 	reviews authapp.AccessReviews
@@ -138,11 +137,9 @@ type publicAuditStore struct {
 	operation *installedOperationAudit
 }
 
-// publicShared are the owner native composition's retention topology and
-// effect guards; the public layer uses the identical instances.
+// publicShared are the owner native composition's instances the public
+// layer reuses.
 type publicShared struct {
-	topologies configapp.RetentionTopologyReader
-	retention  *postgres.RetentionTransactionGuard
 	nativeRead *pgxpool.Pool
 	// workers are the pinned worker-namespace clients of Native.WorkerAPIs;
 	// origins the native download-peer origins over them.
@@ -154,7 +151,7 @@ type publicShared struct {
 func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInputs, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, shared publicShared, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicContext, error) {
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
+	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
 		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
@@ -262,15 +259,12 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	sources, err := postgres.NewRetentionSources(ctx, sql["hub-metadata-read"], root)
-	if err != nil {
+	if out.retentionPolicies, err = postgres.NewRetentionPolicies(ctx, sql["hub-metadata-read"]); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.retentionSources = sources
-	// ADR-179: no selector reader; selector policies refuse new collection.
-	accepted := privacyapp.AcceptedRetentionReader{Topology: shared.topologies, Sources: sources, Now: time.Now}
-	out.retention = privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}
-	historySQL, err := postgres.NewHistoryParameters(ctx, sql["capture-history"], root, installation, shared.retention)
+	// Selector policies refuse new collection: no reader supplies labels.
+	out.retention = privacyapp.RetentionResolver{Policies: out.retentionPolicies, Now: time.Now}
+	historySQL, err := postgres.NewHistoryParameters(ctx, sql["capture-history"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -287,7 +281,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.retention); err != nil {
+	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.sourceDispatch = RegionalSourceDispatch{Router: router, Now: time.Now}
@@ -312,7 +306,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, installation, out.mac, shared.retention)
+	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, installation, out.mac)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -373,7 +367,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
-	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, installation, shared.retention)
+	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -419,7 +413,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters, out.investigation.Profiles, out.investigation.ProfileEndpoints), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
 		NewID:       ownerRandomID, Now: time.Now}
 	out.caseRoutes = routes
-	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews, Now: time.Now}
+	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Processing: processing, Shares: out.shares, Reviews: out.reviews, Now: time.Now}
 	// Freeze a fully initialized read service, never the earlier partial case value.
 	out.grants.RawSelections = out.cases
 	out.investigation.Grants = out.grants
@@ -450,8 +444,7 @@ type publicCatalog struct {
 }
 
 // readPublicClusterCatalog reads the guarded catalog once at process start,
-// before the native configuration: its entries carry the joined slots'
-// retention topology pins (ADR-196 decision 7).
+// before the native configuration.
 func readPublicClusterCatalog(ctx context.Context, c contracts.OwnerDeployment, observer, probe *kube.PermissionClient) (publicCatalog, error) {
 	var out publicCatalog
 	p := c.Public

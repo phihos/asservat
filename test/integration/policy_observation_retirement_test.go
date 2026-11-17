@@ -183,7 +183,7 @@ func qualifyPolicyObservationRetirement(t *testing.T, ctx context.Context, admin
 	// registration and observation lease dates are never rewritten for the test.
 	retentionPool := poolFor("retention_runtime", "synthetic-retention")
 	t.Cleanup(retentionPool.Close)
-	retention, err := postgres.NewRetention(ctx, retentionPool, s.a.RootID)
+	retention, err := newRetentionShortening(ctx, retentionPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

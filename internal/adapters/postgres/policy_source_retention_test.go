@@ -42,8 +42,7 @@ func sourceRetentionCheckFixture(t *testing.T, maximum, deletion int64) (capture
 	r := preview.Target
 	target := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID, ControllerUID: "replicaset"}, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	revision := identity.Revision{UID: preview.ID, Generation: 1, Digest: artifact.Digest{1}}
-	proof := artifact.RetentionProof{RootID: preview.RootID, ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadUID: a.WorkloadUID, PodUID: target.Pin.UID, Topology: revision, Policy: revision, Selectors: revision, ObservedAt: now, ValidUntil: now.Add(5 * time.Second), SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: a.ClusterID, ControlNamespaceUID: "control", Epoch: preview.ID, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: revision}}}
-	set := privacy.PolicySet{Target: target.Target(), Revision: revision, Complete: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Proof: proof, Policies: []privacy.Policy{{Revision: revision, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 10, MaximumSeconds: maximum, DeletionBudgetSeconds: deletion}}}
+	set := privacy.PolicySet{Target: target.Target(), Revision: revision, Policies: []privacy.Policy{{Revision: revision, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 10, MaximumSeconds: maximum, DeletionBudgetSeconds: deletion}}}
 	retention, err := privacy.Resolve(set, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: 60, AnchorAt: now}, now)
 	if err != nil {
 		t.Fatal("actual retention resolver", err)

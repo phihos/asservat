@@ -400,7 +400,7 @@ func (w ContextDownloadWorker) identityCheck(ctx context.Context, current identi
 		authorityCtx, stopAuthority := context.WithDeadline(bounded, until)
 		defer stopAuthority()
 		a, err := w.CurrentAuthority.CheckDownloadCurrent(authorityCtx, current, r.Scope)
-		if err != nil || authorityCtx.Err() != nil || !a.Valid(w.Now()) || !a.Environment.Valid(w.Now()) || !a.Retention.Valid(w.Now()) || a.Environment.StoreID != r.Expectation.Registration.StoreID || a.Environment.Location != r.Expectation.Registration.Location || a.Scope != r.Scope || a.AccessUntil.After(r.Expectation.Registration.ExpiresAt) || a.DeleteBy.IsZero() || a.DeleteBy.After(r.Expectation.Registration.DeleteBy) {
+		if err != nil || authorityCtx.Err() != nil || !a.Valid(w.Now()) || !a.Environment.Valid(w.Now()) || a.Environment.StoreID != r.Expectation.Registration.StoreID || a.Environment.Location != r.Expectation.Registration.Location || a.Scope != r.Scope || a.AccessUntil.After(r.Expectation.Registration.ExpiresAt) || a.DeleteBy.IsZero() || a.DeleteBy.After(r.Expectation.Registration.DeleteBy) {
 			return artifact.DownloadAuthority{}, collapsed("authority", artifact.ErrDownloadUnavailable, err)
 		}
 		latest, err = current.ResolveIdentity(authorityCtx)

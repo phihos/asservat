@@ -30,7 +30,7 @@ type permissionLoader struct{}
 func (permissionLoader) Load(string) (any, error) { return nil, value.ErrInvalid }
 
 type permissionValidator struct {
-	bindingSchema, clusterBindingSchema, sourceSchema, identitySchema, retentionSchema, retentionTopologySchema, browserSchema *jsonschema.Schema
+	bindingSchema, clusterBindingSchema, sourceSchema, identitySchema, retentionSchema, browserSchema *jsonschema.Schema
 	// clusters maps cluster names to IDs (ADR-335 D4): the hub's own
 	// cluster is LocalClusterName, joined clusters their values name.
 	clusters map[string]string
@@ -82,15 +82,11 @@ func newPermissionValidator() (*permissionValidator, error) {
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	t, err := c.Compile("https://asservat.io/spec/v1/retention-topology.schema.json")
-	if err != nil {
-		return nil, value.ErrUnavailable
-	}
 	browser, err := c.Compile("https://asservat.io/spec/v1/browser-settings.schema.json")
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &permissionValidator{bindingSchema: b, clusterBindingSchema: cb, sourceSchema: s, identitySchema: i, retentionSchema: r, retentionTopologySchema: t, browserSchema: browser}, nil
+	return &permissionValidator{bindingSchema: b, clusterBindingSchema: cb, sourceSchema: s, identitySchema: i, retentionSchema: r, browserSchema: browser}, nil
 }
 
 // Bound syntax before allocation/schema evaluation; reject duplicate keys,

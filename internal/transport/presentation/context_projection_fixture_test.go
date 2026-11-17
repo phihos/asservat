@@ -30,7 +30,7 @@ type bridgeFixture struct {
 	admissions, starts, polls, observations, batches, claims, reads, completions int
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
-	queryErr, claimErr, closeErr, permitErr, errorAfterRead           error
+	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
 	routeHook, planHook, claimHook                                               func(context.Context)
@@ -51,7 +51,6 @@ func (f *bridgeFixture) refresh(now time.Time) {
 	f.a.CheckedAt, f.a.ValidUntil = now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = now, until
-	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = now, until
 	f.p.ObservedAt, f.p.ValidUntil = now, until
 }
 func newBridgeFixture(t *testing.T) *bridgeFixture {
@@ -69,11 +68,8 @@ func newBridgeFixture(t *testing.T) *bridgeFixture {
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: bridgeID, InstallationID: bridgeID,
 		Region: "region", StoreID: bridgeID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
 		Processing: artifact.DownloadProcessingProof{RootID: bridgeID, Epoch: bridgeID, CaptureID: bridgeID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
-		Retention: artifact.RetentionProof{RootID: bridgeID, ClusterID: bridgeID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
-			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
+		PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
 		AccessUntil: f.now.Add(time.Minute), DeleteBy: f.now.Add(2 * time.Minute)}
-	f.a.Retention.Sources[0] = artifact.RetentionSourceVersion{ClusterID: bridgeID, ControlNamespaceUID: "control", Epoch: bridgeID, Hub: true,
-		ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}
 	f.i = identity.Identity{Principal: principal, Policy: rev, Scopes: []string{"evidence:read"}, Groups: []string{"team"}}
 	f.p = value.ContextQueryPlan{AcceptanceID: bridgeID, AccountID: bridgeID, AllocationID: bridgeID, RootID: bridgeID, InstallationID: bridgeID,
 		ClusterID: bridgeID, NamespaceUID: "namespace", WorkloadUID: "workload", AllocationRevision: 1, PoolSource: rev, PolicySource: rev, Principal: principal,

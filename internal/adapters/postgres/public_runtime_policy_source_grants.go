@@ -12,10 +12,10 @@ func publicRuntimePolicySourceGrants() []publicRuntimeGrant {
 		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
 		{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"},
 	}
-	for _, table := range []string{"context_storage_binding", "custody_pool", "custody_allocation", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision"} {
+	for _, table := range []string{"context_storage_binding", "custody_pool", "custody_allocation", "retention_policy", "retention_decision"} {
 		out = append(out, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}
-	for _, p := range []struct{ table, column string }{{"context_storage_binding", "source_uid"}, {"custody_pool", "id"}, {"custody_allocation", "id"}, {"retention_source", "root_id"}} {
+	for _, p := range []struct{ table, column string }{{"context_storage_binding", "source_uid"}, {"custody_pool", "id"}, {"custody_allocation", "id"}} {
 		out = append(out, publicRuntimeGrant{"table", p.table, p.column, "UPDATE"}) // row locking only
 	}
 	return out

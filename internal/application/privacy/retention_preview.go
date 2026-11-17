@@ -10,10 +10,11 @@ import (
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
-// RetentionPreviewCatalog reads the sources and the bounded retained catalog
-// that a retention impact preview evaluates (ADR-240).
+// RetentionPreviewCatalog reads the current policies and aggregates the
+// effect of proposed policies over stored deadlines (ADR-240).
 type RetentionPreviewCatalog interface {
-	RetentionPreviewCatalog(context.Context, int) (value.PreviewCatalog, error)
+	CurrentRetentionPolicies(context.Context) ([]value.ScopedPolicy, error)
+	PreviewRetentionEffects(context.Context, []value.PolicyEffect) ([]value.PreviewRow, error)
 }
 
 // RetentionSpecDecoder applies the observed EvidenceRetentionPolicy schema
@@ -44,7 +45,7 @@ type ProposedRetentionChange struct {
 // RetentionPreviewer answers preview_retention_change (ADR-240): how a
 // proposed EvidenceRetentionPolicy change would shorten the effective
 // deadlines of retained evidence, computed by the catch-up's own functions
-// over the current catalog. Callers are the installation administrators: retention policies are installation-wide administrator
+// over stored deadlines. Callers are the installation administrators: retention policies are installation-wide administrator
 // configuration and the browser has no mapping to their Kubernetes writers.
 // It returns counts and dates only, never evidence, and writes nothing.
 type RetentionPreviewer struct {
@@ -56,9 +57,8 @@ type RetentionPreviewer struct {
 }
 
 // Preview returns the preview and the reply's metadata deadline.
-// identity.ErrDenied marks a caller who is not an administrator,
-// value.ErrInvalid an invalid proposal and value.ErrPreviewLimit one beyond
-// the preview bounds.
+// identity.ErrDenied marks a caller who is not an administrator and
+// value.ErrInvalid an invalid proposal.
 func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity, proposed []ProposedRetentionChange) (value.RetentionPreview, time.Time, error) {
 	var zero value.RetentionPreview
 	if ctx == nil || current == nil || s.Administrators == nil || s.Catalog == nil || s.Decoder == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
@@ -80,8 +80,8 @@ func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	until := identity.Earlier(i.ValidUntil, admin.FreshUntil)
-	if len(proposed) < 1 || len(proposed) > value.MaxRetentionPreviewChanges {
-		return zero, time.Time{}, value.ErrPreviewLimit
+	if len(proposed) < 1 {
+		return zero, time.Time{}, value.ErrInvalid
 	}
 	changes := make([]value.RetentionChange, len(proposed))
 	for n, p := range proposed {
@@ -96,17 +96,21 @@ func (s RetentionPreviewer) Preview(ctx context.Context, current PreviewIdentity
 			return zero, time.Time{}, value.ErrInvalid
 		}
 	}
-	catalog, err := s.Catalog.RetentionPreviewCatalog(ctx, value.MaxRetentionPreviewArtifacts)
+	policies, err := s.Catalog.CurrentRetentionPolicies(ctx)
 	if err != nil {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
-	out, err := value.PreviewRetention(changes, catalog, s.Now().UTC())
-	if errors.Is(err, value.ErrInvalid) || errors.Is(err, value.ErrPreviewLimit) {
-		return zero, time.Time{}, err
-	}
+	effects, skipped, baseline, err := value.PlanPreview(changes, policies)
 	if err != nil {
-		return zero, time.Time{}, identity.ErrUnavailable
+		return zero, time.Time{}, value.ErrInvalid
 	}
+	var rows []value.PreviewRow
+	if len(effects) > 0 {
+		if rows, err = s.Catalog.PreviewRetentionEffects(ctx, effects); err != nil {
+			return zero, time.Time{}, identity.ErrUnavailable
+		}
+	}
+	out := value.SummarizePreview(rows, skipped, baseline, s.Now().UTC())
 	fresh, err := current.ResolveIdentity(ctx)
 	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) || !admin.Administrator(fresh) {
 		return zero, time.Time{}, identity.ErrDenied

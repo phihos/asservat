@@ -63,7 +63,7 @@ type HistoryWriteResult struct {
 	Completion HistoryWriterCompletion
 }
 type HistoryReadRequest struct {
-	Retention     privacy.RetainedResolution
+	Target        authorization.Target
 	Query         SettingsQuery
 	RequestID     string
 	ExecutorEpoch string

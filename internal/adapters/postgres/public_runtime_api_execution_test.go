@@ -96,12 +96,8 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "permission_review_source", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
-		{"table", "retention_catchup", "", "SELECT"},
-		{"table", "retention_catchup_effect", "", "SELECT"},
-		{"table", "retention_checkpoint", "", "SELECT"},
 		{"table", "retention_decision", "", "SELECT"},
-		{"table", "retention_source", "", "SELECT"},
-		{"table", "retention_source", "root_id", "UPDATE"},
+		{"table", "retention_policy", "", "SELECT"},
 		{"table", "workload_name", "", "SELECT"},
 	}
 	slices.SortFunc(want, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })

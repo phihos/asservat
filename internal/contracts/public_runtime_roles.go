@@ -76,12 +76,11 @@ func PublicRuntimeContextDeletionPurposes() []string {
 	return []string{"context-cleanup", "context-cleanup-audit", "context-cleanup-finalize"}
 }
 
-// PublicRuntimeRetentionPurposes are the hub-worker's retention source logins
-// (ADR-195): the reconciler, checkpoint audit acknowledgement, catch-up and
-// lifecycle decision audit. Like the permission logins, they never enter the
-// hub projection.
+// PublicRuntimeRetentionPurposes are the hub-worker's retention logins: the
+// policy follower (ADR-330 D12) and the lifecycle decision audit. Like the
+// permission logins, they never enter the hub projection.
 func PublicRuntimeRetentionPurposes() []string {
-	return []string{"retention-source", "retention-source-audit", "retention-catchup", "retention-lifecycle-audit"}
+	return []string{"retention-source", "retention-lifecycle-audit"}
 }
 
 // PublicRuntimePermissionPurposes are the hub-worker's permission stream
@@ -141,8 +140,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 27, true
 	case "publisher-identity-read":
 		return 65, true
-	case "publisher-retention-read":
-		return 66, true
 	case "capacity":
 		return 70, true
 	case "capacity-capture":
@@ -153,10 +150,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 73, true
 	case "retention-source":
 		return 78, true
-	case "retention-source-audit":
-		return 79, true
-	case "retention-catchup":
-		return 80, true
 	case "retention-lifecycle-audit":
 		return 81, true
 	// ADR-198: the installed key service's logins.

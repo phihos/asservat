@@ -99,7 +99,7 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	who = f.scenario.a.Eligibility.VerifiedIdentity // Original acquisition identity, not the read-only summary identity.
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	who.VerifiedAt, who.ValidUntil = n, n.Add(5*time.Second)
-	executionSQL, err := postgres.NewAPIContextExecutions(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.installation, f.scenario.retention.guard)
+	executionSQL, err := postgres.NewAPIContextExecutions(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

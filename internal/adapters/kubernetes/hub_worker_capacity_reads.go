@@ -45,6 +45,6 @@ func augmentInstalledWorkerPermissionReads(w *HubWorkerWorkload, installationID 
 		// ADR-242: namespace inheritance lists and watches the hub cluster's
 		// namespaces (metadata of the configured keys leaves the reader).
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get", "list", "watch"}},
-		rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{contracts.PermissionGuardName(installationID), contracts.RetentionGuardName(installationID)}, Verbs: []string{"get"}},
+		rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{contracts.PermissionGuardName(installationID)}, Verbs: []string{"get"}},
 	)
 }

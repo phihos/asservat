@@ -72,8 +72,7 @@ func (f *reserveFacts) ContextStorage(ctx context.Context, target authorization.
 func (f *reserveFacts) Resolve(_ context.Context, in privacy.Input) (privacy.Resolution, error) {
 	now := time.Now()
 	revision := identity.Revision{UID: reserveID(9), Generation: 1, Digest: [32]byte{7}}
-	set := privacy.PolicySet{Target: in.Target, Revision: revision, Complete: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
-	set.Proof = artifact.RetentionProof{RootID: reserveID(1), ClusterID: in.Target.ClusterID, NamespaceUID: in.Target.NamespaceUID, WorkloadUID: in.Target.WorkloadUID, PodUID: in.Target.PodUID, Topology: revision, Policy: revision, Selectors: revision, ObservedAt: now, ValidUntil: set.FreshUntil, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: in.Target.ClusterID, ControlNamespaceUID: "control", Epoch: reserveID(3), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: revision}}}
+	set := privacy.PolicySet{Target: in.Target, Revision: revision, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
 	return privacy.Resolve(set, in, now)
 }
 func (f *reserveFacts) ContextProcessingCoverage(ctx context.Context, in value.ProcessingCoverageRequest) (value.ProcessingCoverage, error) {

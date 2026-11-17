@@ -2,73 +2,55 @@ package privacy
 
 import (
 	"context"
-	"errors"
+	"crypto/sha256"
+	"encoding/json"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"slices"
 )
 
-// RetentionReader supplies the complete currently protected policy intersection
-// for this exact target, including the installation baseline and local ceilings.
-// Mutable names, caller-selected policies and incomplete lists cannot implement it.
-type RetentionReader interface {
-	RetentionPolicies(context.Context, authorization.Target) (value.PolicySet, error)
+// RetentionPolicies reads the current EvidenceRetentionPolicy set that the
+// hub worker stores from its watch (ADR-330 D12).
+type RetentionPolicies interface {
+	CurrentRetentionPolicies(context.Context) ([]value.ScopedPolicy, error)
 }
-type RetainedPolicyReader interface {
-	RetainedRetentionPolicies(context.Context, authorization.Target, []artifact.RetentionRule) (value.PolicySet, error)
-}
+
+// RetentionResolver resolves the deadlines a new artifact stores.
 type RetentionResolver struct {
-	Policies         RetentionReader
-	RetainedPolicies RetainedPolicyReader
-	Now              func() time.Time
+	Policies RetentionPolicies
+	Now      func() time.Time
 }
 
 func (r RetentionResolver) Resolve(ctx context.Context, in value.Input) (value.Resolution, error) {
-	if r.Policies == nil || r.Now == nil || ctx.Err() != nil {
-		return value.Resolution{}, value.ErrUnavailable
-	}
-	if !in.Target.Valid() {
-		return value.Resolution{}, value.ErrInvalid
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	set, err := r.Policies.RetentionPolicies(ctx, in.Target)
-	if err != nil || ctx.Err() != nil {
-		step := "other"
-		var s readStepError
-		if errors.As(err, &s) {
-			step = s.step
-		}
-		return value.Resolution{}, policyReadError{step}
-	}
-	return value.Resolve(set, in, r.Now())
+	return r.resolve(ctx, in, false)
 }
 
-// policyReadError is ErrUnavailable from the current policy read, as opposed
-// to the domain resolution; only diagnostics distinguish them.
-type policyReadError struct{ step string }
+// ResolveCaseMetadata uses the policies' case-metadata lifetimes.
+func (r RetentionResolver) ResolveCaseMetadata(ctx context.Context, in value.Input) (value.Resolution, error) {
+	in.ControlKind = "case-metadata"
+	return r.resolve(ctx, in, true)
+}
 
-func (policyReadError) Error() string           { return value.ErrUnavailable.Error() }
-func (policyReadError) Unwrap() error           { return value.ErrUnavailable }
-func (e policyReadError) RetentionRead() string { return e.step }
-
-// ResolveRetained consumes original ledger facts and current parent obligations.
-// Public callers cannot supply their own older/newer lifetime or classification.
-func (r RetentionResolver) ResolveRetained(ctx context.Context, in value.Input, previous value.Deadlines, origins []artifact.RetentionRule) (value.RetainedResolution, error) {
-	if r.RetainedPolicies == nil || r.Now == nil || ctx.Err() != nil {
-		return value.RetainedResolution{}, value.ErrUnavailable
+func (r RetentionResolver) resolve(ctx context.Context, in value.Input, caseMetadata bool) (value.Resolution, error) {
+	if r.Policies == nil || r.Now == nil || ctx == nil || ctx.Err() != nil {
+		return value.Resolution{}, value.ErrUnavailable
 	}
-	if !in.Target.Valid() || !value.ValidPolicyOrigins(origins) {
-		return value.RetainedResolution{}, value.ErrInvalid
+	policies, err := r.Policies.CurrentRetentionPolicies(ctx)
+	if err != nil {
+		return value.Resolution{}, value.ErrUnavailable
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	set, err := r.RetainedPolicies.RetainedRetentionPolicies(ctx, in.Target, slices.Clone(origins))
-	if err != nil || ctx.Err() != nil {
-		return value.RetainedResolution{}, value.ErrUnavailable
+	if caseMetadata {
+		for i, p := range policies {
+			policies[i].Policy = value.CaseMetadataPolicy(p)
+		}
 	}
-	return value.ResolveRetained(set, in, previous, r.Now())
+	set, err := value.MatchPolicies(policies, in.Target, func(p []value.Policy) identity.Revision {
+		b, _ := json.Marshal(p)
+		return identity.Revision{UID: in.Target.ClusterID, Generation: 1, Digest: sha256.Sum256(b)}
+	})
+	if err != nil {
+		return value.Resolution{}, err
+	}
+	return value.Resolve(set, in, r.Now())
 }

@@ -44,12 +44,6 @@ type ServiceObjectStore struct {
 	Bucket   string `json:"bucket"`
 }
 
-// ServiceTopology names a retention topology ConfigMap of one target cluster.
-type ServiceTopology struct {
-	TargetClusterID string `json:"targetClusterID"`
-	Name            string `json:"name"`
-}
-
 // FederationConfig, KeyServiceConfig and PublisherConfig carry only values
 // Helm knows. Name is installation.name: object names (`<name>-<component>`,
 // `<name>-owner-source`, `<name>-cluster-catalog`, ...) and the OpenBao role
@@ -112,26 +106,18 @@ type KeyServiceConfig struct {
 }
 
 // KeyServiceDownloadsConfig enables acquisition unwraps (ADR-204): the worker
-// configuration ConfigMap selects the profile SQL must currently audit, and
-// the topologies (plus the catalog's joined slots) bound retention.
-type KeyServiceDownloadsConfig struct {
-	RetentionTopologies []ServiceTopology `json:"retentionTopologies"`
-	// RemoteClusters are the registered mode=cluster clusters' names; each
-	// gets the in-process topology of the hub retention source.
-	RemoteClusters []string `json:"remoteClusters,omitempty"`
-}
+// configuration ConfigMap selects the profile SQL must currently audit.
+type KeyServiceDownloadsConfig struct{}
 
 type PublisherConfig struct {
-	Name                string             `json:"name"`
-	Namespace           string             `json:"namespace"`
-	PollSeconds         int                `json:"pollSeconds"`
-	Batch               int                `json:"batch"`
-	Postgres            ServicePostgres    `json:"postgres"`
-	AuditStore          ServiceObjectStore `json:"auditStore"`
-	Evidence            ServiceObjectStore `json:"evidence"`
-	OpenBao             string             `json:"openBao"`
-	RetentionTopologies []ServiceTopology  `json:"retentionTopologies"`
-	RemoteClusters      []string           `json:"remoteClusters,omitempty"`
+	Name        string             `json:"name"`
+	Namespace   string             `json:"namespace"`
+	PollSeconds int                `json:"pollSeconds"`
+	Batch       int                `json:"batch"`
+	Postgres    ServicePostgres    `json:"postgres"`
+	AuditStore  ServiceObjectStore `json:"auditStore"`
+	Evidence    ServiceObjectStore `json:"evidence"`
+	OpenBao     string             `json:"openBao"`
 }
 
 // decodeServiceConfig is a closed decode (no unknown fields, one value) that,

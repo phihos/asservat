@@ -249,7 +249,7 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: backing.ValidUntil}, mac); err != nil {
 		t.Fatal("original share-qualified capture cohort", err)
 	}
-	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
+	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac)
 	if err != nil {
 		t.Fatal(err)
 	}

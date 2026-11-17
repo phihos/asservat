@@ -15,7 +15,6 @@ func TestRetentionCurrentAuditRequiresImmutableVersions(t *testing.T) {
 		max       int64
 		valid     func(audit.Receipt) bool
 	}{
-		{"checkpoint", audit.RetentionAcceptanceKey(root, event), 512 << 10, func(r audit.Receipt) bool { return r.ValidRetentionAcceptance(root, event) }},
 		{"lifecycle", audit.LifecycleKey(root, event), 128 << 10, func(r audit.Receipt) bool { return r.ValidLifecycle(root, event) }},
 	} {
 		for _, tc := range []struct {

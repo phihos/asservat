@@ -260,13 +260,13 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 		signing = &permissionDeletionSigning{w: w}
 	}
 	if c.Retention {
-		// ADR-208: the retention source follower gets its own client with the
-		// opening limiter, so the hub source stays within its five seconds.
+		// ADR-208: the retention follower gets its own client with the
+		// opening limiter.
 		retentionObserver, e := w.kubeOpeningClient()
 		if e != nil {
 			return nil, &fixedStepError{"retention/clients", e}
 		}
-		if p.retention, err = newRetentionWorker(startup, root, cluster, w.namespace, pools, retentionObserver, w.audit, signing); err != nil {
+		if p.retention, err = newRetentionWorker(startup, root, pools, retentionObserver, w.audit, signing); err != nil {
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}
@@ -371,7 +371,7 @@ func (p *permissionWorker) publish(ctx context.Context) {
 		if lease, release, err := p.authority.wait(ctx); err == nil {
 			if lease.Schedule() == nil {
 				if p.retention != nil && turn%2 == 1 {
-					p.retention.publish(lease.Context(), turn%4 == 3)
+					p.retention.publish(lease.Context())
 				} else if outcome := regionalOutcome(p.publisher.PublishAuthority(lease.Context())); outcome != last && ctx.Err() == nil {
 					last = outcome
 					fmt.Fprintln(os.Stderr, "authority audit publish: "+outcome)

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"slices"
 	"strconv"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/keyservice"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 )
 
@@ -37,10 +35,6 @@ type KeyService struct {
 	handler *keyservice.Handler
 	tls     *tls.Config
 	port    int
-	// catalog is the cluster catalog as read at start, only with downloads;
-	// a changed digest restarts the process (ADR-204, as the publisher does
-	// under ADR-203 decision 6).
-	catalog publicCatalog
 	closers []func()
 }
 
@@ -88,11 +82,6 @@ func readKeyServiceInputs(ctx context.Context, files, ids *os.Root) (keyServiceI
 	if !validServiceScope(c.Name, c.Namespace) || !artifactScope(v.InstallationID).Valid() || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 64 || !pg || !ownerEndpoint(c.OpenBao) {
 		return keyServiceInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
-	if d := c.Downloads; d != nil {
-		if _, err = serviceTopologyPins(d.RetentionTopologies, nil); err != nil {
-			return keyServiceInputs{}, &fixedStepError{"config", err}
-		}
-	}
 	return keyServiceInputs{c, v}, nil
 }
 
@@ -100,53 +89,6 @@ func readKeyServiceInputs(ctx context.Context, files, ids *os.Root) (keyServiceI
 // Job writes into `<name>-artifact-key` (artifactKeyID).
 func artifactScope(installation string) authorization.KeyScope {
 	return authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: artifactKeyID(installation)}
-}
-
-// serviceTopologyPins unions the configured topologies with each joined
-// catalog slot's topology, as the hub-api does (ADR-196 decision 7). A
-// cluster or topology named twice is refused; both sets may be empty.
-func serviceTopologyPins(configured []contracts.ServiceTopology, catalog []contracts.OwnerPublicCluster) ([]kube.RetentionTopologyPin, error) {
-	pins := make([]kube.RetentionTopologyPin, 0, len(configured)+len(catalog))
-	for _, t := range configured {
-		pins = append(pins, kube.RetentionTopologyPin{TargetClusterID: t.TargetClusterID, Name: t.Name})
-	}
-	for _, v := range catalog {
-		if v.Topology.TargetClusterID != v.ClusterID {
-			return nil, mounts.ErrUnavailable
-		}
-		pins = append(pins, kube.RetentionTopologyPin{TargetClusterID: v.ClusterID, Name: v.Topology.Name})
-	}
-	if len(pins) > 1024 {
-		return nil, mounts.ErrUnavailable
-	}
-	clusters, names := map[string]bool{}, map[string]bool{}
-	for _, p := range pins {
-		if !authorization.UUID(p.TargetClusterID) || len(validation.IsDNS1123Subdomain(p.Name)) != 0 || clusters[p.TargetClusterID] || names[p.Name] {
-			return nil, mounts.ErrUnavailable
-		}
-		clusters[p.TargetClusterID], names[p.Name] = true, true
-	}
-	return pins, nil
-}
-
-// readServiceCatalog reads the cluster catalog once at process start; its
-// joined slots add topology pins and a changed digest restarts the process.
-func readServiceCatalog(ctx context.Context, observer *kube.PermissionClient, api *rest.Config, namespace, name string) (publicCatalog, error) {
-	var out publicCatalog
-	uid, err := kube.ConfigMapUID(ctx, api, namespace, name)
-	if err != nil {
-		return out, &fixedStepError{"catalog", mounts.ErrUnavailable}
-	}
-	if out.source, err = kube.NewNamedClusterCatalogSource(observer, name, uid); err != nil {
-		return out, mounts.ErrUnavailable
-	}
-	if out.catalog, err = out.source.ReadClusterCatalog(ctx); err != nil {
-		return out, &fixedStepError{"catalog", mounts.ErrUnavailable}
-	}
-	if out.digest, err = clusterCatalogDigest(out.catalog); err != nil {
-		return out, mounts.ErrUnavailable
-	}
-	return out, nil
 }
 
 // keyServiceAuthorities is the artifact scope's authority map: wraps,
@@ -162,77 +104,46 @@ func keyServiceAuthorities(wraps, verifier authapp.KeyOperationAuthorizer, acqui
 }
 
 // keyServiceAcquisition composes the native download key authority from the
-// key-acquisition login, the worker configuration's profile and the retention
-// transaction guard it needs. Topology pins come from the
-// configuration and the cluster catalog.
-func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Config, observer *kube.PermissionClient, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, publicCatalog, error) {
-	var none publicCatalog
-	d := c.Downloads
-	if d == nil || pool == nil {
-		return nil, none, mounts.ErrUnavailable
+// key-acquisition login and the worker configuration's profile.
+func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Config, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, error) {
+	if c.Downloads == nil || pool == nil {
+		return nil, mounts.ErrUnavailable
 	}
 	// The worker profile lives in the download-worker namespace, never the
 	// key service's (ADR-204 decision 1).
 	workers := c.Name + "-downloads"
 	workersUID, err := kube.NamespaceUID(ctx, api, workers)
 	if err != nil {
-		return nil, none, &fixedStepError{"key-service/worker-namespace", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"key-service/worker-namespace", mounts.ErrUnavailable}
 	}
 	workerClient, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: workers, UID: workersUID}, time.Now)
 	if err != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	profile, err := kube.ReadWorkerProfile(ctx, workerClient, c.Name+"-worker-profile", c.InstallationID, c.IssuerEpoch)
 	if err != nil || profile.Namespace == c.Namespace {
-		return nil, none, &fixedStepError{"key-service/worker-configuration", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"key-service/worker-configuration", mounts.ErrUnavailable}
 	}
-	catalog, err := readServiceCatalog(ctx, observer, api, c.Namespace, c.Name+"-cluster-catalog")
+	native, err := postgres.NewNativeKeyAuthority(ctx, pool, c.PermissionRootID, profile, scope)
 	if err != nil {
-		return nil, none, &fixedStepError{"key-service/catalog", err}
-	}
-	pins, err := serviceTopologyPins(d.RetentionTopologies, catalog.catalog.Clusters)
-	if err != nil {
-		return nil, none, &fixedStepError{"key-service/topology", err}
-	}
-	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
-	if err != nil {
-		return nil, none, mounts.ErrUnavailable
-	}
-	// Hub-cluster captures (mode=combined): the in-process hub topology.
-	if !slices.ContainsFunc(pins, func(p kube.RetentionTopologyPin) bool { return p.TargetClusterID == c.ClusterID }) {
-		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
-			return nil, none, &fixedStepError{"key-service/hub-topology", err}
-		}
-	}
-	for _, name := range d.RemoteClusters {
-		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, contracts.RemoteClusterID(c.InstallationID, name)); err != nil {
-			return nil, none, &fixedStepError{"key-service/remote-topology", err}
-		}
-	}
-	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
-	if err != nil {
-		return nil, none, mounts.ErrUnavailable
-	}
-	native, err := postgres.NewNativeKeyAuthority(ctx, pool, c.PermissionRootID, profile, scope, retention)
-	if err != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	plans, err := postgres.NewSharedContextQueryPlans(ctx, pool, c.PermissionRootID, c.InstallationID, profile)
 	if err != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
-	queries, err := postgres.NewContextQueries(ctx, pool, c.PermissionRootID, c.InstallationID, retention, plans, nil)
+	queries, err := postgres.NewContextQueries(ctx, pool, c.PermissionRootID, c.InstallationID, plans, nil)
 	if err != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	if _, err = postgres.AttachProjectionWorkers(queries, profile); err != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	projection, err := postgres.NewProjectionKeys(queries, scope)
 	if err != nil || native.WithProjectionKeys(projection) != nil {
-		return nil, none, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
-	return native, catalog, nil
+	return native, nil
 }
 
 func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err error) {
@@ -334,11 +245,7 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	// only with a Downloads section.
 	var acquisition *postgres.NativeKeyAuthority
 	if c.Downloads != nil {
-		observer, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
-		if err != nil {
-			return k, mounts.ErrUnavailable
-		}
-		if acquisition, k.catalog, err = keyServiceAcquisition(startup, c, api, observer, pools["key-acquisition"], scope); err != nil {
+		if acquisition, err = keyServiceAcquisition(startup, c, api, pools["key-acquisition"], scope); err != nil {
 			return k, err
 		}
 	}
@@ -414,44 +321,16 @@ func (k *KeyService) Serve(ctx context.Context, listener net.Listener) error {
 	server := &http.Server{Handler: mux, TLSConfig: k.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
-	// With downloads, a changed cluster catalog restarts the process, which
-	// reads the joined slots' topology pins only at start.
-	var changed <-chan time.Time
-	if k.catalog.source != nil {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		changed = ticker.C
-	}
-	var result error
-	for stopped := false; !stopped; {
-		select {
-		case err := <-done:
-			return errors.Join(mounts.ErrUnavailable, err)
-		case <-ctx.Done():
-			stopped = true
-		case <-changed:
-			// A failed read is not a change.
-			if k.clusterCatalogChanged(ctx) {
-				stopped, result = true, errClusterCatalogChanged
-			}
-		}
+	select {
+	case err := <-done:
+		return errors.Join(mounts.ErrUnavailable, err)
+	case <-ctx.Done():
 	}
 	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	_ = server.Shutdown(stop)
 	<-done
-	return result
-}
-
-func (k *KeyService) clusterCatalogChanged(ctx context.Context) bool {
-	call, end := context.WithTimeout(ctx, 10*time.Second)
-	defer end()
-	catalog, err := k.catalog.source.ReadClusterCatalog(call)
-	if err != nil {
-		return false
-	}
-	digest, err := clusterCatalogDigest(catalog)
-	return err == nil && digest != k.catalog.digest
+	return nil
 }
 
 func (k *KeyService) Close() {

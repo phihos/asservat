@@ -1,12 +1,13 @@
 package postgres
 
 import (
+	"context"
+	"errors"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	auth "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"context"
-	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,12 +24,12 @@ type NativeKeyAuthority struct {
 	projection  *ProjectionKeys
 }
 
-func NewNativeKeyAuthority(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, scope value.KeyScope, guards *RetentionTransactionGuard) (*NativeKeyAuthority, error) {
-	preparation, e := NewDownloadKeys(ctx, pool, root, scope, guards)
+func NewNativeKeyAuthority(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, scope value.KeyScope) (*NativeKeyAuthority, error) {
+	preparation, e := NewDownloadKeys(ctx, pool, root, scope)
 	if e != nil {
 		return nil, e
 	}
-	window, e := NewNativeKeys(ctx, pool, root, profile, scope, guards)
+	window, e := NewNativeKeys(ctx, pool, root, profile, scope)
 	if e != nil {
 		return nil, e
 	}

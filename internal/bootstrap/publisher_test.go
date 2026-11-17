@@ -12,7 +12,7 @@ func publisherTestConfig() contracts.PublisherConfig {
 	return contracts.PublisherConfig{Name: "asservat", Namespace: "asservat", PollSeconds: 2, Batch: 8,
 		Postgres:   contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
 		AuditStore: store, Evidence: contracts.ServiceObjectStore{Endpoint: store.Endpoint, Region: store.Region, Bucket: "evidence"},
-		OpenBao: "https://bao.example", RetentionTopologies: []contracts.ServiceTopology{}}
+		OpenBao: "https://bao.example"}
 }
 
 // ADR-181/203: the publisher's Helm inputs are closed and bounded; the key
@@ -30,9 +30,6 @@ func TestPublisherInputsAreClosedAndBound(t *testing.T) {
 		"http evidence":     func(c *contracts.PublisherConfig) { c.Evidence.Endpoint = "http://s3.example" },
 		"invalid namespace": func(c *contracts.PublisherConfig) { c.Namespace = "" },
 		"no name":           func(c *contracts.PublisherConfig) { c.Name = "" },
-		"bad topology cluster": func(c *contracts.PublisherConfig) {
-			c.RetentionTopologies = []contracts.ServiceTopology{{TargetClusterID: "x", Name: "t"}}
-		},
 	} {
 		c := publisherTestConfig()
 		mutate(&c)

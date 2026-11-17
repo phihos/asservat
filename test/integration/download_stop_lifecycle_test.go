@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -79,21 +78,20 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			defer verifyPool.Close()
 			finalPool := roles("download_stop_retire_runtime", "synthetic-stop-retire")
 			defer finalPool.Close()
-			guards := scenario.retention.guard
-			ledger, e := postgres.NewDownloads(ctx, runtimePool, root, guards)
+			ledger, e := postgres.NewDownloads(ctx, runtimePool, root)
 			if e != nil {
 				t.Fatal(e)
 			}
-			config, e := postgres.NewDownloads(ctx, configPool, root, guards)
+			config, e := postgres.NewDownloads(ctx, configPool, root)
 			if e != nil {
 				t.Fatal(e)
 			}
-			catalog, e := postgres.NewContextPublications(ctx, catalogPool, root, guards)
+			catalog, e := postgres.NewContextPublications(ctx, catalogPool, root)
 			if e != nil {
 				t.Fatal(e)
 			}
 			scope := artifact.DownloadScope{RootID: root, ArtifactID: expect.Registration.Location.ArtifactID, CaptureID: expect.CaptureUID, ClusterID: expect.Registration.Location.ClusterID, NamespaceUID: expect.NamespaceUID, WorkloadUID: expect.WorkloadUID, PodUID: expect.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), Principal: scenario.a.Plan.Input.Executor}
-			gate := authorizationapp.ContextDownloadAuthority{RootID: root, Permissions: scenario.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: scenario.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, scenario, expect.Registration), Now: time.Now}
+			gate := authorizationapp.ContextDownloadAuthority{RootID: root, Permissions: scenario.p, Catalog: catalog, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, scenario, expect.Registration), Now: time.Now}
 			current := func() artifact.DownloadAuthority {
 				t.Helper()
 				now := time.Now().UTC().Truncate(time.Microsecond)

@@ -60,7 +60,7 @@ func hubAPIConfigFixture() contracts.HubAPIConfig {
 		OpenBao:     contracts.HubAPIOpenBao{Endpoint: "https://asservat-openbao.hub.svc:8200"},
 		Connections: 4, Concurrency: 2,
 		Observation: contracts.HubAPIObservation{LocalCapacity: &contracts.HubAPILocalCapacity{Keys: []string{"asservat-trial"}}},
-		Native:      contracts.HubAPINative{WorkerNamespaces: []string{"asservat-downloads"}, RetentionTopologies: []contracts.HubAPITopology{}},
+		Native:      contracts.HubAPINative{WorkerNamespaces: []string{"asservat-downloads"}},
 		Public: &contracts.HubAPIPublic{Origin: "https://asservat.example.test", BrowserAudience: "asservat-api",
 			Standby: 2, Captures: 1, PreviewSeconds: 120, DownloadPlan: contracts.OwnerPublicDownloadPlan{OutputLimit: 1 << 28, ReadLimit: 1 << 28},
 			ProxyTLS: true, Version: "test", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4,

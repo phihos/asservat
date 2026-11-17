@@ -140,3 +140,12 @@ func ValidNativeDownloadMetadata(artifactID string, m NativeDownloadMetadata) bo
 	t, ok := NativeTypeForFormat(m.Format)
 	return ok && m.Filename == t.Filename(artifactID) && m.Size >= 1 && m.Size <= t.DownloadLimit() && m.SHA256 != (Digest{}) && identity.Text(m.Coverage, 1024) && !strings.ContainsAny(m.Coverage, "\r\n")
 }
+
+// NativeTypeNames lists every registered native type name.
+func NativeTypeNames() []string {
+	out := make([]string, len(nativeTypes))
+	for i, t := range nativeTypes {
+		out[i] = t.Name
+	}
+	return out
+}

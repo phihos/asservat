@@ -61,24 +61,13 @@ func OwnerPublicGuardedSources(installationID string) []string {
 	return append(out, OwnerWorkerConfigurationName(installationID), OwnerDownloadEnvironmentName(installationID))
 }
 
-// OwnerClusterTopologyNames are the fixed per-slot retention topology
-// ConfigMaps (ADR-196 decision 7). They are immutable and pinned by digest in
-// the catalog entry, so they need no guard or probe.
-func OwnerClusterTopologyNames(installationID string) []string {
-	out := make([]string, 0, OwnerClusterCatalogSlots)
-	for slot := 1; slot <= OwnerClusterCatalogSlots; slot++ {
-		out = append(out, OwnerClusterSourceName(installationID, slot, "topology"))
-	}
-	return out
-}
-
 func OwnerClusterCatalogName(installationID string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-cluster-catalog"
 }
 
 // OwnerClusterSourceName is a fixed per-slot source name, so the owner Role
-// can name it before any cluster enrolls. kind is "capability" or
-// "topology"; slot counts from 1.
+// can name it before any cluster enrolls. kind is "capability";
+// slot counts from 1.
 func OwnerClusterSourceName(installationID string, slot int, kind string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-cluster-" + strconv.Itoa(slot) + "-" + kind
 }

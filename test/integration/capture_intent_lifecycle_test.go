@@ -99,7 +99,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 			if e = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: pool, Account: a, ValidUntil: n.Add(time.Hour)}, mac); e != nil {
 				t.Fatal("configure private backing", e)
 			}
-			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac, s.retention.guard)
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, s.recovery.installation, mac)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -287,7 +287,7 @@ func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgx
 				t.Fatal(e)
 			}
 			defer wrong.Close()
-			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.s.a.RootID, s.s.recovery.installation, wrong, s.s.retention.guard)
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.s.a.RootID, s.s.recovery.installation, wrong)
 			if e != nil {
 				t.Fatal(e)
 			}

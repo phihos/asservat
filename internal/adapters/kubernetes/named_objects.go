@@ -39,16 +39,6 @@ func ConfigMapUID(ctx context.Context, config *rest.Config, namespace, name stri
 	return ObjectUID(ctx, config, "/api/v1/namespaces/"+namespace+"/configmaps/"+name)
 }
 
-// NewNamedClusterCatalogSource reads the cluster catalog ConfigMap under
-// ordinary RBAC; uid is the object's UID as read by name at startup, so a
-// replaced catalog reads as changed.
-func NewNamedClusterCatalogSource(client *PermissionClient, name, uid string) (*ClusterCatalogSource, error) {
-	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(uid) {
-		return nil, artifact.ErrInvalid
-	}
-	return &ClusterCatalogSource{client: client, name: name, uid: uid}, nil
-}
-
 // ReadWorkerProfile reads the worker profile ConfigMap name of the client's
 // namespace with the worker configuration source's own parse; installation
 // and epoch are the IDs Secret's. The profile only selects; consumers still

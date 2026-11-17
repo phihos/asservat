@@ -29,11 +29,11 @@ type DownloadKeys struct {
 var _ evidence.DownloadKeyBindingLedger = (*DownloadKeys)(nil)
 var _ authapp.KeyOperationAuthorizer = (*DownloadKeys)(nil)
 
-func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope authorization.KeyScope, retention *RetentionTransactionGuard) (*DownloadKeys, error) {
-	if !scope.Valid() || scope.Purpose != "artifact" || retention == nil {
+func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope authorization.KeyScope) (*DownloadKeys, error) {
+	if !scope.Valid() || scope.Purpose != "artifact" {
 		return nil, artifact.ErrInvalid
 	}
-	d, err := NewDownloads(ctx, pool, root, retention)
+	d, err := NewDownloads(ctx, pool, root)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +48,8 @@ func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact
 	if a.Started() {
 		return artifact.ErrDownloadExpired
 	}
-	if s == nil || s.retention == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
+	if s == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
-	}
-	topology, err := s.downloadTopology(ctx, a)
-	if err != nil {
-		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		p, err := q.LockPermissionStream(ctx, id(s.root))
@@ -69,7 +65,7 @@ func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact
 			return err
 		}
 		check := func() (time.Time, error) {
-			if err := s.downloadFence(ctx, q, p, a, topology); err != nil {
+			if err := s.downloadFence(ctx, q, p, a); err != nil {
 				return time.Time{}, err
 			}
 			now, err := q.CurrentTime(ctx)

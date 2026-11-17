@@ -123,13 +123,13 @@ func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f native
 	nativeSQLRoles(t, ctx, f.admin)
 	pool := f.poolFor("native_metadata_runtime", "synthetic-native-metadata")
 	defer pool.Close()
-	readers, err := postgres.NewNativeReaders(ctx, pool, w.Intent.Authority.Scope.RootID, w.Binding.InstallationID, f.guards)
+	readers, err := postgres.NewNativeReaders(ctx, pool, w.Intent.Authority.Scope.RootID, w.Binding.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ownerPool := f.poolFor("worker_owner_runtime", "synthetic-worker-owner")
 	defer ownerPool.Close()
-	owners, err := postgres.NewWorkerOwners(ctx, ownerPool, w.Intent.Authority.Scope.RootID, w.Intent.Profile, f.guards)
+	owners, err := postgres.NewWorkerOwners(ctx, ownerPool, w.Intent.Authority.Scope.RootID, w.Intent.Profile)
 	if err != nil {
 		t.Fatal(err)
 	}

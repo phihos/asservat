@@ -21,7 +21,6 @@ import (
 	executionapp "asservat.local/asservat/internal/application/execution"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
@@ -382,7 +381,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	}
 	p := func(user, password string) *pgxpool.Pool { return poolFor(user, password) }
 	x := func(user, password string) *postgres.APIContextExecutions {
-		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, s.recovery.installation, s.retention.guard)
+		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, s.recovery.installation)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -560,14 +559,14 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	}
 	refreshPermissions()
 	publication := func(user, password string) *postgres.ContextPublications {
-		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID, s.retention.guard)
+		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID)
 		if e != nil {
 			t.Fatal(e)
 		}
 		return r
 	}
 	verify, audit, publish := publication("context_verify_runtime", "synthetic-context-verify"), publication("context_verification_audit_runtime", "synthetic-context-audit"), publication("context_publish_runtime", "synthetic-context-publish")
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, s.retention.guard, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

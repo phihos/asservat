@@ -138,8 +138,7 @@ func historicalWorkerFixture(t *testing.T) (value.DownloadWorker, *batch.Job, co
 	path := artifact.DownloadPath{ID: id, TargetClusterID: id, StoreID: id, StorageRegion: "local", AcquisitionClusterID: id, AcquisitionRegion: "local", ConnectorClusterID: id, ConnectorRegion: "local", HubClusterID: id, HubRegion: "local", WorkerConfiguration: revision, HubConfiguration: revision}
 	processing := artifact.DownloadProcessingProof{RootID: id, Epoch: id, CaptureID: id, Location: location, Sequence: 1, StateDigest: artifact.Digest{4}, ObservedAt: admittedAt, ValidUntil: until}
 	environment := artifact.DownloadEnvironment{RootID: id, InstallationID: id, Region: "local", StoreID: id, RecoveryEpoch: id, Location: location, Principal: principal, Revision: revision, Path: path, Processing: processing, ObservedAt: admittedAt, ValidUntil: until}
-	retention := artifact.RetentionProof{RootID: id, ClusterID: id, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID, Topology: revision, Policy: revision, Selectors: revision, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: id, ControlNamespaceUID: "control-uid", Epoch: id, Hub: true, ProtectionDigest: artifact.Digest{5}, SnapshotDigest: artifact.Digest{6}, Acceptance: revision}}, ObservedAt: admittedAt, ValidUntil: until}
-	authority := artifact.DownloadAuthority{Environment: environment, Retention: retention, Scope: scope, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{7}, DecisionDigest: artifact.Digest{8}, IdentityRevision: revision, CheckedAt: admittedAt, ValidUntil: until, AccessUntil: admittedAt.Add(time.Minute), DeleteBy: admittedAt.Add(2 * time.Minute)}
+	authority := artifact.DownloadAuthority{Environment: environment, Scope: scope, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{7}, DecisionDigest: artifact.Digest{8}, IdentityRevision: revision, CheckedAt: admittedAt, ValidUntil: until, AccessUntil: admittedAt.Add(time.Minute), DeleteBy: admittedAt.Add(2 * time.Minute)}
 	i := value.DownloadWorkerIntent{ID: id, SessionID: id, Generation: 1, Profile: p, Authority: authority, CreatedAt: admittedAt, RunUntil: admittedAt.Add(time.Minute)}
 	job := workerJob(i)
 	job.UID = "historical-job"
@@ -161,7 +160,7 @@ func historicalWorkerFixture(t *testing.T) (value.DownloadWorker, *batch.Job, co
 		t.Fatal(err)
 	}
 	w := value.DownloadWorker{Intent: i, Job: value.DownloadWorkerJob{IntentID: id, UID: string(job.UID), Spec: jd}, Binding: value.KeyWorkerBinding{InstallationID: p.InstallationID, DownloadID: i.SessionID, ClusterID: p.ClusterID, Namespace: p.Namespace, NamespaceUID: p.NamespaceUID, ServiceAccount: p.ServiceAccount, ServiceAccountUID: p.ServiceAccountUID, Job: job.Name, JobUID: string(job.UID), JobSpec: jd, Pod: pod.Name, PodUID: id, PodSpec: pd}}
-	if !w.Valid() || !w.Acquisition().Valid() || !environment.CurrentValid(admittedAt) || !retention.Valid(admittedAt) {
+	if !w.Valid() || !w.Acquisition().Valid() || !environment.CurrentValid(admittedAt) {
 		t.Fatal("invalid original admitted worker fixture")
 	}
 	if authority.Valid(time.Now()) || time.Now().Before(i.RunUntil) {

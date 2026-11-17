@@ -58,14 +58,13 @@ func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		return ownerIdentityGrantSet(out), true
 	case "native-read":
-		for _, table := range []string{"goose_db_version", "fleet_trust", "fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "context_verification", "custody_attempt", "artifact_download", "download_batch", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision", "download_worker", "download_worker_configuration", "download_worker_configuration_revision", "download_worker_enrollment", "download_worker_certificate", "download_key_binding", "download_response", "download_window", "download_control_allocation", "download_native_owner", "download_native_key", "download_native_backing", "processing_root", "context_processing", "processing_rule"} {
+		for _, table := range []string{"goose_db_version", "fleet_trust", "fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "context_verification", "custody_attempt", "artifact_download", "download_batch", "retention_policy", "retention_decision", "download_worker", "download_worker_configuration", "download_worker_configuration_revision", "download_worker_enrollment", "download_worker_certificate", "download_key_binding", "download_response", "download_window", "download_control_allocation", "download_native_owner", "download_native_key", "download_native_backing", "processing_root", "context_processing", "processing_rule"} {
 			add(table, "SELECT")
 		}
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		for _, table := range []string{"permission_stream", "artifact_download", "download_worker", "download_response", "download_window"} {
 			add(table, "UPDATE", "id")
 		}
-		add("retention_source", "UPDATE", "root_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		add("download_native_owner", "UPDATE", "worker_id")
 		return ownerIdentityGrantSet(out), true

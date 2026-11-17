@@ -255,11 +255,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// retention and storage-binding observations as the hub's readers would.
 		in.Target.ObservedAt, in.Target.FreshUntil = now, now.Add(5*time.Second)
 		in.Capability.ObservedAt, in.Capability.FreshUntil = now, now.Add(30*time.Second)
-		policies, err := s.retention.policies(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		in.Retention.Proof, in.Retention.ValidUntil = policies.Proof, policies.FreshUntil
 		a.Storage.ObservedAt, a.Storage.FreshUntil = now, now.Add(30*time.Second)
 		if _, err = admin.Exec(ctx, "UPDATE context_storage_binding SET observed_at=$2,fresh_until=$3 WHERE root_id=$1", root, a.Storage.ObservedAt, a.Storage.FreshUntil); err != nil {
 			t.Fatal(err)
@@ -376,7 +371,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// a process restart cannot invent a replacement admission identity.
 		pool := poolFor(qualifiedCapture.admissionRole, "synthetic-share-capture-admit")
 		t.Cleanup(pool.Close)
-		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, installation, qualifiedCapture.mac, s.retention.guard)
+		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, installation, qualifiedCapture.mac)
 		if err != nil {
 			t.Fatal(err)
 		}

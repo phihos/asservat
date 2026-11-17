@@ -47,7 +47,7 @@ func compiledAssessmentResult(t *testing.T, i identity.Identity, class artifact.
 		target.Pin.NodeName, target.NodeUID, target.NodeBootID = "worker", "node-uid", "00000000-0000-4000-8000-000000000006"
 	}
 	policies := privacy.PolicySet{
-		Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: [32]byte{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Complete: true,
+		Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: [32]byte{7}},
 		Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{4}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}},
 	}
 	retention, err := privacy.Resolve(policies, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 60, AnchorAt: now}, now)

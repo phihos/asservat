@@ -153,7 +153,7 @@ func (s ContextDownloadCoordinator) authority(ctx context.Context, current ident
 // An already checked authority belongs only to this request. Consuming it again
 // checks its original bounds locally; it does not reconstruct or renew it.
 func (s ContextDownloadCoordinator) consumeAuthority(ctx context.Context, a artifact.DownloadAuthority, scope artifact.DownloadScope, until *time.Time) (artifact.DownloadAuthority, error) {
-	if ctx.Err() != nil || !a.Valid(s.Now()) || a.Scope != scope || !a.Environment.Valid(s.Now()) || a.Environment.InstallationID != s.InstallationID || !a.Retention.Valid(s.Now()) || a.DeleteBy.IsZero() {
+	if ctx.Err() != nil || !a.Valid(s.Now()) || a.Scope != scope || !a.Environment.Valid(s.Now()) || a.Environment.InstallationID != s.InstallationID || a.DeleteBy.IsZero() {
 		return artifact.DownloadAuthority{}, collapsed("authority-bounds", artifact.ErrDownloadUnavailable, ctx.Err())
 	}
 	*until = identity.Earlier(*until, a.ValidUntil)

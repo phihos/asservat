@@ -168,9 +168,6 @@ type OwnerPublicCluster struct {
 	Captures   int                       `json:"captures"`
 	Capability OwnerPublicGuardedSource  `json:"capability"`
 	Settings   ContextCapabilitySettings `json:"capabilitySettings"`
-	// Topology pins the slot's immutable retention topology (ADR-196
-	// decision 7); the hub-api unions it with its input's pins at start.
-	Topology OwnerNativeTopology `json:"topology"`
 	// Capacity selects ADR-197 v2 capacity observation for this cluster:
 	// the connector Deployment's template and workload guard digests, and the
 	// region's selector guard digest and keys, which the hub-api records as
@@ -211,23 +208,16 @@ const (
 type OwnerNativeDeployment struct {
 	// ConnectorTokens verifies the connectors' context-start tokens
 	// (ADR-334); ConnectorPeerID is the combined-mode connector's peer.
-	ConnectorTokens     ConnectorTokens        `json:"connectorTokens"`
-	ConnectorPeerID     string                 `json:"connectorPeerID"`
-	WorkerAPIs          []OwnerNativeWorkerAPI `json:"workerAPIs"`
-	RetentionTopologies []OwnerNativeTopology  `json:"retentionTopologies"`
-	Connections         int                    `json:"connections"`
-	Concurrency         int                    `json:"concurrency"`
+	ConnectorTokens ConnectorTokens        `json:"connectorTokens"`
+	ConnectorPeerID string                 `json:"connectorPeerID"`
+	WorkerAPIs      []OwnerNativeWorkerAPI `json:"workerAPIs"`
+	Connections     int                    `json:"connections"`
+	Concurrency     int                    `json:"concurrency"`
 }
 type OwnerNativeWorkerAPI struct {
 	ClusterID  string                `json:"clusterID"`
 	Namespace  WorkerObjectReference `json:"namespace"`
 	Kubernetes OwnerProviderEndpoint `json:"kubernetes"`
-}
-type OwnerNativeTopology struct {
-	TargetClusterID string `json:"targetClusterID"`
-	Name            string `json:"name"`
-	UID             string `json:"uid"`
-	SHA256          string `json:"sha256"`
 }
 
 // OwnerGuardInputs are the owner pool's exact source pins and installed

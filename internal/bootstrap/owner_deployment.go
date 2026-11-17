@@ -60,8 +60,8 @@ type OwnerDeployment struct {
 	once              sync.Once
 	catalogDigest     [32]byte
 	// public holds the ADR-180 public purpose pools, identity and context
-	// services; all nil without Public. shared is the native composition's
-	// retention topology and effect guards, reused by the public layer.
+	// services; all nil without Public. shared holds native composition
+	// instances reused by the public layer.
 	public          *publicPools
 	publicID        *publicIdentity
 	publicContext   *publicContext
@@ -74,7 +74,7 @@ type OwnerDeployment struct {
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	shared      publicShared
+	shared           publicShared
 	// localControls are the control documents this process wrote (the
 	// hub-local download workers'); the trust catalog holds them beside the
 	// mounted worker-controls.json.
@@ -268,8 +268,6 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	if (c.Native == nil) != (pool.NativePort == 0) {
 		return nil, mounts.ErrUnavailable
 	}
-	// ADR-196 decision 7: the catalog is read before the native configuration,
-	// which unions the joined slots' topology pins with the input's.
 	var catalog publicCatalog
 	if c.Public != nil {
 		phase = startupClusterCatalog
@@ -279,7 +277,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	}
 	if c.Native != nil {
 		phase = startupNativeConfiguration
-		nativeConfig, err = d.nativeConfiguration(startup, pools["native-read"], observer, catalog.catalog.Clusters)
+		nativeConfig, err = d.nativeConfiguration(startup, pools["native-read"])
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}

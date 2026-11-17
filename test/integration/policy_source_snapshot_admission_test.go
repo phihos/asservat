@@ -38,7 +38,7 @@ func admitPolicySourceSnapshotFixture(t *testing.T, ctx context.Context, hub *pg
 	t.Helper()
 	var out policySourceSnapshotAdmissionFixture
 	s := accepted.Scenario
-	ledger, err := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Authority.InstallationID, s.retention.guard)
+	ledger, err := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Authority.InstallationID)
 	if err != nil {
 		t.Fatal("snapshot source reader", err)
 	}

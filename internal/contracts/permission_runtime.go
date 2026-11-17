@@ -37,11 +37,8 @@ type PermissionDeployment struct {
 	// Review is the administrator-created initial review ConfigMap, needed
 	// only when bindings exist at the first acceptance.
 	Review *WorkerObjectReference `json:"review,omitempty"`
-	// Retention is the hub retention source (ADR-195). It rides in this
-	// projection: the same root, process and mount as the permission stream.
-	Retention *RetentionDeployment `json:"retention,omitempty"`
 	// WorkerConfiguration is the download worker configuration acceptance
-	// (ADR-204 decision 7). Like retention, it rides in this projection; its
+	// (ADR-204 decision 7). It rides in this projection; its
 	// two logins follow the retention logins. Without it no worker
 	// configuration child runs.
 	WorkerConfiguration *WorkerConfigurationDeployment `json:"workerConfiguration,omitempty"`
@@ -113,19 +110,6 @@ type WorkerConfigurationDeployment struct {
 	Source       WorkerObjectReference `json:"source"`
 	Guard        OwnerDeploymentGuard  `json:"guard"`
 	AuditTransit OwnerPublicTransit    `json:"auditTransit"`
-}
-
-// RetentionDeployment pins the installer-applied retention guard. Its plan
-// is derived: the permission guard's administrators, the one reserved status
-// user and no delegations.
-type RetentionDeployment struct {
-	Guard OwnerDeploymentGuard `json:"guard"`
-}
-
-// RetentionGuardName is the installer-applied retention admission policy and
-// binding (ADR-195).
-func RetentionGuardName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-retention-guard"
 }
 
 type PermissionControlDeployment struct {

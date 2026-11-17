@@ -225,7 +225,7 @@ func qualifyContextNativeInterrupted(t *testing.T, ctx context.Context, f native
 	// Independent SQL facet, no process cache: deny before reserving a response.
 	p := f.poolFor("download_runtime", "synthetic-download")
 	defer p.Close()
-	ledger, e := postgres.NewDownloads(ctx, p, f.allocation.RootID, f.guards)
+	ledger, e := postgres.NewDownloads(ctx, p, f.allocation.RootID)
 	if e != nil {
 		t.Fatal("independent interrupted-session ledger", e)
 	}

@@ -23,13 +23,11 @@ type projectionFixture struct {
 	identity    identity.Identity
 	permission  value.Projection
 	record      ContextProjectionEvidence
-	retention   privacy.RetainedResolution
 	environment analysis.ContextProjectionEnvironment
 	calls       []string
 	counts      map[string]int
 	on          func(context.Context, string, int)
 	fail        string
-	origins     [][]artifact.RetentionRule
 	evidence    []ContextProjectionEvidence
 	artifacts   []string
 	actors      []identity.Principal
@@ -62,14 +60,6 @@ func (f *projectionFixture) ContextProjectionEvidence(ctx context.Context, id st
 	e := f.step(ctx, "catalog")
 	return f.record, e
 }
-func (f *projectionFixture) ResolveRetained(ctx context.Context, input privacy.Input, previous privacy.Deadlines, origins []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	f.origins = append(f.origins, slices.Clone(origins))
-	e := f.step(ctx, "retention")
-	if !reflect.DeepEqual(input, f.record.Retained.Input) || previous != f.record.Retained.Effective {
-		return privacy.RetainedResolution{}, errors.New("changed original retention inputs")
-	}
-	return f.retention, e
-}
 func (f *projectionFixture) ProjectionEnvironment(ctx context.Context, record ContextProjectionEvidence, actor identity.Principal) (analysis.ContextProjectionEnvironment, error) {
 	f.evidence = append(f.evidence, cloneProjectionEvidence(record))
 	f.actors = append(f.actors, actor)
@@ -91,32 +81,25 @@ func newProjectionFixture() (*projectionFixture, ContextProjectionAuthority, ana
 	audience := artifact.AudienceAssignment{Kind: "Group", Issuer: actor.Issuer, SubjectID: "team", Role: "evidence-reader", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{10}, AssignmentID: projectionTestID(11)}
 	refs := []artifact.RetentionRule{{UID: "baseline", Generation: 1, Digest: artifact.Digest{12}}, {UID: "previously-applied", Generation: 2, Digest: artifact.Digest{13}}}
 	deadlines := privacy.Deadlines{AnchorAt: reg.AnchorAt, ExpiresAt: reg.ExpiresAt, DeleteBy: reg.DeleteBy}
-	proof := artifact.RetentionProof{RootID: scope.RootID, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, PodUID: target.PodUID, Topology: rev(14), Policy: rev(15), Selectors: rev(16), SourceCount: 1, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), Sources: [2]artifact.RetentionSourceVersion{{ClusterID: target.ClusterID, ControlNamespaceUID: "control", Epoch: projectionTestID(17), Hub: true, ProtectionDigest: artifact.Digest{18}, SnapshotDigest: artifact.Digest{19}, Acceptance: rev(20)}}}
 	f := &projectionFixture{now: n, counts: map[string]int{},
 		identity:   identity.Identity{Principal: actor, Policy: rev(21), Groups: []string{"team"}, Scopes: []string{"evidence:read"}, VerifiedAt: n, ValidUntil: n.Add(30 * time.Second)},
 		permission: value.Projection{Target: target, Revision: rev(22), ObservedAt: n, FreshUntil: n.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: n, DeniesFreshUntil: n.Add(5 * time.Second), Allows: []value.CurrentAssignment{{Audience: audience, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}},
 		record:     ContextProjectionEvidence{CaseID: scope.CaseID, CaptureID: scope.CaptureID, PurposeRef: "diagnostics", Version: scope.Version, SourceFormat: scope.SourceFormat, SourceProjectionDigest: scope.SourceProjectionDigest, DataClass: "metadata", Audience: []artifact.AudienceAssignment{audience}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), Retained: privacy.RetainedArtifact{RootID: scope.RootID, Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: refs, Effective: deadlines}},
-		retention:  privacy.RetainedResolution{Target: target, PolicyRevision: proof.Policy, PurposeRef: "diagnostics", Policies: slices.Clone(refs), Deadlines: deadlines, ValidUntil: n.Add(5 * time.Second), Proof: proof},
 		environment: analysis.ContextProjectionEnvironment{RootID: scope.RootID, InstallationID: scope.RootID, Region: "region", StoreID: reg.StoreID, Location: reg.Location, Principal: actor, PolicyRevision: rev(23), ObservedAt: n, ValidUntil: n.Add(5 * time.Second),
 			Processing: artifact.DownloadProcessingProof{RootID: scope.RootID, Epoch: projectionTestID(26), CaptureID: scope.CaptureID, Location: reg.Location, Sequence: 1, StateDigest: artifact.Digest{27}, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)},
 			Path:       analysis.ContextProjectionPath{Purpose: analysis.ContextProjectionPurpose, ID: projectionTestID(28), TargetClusterID: target.ClusterID, StoreID: reg.StoreID, StorageRegion: "region", AcquisitionClusterID: projectionTestID(29), AcquisitionRegion: "region", ConnectorClusterID: projectionTestID(29), ConnectorRegion: "region", HubClusterID: projectionTestID(30), HubRegion: "region", WorkerConfiguration: rev(31), HubConfiguration: rev(32)}},
 	}
-	return f, ContextProjectionAuthority{RootID: scope.RootID, Permissions: f, Catalog: f, Retention: f, Environment: f, Now: func() time.Time { return f.now }}, scope
+	return f, ContextProjectionAuthority{RootID: scope.RootID, Permissions: f, Catalog: f, Environment: f, Now: func() time.Time { return f.now }}, scope
 }
 
 func TestContextProjectionAuthorityReadWithoutDownload(t *testing.T) {
 	f, s, scope := newProjectionFixture()
 	out, err := s.CheckProjectionCurrent(context.Background(), f, scope)
-	if err != nil || !out.Valid(f.now) || out.Scope != scope || out.Environment != f.environment || out.Retention != f.retention.Proof || !out.AccessUntil.Equal(f.retention.ExpiresAt) || !out.DeleteBy.Equal(f.retention.DeleteBy) {
+	if err != nil || !out.Valid(f.now) || out.Scope != scope || out.Environment != f.environment || !out.AccessUntil.Equal(f.record.Retained.Effective.ExpiresAt) || !out.DeleteBy.Equal(f.record.Retained.Effective.DeleteBy) {
 		t.Fatalf("ordinary read failed: %v %+v", err, out)
 	}
-	if slices.Contains(f.identity.Scopes, "evidence:download") || !reflect.DeepEqual(f.calls, []string{"identity", "permissions", "catalog", "retention", "environment", "identity", "permissions", "retention", "environment", "identity"}) {
+	if slices.Contains(f.identity.Scopes, "evidence:download") || !reflect.DeepEqual(f.calls, []string{"identity", "permissions", "catalog", "environment", "identity", "permissions", "environment", "identity"}) {
 		t.Fatalf("wrong authority sequence: %v", f.calls)
-	}
-	for _, origins := range f.origins {
-		if !slices.Equal(origins, f.record.Retained.OriginPolicies) {
-			t.Fatal("lost a retained policy origin")
-		}
 	}
 	for _, record := range f.evidence {
 		if !reflect.DeepEqual(record, f.record) {
@@ -251,7 +234,7 @@ func TestContextProjectionAuthorityRejectsSourceSubstitution(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
-	for _, name := range []string{"deny", "permission-revision", "groups", "scopes", "identity-policy", "processing", "path", "environment-policy", "retention-cutoff", "retention-source", "retention-origins", "final-identity", "final-environment"} {
+	for _, name := range []string{"deny", "permission-revision", "groups", "scopes", "identity-policy", "processing", "path", "environment-policy", "final-identity", "final-environment"} {
 		t.Run(name, func(t *testing.T) {
 			f, s, scope := newProjectionFixture()
 			f.on = func(_ context.Context, port string, count int) {
@@ -277,12 +260,6 @@ func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
 						f.environment.Path.HubRegion = "other-region"
 					case "environment-policy":
 						f.environment.PolicyRevision.Generation++
-					case "retention-cutoff":
-						f.retention.ExpiresAt = f.now.Add(time.Minute)
-					case "retention-source":
-						f.retention.Proof.Sources[0].Epoch = projectionTestID(99)
-					case "retention-origins":
-						f.retention.Policies = f.retention.Policies[:1]
 					}
 				}
 				if port == "environment" && count == 2 && name == "final-environment" {
@@ -300,7 +277,7 @@ func TestContextProjectionAuthorityRechecksAfterBlockingReads(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityRequiresEveryProof(t *testing.T) {
-	for _, name := range []string{"processing", "wrong-processing-capture", "path", "download-purpose", "retention", "retention-target", "retention-extension", "retention-purpose", "environment", "catalog", "permissions", "retention-error"} {
+	for _, name := range []string{"processing", "wrong-processing-capture", "path", "download-purpose", "retention", "environment", "catalog", "permissions"} {
 		t.Run(name, func(t *testing.T) {
 			f, s, scope := newProjectionFixture()
 			switch name {
@@ -313,15 +290,7 @@ func TestContextProjectionAuthorityRequiresEveryProof(t *testing.T) {
 			case "download-purpose":
 				f.environment.Path.Purpose = "download-artifact/v1"
 			case "retention":
-				f.retention.Proof = artifact.RetentionProof{}
-			case "retention-target":
-				f.retention.Proof.PodUID = "replacement"
-			case "retention-extension":
-				f.retention.DeleteBy = f.retention.DeleteBy.Add(time.Minute)
-			case "retention-purpose":
-				f.retention.PurposeRef = "other-purpose"
-			case "retention-error":
-				f.fail = "retention"
+				f.record.Retained.Effective.ExpiresAt = f.now
 			default:
 				f.fail = name
 			}
@@ -334,7 +303,7 @@ func TestContextProjectionAuthorityRequiresEveryProof(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityKeepsOriginalIntervals(t *testing.T) {
-	for _, bound := range []string{"identity", "permission", "denies", "catalog", "retention", "environment", "request"} {
+	for _, bound := range []string{"identity", "permission", "denies", "catalog", "expiry", "environment", "request"} {
 		for _, expire := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/expire=%v", bound, expire), func(t *testing.T) {
 				f, s, scope := newProjectionFixture()
@@ -349,8 +318,8 @@ func TestContextProjectionAuthorityKeepsOriginalIntervals(t *testing.T) {
 					f.permission.DeniesFreshUntil = until
 				case "catalog":
 					f.record.ValidUntil = until
-				case "retention":
-					f.retention.ValidUntil = until
+				case "expiry":
+					f.record.Retained.Effective.ExpiresAt = until
 				case "environment":
 					f.environment.ValidUntil = until
 				case "request":
@@ -374,8 +343,6 @@ func TestContextProjectionAuthorityKeepsOriginalIntervals(t *testing.T) {
 					f.permission.ObservedAt, f.permission.FreshUntil = f.now, f.now.Add(30*time.Second)
 					f.permission.DeniesObservedAt, f.permission.DeniesFreshUntil = f.now, f.now.Add(5*time.Second)
 					f.permission.Allows[0].ObservedAt, f.permission.Allows[0].FreshUntil = f.now, f.now.Add(30*time.Second)
-					f.retention.Proof.ObservedAt, f.retention.Proof.ValidUntil = f.now, f.now.Add(5*time.Second)
-					f.retention.ValidUntil = f.now.Add(5 * time.Second)
 					f.environment.ObservedAt, f.environment.ValidUntil = f.now, f.now.Add(5*time.Second)
 					f.environment.Processing.ObservedAt, f.environment.Processing.ValidUntil = f.now, f.now.Add(5*time.Second)
 				}
@@ -393,7 +360,7 @@ func TestContextProjectionAuthorityKeepsOriginalIntervals(t *testing.T) {
 }
 
 func TestContextProjectionAuthorityCancellationAndDependencies(t *testing.T) {
-	for _, which := range []string{"nil-context", "cancelled", "identity", "permissions", "catalog", "retention", "environment", "now"} {
+	for _, which := range []string{"nil-context", "cancelled", "identity", "permissions", "catalog", "environment", "now"} {
 		t.Run(which, func(t *testing.T) {
 			f, s, scope := newProjectionFixture()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -407,8 +374,6 @@ func TestContextProjectionAuthorityCancellationAndDependencies(t *testing.T) {
 				s.Permissions = nil
 			case "catalog":
 				s.Catalog = nil
-			case "retention":
-				s.Retention = nil
 			case "environment":
 				s.Environment = nil
 			case "now":
@@ -435,7 +400,7 @@ func TestContextProjectionAuthorityCancellationAndDependencies(t *testing.T) {
 				<-ctx.Done()
 			}
 		}
-		if out, err := s.CheckProjectionCurrent(ctx, f, scope); err == nil || out != (analysis.ContextProjectionAuthority{}) || f.counts["retention"] != 0 {
+		if out, err := s.CheckProjectionCurrent(ctx, f, scope); err == nil || out != (analysis.ContextProjectionAuthority{}) || f.counts["environment"] != 0 {
 			t.Fatal("continued after cancelled blocking catalog")
 		}
 	})
@@ -454,15 +419,14 @@ func TestContextProjectionAuthorityCancellationAndDependencies(t *testing.T) {
 	})
 }
 
-// Installed native86: the decision ended 1.27 s after its check at the
-// retention proof's end, which the report did not name. The decision now
+// Installed native86: the decision ended 1.27 s after its check at a
+// component's end, which the report did not name. The decision now
 // carries the component whose interval ended it, for the report only.
 func TestContextProjectionAuthorityNamesItsEarliestBound(t *testing.T) {
 	for _, c := range []struct {
 		bound string
 		set   func(*projectionFixture)
 	}{
-		{"retention", func(f *projectionFixture) { f.retention.ValidUntil = f.now.Add(2 * time.Second) }},
 		{"environment/processing", func(f *projectionFixture) {
 			f.environment.Processing.ValidUntil = f.now.Add(time.Second)
 			f.environment.ValidUntil = f.environment.Processing.ValidUntil

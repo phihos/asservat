@@ -17,8 +17,8 @@ type WorkerOwners struct{ workers *DownloadWorkers }
 
 var _ evidence.WorkerOwnerStore = (*WorkerOwners)(nil)
 
-func NewWorkerOwners(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile, guards *RetentionTransactionGuard) (*WorkerOwners, error) {
-	w, err := NewDownloadWorkers(ctx, pool, root, profile, guards)
+func NewWorkerOwners(ctx context.Context, pool *pgxpool.Pool, root string, profile value.DownloadWorkerProfile) (*WorkerOwners, error) {
+	w, err := NewDownloadWorkers(ctx, pool, root, profile)
 	if err != nil {
 		return nil, err
 	}

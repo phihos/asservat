@@ -31,20 +31,19 @@ import (
 type PolicySources struct {
 	ledger             *Ledger
 	root, installation string
-	retention          *RetentionTransactionGuard
 }
 
 var _ app.PolicySourceLedger = (*PolicySources)(nil)
 
-func NewPolicySources(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*PolicySources, error) {
-	if !authorization.UUID(root) || !authorization.UUID(installation) || retention == nil || retention.root != root {
+func NewPolicySources(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*PolicySources, error) {
+	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
-	return &PolicySources{l, root, installation, retention}, nil
+	return &PolicySources{l, root, installation}, nil
 }
 
 func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
@@ -65,7 +64,7 @@ func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
 		in.Target.ExecutionClass == artifact.ContextAPIExecution && in.Target.Valid(now) && in.Node.Valid(now) &&
 		in.Target.Request.ClusterID == in.Authority.ClusterID && in.Target.Request.Namespace.UID == in.Authority.NamespaceUID && in.Target.Request.Workload.UID == in.Authority.WorkloadUID &&
 		in.Target.Request.PodUID == in.Node.PodUID &&
-		identity.Fresh(in.ObservedAt, in.ValidUntil, now, 5*time.Second) && now.Before(in.Retention.ValidUntil) && in.Retention.Target == in.Target.Target() && in.Retention.Proof.Valid(now) &&
+		identity.Fresh(in.ObservedAt, in.ValidUntil, now, 5*time.Second) && now.Before(in.Retention.ValidUntil) && in.Retention.Target == in.Target.Target() &&
 		authorization.UUID(in.SourceID) && authorization.UUID(in.Fence) && in.BytesPerSecond > 0 && in.BytesPerSecond <= collector.MaxInputRate && in.SourceSlots > 0 && in.SourceSlots <= collector.MaxActiveSources &&
 		in.InitialCredit >= 0 && in.ExpectedCredit >= 0 && in.AdditionalCredit >= 0 && in.ExpectedCredit <= math.MaxInt64-in.AdditionalCredit &&
 		((!in.Initial && in.InitialCredit == 0) || (in.Initial && in.InitialCredit > 0 && in.ExpectedCredit == 0 && in.AdditionalCredit == 0))
@@ -98,12 +97,8 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	}
 	defer stopCutoff()
 	// step names the bounded admission step for content-free failure counters.
-	step := "topology"
-	topology, err := s.retention.observe(call, in.Authority.ClusterID)
-	if err != nil {
-		return out, app.StagedSourceError("admit-"+step, err)
-	}
-	err = s.ledger.transaction(call, func(q *custodydb.Queries) error {
+	step := "trust"
+	err := s.ledger.transaction(call, func(q *custodydb.Queries) error {
 		step = "trust"
 		out = app.PolicySourceAdmission{}
 		stopCutoff()
@@ -256,7 +251,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				storage.ClusterID != id(a.ClusterID) || storage.NamespaceUid != a.NamespaceUID || storage.WorkloadUid != a.WorkloadUID || storage.AllocationID != allocation.ID || allocation.ServiceClass != "context" || allocation.Paused || pool.Paused {
 				return value.ErrChanged
 			}
-			return s.retention.check(call, q, topology, in.Retention.Proof, in.Target.Target())
+			return nil
 		}
 		step = "check"
 		if err = check(); err != nil {

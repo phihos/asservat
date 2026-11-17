@@ -18,7 +18,7 @@ func contextInput(t *testing.T) (value.ContextInput, time.Time) {
 	t.Helper()
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	target := targets.PodResolution{Request: targets.Request{ClusterID: "00000000-0000-4000-8000-000000000001", Namespace: configuration.NamespaceRef{Name: "payments", UID: "namespace-payments-uid"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "deployment-api-uid"}, PodName: "api-123", PodUID: "pod-uid"}, Pin: artifact.PinnedPod{Namespace: "payments", NamespaceUID: "namespace-payments-uid", Name: "api-123", UID: "pod-uid", NodeName: "worker", ControllerUID: "replicaset-uid"}, NodeUID: "node-uid", NodeBootID: "00000000-0000-4000-8000-000000000006", PodResourceVersion: "10", WorkloadResourceVersion: "20", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-	set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: [32]byte{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Complete: true, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{4}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
+	set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: [32]byte{7}}, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{4}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
 	r, err := privacy.Resolve(set, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: now}, now)
 	if err != nil {
 		t.Fatal(err)
@@ -187,36 +187,5 @@ func TestRecipeHasOnlyQualifiedAction(t *testing.T) {
 	}
 	if json.Unmarshal([]byte(ContextRecipeSpec), &recipe) != nil || len(recipe.Actions) != 1 || recipe.Actions[0].Kind != "kubernetesSnapshot" || recipe.Actions[0].ExecutionMode != "onTrigger" || len(recipe.Actions[0].Parameters["include"]) != 1 || recipe.Actions[0].Parameters["include"][0] != "pod" {
 		t.Fatal("recipe drift")
-	}
-}
-
-func TestRetentionRuntimeFenceDoesNotChangeApprovalIdentity(t *testing.T) {
-	in, now := contextInput(t)
-	original, err := CompileContext(in, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := "11111111-1111-4111-8111-111111111111"
-	rev := identity.Revision{UID: root, Generation: 1, Digest: artifact.Digest{1}}
-	target := in.Target.Target()
-	in.Retention.ValidUntil = now.Add(5 * time.Second)
-	in.Retention.Proof = artifact.RetentionProof{RootID: root, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, PodUID: target.PodUID, Topology: rev, Policy: in.Retention.PolicyRevision, Selectors: rev, SourceCount: 1, ObservedAt: now, ValidUntil: in.Retention.ValidUntil, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: target.ClusterID, ControlNamespaceUID: "control", Epoch: root, Hub: true, ProtectionDigest: artifact.Digest{2}, SnapshotDigest: artifact.Digest{3}, Acceptance: rev}}}
-	for _, epoch := range []string{root, "22222222-2222-4222-8222-222222222222"} {
-		in.Retention.Proof.Sources[0].Epoch = epoch
-		p, err := CompileContext(in, now)
-		if err != nil || p.ScopeDigest != original.ScopeDigest {
-			t.Fatal("runtime source epoch changed approval scope", err)
-		}
-	}
-	for _, edit := range []func(*value.ContextInput){
-		func(i *value.ContextInput) { i.Retention.Proof.PodUID = "replacement" },
-		func(i *value.ContextInput) { i.Retention.Proof.Policy.Digest[0]++ },
-		func(i *value.ContextInput) { i.Retention.ValidUntil = i.Retention.ValidUntil.Add(time.Second) },
-	} {
-		bad := in
-		edit(&bad)
-		if _, err := CompileContext(bad, now); err == nil {
-			t.Fatal("invalid proof binding")
-		}
 	}
 }

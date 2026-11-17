@@ -2,19 +2,20 @@ package privacy
 
 import (
 	"slices"
-	"time"
+	"strings"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// Snapshot and scoped policies are observations, not proof of write protection.
-// Hub origin is fixed by enrollment/bootstrap wiring; no CRD field can set it.
+// PolicyScope selects clusters and, by labels, namespaces and workloads.
 type PolicyScope struct {
 	ClusterIDs                      []string
 	NamespaceLabels, WorkloadLabels map[string]string
 }
+
+// ScopedPolicy is one EvidenceRetentionPolicy of the hub control namespace.
+// An empty scope is the installation baseline.
 type ScopedPolicy struct {
 	Name                                     string
 	Policy                                   Policy
@@ -22,22 +23,26 @@ type ScopedPolicy struct {
 	CaseDefaultSeconds, CaseMaximumSeconds   int64
 	AuditDefaultSeconds, AuditMaximumSeconds int64
 	LegalExceptions                          string
+	// Rejected names why the hub worker could not accept the object
+	// (RejectedSpec: schema; RejectedPolicy: domain rules). A rejected
+	// policy changes no stored deadline and refuses new collection in its
+	// cluster scope, which is every cluster when the scope is unreadable.
+	Rejected string `json:",omitempty"`
 }
-type PolicySnapshot struct {
-	SourceClusterID, ControlNamespaceUID string
-	Hub                                  bool
-	Revision                             identity.Revision
-	ObservedAt, FreshUntil               time.Time
-	Policies                             []ScopedPolicy
-}
+
+const (
+	RejectedSpec   = "RejectedSpec"
+	RejectedPolicy = "RejectedPolicy"
+)
 
 func (s PolicyScope) Empty() bool {
 	return len(s.ClusterIDs) == 0 && len(s.NamespaceLabels) == 0 && len(s.WorkloadLabels) == 0
 }
+
+// Labeled reports a namespace or workload label selector.
+func (s PolicyScope) Labeled() bool { return len(s.NamespaceLabels) > 0 || len(s.WorkloadLabels) > 0 }
+
 func (s PolicyScope) Valid() bool {
-	if !identity.Strings(s.ClusterIDs, 100, 36) || len(s.NamespaceLabels) > 16 || len(s.WorkloadLabels) > 16 {
-		return false
-	}
 	for _, id := range s.ClusterIDs {
 		if !authorization.UUID(id) {
 			return false
@@ -53,169 +58,72 @@ func (s PolicyScope) Valid() bool {
 	return true
 }
 
-// Valid checks a raw LIST snapshot (five seconds).
-func (s PolicySnapshot) Valid(now time.Time) bool { return s.validWithin(now, 5*time.Second) }
-
-// validWithin also serves accepted source snapshots (RetentionSourceInterval).
-func (s PolicySnapshot) validWithin(now time.Time, interval time.Duration) bool {
-	if !authorization.UUID(s.SourceClusterID) || !identity.Text(s.ControlNamespaceUID, 64) || !s.Revision.Valid() || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, interval) || len(s.Policies) > 1024 {
-		return false
-	}
-	seenUID, seenName := map[string]bool{}, map[string]bool{}
-	for _, p := range s.Policies {
-		if !identity.Text(p.Name, 253) || seenUID[p.Policy.Revision.UID] || seenName[p.Name] || !p.Policy.Valid() || !p.Scope.Valid() || p.Policy.Baseline != (s.Hub && p.Scope.Empty()) || !age(p.CaseDefaultSeconds) || !age(p.CaseMaximumSeconds) || !age(p.AuditDefaultSeconds) || !age(p.AuditMaximumSeconds) || (p.LegalExceptions != "disabled" && p.LegalExceptions != "reviewed") {
-			return false
-		}
-		seenUID[p.Policy.Revision.UID], seenName[p.Name] = true, true
-	}
-	return true
+// Covers reports whether the policy's cluster scope includes cluster.
+func (s PolicyScope) Covers(cluster string) bool {
+	return len(s.ClusterIDs) == 0 || slices.Contains(s.ClusterIDs, cluster)
 }
 
-// SelectorFacts must be produced by the source/metadata guard, not merely a
-// successful API GET. Complete protected key sets include absent label values.
-type SelectorFacts struct {
-	Target                          authorization.Target
-	Revision                        identity.Revision
-	ObservedAt, FreshUntil          time.Time
-	NamespaceLabels, WorkloadLabels map[string]string
-	NamespaceKeys, WorkloadKeys     []string
+func (p ScopedPolicy) Valid() bool {
+	if p.Rejected != "" {
+		return identity.Text(p.Name, 253) && p.Policy.Revision.Valid() && p.Scope.Valid() && !p.Policy.Baseline && (p.Rejected == RejectedSpec || p.Rejected == RejectedPolicy)
+	}
+	return identity.Text(p.Name, 253) && p.Policy.Valid() && p.Scope.Valid() && p.Policy.Baseline == p.Scope.Empty() && age(p.CaseDefaultSeconds) && age(p.CaseMaximumSeconds) && age(p.AuditDefaultSeconds) && age(p.AuditMaximumSeconds) && (p.LegalExceptions == "disabled" || p.LegalExceptions == "reviewed")
 }
 
-// Valid checks protected selector observations (five seconds).
-func (f SelectorFacts) Valid(now time.Time) bool { return f.validWithin(now, 5*time.Second) }
-
-// validWithin also serves facts bounded only by accepted sources
-// (RetentionSourceInterval) when no selector affects the result.
-func (f SelectorFacts) validWithin(now time.Time, interval time.Duration) bool {
-	if !f.Target.Valid() || !f.Revision.Valid() || !identity.Fresh(f.ObservedAt, f.FreshUntil, now, interval) || !identity.Strings(f.NamespaceKeys, 64, 253) || !identity.Strings(f.WorkloadKeys, 64, 253) {
-		return false
+// MatchPolicies selects the policies of the current set that apply to the
+// target: every policy whose cluster scope covers it. Label selectors need
+// namespace and workload labels that no reader supplies yet, so a covering
+// labeled policy refuses new collection, as does a covering rejected policy
+// (it may be stricter than the others). Exactly one baseline is required.
+// revision identifies the matched set; the caller digests it.
+func MatchPolicies(policies []ScopedPolicy, t authorization.Target, revision func([]Policy) identity.Revision) (PolicySet, error) {
+	out := PolicySet{Target: t}
+	if !t.Valid() {
+		return out, ErrInvalid
 	}
-	for i, labels := range []map[string]string{f.NamespaceLabels, f.WorkloadLabels} {
-		keys := f.NamespaceKeys
-		if i == 1 {
-			keys = f.WorkloadKeys
-		}
-		for k, v := range labels {
-			if !slices.Contains(keys, k) || len(v) > 63 {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// MatchPolicies intersects only a complete configured hub/local source set.
-// The caller must establish source protection and topology completeness first.
-// Nonmatching cluster scope does not require unrelated selector observations.
-func MatchPolicies(snapshots []PolicySnapshot, f SelectorFacts, now time.Time) ([]Policy, time.Time, error) {
-	return matchPolicies(snapshots, f, nil, now)
-}
-
-// Retained matching also follows the policy UIDs recorded at acquisition even
-// when protected selectors change. Deletion of an override cannot extend the
-// existing ledger dates. Rollback/reuse of a recorded revision fails closed.
-func MatchRetainedPolicies(snapshots []PolicySnapshot, f SelectorFacts, origins []artifact.RetentionRule, now time.Time) ([]Policy, time.Time, error) {
-	if !ValidPolicyOrigins(origins) {
-		return nil, time.Time{}, ErrInvalid
-	}
-	return matchPolicies(snapshots, f, origins, now)
-}
-func ValidPolicyOrigins(origins []artifact.RetentionRule) bool {
-	if len(origins) < 1 || len(origins) > 64 {
-		return false
-	}
+	baselines := 0
 	seen := map[string]bool{}
-	for _, r := range origins {
-		if !identity.Text(r.UID, 64) || seen[r.UID] || r.Generation < 1 || r.Generation > 2147483647 || r.Digest == (artifact.Digest{}) {
-			return false
+	for _, p := range policies {
+		if !p.Valid() || seen[p.Policy.Revision.UID] {
+			return out, ErrUnavailable
 		}
-		seen[r.UID] = true
+		seen[p.Policy.Revision.UID] = true
+		if !p.Scope.Covers(t.ClusterID) {
+			continue
+		}
+		if p.Scope.Labeled() || p.Rejected != "" {
+			return out, ErrUnavailable
+		}
+		if p.Policy.Baseline {
+			baselines++
+		}
+		out.Policies = append(out.Policies, clonePolicy(p.Policy))
 	}
-	return true
+	if baselines != 1 {
+		return out, ErrUnavailable
+	}
+	slices.SortFunc(out.Policies, func(a, b Policy) int { return strings.Compare(a.Revision.UID, b.Revision.UID) })
+	out.Revision = revision(out.Policies)
+	return out, nil
 }
-func matchPolicies(snapshots []PolicySnapshot, f SelectorFacts, origins []artifact.RetentionRule, now time.Time) ([]Policy, time.Time, error) {
-	original := map[string]artifact.RetentionRule{}
-	for _, r := range origins {
-		original[r.UID] = r
+
+func clonePolicy(p Policy) Policy {
+	p.Rules = slices.Clone(p.Rules)
+	for i := range p.Rules {
+		p.Rules[i].PrivacyClasses = slices.Clone(p.Rules[i].PrivacyClasses)
+		p.Rules[i].EvidenceTypes = slices.Clone(p.Rules[i].EvidenceTypes)
 	}
-	// Snapshots come from accepted sources (RetentionSourceInterval); protected
-	// selector facts were already checked against their own five seconds.
-	if !f.validWithin(now, RetentionSourceInterval) || len(snapshots) < 1 || len(snapshots) > 2 {
-		return nil, time.Time{}, ErrUnavailable
-	}
-	until := f.FreshUntil
-	hubs, baselines := 0, 0
-	seenSource, seenPolicy := map[string]bool{}, map[string]bool{}
-	var out []Policy
-	for _, s := range snapshots {
-		source := s.SourceClusterID + "/" + s.ControlNamespaceUID
-		if !s.validWithin(now, RetentionSourceInterval) || seenSource[source] || (!s.Hub && s.SourceClusterID != f.Target.ClusterID) {
-			return nil, time.Time{}, ErrUnavailable
-		}
-		seenSource[source] = true
-		if s.Hub {
-			hubs++
-		}
-		until = identity.Earlier(until, s.FreshUntil)
-		for _, p := range s.Policies {
-			if p.Policy.Baseline {
-				baselines++
-			}
-			origin, wasApplied := original[p.Policy.Revision.UID]
-			if wasApplied && (p.Policy.Revision.Generation < origin.Generation || (p.Policy.Revision.Generation == origin.Generation && artifact.Digest(p.Policy.Revision.Digest) != origin.Digest)) {
-				return nil, time.Time{}, ErrUnavailable
-			}
-			if !wasApplied && len(p.Scope.ClusterIDs) > 0 && !slices.Contains(p.Scope.ClusterIDs, f.Target.ClusterID) {
-				continue
-			}
-			matches := true
-			for i, selector := range []map[string]string{p.Scope.NamespaceLabels, p.Scope.WorkloadLabels} {
-				keys, labels := f.NamespaceKeys, f.NamespaceLabels
-				if i == 1 {
-					keys, labels = f.WorkloadKeys, f.WorkloadLabels
-				}
-				for k, v := range selector {
-					if wasApplied {
-						continue
-					} // historical applicability needs no current label proof
-					if !slices.Contains(keys, k) {
-						return nil, time.Time{}, ErrUnavailable
-					}
-					if labels[k] != v {
-						matches = false
-					}
-				}
-			}
-			if !matches && !wasApplied {
-				continue
-			}
-			if seenPolicy[p.Policy.Revision.UID] {
-				return nil, time.Time{}, ErrUnavailable
-			}
-			seenPolicy[p.Policy.Revision.UID] = true
-			policy := p.Policy
-			policy.Rules = slices.Clone(policy.Rules)
-			for i := range policy.Rules {
-				policy.Rules[i].PrivacyClasses = slices.Clone(policy.Rules[i].PrivacyClasses)
-				policy.Rules[i].EvidenceTypes = slices.Clone(policy.Rules[i].EvidenceTypes)
-			}
-			out = append(out, policy)
-			if len(out) > 64 {
-				return nil, time.Time{}, ErrUnavailable
-			}
+	return p
+}
+
+// EvidenceMaximum is the policy's maximum age for evidence of the given type
+// collected as potential user data, the class every collector records.
+func (p Policy) EvidenceMaximum(evidenceType string) int64 {
+	maximum := p.MaximumSeconds
+	for _, r := range p.Rules {
+		if matchesClass(r.PrivacyClasses, "potentialPersonalData") && (len(r.EvidenceTypes) == 0 || evidenceType == "other" || slices.Contains(r.EvidenceTypes, evidenceType)) {
+			maximum = min(maximum, r.MaxAgeSeconds)
 		}
 	}
-	if hubs != 1 || baselines != 1 {
-		return nil, time.Time{}, ErrUnavailable
-	}
-	slices.SortFunc(out, func(a, b Policy) int {
-		if a.Revision.UID < b.Revision.UID {
-			return -1
-		}
-		if a.Revision.UID > b.Revision.UID {
-			return 1
-		}
-		return 0
-	})
-	return out, until, nil
+	return maximum
 }

@@ -162,7 +162,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 		t.Fatal("API resolution lost Pod/owner identity or invented node authority", err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	policies := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "synthetic-policies", Generation: 1, Digest: artifact.Digest{1}}, Complete: true, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "synthetic-retention", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "synthetic-diagnostics", DefaultSeconds: 120, MaximumSeconds: 300, DeletionBudgetSeconds: 30}}}
+	policies := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "synthetic-policies", Generation: 1, Digest: artifact.Digest{1}}, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "synthetic-retention", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "synthetic-diagnostics", DefaultSeconds: 120, MaximumSeconds: 300, DeletionBudgetSeconds: 30}}}
 	retention, err := privacy.Resolve(policies, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: now}, now)
 	if err != nil {
 		t.Fatal(err)

@@ -187,7 +187,6 @@ type publicJourneyPublication struct {
 	ctx    context.Context
 	pools  *publicJourneyPools
 	root   string
-	guard  *postgres.RetentionTransactionGuard
 	step   int
 	pool   *pgxpool.Pool
 	verify *postgres.ContextPublications
@@ -200,8 +199,8 @@ func (p *publicJourneyPublication) note(ctx context.Context, err error) {
 	}
 }
 
-func newPublicJourneyPublication(ctx context.Context, pools *publicJourneyPools, root string, guard *postgres.RetentionTransactionGuard) *publicJourneyPublication {
-	return &publicJourneyPublication{ctx: ctx, pools: pools, root: root, guard: guard}
+func newPublicJourneyPublication(ctx context.Context, pools *publicJourneyPools, root string) *publicJourneyPublication {
+	return &publicJourneyPublication{ctx: ctx, pools: pools, root: root}
 }
 func (p *publicJourneyPublication) Close() {
 	if p.pool != nil {
@@ -214,7 +213,7 @@ func (p *publicJourneyPublication) open(ctx context.Context, role, password stri
 		return nil, privacy.ErrUnavailable
 	}
 	p.pool = p.pools.Open(role, password)
-	v, err := postgres.NewContextPublications(ctx, p.pool, p.root, p.guard)
+	v, err := postgres.NewContextPublications(ctx, p.pool, p.root)
 	if err != nil {
 		p.Close()
 	}

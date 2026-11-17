@@ -7,11 +7,7 @@ import (
 	"testing"
 	"time"
 
-	authapp "asservat.local/asservat/internal/application/authorization"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
-	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -78,15 +74,6 @@ func startNativeScenarioSources(t *testing.T, parent context.Context, admin *pgx
 		if _, err := s.p.RenewPermissions(call, cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}); err != nil {
 			return err
 		}
-		// observe renews and replaces this scenario's retention fence under the
-		// fixture lock. Accepted readers below perform no observation or
-		// ownership writes.
-		s.retention.mu.Lock()
-		err := s.retention.observe(call)
-		s.retention.mu.Unlock()
-		if err != nil {
-			return err
-		}
 		batch := s.batch
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
@@ -94,81 +81,8 @@ func startNativeScenarioSources(t *testing.T, parent context.Context, admin *pgx
 	})
 }
 
-func nativeFixtureAcceptedRetention(s captureAdmissionScenario) privacyapp.AcceptedRetentionReader {
-	return privacyapp.AcceptedRetentionReader{Topology: s.retention.topology, Sources: s.retention.reader, Now: time.Now}
-}
-func nativeFixtureRetainedPolicies(s captureAdmissionScenario) privacyapp.RetainedPolicyReader {
-	if s.nativeSources == nil {
-		return s.retention // Preserve ordinary fixtures' existing setup contract.
-	}
-	return nativeFixtureAcceptedRetention(s)
-}
-func nativeFixturePublicationPolicies(ctx context.Context, s captureAdmissionScenario) (privacy.PolicySet, error) {
-	if s.nativeSources == nil {
-		return s.retention.policies(ctx)
-	}
-	return nativeFixtureAcceptedRetention(s).RetentionPolicies(ctx, s.retention.target)
-}
-
-// Read the exact source under a separate fixture-admin observation, never add
-// privileges to its runtime reader. No UPDATE, freshening or synthetic expiry
-// is used by this regression; it crosses the actual original observation end.
-func qualifyNativeRetentionObservation(t *testing.T, admin *pgxpool.Pool, s captureAdmissionScenario, gate authapp.ContextDownloadAuthority) {
-	t.Helper()
-	if s.nativeSources == nil {
-		t.Fatal("native retention owner missing")
-	}
-	s.nativeSources.Close()
-	// The accepted observation lives up to 30 seconds (migration 00075).
-	ctx, stop := context.WithTimeout(context.Background(), 40*time.Second)
-	defer stop()
-	type stamp struct {
-		observed, fresh, lease time.Time
-		epoch                  string
-		sequence               int64
-	}
-	read := func() stamp {
-		t.Helper()
-		var row stamp
-		ref := s.retention.fence.Source
-		err := admin.QueryRow(ctx, "SELECT observed_at,fresh_until,lease_until,epoch::text,sequence FROM retention_source WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3", s.a.RootID, ref.ClusterID, ref.ControlNamespaceUID).Scan(&row.observed, &row.fresh, &row.lease, &row.epoch, &row.sequence)
-		if err != nil {
-			t.Fatal("native retention source snapshot", err)
-		}
-		return row
-	}
-	original := read()
-	resolver, ok := gate.Retention.(privacyapp.RetentionResolver)
-	if !ok {
-		t.Fatal("native retained reader composition")
-	}
-	var origins []artifact.RetentionRule
-	// The accepted original capture rules remain the exact historical scope.
-	for _, p := range s.a.Plan.Input.Retention.Policies {
-		origins = append(origins, p)
-	}
-	for i := 0; i < 3; i++ {
-		policy, err := resolver.RetainedPolicies.RetainedRetentionPolicies(ctx, s.retention.target, origins)
-		if err != nil || !policy.Proof.Valid(time.Now()) || policy.FreshUntil.After(original.fresh) {
-			t.Fatal("current native retention read", err)
-		}
-		if read() != original {
-			t.Fatal("retention read refreshed the original source")
-		}
-	}
-	timer := time.NewTimer(time.Until(original.fresh.Add(20 * time.Millisecond)))
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-	case <-ctx.Done():
-		t.Fatal("retention observation expiry wait", ctx.Err())
-	}
-	if _, err := resolver.RetainedPolicies.RetainedRetentionPolicies(ctx, s.retention.target, origins); err == nil {
-		t.Fatal("expired observer source was refreshed by a read")
-	}
-	if read() != original {
-		t.Fatal("denied read changed expired retention source")
-	}
+func nativeFixtureAcceptedRetention(s captureAdmissionScenario) *retentionEffectFixture {
+	return s.retention
 }
 
 func TestNativeFixtureSourceOwnerJoinsRefresh(t *testing.T) {

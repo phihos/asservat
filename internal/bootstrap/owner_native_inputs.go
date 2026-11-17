@@ -2,8 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"encoding/hex"
-	"slices"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -54,7 +52,7 @@ func validateOwnerNativeInputs(c *contracts.OwnerNativeDeployment, hub string, i
 	if installed {
 		least = 0
 	}
-	if c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections || c.WorkerAPIs == nil || len(c.WorkerAPIs) < least || len(c.WorkerAPIs) > 256 || c.RetentionTopologies == nil || len(c.RetentionTopologies) < least || len(c.RetentionTopologies) > 1024 {
+	if c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections || c.WorkerAPIs == nil || len(c.WorkerAPIs) < least || len(c.WorkerAPIs) > 256 {
 		return mounts.ErrUnavailable
 	}
 	seen, files := map[ownerNativeAPIKey]bool{}, map[string]bool{}
@@ -70,19 +68,7 @@ func validateOwnerNativeInputs(c *contracts.OwnerNativeDeployment, hub string, i
 		}
 		seen[key] = true
 	}
-	clusters, names := map[string]bool{}, map[string]bool{}
-	for _, p := range c.RetentionTopologies {
-		if !validOwnerNativeTopology(p) || clusters[p.TargetClusterID] || names[p.Name] {
-			return mounts.ErrUnavailable
-		}
-		clusters[p.TargetClusterID], names[p.Name] = true, true
-	}
 	return nil
-}
-
-func validOwnerNativeTopology(p contracts.OwnerNativeTopology) bool {
-	b, err := hex.DecodeString(p.SHA256)
-	return value.UUID(p.TargetClusterID) && value.UUID(p.UID) && len(validation.IsDNS1123Subdomain(p.Name)) == 0 && err == nil && len(b) == 32 && hex.EncodeToString(b) == p.SHA256 && p.SHA256 != "0000000000000000000000000000000000000000000000000000000000000000"
 }
 
 // ownerNativeProofs chooses the API only after an exact current SQL worker read.
@@ -127,50 +113,15 @@ func (p *ownerNativeProofs) ReadNativeResponsePeerProof(ctx context.Context, ses
 	return out, nil
 }
 
-// nativeConfiguration unions the input's retention topology pins with each
-// joined slot's pin from the catalog (ADR-196 decision 7); a slot's pin must
-// name its own cluster and fixed slot topology.
-func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool.Pool, observer *kube.PermissionClient, clusters []contracts.OwnerPublicCluster) (*OwnerNativeRuntimeConfig, error) {
+// nativeConfiguration composes the native download peer checks.
+func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool.Pool) (*OwnerNativeRuntimeConfig, error) {
 	c := d.inputs.config
 	n := c.Native
 	if n == nil || validateOwnerNativeInputs(n, c.ClusterID, c.ProviderAuthentication != nil) != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	all := slices.Clone(n.RetentionTopologies)
-	for i, v := range clusters {
-		t := v.Topology
-		if t.TargetClusterID != v.ClusterID || t.Name != contracts.OwnerClusterSourceName(c.InstallationID, i+1, "topology") || !validOwnerNativeTopology(t) {
-			return nil, mounts.ErrUnavailable
-		}
-		all = append(all, t)
-	}
-	pins := make([]kube.RetentionTopologyPin, len(all))
-	for i, p := range all {
-		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name}
-	}
-	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
-	if err != nil {
-		return nil, err
-	}
-	// mode=combined: the hub cluster is also a capture target; its topology
-	// names the hub retention source only and is served in process.
-	if !d.inputs.hubOnly() {
-		if err = topologies.AddHubTopology(observer, c.PermissionRootID); err != nil {
-			return nil, &fixedStepError{"local-cluster-topology", err}
-		}
-	}
-	// Joined mode=cluster clusters: the hub retention source, in process.
-	for _, r := range d.inputs.remote {
-		if err = topologies.AddRemoteTopology(observer, c.PermissionRootID, r.clusterID); err != nil {
-			return nil, &fixedStepError{"remote-cluster-topology", err}
-		}
-	}
-	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
-	if err != nil {
-		return nil, err
-	}
-	d.shared = publicShared{topologies: topologies, retention: retention, nativeRead: pool}
-	readers, err := postgres.NewNativeReaders(ctx, pool, c.PermissionRootID, c.InstallationID, retention)
+	d.shared = publicShared{nativeRead: pool}
+	readers, err := postgres.NewNativeReaders(ctx, pool, c.PermissionRootID, c.InstallationID)
 	if err != nil {
 		return nil, err
 	}

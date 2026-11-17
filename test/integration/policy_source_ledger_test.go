@@ -44,7 +44,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: strconv.FormatInt(policySourceFixtureRetentionSeconds, 10) + "s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			s := accepted.Scenario
-			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation, s.retention.guard)
+			ledger, err := postgres.NewPolicySources(ctx, f.roles["hub-runtime"], s.a.RootID, s.recovery.installation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -113,23 +113,6 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					scopeMatches := readErr == nil && captureapp.RecorderPolicyScopeDigest(diagnosticAuthority.PolicyUID, persisted.IntentVersion, accepted.Source.CollectionDigest, accepted.Compiled, diagnosticAuthority.NamespaceUID, diagnosticAuthority.WorkloadUID, diagnosticAuthority.Delegation, diagnosticAuthority.Owners, diagnosticAuthority.Actions, diagnosticAuthority.Limits) == diagnosticAuthority.ScopeDigest
 					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches)
 
-					topology, topologyErr := s.retention.topology.RetentionTopology(diagnosticCtx, diagnosticAuthority.ClusterID)
-					if topologyErr != nil {
-						diagnosticErr = errors.Join(diagnosticErr, topologyErr)
-						t.Log("source_retention_topology_readable=false")
-					}
-					proof := originalCheck.Retention.Proof
-					retentionVersions := topologyErr == nil && proof.SourceCount == len(topology.Sources)
-					for i, ref := range topology.Sources {
-						live, liveErr := s.retention.reader.AcceptedRetentionSource(diagnosticCtx, s.a.RootID, ref)
-						if liveErr != nil {
-							diagnosticErr = errors.Join(diagnosticErr, liveErr)
-							t.Log("source_retention_source_readable=false")
-						}
-						v := proof.Sources[i]
-						retentionVersions = retentionVersions && liveErr == nil && live.Epoch == v.Epoch && live.Acceptance == v.Acceptance && artifact.Digest(live.Snapshot.Revision.Digest) == v.SnapshotDigest && live.Valid(time.Now())
-					}
-					t.Logf("source_retention_readback proof_current=%t target_matches=%t topology_matches=%t source_versions=%t", proof.Valid(time.Now()), proof.Matches(s.a.RootID, originalCheck.Target.Target().ClusterID, originalCheck.Target.Target().NamespaceUID, originalCheck.Target.Target().WorkloadUID, originalCheck.Target.Target().PodUID), proof.Topology == topology.Revision, retentionVersions)
 					return diagnosticErr
 				}
 				old, err = policySourceFixtureAdmit(sourceCall, initialCheck, diagnostics, ledger.AdmitSource, func(ok bool) { t.Logf("source_diagnostics_readable=%t", ok) })
@@ -335,7 +318,7 @@ func TestPolicySourceFixtureFitsOriginalBacking(t *testing.T) {
 	policy.Policy.DefaultSeconds = policySourceFixtureRetentionSeconds
 	target := authorization.Target{ClusterID: custodyID(), NamespaceUID: custodyID(), WorkloadUID: custodyID(), PodUID: custodyID()}
 	resolve := func(at time.Time) privacy.Resolution {
-		set := privacy.PolicySet{Target: target, Revision: policy.Policy.Revision, Policies: []privacy.Policy{policy.Policy}, Complete: true, ObservedAt: at, FreshUntil: at.Add(5 * time.Second)}
+		set := privacy.PolicySet{Target: target, Revision: policy.Policy.Revision, Policies: []privacy.Policy{policy.Policy}}
 		r, e := privacy.Resolve(set, privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: at, RequestedSeconds: policySourceFixtureRetentionSeconds}, at)
 		if e != nil {
 			t.Fatal(e)

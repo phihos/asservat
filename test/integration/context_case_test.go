@@ -10,7 +10,6 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	identities "asservat.local/asservat/internal/application/identity"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/catalog"
@@ -34,7 +33,7 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: processing, Now: time.Now}
+	service := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Processing: processing, Now: time.Now}
 	current := func(edit func(*identity.Identity)) identities.CurrentIdentity {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)

@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
@@ -13,13 +12,12 @@ func nativeInputFixture(t *testing.T) (*ownerInputs, string, contracts.OwnerDepl
 	in, dir, c := ownerInputFixture(t)
 	c.Native = &contracts.OwnerNativeDeployment{
 		Connections: 2, Concurrency: 1,
-		WorkerAPIs:          []contracts.OwnerNativeWorkerAPI{{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}},
-		RetentionTopologies: []contracts.OwnerNativeTopology{{TargetClusterID: runtimeID, Name: "topology", UID: runtimeID, SHA256: strings.Repeat("1", 64)}},
+		WorkerAPIs: []contracts.OwnerNativeWorkerAPI{{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: "workers", UID: runtimeID}, Kubernetes: c.Kubernetes}},
 	}
 	return in, dir, c
 }
 func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
-	for _, mode := range []string{"valid", "absent", "duplicate-api", "same-name-api", "missing-api", "empty-api", "empty-topologies", "foreign-namespace", "http-api", "api-credentials", "duplicate-topology", "zero-topology-digest", "alias-digest", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
+	for _, mode := range []string{"valid", "absent", "duplicate-api", "same-name-api", "missing-api", "empty-api", "foreign-namespace", "http-api", "api-credentials", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
 			switch mode {
@@ -37,20 +35,12 @@ func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
 			case "empty-api":
 				// ADR-194 D2: only the provider-installed layout may start empty.
 				c.Native.WorkerAPIs = []contracts.OwnerNativeWorkerAPI{}
-			case "empty-topologies":
-				c.Native.RetentionTopologies = []contracts.OwnerNativeTopology{}
 			case "foreign-namespace":
 				c.Native.WorkerAPIs[0].Namespace.Name = "../workers"
 			case "http-api":
 				c.Native.WorkerAPIs[0].Kubernetes.Endpoint = "http://api.invalid"
 			case "api-credentials":
 				c.Native.WorkerAPIs[0].Kubernetes.Endpoint = "https://user:secret@api.invalid"
-			case "duplicate-topology":
-				c.Native.RetentionTopologies = append(c.Native.RetentionTopologies, c.Native.RetentionTopologies[0])
-			case "zero-topology-digest":
-				c.Native.RetentionTopologies[0].SHA256 = strings.Repeat("0", 64)
-			case "alias-digest":
-				c.Native.RetentionTopologies[0].SHA256 = strings.Repeat("A", 64)
 			case "excess-concurrency":
 				c.Native.Concurrency = 3
 			case "workload-cluster-api": // ADR-179: only the hub's own cluster API

@@ -16,7 +16,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -158,10 +157,9 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	t.Helper()
 	open := func(r, p string) *pgxpool.Pool { v := poolFor(r, p); t.Cleanup(v.Close); return v }
 	root, installation := s.a.RootID, s.recovery.installation
-	g := s.retention.guard
 	f := &publicJourneyNative{keys: artifactKeys, store: store, storeID: s.a.Registration.StoreID, jobs: &publicJourneyJobs{}, enrollmentTrace: &journeyEnrollmentTrace{}}
 	makeDownloads := func(r, p string) *postgres.Downloads {
-		v, e := postgres.NewDownloads(ctx, open(r, p), root, g)
+		v, e := postgres.NewDownloads(ctx, open(r, p), root)
 		publicJourneyRequire(t, r, e)
 		return v
 	}
@@ -169,7 +167,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	f.audit = makeDownloads("download_audit_runtime", "synthetic-download-audit")
 	configPool := open("download_config_runtime", "synthetic-download-config")
 	defer configPool.Close() // No backing configuration writes after this setup phase.
-	config, e := postgres.NewDownloads(ctx, configPool, root, g)
+	config, e := postgres.NewDownloads(ctx, configPool, root)
 	publicJourneyRequire(t, "download backing configuration", e)
 	f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: s.a.Registration.Location.ClusterID, NamespaceUID: s.a.Plan.Input.Target.Target().NamespaceUID, WorkloadUID: s.a.Plan.Input.Target.Target().WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
 	publicJourneyRequire(t, "original download allocation", config.BindDownloadAllocation(ctx, f.allocation))
@@ -183,7 +181,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	path := syntheticDownloadPlacement(s.a.Registration)
 	path.AcquisitionClusterID, path.ConnectorClusterID, path.WorkerConfiguration = f.profile.ClusterID, f.profile.ClusterID, f.profile.Configuration
 	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: root, InstallationID: installation, RecoveryEpoch: s.recovery.observation.issuer, Revision: identity.Revision{UID: path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{{Issuer: actor.Principal.Issuer, ID: actor.Principal.ClientID, Kind: actor.Principal.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
-	f.gate = f.gateTrace.Wrap(authapp.ContextDownloadAuthority{RootID: root, Identities: nativeDownloadTestIdentity{actor, loginUntil}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureAcceptedRetention(s), Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policy, Processing: processing, Now: time.Now}, Now: time.Now})
+	f.gate = f.gateTrace.Wrap(authapp.ContextDownloadAuthority{RootID: root, Identities: nativeDownloadTestIdentity{actor, loginUntil}, Permissions: s.p, Catalog: catalog, Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policy, Processing: processing, Now: time.Now}, Now: time.Now})
 	f.gateTrace.probe = func(c context.Context) string {
 		// Fixture-admin timestamps only; classifies which stream predicate lapsed.
 		var stale, lease, suspended, window bool
@@ -205,7 +203,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	_, configuration, observer, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, f.profile, s.recovery.observation.issuer)
 	s.nativeSources.SetWorker(t, observer.Observe)
 	makeWorkers := func(r, p string) *postgres.DownloadWorkers {
-		v, e := postgres.NewDownloadWorkers(ctx, open(r, p), root, f.profile, g)
+		v, e := postgres.NewDownloadWorkers(ctx, open(r, p), root, f.profile)
 		publicJourneyRequire(t, r, e)
 		return v
 	}
@@ -215,9 +213,9 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	bindContextNativeStopFixture(t, ctx, config, f.allocation, installation, f.storeID, poolFor)
 	nativeSQLRoles(t, ctx, admin)
 	contextNativeSQLRoles(t, ctx, admin)
-	owners, e := postgres.NewNativeOwners(ctx, open("native_owner_runtime", "synthetic-native-owner"), root, f.profile, g)
+	owners, e := postgres.NewNativeOwners(ctx, open("native_owner_runtime", "synthetic-native-owner"), root, f.profile)
 	publicJourneyRequire(t, "native owners", e)
-	readers, e := postgres.NewNativeReaders(ctx, open("native_metadata_runtime", "synthetic-native-metadata"), root, installation, g)
+	readers, e := postgres.NewNativeReaders(ctx, open("native_metadata_runtime", "synthetic-native-metadata"), root, installation)
 	publicJourneyRequire(t, "native readers", e)
 	historyPool := open("native_history_runtime", "synthetic-native-history")
 	defer historyPool.Close()
@@ -227,13 +225,13 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	publicJourneyRequire(t, "original native backing", history.InstallNativeBacking(ctx, backing))
 	historyPool.Close() // This fixture uses the role only for its initial backing.
 	bind := open("native_key_bind_runtime", "synthetic-native-bind")
-	prepKeys, e := postgres.NewDownloadKeys(ctx, bind, root, artifactKeys.scope, g)
+	prepKeys, e := postgres.NewDownloadKeys(ctx, bind, root, artifactKeys.scope)
 	publicJourneyRequire(t, "preparation keys", e)
-	windowKeys, e := postgres.NewNativeKeys(ctx, bind, root, f.profile, artifactKeys.scope, g)
+	windowKeys, e := postgres.NewNativeKeys(ctx, bind, root, f.profile, artifactKeys.scope)
 	publicJourneyRequire(t, "window keys", e)
-	f.keyAuthority, e = postgres.NewNativeKeyAuthority(ctx, open("native_key_read_runtime", "synthetic-native-read"), root, f.profile, artifactKeys.scope, g)
+	f.keyAuthority, e = postgres.NewNativeKeyAuthority(ctx, open("native_key_read_runtime", "synthetic-native-read"), root, f.profile, artifactKeys.scope)
 	publicJourneyRequire(t, "key authority", e)
-	f.enrollment = newWorkerEnrollmentServices(t, ctx, poolFor, root, installation, f.profile, publicJourneyEnrollmentProof{jobs: f.jobs}, g, store, keys, f.gate)
+	f.enrollment = newWorkerEnrollmentServices(t, ctx, poolFor, root, installation, f.profile, publicJourneyEnrollmentProof{jobs: f.jobs}, store, keys, f.gate)
 	ownerPod, epoch := custodyID(), custodyID()
 	first, e := postgres.NewFirstContextPreparations(f.runtime)
 	publicJourneyRequire(t, "first preparation", e)

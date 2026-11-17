@@ -174,11 +174,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 			return out, value.ErrInvalid
 		}
 	}
-	topology, err := s.retention.observe(ctx, children[0].Plan.Input.Target.Target().ClusterID)
-	if err != nil {
-		return out, captureError(err)
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		trust, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
@@ -300,7 +296,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 						return value.ErrCapacity
 					}
 				}
-				if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
+				if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
 					return err
 				}
 				if err := r.manual.insertReservation(ctx, q, s.root, child.Plan.Input.CaptureID, child, r.grant, r.bytes); err != nil {
@@ -381,11 +377,7 @@ func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, 
 			return out, value.ErrInvalid
 		}
 	}
-	topology, err := s.retention.observe(ctx, children[0].Plan.Input.Target.Target().ClusterID)
-	if err != nil {
-		return out, captureError(err)
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		trust, err := currentTrust(ctx, q, s.installation)
 		if err != nil {
 			return err
@@ -462,7 +454,7 @@ func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, 
 		}
 		permissions := newRecordingGroupFacts(q, stream)
 		for n, child := range children {
-			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, Permissions: permissions, Composition: true, ChildIndex: n, AcceptedAt: acceptedAt}); err != nil {
+			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, &contextAdmissionGroupOptions{Recovery: trust, Stream: stream, Preview: protected, Permissions: permissions, Composition: true, ChildIndex: n, AcceptedAt: acceptedAt}); err != nil {
 				return err
 			}
 		}

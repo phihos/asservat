@@ -15,18 +15,9 @@
 {{- $purposes := list "key-configuration" "key-wrap" "key-verify" }}
 {{- $rules := list }}
 {{- if $d.enabled }}
-{{- $topologies := list }}
-{{- range (default list $d.retentionTopologies) }}
-{{- $topologies = append $topologies (dict "targetClusterID" .targetClusterID "name" .name) }}
-{{- end }}
-{{- $downloads := dict "retentionTopologies" $topologies }}
-{{- $remote := list }}
-{{- range (include "asservat.hubApi.clusters" . | fromJsonArray) }}{{ $remote = append $remote .name }}{{ end }}
-{{- with $remote }}{{ $_ := set $downloads "remoteClusters" . }}{{ end }}
-{{- $_ := set $config "downloads" $downloads }}
+{{- $_ := set $config "downloads" dict }}
 {{- $purposes = append $purposes "key-acquisition" }}
-{{- /* Worker configuration, cluster catalog and topologies; catalog slot
-  topologies are named by the catalog. No Secret is read through the API. */}}
+{{- /* The worker configuration ConfigMap. No Secret is read through the API. */}}
 {{- $rules = list (dict "apiGroups" (list "") "resources" (list "configmaps") "verbs" (list "get")) }}
 {{- end }}
 {{- $tls := include "asservat.svc.tlsSecret" (list . "key-service") }}
