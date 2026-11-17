@@ -43,6 +43,23 @@ type ContextProjectionService struct {
 	SyscallRoutes    SyscallProjectionRouteReader
 	LogRoutes        LogProjectionRouteReader
 	ComparisonRoutes ContextProjectionRouteReader
+	// RawGrants reuses a current covering grant when a raw query names none.
+	RawGrants RawGrantFinder
+}
+
+// RawGrantFinder returns a current approved grant of the caller that covers
+// operation on the artifact, or "" (ADR-335 D5, REQ-MCP-003).
+type RawGrantFinder interface {
+	FindRawGrant(ctx context.Context, i identity.Identity, caseID, artifactID, captureID, operation string) (string, error)
+}
+
+// rawGrant is the named grant, else a reused covering grant, else "" (the
+// query then answers RawApprovalRequired).
+func (s ContextProjectionService) rawGrant(ctx context.Context, i identity.Identity, c value.ContextProjectionCandidate, named, operation string) (string, error) {
+	if named != "" || s.RawGrants == nil {
+		return named, nil
+	}
+	return s.RawGrants.FindRawGrant(ctx, i, c.CaseID, c.ArtifactID, c.CaptureID, operation)
 }
 
 // HTTPHeaders is the get_http_headers admission over this same service, when

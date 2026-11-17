@@ -51,7 +51,10 @@ func (s RawSyscallReads) Begin(ctx context.Context, current identities.CurrentId
 		if c.NativeType != artifact.SyscallArgumentsArtifact || c.CaseID != r.CaseID || c.ArtifactID != r.ArtifactID || c.Syscalls != (value.SyscallWindow{}) {
 			return value.ContextProjectionCandidate{}, value.ErrUnavailable
 		}
-		c.Syscalls, c.RawGrantID = r.Selection, r.GrantID
+		c.Syscalls = r.Selection
+		if c.RawGrantID, e = s.Service.rawGrant(ctx, i, c, r.GrantID, "syscall_query"); e != nil {
+			return value.ContextProjectionCandidate{}, e
+		}
 		if !c.Valid() {
 			return value.ContextProjectionCandidate{}, value.ErrInvalid
 		}
