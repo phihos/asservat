@@ -32,6 +32,23 @@ baseline have identical catalogs (functions, triggers, columns, constraints,
 indexes, privileges, no seed rows); four CHECK constraints differ only in
 PostgreSQL's flattening of nested `AND`.
 
+## Grants and policies on the canonical contract (ADR-335, 2026-11-17)
+
+Branch `clean/api-grants`. `request_raw_access`, `get_grant`, `list_reviews`,
+`decide_review`, `revoke_grant`, `get_policy_status` and `deactivate_policy`
+validate against the canonical schemas. Raw access selects by `artifact_ids`
+or `artifact_digests`; size and expiry default to the verified sizes and the
+earliest access end; memory and debugger operations return
+`CapabilityUnavailable`. `list_reviews` pages with a keyset cursor. Policies
+are named by cluster, namespace and name. The public `request_policy_grant`
+and `activate_policy` tools and their console forms are removed.
+Gaps: the hub does not yet accept observed DebugPolicy generations or open
+policy-grant reviews by itself (`PolicyActivation`, `GrantService.RequestPolicy`
+and the grant attachment remain as internal steps without a production
+caller); no `renewal_due`; the planner still emits `recordingApprovalRequired`,
+which the review shows as `policyCollection` on policy grants and drops
+otherwise.
+
 ## Capture tools on the canonical contract (ADR-335 D4, 2026-11-17)
 
 Branch `clean/api-capture`. `list_diagnostics`, `preview_capture`,
