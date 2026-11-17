@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"slices"
+	"strconv"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capture"
@@ -14,10 +15,16 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // PolicyStatusUseCase and PolicyDeactivationUseCase name a DebugPolicy by
 // cluster ID, namespace and name.
+// PolicyActivationUseCase serves the legacy activate_policy, which remains
+// until hub-side acceptance (specs/policy-automation.md) replaces it.
+type PolicyActivationUseCase interface {
+	Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error)
+}
 type PolicyStatusUseCase interface {
 	Get(context.Context, identities.CurrentIdentity, string, string, string) (value.PolicyStatus, time.Time, error)
 }
@@ -29,25 +36,26 @@ type PolicyDeactivationUseCase interface {
 // the browser through the same audited operation path. Policies are accepted
 // from their DebugPolicy objects; there is no public activation.
 type PolicyOperations struct {
-	origin    string
-	now       func() time.Time
-	newID     func() string
-	clusters  ClusterNames
-	status    PolicyStatusUseCase
-	stop      PolicyDeactivationUseCase
-	contracts *contracts.InvestigationContracts
+	origin     string
+	now        func() time.Time
+	newID      func() string
+	clusters   ClusterNames
+	activation PolicyActivationUseCase
+	status     PolicyStatusUseCase
+	stop       PolicyDeactivationUseCase
+	contracts  *contracts.InvestigationContracts
 }
 
-func NewPolicyOperations(origin string, now func() time.Time, newID func() string, clusters ClusterNames, status PolicyStatusUseCase, stop PolicyDeactivationUseCase) (*PolicyOperations, error) {
+func NewPolicyOperations(origin string, now func() time.Time, newID func() string, clusters ClusterNames, activation PolicyActivationUseCase, status PolicyStatusUseCase, stop PolicyDeactivationUseCase) (*PolicyOperations, error) {
 	u, err := url.Parse(origin)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || status == nil || stop == nil || now == nil || newID == nil {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || activation == nil || status == nil || stop == nil || now == nil || newID == nil {
 		return nil, ErrOperationsConfiguration
 	}
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
 		return nil, err
 	}
-	return &PolicyOperations{origin: origin, now: now, newID: newID, clusters: clusters, status: status, stop: stop, contracts: wire}, nil
+	return &PolicyOperations{origin: origin, now: now, newID: newID, clusters: clusters, activation: activation, status: status, stop: stop, contracts: wire}, nil
 }
 
 func (s *PolicyOperations) PublicOrigin() string {
@@ -57,7 +65,7 @@ func (s *PolicyOperations) PublicOrigin() string {
 	return s.origin
 }
 func (s *PolicyOperations) ToolNames() []string {
-	return []string{"deactivate_policy", "get_policy_status"}
+	return []string{"activate_policy", "deactivate_policy", "get_policy_status"}
 }
 func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	if s == nil || !slices.Contains(s.ToolNames(), name) {
@@ -72,6 +80,52 @@ type PolicyOperationInput struct {
 	Namespace      string `json:"namespace"`
 	PolicyName     string `json:"policy_name"`
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	// activate_policy (legacy contract) only.
+	GrantID         string `json:"grant_id,omitempty"`
+	SharingReviewed bool   `json:"sharing_reviewed,omitempty"`
+}
+
+type policyActivationData struct {
+	PolicyUID     string                   `json:"policy_uid"`
+	AcceptanceID  string                   `json:"acceptance_id"`
+	State         string                   `json:"state"`
+	ExpiresAt     time.Time                `json:"expires_at"`
+	MaxExecutions int64                    `json:"max_executions"`
+	Replay        bool                     `json:"replay"`
+	Sharing       *policyActivationSharing `json:"sharing,omitempty"`
+}
+
+// policyActivationSharing is the review statement of an activation that
+// shares its repeated collections (ADR-239, REQ-SHR-005).
+type policyActivationSharing struct {
+	Statement   string    `json:"statement"`
+	Recipients  int       `json:"recipients"`
+	MaxCaptures int       `json:"max_captures"`
+	NotAfter    time.Time `json:"not_after"`
+}
+
+// policySharingReview is the pre-activation review (REQ-SHR-005): the
+// statement and the maximum scope — every recipient while the message fits,
+// the capture limit and the end — and how to accept it.
+func policySharingReview(s value.PolicyShareInstruction) string {
+	who := ""
+	for i, r := range s.Recipients {
+		if i > 0 {
+			who += ", "
+		}
+		who += r.Kind + " " + r.ID
+	}
+	tail := ": at most the next " + strconv.Itoa(s.MaxCaptures) + " capture(s) of this policy until " + s.NotAfter.UTC().Format(time.RFC3339) + ", each share for at most seven days. Repeat activate_policy with sharing_reviewed true to activate and share."
+	if len(who)+len(tail)+64 > 1024 {
+		who = strconv.Itoa(len(s.Recipients)) + " recipients of your identity provider (see spec.sharing.recipients)"
+	}
+	return value.PolicySharingStatement + " with " + who + tail
+}
+
+// policySharingStatement is the activation warning that names who receives
+// the repeated collections, how many and until when.
+func policySharingStatement(s *value.PolicyShareInstruction) string {
+	return value.PolicySharingStatement + " with " + strconv.Itoa(len(s.Recipients)) + " recipient(s): at most the next " + strconv.Itoa(s.MaxCaptures) + " capture(s) of this policy until " + s.NotAfter.UTC().Format(time.RFC3339) + ". Existing shares stay until they expire or are revoked."
 }
 
 // policyStatusSharing is the content-free recurring sharing status (ADR-239).
@@ -158,13 +212,33 @@ type policyStatusData struct {
 	Sharing             *policyStatusSharing    `json:"sharing,omitempty"`
 }
 
-
 func publicPolicyFailure(err error) OperationFailure {
+	var field value.PolicyFieldError
+	var review app.PolicySharingReview
 	switch {
+	case errors.As(err, &field):
+		// Fixed reviewed reasons with a field path; never a user-authored value.
+		return OperationFailure{"PolicyRejected", "This release cannot activate the policy: " + field.Error() + ".", false}
+	case errors.Is(err, app.ErrPolicyDeactivated):
+		return OperationFailure{"PolicyDeactivated", "This policy revision was deactivated and cannot be activated again, so its spend and expiry are never reset. Change the DebugPolicy to activate a new revision.", false}
+	case errors.Is(err, value.ErrSharingDenied):
+		return OperationFailure{"SharingNotPermitted", "The policy shares its captures (spec.sharing), which needs the evidence:share scope and an evidence-owner group of the workload's automation AccessBinding that you belong to. Remove spec.sharing or ask a permission administrator to add evidence-owner to that binding.", false}
+	case errors.As(err, &review):
+		return OperationFailure{"SharingReviewRequired", policySharingReview(review.Instruction), false}
+	case errors.Is(err, value.ErrCapacity):
+		return OperationFailure{"CapacityUnavailable", "The workload cluster already has the maximum number of active policies.", false}
+	case errors.Is(err, value.ErrConflict):
+		return OperationFailure{"Conflict", "This request conflicts with a newer activation of the policy. Check its status and retry.", false}
+	case errors.Is(err, value.ErrChanged):
+		return OperationFailure{"PolicySuspended", "The policy is suspended or being deleted and cannot be activated.", false}
+	case errors.Is(err, value.ErrInvalid):
+		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-, probe-, alert-, log- or resource-trigger DebugPolicy.", false}
+	case errors.Is(err, targets.ErrUnsupported):
+		return OperationFailure{"DetectorUnavailable", "The workload cluster's connector cannot observe this detector. An alert policy needs the cluster's Alertmanager address (Helm value cluster.alertmanager); a resource policy needs the Kubernetes metrics API (metrics-server) and, for a ratio, a finite limit on every container.", false}
 	case errors.Is(err, errUnknownCluster):
 		return OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}
 	case errors.Is(err, app.ErrPolicyDelegation):
-		return OperationFailure{"NotAvailable", "Stopping this policy needs the workload-maintainer role of one of its sponsoring groups.", false}
+		return OperationFailure{"DelegationRequired", "No sole automation AccessBinding covers this workload for one of your groups, or its envelope does not allow pod-status snapshots. Ask a permission administrator to add spec.automation to the team's AccessBinding.", false}
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	}
@@ -205,6 +279,35 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 	noDispatch := false
 	clusterID, known := s.clusters.ID(in.Cluster)
 	switch {
+	case name == "activate_policy":
+		if !slices.Contains(i.Scopes, "evidence:capture") {
+			noDispatch, operationErr = true, value.ErrDenied
+			break
+		}
+		var r app.PolicyActivationResult
+		if in.GrantID != "" {
+			if attached, ok := s.activation.(interface {
+				ActivateWithGrant(context.Context, identities.CurrentIdentity, string, string, bool, string) (app.PolicyActivationResult, error)
+			}); ok {
+				r, operationErr = attached.ActivateWithGrant(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed, in.GrantID)
+			} else {
+				operationErr = value.ErrUnavailable
+			}
+		} else {
+			r, operationErr = s.activation.Activate(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed)
+		}
+		if operationErr == nil {
+			state := "active"
+			if !r.Audited {
+				state = "pendingAudit"
+			}
+			data := policyActivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: state, ExpiresAt: r.NotAfter.UTC(), MaxExecutions: r.MaxExecutions, Replay: r.Replay}
+			if sh := r.Sharing; sh != nil {
+				data.Sharing = &policyActivationSharing{Statement: value.PolicySharingStatement, Recipients: len(sh.Recipients), MaxCaptures: sh.MaxCaptures, NotAfter: sh.NotAfter.UTC()}
+				out.Warnings = append(out.Warnings, policySharingStatement(sh))
+			}
+			out.Data = data
+		}
 	case !known:
 		noDispatch, operationErr = true, errUnknownCluster
 	case name == "deactivate_policy":

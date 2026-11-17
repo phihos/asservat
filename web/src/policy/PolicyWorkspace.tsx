@@ -59,6 +59,53 @@ function occurrence(o: Status['recent'][number]): string {
   return o.detector === 'probe' && o.failed_at ? `probe failure at ${new Date(o.failed_at).toLocaleString()}` : `restart ${o.restarts ?? ''}`;
 }
 
+// Legacy policy approval request and attachment (request_policy_grant,
+// activate_policy with grant_id); they remain until hub-side acceptance
+// (specs/policy-automation.md) opens and attaches the review itself.
+function PolicyGrantControls({ entry, controller }: { entry: Entry; controller: Policies }) {
+  const s = entry.status!;
+  const finite = s.collection_kind === 'profile' || s.collection_kind === 'logs';
+  const [executions, setExecutions] = useState(10);
+  const [output, setOutput] = useState(finite ? s.max_collected_bytes ?? 1 : Math.min(s.max_collected_bytes ?? 8 << 20, 8 << 20));
+  const [observed, setObserved] = useState(0);
+  const [days, setDays] = useState('');
+  const [seconds, setSeconds] = useState(10);
+  const [rate, setRate] = useState(16 << 20);
+  const [concurrent, setConcurrent] = useState(1);
+  const [grantID, setGrantID] = useState('');
+  return <section aria-label={'Policy approval for ' + entry.policy_name}>
+    <h3>Policy approval</h3>
+    <p>A different human approver reviews this workload, configuration and finite limits. Approval gives no personal evidence access.</p>
+    <form onSubmit={event => { event.preventDefault(); void controller.requestGrant(entry.key, {
+      limits: { max_executions: executions, max_collected_bytes: output, max_observed_bytes: finite ? 0 : observed },
+      ...(days ? { lifetime_seconds: Number(days) * 86400 } : {}),
+      ...(!finite && observed > 0 ? { observation_limits: { max_session_seconds: seconds, max_observed_bytes: observed, max_bytes_per_second: rate, max_concurrent_sessions: concurrent } } : {}),
+    }); }}>
+      <fieldset disabled={entry.busy || entry.requestPending}>
+        <legend>Approval limits</legend>
+        <label>Action starts<input type="number" required min={1} step={1} value={executions} onChange={e => setExecutions(Number(e.target.value))}/></label>
+        <label>Maximum output (bytes)<input type="number" required min={1} step={1} value={output} onChange={e => setOutput(Number(e.target.value))}/></label>
+        {!finite && <label>Maximum observed input (bytes)<input type="number" required min={0} step={1} value={observed} onChange={e => setObserved(Number(e.target.value))}/></label>}
+        <label>Approval period (days, optional)<input type="number" min={1} step={1} value={days} onChange={e => setDays(e.target.value)}/></label>
+        <p>Leave the period empty to use the installation default. The original policy expiry still applies.</p>
+        {!finite && observed > 0 && <>
+          <label>Maximum session (seconds)<input type="number" required min={1} step={1} value={seconds} onChange={e => setSeconds(Number(e.target.value))}/></label>
+          <label>Maximum input rate (bytes/second)<input type="number" required min={1} step={1} value={rate} onChange={e => setRate(Number(e.target.value))}/></label>
+          <label>Maximum concurrent sessions<input type="number" required min={1} step={1} value={concurrent} onChange={e => setConcurrent(Number(e.target.value))}/></label>
+        </>}
+      </fieldset>
+      {entry.requestPending && <p>Retry keeps the original request and selected limits.</p>}
+      <Button type="submit" className="button secondary" isDisabled={entry.busy}>{entry.requestPending ? 'Retry approval request' : 'Request policy approval'}</Button>
+    </form>
+    {entry.grant && <p>Approval request recorded. <a href={entry.grant.approval_navigation_uri}>View policy approval</a>.</p>}
+    <form onSubmit={event => { event.preventDefault(); void controller.attachGrant(entry.key, grantID.trim()); }}>
+      <label>Approved policy grant ID<input disabled={entry.busy || !!entry.attachmentPending} required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" value={grantID} onChange={e => setGrantID(e.target.value)} autoComplete="off" spellCheck={false}/></label>
+      <p>A current team manager can attach the reviewed grant. This keeps the original policy expiry and shared spend.</p>
+      <Button type="submit" className="button secondary" isDisabled={entry.busy}>{entry.attachmentPending ? 'Retry attachment' : 'Attach approved grant'}</Button>
+    </form>
+  </section>;
+}
+
 function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies }) {
   const s = entry.status;
   const live = s?.state === 'active' || s?.state === 'renewalDue';
@@ -80,14 +127,18 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
         {s.suppressions.length > 0 && <><dt>Suppressed</dt><dd>{s.suppressions.map(x => `${x.count} × ${reasons[x.reason] ?? x.reason}`).join('; ')}</dd></>}
       </dl>
       {s.attached_grant_id && <p><a href={'/approvals/' + s.attached_grant_id}>View policy approval</a></p>}
+      {s.collection_kind !== 'podStatus' && live && <PolicyGrantControls entry={entry} controller={controller}/>}
       {s.recent.length > 0 && <ul className="progress-actions" aria-label="Recent occurrences">{s.recent.map(o => <li key={o.occurrence_id}>
         <span>{new Date(o.created_at).toLocaleString()} ({occurrence(o)})</span>
         <span>{o.capture_id ? <a href={'/captures/' + o.capture_id}>View capture</a> : o.outcome}</span>
       </li>)}</ul>}
-      {s.state === 'deactivated' && <p>Existing captures and evidence are kept. Change the DebugPolicy to start a new revision.</p>}
+      {s.state === 'deactivated' && <p>Existing captures and evidence are kept. This revision cannot be activated again; change the DebugPolicy to activate a new revision.</p>}
     </> : !entry.busy && !entry.message && <p role="status">No status yet.</p>}
     {entry.message && <p role="alert" className="notice">{entry.message}</p>}
+    {entry.review && <div role="alert" className="notice"><p>{entry.review}</p>
+      <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activateSharing(entry.key)}>Activate and share</Button></div>}
     <div className="actions">
+      {!live && s?.state !== 'deactivated' && <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activate(entry.key)}>Activate</Button>}
       {live && <Button className="button" isDisabled={entry.busy} onPress={() => void controller.deactivate(entry.key)}>Deactivate</Button>}
       {s?.sharing && s.sharing.state !== 'revoked' && s.sharing.state !== 'stopped' && <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.stopSharing(entry.key)}>Stop future sharing</Button>}
       {s?.sharing && s.sharing.state !== 'revoked' && <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.revokeSharing(entry.key)}>Revoke all shares</Button>}
@@ -96,9 +147,9 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
   </article>;
 }
 
-// Hub-held DebugPolicies (ADR-228/229/230/231/241). The hub accepts each
-// observed generation; status and deactivation are the shared browser/MCP
-// operations, and automatic intrusive actions are approved in the approvals inbox.
+// Hub-held DebugPolicies (ADR-228/229/230/231/241). Activation, status and
+// deactivation are the shared browser/MCP operations. Activation and the
+// policy approval request remain until hub-side acceptance replaces them.
 export function PolicyWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Policies }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const [ref, setRef] = useState({ cluster: 'local', namespace: '', policy_name: '' });
@@ -109,7 +160,7 @@ export function PolicyWorkspace({ session, scope, controller }: { session: Sessi
     <label>{label}<input name={key} value={ref[key]} required maxLength={maxLength} pattern={pattern} onChange={event => setRef({ ...ref, [key]: event.target.value })} autoComplete="off" spellCheck={false}/></label>;
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Automatic policies</h1>
-      <p>Check what a restart, probe-failure, alert, log or resource policy captured and stop it.
+      <p>Activate a hub-held restart, probe-failure, alert, log or resource policy for your team, check what it captured and stop it.
  A permission administrator can also stop a policy by suspending it in Kubernetes. <a href="/captures/new">Collect evidence manually</a>.</p>
     </div>
     <form onSubmit={event => { event.preventDefault(); void controller.lookup(ref); }}>

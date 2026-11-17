@@ -1,7 +1,9 @@
 package presentation
 
 import (
+	app "asservat.local/asservat/internal/application/capture"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,6 +39,37 @@ func policyShareInstruction(end time.Time) *value.PolicyShareInstruction {
 	creator := identity.Principal{Issuer: "https://id.example.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}
 	return &value.PolicyShareInstruction{Creator: creator, Management: []artifact.AudienceAssignment{{Kind: "Group", Issuer: creator.Issuer, SubjectID: "team-a", Role: "evidence-owner", BasisKind: "AccessBinding", BasisUID: "b", AssignmentID: "55555555-5555-4555-8555-555555555555"}},
 		Recipients: []authorization.ShareRecipient{{Kind: "Group", Issuer: creator.Issuer, ID: "incident"}, {Kind: "User", Issuer: creator.Issuer, ID: "oncall"}}, MaxCaptures: 10, NotAfter: end}
+}
+
+func TestPolicyActivationStatesThatRepeatedCollectionsWillBeShared(t *testing.T) {
+	end := time.Date(2026, 10, 28, 18, 0, 0, 0, time.UTC)
+	f := &policyOperationsFixture{scopes: []string{"evidence:read", "evidence:capture"}, activated: &app.PolicyActivationResult{PolicyUID: "policy-uid", AcceptanceID: "99999999-9999-4999-8999-999999999999", NotAfter: time.Now().Add(time.Hour), MaxExecutions: 10, Audited: true, Sharing: policyShareInstruction(end)}}
+	s := newPolicyOperations(t, f)
+	out := policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
+	data, _ := out["data"].(map[string]any)
+	sharingData, _ := data["sharing"].(map[string]any)
+	warnings, _ := out["warnings"].([]any)
+	if out["status"] != "ok" || sharingData["statement"] != "Repeated collections will be shared" || sharingData["recipients"] != float64(2) || sharingData["max_captures"] != float64(10) || sharingData["not_after"] != "2026-10-28T18:00:00Z" {
+		t.Fatal("activation sharing", out)
+	}
+	if len(warnings) != 1 || !strings.HasPrefix(warnings[0].(string), "Repeated collections will be shared with 2 recipient(s)") {
+		t.Fatal("activation warning", warnings)
+	}
+	// Without sharing_reviewed the server returns the review: the statement,
+	// the recipients, the capture limit and the end.
+	f.activated, f.activateErr = nil, app.PolicySharingReview{Instruction: *policyShareInstruction(end)}
+	out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
+	review, _ := out["data"].(map[string]any)
+	if out["status"] != "error" || review["code"] != "SharingReviewRequired" || !strings.HasPrefix(review["message"].(string), "Repeated collections will be shared with Group incident, User oncall: at most the next 10 capture(s) of this policy until 2026-10-28T18:00:00Z") {
+		t.Fatal("sharing review", out)
+	}
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k","sharing_reviewed":true}`); out["status"] != "error" {
+		t.Fatal("reviewed activation input refused", out)
+	}
+	f.activateErr = value.ErrSharingDenied
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "SharingNotPermitted" {
+		t.Fatal("sharing refusal", out)
+	}
 }
 
 func TestPolicyStatusReportsRecurringSharing(t *testing.T) {

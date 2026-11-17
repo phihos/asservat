@@ -124,7 +124,7 @@ func (s *GrantOperations) PublicOrigin() string {
 }
 
 func (s *GrantOperations) ToolNames() []string {
-	return []string{"request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
+	return []string{"request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
 }
 
 func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) {
@@ -134,24 +134,45 @@ func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) 
 	return s.contracts.Tool(name)
 }
 
-// GrantOperationInput is the closed union of the five inputs. after_revision
+// request_policy_grant (legacy contract) remains until hub-side acceptance
+// (specs/policy-automation.md) opens policy reviews itself.
+type policyGrantRequestLimits struct {
+	MaxObservedEvents int64 `json:"max_observed_events,omitempty"`
+	MaxExecutions     int64 `json:"max_executions"`
+	MaxCollectedBytes int64 `json:"max_collected_bytes"`
+	MaxObservedBytes  int64 `json:"max_observed_bytes"`
+}
+type policyGrantObservationInput struct {
+	MaxSessionSeconds     int64 `json:"max_session_seconds"`
+	MaxObservedBytes      int64 `json:"max_observed_bytes"`
+	MaxBytesPerSecond     int64 `json:"max_bytes_per_second"`
+	MaxConcurrentSessions int64 `json:"max_concurrent_sessions"`
+	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
+}
+
+// GrantOperationInput is the closed union of the six inputs. after_revision
 // is accepted; the shared wait wrapper serves it.
 type GrantOperationInput struct {
-	CaseID           string   `json:"case_id,omitempty"`
-	ArtifactIDs      []string `json:"artifact_ids,omitempty"`
-	ArtifactDigests  []string `json:"artifact_digests,omitempty"`
-	Operations       []string `json:"operations,omitempty"`
-	MaxBytes         int64    `json:"max_bytes,omitempty"`
-	ExpiresInSeconds int64    `json:"expires_in_seconds,omitempty"`
-	GrantID          string   `json:"grant_id,omitempty"`
-	AfterRevision    int64    `json:"after_revision,omitempty"`
-	View             string   `json:"view,omitempty"`
-	Limit            int      `json:"limit,omitempty"`
-	Cursor           string   `json:"cursor,omitempty"`
-	Decision         string   `json:"decision,omitempty"`
-	Reason           string   `json:"reason,omitempty"`
-	ExpectedRevision int64    `json:"expected_revision,omitempty"`
-	IdempotencyKey   string   `json:"idempotency_key,omitempty"`
+	PolicyName       string                       `json:"policy_name,omitempty"`
+	PolicyUID        string                       `json:"policy_uid,omitempty"`
+	LifetimeSeconds  int64                        `json:"lifetime_seconds,omitempty"`
+	Limits           *policyGrantRequestLimits    `json:"limits,omitempty"`
+	Observation      *policyGrantObservationInput `json:"observation_limits,omitempty"`
+	CaseID           string                       `json:"case_id,omitempty"`
+	ArtifactIDs      []string                     `json:"artifact_ids,omitempty"`
+	ArtifactDigests  []string                     `json:"artifact_digests,omitempty"`
+	Operations       []string                     `json:"operations,omitempty"`
+	MaxBytes         int64                        `json:"max_bytes,omitempty"`
+	ExpiresInSeconds int64                        `json:"expires_in_seconds,omitempty"`
+	GrantID          string                       `json:"grant_id,omitempty"`
+	AfterRevision    int64                        `json:"after_revision,omitempty"`
+	View             string                       `json:"view,omitempty"`
+	Limit            int                          `json:"limit,omitempty"`
+	Cursor           string                       `json:"cursor,omitempty"`
+	Decision         string                       `json:"decision,omitempty"`
+	Reason           string                       `json:"reason,omitempty"`
+	ExpectedRevision int64                        `json:"expected_revision,omitempty"`
+	IdempotencyKey   string                       `json:"idempotency_key,omitempty"`
 }
 
 // grantListPage is the most rows one list_reviews store read examines; a
@@ -253,6 +274,11 @@ type grantProfile struct {
 
 type grantLimits struct {
 	MaxBytesPerSecond int64 `json:"max_bytes_per_second"`
+	// The legacy request_policy_grant reply also carries these.
+	MaxSessionSeconds     int64 `json:"max_session_seconds,omitempty"`
+	MaxObservedBytes      int64 `json:"max_observed_bytes,omitempty"`
+	MaxConcurrentSessions int64 `json:"max_concurrent_sessions,omitempty"`
+	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
 }
 
 type grantAuthentication struct {
@@ -288,6 +314,27 @@ type grantPolicyData struct {
 	MaxCollectedBytes  int64           `json:"max_collected_bytes"`
 	ExecutionsUsed     int64           `json:"executions_used"`
 	CollectedBytesUsed int64           `json:"collected_bytes_used"`
+	// The legacy request_policy_grant reply also carries these.
+	MaxExecutions      *int64 `json:"max_executions,omitempty"`
+	MaxObservedBytes   *int64 `json:"max_observed_bytes,omitempty"`
+	ObservedBytesUsed  *int64 `json:"observed_bytes_used,omitempty"`
+	MaxObservedEvents  int64  `json:"max_observed_events,omitempty"`
+	ObservedEventsUsed int64  `json:"observed_events_used,omitempty"`
+}
+
+// legacyPolicyGrant adds the fields of the legacy request_policy_grant
+// reply, which remains until hub-side acceptance replaces it.
+func legacyPolicyGrant(d grantData, v authapp.GrantView) grantData {
+	g := v.Grant
+	if p := d.Policy; p != nil && g.Policy != nil {
+		l := g.Policy.Limits
+		p.MaxExecutions, p.MaxObservedBytes, p.ObservedBytesUsed = &l.MaxExecutions, &l.MaxObservedBytes, &g.PolicySpend.ObservedBytes
+		p.MaxObservedEvents, p.ObservedEventsUsed = l.MaxObservedEvents, g.PolicySpend.ObservedEvents
+	}
+	if l := v.Review.ObservationLimits; l != nil && d.ObservationLimits != nil {
+		d.ObservationLimits.MaxSessionSeconds, d.ObservationLimits.MaxObservedBytes, d.ObservationLimits.MaxConcurrentSessions, d.ObservationLimits.MaxObservedEvents = l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxConcurrentSessions, l.MaxObservedEvents
+	}
+	return d
 }
 
 // grantData is get_grant's reply; list rows omit actions, result access and
@@ -547,6 +594,28 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 				Phase       string `json:"phase"`
 				ApprovalURI string `json:"approval_uri"`
 			}{g.ID, string(g.Phase(s.now())), s.origin + "/approvals/" + g.ID}
+		}
+	case "request_policy_grant":
+		requester, ok := s.grants.(interface {
+			RequestPolicy(context.Context, identities.CurrentIdentity, authapp.PolicyGrantRequestInput) (authorization.Grant, bool, error)
+		})
+		if !ok || in.Limits == nil || !slices.Contains(i.Scopes, "evidence:capture") {
+			operationErr = authapp.ErrGrantUnavailable
+			break
+		}
+		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes, MaxObservedEvents: in.Limits.MaxObservedEvents}}
+		if in.Observation != nil {
+			o := in.Observation
+			request.Observation = &authorization.ObservationLimits{MaxSessionSeconds: o.MaxSessionSeconds, MaxObservedBytes: o.MaxObservedBytes, MaxBytesPerSecond: o.MaxBytesPerSecond, MaxConcurrentSessions: o.MaxConcurrentSessions, MaxObservedEvents: o.MaxObservedEvents}
+		}
+		var g authorization.Grant
+		if g, _, operationErr = requester.RequestPolicy(ctx, current, request); operationErr == nil {
+			var v authapp.GrantView
+			var valid time.Time
+			if v, valid, operationErr = s.grants.Get(ctx, current, g.ID); operationErr == nil {
+				until = identity.Earlier(until, valid)
+				out.Data = legacyPolicyGrant(s.view(v, i.Principal, true), v)
+			}
 		}
 	case "get_grant":
 		var v authapp.GrantView

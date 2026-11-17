@@ -1,6 +1,8 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
+	"fmt"
 	"testing"
 	"time"
 
@@ -25,5 +27,14 @@ func TestPolicyStatusReportsAlertOccurrences(t *testing.T) {
 	}
 	if o := recent[0].(map[string]any); o["detector"] != "alert" || o["failed_at"] != "2026-10-26T11:59:00Z" || o["restarts"] != nil {
 		t.Fatal("alert occurrence", o)
+	}
+}
+
+// A region without an Alertmanager refuses an alert policy's activation with
+// a fixed, actionable reason.
+func TestPolicyActivationNamesMissingAlertmanager(t *testing.T) {
+	f := publicPolicyFailure(fmt.Errorf("workload: %w", targets.ErrUnsupported))
+	if f.Code != "DetectorUnavailable" || f.Retryable {
+		t.Fatal(f)
 	}
 }
