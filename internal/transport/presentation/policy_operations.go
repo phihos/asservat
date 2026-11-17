@@ -158,7 +158,6 @@ type policyStatusData struct {
 	Sharing             *policyStatusSharing    `json:"sharing,omitempty"`
 }
 
-var errUnknownCluster = errors.New("unknown cluster name")
 
 func publicPolicyFailure(err error) OperationFailure {
 	switch {
