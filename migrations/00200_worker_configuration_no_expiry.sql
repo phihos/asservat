@@ -3,6 +3,8 @@
 -- observation replaces it (AGENTS.md: cached state remains valid until
 -- replaced). The five-second head expiry forced a once-a-second refresh loop
 -- and failed downloads whenever that loop stalled. Drop it.
+-- No Down: the expiry is not restored. CREATE OR REPLACE and IF EXISTS keep
+-- a re-Up harmless.
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION context_query_shared_profile_current(r uuid,p jsonb) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -22,4 +24,4 @@ BEGIN
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
 -- +goose StatementEnd
-ALTER TABLE download_worker_configuration DROP COLUMN fresh_until;
+ALTER TABLE download_worker_configuration DROP COLUMN IF EXISTS fresh_until;
