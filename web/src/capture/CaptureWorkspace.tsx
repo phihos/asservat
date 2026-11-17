@@ -213,7 +213,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
       {!state.preview.capture_enabled && state.preview.blockers.length === 0 && <p className="notice">Collection is not enabled for this client. An administrator can check the installation settings.</p>}
-      {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; collection starts only after approval and a further submission.</p>}
+      {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; approval starts the collection.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
       <p role="status">{state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
       <div className="actions"><CaptureSubmission key={state.preview.plan_digest} preview={state.preview} state={state} controller={controller}/>
@@ -228,10 +228,16 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
     </section>}
     {state.stage === 'approval' && <section aria-busy={state.busy}>
-      <p role="status">The independent review is pending. Collection has not been accepted.</p>
-      <p>After approval, submit this same request again from this tab. Asservat recomputes the plan and checks your current access and the grant again.</p>
+      {state.resubmit ? <>
+        <p role="status">The request was approved after your sign-in had ended, so it was not started.</p>
+        <p>Submit it again from this tab. Asservat recomputes the plan and checks your current access and the approval.</p>
+        <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>Submit again</Button>
+      </> : <>
+        <p role="status">The independent review is pending. Collection has not been accepted.</p>
+        <p>Approval starts the collection. This page shows it when it starts.</p>
+        <Button className="button" isDisabled={state.busy} onPress={() => void controller.checkApproval()}>Check approval</Button>
+      </>}
       {state.approvalURI && <a className="button secondary" href={state.approvalURI}>View approval</a>}
-      <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>Submit after approval</Button>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.discardApprovalRequest}>Edit request</Button>
     </section>}
     {state.stage === 'uncertain' && <section aria-busy={state.busy}>

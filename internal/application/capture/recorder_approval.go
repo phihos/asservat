@@ -33,7 +33,8 @@ type RecorderGrants interface {
 // (ADR-248). Manual raw predicates stay unavailable. Finite policy raw actions
 // pass only to their original atomic policy admission and observation companion;
 // this gate itself never arms a source, reserves input or grants acquisition.
-func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) (authorization.Grant, error) {
+func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, in CaptureRequest) (authorization.Grant, error) {
+	access := in.Access
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
 	if g := p.CompositionGroup; g != nil {
 		scopes := make([][]byte, len(g.Children))
@@ -147,7 +148,7 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 	}
 	created, _, err := s.Grants.Request(ctx, source, authapp.GrantRequestInput{PreviewID: p.ID, CaptureID: p.CaptureID, Actor: p.Actor, Target: t, Scope: p.CanonicalScope, ExecutionDigest: p.ScopeDigest,
-		DataClass: approval.DataClass, Reasons: approval.Reasons, Review: review, Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: key})
+		DataClass: approval.DataClass, Reasons: approval.Reasons, Review: review, Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: in.Key, Submission: in.Submission})
 	if err != nil {
 		return authorization.Grant{}, err
 	}

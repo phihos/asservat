@@ -79,6 +79,8 @@ type GrantRequestInput struct {
 	Lifetime             time.Duration
 	ResultAccess         *value.ResultAccess
 	IdempotencyKey       string
+	// Submission is the reviewed request_capture input that approval submits.
+	Submission []byte
 }
 
 // StoredGrantRequest is what the store inserts; the review window and
@@ -291,6 +293,9 @@ func (s GrantService) Request(ctx context.Context, current identities.CurrentIde
 	g := value.Grant{Review: review, ID: s.NewID(), RootID: s.RootID, Kind: value.GrantAdHocCapture, PreviewID: in.PreviewID, CaptureID: in.CaptureID, Target: in.Target,
 		ExecutionDigest: in.ExecutionDigest, DataClass: in.DataClass, Reasons: slices.Clone(in.Reasons), Scope: slices.Clone(in.Scope), Requester: i.Principal,
 		Lifetime: in.Lifetime, Revision: 1}
+	if in.Submission != nil {
+		g.Submission = &value.GrantSubmission{Request: slices.Clone(in.Submission), Groups: slices.Clone(i.Groups), Scopes: slices.Clone(i.Scopes), Policy: i.Policy, Until: i.AuthenticatedUntil}
+	}
 	if sha256.Sum256(in.Scope) != in.ExecutionDigest {
 		return zero, false, value.ErrGrantInvalid
 	}
@@ -547,11 +552,14 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 		v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
 	}
 	// Resume is a UI hint only; it never replaces the request's admission checks.
+	// Approval submits a stored request while its requester's authentication
+	// lasts (ADR-335 D5); only after that does the requester resubmit.
 	var timing struct {
 		Timing string `json:"timing"`
 	}
 	marked := g.Kind == value.GrantAdHocCapture && json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
-	if sameHuman(i.Principal, g.Requester) && slices.Contains(i.Scopes, "evidence:capture") && marked &&
+	submitted := g.Submission != nil && g.Decision != nil && g.Decision.DecidedAt.Before(g.Submission.Until)
+	if sameHuman(i.Principal, g.Requester) && slices.Contains(i.Scopes, "evidence:capture") && marked && !submitted &&
 		ReviewDigest(g, g.Review) == g.ReviewDigest &&
 		value.CheckCaptureUse(g, i, g.CaptureID, g.ExecutionDigest, g.ReviewDigest, s.Now()) == nil {
 		eligible, e := s.collector(ctx, i, g.Target, value.CollectContext)

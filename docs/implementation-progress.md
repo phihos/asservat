@@ -14,10 +14,19 @@ request ID. Migration 00200 drops `context_preview`, its fences and expiry.
 Removed: the preview store, preview cleanup, `resolve_capture_request`,
 `continue_acquisition`, the `capture-resolution` SQL duty, the per-root
 preview cap and `preview_id` in grant replies.
-Gaps: approval does not yet submit the request itself (ADR-335 D5): after
-approval the requester resubmits the same request and key, which the grant
-then covers. A request recomputes the preview's reads before admission.
-Recording handles still expire after one minute.
+Gaps: a request recomputes the preview's reads before admission. Recording
+handles still expire after one minute.
+
+## Approval submits the request (ADR-335 D5, 2026-11-17)
+
+Branch `clean/approval-submit`. An ad hoc grant stores the `request_capture`
+input with the requester's verified groups, scopes, identity policy revision
+and the end of their authentication (00201 `access_grant.submission`).
+`decide_review` approve submits it right after the decision commits, through
+the `request_capture` path, so current bindings and denies decide. After that
+end it returns the warning `RequesterReauthenticationRequired`, `get_grant`
+sets `can_resume` and the requester resubmits. The console waits for the
+capture on the status stream, which now waits for a capture not yet visible.
 
 ## One-step publication (REQ-EVD-001, ADR-330, 2026-11-17)
 

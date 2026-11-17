@@ -144,6 +144,10 @@ type Identity struct {
 	Policy                 Revision
 	VerifiedAt, ValidUntil time.Time
 	Assurance              Assurance
+	// AuthenticatedUntil is the end of the authentication itself: the token
+	// expiry, or the browser session expiry for a session that renews its
+	// token. Policy freshness and request windows do not shorten it.
+	AuthenticatedUntil time.Time
 }
 
 // SteppedUp reports a current IdP step-up of a human identity (ADR-249).
@@ -232,7 +236,7 @@ func Admit(c Claims, p Policy, now time.Time) (Identity, error) {
 	if !now.Before(until) {
 		return out, ErrDenied
 	}
-	return Identity{Principal{c.Issuer, c.Subject, c.ClientID, kind}, slices.Clone(c.Scopes), slices.Clone(c.Groups), p.Revision, now, until, assurance(c, p, kind, now, until)}, nil
+	return Identity{Principal{c.Issuer, c.Subject, c.ClientID, kind}, slices.Clone(c.Scopes), slices.Clone(c.Groups), p.Revision, now, until, assurance(c, p, kind, now, until), Earlier(c.ExpiresAt, c.KeyUntil)}, nil
 }
 
 // assurance derives step-up from the signed acr/auth_time of a human token

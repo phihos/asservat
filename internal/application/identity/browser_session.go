@@ -242,6 +242,8 @@ func (s BrowserSessions) Complete(ctx context.Context, state, browser, code stri
 		return out, value.ErrDenied
 	}
 	i.ValidUntil = value.Earlier(i.ValidUntil, record.ExpiresAt)
+	// The session renews its token, so the session bounds the authentication.
+	i.AuthenticatedUntil = record.ExpiresAt
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied
 	}
@@ -350,6 +352,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	}
 	// The returned identity keeps token/key/policy and actual session expiry.
 	i.ValidUntil = value.Earlier(i.ValidUntil, current.ExpiresAt)
+	i.AuthenticatedUntil = current.ExpiresAt
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied
 	}

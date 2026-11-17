@@ -92,6 +92,9 @@ type GrantUseCase interface {
 // GrantOperations serves get_grant (browser and MCP) and the browser-only
 // list_reviews, decide_review and revoke_grant through the audited path.
 type GrantOperations struct {
+	// Submit submits a stored request_capture input as current, the
+	// recorded requester; approval calls it (ADR-335 D5).
+	Submit    func(context.Context, identities.CurrentIdentity, []byte) (string, error)
 	origin    string
 	now       func() time.Time
 	newID     func() string
@@ -551,6 +554,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 				d.NotAfter = &end
 			}
 			out.Data = d
+			out.Warnings = s.submitApproved(ctx, g)
 		}
 	case "revoke_grant":
 		var g authorization.Grant
@@ -582,6 +586,25 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 	// logical mutation may already have committed.
 	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval)
 	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch, grantReview: name == "get_grant"}, nil
+}
+
+// submitApproved submits the request an approval covers, as its requester
+// with the groups recorded at request time (ADR-335 D5). Current bindings
+// and denies decide. The recorded groups apply only before the recorded end
+// of the requester's authentication; after it the requester submits again.
+// A failure code is returned as a warning.
+func (s *GrantOperations) submitApproved(ctx context.Context, g authorization.Grant) []string {
+	x := g.Submission
+	if x == nil || s.Submit == nil || g.Kind != authorization.GrantAdHocCapture || g.Decision == nil || !g.Decision.Approved {
+		return []string{}
+	}
+	if !g.Decision.DecidedAt.Before(x.Until) {
+		return []string{"RequesterReauthenticationRequired"}
+	}
+	if _, err := s.Submit(ctx, identities.Recorded(g.Requester, x.Groups, x.Scopes, x.Policy, x.Until, s.now), x.Request); err != nil {
+		return []string{publicCaptureFailure(err, true).Code}
+	}
+	return []string{}
 }
 
 func grantAuditDecision(err error) operationAuditDecision {

@@ -65,12 +65,18 @@ func TestSensitiveRecorderPlanNeedsApprovalBeforeAnything(t *testing.T) {
 	}
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
-	_, err = f.request(t, p, "k1")
+	// The review request stores the submission approval submits (ADR-335 D5).
+	first := reviewed(p, "k1")
+	first.Submission = []byte(`{"idempotency_key":"k1"}`)
+	_, err = f.svc.Request(ctx, f.source(t, ctx), first)
 	var pending authorization.ApprovalPendingError
 	if !errors.As(err, &pending) || len(grants.requests) != 1 {
 		t.Fatal("no review request opened", err)
 	}
 	in := grants.requests[0]
+	if string(in.Submission) != string(first.Submission) {
+		t.Fatal("submission not stored with the review request")
+	}
 	if in.CaptureID != p.CaptureID || in.ExecutionDigest != p.ScopeDigest || in.Actor != f.actor || in.DataClass != "extract" || len(in.Review.Actions) != 1 || in.Review.Actions[0].Filter != "tcp[13] & 2 != 0" || in.Review.ObservationLimits == nil || in.Lifetime != authorization.GrantDefaultLifetime {
 		t.Fatalf("review request %+v", in)
 	}

@@ -173,7 +173,7 @@ func (q *Queries) ListRecordingCandidates(ctx context.Context, arg ListRecording
 }
 
 const readLiveSourceObservation = `-- name: ReadLiveSourceObservation :one
-SELECT g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query,s.binding_json,s.started_at,s.hard_until,s.bytes_per_second,s.cluster_id AS source_cluster_id,
+SELECT g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query, g.submission,s.binding_json,s.started_at,s.hard_until,s.bytes_per_second,s.cluster_id AS source_cluster_id,
  s.namespace_uid AS source_namespace_uid,s.workload_uid AS source_workload_uid,
  p.observed_at AS policy_observed_at,p.fresh_until AS policy_fresh_until,
  a.authority_digest,a.authored_grant_ref
@@ -278,6 +278,7 @@ func (q *Queries) ReadLiveSourceObservation(ctx context.Context, arg ReadLiveSou
 		&i.AccessGrant.PolicyObservedBytesSpent,
 		&i.AccessGrant.PolicyObservedEventsSpent,
 		&i.AccessGrant.RawQuery,
+		&i.AccessGrant.Submission,
 		&i.BindingJson,
 		&i.StartedAt,
 		&i.HardUntil,

@@ -138,4 +138,20 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	if e := next(); e.Type != "capture" || e.Revision != 1 {
 		t.Fatal("pushed state", e)
 	}
+	calls.hidden.Store(true)
+	changes.Publish("00000000-0000-4000-8000-000000000030")
+	if e := next(); e.Type != "accessLost" {
+		t.Fatal("shown capture lost access", e)
+	}
+
+	// A capture that is not visible yet is awaited: an approval may start it.
+	waiting := get("?capture_id=00000000-0000-4000-8000-000000000030")
+	defer waiting.Body.Close()
+	lines = bufio.NewScanner(waiting.Body)
+	time.Sleep(50 * time.Millisecond)
+	calls.hidden.Store(false)
+	changes.Publish("00000000-0000-4000-8000-000000000030")
+	if e := next(); e.Type != "capture" || e.ID != "00000000-0000-4000-8000-000000000030" {
+		t.Fatal("awaited capture", e)
+	}
 }

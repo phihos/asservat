@@ -72,6 +72,7 @@ type AccessGrant struct {
 	PolicyObservedBytesSpent  int64
 	PolicyObservedEventsSpent int64
 	RawQuery                  []byte
+	Submission                []byte
 }
 
 type AccessGrantChild struct {

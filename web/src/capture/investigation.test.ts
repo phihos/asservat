@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from './investigation';
 import { FakeEventSource } from '../test-setup';
-import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
+import { SyntheticOperations, SyntheticGrants, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
 
 const controllers: Investigation[] = [];
 const submission = (retention: number, key = id(4)) => ({ preview: { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' }, requested_retention_seconds: retention }, expected_plan_digest: 'b'.repeat(64), idempotency_key: key });
@@ -110,13 +110,13 @@ it('pages with the opaque authorized cursor, removes duplicates and expires its 
 });
 afterEach(() => { for (const c of controllers) c.reset(); controllers.length = 0; vi.useRealTimers(); window.history.replaceState(null, '', '/'); });
 async function ready(retention = '3600', newID = () => id(4)) {
-  const client = new SyntheticOperations();
-  const controller = new Investigation(client, newID); controllers.push(controller);
+  const client = new SyntheticOperations(); const grants = new SyntheticGrants();
+  const controller = new Investigation(client, newID, grants); controllers.push(controller);
   const scope = new AbortController(); controller.attach(session, scope.signal);
   controller.setDraft({ target, retention }); await controller.discover();
   await controller.preview(controller.snapshot().diagnostics![0]);
   expect(controller.snapshot().stage).toBe('review');
-  return { controller, client, scope };
+  return { controller, client, scope, grants };
 }
 it('submits only the reviewed preview input and digest and freezes its key before I/O', async () => {
   const { controller, client } = await ready(); await controller.submit();
@@ -326,6 +326,33 @@ it('requests independent approval for an exact recording review and resubmits th
   expect(client.calls.filter(c => c.name === 'request_capture').map(c => c.input)).toEqual([first, first]);
   expect(client.calls.filter(c => c.name === 'preview_capture')).toHaveLength(2);
   expect(controller.snapshot().captureID).toBe(id(8));
+});
+// ADR-335 D5: approval submits the request; the tab waits for its capture.
+it('waits for the capture an approval starts and resubmits only after the sign-in ended', async () => {
+  const { controller, client, grants } = await ready();
+  client.responder = () => approvalPendingResult(); await controller.submit();
+  await vi.waitFor(() => expect(grants.calls).toBe(1));
+  const stream = FakeEventSource.instances.at(-1)!;
+  expect(stream.url).toBe('/api/v1/events?capture_id=' + id(8));
+  client.responder = () => progressResult();
+  stream.emit('capture', {});
+  await vi.waitFor(() => expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8) }));
+  expect(client.calls.filter(c => c.name === 'request_capture')).toHaveLength(1);
+
+  const again = await ready();
+  again.client.responder = () => approvalPendingResult(); again.grants.grant = { phase: 'Approved', can_resume: true };
+  await again.controller.submit();
+  await vi.waitFor(() => expect(again.controller.snapshot().resubmit).toBe(true));
+  expect(again.client.calls.filter(c => c.name === 'request_capture')).toHaveLength(1);
+
+  const approved = await ready();
+  approved.client.responder = () => approvalPendingResult(); await approved.controller.submit();
+  approved.grants.grant = { phase: 'Approved', can_resume: false };
+  approved.client.responder = name => name === 'request_capture' ? acceptedResult() : progressResult();
+  await approved.controller.checkApproval();
+  const submits = approved.client.calls.filter(c => c.name === 'request_capture');
+  expect(submits).toHaveLength(2); expect(submits[1].input).toEqual(submits[0].input);
+  expect(approved.controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8) });
 });
 it('drops an approval-pending submission only on an explicit edit', async () => {
   const { controller, client } = await ready();

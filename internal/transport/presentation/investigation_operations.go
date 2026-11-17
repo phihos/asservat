@@ -106,6 +106,10 @@ func NewInvestigationGrantOperations(base *InvestigationOperations, grants *Gran
 	if grants == nil {
 		return nil, ErrOperationsConfiguration
 	}
+	// Approval submits the reviewed request through request_capture's path.
+	if base != nil && base.captures != nil && grants.Submit == nil {
+		grants.Submit = base.captures.SubmitApproved
+	}
 	return withOperations(base, grants)
 }
 

@@ -61,6 +61,15 @@ type grantResultAccessWire struct {
 	NotAfter      string   `json:"notAfter"`
 }
 
+// grantSubmissionWire is the stored submission of an ad hoc grant (00201).
+type grantSubmissionWire struct {
+	Request json.RawMessage   `json:"request"`
+	Groups  []string          `json:"groups"`
+	Scopes  []string          `json:"scopes"`
+	Policy  identity.Revision `json:"policy"`
+	Until   time.Time         `json:"until"`
+}
+
 func optionalTime(t pgtype.Timestamptz) time.Time {
 	if !t.Valid {
 		return time.Time{}
@@ -125,6 +134,13 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		}
 		g.ResultAccess = &authorization.ResultAccess{ActionIDs: w.ActionIDs, Operations: w.Operations, MaxArtifacts: w.MaxArtifacts, MaxBytes: w.MaxBytes, MaxOperations: w.MaxOperations, NotAfter: r.NotAfter.Time}
 		copy(g.ResultAccessDigest[:], r.ResultAccessDigest)
+	}
+	if len(r.Submission) > 0 {
+		var w grantSubmissionWire
+		if r.Kind != authorization.GrantAdHocCapture || json.Unmarshal(r.Submission, &w) != nil {
+			return authorization.Grant{}, authapp.ErrGrantUnavailable
+		}
+		g.Submission = &authorization.GrantSubmission{Request: w.Request, Groups: w.Groups, Scopes: w.Scopes, Policy: w.Policy, Until: w.Until}
 	}
 	if r.Decision.Valid {
 		g.Decision = &authorization.GrantDecision{Approved: r.Decision.String == "approved", Reason: r.DecisionReason.String, ACR: r.DecisionAcr.String, AuthenticatedAt: optionalTime(r.DecisionAuthTime), DecidedAt: r.DecidedAt.Time,
@@ -197,6 +213,11 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 		params.NotAfter = ts(notAfter)
 		params.ResultAccessDigest = g.ResultAccessDigest[:]
 		params.MaxArtifacts, params.MaxBytes, params.MaxOperations = int32(a.MaxArtifacts), a.MaxBytes, a.MaxOperations
+	}
+	if x := g.Submission; x != nil {
+		if params.Submission, err = json.Marshal(grantSubmissionWire{x.Request, x.Groups, x.Scopes, x.Policy, x.Until.UTC()}); err != nil {
+			return zero, false, authorization.ErrGrantInvalid
+		}
 	}
 	var out authorization.Grant
 	replay := false

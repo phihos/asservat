@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -148,6 +149,39 @@ func (s *consoleArgumentCaptures) Request(ctx context.Context, current identitie
 	return s.consoleSyntheticCaptures.Request(ctx, current, in)
 }
 
+// consoleArgumentGrants answers get_grant for the synthetic approval: Pending
+// until the test approves, then Approved. Approval submission itself is not
+// part of this fixture; the console reads the capture back with its key.
+type consoleArgumentGrants struct{ service *consoleArgumentCaptures }
+
+func (g consoleArgumentGrants) Get(ctx context.Context, current identities.CurrentIdentity, id string) (authapp.GrantView, time.Time, error) {
+	i, err := current.ResolveIdentity(ctx)
+	if err != nil || id != consoleCaptureID(41) {
+		return authapp.GrantView{}, time.Time{}, authapp.ErrGrantNotFound
+	}
+	g.service.mu.Lock()
+	approved := g.service.approved
+	g.service.mu.Unlock()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	v := authapp.GrantView{Phase: authorization.GrantPending, Review: authapp.GrantReview{Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", PodName: "api-a", Deadline: now.Add(5 * time.Minute), Actions: []authapp.GrantReviewAction{{ActionID: "a1", Kind: "packetCapture", ExecutionMode: "ongoing", Before: "30s", After: "10s", Filter: "tcp", FilterDigest: artifact.Digest{4}, FilterInstructions: 4, MaxBytes: 16 << 20, RingMaxBytes: 16 << 20, RingMaxAge: "50s", Sensitive: []string{"rawBytePredicate"}}}},
+		Grant: authorization.Grant{ID: id, Kind: authorization.GrantAdHocCapture, CaptureID: consoleCaptureID(8), Target: authorization.Target{ClusterID: consoleCaptureID(1)}, ExecutionDigest: artifact.Digest{1}, ReviewDigest: artifact.Digest{2}, DataClass: "extract",
+			Reasons: []authorization.SensitiveReason{{ActionID: "a1", Code: "rawBytePredicate"}}, Requester: i.Principal, RequestedAt: now, Lifetime: time.Hour, Revision: 1}}
+	if approved {
+		v.Phase, v.Grant.Revision, v.Grant.ExpiresAt = authorization.GrantApproved, 2, now.Add(time.Hour)
+		v.Grant.Decision = &authorization.GrantDecision{Approved: true, Approver: identity.Principal{Issuer: i.Principal.Issuer, Subject: "synthetic-reviewer", ClientID: "console", Kind: identity.Human}, Reason: "synthetic", ACR: "mfa", DecidedAt: now, AuthenticatedAt: now}
+	}
+	return v, i.ValidUntil, nil
+}
+func (consoleArgumentGrants) List(context.Context, identities.CurrentIdentity, string, int) ([]authapp.GrantView, time.Time, error) {
+	return nil, time.Time{}, authapp.ErrGrantUnavailable
+}
+func (consoleArgumentGrants) Decide(context.Context, identities.CurrentIdentity, string, bool, string, string) (authorization.Grant, bool, error) {
+	return authorization.Grant{}, false, authapp.ErrGrantUnavailable
+}
+func (consoleArgumentGrants) Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Grant, bool, error) {
+	return authorization.Grant{}, false, authapp.ErrGrantUnavailable
+}
+
 func consoleArgumentOperations(t *testing.T, origin string, service *consoleArgumentCaptures) *presentation.ContextOperations {
 	t.Helper()
 	op, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, service, service, nil)
@@ -205,6 +239,13 @@ func consoleSyscallCaptureAuthoring(t *testing.T, mode string) {
 	}
 	operations, err := presentation.NewInvestigationOperations(consoleArgumentOperations(t, origin, service), cases)
 	if err != nil {
+		t.Fatal(err)
+	}
+	grants, err := presentation.NewGrantOperations(origin, time.Now, func() string { return consoleCaptureID(502) }, consoleArgumentGrants{service})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operations, err = presentation.NewInvestigationGrantOperations(operations, grants); err != nil {
 		t.Fatal(err)
 	}
 	handler, err := browser.NewInvestigationHandler(sessionHandler, operations, 4)

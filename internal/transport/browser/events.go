@@ -26,7 +26,8 @@ type ChangeSubscription interface {
 // EventsHandler serves GET /api/v1/events as Server-Sent Events. Each event
 // is the unchanged get_capture result, read through the same audited
 // operation as a POST, so every event is authorized and audited like one
-// status read. A denied read ends the stream with accessLost.
+// status read. A denied read of a shown capture ends the stream with
+// accessLost.
 type EventsHandler struct {
 	sessions   SessionHandler
 	operations presentation.Operations
@@ -92,8 +93,11 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if control.Flush() != nil {
 		return
 	}
+	// A capture that is not visible yet (an approval may still start it) is
+	// waited for; accessLost only follows a capture this stream has shown.
+	shown := map[string]bool{}
 	for _, id := range ids {
-		if !h.send(w, r, control, id) {
+		if !h.send(w, r, control, id, shown) {
 			return
 		}
 	}
@@ -126,7 +130,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		changed := subscription.Take()
 		_, all := changed[""]
 		for _, id := range ids {
-			if _, ok := changed[id]; (all || ok) && !h.send(w, r, control, id) {
+			if _, ok := changed[id]; (all || ok) && !h.send(w, r, control, id, shown) {
 				return
 			}
 		}
@@ -134,7 +138,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // send writes the current state of one capture; false ends the stream.
-func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *http.ResponseController, id string) bool {
+func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *http.ResponseController, id string, shown map[string]bool) bool {
 	ctx, cancel := context.WithTimeout(r.Context(), audit.OperationRequestWindow("get_capture"))
 	defer cancel()
 	request := r.WithContext(ctx)
@@ -160,6 +164,9 @@ func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *ht
 		}
 		if envelope.Status == "ok" {
 			event = statusEvent{Type: "capture", ID: id, Revision: envelope.Data.Revision, Result: out.Body}
+			shown[id] = true
+		} else if !shown[id] {
+			return true
 		}
 	}
 	data, err := json.Marshal(event)

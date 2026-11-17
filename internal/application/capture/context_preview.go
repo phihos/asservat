@@ -17,6 +17,9 @@ type CaptureRequest struct {
 	Plan    artifact.Digest
 	Access  *authorization.ResultAccess
 	Preview func(context.Context) (value.ContextPreview, error)
+	// Submission is this request as request_capture input. A plan that
+	// needs approval stores it so approval can submit it (ADR-335 D5).
+	Submission []byte
 }
 
 // ContextAdmissionReplay is a read-only transaction with current SQL target

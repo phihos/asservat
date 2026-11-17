@@ -87,7 +87,8 @@ try {
   const approved = await page.request.post(origin + '/test/argument-approve', { headers: { Origin: origin } });
   assert.equal(approved.status(), 204);
   const resumedWait = waitOperation('request_capture');
-  await page.getByRole('button', { name: 'Submit after approval', exact: true }).click();
+  // ADR-335 D5: the console reads the approved request back with its key.
+  await page.getByRole('button', { name: 'Check approval', exact: true }).click();
   const resumedResponse = await resumedWait;
   const accepted = await checked(resumedResponse, validOutput_request_capture);
   assert.equal(accepted.status, 'ok');
