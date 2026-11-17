@@ -71,7 +71,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, e
 		}
 	}
-	// ADR-228: get_policy_status and deactivate_policy on the same audited
+	// ADR-228: activate_policy, get_policy_status and deactivate_policy on the same audited
 	// routes, and the restart trigger that RunPublic supervises.
 	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{ongoingSources: ongoingSources, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)

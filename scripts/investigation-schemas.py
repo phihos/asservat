@@ -7,7 +7,9 @@ Schemas alone never register an operation; the composed services do.
 
 Tools listed in specs/contracts/implemented/legacy-tools.txt still run the
 earlier contract: their embedded files stay as they are until the runtime
-follows the canonical tool, which then removes its line.
+follows the canonical tool, which then removes its line. activate_policy and
+request_policy_grant remain until hub-side acceptance (specs/policy-automation.md)
+replaces them.
 """
 import argparse
 import copy

@@ -1,11 +1,12 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
+	"strings"
 	"testing"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ADR-241: log and resource occurrences report their second as failed_at;
@@ -44,5 +45,14 @@ func TestPolicyStatusReportsLogAndResourceDetectors(t *testing.T) {
 				t.Fatal("resource detector", detector)
 			}
 		}
+	}
+}
+
+// A region without the metrics API refuses a resource policy's activation
+// with a fixed reason naming metrics-server.
+func TestPolicyActivationNamesMissingMetricsAPI(t *testing.T) {
+	f := publicPolicyFailure(targets.ErrUnsupported)
+	if f.Code != "DetectorUnavailable" || f.Retryable || !strings.Contains(f.Message, "metrics-server") {
+		t.Fatal(f)
 	}
 }

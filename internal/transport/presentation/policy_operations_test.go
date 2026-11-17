@@ -22,11 +22,14 @@ type policyOperationsFixture struct {
 	stopped int
 	status  value.PolicyStatus
 	named   []string
+	// activated/activateErr answer activate_policy; nil means deactivated.
+	activated   *app.PolicyActivationResult
+	activateErr error
 }
 
 func newPolicyOperations(t *testing.T, f *policyOperationsFixture) *PolicyOperations {
 	t.Helper()
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, NewClusterNames(map[string]string{"local": policyTestCluster}), f, f)
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, NewClusterNames(map[string]string{"local": policyTestCluster}), f, f, f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +39,15 @@ func newPolicyOperations(t *testing.T, f *policyOperationsFixture) *PolicyOperat
 func (f *policyOperationsFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
 	now := time.Now()
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}, Scopes: f.scopes, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}, nil
+}
+func (f *policyOperationsFixture) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
+	if f.activated == nil && f.activateErr == nil {
+		return app.PolicyActivationResult{}, app.ErrPolicyDeactivated
+	}
+	if f.activateErr != nil {
+		return app.PolicyActivationResult{}, f.activateErr
+	}
+	return *f.activated, nil
 }
 func (f *policyOperationsFixture) Get(_ context.Context, _ identities.CurrentIdentity, cluster, namespace, name string) (value.PolicyStatus, time.Time, error) {
 	f.named = []string{cluster, namespace, name}
@@ -75,6 +87,10 @@ func TestPolicyDeactivationOperationContract(t *testing.T) {
 	}
 	if out = policyCall(t, s, f, "deactivate_policy", in); out["data"].(map[string]any)["replay"] != true {
 		t.Fatal("repeated deactivation is not a replay", out)
+	}
+	// A deactivated revision explains why it cannot be activated again.
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "PolicyDeactivated" {
+		t.Fatal("reactivation refusal", out)
 	}
 	// Status of a deactivated policy reports it, with its last acceptance.
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", DeactivatedID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour)}

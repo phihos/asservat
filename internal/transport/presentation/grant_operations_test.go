@@ -3,7 +3,6 @@ package presentation
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -212,39 +211,6 @@ func TestGrantReviewShowsArgumentReason(t *testing.T) {
 	if !bytes.Contains(raw, []byte(`"syscallArguments"`)) || bytes.Contains(raw, []byte(`"max_observed_events"`)) {
 		t.Fatalf("argument reason lost: %s %v", raw, err)
 	}
-}
-
-// policyRequestWireView is a team policy grant view (kind policy).
-func policyRequestWireView(now time.Time, actor identity.Principal) authapp.GrantView {
-	v := grantView(now)
-	g := v.Grant
-	target := g.Target
-	g.Kind, g.PreviewID, g.CaptureID, g.Target = authorization.GrantPolicy, "", "", authorization.Target{}
-	g.Requester = actor
-	g.ResultAccess = nil
-	g.ResultAccessDigest = artifact.Digest{}
-	g.Scope = []byte(`{"format":"synthetic-policy-request-wire/v1"}`)
-	g.ExecutionDigest = sha256.Sum256(g.Scope)
-	revision := identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{1}}
-	owner := artifact.AudienceAssignment{Kind: "Group", Issuer: actor.Issuer, SubjectID: "maintainers", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{1}, AssignmentID: "00000000-0000-4000-8000-000000000901"}
-	a := authorization.AcceptedPolicyAuthority{InstallationID: g.RootID, PolicyUID: "team-policy", Creator: actor, Executor: authorization.PolicyPrincipal(g.RootID, "team-policy"), ScopeDigest: g.ExecutionDigest, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: revision, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 1 << 30}, IssuedAt: now.Add(-time.Hour), NotAfter: now.Add(7 * 24 * time.Hour)}
-	g.Policy = &authorization.PolicyGrantScope{Authority: a, RecipeDigest: artifact.Digest{8}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 64 << 20}, ApprovalPolicyRef: revision, ApprovalMaxAge: 30 * 24 * time.Hour}
-	g.Lifetime = 24 * time.Hour
-	g.PolicyNotAfter = now.Add(24 * time.Hour)
-	g.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "policyCollection"}}
-	v.Grant = g
-	v.Approver = false
-	v.CanRevoke = true
-	v.Review.PodName = ""
-	v.Review.ObservationLimits = nil
-	v.Review.Deadline = a.NotAfter
-	v.Review.Actions[0].ExecutionMode = "onTrigger"
-	v.Review.Actions[0].Before = "0s"
-	v.Review.Actions[0].After = "2s"
-	v.Review.Actions[0].Sensitive = []string{}
-	v.Grant.Review, _ = json.Marshal(v.Review)
-	v.Grant.ReviewDigest = authapp.ReviewDigest(v.Grant, v.Grant.Review)
-	return v
 }
 
 func TestListReviewsCursor(t *testing.T) {

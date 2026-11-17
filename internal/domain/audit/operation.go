@@ -74,6 +74,7 @@ var operations = map[string]operationKind{
 	"release_processing":         {processingInput, ordinaryWindow, true, OperationOutputLimit},
 	"request_capture":            {contextInput, identity.RecordingSaveRequestWindow, true, OperationOutputLimit},
 	"request_early_erasure":      {processingInput, ordinaryWindow, true, OperationOutputLimit},
+	"request_policy_grant":       {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"request_raw_access":         {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"restrict_processing":        {processingInput, ordinaryWindow, true, OperationOutputLimit},
 	"revoke_grant":               {contextInput, ordinaryWindow, true, OperationOutputLimit},

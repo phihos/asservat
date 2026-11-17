@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PolicyWorkspace } from './PolicyWorkspace';
 import { Policies } from './policies';
@@ -6,6 +6,8 @@ import { operations, type Input, type Operation, type Operations, type Output } 
 import { validInput_get_policy_status, validOutput_get_policy_status, validOutput_deactivate_policy } from '../generated/validate-policy';
 import { validOutput_revoke_share, validOutput_stop_future_sharing } from '../generated/validate-sharing';
 import type { Operations as ShareOperations } from '../sharing/http';
+import type { Operations as LegacyOperations, Operation as LegacyOperation, Input as LegacyInput, Output as LegacyOutput } from './legacy';
+import { validInput_activate_policy, validInput_request_policy_grant } from '../generated/validate-policy-legacy';
 import { id, result, session } from '../capture/test-fixtures';
 
 // Synthetic, content-free policy fixtures for unit tests only.
@@ -81,7 +83,7 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
   expect(stop.csrf).toBe(session.csrf_token);
   expect(stop.input).toEqual({ ...ref, policy_name: 'regional-restarts', idempotency_key: id(20) });
   expect(screen.queryByRole('button', { name: 'Deactivate' })).toBeNull();
-  expect(screen.getByText(/Change the DebugPolicy to start a new revision/)).toBeTruthy();
+  expect(screen.getByText(/change the DebugPolicy to activate a new revision/)).toBeTruthy();
   // RenewalDue keeps the policy running and points at the approvals inbox.
   client.state = 'renewalDue';
   fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
@@ -170,3 +172,68 @@ it('sends the identical idempotency header for policy commands', async () => {
   expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': 'C'.repeat(43), 'Idempotency-Key': id(3) } });
 });
 
+
+// Legacy activate_policy and request_policy_grant (until hub-side acceptance).
+class SyntheticLegacy implements LegacyOperations {
+  calls: { name: LegacyOperation; input: unknown }[] = [];
+  reply: (name: LegacyOperation, input: unknown) => unknown = () => ({ ...result<'get_capture'>({}), status: 'error', data: { code: 'PolicyDeactivated', message: 'This policy revision was deactivated and cannot be activated again.', retryable: false } });
+  async call<N extends LegacyOperation>(name: N, input: LegacyInput<N>): Promise<LegacyOutput<N>> {
+    this.calls.push({ name, input: structuredClone(input) });
+    return this.reply(name, input) as LegacyOutput<N>;
+  }
+}
+function mountLegacy(legacy: SyntheticLegacy, client = new SyntheticPolicies()) {
+  let n = 40; const controller = new Policies(client, () => id(n++), undefined, legacy); controllers.push(controller);
+  render(<PolicyWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+  return { client, controller };
+}
+
+it('activates by policy name and shows the server refusal', async () => {
+  const legacy = new SyntheticLegacy();
+  const client = new SyntheticPolicies(); client.state = 'deactivated';
+  mountLegacy(legacy, client);
+  client.state = 'suspended';
+  show('regional-restarts');
+  fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/cannot be activated again/));
+  expect(legacy.calls).toEqual([{ name: 'activate_policy', input: { policy_name: 'regional-restarts', idempotency_key: id(40) } }]);
+  expect(validInput_activate_policy(legacy.calls[0].input)).toBe(true);
+});
+
+it('shows the sharing review before activating a sharing policy', async () => {
+  const legacy = new SyntheticLegacy();
+  legacy.reply = (_name, input) => (input as { sharing_reviewed?: boolean }).sharing_reviewed
+    ? result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'active', expires_at: '2026-10-28T18:00:00Z', max_executions: 10, replay: false })
+    : { ...result<'get_capture'>({}), status: 'error', data: { code: 'SharingReviewRequired', message: 'Repeated collections will be shared with Group incident-response.', retryable: false } };
+  const client = new SyntheticPolicies(); client.state = 'suspended';
+  mountLegacy(legacy, client);
+  show('regional-restarts');
+  fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+  expect(await screen.findByText(/^Repeated collections will be shared with Group incident-response/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Activate and share' }));
+  await waitFor(() => expect(legacy.calls).toHaveLength(2));
+  expect(legacy.calls[1].input).toEqual({ policy_name: 'regional-restarts', idempotency_key: id(41), sharing_reviewed: true });
+});
+
+it('policy approval retries pin the original finite selection and key', async () => {
+  const legacy = new SyntheticLegacy();
+  let first = true;
+  legacy.reply = () => { if (first) { first = false; throw new Error('unknown response'); } return result({ grant_id: id(41), kind: 'policy', approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41) }); };
+  const client = new SyntheticPolicies();
+  const original = client.call.bind(client);
+  client.call = (async (name: Operation, input: unknown, csrf: string) => {
+    const reply = await original(name, input as never, csrf);
+    if (name === 'get_policy_status' && reply.status === 'ok') (reply.data as { collection_kind: string }).collection_kind = 'packetCapture';
+    return reply;
+  }) as typeof client.call;
+  const { controller } = mountLegacy(legacy, client);
+  show('p');
+  fireEvent.change(await screen.findByLabelText('Action starts'), { target: { value: '3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request policy approval' }));
+  await screen.findByRole('button', { name: 'Retry approval request' });
+  await act(async () => { await controller.requestGrant('local/team-a/p', { limits: { max_executions: 1, max_collected_bytes: 1, max_observed_bytes: 0 } }); });
+  expect(legacy.calls).toHaveLength(2); expect(legacy.calls[1]).toEqual(legacy.calls[0]);
+  expect(legacy.calls[0].input).toEqual({ policy_uid: 'policy-uid', policy_name: 'p', idempotency_key: id(40), limits: { max_executions: 3, max_collected_bytes: 65536, max_observed_bytes: 0 } });
+  expect(validInput_request_policy_grant(legacy.calls[0].input)).toBe(true);
+  expect(await screen.findByRole('link', { name: 'View policy approval' })).toBeTruthy();
+});

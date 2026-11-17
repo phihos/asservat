@@ -249,9 +249,11 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if !ok {
 		return nil, nil, presentation.ErrOperationsConfiguration
 	}
+	// activate_policy remains until hub-side acceptance replaces it.
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters, pc.investigation.Profiles, pc.investigation.ProfileEndpoints), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
 	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters, v.submission.Profiles, v.submission.ProfileEndpoints), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Now: c.Now}
 	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Now: c.Now}
-	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, c.Clusters, status, deactivation)
+	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, c.Clusters, activation, status, deactivation)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -40,12 +40,11 @@ validate against the canonical schemas. Raw access selects by `artifact_ids`
 or `artifact_digests`; size and expiry default to the verified sizes and the
 earliest access end; memory and debugger operations return
 `CapabilityUnavailable`. `list_reviews` pages with a keyset cursor. Policies
-are named by cluster, namespace and name. The public `request_policy_grant`
-and `activate_policy` tools and their console forms are removed.
-Gaps: the hub does not yet accept observed DebugPolicy generations or open
-policy-grant reviews by itself (`PolicyActivation`, `GrantService.RequestPolicy`
-and the grant attachment remain as internal steps without a production
-caller); no `renewal_due`; the planner still emits `recordingApprovalRequired`,
+are named by cluster, namespace and name. `activate_policy` and
+`request_policy_grant` keep their legacy contract (legacy-tools.txt) until
+hub-side acceptance of observed DebugPolicy generations replaces them; that
+is a separate slice, together with the missing `ApprovalRequired` status.
+Gaps: no `renewal_due`; the planner still emits `recordingApprovalRequired`,
 which the review shows as `policyCollection` on policy grants and drops
 otherwise.
 
