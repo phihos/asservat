@@ -141,12 +141,14 @@ func targetOutput(t targets.WorkloadRequest) WorkloadReference {
 	return WorkloadReference{t.ClusterID, t.Namespace, t.Kind, t.Name}
 }
 
-// workload resolves a target_ref cluster name. An unknown name projects
-// like an absent or unauthorized target.
+// errUnknownCluster is a public cluster name that no configured cluster has.
+var errUnknownCluster = errors.New("unknown cluster name")
+
+// workload resolves a target_ref cluster name.
 func (s *ContextOperations) workload(r TargetRef) (targets.WorkloadRequest, error) {
 	id, ok := s.config.Clusters.ID(r.Cluster)
 	if !ok {
-		return targets.WorkloadRequest{}, targets.ErrDenied
+		return targets.WorkloadRequest{}, errUnknownCluster
 	}
 	return targets.WorkloadRequest{ClusterID: id, Namespace: r.Namespace, Kind: r.Kind, Name: r.Name}, nil
 }
@@ -407,6 +409,9 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 	if errors.As(err, &refusal) {
 		return OperationFailure{refusal.Code, boundedText(refusal.Path+": "+refusal.Reason, 1024), false}
 	}
+	if errors.Is(err, errUnknownCluster) {
+		return OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}
+	}
 	var capability capabilityError
 	if errors.As(err, &capability) {
 		return OperationFailure{"CapabilityUnavailable", capability.Error() + ".", false}
@@ -523,7 +528,7 @@ func captureAuditDecision(err error) operationAuditDecision {
 	switch {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, targets.ErrDenied):
 		return operationAuditDenied
-	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable), errors.As(err, new(planning.CompositionError)), errors.As(err, new(capabilityError)), errors.Is(err, errInvalidCursor):
+	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable), errors.As(err, new(planning.CompositionError)), errors.As(err, new(capabilityError)), errors.Is(err, errInvalidCursor), errors.Is(err, errUnknownCluster):
 		return operationAuditInvalid
 	default:
 		return operationAuditUnspecified
