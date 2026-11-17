@@ -44,7 +44,6 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.workerIdentities == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 {
 		return nil, &fixedStepError{"downloads/start", mounts.ErrUnavailable}
 	}
-	g := d.shared.retention
 	sql := map[string]*pgxpool.Pool{}
 	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop"} {
 		pool, err := d.public.open(ctx, purpose)
@@ -83,11 +82,11 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/processingReads", mounts.ErrUnavailable}
 	}
-	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
+	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog,
 		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, RawResults: pc.grants, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
-		return postgres.NewDownloads(ctx, sql[purpose], root, g)
+		return postgres.NewDownloads(ctx, sql[purpose], root)
 	}
 	downloads, err := makeDownloads("download-session")
 	if err != nil {
@@ -153,7 +152,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 
 	makeWorkers := func(purpose string) (*postgres.DownloadWorkers, error) {
-		return postgres.NewDownloadWorkers(ctx, sql[purpose], root, profile, g)
+		return postgres.NewDownloadWorkers(ctx, sql[purpose], root, profile)
 	}
 	workers, err := makeWorkers("download-worker")
 	if err != nil {
@@ -215,7 +214,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 			return kube.NewAcquisitionEnrollmentAttester(jobsClient, d.workerIdentities, token)
 		}, Now: time.Now}
 
-	native, err := postgres.NewNativeOwners(ctx, sql["native-owner"], root, profile, g)
+	native, err := postgres.NewNativeOwners(ctx, sql["native-owner"], root, profile)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/native", mounts.ErrUnavailable}
 	}
@@ -224,11 +223,11 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, &fixedStepError{"downloads/first", mounts.ErrUnavailable}
 	}
 	scope := authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: p.ArtifactKeyID}
-	prepKeys, err := postgres.NewDownloadKeys(ctx, sql["download-key-bind"], root, scope, g)
+	prepKeys, err := postgres.NewDownloadKeys(ctx, sql["download-key-bind"], root, scope)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/prepKeys", mounts.ErrUnavailable}
 	}
-	windowKeys, err := postgres.NewNativeKeys(ctx, sql["native-key-bind"], root, profile, scope, g)
+	windowKeys, err := postgres.NewNativeKeys(ctx, sql["native-key-bind"], root, profile, scope)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/windowKeys", mounts.ErrUnavailable}
 	}

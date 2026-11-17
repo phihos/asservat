@@ -1,7 +1,7 @@
 package privacy
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -10,166 +10,111 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-func retentionObservationFixture() ([]PolicySnapshot, SelectorFacts, time.Time) {
-	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
-	cluster := "11111111-1111-4111-8111-111111111111"
-	revision := identity.Revision{UID: "control", Generation: 1, Digest: artifact.Digest{1}}
-	policy := ScopedPolicy{Name: "baseline", Policy: Policy{Revision: identity.Revision{UID: "baseline-uid", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 7200, DeletionBudgetSeconds: 300}, CaseDefaultSeconds: 3600, CaseMaximumSeconds: 7200, AuditDefaultSeconds: 3600, AuditMaximumSeconds: 7200, LegalExceptions: "disabled"}
-	snapshot := PolicySnapshot{SourceClusterID: cluster, ControlNamespaceUID: "hub-ns", Hub: true, Revision: revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []ScopedPolicy{policy}}
-	facts := SelectorFacts{Target: authorization.Target{ClusterID: cluster, NamespaceUID: "namespace-uid", WorkloadUID: "workload-uid", PodUID: "pod-uid"}, Revision: revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), NamespaceKeys: []string{"privacy.example.test/class"}, NamespaceLabels: map[string]string{"privacy.example.test/class": "user-data"}, WorkloadKeys: []string{"privacy.example.test/scope"}, WorkloadLabels: map[string]string{"privacy.example.test/scope": "internal"}}
-	return []PolicySnapshot{snapshot}, facts, now
+const (
+	matchCluster = "11111111-1111-4111-8111-111111111111"
+	otherCluster = "22222222-2222-4222-8222-222222222222"
+)
+
+func scoped(uid string, scope PolicyScope, maximum int64, rules ...Rule) ScopedPolicy {
+	return ScopedPolicy{Name: uid, Scope: scope, Policy: Policy{Revision: identity.Revision{UID: uid, Generation: 1, Digest: artifact.Digest{1}}, Baseline: scope.Empty(), PurposeRef: "diagnostics", DefaultSeconds: maximum, MaximumSeconds: maximum, DeletionBudgetSeconds: 300, Rules: rules},
+		CaseDefaultSeconds: 3600, CaseMaximumSeconds: 7200, AuditDefaultSeconds: 3600, AuditMaximumSeconds: 7200, LegalExceptions: "disabled"}
 }
-func TestRetentionMatchingIntersectsHubLocalAndProtectedSelectors(t *testing.T) {
-	sources, f, now := retentionObservationFixture()
-	narrow := sources[0].Policies[0]
-	narrow.Name = "internal-user-data"
-	narrow.Policy.Baseline = false
-	narrow.Policy.Revision.UID = "narrow-uid"
-	narrow.Policy.MaximumSeconds = 1800
-	narrow.Scope = PolicyScope{ClusterIDs: []string{f.Target.ClusterID}, NamespaceLabels: map[string]string{"privacy.example.test/class": "user-data"}, WorkloadLabels: map[string]string{"privacy.example.test/scope": "internal"}}
-	sources[0].Policies = append(sources[0].Policies, narrow)
-	local := sources[0]
-	local.Hub = false
-	local.ControlNamespaceUID = "collector-ns"
-	local.Policies = []ScopedPolicy{sources[0].Policies[0]}
-	local.Policies[0].Name = "local"
-	local.Policies[0].Policy.Revision.UID = "local-uid"
-	local.Policies[0].Policy.Baseline = false
-	local.Policies[0].Policy.MaximumSeconds = 1200
-	sources = append(sources, local)
-	matched, until, err := MatchPolicies(sources, f, now)
-	if err != nil || len(matched) != 3 || !until.Equal(now.Add(5*time.Second)) {
-		t.Fatal("matching intersection", len(matched), err)
-	}
-	set := PolicySet{Target: f.Target, Revision: f.Revision, ObservedAt: now, FreshUntil: until, Complete: true, Policies: matched}
-	resolved, err := Resolve(set, Input{Target: f.Target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: now}, now)
-	if err != nil || resolved.MaximumSeconds != 1200 || len(resolved.Policies) != 3 || !resolved.ExpiresAt.Equal(now.Add(900*time.Second)) {
-		t.Fatal("weaker retention won", resolved, err)
-	}
-	// Namespace AND workload dimensions; values within cluster IDs are ORed.
-	f.WorkloadLabels["privacy.example.test/scope"] = "external"
-	matched, _, err = MatchPolicies(sources, f, now)
-	if err != nil || len(matched) != 2 {
-		t.Fatal("selector AND failed", err)
-	}
+
+func stubRevision([]Policy) identity.Revision {
+	return identity.Revision{UID: "set", Generation: 1, Digest: artifact.Digest{9}}
 }
-func TestRetentionMatchingRejectsUnknownProvenanceAndIncompleteBaseline(t *testing.T) {
-	for _, mode := range []string{"unprotected-namespace", "unprotected-workload", "stale-facts", "stale-source", "no-hub", "two-hubs", "no-baseline", "two-baselines", "wrong-local-cluster", "duplicate-source", "overflow"} {
-		t.Run(mode, func(t *testing.T) {
-			sources, f, now := retentionObservationFixture()
-			narrow := sources[0].Policies[0]
-			narrow.Name = "narrow"
-			narrow.Policy.Baseline = false
-			narrow.Policy.Revision.UID = "narrow"
-			narrow.Scope.NamespaceLabels = map[string]string{"privacy.example.test/class": "unmatched"}
-			narrow.Scope.WorkloadLabels = map[string]string{"privacy.example.test/scope": "unmatched"}
-			sources[0].Policies = append(sources[0].Policies, narrow)
-			switch mode {
-			case "unprotected-namespace":
-				f.NamespaceKeys = nil
-				f.NamespaceLabels = nil
-			case "unprotected-workload":
-				f.WorkloadKeys = nil
-				f.WorkloadLabels = nil
-			case "stale-facts":
-				f.FreshUntil = now
-			case "stale-source":
-				sources[0].FreshUntil = now
-			case "no-hub":
-				sources[0].Hub = false
-				sources[0].Policies[0].Policy.Baseline = false
-			case "two-hubs":
-				second := sources[0]
-				second.ControlNamespaceUID = "other"
-				sources = append(sources, second)
-			case "no-baseline":
-				sources[0].Policies = sources[0].Policies[1:]
-			case "two-baselines":
-				second := sources[0].Policies[0]
-				second.Name = "second"
-				second.Policy.Revision.UID = "second"
-				sources[0].Policies = append(sources[0].Policies, second)
-			case "wrong-local-cluster":
-				second := sources[0]
-				second.SourceClusterID = "22222222-2222-4222-8222-222222222222"
-				second.Hub = false
-				second.Policies = nil
-				sources = append(sources, second)
-			case "duplicate-source":
-				sources = append(sources, sources[0])
-			case "overflow":
-				for i := 0; i < 64; i++ {
-					p := sources[0].Policies[0]
-					p.Name = fmt.Sprintf("p-%d", i)
-					p.Policy.Revision.UID = p.Name
-					p.Policy.Baseline = false
-					p.Scope.ClusterIDs = []string{f.Target.ClusterID}
-					sources[0].Policies = append(sources[0].Policies, p)
-				}
-			}
-			if _, _, err := MatchPolicies(sources, f, now); err == nil {
-				t.Fatal("incomplete provenance or policy overflow accepted")
-			}
-		})
+
+func TestMatchPoliciesClusterScopeLabelsAndBaseline(t *testing.T) {
+	target := authorization.Target{ClusterID: matchCluster, NamespaceUID: "ns", WorkloadUID: "app", PodUID: "pod"}
+	base := scoped("base", PolicyScope{}, 86400)
+	here := scoped("here", PolicyScope{ClusterIDs: []string{matchCluster}}, 3600)
+	there := scoped("there", PolicyScope{ClusterIDs: []string{otherCluster}}, 600)
+	set, err := MatchPolicies([]ScopedPolicy{there, here, base}, target, stubRevision)
+	if err != nil || len(set.Policies) != 2 || set.Policies[0].Revision.UID != "base" || set.Policies[1].Revision.UID != "here" || set.Revision.UID != "set" {
+		t.Fatal("cluster scope", set, err)
 	}
-}
-func TestRetentionMatchingAbsenceIsProtectedAndReturnedRulesAreCopied(t *testing.T) {
-	sources, f, now := retentionObservationFixture()
-	narrow := sources[0].Policies[0]
-	narrow.Name = "narrow"
-	narrow.Policy.Revision.UID = "narrow"
-	narrow.Policy.Baseline = false
-	narrow.Scope.NamespaceLabels = map[string]string{"privacy.example.test/class": "user-data"}
-	sources[0].Policies = append(sources[0].Policies, narrow)
-	f.NamespaceLabels = nil // Qualified absence, not a failed or partial metadata read.
-	policies, _, err := MatchPolicies(sources, f, now)
-	if err != nil || len(policies) != 1 {
-		t.Fatal("qualified absent label failed", err)
+	labeled := scoped("labeled", PolicyScope{NamespaceLabels: map[string]string{"team": "a"}}, 600)
+	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("covering labeled policy admitted", err)
 	}
-	sources[0].Policies[0].Policy.Rules = []Rule{{Name: "short", PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, MaxAgeSeconds: 1000}}
-	policies, _, err = MatchPolicies(sources, f, now)
-	if err != nil {
-		t.Fatal(err)
+	labeled.Scope.ClusterIDs = []string{otherCluster}
+	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, stubRevision); err != nil {
+		t.Fatal("non-covering labeled policy refused", err)
 	}
-	sources[0].Policies[0].Policy.Rules[0].PrivacyClasses[0] = "verifiedNonPersonal"
-	if policies[0].Rules[0].PrivacyClasses[0] != "potentialPersonalData" {
-		t.Fatal("caller mutated matched rules")
+	if _, err = MatchPolicies([]ScopedPolicy{here}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("no baseline admitted", err)
+	}
+	second := scoped("base2", PolicyScope{}, 86400)
+	if _, err = MatchPolicies([]ScopedPolicy{base, second}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("two baselines admitted", err)
 	}
 }
 
-func TestRetainedPoliciesFollowOriginalUIDAfterLabelsChange(t *testing.T) {
-	sources, f, now := retentionObservationFixture()
-	narrow := sources[0].Policies[0]
-	narrow.Name = "original-owner-scope"
-	narrow.Policy.Baseline = false
-	narrow.Policy.Revision.UID = "narrow-uid"
-	narrow.Scope.NamespaceLabels = map[string]string{"privacy.example.test/class": "user-data"}
-	original := artifact.RetentionRule{UID: narrow.Policy.Revision.UID, Generation: 1, Digest: artifact.Digest(narrow.Policy.Revision.Digest)}
-	narrow.Policy.Revision.Generation = 2
-	narrow.Policy.Revision.Digest[0]++
-	narrow.Policy.MaximumSeconds = 600
-	sources[0].Policies = append(sources[0].Policies, narrow)
-	f.NamespaceLabels["privacy.example.test/class"] = "different"
-	fresh, _, err := MatchPolicies(sources, f, now)
-	if err != nil || len(fresh) != 1 {
-		t.Fatal("new collection used old scope", err)
+func TestEvidenceMaximumAndEffect(t *testing.T) {
+	p := scoped("p", PolicyScope{ClusterIDs: []string{matchCluster}}, 86400,
+		Rule{Name: "packets", EvidenceTypes: []string{"packetCapture"}, MaxAgeSeconds: 3600},
+		Rule{Name: "nonpersonal", PrivacyClasses: []string{"verifiedNonPersonal"}, MaxAgeSeconds: 600},
+		Rule{Name: "general", PrivacyClasses: []string{"potentialPersonalData"}, MaxAgeSeconds: 43200})
+	if got := p.Policy.EvidenceMaximum("packetCapture"); got != 3600 {
+		t.Fatal("type rule", got)
 	}
-	retained, _, err := MatchRetainedPolicies(sources, f, []artifact.RetentionRule{original}, now)
-	if err != nil || len(retained) != 2 || retained[1].MaximumSeconds != 600 {
-		t.Fatal("retained evidence escaped original stricter rule", retained, err)
+	if got := p.Policy.EvidenceMaximum("context"); got != 43200 {
+		t.Fatal("general rule or class mismatch", got)
 	}
-	// Current labels are not needed to establish an original policy relationship.
-	f.NamespaceLabels = nil
-	f.NamespaceKeys = nil
-	if _, _, err = MatchRetainedPolicies(sources, f, []artifact.RetentionRule{original}, now); err != nil {
-		t.Fatal("original relationship required current labels", err)
+	if got := p.Policy.EvidenceMaximum("other"); got != 3600 {
+		t.Fatal("other must match every type rule", got)
 	}
-	sources[0].Policies[1].Policy.Revision.Generation = 1
-	if _, _, err = MatchRetainedPolicies(sources, f, []artifact.RetentionRule{original}, now); err == nil {
-		t.Fatal("reused generation with changed definition")
+	e := Effect(p)
+	if len(e.Clusters) != 1 || e.Budget != 300 || e.Maxima[artifact.PCAPNGArtifact] != 3600 || e.Maxima[artifact.PodStatusArtifact] != 43200 || e.CaseMaximum != 7200 || len(e.Maxima) != len(artifact.NativeTypeNames()) {
+		t.Fatal("effect", e)
 	}
-	sources[0].Policies = sources[0].Policies[:1]
-	if _, _, err = MatchRetainedPolicies(sources, f, []artifact.RetentionRule{original}, now); err != nil {
-		t.Fatal("deleted override lost existing ledger obligation", err)
+	if e = Effect(scoped("b", PolicyScope{}, 86400)); e.Clusters == nil || len(e.Clusters) != 0 {
+		t.Fatal("baseline effect must cover all clusters", e)
+	}
+}
+
+// SC-PRV-009 shape: lowering produces an effect, raising cannot shorten (the
+// SQL LEAST does that), deleting produces none, unknown UIDs are reported.
+func TestPlanAndSummarizePreview(t *testing.T) {
+	base := scoped("base", PolicyScope{}, 86400)
+	lower := scoped("", PolicyScope{}, 600)
+	effects, skipped, baseline, err := PlanPreview([]RetentionChange{{Action: "update", UID: "base", Policy: lower}}, []ScopedPolicy{base})
+	if err != nil || len(effects) != 1 || effects[0].Maxima[artifact.PodStatusArtifact] != 600 || len(skipped) != 0 || baseline {
+		t.Fatal("lowering", effects, skipped, baseline, err)
+	}
+	effects, skipped, baseline, err = PlanPreview([]RetentionChange{{Action: "delete", UID: "base"}, {Action: "update", UID: "missing", Policy: lower}}, []ScopedPolicy{base})
+	if err != nil || len(effects) != 0 || len(skipped) != 1 || skipped[0].Reason != PreviewUnknownObject || !baseline {
+		t.Fatal("deletion", effects, skipped, baseline, err)
+	}
+	if _, _, _, err = PlanPreview([]RetentionChange{{Action: "update", UID: "base", Policy: lower}, {Action: "delete", UID: "base"}}, []ScopedPolicy{base}); !errors.Is(err, ErrInvalid) {
+		t.Fatal("duplicate UID admitted", err)
+	}
+	if _, _, _, err = PlanPreview(nil, nil); !errors.Is(err, ErrInvalid) {
+		t.Fatal("empty proposal admitted", err)
+	}
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	out := SummarizePreview([]PreviewRow{
+		{ClusterID: matchCluster, NativeType: artifact.PodStatusArtifact, Scanned: 3, Affected: 2, ReadClosed: 1, DeletionDue: 1, EarliestExpiresAt: now, EarliestDeleteBy: now.Add(time.Minute)},
+		{ClusterID: matchCluster, CaseMetadata: true, Scanned: 1},
+	}, skipped, true, now)
+	if out.Scanned != 4 || out.Affected != 2 || out.ReadClosed != 1 || out.DeletionDue != 1 || !out.EarliestExpiresAt.Equal(now) || len(out.Groups) != 2 || out.Groups[0].EvidenceType != "context" || out.Groups[1].EvidenceType != "other" || !out.BaselineChanged || out.Complete() {
+		t.Fatal("summary", out)
+	}
+}
+
+// A rejected policy refuses collection in its cluster scope only.
+func TestMatchPoliciesRefusesCoveringRejectedPolicy(t *testing.T) {
+	target := authorization.Target{ClusterID: matchCluster, NamespaceUID: "ns", WorkloadUID: "app", PodUID: "pod"}
+	base := scoped("base", PolicyScope{}, 86400)
+	rejected := ScopedPolicy{Name: "bad", Policy: Policy{Revision: identity.Revision{UID: "bad", Generation: 1, Digest: artifact.Digest{1}}}, Scope: PolicyScope{ClusterIDs: []string{otherCluster}}, Rejected: RejectedSpec}
+	if !rejected.Valid() {
+		t.Fatal("rejected policy invalid")
+	}
+	if set, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); err != nil || len(set.Policies) != 1 {
+		t.Fatal("rejected policy outside the scope blocked collection", err)
+	}
+	rejected.Scope = PolicyScope{}
+	if _, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("covering rejected policy admitted", err)
 	}
 }

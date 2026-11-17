@@ -9,7 +9,7 @@ type HubWorkerPermission struct {
 	// StatusUsers may write PermissionSource/AccessBinding status (the
 	// reconciler's own account, system:serviceaccount:<ns>:<account>).
 	StatusUsers []string `json:"statusUsers"`
-	// Retention runs the hub retention source (ADR-195).
+	// Retention runs the retention policy follower (ADR-330 D12).
 	Retention bool `json:"retention,omitempty"`
 	// WorkerConfiguration is the download worker configuration acceptance
 	// (ADR-204 decision 7). Its audit Transit key is
@@ -50,14 +50,3 @@ const (
 	// principal (`<name>-s3-evidence-delete`, credentials.json).
 	HubWorkerEvidenceDeleteStorageFile = "evidence-delete-storage.json"
 )
-
-// RetentionSourceResource names the hub retention source in its digest.
-const RetentionSourceResource = "evidenceretentionpolicies"
-
-// RetentionSourceDigest is the deterministic protection digest of the hub
-// retention source, the EvidenceRetentionPolicies of one cluster's control
-// namespace (retention_source.protection_digest and a retention topology's
-// hub protectionSHA256).
-func RetentionSourceDigest(clusterID, namespace string) [32]byte {
-	return ConfigMapSourceDigest(clusterID, namespace, RetentionSourceResource)
-}

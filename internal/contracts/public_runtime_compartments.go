@@ -24,7 +24,7 @@ const PublicRuntimeRetainedPublisherProcesses = 2
 const PublicRuntimePublisherRoleConnections = PublicRuntimeRetainedPublisherProcesses + 1
 
 func PublicRuntimePublisherPurposes() []string {
-	return []string{"publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "publisher-retention-read"}
+	return []string{"publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read"}
 }
 
 // ConnectionLimit describes a fixed purpose, not permission to provision it.

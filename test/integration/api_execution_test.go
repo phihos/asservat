@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/execution"
@@ -95,7 +94,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					t.Fatal("shared hub lost its existing capture-history receipt update", err)
 				}
 				newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
-					x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, s.recovery.installation, s.retention.guard)
+					x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, s.recovery.installation)
 					if e != nil {
 						t.Fatal(e)
 					}
@@ -290,7 +289,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					t.Fatal("completed result rewritten")
 				}
 				publication := func(user, password string) *postgres.ContextPublications {
-					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, s.retention.guard)
+					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID)
 					if e != nil {
 						t.Fatal(e)
 					}
@@ -314,7 +313,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				verify := publication(verifyRole, verifyPassword)
 				audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
 				publish := publication(publishRole, publishPassword)
-				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, s.retention.guard, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now})
+				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID)
 				if err != nil {
 					t.Fatal(err)
 				}

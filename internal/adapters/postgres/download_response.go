@@ -1,17 +1,18 @@
 package postgres
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5"
-	"time"
 )
 
 var _ evidence.DownloadResponses = (*Downloads)(nil)
@@ -80,10 +81,6 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 	if !authorization.UUID(sessionID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
-	topology, e := s.downloadTopology(ctx, a)
-	if e != nil {
-		return e
-	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		p, e := q.LockPermissionStream(ctx, id(s.root))
 		if e != nil {
@@ -100,7 +97,7 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 		if current.Scope != a.Scope {
 			return privacy.ErrFence
 		}
-		if e = s.downloadFence(ctx, q, p, a, topology); e != nil {
+		if e = s.downloadFence(ctx, q, p, a); e != nil {
 			return e
 		}
 		now, e := q.CurrentTime(ctx)
@@ -116,7 +113,7 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return s.downloadFence(ctx, q, p, a, topology)
+		return s.downloadFence(ctx, q, p, a)
 	})
 }
 func responseBusy(ctx context.Context, q *custodydb.Queries, s artifact.DownloadSession, now time.Time) error {

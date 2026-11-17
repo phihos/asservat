@@ -35,7 +35,7 @@ func TestKeyServiceInputsAreClosed(t *testing.T) {
 	}
 	withDownloads := func() contracts.KeyServiceConfig {
 		c := keyServiceTestConfig()
-		c.Downloads = &contracts.KeyServiceDownloadsConfig{RetentionTopologies: []contracts.ServiceTopology{{TargetClusterID: serviceTestIDs.ClusterID, Name: "asservat-topology"}}}
+		c.Downloads = &contracts.KeyServiceDownloadsConfig{}
 		return c
 	}
 	if got, err := read(withDownloads()); err != nil || got.Downloads == nil {
@@ -45,10 +45,6 @@ func TestKeyServiceInputsAreClosed(t *testing.T) {
 		"plain HTTP provider":   func(c *contracts.KeyServiceConfig) { c.OpenBao = "http://bao.example" },
 		"unbounded concurrency": func(c *contracts.KeyServiceConfig) { c.Concurrency = 65 },
 		"no name":               func(c *contracts.KeyServiceConfig) { c.Name = "" },
-		"duplicate topology cluster": func(c *contracts.KeyServiceConfig) {
-			c.Downloads.RetentionTopologies = append(c.Downloads.RetentionTopologies, contracts.ServiceTopology{TargetClusterID: serviceTestIDs.ClusterID, Name: "second"})
-		},
-		"topology of no cluster": func(c *contracts.KeyServiceConfig) { c.Downloads.RetentionTopologies[0].TargetClusterID = "hub" },
 	} {
 		c := withDownloads()
 		mutate(&c)

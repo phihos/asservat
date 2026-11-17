@@ -214,7 +214,6 @@ hub:
       # nodePorts: {native: 31447, operation: 31449}
     # Download-worker namespaces in the hub cluster; empty uses <name>-downloads.
     workerNamespaces: []
-    retentionTopologies: []
     # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
     peers: []
     public:
@@ -305,9 +304,6 @@ hub:
       # Native downloads need the key service to unwrap for the hub-local
       # download workers (hub.download-worker, enabled by default).
       enabled: true
-      # Retention topology ConfigMaps by target cluster; the cluster catalog
-      # adds registered clusters.
-      retentionTopologies: []
   # Asynchronous publication verifier (no listener).
   publisher:
     replicas: 1
@@ -318,7 +314,6 @@ hub:
       limits: {cpu: "1", memory: 512Mi}
     nodeSelector: {}
     tolerations: []
-    retentionTopologies: []
   # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
   # dedicated `<name>-downloads` namespace; Helm renders the namespace,
   # account, PriorityClass, the worker configuration and the dispatch Roles.

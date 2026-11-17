@@ -2,11 +2,11 @@
 
 ## Audit as a database row, part 1 (ADR-330 D6, REQ-AUT-005, 2026-11-17)
 
-Branch `clean/audit-api`. `audit_event` (00190) holds one append-only row per
+Branch `clean/audit-api`. `audit_event` (00191) holds one append-only row per
 event: one `call` row per admitted public operation, and one row per effect
-written in the effect's own transaction (shares 00191, context queries 00192,
-capture admission 00193, download stop 00194, processing decisions 00195).
-00196 drops the encrypted operation audit: `operation_audit*` tables, the
+written in the effect's own transaction (shares 00192, context queries 00193,
+capture admission 00194, download stop 00195, processing decisions 00196).
+00197 drops the encrypted operation audit: `operation_audit*` tables, the
 `capture_operation_*` views, `capture_audit_root`, their guards and history
 functions. Capacity creates no audit pool and enrollment reserves no audit
 account. Removed in Go: the operation journal/acknowledgement/lifecycle,
@@ -24,7 +24,31 @@ size `download_control_allocation` and native backing. Other encrypted audit
 receipts (download batches and workers, owner/worker enrollment, retention,
 permission authority, context deletion) are unchanged. A `goose down-to 125`
 probe no longer works: about thirty historical migrations name the dropped
-tables; our migrations have no Down and re-Up of 00190-00196 is safe.
+tables; our migrations have no Down and re-Up of 00191-00197 is safe.
+
+## Retention as stored deadlines (ADR-330 D12, 2026-11-15)
+
+Branch `clean/retention`. Migration 00190 drops the retention source,
+epoch, checkpoint and catch-up tables; `retention_policy` holds the stored
+policy set, `retention_policy_event` one audit row per applied or removed
+policy. The hub-worker `RetentionFollower` lists and watches
+`EvidenceRetentionPolicy` and stores the set; each new or changed policy
+shortens matching deadlines with one `retention_policy_effect` update in the
+same transaction, and an admission trigger applies stored policies to each new
+capture (taking a shared advisory lock that the follower holds exclusively,
+and evaluating only policies covering the row's cluster). An invalid policy
+is stored as rejected: the valid ones apply, the rejected one refuses new
+collection in its cluster scope (all clusters when unreadable) and is logged
+once per generation. `RetentionProof`, `RetentionTransactionGuard`, retention topology
+contracts and schema, accepted-source readiness, per-read re-resolution and
+the key-service/publisher catalog polling loops are gone. Verified: focused custody
+(`^d`, retention, deletion, publication, history: 98 subtests pass), goose
+up/down-to 125/up on PostgreSQL 17, `make go-check pcap-check` and the CI
+gate set.
+Open: policy status writes (no RBAC or status code yet; the log line is the
+signal), label selectors (no label reader; a labeled policy refuses collection in
+its clusters and applies cluster-wide to existing evidence), connector-pushed
+local policies, one-step publication.
 
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
 
@@ -210,8 +234,7 @@ function body; its Down restores the 00167 view for downgrade probes.
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
 lock or check the trust row for recovery. Open: the setup recovery step of REQ-DB-005;
-retention topology, proofs and source checkpoints (D12); one-step publication;
-the unused `identity-read` pools that only served recovery reads.
+one-step publication; the unused `identity-read` pools that only served recovery reads.
 
 ## Standing connector identity (ADR-332, 2026-11-14)
 
@@ -419,10 +442,6 @@ implement the canonical contract.
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |
 
-Schemas kept because Go still embeds them with production code paths:
-`retention-topology`
-(`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
-each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
 ## ADR-335 contract divergence (2026-11-14)
 

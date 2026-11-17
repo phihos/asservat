@@ -1482,36 +1482,6 @@ type RemoteAccessBindingDelivery struct {
 	Bindings   []byte
 }
 
-type RetentionCatchup struct {
-	CheckpointID pgtype.UUID
-	AfterAttempt pgtype.UUID
-	Visited      int64
-	Shortened    int64
-	CompletedAt  pgtype.Timestamptz
-}
-
-type RetentionCatchupEffect struct {
-	CheckpointID pgtype.UUID
-	AttemptID    pgtype.UUID
-	DecisionID   pgtype.UUID
-}
-
-type RetentionCheckpoint struct {
-	ID                  pgtype.UUID
-	RootID              pgtype.UUID
-	ClusterID           pgtype.UUID
-	NamespaceUid        string
-	Epoch               pgtype.UUID
-	Sequence            int64
-	TransitionDigest    []byte
-	TransitionJson      []byte
-	RecordDigest        []byte
-	RecordJson          []byte
-	CreatedAt           pgtype.Timestamptz
-	AuditAcknowledgedAt pgtype.Timestamptz
-	AuditReceipt        []byte
-}
-
 type RetentionDecision struct {
 	ID                  pgtype.UUID
 	RootID              pgtype.UUID
@@ -1528,30 +1498,25 @@ type RetentionDecision struct {
 	AuditReceiptJson    []byte
 }
 
-type RetentionSource struct {
-	RootID           pgtype.UUID
-	ClusterID        pgtype.UUID
-	NamespaceUid     string
-	Hub              bool
-	ProtectionDigest []byte
-	Epoch            pgtype.UUID
-	Sequence         int64
-	LeaseUntil       pgtype.Timestamptz
-	Suspended        bool
-	RecoveryBlocked  bool
-	WatchCursor      string
-	ObservedSequence pgtype.Int8
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-	ListCursor       string
+type RetentionPolicy struct {
+	Uid        string
+	Name       string
+	Generation int64
+	Digest     []byte
+	Policy     []byte
+	Effect     []byte
+	UpdatedAt  pgtype.Timestamptz
 }
 
-type RetentionSourceEpoch struct {
-	RootID       pgtype.UUID
-	ClusterID    pgtype.UUID
-	NamespaceUid string
-	Epoch        pgtype.UUID
-	CreatedAt    pgtype.Timestamptz
+type RetentionPolicyEvent struct {
+	ID         int64
+	Uid        string
+	Name       string
+	Generation int64
+	Digest     []byte
+	Change     string
+	Shortened  int64
+	RecordedAt pgtype.Timestamptz
 }
 
 type WorkloadName struct {

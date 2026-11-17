@@ -37,7 +37,7 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	acknowledge = append(acknowledge, publicRuntimeGrant{"table", "download_worker_configuration", "source_uid", "UPDATE"}, publicRuntimeGrant{"table", "download_worker_configuration_revision", "audit_receipt_json", "UPDATE"})
 	acquisition := with(read("fleet_current_trust", "permission_stream", "authority_audit", "artifact_download", "download_batch",
 		"processing_root", "context_processing", "processing_rule",
-		"retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision",
+		"retention_policy", "retention_decision",
 		"context_capture", "context_verification", "download_key_binding", "download_native_key", "download_native_owner",
 		"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
 		"download_worker_configuration", "download_worker_configuration_revision")...)
@@ -48,7 +48,6 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		acquisition = append(acquisition, publicRuntimeGrant{"table", table, "id", "UPDATE"})
 	}
 	acquisition = append(acquisition,
-		publicRuntimeGrant{"table", "retention_source", "root_id", "UPDATE"},
 		publicRuntimeGrant{"table", "download_worker_configuration", "source_uid", "UPDATE"},
 		publicRuntimeGrant{"table", "download_native_owner", "worker_id", "UPDATE"},
 		publicRuntimeGrant{"table", "download_key_binding", "used_roles", "UPDATE"},
@@ -100,13 +99,12 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 }
 
 // ADR-204: Downloads.downloadFence reads the current processing snapshot
-// (readProcessingSnapshot) and checks the accepted retention sources
-// (RetentionTransactionGuard.check). Every purpose whose adapter runs that
-// fence needs exactly these reads; the audit, identity, stop and plan
+// (readProcessingSnapshot); its purposes also read the retention tables.
+// Every purpose whose adapter runs that fence needs exactly these reads; the audit, identity, stop and plan
 // purposes run no fence and must not gain them.
 func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	var fence []publicRuntimeGrant
-	for _, table := range []string{"processing_root", "context_processing", "processing_rule", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision"} {
+	for _, table := range []string{"processing_root", "context_processing", "processing_rule", "retention_policy", "retention_decision"} {
 		fence = append(fence, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}
 	// Downloads (download-session, download-source), DownloadWorkers.withSession
@@ -133,7 +131,7 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 		}
 	}
 	// The additions are reads only: no hub extension purpose writes a
-	// processing table or a retention table beyond the root_id lock column.
+	// processing table or a retention table.
 	// ADR-210's processing-decision is the one processing writer.
 	for _, purpose := range contracts.PublicRuntimeHubSharedDuties() {
 		if purpose == "processing-decision" {
@@ -141,8 +139,7 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 		}
 		got, _ := publicRuntimeDutyGrants(purpose)
 		for _, g := range got {
-			lock := g.object == "retention_source" && g.column == "root_id" && g.privilege == "UPDATE"
-			if g.privilege != "SELECT" && !lock && (strings.Contains(g.object, "processing") || strings.HasPrefix(g.object, "retention_")) {
+			if g.privilege != "SELECT" && (strings.Contains(g.object, "processing") || strings.HasPrefix(g.object, "retention_")) {
 				t.Errorf("%s gained %s", purpose, g.key())
 			}
 		}

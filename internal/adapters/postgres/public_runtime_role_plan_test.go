@@ -11,10 +11,10 @@ import (
 func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	const installation = "10000000-0000-4000-8000-000000000001"
 	wantHub := []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
-	want := append(slices.Clone(wantHub), "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "publisher-retention-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-source-audit", "retention-catchup", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
+	want := append(slices.Clone(wantHub), "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
 	// ADR-204 takes the next unused ordinals 86-88, ADR-205 89-91 and ADR-210
 	// 92; metadata uses 93 and execution 94; old facet ordinals remain retired.
-	ordinals := []int{95, 20, 34, 40, 52, 56, 24, 25, 26, 27, 65, 66, 70, 71, 72, 73, 78, 79, 80, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
+	ordinals := []int{95, 20, 34, 40, 52, 56, 24, 25, 26, 27, 65, 70, 71, 72, 73, 78, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
 	for n, purpose := range want {
 		ordinal, known := contracts.PublicRuntimeRoleOrdinal(purpose)
 		name, valid := PublicRuntimeRoleName(installation, purpose)
@@ -63,7 +63,7 @@ func TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges(t *testing
 		if g.privilege == "SELECT" || g.kind == "schema" {
 			continue
 		}
-		if g.privilege == "UPDATE" && (g.object == "fleet_current_trust" && g.column == "installation_id" || g.object == "permission_stream" && g.column == "id" || g.object == "retention_source" && g.column == "root_id") {
+		if g.privilege == "UPDATE" && (g.object == "fleet_current_trust" && g.column == "installation_id" || g.object == "permission_stream" && g.column == "id") {
 			continue
 		}
 		t.Fatalf("source role gained an effect grant: %+v", g)

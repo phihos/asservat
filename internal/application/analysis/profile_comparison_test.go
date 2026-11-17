@@ -36,7 +36,6 @@ func newComparisonServiceFixture(t *testing.T) (*comparisonServiceFixture, value
 	b.Environment.Processing.Location = b.Environment.Location
 	b.Environment.Processing.CaptureID = comparisonSourceID
 	b.Environment.Path.ID = comparisonSourceID
-	b.Retention.WorkloadUID, b.Retention.PodUID = b.Scope.WorkloadUID, b.Scope.PodUID
 	f.a.Baseline = &b
 	baselinePlan := f.p
 	baselinePlan.AllocationID = comparisonSourceID

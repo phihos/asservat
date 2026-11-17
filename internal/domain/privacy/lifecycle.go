@@ -109,3 +109,18 @@ func MergePolicyOrigins(old, current []artifact.RetentionRule) ([]artifact.Reten
 	})
 	return out, nil
 }
+
+// ValidPolicyOrigins checks the policy references recorded on an artifact.
+func ValidPolicyOrigins(origins []artifact.RetentionRule) bool {
+	if len(origins) < 1 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, r := range origins {
+		if !identity.Text(r.UID, 64) || seen[r.UID] || r.Generation < 1 || r.Digest == (artifact.Digest{}) {
+			return false
+		}
+		seen[r.UID] = true
+	}
+	return true
+}

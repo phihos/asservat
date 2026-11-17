@@ -18,7 +18,6 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	planningapp "asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -357,8 +356,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	if err != nil {
 		t.Fatal(err)
 	}
-	retainedReader := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: time.Now}
-	readers := &manualRecordingSaveReaders{Current: authorities, Storage: storage, Retention: &retainedReader}
+	readers := &manualRecordingSaveReaders{Current: authorities, Storage: storage, Retention: policy.Scenario.retention}
 	prepare := func() (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
 		var err error
 		readers.Sources, err = ledger.ListSources(ctx, policy.Authority.PolicyUID)

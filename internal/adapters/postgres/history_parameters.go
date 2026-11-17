@@ -25,18 +25,17 @@ import (
 type HistoryParametersLedger struct {
 	ledger             *Ledger
 	root, installation string
-	retention          *RetentionTransactionGuard
 }
 
-func NewHistoryParameters(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*HistoryParametersLedger, error) {
-	if !authorization.UUID(installation) || retention == nil || retention.root != root {
+func NewHistoryParameters(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*HistoryParametersLedger, error) {
+	if !authorization.UUID(installation) {
 		return nil, artifact.ErrInvalid
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, e
 	}
-	return &HistoryParametersLedger{ledger: l, root: root, installation: installation, retention: retention}, nil
+	return &HistoryParametersLedger{ledger: l, root: root, installation: installation}, nil
 }
 
 func decodeHistoryExpectation(h custodydb.CaptureHistoryParameter) (value.HistoryExpectation, error) {
@@ -95,14 +94,10 @@ func (s *HistoryParametersLedger) transaction(ctx context.Context, f func(*custo
 func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, in value.HistoryReservation) (value.HistoryStorage, error) {
 	var out value.HistoryStorage
 	e := in.Expectation
-	if s == nil || !e.Valid() || e.RootID != s.root || !in.Limits.Valid() || !in.Retention.Target.Valid() || !in.Retention.Proof.Valid(in.Retention.Proof.ObservedAt) {
+	if s == nil || !e.Valid() || e.RootID != s.root || !in.Limits.Valid() || !in.Retention.Target.Valid() {
 		return out, value.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, e.Registration.Location.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+	err := s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
 		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, e.CaptureID, in.Identity, stream, trust, true)
 		if err != nil {
 			return err
@@ -113,9 +108,6 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		}
 		if in.Retention.Target != c.Target {
 			return value.ErrDenied
-		}
-		if err = s.retention.check(ctx, q, topology, in.Retention.Proof, c.Target); err != nil {
-			return err
 		}
 		if existing, err := q.LockHistoryParameter(ctx, custodydb.LockHistoryParameterParams{RootID: id(s.root), CaptureID: id(e.CaptureID)}); err == nil {
 			old, err := decodeHistoryExpectation(existing)
@@ -255,7 +247,7 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 			return value.ErrDenied
 		}
 		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: until, Target: c.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
-		return s.retention.check(ctx, q, topology, in.Retention.Proof, c.Target)
+		return nil
 	})
 	if err != nil {
 		return value.HistoryStorage{}, err
@@ -365,14 +357,10 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 	if s == nil || in.Query.RootID != s.root || !authorization.UUID(in.RequestID) || !authorization.UUID(in.ExecutorEpoch) {
 		return out, value.ErrInvalid
 	}
-	if !in.Retention.Target.Valid() || !in.Retention.Proof.Valid(in.Retention.Proof.ObservedAt) {
+	if !in.Target.Valid() {
 		return out, value.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, in.Retention.Target.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
+	err := s.transaction(ctx, func(q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream) error {
 		c, until, err := historyAuthorizedCapture(ctx, q, s.root, s.installation, in.Query.CaptureID, in.Query.Identity, stream, trust, false)
 		if err != nil {
 			return err
@@ -388,11 +376,8 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 		if err != nil {
 			return err
 		}
-		if in.Retention.Target != storage.Target {
+		if in.Target != storage.Target {
 			return value.ErrDenied
-		}
-		if err = s.retention.check(ctx, q, topology, in.Retention.Proof, storage.Target); err != nil {
-			return err
 		}
 		if storage.Copies.Validate(storage.Expectation.Registration) != nil {
 			return value.ErrUnavailable
@@ -401,7 +386,6 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 		if err != nil {
 			return err
 		}
-		until = identity.Earlier(until, identity.Earlier(in.Retention.ExpiresAt, in.Retention.ValidUntil))
 		until = identity.Earlier(until, identity.Earlier(h.SummaryExpiresAt.Time, storage.Effective.ExpiresAt))
 		if d, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, d)
@@ -413,7 +397,7 @@ func (s *HistoryParametersLedger) AuthorizeHistoryRead(ctx context.Context, in v
 			return value.ErrDenied
 		}
 		out = value.HistoryReadPermission{Storage: storage, Authority: a}
-		return s.retention.check(ctx, q, topology, in.Retention.Proof, storage.Target)
+		return nil
 	})
 	if err != nil {
 		return value.HistoryReadPermission{}, err

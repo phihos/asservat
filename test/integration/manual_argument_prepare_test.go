@@ -60,7 +60,6 @@ func manualArgumentSQLComposition(t *testing.T, target targets.PodResolution) pl
 // no node collector runs and no fixture row directly supplies observation spend.
 func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario) {
 	t.Helper()
-	guards := s.retention.guard
 	duty := func(purpose string) *pgxpool.Pool {
 		t.Helper()
 		// custodyID has a shared prefix; each compiled duty needs its own role.
@@ -150,7 +149,7 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	if r.WriteUntil.After(r.ExpiresAt) {
 		r.WriteUntil = r.ExpiresAt
 	}
-	admissions, err := postgres.NewContextAdmissions(ctx, duty(manualArgumentAdmissionRolePurpose), s.a.RootID, s.recovery.installation, guards)
+	admissions, err := postgres.NewContextAdmissions(ctx, duty(manualArgumentAdmissionRolePurpose), s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +167,7 @@ func qualifyManualArgumentPreparation(t *testing.T, ctx context.Context, admin *
 	}
 	// The installed hub aggregates execution; its retired standalone duty cannot issue a credential.
 	executionPool := grantPool
-	executions, err := postgres.NewAPIContextExecutions(ctx, executionPool, s.a.RootID, s.recovery.installation, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, executionPool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

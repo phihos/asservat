@@ -27,12 +27,12 @@ func rawCaseFixture() (*caseFixture, ContextCaseService) {
 }
 func TestRawQuerySelectionUsesExactPublishedVersionAndReadableProvenance(t *testing.T) {
 	f, s := rawCaseFixture()
-	f.retained.ExpiresAt = f.now.Add(10 * time.Minute)
+	f.record.Retained.Effective.ExpiresAt = f.now.Add(10 * time.Minute)
 	got, err := s.ResolveRawQuery(t.Context(), f, f.routes.CaseID, []artifact.Digest{f.record.Version})
-	if err != nil || len(got.Artifacts) != 1 || got.Artifacts[0].Output.ExecutionDigest != f.record.ExecutionDigest || got.Artifacts[0].NativeBytes != 234 || !got.Artifacts[0].ExpiresAt.Equal(f.retained.ExpiresAt) || got.Review[0].WorkloadName != "api" || got.Review[0].PodName != "" {
+	if err != nil || len(got.Artifacts) != 1 || got.Artifacts[0].Output.ExecutionDigest != f.record.ExecutionDigest || got.Artifacts[0].NativeBytes != 234 || !got.Artifacts[0].ExpiresAt.Equal(f.record.Retained.Effective.ExpiresAt) || got.Review[0].WorkloadName != "api" || got.Review[0].PodName != "" {
 		t.Fatal("exact selection", got, err)
 	}
-	if f.catalogReads != 1 || f.retentionReads != 1 || f.processingReads != 2 || f.permissionReads != 2 {
+	if f.catalogReads != 1 || f.processingReads != 2 || f.permissionReads != 2 {
 		t.Fatal("missing current authority checks", f)
 	}
 	// The ordinary case view receives the same accepted display metadata.
@@ -62,7 +62,7 @@ func TestRawQuerySelectionRefusesUnavailableAndChangedFacts(t *testing.T) {
 			case "audience":
 				f.record.Audience[0].SubjectID = "another-team"
 			case "retention":
-				f.retained.ExpiresAt = f.now
+				f.record.Retained.Effective.ExpiresAt = f.now
 			case "processing":
 				f.fail = "processing"
 			case "changed processing":

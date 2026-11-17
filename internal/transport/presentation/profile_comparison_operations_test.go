@@ -48,7 +48,6 @@ func comparisonBridge(t *testing.T, same bool) (*AuditedOperations, *pairedBridg
 		b.Environment.Processing.Location = b.Environment.Location
 		b.Environment.Processing.CaptureID = id
 		b.Environment.Path.ID = id
-		b.Retention.WorkloadUID, b.Retention.PodUID = b.Scope.WorkloadUID, b.Scope.PodUID
 		b.Scope.Version = artifact.Digest{5}
 		plan.WorkloadUID, plan.AllocationID, plan.Profile.Path = b.Scope.WorkloadUID, id, b.Environment.Path
 	}

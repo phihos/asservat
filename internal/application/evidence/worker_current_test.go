@@ -111,8 +111,6 @@ func (f *workerLifecycleFixture) CheckDownloadCurrent(ctx context.Context, curre
 	a.ValidUntil = identity.Earlier(a.ValidUntil, f.now.Add(5*time.Second))
 	a.Environment.ObservedAt = f.now
 	a.Environment.ValidUntil = a.ValidUntil
-	a.Retention.ObservedAt = f.now
-	a.Retention.ValidUntil = a.ValidUntil
 	return a, nil
 }
 func (f *workerLifecycleFixture) CheckDownload(context.Context, string, artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -648,7 +646,7 @@ func TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound(t *testing.T) {
 }
 
 func TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority(t *testing.T) {
-	for _, which := range []string{"read-scope", "download-scope", "principal", "authority-scope", "environment", "retention", "expired", "cancelled", "authority-denied"} {
+	for _, which := range []string{"read-scope", "download-scope", "principal", "authority-scope", "environment", "expired", "cancelled", "authority-denied"} {
 		t.Run(which, func(t *testing.T) {
 			f, _, _, _ := newWorkerLifecycleFixture(t)
 			source := workerCurrentSourceFunc(func(context.Context) (identity.Identity, error) { return f.i, nil })
@@ -672,8 +670,6 @@ func TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority(t *te
 				f.a.Scope.Principal.Subject = "another-user"
 			case "environment":
 				f.a.Environment = artifact.DownloadEnvironment{}
-			case "retention":
-				f.a.Retention = artifact.RetentionProof{}
 			case "expired":
 				f.a.ValidUntil = f.now
 			case "cancelled":

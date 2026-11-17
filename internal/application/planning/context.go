@@ -146,10 +146,7 @@ func CompileContext(in value.ContextInput, now time.Time) (value.ContextPlan, er
 		return bad()
 	}
 	r := in.Retention
-	if r.Proof != (artifact.RetentionProof{}) && (!r.Proof.Valid(now) || !r.Proof.Matches(r.Proof.RootID, r.Target.ClusterID, r.Target.NamespaceUID, r.Target.WorkloadUID, r.Target.PodUID) || r.Proof.Policy != r.PolicyRevision || r.ValidUntil.After(r.Proof.ValidUntil)) {
-		return bad()
-	}
-	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.ValidUntil.After(now.Add(60*time.Second)) || r.PrivacyClass != "potentialPersonalData" || r.EvidenceType != "context" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 {
+	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.PrivacyClass != "potentialPersonalData" || r.EvidenceType != "context" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 {
 		return bad()
 	}
 	// For this acquired, single-source profile, the verifier's initial retention

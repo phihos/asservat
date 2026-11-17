@@ -68,7 +68,7 @@ func TestRetentionPreviewOperationReply(t *testing.T) {
 	at := f.now.Add(time.Hour).Truncate(time.Microsecond)
 	f.preview = privacy.RetentionPreview{Scanned: 3, Affected: 2, ReadClosed: 1, DeletionDue: 1, Unknown: 1, EarliestExpiresAt: at, EarliestDeleteBy: at.Add(time.Minute), ObservedAt: f.now,
 		Groups:       []privacy.RetentionPreviewGroup{{ClusterID: cluster, PrivacyClass: "potentialPersonalData", EvidenceType: "context", Scanned: 3, Affected: 2, ReadClosed: 1, DeletionDue: 1, Unknown: 1, EarliestExpiresAt: at, EarliestDeleteBy: at.Add(time.Minute)}},
-		Incomplete:   []privacy.PreviewIncomplete{{ClusterID: cluster, Reason: privacy.PreviewSourceUnavailable}},
+		Incomplete:   []privacy.PreviewIncomplete{{ClusterID: cluster, Reason: "SourceUnavailable"}},
 		NotEvaluated: []privacy.PreviewNotEvaluated{{Action: "update", SourceClusterID: cluster, UID: "gone", Reason: privacy.PreviewUnknownObject}}}
 	out := callRetentionPreview(t, f, ops, `{"changes":[{"action":"update","uid":"baseline","spec":`+retentionSpecJSON+`},{"action":"delete","source_cluster_id":"`+cluster+`","uid":"local"}]}`)
 	data := out["data"].(map[string]any)
@@ -88,10 +88,10 @@ func TestRetentionPreviewOperationLargestReply(t *testing.T) {
 	for i := range 200 {
 		cluster := fmt.Sprintf("22222222-3333-4444-8555-%012d", i)
 		f.preview.Groups = append(f.preview.Groups, privacy.RetentionPreviewGroup{ClusterID: cluster, PrivacyClass: "specialCategoryPossible", EvidenceType: "commandOutput", Scanned: 10000, Affected: 10000, ReadClosed: 10000, DeletionDue: 10000, Unknown: 10000, EarliestExpiresAt: at, EarliestDeleteBy: at})
-		f.preview.Incomplete = append(f.preview.Incomplete, privacy.PreviewIncomplete{ClusterID: cluster, Reason: privacy.PreviewSourceUnavailable})
+		f.preview.Incomplete = append(f.preview.Incomplete, privacy.PreviewIncomplete{ClusterID: cluster, Reason: "SourceUnavailable"})
 	}
 	for i := range 16 {
-		f.preview.NotEvaluated = append(f.preview.NotEvaluated, privacy.PreviewNotEvaluated{Action: "update", SourceClusterID: "22222222-3333-4444-8555-666666666666", UID: fmt.Sprintf("%064d", i), Reason: privacy.PreviewSourceAmbiguous})
+		f.preview.NotEvaluated = append(f.preview.NotEvaluated, privacy.PreviewNotEvaluated{Action: "update", SourceClusterID: "22222222-3333-4444-8555-666666666666", UID: fmt.Sprintf("%064d", i), Reason: privacy.PreviewUnknownObject})
 	}
 	f.preview.ObservedAt = f.now
 	data := callRetentionPreview(t, f, ops, `{"changes":[{"action":"delete","uid":"baseline"}]}`)["data"].(map[string]any)
@@ -101,7 +101,7 @@ func TestRetentionPreviewOperationLargestReply(t *testing.T) {
 }
 
 func TestRetentionPreviewOperationFailures(t *testing.T) {
-	for err, code := range map[error]string{privacy.ErrPreviewLimit: "PreviewTooLarge", privacy.ErrInvalid: "InvalidProposal", identity.ErrDenied: "AdministratorRequired", identity.ErrUnavailable: "NotAvailable"} {
+	for err, code := range map[error]string{privacy.ErrInvalid: "InvalidProposal", identity.ErrDenied: "AdministratorRequired", identity.ErrUnavailable: "NotAvailable"} {
 		f, ops := newRetentionPreviewOps(t)
 		f.err = err
 		out := callRetentionPreview(t, f, ops, `{"changes":[{"action":"delete","uid":"baseline"}]}`)

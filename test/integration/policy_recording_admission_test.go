@@ -211,7 +211,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				})
 				admitPool := poolFor(admitRole, "synthetic-policy-recorder-admit")
 				defer admitPool.Close()
-				admissions, err = postgres.NewContextAdmissions(ctx, admitPool, root, installation, s.retention.guard)
+				admissions, err = postgres.NewContextAdmissions(ctx, admitPool, root, installation)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -680,7 +680,7 @@ func policyRecorderOfflineAdmission(t testing.TB, now time.Time) capture.Admissi
 	target := capacityNativeTarget(cluster, cfg.NamespaceRef{Name: "app", UID: custodyID()}, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: custodyID()}, now)
 	target.ExecutionClass = artifact.ContextAPIExecution
 	target.NodeUID, target.NodeBootID, target.Pin.NodeName = "", "", ""
-	set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Complete: true, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
+	set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: artifact.Digest{1}}, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
 	retained, err := privacy.Resolve(set, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: now}, now)
 	if err != nil {
 		t.Fatal(err)

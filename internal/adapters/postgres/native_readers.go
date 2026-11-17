@@ -25,11 +25,11 @@ var _ evidence.NativeLocator = (*NativeReaders)(nil)
 var _ evidence.WorkerEnrollmentBindings = (*NativeReaders)(nil)
 var _ evidence.DownloadWorkerBindings = (*NativeReaders)(nil)
 
-func NewNativeReaders(ctx context.Context, pool *pgxpool.Pool, root, installation string, guards ...*RetentionTransactionGuard) (*NativeReaders, error) {
+func NewNativeReaders(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*NativeReaders, error) {
 	if !value.UUID(installation) {
 		return nil, artifact.ErrInvalid
 	}
-	downloads, err := NewDownloads(ctx, pool, root, guards...)
+	downloads, err := NewDownloads(ctx, pool, root)
 	if err != nil {
 		return nil, err
 	}

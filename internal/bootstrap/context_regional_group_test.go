@@ -207,7 +207,6 @@ func newGroupRegionalFixture(t *testing.T, counts ...int) *groupRegionalFixture 
 		retention.AnchorAt = artifact.SourceSnapshotAnchor(request)
 		retention.ExpiresAt = retention.AnchorAt.Add(60 * time.Second)
 		retention.DeleteBy = retention.ExpiresAt.Add(30 * time.Second)
-		retention.Proof.PodUID = target.Request.PodUID
 		sources = append(sources, compiler.RecordingSaveScopeSource{PolicyUID: binding.PolicyUID, ExecutionDigest: authority.ScopeDigest, Original: original, ActionID: binding.ActionID, Kind: "packetCapture", DefinitionDigest: scope.SourceDefinitionDigest, AudienceDigest: audience, CeilingDigest: artifact.Digest(cap.Revision.Digest), RetentionDigest: artifact.Digest(retention.PolicyRevision.Digest), ApprovedBefore: time.Second, Before: time.Second, MaxBytes: 65536})
 		w.Actor = authority.Executor
 		w.SourceBinding = &binding

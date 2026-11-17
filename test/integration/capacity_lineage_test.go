@@ -29,7 +29,7 @@ func TestCapacityNativeProcessingLineageDates(t *testing.T) {
 	target := authorization.Target{ClusterID: custodyID(), NamespaceUID: custodyID(), WorkloadUID: custodyID(), PodUID: custodyID()}
 	resolve := func(t *testing.T, p privacy.ScopedPolicy, requested int64, at time.Time) privacy.Resolution {
 		t.Helper()
-		set := privacy.PolicySet{Target: target, Revision: p.Policy.Revision, Policies: []privacy.Policy{p.Policy}, Complete: true, ObservedAt: at, FreshUntil: at.Add(5 * time.Second)}
+		set := privacy.PolicySet{Target: target, Revision: p.Policy.Revision, Policies: []privacy.Policy{p.Policy}}
 		r, err := privacy.Resolve(set, privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: at, RequestedSeconds: requested}, at)
 		if err != nil {
 			t.Fatal("fixture retention shape", err)

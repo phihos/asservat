@@ -30,7 +30,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/keyservice"
 	native "asservat.local/asservat/internal/transport/native"
@@ -40,7 +39,6 @@ import (
 
 type nativeExchangeFixture struct {
 	renewOnly              bool
-	topologySource         privacy.PolicySourceRef
 	content                *nativeContextFixture
 	worker                 value.DownloadWorker
 	enrollment             workerEnrollmentFixture
@@ -48,7 +46,6 @@ type nativeExchangeFixture struct {
 	runtime, audit, config *postgres.Downloads
 	allocation             artifact.DownloadAllocation
 	gate                   authapp.ContextDownloadAuthority
-	guards                 *postgres.RetentionTransactionGuard
 	authority              func() artifact.DownloadAuthority
 	store                  *objectstore.Store
 	keys                   authorityTestKeys
@@ -111,7 +108,7 @@ func qualifyNativeExchange(t *testing.T, ctx context.Context, f nativeExchangeFi
 	t.Run("explicit-new-session", func(t *testing.T) {
 		next := f
 		next.worker = *state.nextWorker
-		next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.guards, f.store, f.keys, f.gate)
+		next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.store, f.keys, f.gate)
 		qualifyNativeExchangePhase(t, ctx, next)
 	})
 }
@@ -146,11 +143,11 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	historyPool := open("native_history_runtime", "synthetic-native-history")
 	metadataPool := open("native_metadata_runtime", "synthetic-native-metadata")
 	root := f.worker.Intent.Authority.Scope.RootID
-	owners, e := postgres.NewNativeOwners(ctx, ownerPool, root, f.worker.Intent.Profile, f.guards)
+	owners, e := postgres.NewNativeOwners(ctx, ownerPool, root, f.worker.Intent.Profile)
 	if e != nil {
 		t.Fatal(e)
 	}
-	readers, e := postgres.NewNativeReaders(ctx, metadataPool, root, f.worker.Binding.InstallationID, f.guards)
+	readers, e := postgres.NewNativeReaders(ctx, metadataPool, root, f.worker.Binding.InstallationID)
 	if e != nil {
 		t.Fatal("current native metadata reader", e)
 	}
@@ -177,15 +174,15 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	}
 	// Fixture capacity values exercise the arithmetic/SQL contract, not measured
 	// production WAL/backup qualification or a source acceptance mechanism.
-	preparationKeys, e := postgres.NewDownloadKeys(ctx, bindPool, root, f.keyScope, f.guards)
+	preparationKeys, e := postgres.NewDownloadKeys(ctx, bindPool, root, f.keyScope)
 	if e != nil {
 		t.Fatal(e)
 	}
-	windowKeys, e := postgres.NewNativeKeys(ctx, bindPool, root, f.worker.Intent.Profile, f.keyScope, f.guards)
+	windowKeys, e := postgres.NewNativeKeys(ctx, bindPool, root, f.worker.Intent.Profile, f.keyScope)
 	if e != nil {
 		t.Fatal(e)
 	}
-	keyAuthority, e := postgres.NewNativeKeyAuthority(ctx, readPool, root, f.worker.Intent.Profile, f.keyScope, f.guards)
+	keyAuthority, e := postgres.NewNativeKeyAuthority(ctx, readPool, root, f.worker.Intent.Profile, f.keyScope)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -643,11 +640,10 @@ func nativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
 		"GRANT INSERT ON download_native_backing TO native_history_runtime",
 		"GRANT UPDATE(closed,retired_at,updated_at,updates) ON download_native_owner TO native_history_runtime",
 		"GRANT DELETE ON download_native_backing,download_native_owner,download_native_key TO native_history_runtime",
-		"GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,artifact_download,download_batch,retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,download_worker,download_worker_configuration,download_worker_configuration_revision,download_worker_enrollment,download_worker_certificate,download_key_binding,download_response,download_window,download_control_allocation,download_native_owner,download_native_key,download_native_backing TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,artifact_download,download_batch,retention_policy,retention_decision,download_worker,download_worker_configuration,download_worker_configuration_revision,download_worker_enrollment,download_worker_certificate,download_key_binding,download_response,download_window,download_control_allocation,download_native_owner,download_native_key,download_native_backing TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(installation_id) ON fleet_current_trust TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT SELECT ON processing_root,context_processing,processing_rule TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(id) ON permission_stream,artifact_download,download_worker,download_response,download_window TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
-		"GRANT UPDATE(root_id) ON retention_source TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(source_uid) ON download_worker_configuration TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT UPDATE(worker_id) ON download_native_owner TO native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
 		"GRANT INSERT ON download_native_owner TO native_owner_runtime",

@@ -204,8 +204,6 @@ func (f *downloadResultFixture) refresh(at time.Time) {
 	f.a.ValidUntil = until
 	f.a.Environment.ObservedAt = at
 	f.a.Environment.ValidUntil = until
-	f.a.Retention.ObservedAt = at
-	f.a.Retention.ValidUntil = until
 }
 func (f *downloadResultFixture) count(name string) int {
 	f.mu.Lock()

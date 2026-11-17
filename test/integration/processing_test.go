@@ -12,7 +12,6 @@ import (
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
@@ -91,7 +90,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Processing: reader, Now: time.Now}
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Processing: reader, Now: time.Now}
 	refreshPermission := func() {
 		batch := s.batch
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
@@ -211,16 +210,15 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 	defer configPool.Close()
 	readPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 	defer readPool.Close()
-	guards := s.retention.guard
-	runtime, err := postgres.NewDownloads(ctx, runtimePool, s.a.RootID, guards)
+	runtime, err := postgres.NewDownloads(ctx, runtimePool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ack, err := postgres.NewDownloads(ctx, auditPool, s.a.RootID, guards)
+	ack, err := postgres.NewDownloads(ctx, auditPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := postgres.NewDownloads(ctx, configPool, s.a.RootID, guards)
+	config, err := postgres.NewDownloads(ctx, configPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +228,7 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 		t.Fatal(err)
 	}
 	scope := artifact.DownloadScope{RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), Principal: s.a.Plan.Input.Executor}
-	gate := authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, readPool, s, e.Registration), Now: time.Now}
+	gate := authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: catalog, Environment: newDownloadTestEnvironment(t, ctx, readPool, s, e.Registration), Now: time.Now}
 	current := func() artifact.DownloadAuthority {
 		batch := s.batch
 		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)

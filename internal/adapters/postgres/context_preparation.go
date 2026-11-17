@@ -1,10 +1,11 @@
 package postgres
 
 import (
+	"context"
+
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"context"
 )
 
 // FirstContextPreparations is selected only by the installed first-context
@@ -16,7 +17,7 @@ type FirstContextPreparations struct{ *Downloads }
 var _ evidence.DownloadSessions = (*FirstContextPreparations)(nil)
 
 func NewFirstContextPreparations(s *Downloads) (*FirstContextPreparations, error) {
-	if s == nil || s.ledger == nil || s.retention == nil {
+	if s == nil || s.ledger == nil {
 		return nil, artifact.ErrInvalid
 	}
 	return &FirstContextPreparations{s}, nil

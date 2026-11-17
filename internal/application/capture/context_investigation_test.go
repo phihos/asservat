@@ -40,7 +40,7 @@ type investigationFixture struct {
 	cap                                                   planning.ContextCapability
 	store                                                 ContextStorageObservation
 	epoch                                                 string
-	denied, missing, noProof                              bool
+	denied, missing                                       bool
 	unknownCommit, unknownPreview                         bool
 	afterStore, afterStorage, afterAdmission, afterReplay func()
 	identityChange                                        string
@@ -133,10 +133,7 @@ func (f *investigationFixture) ContextStorage(context.Context, authorization.Tar
 }
 func (f *investigationFixture) Resolve(_ context.Context, in privacy.Input) (privacy.Resolution, error) {
 	r := identity.Revision{UID: fixtureID(9), Generation: 1, Digest: [32]byte{7}}
-	set := privacy.PolicySet{Target: in.Target, Revision: r, Complete: true, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: f.policyGeneration, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
-	if !f.noProof {
-		set.Proof = artifact.RetentionProof{RootID: fixtureID(1), ClusterID: in.Target.ClusterID, NamespaceUID: in.Target.NamespaceUID, WorkloadUID: in.Target.WorkloadUID, PodUID: in.Target.PodUID, Topology: r, Policy: r, Selectors: r, ObservedAt: f.now, ValidUntil: set.FreshUntil, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: in.Target.ClusterID, ControlNamespaceUID: "control", Epoch: fixtureID(3), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: r}}}
-	}
+	set := privacy.PolicySet{Target: in.Target, Revision: r, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: f.policyGeneration, Digest: [32]byte{8}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 60, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}
 	return privacy.Resolve(set, in, f.now)
 }
 func (f *investigationFixture) CreateContextPreview(_ context.Context, p value.ContextPreview) error {
@@ -282,7 +279,6 @@ func TestContextUnknownCommitRecoversAfterExpiryAndPodDisappearance(t *testing.T
 	beforeReads, beforeIDs := f.targetReads.Load(), f.newIDs.Load()
 	f.now = f.now.Add(10 * time.Minute)
 	f.missing = true
-	f.noProof = true
 	f.cap.Enabled = false
 	f.store = ContextStorageObservation{}
 	delete(f.previews, p.ID)
@@ -430,13 +426,6 @@ func TestContextPreviewExpiryOwnershipAndAdmissionKey(t *testing.T) {
 }
 
 func TestContextRequiresProtectedAuthorityAndNoDetachedContext(t *testing.T) {
-	t.Run("retention proof", func(t *testing.T) {
-		f := newInvestigationFixture()
-		f.noProof = true
-		if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), f.intent()); err == nil {
-			t.Fatal("arithmetic authorized acquisition")
-		}
-	})
 	t.Run("canceled owner", func(t *testing.T) {
 		f := newInvestigationFixture()
 		p := f.preview(t)

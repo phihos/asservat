@@ -58,7 +58,7 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	})
 	pool := poolFor(admissionRole, "synthetic-share-capture-admit")
 	t.Cleanup(pool.Close)
-	admissions, err := postgres.NewContextAdmissions(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
+	admissions, err := postgres.NewContextAdmissions(ctx, pool, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

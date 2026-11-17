@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,20 +38,19 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		defer configPool.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		guards := scenario.retention.guard
-		ledger, err := postgres.NewDownloads(ctx, runtimePool, root, guards)
+		ledger, err := postgres.NewDownloads(ctx, runtimePool, root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		config, err := postgres.NewDownloads(ctx, configPool, root, guards)
+		config, err := postgres.NewDownloads(ctx, configPool, root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		catalog, err := postgres.NewContextPublications(ctx, catalogPool, root, guards)
+		catalog, err := postgres.NewContextPublications(ctx, catalogPool, root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		gate := authorizationapp.ContextDownloadAuthority{RootID: root, Permissions: scenario.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: scenario.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, scenario, e.Registration), Now: time.Now}
+		gate := authorizationapp.ContextDownloadAuthority{RootID: root, Permissions: scenario.p, Catalog: catalog, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, scenario, e.Registration), Now: time.Now}
 		scope := artifact.DownloadScope{RootID: root, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), Principal: scenario.a.Plan.Input.Executor}
 		current := func() artifact.DownloadAuthority {
 			t.Helper()

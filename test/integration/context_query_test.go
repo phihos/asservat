@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
@@ -111,7 +110,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		principal := s.a.Plan.Input.Executor
 		backing := &querySQLBacking{current: f.current}
 		worker := &querySQLWorker{}
-		ledger, err := postgres.NewContextQueries(ctx, runtime, rootID, s.recovery.installation, s.retention.guard, backing, worker)
+		ledger, err := postgres.NewContextQueries(ctx, runtime, rootID, s.recovery.installation, backing, worker)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +123,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal(err)
 		}
 		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.policies, Processing: processing, Now: time.Now}
-		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
+		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Environment: environment, Now: time.Now}
 		scope := value.ContextProjectionScope{RootID: rootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: principal}
 		profileSummary := e.NativeType == artifact.PprofArtifact
 		beginTool := "get_file_excerpt"

@@ -45,7 +45,6 @@ type publicContextOperationPorts struct {
 	catalogapp.ContextCaseRoutes
 	permissions.ProjectionReader
 	permissions.ContextDownloadCatalog
-	permissions.DownloadRetentionResolver
 	permissions.DownloadProcessingReader
 	evidence.ContextDownloadRoutes
 	evidence.ContextDownloadSources
@@ -73,7 +72,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 		Intents:       p,
 		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Router: &contextstart.Router{}},
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
-		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Retention: p, Processing: p},
+		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Processing: p},
 		Downloads:     evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: p, Sources: p, Authority: p, Sessions: p, Plans: p},
 		Native:        ContextNativeDownloadServices{Runtime: native, Stop: evidence.ContextDownloadStopCoordinator{Ledger: p, Now: time.Now, Active: native}},
 	}
@@ -269,7 +268,7 @@ func TestPublicRawAccessUsesInitializedSharedCatalogAuthority(t *testing.T) {
 		t.Fatal("grant service replaced")
 	}
 	cases, ok := grants.RawSelections.(catalogapp.ContextCaseService)
-	if !ok || grants.RawStore != ports || grants.Store != ports || grants.Now == nil || grants.NewID == nil || cases.Now == nil || cases.Catalog != s.Cases.Catalog || cases.Routes != s.Cases.Routes || cases.Permissions != s.Cases.Permissions || cases.Retention != s.Cases.Retention || cases.Processing != s.Cases.Processing {
+	if !ok || grants.RawStore != ports || grants.Store != ports || grants.Now == nil || grants.NewID == nil || cases.Now == nil || cases.Catalog != s.Cases.Catalog || cases.Routes != s.Cases.Routes || cases.Permissions != s.Cases.Permissions || cases.Processing != s.Cases.Processing {
 		t.Fatal("raw selection captured an uninitialized or different authority")
 	}
 	ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), publicOperationContextKey{}, "original"), time.Second)

@@ -50,11 +50,8 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: projectionID, InstallationID: projectionID,
 		Region: "region", StoreID: projectionID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
 		Processing: artifact.DownloadProcessingProof{RootID: projectionID, Epoch: projectionID, CaptureID: projectionID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
-		Retention: artifact.RetentionProof{RootID: projectionID, ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
-			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
+		PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
 		AccessUntil: f.now.Add(time.Minute), DeleteBy: f.now.Add(2 * time.Minute)}
-	f.a.Retention.Sources[0] = artifact.RetentionSourceVersion{ClusterID: projectionID, ControlNamespaceUID: "control", Epoch: projectionID, Hub: true,
-		ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}
 	f.p = value.ContextQueryPlan{AcceptanceID: projectionID, AccountID: projectionID, AllocationID: projectionID, RootID: projectionID, InstallationID: projectionID,
 		ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", AllocationRevision: 1, PoolSource: rev, PolicySource: rev, Principal: principal,
 		Profile: value.ContextQueryResourceProfile{ID: projectionID, Source: rev, Qualification: rev, Path: path, Lifetime: value.ContextDefaultQueryTime,
@@ -80,7 +77,6 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 	f.a.Environment.Path.TargetClusterID = e.Registration.Location.ClusterID
 	f.a.Environment.Processing.Location = e.Registration.Location
 	f.a.Environment.Processing.CaptureID = e.CaptureUID
-	f.a.Retention.ClusterID, f.a.Retention.NamespaceUID, f.a.Retention.WorkloadUID, f.a.Retention.PodUID = f.a.Scope.ClusterID, e.NamespaceUID, e.WorkloadUID, e.PodUID
 	f.a.AccessUntil, f.a.DeleteBy = e.Registration.ExpiresAt, e.Registration.DeleteBy
 	f.p.ClusterID, f.p.NamespaceUID, f.p.WorkloadUID = f.a.Scope.ClusterID, e.NamespaceUID, e.WorkloadUID
 	f.p.Profile.Path = f.a.Environment.Path
@@ -88,7 +84,6 @@ func newProjectionWorkerFixture(t *testing.T) *projectionWorkerFixture {
 	f.a.CheckedAt, f.a.ValidUntil = f.now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = f.now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = f.now, until
-	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = f.now, until
 	f.p.ObservedAt, f.p.ValidUntil = f.now, until
 	var err error
 	f.q, err = value.NewContextQuery(projectionID, projectionID, projectionID, f.a, f.p, f.now)

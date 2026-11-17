@@ -131,7 +131,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 		t.Fatal("audited exact snapshot intent", err)
 	}
 	hub := f.roles["hub-runtime"]
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID, s.retention.guard)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,21 +355,14 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 		t.Fatal("immutable coverage replacement", err)
 	}
 	publications := func(purpose string) *postgres.ContextPublications {
-		p, err := postgres.NewContextPublications(ctx, f.roles[purpose], admission.RootID, s.retention.guard)
+		p, err := postgres.NewContextPublications(ctx, f.roles[purpose], admission.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return p
 	}
 	verify, audit, publish := publications("context-verify"), publications("context-verification-audit"), publications("context-publish")
-	retentionResolver := privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}
-	if admission.Plan.Input.Snapshot.Group != nil {
-		retentionResolver.RetainedPolicies = manualGroupRetainedPolicies{fixture: s.retention}
-	}
-	if stage.Retention != nil {
-		retentionResolver = *stage.Retention
-	}
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, s.retention.guard, retentionResolver)
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

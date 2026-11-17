@@ -1,12 +1,13 @@
 package analysis
 
 import (
-	"asservat.local/asservat/internal/domain/authorization"
 	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/authorization"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
@@ -25,11 +26,6 @@ func comparisonAuthorityFixture() ContextProjectionAuthority {
 	b.Environment.Processing.CaptureID = b.Scope.CaptureID
 	b.Environment.Path.ID = queryOtherID
 	b.Environment.Path.TargetClusterID = b.Scope.ClusterID
-	b.Retention.ClusterID = b.Scope.ClusterID
-	b.Retention.NamespaceUID = b.Scope.NamespaceUID
-	b.Retention.WorkloadUID = b.Scope.WorkloadUID
-	b.Retention.PodUID = b.Scope.PodUID
-	b.Retention.Sources[0].ClusterID = b.Scope.ClusterID
 	a.Baseline = &b
 	return a
 }
@@ -92,11 +88,10 @@ func TestProfileComparisonAuthorityKeepsLegacyAuthorityJSON(t *testing.T) {
 	old := struct {
 		Scope                                        ContextProjectionScope
 		Environment                                  ContextProjectionEnvironment
-		Retention                                    artifact.RetentionProof
 		PermissionRevision, IdentityRevision         identity.Revision
 		DecisionDigest                               artifact.Digest
 		CheckedAt, ValidUntil, AccessUntil, DeleteBy time.Time
-	}{a.Scope, a.Environment, a.Retention, a.PermissionRevision, a.IdentityRevision, a.DecisionDigest, a.CheckedAt, a.ValidUntil, a.AccessUntil, a.DeleteBy}
+	}{a.Scope, a.Environment, a.PermissionRevision, a.IdentityRevision, a.DecisionDigest, a.CheckedAt, a.ValidUntil, a.AccessUntil, a.DeleteBy}
 	got, err := json.Marshal(a)
 	want, otherErr := json.Marshal(old)
 	if err != nil || otherErr != nil || !bytes.Equal(got, want) {
@@ -145,15 +140,6 @@ func maximumComparisonAuthority() ContextProjectionAuthority {
 		v.Environment.Processing.Sequence = 1 << 60
 		v.Environment.Processing.StateDigest = digest
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = start, start.Add(4*time.Second)
-		r := &v.Retention
-		r.NamespaceUID, r.WorkloadUID, r.PodUID = v.Scope.NamespaceUID, v.Scope.WorkloadUID, v.Scope.PodUID
-		r.Topology, r.Policy, r.Selectors = revision(false), revision(false), revision(false)
-		r.SourceCount = 2
-		r.ObservedAt, r.ValidUntil = start, start.Add(4*time.Second)
-		r.Sources = [2]artifact.RetentionSourceVersion{
-			{ClusterID: queryTestID, ControlNamespaceUID: text(64), Epoch: queryTestID, Hub: true, ProtectionDigest: digest, SnapshotDigest: digest, Acceptance: revision(true)},
-			{ClusterID: v.Scope.ClusterID, ControlNamespaceUID: strings.Repeat(">", 64), Epoch: queryOtherID, ProtectionDigest: digest, SnapshotDigest: digest, Acceptance: revision(true)},
-		}
 		v.PermissionRevision, v.IdentityRevision = revision(true), revision(false)
 		v.DecisionDigest = digest
 		v.CheckedAt, v.ValidUntil, v.AccessUntil, v.DeleteBy = start, start.Add(4*time.Second), start.Add(time.Minute), start.Add(2*time.Minute)

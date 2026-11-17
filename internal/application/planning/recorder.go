@@ -1259,7 +1259,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		return bad()
 	}
 	r := in.Retention
-	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.ValidUntil.After(now.Add(60*time.Second)) || r.PrivacyClass != "potentialPersonalData" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 {
+	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.PrivacyClass != "potentialPersonalData" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 {
 		return bad()
 	}
 	if r.RequestedSeconds < 1 || r.MaximumSeconds < 1 || r.DeletionBudgetSeconds < 1 || r.DeletionBudgetSeconds > 86400 || r.DeletionBudgetSeconds >= r.MaximumSeconds {

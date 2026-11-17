@@ -1,13 +1,14 @@
 package postgres
 
 import (
-	executionapp "asservat.local/asservat/internal/application/execution"
-	executionvalue "asservat.local/asservat/internal/domain/execution"
 	"bytes"
 	"context"
 	"errors"
 	"reflect"
 	"time"
+
+	executionapp "asservat.local/asservat/internal/application/execution"
+	executionvalue "asservat.local/asservat/internal/domain/execution"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
@@ -17,16 +18,14 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ContextPublications struct {
-	ledger    *Ledger
-	root      string
-	retention *RetentionTransactionGuard
+	ledger *Ledger
+	root   string
 }
 
 var _ evidence.ContextPublicationLedger = (*ContextPublications)(nil)
@@ -34,7 +33,7 @@ var _ authorizationapp.AudienceReader = (*ContextPublications)(nil)
 
 // Instantiate each facet with separate verification, audit, publish or SELECT
 // credentials. Sharing a Go implementation does not combine runtime SQL roles.
-func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string, guards ...*RetentionTransactionGuard) (*ContextPublications, error) {
+func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextPublications, error) {
 	if !authorization.UUID(root) {
 		return nil, artifact.ErrInvalid
 	}
@@ -47,11 +46,7 @@ func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string
 	if why := schemaCompatible(ctx, pool); why != "" {
 		return nil, schemaRefusal(privacy.ErrUnavailable, why)
 	}
-	guard, err := retentionGuardFor(root, guards)
-	if err != nil {
-		return nil, err
-	}
-	return &ContextPublications{ledger: l, root: root, retention: guard}, nil
+	return &ContextPublications{ledger: l, root: root}, nil
 }
 
 // historicalPublication checks original durable structure without conferring
@@ -82,10 +77,7 @@ func (s *ContextPublications) AcceptedContextForPublication(ctx context.Context,
 	})
 	return out, err
 }
-func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, e artifact.ContextExpectation, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology) error {
-	if err := s.retention.check(ctx, q, topology, a.Retention, authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}); err != nil {
-		return err
-	}
+func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, e artifact.ContextExpectation, a artifact.PublicationAuthority) error {
 	n, err := q.CurrentTime(ctx)
 	if err != nil {
 		return err
@@ -107,7 +99,7 @@ func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb
 
 // Canonical order: permission root -> storage pool/allocation -> attempt ->
 // capture -> verification/catalog. No external work occurs while locks are held.
-func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, topology privacyvalue.PolicyTopology) (custodydb.PermissionStream, custodydb.CustodyPool, custodydb.CustodyAllocation, custodydb.CustodyAttempt, custodydb.ContextCapture, error) {
+func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (custodydb.PermissionStream, custodydb.CustodyPool, custodydb.CustodyAllocation, custodydb.CustodyAttempt, custodydb.ContextCapture, error) {
 	var stream custodydb.PermissionStream
 	var pool custodydb.CustodyPool
 	var allocation custodydb.CustodyAllocation
@@ -148,7 +140,7 @@ func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb
 		err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time)
 	}
 	if err == nil {
-		err = s.publicationFence(ctx, q, stream, e, a, topology)
+		err = s.publicationFence(ctx, q, stream, e, a)
 	}
 	return stream, pool, allocation, attempt, accepted, err
 }
@@ -206,12 +198,8 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 		window := *verified.Acquisition
 		verified.Acquisition = &window
 	}
-	topology, err := s.retention.observe(ctx, e.Registration.Location.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology)
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a)
 		if err != nil {
 			return err
 		}
@@ -261,7 +249,7 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
 			return err
 		}
-		return s.publicationFence(ctx, q, stream, e, a, topology)
+		return s.publicationFence(ctx, q, stream, e, a)
 	})
 	if err != nil {
 		return audit.ContextVerification{}, err
@@ -314,12 +302,8 @@ func (s *ContextPublications) PublishContext(ctx context.Context, e artifact.Con
 	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root {
 		return out, artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, e.Registration.Location.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a, topology)
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		stream, pool, allocation, attempt, accepted, err := s.publicationLocks(ctx, q, e, c, a)
 		if err != nil {
 			return err
 		}
@@ -351,7 +335,7 @@ func (s *ContextPublications) PublishContext(ctx context.Context, e artifact.Con
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
 			return err
 		}
-		return s.publicationFence(ctx, q, stream, e, a, topology)
+		return s.publicationFence(ctx, q, stream, e, a)
 	})
 	if err != nil {
 		return artifact.PublishedContext{}, err

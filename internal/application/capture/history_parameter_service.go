@@ -26,7 +26,6 @@ type HistoryParameterLedger interface {
 }
 type HistoryMetadataRetention interface {
 	ResolveCaseMetadata(context.Context, privacy.Input) (privacy.Resolution, error)
-	ResolveRetainedCaseMetadata(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error)
 }
 
 // HistoryParameterService operates only on independently admitted captures.
@@ -240,8 +239,7 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 		return s.Legacy.ReadCaptureSettings(ctx, q)
 	}
 	stage = markHistoryStage(ctx, "hr-", stage, "retention", &began)
-	retained, err := s.Retention.ResolveRetainedCaseMetadata(ctx, storage.Retention.Input, storage.Effective, storage.Retention.Origins)
-	if err != nil || !s.Now().Before(retained.ExpiresAt) {
+	if !s.Now().Before(storage.Effective.ExpiresAt) {
 		return zero, value.ErrSettingsUnavailable
 	}
 	stage = markHistoryStage(ctx, "hr-", stage, "prepare", &began)
@@ -252,7 +250,7 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 	defer session.Close()
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
-	in := value.HistoryReadRequest{Retention: retained, Query: q, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch()}
+	in := value.HistoryReadRequest{Target: storage.Target, Query: q, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch()}
 	stage = markHistoryStage(ctx, "hr-", stage, "authorize", &began)
 	permission, err := s.Ledger.AuthorizeHistoryRead(operation, in)
 	if err != nil {
@@ -281,7 +279,7 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 		target, _ = json.Marshal(p.Target)
 	}
 	until := identity.Earlier(permission.Authority.NotAfter, final.Authority.NotAfter)
-	return value.CaptureSettings{RecordingSave: p.RecordingSave.Clone(), CaptureID: q.CaptureID, Origin: storage.Origin, ClusterID: p.Target.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, AcceptedAt: storage.Expectation.Registration.AnchorAt, ExpiresAt: identity.Earlier(final.Storage.SummaryExpiresAt, identity.Earlier(final.Storage.Effective.ExpiresAt, retained.ExpiresAt)), TargetJSON: target, DependencyJSON: bytes.Clone(p.DependencyJSON), RecipeJSON: bytes.Clone(p.RecipeJSON), CompositionJSON: bytes.Clone(p.CompositionJSON), FrozenFilters: bytes.Clone(p.FrozenFilters), ExplicitPodUID: p.ExplicitPodUID, Selection: p.Selection, PolicyOrigins: append([]value.HistoryPolicyOrigin(nil), p.PolicyOrigins...), Composition: p.Composition.Clone(), SettingsKey: storage.Expectation.SettingsKey, OriginalEffectiveSeconds: p.OriginalEffectiveSeconds, Namespace: p.Target.Namespace, WorkloadKind: p.Target.Kind, WorkloadName: p.Target.Name, RequestedSeconds: p.RequestedSeconds, ExecutionDigest: p.OriginalExecutionDigest, ObservedAt: final.Storage.ObservedAt, ValidUntil: until}, nil
+	return value.CaptureSettings{RecordingSave: p.RecordingSave.Clone(), CaptureID: q.CaptureID, Origin: storage.Origin, ClusterID: p.Target.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, AcceptedAt: storage.Expectation.Registration.AnchorAt, ExpiresAt: identity.Earlier(final.Storage.SummaryExpiresAt, final.Storage.Effective.ExpiresAt), TargetJSON: target, DependencyJSON: bytes.Clone(p.DependencyJSON), RecipeJSON: bytes.Clone(p.RecipeJSON), CompositionJSON: bytes.Clone(p.CompositionJSON), FrozenFilters: bytes.Clone(p.FrozenFilters), ExplicitPodUID: p.ExplicitPodUID, Selection: p.Selection, PolicyOrigins: append([]value.HistoryPolicyOrigin(nil), p.PolicyOrigins...), Composition: p.Composition.Clone(), SettingsKey: storage.Expectation.SettingsKey, OriginalEffectiveSeconds: p.OriginalEffectiveSeconds, Namespace: p.Target.Namespace, WorkloadKind: p.Target.Kind, WorkloadName: p.Target.Name, RequestedSeconds: p.RequestedSeconds, ExecutionDigest: p.OriginalExecutionDigest, ObservedAt: final.Storage.ObservedAt, ValidUntil: until}, nil
 }
 
 type HistoryRetirementLedger interface {

@@ -313,7 +313,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 	// must serialize through SQL; no shared Go mutex supplies correctness.
 	secondPool := f.poolFor("download_runtime", "synthetic-download")
 	defer secondPool.Close()
-	secondLedger, e := postgres.NewDownloads(ctx, secondPool, f.allocation.RootID, f.guards)
+	secondLedger, e := postgres.NewDownloads(ctx, secondPool, f.allocation.RootID)
 	if e != nil {
 		t.Fatal(e)
 	}

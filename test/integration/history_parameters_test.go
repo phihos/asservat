@@ -38,7 +38,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		})
 		pool := poolFor(role, "synthetic-history")
 		defer pool.Close()
-		ledger, err := postgres.NewHistoryParameters(ctx, pool, s.a.RootID, s.recovery.installation, s.retention.guard)
+		ledger, err := postgres.NewHistoryParameters(ctx, pool, s.a.RootID, s.recovery.installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,10 +52,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		defer mac.Close()
 		policies := func() privacy.PolicySet {
-			if _, e := s.retention.policies(ctx); e != nil {
-				t.Fatal(e)
-			}
-			set, e := (privacyapp.AcceptedRetentionReader{Topology: s.retention.topology, Sources: s.retention.reader, Now: time.Now}).CaseMetadataPolicies(ctx, s.a.Eligibility.Target)
+			set, e := s.retention.caseMetadataPolicies(ctx)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -148,12 +145,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err = ledger.CompleteHistoryWrite(ctx, capture.HistoryWriteResult{Authority: write, Copies: copies, Completion: completion}); err != nil {
 			t.Fatal("complete writer", err)
 		}
-		set := policies()
-		retained, err := privacy.ResolveRetained(set, h.Retention.Input, h.Effective, time.Now())
-		if err != nil {
-			t.Fatal(err)
-		}
-		permission, err := ledger.AuthorizeHistoryRead(ctx, capture.HistoryReadRequest{Query: capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity}, RequestID: custodyID(), ExecutorEpoch: custodyID(), Retention: retained})
+		permission, err := ledger.AuthorizeHistoryRead(ctx, capture.HistoryReadRequest{Query: capture.SettingsQuery{RootID: s.a.RootID, CaptureID: first.CaptureID, Identity: s.a.Eligibility.VerifiedIdentity}, RequestID: custodyID(), ExecutorEpoch: custodyID(), Target: h.Target})
 		if err != nil {
 			t.Fatal("current history read", err)
 		}
@@ -166,6 +158,33 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil || got.RequestedSeconds != p.RequestedSeconds || got.Target != p.Target {
 			t.Fatal("encrypted settings changed", err)
 		}
+		// ADR-330 D12: a policy event shortens the parameter record as case
+		// metadata, by its own maximum.
+		func() {
+			pool := poolFor("retention_source_runtime", "synthetic-retention-source")
+			defer pool.Close()
+			policies, err := postgres.NewRetentionPolicies(ctx, pool)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := policies.SyncRetentionPolicies(context.WithoutCancel(ctx), nil); err != nil {
+					t.Error(err)
+				}
+			}()
+			strict := retentionPolicyFixture(custodyID(), 1, h.Expectation.Registration.Location.ClusterID, 86400, 60)
+			strict.CaseMaximumSeconds, strict.CaseDefaultSeconds = 900, 900
+			if err = policies.SyncRetentionPolicies(ctx, []privacy.ScopedPolicy{strict}); err != nil {
+				t.Fatal(err)
+			}
+			var anchor, expires, deleteBy time.Time
+			if err = admin.QueryRow(ctx, "SELECT anchor_at,effective_expires_at,effective_delete_by FROM custody_attempt WHERE id=$1", h.Expectation.Registration.Location.AttemptID).Scan(&anchor, &expires, &deleteBy); err != nil {
+				t.Fatal(err)
+			}
+			if deleteBy.After(anchor.Add(900*time.Second)) || expires.After(anchor.Add(840*time.Second)) {
+				t.Fatal("case-metadata maximum did not shorten the parameter record", anchor, expires, deleteBy)
+			}
+		}()
 		// Create another accepted incident in the same originating allocation. Its
 		// history replaces only that selector's projection, retaining the old charge.
 		secondInput := s.a
@@ -180,7 +199,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		in.Deadline = now.Add(30 * time.Second)
 		in.Target.ObservedAt, in.Target.FreshUntil = now, now.Add(5*time.Second)
 		in.Capability.ObservedAt, in.Capability.FreshUntil = now, now.Add(5*time.Second)
-		set, err = s.retention.policies(ctx)
+		set, err := s.retention.policies(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

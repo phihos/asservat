@@ -353,9 +353,9 @@ def check_cluster_join(render):
     hook = set(named(docs, "Role", "asservat-secrets")["rules"][1]["resourceNames"])
     assert {"asservat-s3-regional-write-eu", "asservat-s3-regional-history-eu"} <= hook and "asservat-s3-regional-write" not in hook
     key = json.loads(named(docs, "ConfigMap", "asservat-key-service-config")["data"]["config.json"])
-    assert key["downloads"]["remoteClusters"] == ["eu"], key
+    assert key["downloads"] == {}, key
     publisher = json.loads(named(docs, "ConfigMap", "asservat-publisher-config")["data"]["config.json"])
-    assert publisher["remoteClusters"] == ["eu"]
+    assert "remoteClusters" not in publisher, publisher
     worker = json.loads(named(docs, "ConfigMap", "asservat-hub-worker-config")["data"]["config.json"])
     assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
     # combined plus one cluster.

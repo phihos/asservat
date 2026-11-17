@@ -131,11 +131,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 	if s == nil || ctx == nil || ctx.Err() != nil || a.Scope.RootID != s.root {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	topology, err := s.downloadTopology(ctx, a)
-	if err != nil {
-		return out, err
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		first, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -144,7 +140,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		if err != nil {
 			return err
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
+		if err = s.downloadFence(ctx, q, p, a); err != nil {
 			return err
 		}
 		row, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: id(s.root)})
@@ -168,7 +164,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 			return privacy.ErrFence
 		}
 		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
-		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
+		if err = s.downloadFence(ctx, q, p, a); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)
@@ -204,11 +200,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 			return out, artifact.ErrInvalid
 		}
 	}
-	topology, err := s.downloadTopology(ctx, a)
-	if err != nil {
-		return out, err
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		first, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -228,7 +220,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 		if session.Scope != a.Scope {
 			return privacy.ErrFence
 		}
-		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
+		if err = s.downloadFence(ctx, q, p, a); err != nil {
 			return err
 		}
 		if preparation != nil {
@@ -247,7 +239,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 			}
 		}
 		out = artifact.DownloadObservation{Session: session, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
-		if err = s.downloadFence(ctx, q, p, a, topology); err != nil {
+		if err = s.downloadFence(ctx, q, p, a); err != nil {
 			return err
 		}
 		now, err := q.CurrentTime(ctx)

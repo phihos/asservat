@@ -36,17 +36,14 @@ func PublisherVerifierRole(installationID string) string {
 }
 
 type PublisherDeployment struct {
-	Format           string                `json:"format"`
-	InstallationID   string                `json:"installationID"`
-	ClusterID        string                `json:"clusterID"`
-	PermissionRootID string                `json:"permissionRootID"`
-	Namespace        WorkerObjectReference `json:"namespace"`
-	Kubernetes       OwnerProviderEndpoint `json:"kubernetes"`
-	Postgres         OwnerPostgresEndpoint `json:"postgres"`
-	// RetentionTopologies are fixed pins; the guarded cluster catalog adds
-	// the joined slots' pins at startup. Either may be empty (ADR-203).
-	RetentionTopologies []OwnerNativeTopology    `json:"retentionTopologies"`
-	ClusterCatalog      OwnerPublicGuardedSource `json:"clusterCatalog"`
+	Format           string                   `json:"format"`
+	InstallationID   string                   `json:"installationID"`
+	ClusterID        string                   `json:"clusterID"`
+	PermissionRootID string                   `json:"permissionRootID"`
+	Namespace        WorkerObjectReference    `json:"namespace"`
+	Kubernetes       OwnerProviderEndpoint    `json:"kubernetes"`
+	Postgres         OwnerPostgresEndpoint    `json:"postgres"`
+	ClusterCatalog   OwnerPublicGuardedSource `json:"clusterCatalog"`
 	// Owner is the hub namespace's workload guard; its current proof and the
 	// recovery state gate every provider login and renewal. OwnerWorkload is
 	// the hub-api Deployment that guard plan names, as the accepted owner

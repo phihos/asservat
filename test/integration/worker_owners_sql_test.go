@@ -16,7 +16,7 @@ import (
 
 // Separate owner pools/registries use real SQL fences; Pod/process identities
 // and worker proofs are explicit synthetic inputs, not hub process attestation.
-func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture, guards *postgres.RetentionTransactionGuard, authority func() artifact.DownloadAuthority, refresh func() error, cancelSession func() error, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) {
+func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWorker, f workerEnrollmentFixture, authority func() artifact.DownloadAuthority, refresh func() error, cancelSession func() error, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) {
 	t.Helper()
 	poolA := poolFor("worker_owner_runtime", "synthetic-worker-owner")
 	defer poolA.Close()
@@ -25,7 +25,7 @@ func qualifyWorkerOwners(t *testing.T, ctx context.Context, w value.DownloadWork
 	readPool := poolFor("worker_owner_read_runtime", "synthetic-worker-owner-read")
 	defer readPool.Close()
 	newStore := func(pool *pgxpool.Pool) *postgres.WorkerOwners {
-		s, err := postgres.NewWorkerOwners(ctx, pool, w.Intent.Authority.Scope.RootID, w.Intent.Profile, guards)
+		s, err := postgres.NewWorkerOwners(ctx, pool, w.Intent.Authority.Scope.RootID, w.Intent.Profile)
 		if err != nil {
 			t.Fatal(err)
 		}

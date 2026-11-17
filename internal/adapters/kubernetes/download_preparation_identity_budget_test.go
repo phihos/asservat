@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"reflect"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -13,10 +12,8 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/privacy"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,11 +27,11 @@ import (
 // nor installed authorization, SQL, Kubernetes admission or native transfer.
 type preparationIdentityBudget struct {
 	*preparationPhaseBudget
-	claims                                       identity.Claims
-	identityRequests, identityPolicyReads        atomic.Int32
-	identityClockOffset                          atomic.Int64
-	permissionDelay                              time.Duration
-	tokenChecks, permissions, catalog, retention int
+	claims                                identity.Claims
+	identityRequests, identityPolicyReads atomic.Int32
+	identityClockOffset                   atomic.Int64
+	permissionDelay                       time.Duration
+	tokenChecks, permissions, catalog     int
 }
 
 func (f *preparationIdentityBudget) Verify(ctx context.Context, token string) (identity.Claims, error) {
@@ -74,14 +71,6 @@ func (f *preparationIdentityBudget) ContextDownloadEvidence(ctx context.Context,
 		f.t.Fatal("catalog read changed the selected artifact")
 	}
 	return f.record, f.step(ctx, "catalog")
-}
-
-func (f *preparationIdentityBudget) ResolveRetained(ctx context.Context, in privacy.Input, old privacy.Deadlines, origins []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	f.retention++
-	if !reflect.DeepEqual(in, f.record.Retained.Input) || old != f.record.Retained.Effective || !reflect.DeepEqual(origins, f.record.Retained.OriginPolicies) {
-		f.t.Fatal("retention read changed original artifact facts")
-	}
-	return privacy.RetainedResolution{Target: in.Target, PolicyRevision: f.a.Retention.Policy, PurposeRef: f.record.PurposeRef, Policies: slices.Clone(origins), Deadlines: old, Proof: f.a.Retention, ValidUntil: f.until}, f.step(ctx, "retention")
 }
 
 func (f *preparationIdentityBudget) identityService(t *testing.T) identities.Service {

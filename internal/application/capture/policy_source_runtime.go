@@ -312,8 +312,8 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 		if ageErr != nil {
 			return errors.Join(failed, value.ErrInvalid)
 		}
-		if !retention.Proof.Valid(s.Now()) || retention.Target != resolved.Recorder.Target.Target() || !s.Now().Before(retention.ValidUntil) {
-			failed = errors.Join(failed, staged("retention-proof", value.ErrUnavailable))
+		if retention.Target != resolved.Recorder.Target.Target() || !s.Now().Before(retention.ValidUntil) {
+			failed = errors.Join(failed, staged("retention-target", value.ErrUnavailable))
 			continue
 		}
 		if age > retention.ExpiresAt.Sub(retention.AnchorAt) {

@@ -54,7 +54,6 @@ func (f *projectionFixture) refresh(now time.Time) {
 	f.a.CheckedAt, f.a.ValidUntil = now, until
 	f.a.Environment.ObservedAt, f.a.Environment.ValidUntil = now, until
 	f.a.Environment.Processing.ObservedAt, f.a.Environment.Processing.ValidUntil = now, until
-	f.a.Retention.ObservedAt, f.a.Retention.ValidUntil = now, until
 	f.p.ObservedAt, f.p.ValidUntil = now, until
 }
 func newProjectionFixture(t *testing.T) *projectionFixture {
@@ -72,11 +71,8 @@ func newProjectionFixture(t *testing.T) *projectionFixture {
 	f.a = value.ContextProjectionAuthority{Scope: scope, Environment: value.ContextProjectionEnvironment{RootID: projectionID, InstallationID: projectionID,
 		Region: "region", StoreID: projectionID, Location: location, Principal: principal, PolicyRevision: rev, Path: path,
 		Processing: artifact.DownloadProcessingProof{RootID: projectionID, Epoch: projectionID, CaptureID: projectionID, Location: location, Sequence: 1, StateDigest: artifact.Digest{1}}},
-		Retention: artifact.RetentionProof{RootID: projectionID, ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
-			Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1}, PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
+		PermissionRevision: rev, IdentityRevision: rev, DecisionDigest: artifact.Digest{1},
 		AccessUntil: f.now.Add(time.Minute), DeleteBy: f.now.Add(2 * time.Minute)}
-	f.a.Retention.Sources[0] = artifact.RetentionSourceVersion{ClusterID: projectionID, ControlNamespaceUID: "control", Epoch: projectionID, Hub: true,
-		ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}
 	f.i = identity.Identity{Principal: principal, Policy: rev, Scopes: []string{"evidence:read"}, Groups: []string{"team"}}
 	f.p = value.ContextQueryPlan{AcceptanceID: projectionID, AccountID: projectionID, AllocationID: projectionID, RootID: projectionID, InstallationID: projectionID,
 		ClusterID: projectionID, NamespaceUID: "namespace", WorkloadUID: "workload", AllocationRevision: 1, PoolSource: rev, PolicySource: rev, Principal: principal,
@@ -763,7 +759,6 @@ func TestQueryTwelveSecondReadWithinOneEvidenceRequest(t *testing.T) {
 	window := start.Add(identity.EvidenceReadRequestWindow)
 	f.i.ValidUntil, f.a.ValidUntil, f.workerUntil = window, window, window
 	f.a.Environment.ValidUntil, f.a.Environment.Processing.ValidUntil = window, window
-	f.a.Retention.ValidUntil = window
 	if !f.a.Valid(start) {
 		t.Fatal("evidence-read authority interval rejected")
 	}

@@ -21,7 +21,6 @@ internal/adapters/kubernetes/permission_guard.go 1
 internal/adapters/kubernetes/permissions.go 2
 internal/adapters/kubernetes/profile_network.go 1
 internal/adapters/kubernetes/retention.go 1
-internal/adapters/kubernetes/retention_guard.go 1
 internal/adapters/kubernetes/submission_trust.go 1
 internal/adapters/kubernetes/target_pod.go 1
 internal/adapters/kubernetes/work_trust.go 1
@@ -62,8 +61,6 @@ internal/adapters/postgres/processing.go 2
 internal/adapters/postgres/processing_capture.go 3
 internal/adapters/postgres/recording_save_group_progress.go 1
 internal/adapters/postgres/retention.go 1
-internal/adapters/postgres/retention_catchup.go 1
-internal/adapters/postgres/retention_observation.go 2
 internal/adapters/postgres/snapshot_cancellation.go 1
 internal/adapters/postgres/worker_configuration.go 1
 internal/adapters/postgres/worker_routing.go 2
@@ -80,7 +77,6 @@ internal/application/capture/policy_recorder_activation.go 1
 internal/application/catalog/context.go 2
 internal/application/configuration/binding_journal.go 4
 internal/application/configuration/reconciler.go 2
-internal/application/configuration/retention_reconciler.go 2
 internal/application/evidence/acquisition_worker_pending.go 1
 internal/application/evidence/context_projection.go 1
 internal/application/evidence/download_worker_pending.go 1

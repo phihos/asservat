@@ -36,9 +36,8 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	if _, err := intents.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("audited exact snapshot intent", err)
 	}
-	guards := s.retention.guard
 	hub := f.roles["hub-runtime"]
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, admission.RootID, policy.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}

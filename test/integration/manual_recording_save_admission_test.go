@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	planningapp "asservat.local/asservat/internal/application/planning"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
@@ -44,7 +43,7 @@ type manualRecordingSaveReaders struct {
 	Sources   []captureapp.PolicySourceState
 	Current   *postgres.AutomationAuthorities
 	Storage   *postgres.ContextStorageReader
-	Retention *privacyapp.AcceptedRetentionReader
+	Retention *retentionEffectFixture
 }
 
 func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, commit bool, prepared *manualRecordingSaveReaders, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
@@ -60,8 +59,7 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 		current = prepared.Current
 		storageReader = prepared.Storage
 	} else {
-		guards := s.retention.guard
-		ledger, e := postgres.NewPolicySources(ctx, hub, s.a.RootID, s.recovery.installation, guards)
+		ledger, e := postgres.NewPolicySources(ctx, hub, s.a.RootID, s.recovery.installation)
 		if e != nil {
 			t.Fatal("snapshot source reader", e)
 		}

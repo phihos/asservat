@@ -31,7 +31,7 @@ func TestSyscallProjectionAuthorityKeepsSourceSelectionAndOriginalBounds(t *test
 				if err != nil || !out.Valid(f.now) || out.Scope != scope || len(f.evidence) != 2 || f.evidence[0].DataClass != f.record.DataClass || f.evidence[0].Retained.Input.EvidenceType != "syscallTrace" {
 					t.Fatal(out, err)
 				}
-				if !out.ValidUntil.Equal(f.record.ValidUntil) || !out.AccessUntil.Equal(f.retention.ExpiresAt) {
+				if !out.ValidUntil.Equal(f.record.ValidUntil) || !out.AccessUntil.Equal(f.record.Retained.Effective.ExpiresAt) {
 					t.Fatal("original bounds changed")
 				}
 			})

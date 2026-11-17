@@ -10,10 +10,8 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
-	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -56,18 +54,14 @@ func currentVerificationRecord(ctx context.Context, q *custodydb.Queries, c cust
 // target reader, and cannot start or repeat a missing acquisition.
 type APIContextPublicationGate struct {
 	publications *ContextPublications
-	retention    privacyapp.RetentionResolver
 }
 
-func NewAPIContextPublicationGate(ctx context.Context, pool *pgxpool.Pool, root string, guard *RetentionTransactionGuard, retention privacyapp.RetentionResolver) (*APIContextPublicationGate, error) {
-	if retention.RetainedPolicies == nil || retention.Now == nil {
-		return nil, artifact.ErrInvalid
-	}
-	p, err := NewContextPublications(ctx, pool, root, guard)
+func NewAPIContextPublicationGate(ctx context.Context, pool *pgxpool.Pool, root string) (*APIContextPublicationGate, error) {
+	p, err := NewContextPublications(ctx, pool, root)
 	if err != nil {
 		return nil, err
 	}
-	return &APIContextPublicationGate{p, retention}, nil
+	return &APIContextPublicationGate{p}, nil
 }
 func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 	var out artifact.PublicationAuthority
@@ -76,17 +70,7 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	target := authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}
-	d := privacyvalue.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
-	retained, err := s.retention.ResolveRetained(ctx, privacyvalue.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: e.Type().EvidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: d.AnchorAt}, d, e.RetentionRules)
-	if err != nil {
-		return out, err
-	}
-	topology, err := s.publications.retention.observe(ctx, target.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.publications.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.publications.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = artifact.PublicationAuthority{}
 		stream, err := q.LockPermissionStream(ctx, id(s.publications.root))
 		if err != nil {
@@ -104,16 +88,16 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		until := identity.Earlier(now.Time.Add(5*time.Second), retained.ValidUntil)
-		for _, end := range []time.Time{stream.FreshUntil.Time, stream.LeaseUntil.Time, e.Registration.WriteUntil, retained.ExpiresAt} {
+		until := now.Time.Add(5 * time.Second)
+		for _, end := range []time.Time{stream.FreshUntil.Time, stream.LeaseUntil.Time, e.Registration.WriteUntil, e.Registration.ExpiresAt} {
 			until = identity.Earlier(until, end)
 		}
 		if deadline, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, deadline)
 		}
-		out = artifact.PublicationAuthority{RootID: s.publications.root, CaptureID: e.CaptureUID, PermissionEpoch: uid(stream.Epoch), PermissionSequence: stream.Sequence, ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: executionapp.APIExecutionDigest(r), CheckedAt: now.Time, ValidUntil: until, Retention: retained.Proof}
+		out = artifact.PublicationAuthority{RootID: s.publications.root, CaptureID: e.CaptureUID, PermissionEpoch: uid(stream.Epoch), PermissionSequence: stream.Sequence, ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: executionapp.APIExecutionDigest(r), CheckedAt: now.Time, ValidUntil: until}
 		copy(out.ProjectionDigest[:], stream.ProjectionDigest)
-		if err = s.publications.publicationFence(ctx, q, stream, e, out, topology); err != nil {
+		if err = s.publications.publicationFence(ctx, q, stream, e, out); err != nil {
 			return err
 		}
 		return ctx.Err()

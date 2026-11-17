@@ -260,7 +260,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		retentionPool := poolFor("retention_runtime", "synthetic-retention")
 		t.Cleanup(retentionPool.Close)
-		retention, err := postgres.NewRetention(ctx, retentionPool, s.a.RootID)
+		retention, err := newRetentionShortening(ctx, retentionPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -300,7 +300,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		retentionPool := poolFor("retention_runtime", "synthetic-retention")
 		t.Cleanup(retentionPool.Close)
-		retention, err := postgres.NewRetention(ctx, retentionPool, s.a.RootID)
+		retention, err := newRetentionShortening(ctx, retentionPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}

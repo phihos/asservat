@@ -42,39 +42,12 @@ func TestManualRecordingSaveGroupWithPolicyGrantRealServices(t *testing.T) {
 }
 
 // The scope remains the fixture's accepted workload. Only the exact selected
-// Pod differs; these are real current accepted retention readers, not a new
-// policy or a copied proof with a replacement target.
+// Pod differs.
 func manualGroupRetentionPolicies(ctx context.Context, f *retentionEffectFixture, target authorization.Target) (privacy.PolicySet, error) {
-	if target == f.target {
-		return f.policies(ctx)
-	}
 	if target.ClusterID != f.target.ClusterID || target.NamespaceUID != f.target.NamespaceUID || target.WorkloadUID != f.target.WorkloadUID {
 		return privacy.PolicySet{}, privacy.ErrUnavailable
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.observe(ctx); err != nil {
-		return privacy.PolicySet{}, err
-	}
-	return (privacyapp.AcceptedRetentionReader{Topology: f.topology, Sources: f.reader, Now: time.Now}).RetentionPolicies(ctx, target)
-}
-
-type manualGroupRetainedPolicies struct{ fixture *retentionEffectFixture }
-
-func (r manualGroupRetainedPolicies) RetainedRetentionPolicies(ctx context.Context, target authorization.Target, origins []artifact.RetentionRule) (privacy.PolicySet, error) {
-	f := r.fixture
-	if target == f.target {
-		return f.RetainedRetentionPolicies(ctx, target, origins)
-	}
-	if target.ClusterID != f.target.ClusterID || target.NamespaceUID != f.target.NamespaceUID || target.WorkloadUID != f.target.WorkloadUID {
-		return privacy.PolicySet{}, privacy.ErrUnavailable
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.observe(ctx); err != nil {
-		return privacy.PolicySet{}, err
-	}
-	return (privacyapp.AcceptedRetentionReader{Topology: f.topology, Sources: f.reader, Now: time.Now}).RetainedRetentionPolicies(ctx, target, origins)
+	return f.RetentionPolicies(ctx, target)
 }
 
 func prepareManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, parts []policySourceSnapshotAdmissionFixture) (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
@@ -244,8 +217,7 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		if e != nil {
 			t.Fatal(e)
 		}
-		retention := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: time.Now}
-		preparedReaders = &manualRecordingSaveReaders{Current: current, Storage: storage, Retention: &retention}
+		preparedReaders = &manualRecordingSaveReaders{Current: current, Storage: storage, Retention: policy.Scenario.retention}
 		t.Logf("group_sources=%d long_lived_reader_setup_ms=%d", count, time.Since(setupStarted).Milliseconds())
 	}
 	prepare := func() (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
@@ -487,8 +459,7 @@ func qualifyManualRecordingSaveGroupMixedCancellation(t *testing.T, ctx context.
 	if err != nil || len(progress.Actions) != 2 {
 		t.Fatal("real parent progress before mixed cancellation", err)
 	}
-	guards := policy.Scenario.retention.guard
-	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], pending.Admission.RootID, policy.Authority.InstallationID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], pending.Admission.RootID, policy.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,27 +584,8 @@ func (s *manualGroupHistorySession) ExecuteHistory(ctx context.Context, a value.
 
 type manualGroupHistoryRetention struct{ fixture *retentionEffectFixture }
 
-func (r manualGroupHistoryRetention) resolver() privacyapp.RetentionResolver {
-	reader := privacyapp.AcceptedRetentionReader{Topology: r.fixture.topology, Sources: r.fixture.reader, Now: time.Now}
-	return privacyapp.RetentionResolver{Policies: reader, RetainedPolicies: reader, Now: time.Now}
-}
 func (r manualGroupHistoryRetention) ResolveCaseMetadata(ctx context.Context, in privacy.Input) (privacy.Resolution, error) {
-	f := r.fixture
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.observe(ctx); err != nil {
-		return privacy.Resolution{}, err
-	}
-	return r.resolver().ResolveCaseMetadata(ctx, in)
-}
-func (r manualGroupHistoryRetention) ResolveRetainedCaseMetadata(ctx context.Context, in privacy.Input, previous privacy.Deadlines, origins []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	f := r.fixture
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := f.observe(ctx); err != nil {
-		return privacy.RetainedResolution{}, err
-	}
-	return r.resolver().ResolveRetainedCaseMetadata(ctx, in, previous, origins)
+	return privacyapp.RetentionResolver{Policies: r.fixture, Now: time.Now}.ResolveCaseMetadata(ctx, in)
 }
 
 // Construct the same real service before the original request, without
@@ -645,8 +597,7 @@ func newManualGroupHistoryService(t *testing.T, ctx context.Context, f *capacity
 	if err != nil {
 		t.Fatal(err)
 	}
-	guards := policy.Scenario.retention.guard
-	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], root, installation, guards)
+	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], root, installation)
 	if err != nil {
 		mac.Close()
 		t.Fatal(err)

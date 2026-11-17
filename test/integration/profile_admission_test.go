@@ -160,7 +160,7 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if _, fresh, err := ledger.AdvanceStreaming(ctx, plan, artifact.StreamingStep{Kind: artifact.StreamClaimCreate}); err == nil || fresh {
 					t.Fatal("unbound writer acquired multipart permission")
 				}
-				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation, s.retention.guard)
+				execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation)
 				if err != nil {
 					t.Fatal(err)
 				}

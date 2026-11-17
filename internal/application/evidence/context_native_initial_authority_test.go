@@ -154,8 +154,6 @@ func TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges(t *testing.T)
 			f.f.a.Environment.ValidUntil = f.f.identity.ValidUntil
 			f.f.a.Environment.Processing.ObservedAt = f.f.identity.VerifiedAt
 			f.f.a.Environment.Processing.ValidUntil = f.f.identity.ValidUntil
-			f.f.a.Retention.ObservedAt = f.f.identity.VerifiedAt
-			f.f.a.Retention.ValidUntil = f.f.identity.ValidUntil
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			bound, call, end, first, err := f.r.beginRequest(ctx, f.f, f.f.s)

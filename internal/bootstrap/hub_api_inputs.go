@@ -138,18 +138,13 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 
 	// Native: connector token trust; worker namespaces by name.
 	n := h.Native
-	c.Native = &contracts.OwnerNativeDeployment{ConnectorTokens: h.ConnectorTokens, ConnectorPeerID: ids.PeerID, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{}, Connections: h.Connections, Concurrency: h.Concurrency}
+	c.Native = &contracts.OwnerNativeDeployment{ConnectorTokens: h.ConnectorTokens, ConnectorPeerID: ids.PeerID, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, Connections: h.Connections, Concurrency: h.Concurrency}
 	for _, namespace := range n.WorkerNamespaces {
 		uid, err := r.NamespaceUID(ctx, namespace)
 		if err != nil {
 			return zero, hubAPIInputError("worker-namespace-uid")
 		}
 		c.Native.WorkerAPIs = append(c.Native.WorkerAPIs, contracts.OwnerNativeWorkerAPI{ClusterID: ids.ClusterID, Namespace: contracts.WorkerObjectReference{Name: namespace, UID: uid}, Kubernetes: kubernetes})
-	}
-	// Remote retention topologies are pinned by content (ADR-196) and arrive
-	// with the remote-region slice; the hub cluster needs none.
-	if len(n.RetentionTopologies) != 0 {
-		return zero, hubAPIInputError("retention-topologies")
 	}
 
 	// Observation: the owner pin names this workload; peers come from values.

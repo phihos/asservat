@@ -97,7 +97,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	// This owner is now the sole observation writer. Acquisition, publication and
 	// download consume accepted read-only sources, avoiding observer/read races.
 	retained := nativeFixtureAcceptedRetention(s)
-	retention := privacyapp.RetentionResolver{Policies: retained, RetainedPolicies: retained, Now: time.Now}
+	retention := privacyapp.RetentionResolver{Policies: retained, Now: time.Now}
 	runner.Retention = retention
 	regional := newRegionalAPIStartFixture(t, ctx, fixture, n, s, admin, poolFor, store, keys, runner)
 	actor := s.a.Eligibility.VerifiedIdentity
@@ -138,7 +138,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	publicJourneyRequire(t, "case processing", e)
 	catalog, e := postgres.NewContextPublications(ctx, open("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
 	publicJourneyRequire(t, "case catalog", e)
-	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: retention, Processing: processing, Now: time.Now}
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Processing: processing, Now: time.Now}
 	bridge := diagnostic.Regional(regional.bridge)
 	// ADR-171: the hub runs the runner, so its hub ports are traced here. The
 	// public assembly supplies the shared capability and clock.
@@ -217,15 +217,12 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	clear(encoded)
 	bound, e := store.ForCustody(s.a.Registration.StoreID)
 	publicJourneyRequire(t, "original custody", e)
-	guard := s.retention.guard
 	pools.Snapshot(ctx, admin, "before-publication")
-	publication := newPublicJourneyPublication(ctx, pools, s.a.RootID, guard)
+	publication := newPublicJourneyPublication(ctx, pools, s.a.RootID)
 	defer publication.Close()
 	gatePool := open("api_publication_gate_runtime", "synthetic-api-publication-gate")
 	defer gatePool.Close()
-	publicationRetention := retention
-	publicationRetention.RetainedPolicies = journeyGateRetainedPolicies{retention.RetainedPolicies, &native.gateTrace}
-	gate, e := postgres.NewAPIContextPublicationGate(ctx, gatePool, s.a.RootID, guard, publicationRetention)
+	gate, e := postgres.NewAPIContextPublicationGate(ctx, gatePool, s.a.RootID)
 	publicJourneyRequire(t, "independent publication gate", e)
 	verifier, e := objectstore.NewContextVerifier(bound, artifactKeys.seal)
 	publicJourneyRequire(t, "original artifact verifier", e)

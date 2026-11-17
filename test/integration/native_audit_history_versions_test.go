@@ -22,7 +22,7 @@ func qualifyNativeParentHistoricalVersions(t *testing.T, ctx context.Context, f 
 	historyPool := f.poolFor("native_history_runtime", "synthetic-native-history")
 	defer historyPool.Close()
 	root := f.allocation.RootID
-	owners, err := postgres.NewNativeOwners(ctx, ownerPool, root, f.worker.Intent.Profile, f.guards)
+	owners, err := postgres.NewNativeOwners(ctx, ownerPool, root, f.worker.Intent.Profile)
 	if err != nil {
 		t.Fatal(err)
 	}

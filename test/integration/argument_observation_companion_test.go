@@ -121,7 +121,7 @@ func TestPolicyArgumentObservationFixtureCompiles(t *testing.T) {
 func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, admissions *postgres.ContextAdmissions, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, s.recovery.installation, s.retention.guard)
+	executions, err := postgres.NewAPIContextExecutions(ctx, hub, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 	})
 	verifierPool := poolFor(verifierRole, "synthetic-argument-verifier")
 	defer verifierPool.Close()
-	publications, err := postgres.NewContextPublications(ctx, verifierPool, s.a.RootID, s.retention.guard)
+	publications, err := postgres.NewContextPublications(ctx, verifierPool, s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

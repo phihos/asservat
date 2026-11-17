@@ -131,9 +131,6 @@ func (h *parameterReadFixture) OpenHistory(context.Context, value.HistoryExpecta
 func (h *parameterReadFixture) ResolveCaseMetadata(ctx context.Context, in privacy.Input) (privacy.Resolution, error) {
 	return h.f.Resolve(ctx, in)
 }
-func (h *parameterReadFixture) ResolveRetainedCaseMetadata(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error) {
-	return privacy.RetainedResolution{Target: h.storage.Target, Deadlines: h.storage.Effective, ValidUntil: h.originalBound}, nil
-}
 
 func newParameterReadFixture(t *testing.T) (HistoryParameterService, *parameterReadFixture, value.SettingsQuery) {
 	t.Helper()

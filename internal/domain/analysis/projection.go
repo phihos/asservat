@@ -358,7 +358,6 @@ func (e ContextProjectionEnvironment) Valid(now time.Time) bool {
 type ContextProjectionAuthority struct {
 	Scope                                        ContextProjectionScope
 	Environment                                  ContextProjectionEnvironment
-	Retention                                    artifact.RetentionProof
 	PermissionRevision, IdentityRevision         identity.Revision
 	DecisionDigest                               artifact.Digest
 	CheckedAt, ValidUntil, AccessUntil, DeleteBy time.Time
@@ -394,10 +393,9 @@ func (a ContextProjectionAuthority) validSingle(now time.Time) bool {
 	return a.grantMatches() && a.Scope.Valid() && a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID &&
 		a.Environment.Principal == a.Scope.Principal && a.Environment.Location.ClusterID == a.Scope.ClusterID &&
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&
-		a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) &&
 		a.PermissionRevision.Valid() && authorization.UUID(a.PermissionRevision.UID) && a.IdentityRevision.Valid() &&
 		a.DecisionDigest != (artifact.Digest{}) && identity.Fresh(a.CheckedAt, a.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
-		!a.ValidUntil.After(a.Environment.ValidUntil) && !a.ValidUntil.After(a.Retention.ValidUntil) &&
+		!a.ValidUntil.After(a.Environment.ValidUntil) &&
 		!a.ValidUntil.After(a.AccessUntil) && a.AccessUntil.Before(a.DeleteBy)
 }
 

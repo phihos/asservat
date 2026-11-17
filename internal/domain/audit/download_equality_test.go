@@ -16,7 +16,6 @@ func TestDownloadAuditEqualitySurvivesPersistence(t *testing.T) {
 	i := DownloadIntent{SessionID: "original-session", Batch: artifact.DownloadBatch{ID: "original-batch", Generation: 1, StartedAt: now, LeaseUntil: now.Add(time.Second)}}
 	a := &i.Batch.Authority
 	a.CheckedAt, a.ValidUntil, a.AccessUntil, a.DeleteBy = now, now.Add(time.Second), now.Add(time.Hour), now.Add(2*time.Hour)
-	a.Retention.ObservedAt, a.Retention.ValidUntil = now, now.Add(time.Second)
 	a.Environment.ObservedAt, a.Environment.ValidUntil = now, now.Add(time.Second)
 	a.Environment.Processing.ObservedAt, a.Environment.Processing.ValidUntil = now, now.Add(time.Second)
 	a.Environment.Processing.Sequence = 3
@@ -43,9 +42,6 @@ func TestDownloadAuditEqualitySurvivesPersistence(t *testing.T) {
 		"processing sequence": func(v *DownloadOutcome) { v.Intent.Batch.Authority.Environment.Processing.Sequence++ },
 		"processing deadline": func(v *DownloadOutcome) {
 			v.Intent.Batch.Authority.Environment.Processing.ValidUntil = v.Intent.Batch.Authority.Environment.Processing.ValidUntil.Add(time.Nanosecond)
-		},
-		"retention deadline": func(v *DownloadOutcome) {
-			v.Intent.Batch.Authority.Retention.ValidUntil = v.Intent.Batch.Authority.Retention.ValidUntil.Add(time.Nanosecond)
 		},
 		"lease":         func(v *DownloadOutcome) { v.Intent.Batch.LeaseUntil = v.Intent.Batch.LeaseUntil.Add(time.Nanosecond) },
 		"recorded time": func(v *DownloadOutcome) { v.RecordedAt = v.RecordedAt.Add(time.Nanosecond) },

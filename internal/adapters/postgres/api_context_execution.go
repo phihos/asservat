@@ -20,7 +20,6 @@ import (
 	"asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
-	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -33,22 +32,17 @@ type APIContextExecutions struct {
 	ledger       *Ledger
 	root         string
 	installation string
-	retention    *RetentionTransactionGuard
 }
 
-func NewAPIContextExecutions(ctx context.Context, pool *pgxpool.Pool, root, installation string, retention *RetentionTransactionGuard) (*APIContextExecutions, error) {
+func NewAPIContextExecutions(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*APIContextExecutions, error) {
 	if !authorization.UUID(root) || !authorization.UUID(installation) {
 		return nil, value.ErrInvalid
-	}
-	g, err := retentionGuardFor(root, []*RetentionTransactionGuard{retention})
-	if err != nil {
-		return nil, err
 	}
 	l, err := New(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
-	return &APIContextExecutions{l, root, installation, g}, nil
+	return &APIContextExecutions{l, root, installation}, nil
 }
 func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 	var out app.APIContextWork
@@ -190,7 +184,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 
 // check locks permission -> pool/allocation -> attempt -> capture,
 // re-evaluating the same ordinary evaluator after every blocking SQL wait.
-func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
+func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
 	trust, err := currentTrust(ctx, q, s.installation)
 	if err != nil {
 		return sqlStep{"trust", err}
@@ -238,9 +232,6 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		}
 		if err != nil {
 			return sqlStep{"approval", err}
-		}
-		if err := s.retention.check(ctx, q, topology, c.Plan.Input.Retention.Proof, c.Plan.Input.Target.Target()); err != nil {
-			return sqlStep{"retention-check", err}
 		}
 		projection, err := permissionProjection(ctx, q, stream, c.Eligibility.Target)
 		if err != nil {
@@ -310,14 +301,10 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
 		return out, false, value.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, c.Work.Target.ClusterID)
-	if err != nil {
-		return out, false, err
-	}
 	// The ledger normalizes errors returned through it; keep the step beside it.
 	failed := ""
 	headroomRefused := false
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.APIExecution{}
 		first = false
 		headroomRefused = false
@@ -328,7 +315,7 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 			originalSourceUntil := observation.source.FreshUntil
 			sourceUntil = &originalSourceUntil
 		}
-		err := s.checked(ctx, q, c, topology, sourceUntil, func(accepted custodydb.ContextCapture, policyGrant *policyCaptureGrantState) error {
+		err := s.checked(ctx, q, c, sourceUntil, func(accepted custodydb.ContextCapture, policyGrant *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
@@ -426,7 +413,7 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 		return err
 	})
 	if err != nil {
-		err = apiPreparationRefusalError(err, headroomRefused)
+		err := apiPreparationRefusalError(err, headroomRefused)
 		if failed != "" {
 			return value.APIExecution{}, false, sqlStep{failed, err}
 		}
@@ -472,12 +459,8 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 	if !r.Valid() || r.RootID != s.root || r.Process != c.Process.Binding {
 		return out, value.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, c.Work.Target.ClusterID)
-	if err != nil {
-		return out, err
-	}
-	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		return s.checked(ctx, q, c, topology, nil, func(_ custodydb.ContextCapture, _ *policyCaptureGrantState) error {
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		return s.checked(ctx, q, c, nil, func(_ custodydb.ContextCapture, _ *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID)})
 			if err != nil {
 				return err

@@ -107,7 +107,7 @@ class HubAPI(unittest.TestCase):
         self.assertEqual((config["format"], config["name"], config["namespace"]), ("asservat-hub-api-config/v1", "asservat", NS))
         self.assertEqual(config["postgres"], {"host": f"asservat-postgres.{NS}.svc", "port": 5432, "database": "asservat"})
         self.assertEqual(config["objectStore"]["auditBucket"], "asservat-audit")
-        self.assertEqual(config["native"], {"workerNamespaces": ["asservat-downloads"], "retentionTopologies": []})
+        self.assertEqual(config["native"], {"workerNamespaces": ["asservat-downloads"]})
         self.assertEqual(config["observation"], {"localCapacity": {"keys": ["asservat.io/evidence"]}})
         public = config["public"]
         self.assertEqual((public["origin"], public["browserAudience"]), ("https://asservat.example.test", "asservat-console"))

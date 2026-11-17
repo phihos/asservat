@@ -146,10 +146,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("recording_save_group", "UPDATE", "id")
 		// The hub's seven metadata facets share only their existing read and
 		// row-lock privileges. No evidence-object locators, credentials or effect writes.
-		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
+		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_decision", "retention_policy")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
 		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
@@ -163,10 +162,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("recording_save_group")
 		// ADR-255: encrypted metadata shares ordinary hub SQL custody, without
 		// a new credential or evidence-key authority. Payloads stay regional.
-		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "capture_history_parameter", "capture_history_quota", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision", "policy_source", "policy_acceptance")
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "capture_history_parameter", "capture_history_quota", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "retention_policy", "retention_decision", "policy_source", "policy_acceptance")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
 		out = append(out, capacityChargeGrants...)
@@ -208,11 +206,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_occurrence_capture", "INSERT") // ADR-275 further recorder captures
 		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
 		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
-		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_policy", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("context_storage_binding", "UPDATE", "source_uid")
-		add("retention_source", "UPDATE", "root_id")
 		add("custody_pool", "UPDATE", "id")
 		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
 		out = append(out, capacityChargeGrants...)
@@ -356,28 +353,14 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_stream", "UPDATE", "id")
 		add("authority_audit", "UPDATE", "acknowledged_at", "object_key", "object_version", "object_etag", "object_bytes", "object_sha256")
 	case "retention-source":
-		// ADR-195: the RetentionSources writer; the stream lock as for reads.
-		read("permission_stream", "retention_source", "retention_checkpoint", "retention_source_epoch")
-		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "INSERT")
-		add("retention_checkpoint", "INSERT")
-		add("retention_source_epoch", "INSERT")
-		add("retention_source", "UPDATE", "epoch", "sequence", "lease_until", "suspended", "watch_cursor", "observed_sequence", "observed_at", "fresh_until", "list_cursor")
-		add("retention_catchup", "INSERT", "checkpoint_id")
-	case "retention-source-audit":
-		read("retention_checkpoint")
-		add("retention_checkpoint", "UPDATE", "audit_acknowledged_at", "audit_receipt")
-	case "retention-catchup":
-		read("capture_history_parameter")
-		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "retention_decision")
-		add("permission_stream", "UPDATE", "id")
-		add("custody_pool", "UPDATE", "id")
-		add("custody_allocation", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
-		add("custody_attempt", "UPDATE", "effective_expires_at", "effective_delete_by", "retention_sequence")
-		add("retention_catchup", "UPDATE", "after_attempt", "visited", "shortened", "completed_at")
-		add("retention_decision", "INSERT")
-		add("retention_catchup_effect", "INSERT")
+		// ADR-330 D12: the retention follower stores the policy set and
+		// shortens stored deadlines with one audit row per event.
+		read("retention_policy", "custody_attempt", "context_capture", "capture_history_parameter")
+		add("retention_policy", "INSERT")
+		add("retention_policy", "UPDATE", "name", "generation", "digest", "policy", "effect", "updated_at")
+		add("retention_policy", "DELETE")
+		add("retention_policy_event", "INSERT")
+		add("custody_attempt", "UPDATE", "effective_expires_at", "effective_delete_by")
 	case "retention-lifecycle-audit":
 		read("retention_decision")
 		add("retention_decision", "UPDATE", "audit_acknowledged_at", "audit_receipt_json")
@@ -417,7 +400,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// write; the lock columns are the ones the hub's binders lock with.
 		read("fleet_current_trust", "permission_stream", "authority_audit", "artifact_download", "download_batch",
 			"processing_root", "context_processing", "processing_rule",
-			"retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision",
+			"retention_policy", "retention_decision",
 			"context_capture", "context_verification", "download_key_binding", "download_native_key", "download_native_owner",
 			"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
 			"download_worker_configuration", "download_worker_configuration_revision")
@@ -428,7 +411,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, table := range []string{"permission_stream", "artifact_download", "download_response", "download_window", "download_worker"} {
 			add(table, "UPDATE", "id")
 		}
-		add("retention_source", "UPDATE", "root_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		add("download_native_owner", "UPDATE", "worker_id")
 		add("download_key_binding", "UPDATE", "used_roles")
@@ -495,17 +477,12 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 			add("custody_event", "INSERT")
 		}
-	case "publisher-retention-read":
-		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
-		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
 	case "download-source":
 		// Exact ciphertext receipts and minimized routing only. In particular,
 		// there is no allocation/session/audit/key/native-operation mutation.
-		read("fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "context_verification", "custody_attempt", "custody_copy", "context_case_locator", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision", "processing_root", "context_processing", "processing_rule")
+		read("fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "context_verification", "custody_attempt", "custody_copy", "context_case_locator", "retention_policy", "retention_decision", "processing_root", "context_processing", "processing_rule")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
 	case "download-plan":
 		read("download_allocation", "download_control_allocation", "download_native_backing", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")

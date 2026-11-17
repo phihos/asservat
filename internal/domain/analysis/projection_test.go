@@ -29,11 +29,7 @@ func testAuthority() ContextProjectionAuthority {
 		Location: location, Principal: principal, PolicyRevision: rev, Path: path, ObservedAt: now, ValidUntil: until,
 		Processing: artifact.DownloadProcessingProof{RootID: queryTestID, Epoch: queryTestID, CaptureID: queryTestID, Location: location, Sequence: 1,
 			StateDigest: artifact.Digest{1}, ObservedAt: now, ValidUntil: until}}
-	retention := artifact.RetentionProof{RootID: queryTestID, ClusterID: queryTestID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod",
-		Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, ObservedAt: now, ValidUntil: until}
-	retention.Sources[0] = artifact.RetentionSourceVersion{ClusterID: queryTestID, ControlNamespaceUID: "control", Epoch: queryTestID, Hub: true,
-		ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}
-	return ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: retention, PermissionRevision: rev, IdentityRevision: rev,
+	return ContextProjectionAuthority{Scope: scope, Environment: environment, PermissionRevision: rev, IdentityRevision: rev,
 		DecisionDigest: artifact.Digest{3}, CheckedAt: now, ValidUntil: until, AccessUntil: now.Add(time.Minute), DeleteBy: now.Add(2 * time.Minute)}
 }
 
@@ -51,7 +47,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"wrong-display":            func(a *ContextProjectionAuthority) { a.Scope.DisplayVersion = "other" },
 		"missing-selection":        func(a *ContextProjectionAuthority) { a.Scope.Selection = LineSelection{} },
 		"missing-environment":      func(a *ContextProjectionAuthority) { a.Environment = ContextProjectionEnvironment{} },
-		"missing-retention":        func(a *ContextProjectionAuthority) { a.Retention = artifact.RetentionProof{} },
 		"missing-processing":       func(a *ContextProjectionAuthority) { a.Environment.Processing = artifact.DownloadProcessingProof{} },
 		"missing-path":             func(a *ContextProjectionAuthority) { a.Environment.Path = ContextProjectionPath{} },
 		"download-purpose":         func(a *ContextProjectionAuthority) { a.Environment.Path.Purpose = "download" },
@@ -59,9 +54,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"other-artifact":           func(a *ContextProjectionAuthority) { a.Scope.ArtifactID = queryOtherID },
 		"other-cluster":            func(a *ContextProjectionAuthority) { a.Scope.ClusterID = queryOtherID },
 		"other-capture":            func(a *ContextProjectionAuthority) { a.Scope.CaptureID = queryOtherID },
-		"other-pod":                func(a *ContextProjectionAuthority) { a.Scope.PodUID = "other" },
-		"other-namespace":          func(a *ContextProjectionAuthority) { a.Scope.NamespaceUID = "other" },
-		"other-workload":           func(a *ContextProjectionAuthority) { a.Scope.WorkloadUID = "other" },
 		"other-client":             func(a *ContextProjectionAuthority) { a.Scope.Principal.ClientID = "other" },
 		"other-subject":            func(a *ContextProjectionAuthority) { a.Scope.Principal.Subject = "other" },
 		"other-processing-root":    func(a *ContextProjectionAuthority) { a.Environment.Processing.RootID = queryOtherID },
@@ -79,8 +71,6 @@ func TestProjectionAuthorityRequiresEveryCurrentBinding(t *testing.T) {
 		"deletion-before-access":   func(a *ContextProjectionAuthority) { a.DeleteBy = a.AccessUntil },
 		"long-authority":           func(a *ContextProjectionAuthority) { a.ValidUntil = a.CheckedAt.Add(5*time.Second + 1) },
 		"future-authority":         func(a *ContextProjectionAuthority) { a.CheckedAt = now.Add(time.Nanosecond) },
-		"old-retention":            func(a *ContextProjectionAuthority) { a.Retention.ValidUntil = now },
-		"extended-retention":       func(a *ContextProjectionAuthority) { a.Retention.ValidUntil = a.ValidUntil.Add(-time.Nanosecond) },
 		"extended-environment":     func(a *ContextProjectionAuthority) { a.Environment.ValidUntil = a.ValidUntil.Add(-time.Nanosecond) },
 		"extended-processing": func(a *ContextProjectionAuthority) {
 			a.Environment.Processing.ValidUntil = a.ValidUntil.Add(-time.Nanosecond)

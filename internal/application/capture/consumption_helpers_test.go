@@ -53,9 +53,6 @@ func (r *consumptionFacts) Resolve(ctx context.Context, in privacy.Input) (priva
 	if r.bound == "retention" {
 		out.ValidUntil = r.until
 	}
-	if r.bound == "retention-proof" {
-		out.ValidUntil, out.Proof.ValidUntil = r.until, r.until
-	}
 	return out, err
 }
 

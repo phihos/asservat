@@ -63,7 +63,7 @@ func nativeContinuationApplicationServices(t *testing.T, ctx context.Context, n 
 		t.Fatal(err)
 	}
 	admit := pool("capture_operation_admit_runtime", "synthetic-capture-operation-admit")
-	admissions, err := postgres.NewContextAdmissions(ctx, admit, s.a.RootID, s.recovery.installation, s.retention.guard)
+	admissions, err := postgres.NewContextAdmissions(ctx, admit, s.a.RootID, s.recovery.installation)
 	if err != nil {
 		t.Fatal(err)
 	}

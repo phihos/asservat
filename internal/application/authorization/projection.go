@@ -37,10 +37,6 @@ type ContextProjectionCatalog interface {
 	ContextProjectionEvidence(context.Context, string) (ContextProjectionEvidence, error)
 }
 
-type ProjectionRetentionResolver interface {
-	ResolveRetained(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error)
-}
-
 // ContextProjectionEnvironmentReader must independently accept the query's
 // current processing and protected delivery path. Download policy or
 // successful storage access alone cannot implement this port.
@@ -55,7 +51,6 @@ type ContextProjectionAuthority struct {
 	RootID      string
 	Permissions ProjectionReader
 	Catalog     ContextProjectionCatalog
-	Retention   ProjectionRetentionResolver
 	Environment ContextProjectionEnvironmentReader
 	// Shares is the ADR-232 recipient branch: consulted only when ordinary
 	// target eligibility refuses, before the protected catalog read. Nil
@@ -92,7 +87,7 @@ func (s ContextProjectionAuthority) ResolveProjectionCurrent(ctx context.Context
 
 func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source identities.CurrentIdentity, candidate analysis.ContextProjectionCandidate, expected *analysis.ContextProjectionScope) (analysis.ContextProjectionAuthority, error) {
 	var zero analysis.ContextProjectionAuthority
-	if ctx == nil || ctx.Err() != nil || source == nil || !value.UUID(s.RootID) || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil {
+	if ctx == nil || ctx.Err() != nil || source == nil || !value.UUID(s.RootID) || s.Permissions == nil || s.Catalog == nil || s.Environment == nil || s.Now == nil {
 		return zero, projectionRefused("configuration", analysis.ErrUnavailable, nil)
 	}
 	if !candidate.Valid() || candidate.RootID != s.RootID {
@@ -193,22 +188,11 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	defer shorten("audience", initial.ValidUntil)()
 	defer shorten("catalog", record.ValidUntil)()
 	defer shorten("expiry", r.Effective.ExpiresAt)()
-	resolve := func() (privacy.RetainedResolution, error) {
-		input := r.Input
-		input.Parents = slices.Clone(input.Parents)
-		v, e := s.Retention.ResolveRetained(call, input, r.Effective, slices.Clone(r.OriginPolicies))
-		v.Policies = slices.Clone(v.Policies)
-		if e != nil || !projectionRetentionMatches(v, record, scope, s.Now()) || call.Err() != nil {
-			return privacy.RetainedResolution{}, projectionRefused("retention", analysis.ErrUnavailable, errors.Join(e, call.Err()))
-		}
-		return v, nil
+	// The stored deadlines are the retention decision (ADR-330 D12).
+	resolved := r.Effective
+	if !resolved.ValidRetained() || !s.Now().Before(resolved.ExpiresAt) {
+		return zero, projectionRefused("retention", analysis.ErrUnavailable, nil)
 	}
-	resolved, err := resolve()
-	if err != nil {
-		return zero, err
-	}
-	defer shorten("retention", resolved.ValidUntil)()
-	defer shorten("expiry", resolved.ExpiresAt)()
 	environment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(environment, record, scope, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("environment", analysis.ErrUnavailable, errors.Join(err, call.Err()))
@@ -243,12 +227,6 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("permissions-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten("permissions", final.ValidUntil)()
-	lastRetention, err := resolve()
-	if err != nil || !sameProjectionRetention(resolved, lastRetention) {
-		return zero, projectionRefused("retention-again", analysis.ErrUnavailable, err)
-	}
-	defer shorten("retention", lastRetention.ValidUntil)()
-	defer shorten("expiry", lastRetention.ExpiresAt)()
 	lastEnvironment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(lastEnvironment, record, scope, s.Now()) || !sameProjectionEnvironment(environment, lastEnvironment) || call.Err() != nil {
 		return zero, projectionRefused("environment-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
@@ -303,7 +281,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		}
 		return value.Evaluate(id, projection, operation, target, &retained, now).Eligible
 	}
-	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !eligibleAt(i, p) || !eligibleAt(lastIdentity, latest) {
+	if !now.Before(until) || !environment.Valid(now) || !eligibleAt(i, p) || !eligibleAt(lastIdentity, latest) {
 		return zero, projectionRefused("expired", analysis.ErrExpired, nil)
 	}
 	if scope.PreGrantValid() {
@@ -315,7 +293,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		}
 		return zero, &packetQueryApprovalRequired{}
 	}
-	out := analysis.ContextProjectionAuthority{Scope: scope, Grant: queryGrant, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}
+	out := analysis.ContextProjectionAuthority{Scope: scope, Grant: queryGrant, Environment: environment, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}
 	// A shared decision also binds the admitting share and its revision.
 	var shareID string
 	var shareRevision int64
@@ -354,13 +332,6 @@ func projectionSourceMatches(src analysis.ProjectionSource, r ContextProjectionE
 		r.Retained.Input.PrivacyClass == "potentialPersonalData"
 }
 
-func projectionRetentionMatches(v privacy.RetainedResolution, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
-	return v.Target == r.Retained.Input.Target && v.PurposeRef == r.PurposeRef && v.Deadlines.ValidRetained() && v.AnchorAt.Equal(r.Retained.Effective.AnchorAt) &&
-		!v.ExpiresAt.After(r.Retained.Effective.ExpiresAt) && !v.DeleteBy.After(r.Retained.Effective.DeleteBy) && now.Before(v.ExpiresAt) && privacy.ValidPolicyOrigins(v.Policies) &&
-		v.PolicyRevision.Valid() && v.Proof.Policy == v.PolicyRevision && v.Proof.Matches(scope.RootID, scope.ClusterID, scope.NamespaceUID, scope.WorkloadUID, scope.PodUID) &&
-		v.Proof.Valid(now) && !v.ValidUntil.After(v.Proof.ValidUntil) && now.Before(v.ValidUntil)
-}
-
 func projectionEnvironmentMatches(v analysis.ContextProjectionEnvironment, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
 	return v.Valid(now) && v.RootID == scope.RootID && v.Location == r.Retained.Registration.Location && v.StoreID == r.Retained.Registration.StoreID &&
 		v.Principal == scope.Principal && v.Processing.CaptureID == scope.CaptureID
@@ -388,13 +359,6 @@ func cloneProjectionEvidence(v ContextProjectionEvidence) ContextProjectionEvide
 	v.Retained.OriginPolicies = slices.Clone(v.Retained.OriginPolicies)
 	v.Retained.Input.Parents = slices.Clone(v.Retained.Input.Parents)
 	return v
-}
-
-func sameProjectionRetention(a, b privacy.RetainedResolution) bool {
-	x, y := a.Proof, b.Proof
-	x.ObservedAt, y.ObservedAt, x.ValidUntil, y.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
-	return a.Target == b.Target && a.PolicyRevision == b.PolicyRevision && a.PurposeRef == b.PurposeRef && a.AnchorAt.Equal(b.AnchorAt) &&
-		a.ExpiresAt.Equal(b.ExpiresAt) && a.DeleteBy.Equal(b.DeleteBy) && slices.Equal(a.Policies, b.Policies) && x == y
 }
 
 func sameProjectionEnvironment(a, b analysis.ContextProjectionEnvironment) bool {
