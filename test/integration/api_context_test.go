@@ -224,7 +224,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	read, err := nativeReader.ReadContext(ctx, e, copies, time.Now().Add(5*time.Second))
+	read, err := nativeReader.ReadContext(ctx, podStatusSource(e, copies, native), time.Now().Add(5*time.Second))
 	defer clear(read)
 	if err != nil || !bytes.Equal(read, native) {
 		t.Fatal("API context native bytes did not survive encrypted verification", err)
@@ -232,7 +232,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	wrong := e
 	wrong.ExecutionClass = artifact.ContextNodeExecution
 	wrong.NodeUID, wrong.NodeBootID = cluster.NodeUID, cluster.NodeBootID
-	if body, err := nativeReader.ReadContext(ctx, wrong, copies, time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
+	if body, err := nativeReader.ReadContext(ctx, podStatusSource(wrong, copies, native), time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
 		t.Fatal("API artifact promoted to node execution identity")
 	}
 	t.Logf("actual unscheduled Pod resolved and captured with Node/exec denied; %d native bytes; encrypted full verification and exact native read; stored_unpublished, synthetic authority remains fixture-only", len(native))

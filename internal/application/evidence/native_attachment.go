@@ -126,7 +126,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 		return nil, artifact.ErrInvalid
 	}
 	c := s.config
-	source := NativeContextSource{r.Expectation, r.Copies}
+	source := r.Source()
 	if !source.Valid(r.Scope.Version) {
 		return nil, artifact.ErrInvalid
 	}

@@ -163,7 +163,11 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextCatalog.CopiesDigest) || evidence.ContextCopiesDigest(stored.Copies) != a.Scope.Version {
 			return privacy.ErrFence
 		}
-		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
+		facts, err := catalogFacts(expected, row.ContextCatalog)
+		if err != nil {
+			return err
+		}
+		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, Catalog: facts, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
 		if err = s.downloadFence(ctx, q, p, a); err != nil {
 			return err
 		}
@@ -176,6 +180,11 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		}
 		return ctx.Err()
 	})
+	if errors.Is(err, artifact.ErrIntegrity) {
+		// A catalog row without its read facts; the caller reports this class
+		// to operator diagnostics and the client still sees Unavailable.
+		return evidence.ContextDownloadSource{}, artifact.ErrIntegrity
+	}
 	if err != nil || ctx.Err() != nil {
 		return evidence.ContextDownloadSource{}, artifact.ErrDownloadUnavailable
 	}

@@ -234,7 +234,7 @@ func (s *ContextNativeResponse) openWindow(ctx context.Context, current identiti
 	if e != nil {
 		return fail(e)
 	}
-	remote, e := NewRemoteContextSource(effect, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, *observed.Preparation)
+	remote, e := NewRemoteContextSource(effect, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies, Catalog: source.Catalog}, *observed.Preparation)
 	if e != nil {
 		return fail(e)
 	}

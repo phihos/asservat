@@ -31,6 +31,12 @@ type ContextDownloadRequest struct {
 	Scope       artifact.DownloadScope
 	Expectation artifact.ContextExpectation
 	Copies      artifact.Copies
+	Catalog     artifact.CatalogFacts
+}
+
+// Source is the exact stored artifact the request reads.
+func (r ContextDownloadRequest) Source() NativeContextSource {
+	return NativeContextSource{r.Expectation, r.Copies, r.Catalog}
 }
 
 // RawResultUses reserves one use of the approved grant's result-access child
@@ -77,9 +83,9 @@ func (w ContextDownloadWorker) valid(r ContextDownloadRequest) bool {
 
 func (w ContextDownloadWorker) read(ctx context.Context, r ContextDownloadRequest, i audit.DownloadIntent, a artifact.DownloadAuthority) ([]byte, error) {
 	if w.BatchNative != nil {
-		return w.BatchNative.ReadContextBatch(ctx, r.Expectation, r.Copies, i, a)
+		return w.BatchNative.ReadContextBatch(ctx, r.Source(), i, a)
 	}
-	return w.Native.ReadContext(ctx, r.Expectation, r.Copies, minDownloadTime(i.Batch.LeaseUntil, a.ValidUntil))
+	return w.Native.ReadContext(ctx, r.Source(), minDownloadTime(i.Batch.LeaseUntil, a.ValidUntil))
 }
 func (w ContextDownloadWorker) current(ctx context.Context, credential string, r ContextDownloadRequest) (artifact.DownloadAuthority, error) {
 	if w.Authority == nil {

@@ -96,7 +96,7 @@ func (r *ContextProjectionReader) readPodStatus(ctx context.Context, source evid
 	// Same authenticated pinned commit/manifest/envelope/index/native machinery;
 	// no download session, authority, key grant or metadata builder is invoked.
 	started := time.Now()
-	native, err := verifier.readContext(ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	native, err := verifier.readContext(ctx, source, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
 	app.MarkDuration(ctx, "object-decrypt", time.Since(started)-timed.total())
 	defer clear(native)
 	if err != nil || ctx.Err() != nil {
@@ -132,7 +132,7 @@ func (r *ContextProjectionReader) readHeaderPage(ctx context.Context, source evi
 		return zero, value.ErrUnavailable
 	}
 	started := time.Now()
-	opened, err := verifier.openNative(ctx, ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	opened, err := verifier.openNative(ctx, ctx, source, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
 	if err != nil || ctx.Err() != nil {
 		if opened != nil {
 			opened.Close()
@@ -221,7 +221,7 @@ func (r *ContextProjectionReader) readProfileSummary(ctx context.Context, source
 		return zero, value.ErrUnavailable
 	}
 	started := time.Now()
-	opened, err := verifier.openNative(ctx, ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	opened, err := verifier.openNative(ctx, ctx, source, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
 	if err != nil || ctx.Err() != nil {
 		if opened != nil {
 			opened.Close()

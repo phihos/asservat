@@ -121,7 +121,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal(err)
 		}
 		worker := evidence.ContextDownloadWorker{Sessions: ledger, AuditAcknowledgements: ack, Audit: &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}, Authority: gate, Native: native, Now: time.Now, NewID: custodyID}
-		if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies}); err != nil {
+		if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies, Catalog: published.Catalog}); err != nil {
 			t.Fatal("native metadata preparation", err)
 		}
 		a = current()
@@ -244,7 +244,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal("second session", err)
 		}
 		worker.Authority = gate
-		if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: second.ID, Scope: scope, Expectation: e, Copies: published.Copies}); err != nil {
+		if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: second.ID, Scope: scope, Expectation: e, Copies: published.Copies, Catalog: published.Catalog}); err != nil {
 			t.Fatal("second metadata", err)
 		}
 		other := artifact.DownloadResponse{ID: custodyID(), SessionID: second.ID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Length: 1}, WholeFile: true, WindowReadLimit: 1}, Until: second.Deadline}
@@ -292,7 +292,7 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			if err != nil {
 				t.Fatal("started session", err)
 			}
-			if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies}); err != nil {
+			if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies, Catalog: published.Catalog}); err != nil {
 				t.Fatal("started metadata", err)
 			}
 			a := current()

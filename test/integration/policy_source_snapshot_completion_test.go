@@ -308,9 +308,12 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 		t.Fatal(err)
 	}
 	published := publishedContext{RootID: admission.RootID, CaptureID: accepted.CaptureID, Expectation: final, Copies: execution.Copies}
+	if published.Catalog, err = catalogFactsFixture(ctx, f.admin, accepted.CaptureID); err != nil {
+		t.Fatal(err)
+	}
 	// PCAPNG uses the existing bounded framed native source. ReadContext is
 	// deliberately the historical pod-status-only small-buffer reader.
-	source, err := verifier.OpenNative(ctx, published.Expectation, published.Copies, time.Now().Add(4*time.Second))
+	source, err := verifier.OpenNative(ctx, published.Source(), time.Now().Add(4*time.Second))
 	if err != nil {
 		t.Fatal("snapshot native open", err)
 	}

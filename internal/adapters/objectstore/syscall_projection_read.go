@@ -50,7 +50,7 @@ func (r *ContextProjectionReader) readSyscallProjection(ctx context.Context, sou
 		return zero, value.ErrUnavailable
 	}
 	started := time.Now()
-	opened, err := verifier.openNative(ctx, ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	opened, err := verifier.openNative(ctx, ctx, source, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
 	if err != nil || ctx.Err() != nil {
 		if opened != nil {
 			opened.Close()

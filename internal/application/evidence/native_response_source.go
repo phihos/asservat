@@ -34,10 +34,11 @@ type RemoteContextSource struct {
 var _ CurrentNativeResponseSource = (*RemoteContextSource)(nil)
 
 func NewRemoteContextSource(ctx context.Context, a *NativeAttachment, r ContextDownloadRequest, p artifact.DownloadPreparation) (*RemoteContextSource, error) {
-	if ctx == nil || ctx.Err() != nil || a == nil || !p.Valid() || p.SessionID != r.SessionID || p.SessionID != a.config.Enrollment.Worker.Intent.SessionID || r.Scope != a.config.Enrollment.Worker.Intent.Authority.Scope || !(NativeContextSource{r.Expectation, r.Copies}).Valid(r.Scope.Version) {
+	if ctx == nil || ctx.Err() != nil || a == nil || !p.Valid() || p.SessionID != r.SessionID || p.SessionID != a.config.Enrollment.Worker.Intent.SessionID || r.Scope != a.config.Enrollment.Worker.Intent.Authority.Scope || !r.Source().Valid(r.Scope.Version) {
 		return nil, artifact.ErrInvalid
 	}
-	r.Expectation = cloneNativeSource(NativeContextSource{r.Expectation, r.Copies}).Expectation
+	c := cloneNativeSource(r.Source())
+	r.Expectation, r.Catalog = c.Expectation, c.Catalog
 	owner, cancel := context.WithCancel(ctx)
 	s := &RemoteContextSource{owner: owner, cancel: cancel, attachment: a, request: r, preparation: p}
 	context.AfterFunc(owner, s.Close)

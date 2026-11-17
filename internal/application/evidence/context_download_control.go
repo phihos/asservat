@@ -34,6 +34,7 @@ type ContextDownloadSource struct {
 	Scope                  artifact.DownloadScope
 	Expectation            artifact.ContextExpectation
 	Copies                 artifact.Copies
+	Catalog                artifact.CatalogFacts
 	ObservedAt, ValidUntil time.Time
 }
 

@@ -326,7 +326,10 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 			t.Fatal(err)
 		}
 		published := publishedContext{RootID: s.a.RootID, CaptureID: accepted.CaptureID, Expectation: e, Copies: got.Copies}
-		source, err := verifier.OpenNative(ctx, published.Expectation, published.Copies, time.Now().Add(30*time.Second))
+		if published.Catalog, err = catalogFactsFixture(ctx, admin, accepted.CaptureID); err != nil {
+			t.Fatal(err)
+		}
+		source, err := verifier.OpenNative(ctx, published.Source(), time.Now().Add(30*time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -163,7 +163,7 @@ func packetQueryProbeGenerate(t *testing.T, dir string) {
 		if err = os.WriteFile(filepath.Join(folder, "native.pcapng"), native, 0600); err != nil {
 			t.Fatal(err)
 		}
-		f.Source.Copies = prepareEncryptedProjectionSource(t, folder, bytes.NewReader(native), f.Source.Expectation, false, sealer)
+		f.Source = prepareEncryptedProjectionSource(t, folder, bytes.NewReader(native), f.Source.Expectation, false, sealer)
 		f.Scope.Version = evidence.ContextCopiesDigest(f.Source.Copies)
 		f.Scope.DisplayVersion = query.PacketQueryDisplayVersion
 		f.Scope.RawGrantID = f.Scope.RootID

@@ -289,7 +289,7 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 		qualifyContextNativeContent(t, ctx, f, owners, nativeOperations.(*postgres.FirstContextNativeOperations), origins, router, preparationKeys, windowKeys, enrollment, target, joined, stopWorker)
 		return
 	}
-	work := evidence.ContextDownloadRequest{SessionID: target.SessionID, Scope: f.worker.Intent.Authority.Scope, Expectation: f.published.Expectation, Copies: f.published.Copies}
+	work := evidence.ContextDownloadRequest{SessionID: target.SessionID, Scope: f.worker.Intent.Authority.Scope, Expectation: f.published.Expectation, Copies: f.published.Copies, Catalog: f.published.Catalog}
 	var batchID string
 	worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, CurrentAuthority: f.gate, RegionalPreparation: attachment, Now: time.Now, NewID: func() string { batchID = custodyID(); return batchID }}
 	current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)

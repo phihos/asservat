@@ -572,7 +572,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	if err != nil {
 		t.Fatal(err)
 	}
-	native, err := nativeReader.ReadContext(ctx, accepted.Expectation, result.Copies, time.Now().Add(5*time.Second))
+	native, err := nativeReader.ReadContext(ctx, podStatusSource(accepted.Expectation, result.Copies, collector.native), time.Now().Add(5*time.Second))
 	if err != nil || !bytes.Equal(native, collector.native) {
 		t.Fatal("exact native bytes after Pod deletion", err)
 	}

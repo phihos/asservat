@@ -46,3 +46,23 @@ func TestProfileAcquisitionWindowCanonicalDisplayMetadata(t *testing.T) {
 		t.Fatal("unknown window invented")
 	}
 }
+
+func TestCatalogFactsMatchAuthenticatedManifest(t *testing.T) {
+	start := time.Date(2026, 11, 4, 9, 0, 0, 123456789, time.UTC)
+	end := start.Add(time.Second)
+	profile := CatalogFacts{NativeBytes: 42, Acquisition: &AcquisitionWindow{StartedAt: start.Truncate(time.Microsecond), CompletedAt: end.Truncate(time.Microsecond)}}
+	if !profile.Matches(true, 42, start, end) || !(CatalogFacts{NativeBytes: 7}).Matches(false, 7, start, end) {
+		t.Fatal("matching catalog row refused")
+	}
+	for name, ok := range map[string]bool{
+		"size":              profile.Matches(true, 41, start, end),
+		"start":             profile.Matches(true, 42, start.Add(time.Microsecond), end),
+		"end":               profile.Matches(true, 42, start, end.Add(-time.Microsecond)),
+		"missing-window":    (CatalogFacts{NativeBytes: 42}).Matches(true, 42, start, end),
+		"unexpected-window": profile.Matches(false, 42, start, end),
+	} {
+		if ok {
+			t.Errorf("%s mismatch accepted", name)
+		}
+	}
+}

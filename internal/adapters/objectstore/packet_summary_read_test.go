@@ -90,12 +90,12 @@ func packetEncryptedFixtureSource(t *testing.T, dir, mode string, raw bool, seal
 	if err = e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, mode == "whole-hash", sealers...)
-	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
+	source := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, mode == "whole-hash", sealers...)
+	f := profileEncryptedFixture{Source: source, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
 	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
-	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(copies), e.NativeType, e.Type().Format, query.PacketSummaryDisplayVersion
+	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(source.Copies), e.NativeType, e.Type().Format, query.PacketSummaryDisplayVersion
 	if raw {
 		s.DisplayVersion = query.RawPacketSummaryDisplayVersion
 	}

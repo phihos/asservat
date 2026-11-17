@@ -25,5 +25,5 @@ type RegionalPreparation interface {
 // hub derives from its own expectation: the type's filename, format, coverage
 // and size bound, the requested version's ETag and the registered dates.
 func validRegionalMetadata(r ContextDownloadRequest, m artifact.NativeDownloadMetadata) bool {
-	return m.ETag == NativeETag(r.Scope.Version) && ValidNativeSourceMetadata(NativeContextSource{r.Expectation, r.Copies}, m)
+	return m.ETag == NativeETag(r.Scope.Version) && ValidNativeSourceMetadata(r.Source(), m)
 }

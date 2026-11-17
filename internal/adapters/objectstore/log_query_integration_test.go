@@ -111,12 +111,12 @@ func prepareLogEncryptedFixture(t *testing.T, dir, shape string, maximum, wrongH
 	if _, err = native.Seek(0, 0); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, native, e, wrongHash)
-	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
+	source := prepareEncryptedProjectionSource(t, dir, native, e, wrongHash)
+	f := profileEncryptedFixture{Source: source, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
 	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
-	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(copies), artifact.LogsArtifact, artifact.LogFormat, query.LogQueryDisplayVersion
+	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(source.Copies), artifact.LogsArtifact, artifact.LogFormat, query.LogQueryDisplayVersion
 	s.Selection, s.SourceProjectionDigest = query.LineSelection{}, artifact.Digest{}
 	s.Logs, s.RawGrantID = query.LogWindow{Limit: 100}, e.CaptureUID
 	if !s.Valid() || !f.Source.Valid(s.Version) {

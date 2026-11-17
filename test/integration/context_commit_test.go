@@ -179,26 +179,26 @@ func TestContextCommitWithRealServices(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, lease := range []time.Time{time.Now().Add(-time.Second), time.Now().Add(6 * time.Second)} {
-				if body, err := nativeReader.ReadContext(ctx, e, copies, lease); err == nil || len(body) != 0 {
+				if body, err := nativeReader.ReadContext(ctx, podStatusSource(e, copies, native), lease); err == nil || len(body) != 0 {
 					t.Fatal("invalid disclosure lease returned bytes")
 				}
 			}
 			time.Sleep(time.Until(e.Registration.WriteUntil) + 10*time.Millisecond)
-			body, err := nativeReader.ReadContext(ctx, e, copies, time.Now().Add(5*time.Second))
+			body, err := nativeReader.ReadContext(ctx, podStatusSource(e, copies, native), time.Now().Add(5*time.Second))
 			if err != nil || !bytes.Equal(body, native) || sha256.Sum256(body) != nativeHash {
 				t.Fatal("native read after acquisition deadline", err)
 			}
 			clear(body)
-			if body, err := nativeReader.ReadContext(ctx, foreign, copies, time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
+			if body, err := nativeReader.ReadContext(ctx, podStatusSource(foreign, copies, native), time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
 				t.Fatal("wrong retained audience returned plaintext")
 			}
 			cancelled, stop := context.WithCancel(ctx)
 			stop()
-			if body, err := nativeReader.ReadContext(cancelled, e, copies, time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
+			if body, err := nativeReader.ReadContext(cancelled, podStatusSource(e, copies, native), time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
 				t.Fatal("cancelled read returned plaintext")
 			}
 			time.Sleep(time.Until(e.Registration.ExpiresAt) + 10*time.Millisecond)
-			if body, err := nativeReader.ReadContext(ctx, e, copies, time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
+			if body, err := nativeReader.ReadContext(ctx, podStatusSource(e, copies, native), time.Now().Add(5*time.Second)); err == nil || len(body) != 0 {
 				t.Fatal("expired artifact returned plaintext")
 			}
 			t.Logf("native=%d, encrypted manifest=%d, envelope=%d bytes; real KMS/S3/full native verification; immutable SQL state=%s; audience mismatch rejected", len(native), copies[2].Bytes, copies[3].Bytes, rec.State)

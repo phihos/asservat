@@ -301,7 +301,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if err != nil {
 					t.Fatal(err)
 				}
-				got, err := reader.ReadContext(ctx, published.Expectation, published.Copies, time.Now().Add(5*time.Second))
+				got, err := reader.ReadContext(ctx, podStatusSource(published.Expectation, published.Copies, native), time.Now().Add(5*time.Second))
 				defer clear(got)
 				if err != nil || !bytes.Equal(got, native) {
 					t.Fatal("native evidence changed", err)

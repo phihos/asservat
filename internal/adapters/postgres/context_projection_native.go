@@ -338,7 +338,11 @@ func readProjectionSource(ctx context.Context, tx *custodydb.Queries, q query.Co
 	if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextCatalog.CopiesDigest) {
 		return out, query.ErrUnavailable
 	}
-	out = evidence.NativeContextSource{Expectation: expected, Copies: stored.Copies}
+	facts, e := catalogFacts(expected, row.ContextCatalog)
+	if e != nil {
+		return out, query.ErrUnavailable
+	}
+	out = evidence.NativeContextSource{Expectation: expected, Copies: stored.Copies, Catalog: facts}
 	if !evidence.ProjectionSourceMatches(out, q, a) {
 		return evidence.NativeContextSource{}, query.ErrUnavailable
 	}

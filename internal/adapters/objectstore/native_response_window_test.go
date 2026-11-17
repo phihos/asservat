@@ -152,7 +152,7 @@ func nativeFramedCursorCancellation(t *testing.T, cause string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cursor, err := verifier.openNative(owner, opening, e, copies, until)
+	cursor, err := verifier.openNative(owner, opening, evidence.NativeContextSource{Expectation: e, Copies: copies, Catalog: artifact.CatalogFacts{NativeBytes: int64(len(native))}}, until)
 	if err != nil {
 		t.Fatal(err)
 	}

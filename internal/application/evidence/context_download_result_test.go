@@ -172,10 +172,10 @@ func (f *downloadResultFixture) AcknowledgeDownloadOutcome(c context.Context, o 
 	}
 	return err
 }
-func (f *downloadResultFixture) ReadContext(c context.Context, e artifact.ContextExpectation, copies artifact.Copies, until time.Time) ([]byte, error) {
+func (f *downloadResultFixture) ReadContext(c context.Context, s NativeContextSource, until time.Time) ([]byte, error) {
 	f.mu.Lock()
-	f.nativeExpectationDigest = ContextExpectationDigest(e)
-	b, err := f.downloadWorkerFixture.ReadContext(c, e, copies, until)
+	f.nativeExpectationDigest = ContextExpectationDigest(s.Expectation)
+	b, err := f.downloadWorkerFixture.ReadContext(c, s, until)
 	f.mu.Unlock()
 	if f.nativeEntered != nil {
 		close(f.nativeEntered)

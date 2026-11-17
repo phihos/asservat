@@ -14,13 +14,13 @@ import (
 // Ownership of returned plaintext passes to the caller, which must clear it
 // after bounded delivery; it is never a SQL, outbox or MCP result payload.
 type ContextNativeReader interface {
-	ReadContext(context.Context, artifact.ContextExpectation, artifact.Copies, time.Time) ([]byte, error)
+	ReadContext(context.Context, NativeContextSource, time.Time) ([]byte, error)
 }
 
 // A local-provider reader binds its remote key facet only after the batch is
 // prepaid, audited and currently permitted. It cannot reuse a previous batch.
 type ContextBatchNativeReader interface {
-	ReadContextBatch(context.Context, artifact.ContextExpectation, artifact.Copies, audit.DownloadIntent, artifact.DownloadAuthority) ([]byte, error)
+	ReadContextBatch(context.Context, NativeContextSource, audit.DownloadIntent, artifact.DownloadAuthority) ([]byte, error)
 }
 
 // The trusted download coordinator supplies the verified acquisition peer.

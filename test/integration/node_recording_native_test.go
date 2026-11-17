@@ -155,7 +155,7 @@ func recordingEncryptedNative(t *testing.T, ctx context.Context, admin *rest.Con
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := verifier.OpenNative(ctx, e, c.Completion.Copies, time.Now().Add(30*time.Second))
+	source, err := verifier.OpenNative(ctx, evidence.NativeContextSource{Expectation: e, Copies: c.Completion.Copies, Catalog: artifact.CatalogFacts{NativeBytes: c.Completion.NativeBytes, Acquisition: c.Completion.Acquisition}}, time.Now().Add(30*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}

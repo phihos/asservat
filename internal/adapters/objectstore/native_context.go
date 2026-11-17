@@ -58,7 +58,7 @@ func (r *NativeContextReader) ReadNativeContext(ctx context.Context, source evid
 	if e != nil {
 		return nil, e
 	}
-	return reader.ReadContext(ctx, source.Expectation, source.Copies, end)
+	return reader.ReadContext(ctx, source, end)
 }
 
 // OpenNativeArtifact opens one stored artifact of any other registered type
@@ -81,7 +81,7 @@ func (r *NativeContextReader) OpenNativeArtifact(ctx context.Context, source evi
 	// belongs to the original response context, not the canceled opening call.
 	opening, stop := context.WithDeadline(ctx, end)
 	defer stop()
-	return v.openNative(ctx, opening, source.Expectation, source.Copies, until)
+	return v.openNative(ctx, opening, source, until)
 }
 
 func (r *NativeContextReader) opener(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, window string, until time.Time) (time.Time, *kms.RemoteOpener, error) {
