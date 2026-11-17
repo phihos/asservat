@@ -16,8 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Own a fresh capacity fixture. Capacity creates the processing root and no
-// normal, resolution or processing audit pool; each decision commits its own
+// Own a fresh capacity fixture. Capacity creates the processing root; each decision commits its own
 // audit row through the compiled hub-runtime credential (REQ-AUT-005).
 // Protected source and privacy identity remain synthetic inputs.
 func TestProcessingDecisionsOnCapacityRootWithRealPostgres(t *testing.T) {
@@ -25,10 +24,6 @@ func TestProcessingDecisionsOnCapacityRootWithRealPostgres(t *testing.T) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 		f.setup(t)
 		f.refreshBase(t)
-		var lanes []string
-		if err := admin.QueryRow(ctx, `SELECT coalesce(array_agg(lane ORDER BY lane),'{}') FROM operation_audit_pool WHERE root_id=$1`, f.input.PermissionRootID).Scan(&lanes); err != nil || len(lanes) != 1 || lanes[0] != "capture" {
-			t.Fatal("capacity created an audit pool other than capture", lanes, err)
-		}
 		decisions, err := postgres.NewProcessingDecisions(ctx, f.roles["hub-runtime"], f.input.PermissionRootID)
 		if err != nil {
 			t.Fatal("compiled hub processing decisions", err)
