@@ -46,4 +46,3 @@ func TestPacketQueryCombinedReviewChoicesAndCurrentClientDefault(t *testing.T) {
 		t.Fatal("unimplemented query operation advertised")
 	}
 }
-

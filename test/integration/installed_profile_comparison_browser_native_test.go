@@ -195,7 +195,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary" || mode == "packet" && name != "get_pcap_summary" || mode == "packet-query" && name != "pcap_query") {
+		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_extract" || mode == "packet" && name != "get_extract" || mode == "packet-query" && name != "query_artifact") {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -219,7 +219,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 		if encodeErr != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil {
 			fail("canonical request unavailable")
 		}
-		if mode == "packet-query" && name == "pcap_query" {
+		if mode == "packet-query" && name == "query_artifact" {
 			a, aok := actual.(map[string]any)
 			w, wok := wanted.(map[string]any)
 			key, kok := a["idempotency_key"].(string)

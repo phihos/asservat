@@ -29,7 +29,7 @@ it('compares only explicitly selected profiles already visible in the same case,
   fireEvent.change(picker, { target: { value: id(4) } }); fireEvent.click(first.getByRole('button', { name: 'Compare profiles' }));
   await first.findByRole('table', { name: 'Profile comparison function costs' });
   expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/compare_profiles');
-  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual({ case_id: id(2), artifact_id: id(3), baseline_case_id: id(2), baseline_artifact_id: id(4), sample_type: 'cpu', normalization: 'perSecond', top_n: 20 });
+  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual({ case_id: id(2), artifact_id: id(3), baseline_case_id: id(2), baseline_artifact_id: id(4), sample_type: 'cpu', normalization: 'perSecond', limit: 20 });
   expect(client.calls.map(call => call.name)).toEqual(['get_case']);
   client.responder = () => { const next = profileCase(); next.data.artifacts = next.data.artifacts.slice(0, 1); return next; };
   await act(() => controller.refresh()); expect(screen.queryByRole('table', { name: 'Profile comparison function costs' })).toBeNull(); expect(fetcher).toHaveBeenCalledOnce();

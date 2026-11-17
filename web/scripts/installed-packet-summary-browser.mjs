@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
-import { validOutput_get_pcap_summary, validOutput_get_query_result } from '../src/generated/validate-projection.js';
+import { validOutput_get_extract, validOutput_get_query_result } from '../src/generated/validate-projection.js';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 async function command() {
@@ -48,7 +48,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if (/^\/api\/v1\/operations\/(get_case|get_pcap_summary|get_query_result)$/.test(path) && response.status === 200) {
+      if (/^\/api\/v1\/operations\/(get_case|get_extract|get_query_result)$/.test(path) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -61,11 +61,11 @@ try {
   page.on('pageerror', () => errors.push('pageerror'));
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
-    if (path === '/api/v1/operations/get_pcap_summary') starts++;
+    if (path === '/api/v1/operations/get_extract') starts++;
     if (path === '/api/v1/operations/get_query_result') polls++;
     if (path === '/api/v1/operations/get_case') cases++;
     if (path.startsWith('/api/v1/operations/')) {
-      if (!['/api/v1/operations/get_case', '/api/v1/operations/get_pcap_summary', '/api/v1/operations/get_query_result'].includes(path)) errors.push('unexpected-operation');
+      if (!['/api/v1/operations/get_case', '/api/v1/operations/get_extract', '/api/v1/operations/get_query_result'].includes(path)) errors.push('unexpected-operation');
       timeline.push(`${request.method()} ${path}`);
     }
   });
@@ -125,7 +125,7 @@ try {
   assert.equal(starts + polls, 0, 'no query before explicit action');
   assert.equal(cases, 1);
   event({ kind: 'ready' });
-  let handle, expiresAt;
+  let handle, revision, expiresAt;
   let terminal = false;
   let calls = 0;
   for (;;) {
@@ -149,8 +149,8 @@ try {
     }
     assert.equal(next.kind, 'call');
     assert(!terminal && ++calls <= 5, 'bounded original query calls');
-    const name = calls === 1 ? 'get_pcap_summary' : 'get_query_result';
-    const input = calls === 1 ? { case_id: config.caseID, artifact_id: config.artifactID } : { query_handle: handle };
+    const name = calls === 1 ? 'get_extract' : 'get_query_result';
+    const input = calls === 1 ? { view: 'pcapSummary', case_id: config.caseID, artifact_id: config.artifactID } : { query_handle: handle, after_revision: revision };
     assert.equal(next.name, name);
     assert.deepEqual(next.input, input);
     stage = name;
@@ -163,7 +163,7 @@ try {
     event({ kind: 'operation', ...response }); // Early locator before render assertions.
     assert.deepEqual(response.input, input);
     assert(Object.values(response.transport).every(Boolean), 'original browser transport');
-    assert((calls === 1 ? validOutput_get_pcap_summary : validOutput_get_query_result)(response.reply));
+    assert((calls === 1 ? validOutput_get_extract : validOutput_get_query_result)(response.reply));
     const reply = response.reply;
     const observedAt = reply.data.query_observed_at; // Current response, not query creation.
     if (expiresAt === undefined) expiresAt = reply.data.query_expires_at;
@@ -171,15 +171,15 @@ try {
     assert(Number.isFinite(Date.parse(observedAt)) && Date.parse(expiresAt) > Date.parse(observedAt), 'original finite query interval');
     if (reply.status === 'pending') {
       if (handle !== undefined) assert.equal(reply.data.query_handle, handle);
-      handle = reply.data.query_handle;
+      handle = reply.data.query_handle; revision = reply.data.revision;
     } else {
       assert.equal(reply.status, 'ok');
       if (calls > 1) {
         assert.equal(reply.data.query_handle, handle);
-        assert.equal(reply.data.tool_name, 'get_pcap_summary');
+        assert.equal(reply.data.tool_name, 'get_extract');
       }
       const result = calls === 1 ? reply : reply.data.result;
-      assert(validOutput_get_pcap_summary(result) && result.status === 'ok');
+      assert(validOutput_get_extract(result) && result.status === 'ok');
       assert.equal(result.request_id, reply.request_id);
       assert.equal(result.data.query_observed_at, observedAt);
       assert.equal(result.data.query_expires_at, expiresAt);

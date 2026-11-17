@@ -25,7 +25,7 @@ func installedApprovedScopes(scope string) bool {
 type installedProjectionCheck func(artifactID string) func(queryID, operationID string) func()
 
 // This adds at most six audited normal operations: one scoped denial, one
-// get_file_excerpt and four already-budgeted result polls. Existing normal128 /
+// get_extract fileExcerpt and four already-budgeted result polls. Existing normal128 /
 // resolution8 fixture allocations are unchanged; no unknown call is replayed.
 func installedApprovedProjection(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, pod string, expires time.Time, check installedProjectionCheck) (query.ContextExcerpt, func()) {
 	t.Helper()
@@ -65,34 +65,27 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 		t.Fatal("read-only OAuth session obtained download preparation")
 	}
 	verify("", "")
-	result := call("get_file_excerpt", map[string]any{"case_id": caseID, "artifact_id": artifactID, "line_start": 1, "max_lines": 14})
+	result := call("get_extract", map[string]any{"view": "fileExcerpt", "case_id": caseID, "artifact_id": artifactID, "line_start": 1, "limit": 14})
 	originalOperation := result.RequestID
 	originalHandle := ""
-	var firstObserved, until time.Time
+	var until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
 		var pending struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
+		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Revision < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
 			t.Fatal("invalid pending approved query")
 		}
 		if poll == 0 {
-			originalHandle, firstObserved, until = pending.Handle, pending.Observed, pending.Expires
+			originalHandle, until = pending.Handle, pending.Expires
 		}
 		if pending.Handle != originalHandle || !pending.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("approved query changed identity/lifetime or exhausted original poll allowance")
 		}
-		next, err := installedProjectionPollTime(firstObserved, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal("approved poll canceled", ctx.Err())
-		}
-		result = call("get_query_result", map[string]string{"query_handle": originalHandle})
+		result = call("get_query_result", map[string]any{"query_handle": originalHandle, "after_revision": pending.Revision})
 	}
 	if result.Status != "ok" {
 		t.Fatal("approved query did not return content", result.Status)
@@ -104,7 +97,7 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 			Tool   string                   `json:"tool_name"`
 			Result installedJourneyEnvelope `json:"result"`
 		}
-		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != originalHandle || resolved.Tool != "get_file_excerpt" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
+		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != originalHandle || resolved.Tool != "get_extract" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
 			t.Fatal("approved result changed original handle/tool")
 		}
 	} else if installedJourneyDecode(result.Data, &excerpt) != nil {
@@ -120,23 +113,6 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 	}
 	t.Log("installed journey: real read-only OAuth scope received approved pod-status content through shared acquisition; native-download scope was absent and preparation refused")
 	return excerpt, retired
-}
-
-// Spread the original four paid polls across the fixed query lifetime instead
-// of spending them immediately while a cold Pod starts. Server not-before wins;
-// an expired or incompatible schedule refuses, never renews the query.
-func installedProjectionPollTime(start, until, now time.Time, retry time.Duration, poll int) (time.Time, error) {
-	if start.IsZero() || !start.Before(until) || now.Before(start) || !now.Before(until) || retry <= 0 || poll < 0 || poll >= 4 {
-		return time.Time{}, errors.New("invalid approved query poll bound")
-	}
-	next := start.Add(until.Sub(start) * time.Duration(poll+1) / 5)
-	if floor := now.Add(retry); floor.After(next) {
-		next = floor
-	}
-	if !next.Before(until) {
-		return time.Time{}, errors.New("approved poll cannot fit original query lifetime")
-	}
-	return next, nil
 }
 
 func installedProjectionMatchesNative(excerpt query.ContextExcerpt, native []byte) error {

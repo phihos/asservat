@@ -17,33 +17,26 @@ import (
 func queryInstalledProfileSummaryWithCall(t *testing.T, ctx context.Context, caseID, artifactID, version, sampleType string, expires time.Time, call func(string, any) installedComparisonReply, verify func(string, string) func()) query.ProfileSummary {
 	t.Helper()
 	type summaryReply = installedComparisonReply
-	result := call("get_profile_summary", map[string]any{"case_id": caseID, "artifact_id": artifactID, "sample_type": sampleType, "top_n": 20})
+	result := call("get_extract", map[string]any{"view": "profileSummary", "case_id": caseID, "artifact_id": artifactID, "sample_type": sampleType, "limit": 20})
 	operation, handle := result.RequestID, ""
-	var observed, until time.Time
+	var until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
 		var pending struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 || pending.Observed.IsZero() || !pending.Expires.After(pending.Observed) || pending.Expires.After(expires) {
+		if json.Unmarshal(result.Data, &pending) != nil || pending.Handle == "" || pending.Revision < 1 || pending.Observed.IsZero() || !pending.Expires.After(pending.Observed) || pending.Expires.After(expires) {
 			t.Fatal("invalid pending profile query")
 		}
 		if poll == 0 {
-			handle, observed, until = pending.Handle, pending.Observed, pending.Expires
+			handle, until = pending.Handle, pending.Expires
 		}
 		if pending.Handle != handle || !pending.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("profile query changed original identity/deadline or exhausted polls")
 		}
-		next, err := installedProjectionPollTime(observed, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal(ctx.Err())
-		}
-		result = call("get_query_result", map[string]string{"query_handle": handle})
+		result = call("get_query_result", map[string]any{"query_handle": handle, "after_revision": pending.Revision})
 	}
 	if result.Status != "ok" {
 		t.Fatal("profile summary did not return a result", string(result.Data))
@@ -55,7 +48,7 @@ func queryInstalledProfileSummaryWithCall(t *testing.T, ctx context.Context, cas
 			Result  summaryReply `json:"result"`
 			Expires time.Time    `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "get_profile_summary" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
+		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "get_extract" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
 			t.Fatal("profile result changed its original query association")
 		}
 		result = nested.Result

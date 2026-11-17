@@ -16,7 +16,7 @@ function setup(raw = true) {
 it('inspects only the attached raw source and explicitly counts unclassified saved records', async () => {
   const { client, controller } = setup(); client.responder = () => rawSummary(); await controller.inspect();
   expect(controller.snapshot().phase).toBe('result'); expect(controller.snapshot().packetSummary).toMatchObject({ capture_mode: 'rawPackets', packets: 5, unclassified_packets: 2 });
-  expect(client.calls).toHaveLength(1); expect(client.calls[0]).toMatchObject({ name: 'get_pcap_summary', input: { case_id: id(2), artifact_id: id(3) } });
+  expect(client.calls).toHaveLength(1); expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'pcapSummary', case_id: id(2), artifact_id: id(3) } });
 });
 it('keeps a complete raw result unavailable to a metadata-attached view', async () => {
   const { client, controller } = setup(false); client.responder = () => rawSummary(); await controller.inspect(); expect(controller.snapshot()).toEqual({ phase: 'unavailable' });
