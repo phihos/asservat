@@ -17,7 +17,7 @@ const SeaweedConfigKey = "s3.json"
 const SeaweedConfigLimit = 768 << 10 // Below the existing Kubernetes Secret data limit.
 var ErrSeaweedStorage = errors.New("bundled object store configuration unavailable")
 var seaweedBucket = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "download-read", "evidence-delete", "operation-cleanup", "operation-verify", "regional-write", "regional-history"}
+var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "download-read", "evidence-delete", "regional-write", "regional-history"}
 
 func SeaweedPrincipalName(k contracts.SeaweedPrincipalKey) (string, error) {
 	if !slices.Contains(seaweedPurposes, k.Purpose) || !authorization.UUID(k.ScopeID) {

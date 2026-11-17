@@ -7,14 +7,13 @@ the collector's stored outcome (`RecordAPIStoredCompletion`): copy receipts,
 the catalog row (admitted facts plus the reported copy digest, native size and
 Go-profile acquisition window) and the custody event; the catalog INSERT
 triggers add the case association, capture-time shares and the progress
-`NOTIFY`. Migration 00199 drops `context_verification` and
+`NOTIFY`; a `capture.publish` `audit_event` row commits with it. Migration 00199 drops `context_verification` and
 `context_key_unwrap`. Removed: the `asservat publisher` Deployment, its
 verifier key unwrap, verifier PKI, OpenBao audit key, SeaweedFS principals,
 SQL purposes and Helm values; `ContextPublisher`, `ContextPublicationGate`,
 verification audit objects and receipts. The producer now runs the
 headers-only, raw-cap and approved-HTTP-header checks before encryption.
-Verified: see the PR. Gaps: the publication `audit_event` row waits for the
-`audit_event` table (#283); reads compare the manifest with the admitted facts
+Verified: see the PR. Gaps: reads compare the manifest with the admitted facts
 and copy digests but not yet with the stored native size.
 
 ## Custody fixes after #279 and #283 (2026-11-17)

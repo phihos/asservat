@@ -18,7 +18,7 @@ transaction publishes:
    action, audience, deadlines) plus the reported copy digest and native facts.
    The INSERT triggers add the case/occurrence association, any capture-time
    share and the progress `NOTIFY`.
-3. Settle the charge to the stored size.
+3. Settle the charge to the stored size and write the `audit_event` row.
 
 There is no separate verification stage and the hub never decrypts the
 artifact. Every read authenticates the commit, manifest, index and frames and
