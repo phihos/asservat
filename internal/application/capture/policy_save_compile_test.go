@@ -33,16 +33,17 @@ func ongoingSaveCompilerOne(raw json.RawMessage) (planvalue.PolicyRecorderConfig
 func TestPolicyRecordingSaveOptInIsExplicitReviewedCollectionIntent(t *testing.T) {
 	spec := recorderPolicySpec()
 	spec["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)["overrides"] = []any{}
+	spec["recordingSaves"] = map[string]any{"enabled": false}
 	raw, _ := json.Marshal(spec)
 	ordinary, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
-	if err != nil {
-		t.Fatal("ongoing baseline", err)
+	if err != nil || ordinary.RecordingSaves {
+		t.Fatal("ongoing baseline with saves off", err)
 	}
-	spec["recordingSaves"] = map[string]any{"enabled": true}
+	delete(spec, "recordingSaves")
 	raw, _ = json.Marshal(spec)
 	enabled, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
-	if err != nil {
-		t.Fatal("explicit reviewed save opt-in refused for existing ongoing recorder", err)
+	if err != nil || !enabled.RecordingSaves {
+		t.Fatal("recording saves do not default on for an ongoing recorder", err)
 	}
 	delegation := identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{1}}
 	before := RecorderPolicyScopeDigest("policy", 1, artifact.Digest{2}, ordinary, "namespace", "workload", delegation, nil, []string{"packetCapture"}, authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20, MaxObservedBytes: 1 << 20})

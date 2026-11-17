@@ -47,6 +47,8 @@ type LiveOperationsConfig struct {
 	Clusters          ClusterNames
 	CollectionEnabled bool
 	Now               func() time.Time
+	// NewID, when set, lets an unaudited composition call list_recordings.
+	NewID func() string
 }
 
 type LiveOperations struct {
@@ -89,8 +91,12 @@ func (s *LiveOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	}
 	return s.wire.Tool(name)
 }
-func (s *LiveOperations) Call(context.Context, identities.CurrentIdentity, string, json.RawMessage) (OperationReply, error) {
-	return OperationReply{}, ErrOperationDelivery
+// Call serves only the passive inventory; watch_live needs the audited path.
+func (s *LiveOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
+	if s == nil || s.config.NewID == nil || name != "list_recordings" {
+		return OperationReply{}, ErrOperationDelivery
+	}
+	return s.CallWithContext(ctx, current, OperationCall{requestID: s.config.NewID()}, name, raw)
 }
 func (s *LiveOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil || current == nil || !authorization.UUID(call.requestID) {
@@ -145,7 +151,7 @@ func (s *LiveOperations) CallWithContext(ctx context.Context, current identities
 		var next string
 		out.Data, next, err = s.listRecordings(bounded, current, raw, &until)
 		if errors.Is(err, errUnknownCluster) {
-			out.Data, err = OperationFailure{Code: "TargetGone", Message: "No configured cluster has this name.", Retryable: false}, nil
+			out.Data, err = OperationFailure{Code: "UnknownCluster", Message: "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", Retryable: false}, nil
 			out.Status = "error"
 		} else if next != "" {
 			out.NextCursor = &next

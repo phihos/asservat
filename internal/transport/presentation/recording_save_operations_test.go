@@ -138,7 +138,7 @@ func TestRecordingSaveMetadataRechecksIdentityAndDoesNotLeakProviderErrors(t *te
 		t.Fatal(err, string(reply.Body))
 	}
 	reply, err = audited.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{"target_ref":{"cluster":"elsewhere","namespace":"payments","kind":"Deployment","name":"api"}}`))
-	if err != nil || !strings.Contains(string(reply.Body), `"code":"TargetGone"`) {
+	if err != nil || !strings.Contains(string(reply.Body), `"code":"UnknownCluster"`) {
 		t.Fatal("unknown cluster name is not a domain error", err, string(reply.Body))
 	}
 }
