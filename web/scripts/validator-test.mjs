@@ -122,11 +122,11 @@ for (const [file, validator] of [
 assert.equal(projection.validInput_get_query_result({ query_handle: 'original', idempotency_key: 'extra' }), false);
 console.log('Native ESM approved projection and pending query validators passed canonical examples and invalid timing checks.');
 const policyReply = { schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000001', data_class: 'metadata', status: 'ok', truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [],
-  data: { policy_uid: 'policy-uid', acceptance_id: '00000000-0000-4000-8000-000000000002', state: 'deactivated', replay: false } };
+  data: { policy_name: 'regional-restarts', namespace: 'team-a', policy_uid: 'policy-uid', acceptance_id: '00000000-0000-4000-8000-000000000002', state: 'deactivated', replay: false } };
 assert.equal(policy.validOutput_deactivate_policy(policyReply), true);
 assert.equal(policy.validOutput_deactivate_policy({ ...policyReply, data: { ...policyReply.data, state: 'active' } }), false);
-assert.equal(policy.validInput_deactivate_policy({ policy_name: 'regional-restarts', idempotency_key: 'k' }), true);
-assert.equal(policy.validInput_deactivate_policy({ policy_name: 'Bad_Name', idempotency_key: 'k' }), false);
+assert.equal(policy.validInput_deactivate_policy({ cluster: 'local', namespace: 'team-a', policy_name: 'regional-restarts', idempotency_key: 'k' }), true);
+assert.equal(policy.validInput_deactivate_policy({ cluster: 'local', namespace: 'team-a', policy_name: 'Bad_Name', idempotency_key: 'k' }), false);
 console.log('Native ESM policy validators passed positive and negative checks.');
 const shareReply = { ...policyReply, data: { share_id: '00000000-0000-4000-8000-000000000003', phase: 'Revoked', revision: 2 } };
 assert.equal(sharing.validOutput_revoke_share(shareReply), true);

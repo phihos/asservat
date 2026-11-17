@@ -119,7 +119,7 @@ await operationBundle([], 'processing', ['ProcessingInventory', 'ProcessingChang
 await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_profile'], 'capture');
 await operationBundle(['get_case', 'download_artifact'], 'evidence');
 await operationBundle(['get_extract', 'query_artifact', 'compare_profiles', 'get_query_result'], 'projection');
-await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
+await operationBundle(['deactivate_policy', 'get_policy_status'], 'policy');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
@@ -127,7 +127,7 @@ await operationBundle(['preview_retention_change'], 'retention-preview');
 await operationBundle(['search_processing_evidence'], 'processing-discovery');
 await operationBundle(['get_processing_erasure'], 'processing-erasure');
 await operationBundle(['get_processing_report'], 'processing-report', ['ProcessingReportExport']);
-await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
+await operationBundle(['request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
 await operationBundle(['list_recordings', 'watch_live'], 'live');
 
