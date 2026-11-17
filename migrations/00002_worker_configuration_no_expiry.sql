@@ -15,7 +15,7 @@ BEGIN
  SELECT * INTO STRICT h FROM public.download_worker_configuration WHERE installation_id=s.installation_id AND cluster_id=(path->>'AcquisitionClusterID')::uuid AND source_uid=(path->'WorkerConfiguration'->>'UID')::uuid FOR SHARE;
  SELECT * INTO STRICT v FROM public.download_worker_configuration_revision WHERE installation_id=h.installation_id AND cluster_id=h.cluster_id AND source_uid=h.source_uid AND generation=h.generation;
  snapshot:=convert_from(v.snapshot_json,'UTF8')::jsonb;profile:=snapshot->'Profile';n:=clock_timestamp();
- RETURN COALESCE(NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=n AND n<t.fresh_until AND
+ RETURN COALESCE(NOT t.suspended AND t.observed_at<=n AND n<t.fresh_until AND
  NOT (snapshot->>'Suspended')::boolean AND snapshot->>'RecoveryEpoch'=t.issuer_epoch::text AND
  v.audit_receipt_json IS NOT NULL AND profile->'Configuration'=path->'WorkerConfiguration' AND profile->>'InstallationID'=s.installation_id::text AND profile->>'ClusterID'=path->>'AcquisitionClusterID' AND
  profile->>'StoreCredentialSecret'<>'' AND (profile->>'CPUMillis')::numeric=(p->'Worker'->>'CPUMilli')::numeric AND (profile->>'MemoryBytes')::numeric=(p->'Worker'->>'MemoryBytes')::numeric AND
