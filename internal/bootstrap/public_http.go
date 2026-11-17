@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -160,11 +159,11 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"capture-progress-pool", mounts.ErrUnavailable}
 	}
-	services.CaptureChanges = browser.NewChanges()
+	services.CaptureChanges = presentation.NewChanges()
 	postgres.ListenPayloads(ctx, progressPool, postgres.CaptureProgressChannel, services.CaptureChanges.Publish)
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency,
-		Audit: presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: ownerRandomID}},
+		Audit: presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: ownerRandomID, Changes: services.CaptureChanges}},
 		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
 	if err != nil {
 		return nil, &fixedStepError{"handler", err}

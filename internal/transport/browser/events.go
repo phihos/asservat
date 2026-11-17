@@ -15,14 +15,6 @@ import (
 // EventsPath is the console's one status stream (REQ-INT-003).
 const EventsPath = "/api/v1/events"
 
-// ChangeSubscription delivers the IDs whose state changed since the last
-// Take. An empty ID means anything may have changed (listener reconnect).
-type ChangeSubscription interface {
-	Ready() <-chan struct{}
-	Take() map[string]struct{}
-	Close()
-}
-
 // EventsHandler serves GET /api/v1/events as Server-Sent Events. Each event
 // is the unchanged get_capture result, read through the same audited
 // operation as a POST, so every event is authorized and audited like one
@@ -31,12 +23,12 @@ type ChangeSubscription interface {
 type EventsHandler struct {
 	sessions   SessionHandler
 	operations presentation.Operations
-	captures   *Changes
+	captures   *presentation.Changes
 	// Report receives fixed failure stages (diagnostics only).
 	Report func(string)
 }
 
-func NewEventsHandler(sessions SessionHandler, operations presentation.Operations, captures *Changes) (*EventsHandler, error) {
+func NewEventsHandler(sessions SessionHandler, operations presentation.Operations, captures *presentation.Changes) (*EventsHandler, error) {
 	if sessions.Sessions == nil || !sessions.validOrigin() || operations == nil || captures == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}

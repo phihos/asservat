@@ -21,6 +21,9 @@ type AuditedOperationsConfig struct {
 	RootID string
 	Now    func() time.Time
 	NewID  func() string
+	// Changes signals committed status changes by ID; nil serves
+	// after_revision without waiting.
+	Changes *Changes
 }
 type auditTarget interface {
 	Operations
@@ -151,8 +154,82 @@ func (s *AuditedOperations) RejectBeforeDispatch(ctx context.Context, current id
 	return time.Time{}, auditapp.ErrUnavailable
 }
 
+// Call serves one operation. A status read with after_revision whose state
+// still has that revision waits for a committed change of its ID (LISTEN/
+// NOTIFY through Changes) or audit.StatusWait, then reads again; each read
+// is its own audited call (REQ-INT-003, no polling).
 func (s *AuditedOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
-	return s.call(ctx, current, name, raw, 0)
+	id, after := statusWait(name, raw)
+	if s == nil || s.config.Changes == nil || id == "" {
+		return s.call(ctx, current, name, raw, 0)
+	}
+	// Each read keeps its operation's own window; only the wait is longer.
+	read := func() (OperationReply, error) {
+		return s.call(ctx, identities.ShortenRequest(current, s.config.Now().Add(audit.OperationRequestWindow(name)), s.config.Now), name, raw, 0)
+	}
+	// Subscribe before the first read so no change between them is lost.
+	changes := s.config.Changes.Subscribe([]string{id})
+	defer changes.Close()
+	reply, err := read()
+	if err != nil || replyRevision(reply.Body) != after {
+		return reply, err
+	}
+	wait := time.NewTimer(audit.StatusWait)
+	defer wait.Stop()
+	select {
+	case <-changes.Ready():
+	case <-wait.C:
+	case <-ctx.Done():
+		return reply, err
+	}
+	if ctx.Err() != nil {
+		return reply, err
+	}
+	_ = reply.Close(ctx)
+	clear(reply.Body)
+	return read()
+}
+
+// statusWait returns the ID and after_revision of a status read that asks to
+// wait; "" otherwise.
+func statusWait(name string, raw json.RawMessage) (string, int64) {
+	var in struct {
+		CaptureID     string `json:"capture_id"`
+		GrantID       string `json:"grant_id"`
+		DownloadID    string `json:"download_id"`
+		Action        string `json:"action"`
+		AfterRevision int64  `json:"after_revision"`
+	}
+	if json.Unmarshal(raw, &in) != nil || in.AfterRevision < 1 {
+		return "", 0
+	}
+	id := ""
+	switch {
+	case name == "get_capture":
+		id = in.CaptureID
+	case name == "get_grant":
+		id = in.GrantID
+	case name == "download_artifact" && in.Action == "status":
+		id = in.DownloadID
+	}
+	if !authorization.UUID(id) {
+		return "", 0
+	}
+	return id, in.AfterRevision
+}
+
+// replyRevision is the data.revision of an ok or pending result, else 0.
+func replyRevision(body []byte) int64 {
+	var out struct {
+		Status string `json:"status"`
+		Data   struct {
+			Revision int64 `json:"revision"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &out) != nil || out.Status == "error" {
+		return 0
+	}
+	return out.Data.Revision
 }
 
 func (s *AuditedOperations) call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, rejection IngressRejectionKind) (OperationReply, error) {

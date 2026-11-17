@@ -66,7 +66,7 @@ func NewBearerRequest(ctx context.Context, resolver Resolver, token string, now 
 // only caps the request, never the resolver's own identity interval. The
 // transport must shorten every other request to its own operation window.
 func NewBearerRequestWithin(ctx context.Context, resolver Resolver, token string, now func() time.Time, lifetime time.Duration) (CurrentIdentity, value.Identity, error) {
-	if ctx == nil || resolver == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > value.EvidenceReadRequestWindow {
+	if ctx == nil || resolver == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > max(value.EvidenceReadRequestWindow, value.StatusWaitRequestWindow) {
 		return nil, value.Identity{}, value.ErrUnavailable
 	}
 	started := now()
@@ -95,7 +95,7 @@ func NewBrowserRequest(ctx context.Context, sessions BrowserSessionResolver, coo
 // window (audit.OperationRequestWindow) may be an evidence read or grouped Save,
 // matching MCP.
 func NewBrowserRequestWithin(ctx context.Context, sessions BrowserSessionResolver, cookie string, allowRefresh bool, now func() time.Time, lifetime time.Duration) (CurrentIdentity, SessionView, error) {
-	if ctx == nil || sessions == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > value.EvidenceReadRequestWindow {
+	if ctx == nil || sessions == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > max(value.EvidenceReadRequestWindow, value.StatusWaitRequestWindow) {
 		return nil, SessionView{}, value.ErrUnavailable
 	}
 	started := now()

@@ -1,8 +1,16 @@
-package browser
+package presentation
 
 import "sync"
 
-// Changes fans published IDs out to status streams. An empty ID means
+// ChangeSubscription delivers the IDs whose state changed since the last
+// Take. An empty ID means anything may have changed (listener reconnect).
+type ChangeSubscription interface {
+	Ready() <-chan struct{}
+	Take() map[string]struct{}
+	Close()
+}
+
+// Changes fans published IDs out to status streams and waits. An empty ID means
 // anything may have changed (for example after a listener reconnect).
 type Changes struct {
 	mu   sync.Mutex

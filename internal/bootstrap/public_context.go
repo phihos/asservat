@@ -42,7 +42,7 @@ type PublicContextServices struct {
 	Processing      browser.ProcessingChangeService
 	ProcessingRules browser.ProcessingInventoryService
 	// CaptureChanges feeds the console status stream; nil serves none.
-	CaptureChanges *browser.Changes
+	CaptureChanges *presentation.Changes
 }
 
 // NewPublicContextHandler composes the original HTTP handlers directly. It

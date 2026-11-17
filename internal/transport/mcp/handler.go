@@ -447,6 +447,10 @@ func (h *Handler) releaseIdentity(p identity.Principal) {
 	}
 }
 
+// maxTransportWindow is the longest operation request: a status read's
+// after_revision wait with its two reads.
+var maxTransportWindow = max(identity.EvidenceReadRequestWindow, identity.StatusWaitRequestWindow)
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	securityHeaders(w)
 	origin, _ := url.Parse(h.config.PublicOrigin)
@@ -521,9 +525,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Evidence reads may use the longer evidence-read window; every other
 	// request is shortened to requestLifetime once its route is known below.
 	started, identityStarted := time.Now(), h.now()
-	ctx, cancel := context.WithTimeout(r.Context(), identity.EvidenceReadRequestWindow)
+	ctx, cancel := context.WithTimeout(r.Context(), maxTransportWindow)
 	defer cancel()
-	current, i, err := identities.NewBearerRequestWithin(ctx, pinnedResolver{h}, fields[1], h.now, identity.EvidenceReadRequestWindow)
+	current, i, err := identities.NewBearerRequestWithin(ctx, pinnedResolver{h}, fields[1], h.now, maxTransportWindow)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
 		h.authFailure(w, err, "identity")
@@ -569,12 +573,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400)
 		return
 	}
-	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationRequestWindow(early.Name) > requestLifetime {
-		operationUntil := identity.Earlier(deadline, started.Add(audit.OperationRequestWindow(early.Name)))
+	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationTransportWindow(early.Name) > requestLifetime {
+		operationUntil := identity.Earlier(deadline, started.Add(audit.OperationTransportWindow(early.Name)))
 		var shorten context.CancelFunc
 		ctx, shorten = context.WithDeadline(ctx, operationUntil)
 		defer shorten()
-		identityUntil := identityStarted.Add(audit.OperationRequestWindow(early.Name))
+		identityUntil := identityStarted.Add(audit.OperationTransportWindow(early.Name))
 		current = identities.ShortenRequest(current, identityUntil, h.now)
 		i.ValidUntil = identity.Earlier(i.ValidUntil, identityUntil)
 		ctx = context.WithValue(ctx, operationIdentityKey{}, current)
