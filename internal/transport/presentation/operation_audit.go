@@ -198,6 +198,7 @@ func statusWait(name string, raw json.RawMessage) (string, int64) {
 		CaptureID     string `json:"capture_id"`
 		GrantID       string `json:"grant_id"`
 		DownloadID    string `json:"download_id"`
+		QueryHandle   string `json:"query_handle"`
 		Action        string `json:"action"`
 		AfterRevision int64  `json:"after_revision"`
 	}
@@ -212,6 +213,9 @@ func statusWait(name string, raw json.RawMessage) (string, int64) {
 		id = in.GrantID
 	case name == "download_artifact" && in.Action == "status":
 		id = in.DownloadID
+	case name == "get_query_result":
+		// A query worker's readiness notifies the query ID (migration 00007).
+		id = in.QueryHandle
 	}
 	if !authorization.UUID(id) {
 		return "", 0
