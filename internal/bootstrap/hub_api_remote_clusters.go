@@ -4,6 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/transport/presentation"
 )
 
 // hubAPIRemoteCluster is one registered mode=cluster workload cluster
@@ -15,7 +16,8 @@ type hubAPIRemoteCluster struct {
 
 // hubAPIRemoteClusters checks the registered clusters: distinct DNS-label
 // names, a release namespace and the router's per-cluster reservations.
-// Cluster IDs derive from the names (ADR-335 D4).
+// Cluster IDs derive from the names (ADR-335 D4); "local" names the hub's
+// own cluster.
 func hubAPIRemoteClusters(h contracts.HubAPIConfig, ids hubAPIIDs) ([]hubAPIRemoteCluster, error) {
 	if len(h.Clusters) == 0 {
 		return nil, nil
@@ -28,7 +30,7 @@ func hubAPIRemoteClusters(h contracts.HubAPIConfig, ids hubAPIIDs) ([]hubAPIRemo
 	for _, c := range h.Clusters {
 		cluster := contracts.RemoteClusterID(ids.InstallationID, c.Name)
 		peer, ok := contracts.RemotePeerID(ids.InstallationID, cluster)
-		if !ok || seen[cluster] || len(validation.IsDNS1123Label(c.Name)) != 0 || len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.Standby < 1 || c.Captures < 1 {
+		if !ok || seen[cluster] || c.Name == presentation.LocalClusterName || len(validation.IsDNS1123Label(c.Name)) != 0 || len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.Standby < 1 || c.Captures < 1 {
 			return nil, hubAPIInputError("clusters")
 		}
 		seen[cluster] = true

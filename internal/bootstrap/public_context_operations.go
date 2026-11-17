@@ -43,6 +43,8 @@ type PublicContextOperationsConfig struct {
 	CollectionEnabled                    bool
 	Now                                  func() time.Time
 	NewID                                func() string
+	// Clusters resolves the cluster names of public inputs (ADR-335 D4).
+	Clusters presentation.ClusterNames
 }
 
 type publicContextUseCases struct {
