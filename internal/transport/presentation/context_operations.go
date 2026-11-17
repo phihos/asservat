@@ -141,9 +141,6 @@ func targetOutput(t targets.WorkloadRequest) WorkloadReference {
 	return WorkloadReference{t.ClusterID, t.Namespace, t.Kind, t.Name}
 }
 
-// errUnknownCluster is a public cluster name that no configured cluster has.
-var errUnknownCluster = errors.New("unknown cluster name")
-
 // workload resolves a target_ref cluster name.
 func (s *ContextOperations) workload(r TargetRef) (targets.WorkloadRequest, error) {
 	id, ok := s.config.Clusters.ID(r.Cluster)

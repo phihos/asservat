@@ -7,7 +7,7 @@ import type { Operations as GrantOperations, Operation as GrantOperation, Output
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const session: Session = { principal: { issuer: 'https://identity.invalid', subject_id: 'synthetic-developer', kind: 'user' }, roles: [], csrf_token: 'C'.repeat(43), expires_at: new Date(Date.now() + 120_000).toISOString(), step_up: 'unavailable' };
 export const target = { cluster: 'local', namespace: 'payments', kind: 'Deployment' as const, name: 'api' };
-// The cluster UUID that explain_access, list_live_sources and list_recordings still take.
+// The cluster UUID that outputs carry as provenance.
 export const clusterID = id(1);
 // The capture operations implement the canonical contracts and their examples.
 const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));

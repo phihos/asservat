@@ -160,7 +160,6 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
-  // explain_access, list_live_sources and list_recordings still take the cluster UUID.
   const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : 'Collect evidence';
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
   return <div className="capture-workspace">
