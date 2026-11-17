@@ -69,7 +69,7 @@ func comparisonBridge(t *testing.T, same bool) (*AuditedOperations, *pairedBridg
 	return s, pair, g, p
 }
 func comparisonInput(f *pairedBridge) []byte {
-	b, _ := json.Marshal(ProfileComparisonOperationInput{CaseID: f.a.Scope.CaseID, ArtifactID: f.a.Scope.ArtifactID, BaselineCaseID: f.a.Baseline.Scope.CaseID, BaselineArtifactID: f.a.Baseline.Scope.ArtifactID, SampleType: "cpu", Normalization: "none", TopN: 20})
+	b, _ := json.Marshal(projectionInput{CaseID: f.a.Scope.CaseID, ArtifactID: f.a.Scope.ArtifactID, BaselineCaseID: f.a.Baseline.Scope.CaseID, BaselineArtifactID: f.a.Baseline.Scope.ArtifactID, SampleType: "cpu", Normalization: "none", Limit: 20})
 	return b
 }
 func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {

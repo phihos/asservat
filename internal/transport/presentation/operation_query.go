@@ -1,175 +1,128 @@
 package presentation
 
 import (
-	analysisapp "asservat.local/asservat/internal/application/analysis"
 	"encoding/json"
 	"slices"
+	"strings"
+	"time"
 
-	"asservat.local/asservat/internal/domain/analysis"
+	value "asservat.local/asservat/internal/domain/analysis"
 )
 
+// queryOperation reports whether name is a public approved-read tool.
 func queryOperation(name string) bool {
-	return name == "get_logs" || name == "syscall_query" || name == "pcap_query" || name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
+	return name == "get_extract" || name == "query_artifact" || name == "compare_profiles" || name == "get_query_result"
 }
 
-func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
-	if name == "get_logs" {
-		var in RawLogQueryOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion string
-			Input                RawLogQueryOperationInput
-		}{name, analysis.LogQueryDisplayVersion, normalizeRawLogInput(in)})
-	}
-	if name == "syscall_query" {
-		var in RawSyscallQueryOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion string
-			Input                RawSyscallQueryOperationInput
-		}{name, analysis.SyscallQueryDisplayVersion, normalizeRawSyscallInput(in)})
-	}
-	if name == "pcap_query" {
-		var in PacketQueryOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		r := analysisapp.NormalizePacketQueryRequest(in.request())
-		if !r.Valid() {
-			return nil, ErrOperationDelivery
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion string
-			Input                PacketQueryOperationInput
-		}{name, analysis.PacketQueryDisplayVersion, packetQueryInput(r)})
-	}
+// projectionOperations maps a public tool and its view or operation to the
+// internal query operation the application layer and SQL record. Canonical
+// views without an entry are CapabilityUnavailable.
+var projectionOperations = map[string]string{
+	"get_extract/fileExcerpt":    "get_file_excerpt",
+	"get_extract/httpHeaders":    "get_http_headers",
+	"get_extract/profileSummary": "get_profile_summary",
+	"get_extract/pcapSummary":    "get_pcap_summary",
+	"get_extract/syscallSummary": "get_syscall_summary",
+	"get_extract/syscallEvents":  "get_syscall_events",
+	"get_extract/logs":           "get_logs",
+	"query_artifact/packets":     "pcap_query",
+	"query_artifact/syscalls":    "syscall_query",
+	"compare_profiles/":          "compare_profiles",
+	"get_query_result/":          "get_query_result",
+}
 
-	if syscallQueryOperation(name) {
-		var in SyscallOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
+// publicTool names the public tool of an internal query operation.
+func publicTool(operation string) string {
+	for k, v := range projectionOperations {
+		if v == operation {
+			tool, _, _ := strings.Cut(k, "/")
+			return tool
 		}
-		if in.Limit == 0 {
-			in.Limit = analysis.SyscallPageRecords
-		}
-		in.Names = slices.Clone(in.Names)
-		slices.Sort(in.Names)
-		view := syscallView(name)
-		return json.Marshal(struct {
-			Tool, DisplayVersion, CaseID, ArtifactID, Cursor string
-			Limit                                            int
-			Names                                            []string
-			ErrorsOnly                                       bool
-		}{name, view.DisplayVersion(), in.CaseID, in.ArtifactID, in.Cursor, in.Limit, in.Names, in.ErrorsOnly})
 	}
+	return ""
+}
 
-	if name == "compare_profiles" {
-		var in ProfileComparisonOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		selection, err := analysis.NormalizeProfileComparisonSelection(in.SampleType, in.Normalization, in.TopN)
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion, CaseID, ArtifactID, BaselineCaseID, BaselineArtifactID, SampleType, Normalization string
-			TopN                                                                                                    int
-		}{name, analysis.ProfileComparisonDisplayVersion, in.CaseID, in.ArtifactID, in.BaselineCaseID, in.BaselineArtifactID, selection.SampleType, selection.Normalization, selection.TopN})
-	}
+type packetQueryFlagInput struct {
+	Mask  uint16 `json:"mask"`
+	Value uint16 `json:"value"`
+}
+type packetQueryPrefixInput struct {
+	Offset uint16 `json:"offset"`
+	Length uint16 `json:"length"`
+}
 
-	if name == "get_pcap_summary" {
-		var in PacketSummaryOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct{ Tool, DisplayVersion, CaseID, ArtifactID string }{name, analysis.PacketSummaryDisplayVersion, in.CaseID, in.ArtifactID})
-	}
-	if name == "get_profile_summary" {
-		var in ProfileSummaryOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		selection, err := analysis.NormalizeProfileSummarySelection(in.SampleType, in.TopN)
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion, CaseID, ArtifactID, SampleType string
-			TopN                                                 int
-		}{name, analysis.ProfileSummaryDisplayVersion, in.CaseID, in.ArtifactID, selection.SampleType, selection.TopN})
-	}
+// projectionInput is the union of the canonical projection tool inputs; the
+// schema already admitted exactly one view's or operation's argument set.
+type projectionInput struct {
+	View               string                   `json:"view,omitempty"`
+	Operation          string                   `json:"operation,omitempty"`
+	CaseID             string                   `json:"case_id,omitempty"`
+	ArtifactID         string                   `json:"artifact_id,omitempty"`
+	BaselineCaseID     string                   `json:"baseline_case_id,omitempty"`
+	BaselineArtifactID string                   `json:"baseline_artifact_id,omitempty"`
+	SampleType         string                   `json:"sample_type,omitempty"`
+	Normalization      string                   `json:"normalization,omitempty"`
+	Cursor             string                   `json:"cursor,omitempty"`
+	Limit              int                      `json:"limit,omitempty"`
+	LineStart          int                      `json:"line_start,omitempty"`
+	Names              []string                 `json:"syscall_names,omitempty"`
+	ErrorsOnly         bool                     `json:"errors_only,omitempty"`
+	GrantID            string                   `json:"grant_id,omitempty"`
+	IdempotencyKey     string                   `json:"idempotency_key,omitempty"`
+	QueryHandle        string                   `json:"query_handle,omitempty"`
+	PacketFilter       string                   `json:"packet_filter,omitempty"`
+	Fields             []value.PacketQueryField `json:"fields,omitempty"`
+	StartTime          *time.Time               `json:"start_time,omitempty"`
+	EndTime            *time.Time               `json:"end_time,omitempty"`
+	TCPFlags           *packetQueryFlagInput    `json:"tcp_flags,omitempty"`
+	FramePrefix        *packetQueryPrefixInput  `json:"frame_prefix,omitempty"`
+}
 
-	if name == "get_http_headers" {
-		// The cursor is bound as supplied; a malformed one is still audited
-		// and answered as InvalidCursor without any lookup. An omitted limit
-		// is the canonical default page.
-		var in HTTPHeaderOperationInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		if in.Limit == 0 {
-			in.Limit = analysis.HTTPHeaderPageRecords
-		}
-		return json.Marshal(struct {
-			Tool, DisplayVersion, CaseID, ArtifactID, Cursor string
-			Limit                                            int
-		}{name, analysis.HTTPHeadersDisplayVersion, in.CaseID, in.ArtifactID, in.Cursor, in.Limit})
-	}
-	if name == "get_query_result" {
-		var in struct {
-			QueryHandle string `json:"query_handle"`
-		}
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return nil, err
-		}
-		return json.Marshal(struct{ Tool, DisplayVersion, QueryHandle string }{name, analysis.ContextDisplayVersion, in.QueryHandle})
-	}
-	var in struct {
-		CaseID     string `json:"case_id"`
-		ArtifactID string `json:"artifact_id"`
-		LineStart  int    `json:"line_start"`
-		MaxLines   int    `json:"max_lines"`
-	}
+// pageMaximum is each operation's page bound: a page must fit the 24 KiB
+// response. A larger requested limit returns that page with next_cursor.
+var pageMaximum = map[string]int{
+	"get_file_excerpt":    200,
+	"get_http_headers":    value.HTTPHeaderPageRecords,
+	"get_profile_summary": value.ProfileSummaryMaximumTop,
+	"compare_profiles":    value.ProfileSummaryMaximumTop,
+	"get_syscall_summary": value.SyscallPageRecords,
+	"get_syscall_events":  value.SyscallPageRecords,
+	"syscall_query":       value.SyscallPageRecords,
+	"get_logs":            value.LogPageRecords,
+	"pcap_query":          value.PacketQueryMaxPackets,
+}
+
+// decodeProjection returns the internal operation ("" when unsupported) and
+// the normalized input of one schema-valid public call.
+func decodeProjection(name string, raw []byte) (string, projectionInput, error) {
+	var in projectionInput
 	if err := json.Unmarshal(raw, &in); err != nil {
-		return nil, err
+		return "", in, err
 	}
-	selection, err := analysis.NormalizeLineSelection(in.LineStart, in.MaxLines)
+	op := projectionOperations[name+"/"+in.View+in.Operation]
+	if m := pageMaximum[op]; in.Limit > m {
+		in.Limit = m
+	}
+	if op == "pcap_query" && in.Limit == 0 {
+		in.Limit = value.PacketQueryMaxPackets
+	}
+	in.Names = slices.Clone(in.Names)
+	slices.Sort(in.Names)
+	return op, in, nil
+}
+
+// normalizeQueryInput is the audited input: the internal operation and its
+// normalized arguments.
+func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	op, in, err := decodeProjection(name, raw)
 	if err != nil {
 		return nil, err
 	}
+	if op == "" {
+		op = name
+	}
 	return json.Marshal(struct {
-		Tool, DisplayVersion, CaseID, ArtifactID string
-		LineStart, MaxLines                      int
-	}{name, analysis.ContextDisplayVersion, in.CaseID, in.ArtifactID, selection.LineStart, selection.MaxLines})
-}
-
-// ProfileSummaryOperationInput is the exact closed selection bound by the
-// query invocation MAC. Registration remains a separate qualification gate.
-type ProfileSummaryOperationInput struct {
-	CaseID     string `json:"case_id"`
-	ArtifactID string `json:"artifact_id"`
-	SampleType string `json:"sample_type"`
-	TopN       int    `json:"top_n"`
-}
-
-// ProfileComparisonOperationInput fixes both roles in the audited selection.
-type ProfileComparisonOperationInput struct {
-	CaseID             string `json:"case_id"`
-	ArtifactID         string `json:"artifact_id"`
-	BaselineCaseID     string `json:"baseline_case_id"`
-	BaselineArtifactID string `json:"baseline_artifact_id"`
-	SampleType         string `json:"sample_type"`
-	Normalization      string `json:"normalization"`
-	TopN               int    `json:"top_n"`
-}
-
-// PacketSummaryOperationInput selects one already saved metadata artifact.
-type PacketSummaryOperationInput struct {
-	CaseID     string `json:"case_id"`
-	ArtifactID string `json:"artifact_id"`
+		Tool  string
+		Input projectionInput
+	}{op, in})
 }

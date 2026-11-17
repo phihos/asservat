@@ -77,7 +77,7 @@ func traceSummaryBridge(t *testing.T) (*AuditedOperations, *bridgeFixture, *pres
 
 func TestProfileSummaryCommittedGoTraceReturnsSemanticUnavailableWithoutQuery(t *testing.T) {
 	s, f, g, ports, stage := traceSummaryBridge(t)
-	reply, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
+	reply, err := s.Call(t.Context(), f, "get_extract", summaryInput(20))
 	if err != nil {
 		t.Fatalf("committed goTrace becomes transport failure instead of semantic NotAvailable: err=%v stage=%s catalogs=%d admissions=%d workers=%d", err, *stage, ports.catalogs, f.admissions, f.starts)
 	}
@@ -88,7 +88,7 @@ func TestProfileSummaryCommittedGoTraceReturnsSemanticUnavailableWithoutQuery(t 
 			Code string `json:"code"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(reply.Body, &result) != nil || result.Status != "error" || result.Data.Code != "NotAvailable" || s.contracts.ValidateOutput("get_profile_summary", reply.Body) != nil || ports.catalogs != 1 || f.admissions+f.starts+f.reads != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
+	if json.Unmarshal(reply.Body, &result) != nil || result.Status != "error" || result.Data.Code != "NotAvailable" || s.contracts.ValidateOutput("get_extract", reply.Body) != nil || ports.catalogs != 1 || f.admissions+f.starts+f.reads != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 		t.Fatal("unsupported source consumed query or lost audited fixed refusal", string(reply.Body), ports.catalogs, f.admissions, f.starts, f.reads)
 	}
 }
@@ -111,7 +111,7 @@ func TestProfileSummaryPreAdmissionUnavailableDoesNotDistinguishSourcesOrAccess(
 				ports.record = authorizationapp.ContextProjectionEvidence{}
 				ports.catalogErr = errors.New("private provider detail")
 			}
-			reply, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
+			reply, err := s.Call(t.Context(), f, "get_extract", summaryInput(20))
 			if err != nil {
 				t.Fatal("proven preadmission refusal became transport error", mode, err)
 			}
@@ -143,7 +143,7 @@ func TestProfileSummaryPreAdmissionRefusalStillRequiresAuditAndDeadline(t *testi
 			case "original-expiry":
 				g.onRecord = func() { f.now = f.i.ValidUntil }
 			}
-			reply, err := s.Call(ctx, f, "get_profile_summary", summaryInput(20))
+			reply, err := s.Call(ctx, f, "get_extract", summaryInput(20))
 			if err == nil || len(reply.Body) != 0 || f.admissions+f.starts+f.reads != 0 {
 				t.Fatal("expired or unaudited semantic refusal escaped", mode, err, string(reply.Body))
 			}
@@ -173,7 +173,7 @@ func TestProfileSummaryUnknownAndPostAdmissionErrorsRemainTransportUnavailable(t
 				}
 				p.adapter = adapter
 			}
-			reply, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(20))
+			reply, err := s.Call(t.Context(), f, "get_extract", summaryInput(20))
 			if err == nil || len(reply.Body) != 0 {
 				t.Fatal("nonclassified or attempted query became zeroeffect semantic refusal", mode, err)
 			}

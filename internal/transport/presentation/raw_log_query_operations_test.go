@@ -52,7 +52,7 @@ func rawLogBridgeFixture(t *testing.T) (*AuditedOperations, *bridgeFixture, *pre
 	if err != nil {
 		t.Fatal(err)
 	}
-	input, _ := json.Marshal(map[string]any{"case_id": bridgeID, "artifact_id": bridgeID, "grant_id": f.a.Scope.RawGrantID, "idempotency_key": "original-log-page"})
+	input, _ := json.Marshal(map[string]any{"view": "logs", "case_id": bridgeID, "artifact_id": bridgeID, "grant_id": f.a.Scope.RawGrantID, "idempotency_key": "original-log-page"})
 	return s, f, a, input
 }
 func logBridgePage(f *bridgeFixture, data []byte) value.LogPage {
@@ -61,7 +61,7 @@ func logBridgePage(f *bridgeFixture, data []byte) value.LogPage {
 }
 func TestRawLogQueryActualAuditedBeginReplayAndRawPoll(t *testing.T) {
 	s, f, a, input := rawLogBridgeFixture(t)
-	first, err := s.Call(t.Context(), f, "get_logs", input)
+	first, err := s.Call(t.Context(), f, "get_extract", input)
 	if err != nil {
 		var fixed interface{ FixedStep() string }
 		stage := "unknown"
@@ -73,7 +73,7 @@ func TestRawLogQueryActualAuditedBeginReplayAndRawPoll(t *testing.T) {
 	if first.Close(context.Background()) != nil {
 		t.Fatal("first closure")
 	}
-	replay, err := s.Call(t.Context(), f, "get_logs", input)
+	replay, err := s.Call(t.Context(), f, "get_extract", input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestRawLogQueryApprovalRemedyBeforeEffects(t *testing.T) {
 	_ = json.Unmarshal(input, &in)
 	delete(in, "grant_id")
 	input, _ = json.Marshal(in)
-	reply, err := s.Call(t.Context(), f, "get_logs", input)
+	reply, err := s.Call(t.Context(), f, "get_extract", input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestRawLogQueryDirectNestedEscapedOutputAndPaidInvalidClosure(t *testing.T)
 			t.Run(map[bool]string{false: "direct", true: "nested"}[nested]+map[bool]string{false: "", true: "-bad-version"}[invalid], func(t *testing.T) {
 				s, f, _, input := rawLogBridgeFixture(t)
 				if nested {
-					initial, err := s.Call(t.Context(), f, "get_logs", input)
+					initial, err := s.Call(t.Context(), f, "get_extract", input)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -183,7 +183,7 @@ func TestRawLogQueryDirectNestedEscapedOutputAndPaidInvalidClosure(t *testing.T)
 					p.Version = artifact.Digest{99}
 				}
 				f.result = &value.ProjectionResult{Logs: &p}
-				name := "get_logs"
+				name := "get_extract"
 				if nested {
 					name = "get_query_result"
 					input = bridgePoll(f.q.ID)
@@ -229,7 +229,7 @@ func TestRawLogQueryKnownRefusalKeepsPaidOwnerThroughAuditAndJoin(t *testing.T) 
 				if mode == "join-unknown" {
 					f.closeErr = value.ErrUnavailable
 				}
-				reply, err := s.Call(t.Context(), f, "get_logs", input)
+				reply, err := s.Call(t.Context(), f, "get_extract", input)
 				if mode == "audit-failed" {
 					if err == nil || len(reply.Body) != 0 {
 						t.Fatal("unaudited refusal escaped")

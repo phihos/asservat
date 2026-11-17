@@ -8,7 +8,7 @@ import (
 )
 
 func TestContextQueryAuditNamesFormatsAndEffects(t *testing.T) {
-	for _, name := range []string{"get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_query_result"} {
+	for _, name := range []string{"get_extract", "query_artifact", "compare_profiles", "get_query_result"} {
 		in := humanAuditIntent(name, "context-query-input/v1")
 		if OperationLane(name) != "normal" || !in.Valid() {
 			t.Fatalf("query audit rejected: %s", name)

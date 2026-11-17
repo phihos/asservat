@@ -19,15 +19,6 @@ type HTTPHeaderQueryService interface {
 	Begin(context.Context, identities.CurrentIdentity, string, value.HTTPHeaderSelection) (*analysisapp.ContextProjectionDelivery, error)
 }
 
-// HTTPHeaderOperationInput is the closed get_http_headers input; the audit
-// digest covers the cursor as supplied and the defaulted limit.
-type HTTPHeaderOperationInput struct {
-	CaseID     string `json:"case_id"`
-	ArtifactID string `json:"artifact_id"`
-	Cursor     string `json:"cursor,omitempty"`
-	Limit      int    `json:"limit,omitempty"`
-}
-
 type httpHeaderField struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
@@ -58,9 +49,8 @@ const httpHeaderHandling = "SensitiveDataHandling: This evidence may contain per
 // The fixed refusals of get_http_headers. Every refusal other than a cursor
 // shares one nondisclosing outcome.
 var (
-	httpHeaderInvalidCursor = OperationFailure{Code: "InvalidCursor", Message: "The cursor is not valid for this HTTP header projection. Start again without a cursor.", Retryable: false}
-	httpHeaderNotAvailable  = OperationFailure{Code: "NotAvailable", Message: "HTTP header evidence is not available with your current access or service conditions. Check your access or retry later.", Retryable: true}
-	httpHeaderTooLarge      = OperationFailure{Code: "AnalysisUnavailable", Message: "This HTTP header record does not fit the response limit.", Retryable: false}
+	httpHeaderNotAvailable = OperationFailure{Code: "NotAvailable", Message: "HTTP header evidence is not available with your current access or service conditions. Check your access or retry later.", Retryable: true}
+	httpHeaderTooLarge     = OperationFailure{Code: "AnalysisUnavailable", Message: "This HTTP header record does not fit the response limit.", Retryable: false}
 )
 
 // renderHTTPHeaderPage renders the get_http_headers envelope of the longest

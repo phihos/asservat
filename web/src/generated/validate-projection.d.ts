@@ -1,22 +1,10 @@
 // Generated from canonical browser OpenAPI. Run npm run generate; do not edit.
 import type { components } from './projection';
-export declare function validInput_get_file_excerpt(value: unknown): value is components['schemas']['McpInput_get_file_excerpt'];
-export declare function validOutput_get_file_excerpt(value: unknown): value is components['schemas']['McpOutput_get_file_excerpt'];
-export declare function validInput_get_profile_summary(value: unknown): value is components['schemas']['McpInput_get_profile_summary'];
-export declare function validOutput_get_profile_summary(value: unknown): value is components['schemas']['McpOutput_get_profile_summary'];
-export declare function validInput_get_pcap_summary(value: unknown): value is components['schemas']['McpInput_get_pcap_summary'];
-export declare function validOutput_get_pcap_summary(value: unknown): value is components['schemas']['McpOutput_get_pcap_summary'];
-export declare function validInput_pcap_query(value: unknown): value is components['schemas']['McpInput_pcap_query'];
-export declare function validOutput_pcap_query(value: unknown): value is components['schemas']['McpOutput_pcap_query'];
+export declare function validInput_get_extract(value: unknown): value is components['schemas']['McpInput_get_extract'];
+export declare function validOutput_get_extract(value: unknown): value is components['schemas']['McpOutput_get_extract'];
+export declare function validInput_query_artifact(value: unknown): value is components['schemas']['McpInput_query_artifact'];
+export declare function validOutput_query_artifact(value: unknown): value is components['schemas']['McpOutput_query_artifact'];
 export declare function validInput_compare_profiles(value: unknown): value is components['schemas']['McpInput_compare_profiles'];
 export declare function validOutput_compare_profiles(value: unknown): value is components['schemas']['McpOutput_compare_profiles'];
-export declare function validInput_get_syscall_summary(value: unknown): value is components['schemas']['McpInput_get_syscall_summary'];
-export declare function validOutput_get_syscall_summary(value: unknown): value is components['schemas']['McpOutput_get_syscall_summary'];
-export declare function validInput_get_syscall_events(value: unknown): value is components['schemas']['McpInput_get_syscall_events'];
-export declare function validOutput_get_syscall_events(value: unknown): value is components['schemas']['McpOutput_get_syscall_events'];
-export declare function validInput_syscall_query(value: unknown): value is components['schemas']['McpInput_syscall_query'];
-export declare function validOutput_syscall_query(value: unknown): value is components['schemas']['McpOutput_syscall_query'];
-export declare function validInput_get_logs(value: unknown): value is components['schemas']['McpInput_get_logs'];
-export declare function validOutput_get_logs(value: unknown): value is components['schemas']['McpOutput_get_logs'];
 export declare function validInput_get_query_result(value: unknown): value is components['schemas']['McpInput_get_query_result'];
 export declare function validOutput_get_query_result(value: unknown): value is components['schemas']['McpOutput_get_query_result'];

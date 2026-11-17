@@ -30,11 +30,11 @@ func oversizedPublicComparison(t *testing.T, f *pairedBridge) []byte {
 	if !result.Valid(f.a.Scope.Comparison.Selection(f.a.Scope.Profile)) {
 		t.Fatal("invalid bounded comparison")
 	}
-	var in ProfileComparisonOperationInput
+	var in projectionInput
 	if json.Unmarshal(comparisonInput(f), &in) != nil {
 		t.Fatal("fixture input")
 	}
-	in.TopN = 100
+	in.Limit = 100
 	b, _ := json.Marshal(in)
 	return b
 }
