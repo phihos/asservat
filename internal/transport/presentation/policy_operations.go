@@ -163,7 +163,7 @@ var errUnknownCluster = errors.New("unknown cluster name")
 func publicPolicyFailure(err error) OperationFailure {
 	switch {
 	case errors.Is(err, errUnknownCluster):
-		return OperationFailure{"TargetGone", "No cluster has this name. Use \"local\" for the hub's own cluster or a configured clusters[].name.", false}
+		return OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}
 	case errors.Is(err, app.ErrPolicyDelegation):
 		return OperationFailure{"NotAvailable", "Stopping this policy needs the workload-maintainer role of one of its sponsoring groups.", false}
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
