@@ -118,7 +118,7 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     const query = actual.request().postDataJSON();
     assert(validInput_search_processing_evidence(query), 'closed workload discovery query');
     assert.deepEqual(query, {
-      cluster_id: scope.clusterID, namespace_uid: scope.namespaceUID, workload_uid: scope.workloadUID,
+      cluster: 'local', namespace: 'synthetic-namespace', workload: 'synthetic-workload',
       acquired_from: scope.acquiredFrom, acquired_until: scope.acquiredUntil, purpose_ref: candidate.purpose_ref, limit: 12,
     });
     const body = await operationBody(actual), reply = JSON.parse(body);
