@@ -62,14 +62,12 @@ export function profileManifest({ namespace, name, version, displayName, source,
   const title = displayName.trim();
   if (title.length < 1 || title.length > 128) throw new ManifestError('Enter a display name of at most 128 characters.');
   const [component] = composition.authored.components;
-  const resolved = composition.resolvedProfiles.find(p => p.componentID === component?.id);
-  if (composition.authored.components.length !== 1 || !resolved) throw new ManifestError('Only a plan with exactly one profile can be saved as a profile.');
+  if (composition.authored.components.length !== 1) throw new ManifestError('Only a plan with exactly one profile can be saved as a profile.');
   const derived = applyOverrides(source, component.overrides ?? []);
   derived.displayName = title;
   // The reviewed aggregate bounds become the recipe's planning totals.
-  derived.recipe.maxTotalBytes = composition.authored.maxTotalBytes;
-  derived.recipe.maxDuration = composition.authored.maxDuration;
-  derived.origins = [...(source.origins ?? []), structuredClone(resolved)].slice(-8);
+  if (composition.authored.maxTotalBytes !== undefined) derived.recipe.maxTotalBytes = composition.authored.maxTotalBytes;
+  if (composition.authored.maxDuration !== undefined) derived.recipe.maxDuration = composition.authored.maxDuration;
   return {
     apiVersion: 'asservat.io/v1alpha1', kind: 'CaptureProfile',
     // The CRD requires metadata.name == spec.name + "." + spec.version.

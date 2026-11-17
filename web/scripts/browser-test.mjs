@@ -91,12 +91,11 @@ try {
   await page.setViewportSize({ width: 1440, height: 1080 });
   await scan('capture-review-desktop');
   await page.screenshot({ path: output + '/capture-review.png', fullPage: true });
-  await expect(page.getByText(/The impact assessment is older/)).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole('button', { name: 'Collect pod status' })).toBeEnabled();
   const beforeSubmit = await (await page.request.get(origin + '/test/capture-stats')).json();
   assert.equal(beforeSubmit.requested_retention_seconds, 3600);
   assert.equal(beforeSubmit.request_keys, null);
-  checks.push('actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview');
+  checks.push('actual canonical catalog/preview, selected pod, custom retention, privacy and a reviewed plan without forced replacement preview');
 
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
   await expect(page.getByRole('button', { name: 'Continue reviewed request' })).toBeVisible();
@@ -153,7 +152,7 @@ try {
   await captureControl('history-large');
   await page.goto(origin + '/captures/00000000-0000-4000-8000-000000000008');
   const beforeRepeat = await (await page.request.get(origin + '/test/capture-stats')).json();
-  const largeSettings = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/operations/get_capture_settings');
+  const largeSettings = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/operations/get_capture' && r.request().postDataJSON()?.view === 'settings');
   await page.getByRole('button', { name: 'View settings', exact: true }).click();
   const largeResponse = await largeSettings;
   assert.equal(largeResponse.status(), 200);

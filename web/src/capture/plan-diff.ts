@@ -1,4 +1,4 @@
-import type { Data, Preview } from './http';
+import type { Preview, Settings } from './http';
 
 // Client-side before/after comparison of two profile-composition plans
 // (REQ-CPR-005). It only restates fields the server already returned; it
@@ -6,7 +6,7 @@ import type { Data, Preview } from './http';
 
 type Composition = NonNullable<Preview['profile_composition']>;
 type Quantity = Preview['capture_assessment']['combinedQuantities'][number];
-type SavedSettings = Extract<Data<'get_capture_settings'>, { kind: 'captureSettings' }>;
+type SavedSettings = Extract<Settings, { kind: 'captureSettings' }>;
 
 export type PlanAction = {
   alias: string;
@@ -84,7 +84,8 @@ function base(composition: Composition): PlanSnapshot {
     }
   }
   const bounds: Record<string, string> = {
-    'Maximum total bytes': bytes(composition.authored.maxTotalBytes), 'Maximum duration': composition.authored.maxDuration,
+    ...(composition.authored.maxTotalBytes !== undefined && { 'Maximum total bytes': bytes(composition.authored.maxTotalBytes) }),
+    ...(composition.authored.maxDuration !== undefined && { 'Maximum duration': composition.authored.maxDuration }),
   };
   for (const c of composition.authored.components) bounds[`Profile ${c.id}`] = `${c.profileRef.catalog}/${c.profileRef.name} ${c.profileRef.version}`;
   return { actions, bounds };

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } fro
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { Investigation, type State } from './investigation';
-import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './http';
+import type { HistoryEntry, Input, Preview, Progress, Settings, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
@@ -15,9 +15,9 @@ const LivePanel = lazy(() => import('../live/LivePanel').then(module => ({ defau
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
-  Pending: 'Waiting to start', Validating: 'Checking the request', AwaitingApproval: 'Waiting for approval',
-  Armed: 'Ready for a trigger', Queued: 'Waiting for capacity', Running: 'Collecting evidence',
-  Finalizing: 'Verifying and publishing evidence', Succeeded: 'Collection complete', Partial: 'Partially complete',
+  Pending: 'Waiting to start', AwaitingApproval: 'Waiting for approval',
+  Armed: 'Ready for a trigger', Running: 'Collecting evidence',
+  Succeeded: 'Collection complete', Partial: 'Partially complete',
   Failed: 'Collection failed', Cancelled: 'Collection cancelled', Indeterminate: 'Collection outcome is uncertain',
 };
 function duration(seconds: number): string {
@@ -114,12 +114,12 @@ function RecentCaptures({ state, controller }: { state: State; controller: Inves
   </section>;
 }
 
-function SavedSettings({ settings, busy, controller }: { settings: Data<'get_capture_settings'>; busy: boolean; controller: Investigation }) {
+function SavedSettings({ settings, busy, controller }: { settings: Settings; busy: boolean; controller: Investigation }) {
   if (settings.kind === 'recordingSaveSettings') return <section className="review-section saved-settings" aria-label="Saved recording settings"><h3>Saved recording settings</h3><p>Saved at {new Date(settings.accepted_at).toLocaleString()}. These settings identify the original policy and preferred windows; they do not retain source handles or sharing instructions.</p><pre tabIndex={0} role="region" aria-label="Saved recording preferences">{JSON.stringify(settings.settings, null, 2)}</pre><Button className="button secondary" onPress={() => controller.closeSettings()}>Close settings</Button><Button className="button" isDisabled={busy} onPress={() => controller.selectRecordingsAgain(settings)}>Choose current recordings</Button></section>;
   return <OrdinarySavedSettings settings={settings} busy={busy} controller={controller}/>;
 }
 
-function OrdinarySavedSettings({ settings, busy, controller }: { settings: Exclude<Data<'get_capture_settings'>, { kind: 'recordingSaveSettings' }>; busy: boolean; controller: Investigation }) {
+function OrdinarySavedSettings({ settings, busy, controller }: { settings: Exclude<Settings, { kind: 'recordingSaveSettings' }>; busy: boolean; controller: Investigation }) {
   const provenance = 'profile_composition' in settings.settings ? settings.settings.profile_composition : undefined;
   const [composition, setComposition] = useState(provenance?.authored);
   const [retention, setRetention] = useState('');
@@ -160,6 +160,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
+  // explain_access, list_live_sources and list_recordings still take the cluster UUID.
   const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : 'Collect evidence';
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
   return <div className="capture-workspace">
@@ -171,14 +172,14 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     {state.error && (state.stage === 'target' || state.stage === 'diagnostics' || state.stage === 'review') && draft.target.name && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
     {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); if ((event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'recordings') controller.showRecordings(); else void controller.discover(); }} aria-busy={state.busy}>
       <fieldset disabled={state.busy}><legend>Target</legend>
-        <label>Cluster ID<input name="cluster" value={draft.target.cluster_id} required maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" placeholder="Registered cluster UUID" onChange={event => setTarget('cluster_id', event.target.value)} autoComplete="off" spellCheck={false}/></label>
-        <p className="field-help">Use the cluster ID supplied by your administrator.</p>
+        <label>Cluster<input name="cluster" value={draft.target.cluster} required maxLength={63} pattern="[a-z0-9]([\-a-z0-9]*[a-z0-9])?" onChange={event => setTarget('cluster', event.target.value)} autoComplete="off" spellCheck={false}/></label>
+        <p className="field-help">The cluster name as configured in Asservat (<code>local</code> is the hub's own cluster) and its ID, both supplied by your administrator.</p>
         <div className="form-row"><label>Namespace<input name="namespace" value={draft.target.namespace} required maxLength={63} onChange={event => setTarget('namespace', event.target.value)} autoComplete="off" spellCheck={false}/></label>
           <div className="field"><label htmlFor="target-kind">Kind</label><select id="target-kind" value={draft.target.kind} onChange={event => setTarget('kind', event.target.value)}><option>Deployment</option><option>StatefulSet</option><option>Pod</option></select></div></div>
         <label>Workload or pod name<input name="workload" value={draft.target.name} required maxLength={253} onChange={event => setTarget('name', event.target.value)} autoComplete="off" spellCheck={false}/></label>
         <details className="retention-edit"><summary>Change evidence retention</summary>
           <div className="field"><label htmlFor="retention-duration">Requested access duration</label><select id="retention-duration" value={customRetention || !['', '900', '3600', '86400'].includes(draft.retention) ? 'custom' : draft.retention} onChange={event => { setCustomRetention(event.target.value === 'custom'); if (event.target.value !== 'custom') controller.setDraft({ ...draft, retention: event.target.value }); }}><option value="">Administrator default</option><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="86400">1 day</option><option value="custom">Custom duration</option></select></div>
-          {(customRetention || !['', '900', '3600', '86400'].includes(draft.retention)) && <label>Custom duration (seconds)<input name="retention" type="number" min="1" max="315360000" step="1" placeholder="Administrator default" value={draft.retention} onChange={event => controller.setDraft({ ...draft, retention: event.target.value })}/></label>}
+          {(customRetention || !['', '900', '3600', '86400'].includes(draft.retention)) && <label>Custom duration (seconds)<input name="retention" type="number" min="1" step="1" placeholder="Administrator default" value={draft.retention} onChange={event => controller.setDraft({ ...draft, retention: event.target.value })}/></label>}
           <p className="field-help">The review shows the effective access and deletion limits. Administrator policy can require a shorter duration.</p>
         </details>
         <details className="retention-edit"><summary>Share results with…</summary>
@@ -215,7 +216,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {!state.preview.capture_enabled && state.preview.blockers.length === 0 && <p className="notice">Collection is not enabled for this client. An administrator can check the installation settings.</p>}
       {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; approval starts the collection.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
-      <p role="status">{state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
+      <p role="status">Collection recomputes this plan and rechecks your access and these exact identities. It stops if the reviewed plan changed.</p>
       <div className="actions"><CaptureSubmission key={state.preview.plan_digest} preview={state.preview} state={state} controller={controller}/>
         {state.preview.profile_composition && !state.repeatedFrom && <Button className="button secondary" isDisabled={state.busy} onPress={controller.changeProfiles}>Change profiles</Button>}
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
@@ -251,7 +252,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         <h2 aria-live="polite">{state.progress.operation === 'recordingSave' && state.progress.phase === 'Running' ? 'Saving recorded history' : phases[state.progress.phase]}</h2>
         {state.progress.operation === 'recordingSave' && <p>The saved window ends at its first successful server acceptance. Saved settings show that recorded time; a preview or retry cannot change it. This status does not establish complete historical coverage.</p>}
         {state.progress.phase === 'Pending' && <p>Your request was accepted. Collection has not been confirmed.</p>}
-        {state.progress.phase === 'Finalizing' && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
+        {state.progress.actions.some(action => action.phase === 'Finalizing') && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
         {state.progress.reason_state === 'available' && state.progress.reason !== undefined && <section aria-label="Save reason"><h3>Reason</h3><p className="capture-reason">{state.progress.reason}</p></section>}
         {state.progress.reason_state === 'unavailable' && <p className="notice">The save reason is unavailable. Capture status remains available.</p>}
         <ul className="progress-actions">{state.progress.actions.map(action => {

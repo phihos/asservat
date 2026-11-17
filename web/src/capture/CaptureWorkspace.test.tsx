@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, SyntheticGrants, session, target, result, previewResult, progressResult, acceptedResult, id, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
+import { SyntheticOperations, SyntheticGrants, session, target, result, previewResult, progressResult, acceptedResult, id, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult, clusterID, isSettings } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
@@ -14,8 +14,7 @@ it('opens saved recorder settings, edits the filter and window, and prepares a f
   if (recording.status !== 'ok' || saved.status !== 'ok' || !('recipe_spec' in saved.data.settings)) throw new Error();
   saved.data.settings.profile_composition = recording.data.profile_composition;
   saved.data.settings.profile_composition!.authored.components[0].overrides!.push({ actionID: 'http', field: 'packetAfter', value: '3s' });
-  client.responder = name => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)]) : name === 'get_capture_settings' ? saved : recordingPreviewResult(id(41));
-  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
+  client.responder = (name, input) => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)]) : isSettings(name, input) ? saved : recordingPreviewResult(id(41));
   fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
   fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
   fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));
@@ -38,7 +37,6 @@ function mount() {
 }
 async function review() {
   const setup = mount();
-  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
   fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
   fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
   fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));
@@ -93,7 +91,7 @@ it('shows only accepted progress and distinguishes verification from available e
   expect(screen.getByText(/Collection has not been confirmed/)).toBeTruthy();
   client.responder = () => progressResult('Finalizing', 2);
   fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
-  expect(await screen.findByRole('heading', { name: 'Verifying and publishing evidence' })).toBeTruthy();
+  expect(await screen.findByText(/Uploaded evidence still needs verification/)).toBeTruthy();
   expect(screen.getByText(/still needs verification and publication/)).toBeTruthy();
   expect(screen.queryByText('Collection complete')).toBeNull();
 });

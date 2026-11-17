@@ -8,12 +8,36 @@ export interface components {
             cursor?: string;
             limit?: number;
             target_ref?: {
-                /** Format: uuid */
-                cluster_id: string;
+                /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                cluster: string;
                 namespace: string;
                 /** @enum {unknown} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
                 name: string;
+            };
+            /**
+             * @description Optional row-kind filter.
+             * @enum {unknown}
+             */
+            kind?: "preset" | "recipe" | "captureProfile" | "discovery";
+            /** @enum {unknown} */
+            catalog?: "builtin" | "organization" | "namespace";
+            /**
+             * @description Optional. Ranks applicable diagnostics for this goal as passive recommendations with rationale, gaps and proposed plans, optionally informed by existing discovery captures.
+             * @enum {unknown}
+             */
+            goal?: "unknown" | "crash" | "memoryGrowth" | "highCPU" | "latency" | "hang" | "network" | "dns" | "probeFailure";
+            discovery_capture_ids?: string[];
+            preferences?: {
+                history_seconds?: number;
+                max_bytes?: number;
+                /** @enum {unknown} */
+                max_impact?: "observe" | "sensitiveRead" | "intrusive";
+                max_ring_bytes?: number;
+            };
+            focus?: {
+                process_refs?: string[];
+                flow_refs?: string[];
             };
         } & (unknown | unknown);
         /** Asservat mcp-result v1 */
@@ -37,6 +61,169 @@ export interface components {
             /** Format: uuid */
             artifactID: string;
             digest: string;
+        };
+        Contract_capture_composition_f1d3ea703d6af495: {
+            /** @enum {unknown} */
+            catalog: "builtin" | "organization" | "namespace";
+            name: string;
+            /** @description Optional; omitted, the hub resolves the current version and records it. */
+            version?: string;
+        };
+        Contract_guidance_564bcb17d432827e: {
+            /** @constant */
+            kind: "diagnosticRecommendations";
+            target_handle: string;
+            /** @enum {unknown} */
+            goal: "unknown" | "crash" | "memoryGrowth" | "highCPU" | "latency" | "hang" | "network" | "dns" | "probeFailure";
+            catalog_digest: string;
+            /** Format: date-time */
+            expires_at: string;
+            source_capture_ids: string[];
+            recommendations: components["schemas"]["Contract_guidance_3832a95b9732184d"][];
+            missing_observations: string[];
+        };
+        Contract_guidance_3832a95b9732184d: {
+            diagnostic_handle: string;
+            title: string;
+            explanation: string;
+            answers: string[];
+            limitations: string[];
+            basis: components["schemas"]["Contract_guidance_a88818a38198abf7"];
+            evidence_kinds: string[];
+            /** @enum {unknown} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            max_bytes: number;
+            max_process_starts: number;
+            retention_seconds: number;
+            approval_required: boolean;
+            blockers: components["schemas"]["Contract_guidance_c8c053ecb8f17e88"][];
+            process_selector?: components["schemas"]["Contract_action_f252bcf961e0afcb"];
+            packet_parameters?: components["schemas"]["Contract_packet_capture"];
+            ring_sizing?: components["schemas"]["Contract_guidance_11b6c98329eb1929"];
+            process_batch?: components["schemas"]["Contract_action_e8308e53a77c994b"];
+            process_match_count?: number;
+            process_inventory_complete?: boolean;
+        };
+        Contract_guidance_a88818a38198abf7: {
+            /** @enum {unknown} */
+            confidence: "observed" | "inferred" | "ambiguous" | "unknown";
+            reason: string;
+        };
+        Contract_guidance_c8c053ecb8f17e88: {
+            code: string;
+            message: string;
+            /** @enum {unknown} */
+            responsible_role: "maintainer" | "approver" | "administrator" | "none";
+            retryable: boolean;
+        };
+        Contract_action_f252bcf961e0afcb: {
+            match: {
+                executablePath?: string;
+                executableName?: string;
+                /** @enum {unknown} */
+                runtime?: "native" | "go" | "dotnet" | "python" | "node" | "jvm";
+                buildIDs?: string[];
+            };
+            includeDescendants: boolean;
+            maxDepth: number;
+            /** @constant */
+            resolve: "atDispatch";
+        };
+        /** Bounded packet action parameters */
+        Contract_packet_capture: {
+            profile: {
+                /** @constant */
+                kind: "networkHeaders";
+            } | {
+                /** @constant */
+                kind: "httpHeaders";
+                /** @constant */
+                protocol: "http1";
+                projectionRef: {
+                    name: string;
+                    version: string;
+                };
+                /**
+                 * @description Common HTTP server header limits (nginx large_client_header_buffers 4 × 8 KiB) bound one request header block.
+                 * @default 32768
+                 */
+                maxHeaderBytes: number;
+                /**
+                 * @description Per-target reassembly memory budget; per-flow reassembly is 2 × maxHeaderBytes, so tracked flows = maxReassemblyBytes ÷ (2 × maxHeaderBytes); the default 16 MiB is derived from the node collector memory limit together with the ring budget.
+                 * @default 16777216
+                 */
+                maxReassemblyBytes: number;
+            } | {
+                /** @constant */
+                kind: "rawPackets";
+                snaplen: number;
+                protocolSnaplen?: {
+                    /** @enum {unknown} */
+                    protocol: "tcp" | "udp" | "icmp";
+                    bytes: number;
+                }[];
+            };
+            before: string;
+            after: string;
+            /** @description No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size. */
+            filter?: string;
+            /** @description In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node. */
+            ring: {
+                maxAge: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                maxBytes: number;
+                /** @description Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history. */
+                segments: number;
+            };
+            /** @description Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096). */
+            peers: {
+                entries: ({
+                    cidrs: string[];
+                } | {
+                    podSelector: {
+                        namespace: string;
+                        matchLabels: {
+                            [key: string]: string;
+                        };
+                    };
+                } | {
+                    resourceRef: {
+                        /** @enum {unknown} */
+                        kind: "Pod" | "Deployment" | "StatefulSet" | "Service";
+                        namespace: string;
+                        name: string;
+                        /** @enum {unknown} */
+                        serviceMode?: "backends" | "virtualIP" | "both";
+                        readyOnly?: boolean;
+                    } & unknown;
+                })[];
+                /** @enum {unknown} */
+                protocol: "tcp" | "udp" | "icmp" | "any";
+                ports?: number[];
+                /** @enum {unknown} */
+                resolution: "frozen" | "follow";
+            };
+        };
+        Contract_common_76a8fd22c9ccd9dc: string;
+        Contract_guidance_11b6c98329eb1929: {
+            /** @enum {unknown} */
+            basis: "measuredProjection" | "estimated";
+            retained_bytes_per_second: number;
+            history_seconds: number;
+            burst_factor: number;
+            segment_bytes: number;
+            segments: number;
+            ring_bytes: number;
+            limitations: string[];
+        };
+        Contract_action_e8308e53a77c994b: {
+            /** @description The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses × maxBytesPerProcess ≤ the action maxBytes and by maxTotalStop. */
+            maxProcesses: number;
+            /** @description Bounded only by the action and capture byte budget. */
+            maxBytesPerProcess: number;
+            maxStopPerProcess: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            maxTotalStop: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            /** @constant */
+            consistency: "sequential";
         };
         McpOutput_list_diagnostics: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
@@ -62,14 +249,26 @@ export interface components {
                         /** @constant */
                         version: "v1";
                     };
-                } & unknown) & (unknown | unknown))[];
+                    /** @enum {unknown} */
+                    kind: "preset" | "recipe" | "captureProfile" | "discovery";
+                    profile_ref?: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
+                    deprecated?: boolean;
+                    display_name?: string;
+                    execution_modes: ("onTrigger" | "ongoing")[];
+                } & (unknown & unknown & unknown)) & (unknown | unknown | unknown))[];
             };
+        } | {
+            /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_guidance_564bcb17d432827e"];
+            /** @constant */
+            data_class?: "extract";
         } | {
             /** @constant */
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -135,14 +334,15 @@ export interface components {
         /** Flat bounded capture profile composition */
         Contract_capture_composition: {
             components: components["schemas"]["Contract_capture_composition_6b531f41803ddb7b"][];
-            maxTotalBytes: number;
-            maxDuration: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            maxTotalBytes?: number;
+            maxDuration?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
             $defs: {
                 profileRef: {
                     /** @enum {unknown} */
                     catalog: "builtin" | "organization" | "namespace";
                     name: string;
-                    version: string;
+                    /** @description Optional; omitted, the hub resolves the current version and records it. */
+                    version?: string;
                 };
                 override: {
                     actionID: string;
@@ -290,6 +490,7 @@ export interface components {
                 };
             };
         };
+        /** @description Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096). */
         Contract_packet_capture_621ac6cb243f371c: {
             entries: ({
                 cidrs: string[];
@@ -316,10 +517,7 @@ export interface components {
             ports?: number[];
             /** @enum {unknown} */
             resolution: "frozen" | "follow";
-            maxEndpoints: number;
-            maxStaleness: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
         };
-        Contract_common_76a8fd22c9ccd9dc: string;
         /** @description No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size. */
         Contract_packet_capture_bd5424e783362da5: string;
         Contract_packet_capture_3cabf6dd4f1621f2: string;
@@ -330,27 +528,6 @@ export interface components {
             maxBytes: number;
             /** @description Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history. */
             segments: number;
-        };
-        Contract_action_f252bcf961e0afcb: {
-            match: {
-                executablePath?: string;
-                executableName?: string;
-                /** @enum {unknown} */
-                runtime?: "native" | "go" | "dotnet" | "python" | "node" | "jvm";
-                buildIDs?: string[];
-            };
-            includeDescendants: boolean;
-            maxDepth: number;
-            /** @constant */
-            resolve: "atDispatch";
-        };
-        Contract_action_e8308e53a77c994b: {
-            maxProcesses: number;
-            maxBytesPerProcess: number;
-            maxStopPerProcess: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-            maxTotalStop: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-            /** @constant */
-            consistency: "sequential";
         };
         Contract_syscall_trace_2f40cbbf2f8e105a: {
             /** @constant */
@@ -371,12 +548,6 @@ export interface components {
         };
         /** @description Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6). */
         Contract_syscall_trace_09825459ded300c7: number;
-        Contract_capture_composition_f1d3ea703d6af495: {
-            /** @enum {unknown} */
-            catalog: "builtin" | "organization" | "namespace";
-            name: string;
-            version: string;
-        };
         Contract_capture_composition_e9eb2edd44ab3f11: {
             actionID: string;
             /** @constant */
@@ -532,8 +703,8 @@ export interface components {
         McpInput_preview_capture: ({
             target_handle?: string;
             target_ref?: {
-                /** Format: uuid */
-                cluster_id: string;
+                /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                cluster: string;
                 namespace: string;
                 /** @enum {unknown} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
@@ -561,7 +732,9 @@ export interface components {
              * @enum {unknown}
              */
             history_selection?: "currentEligiblePod";
-        } & unknown) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown);
+            recording_handles?: string[];
+            before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+        } & (unknown & unknown)) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown | unknown);
         Contract_capture_composition_fea23abd809a781c: {
             authored: components["schemas"]["Contract_capture_composition"];
             resolvedProfiles: components["schemas"]["Contract_capture_composition_d3d99d35a2742711"][];
@@ -610,8 +783,6 @@ export interface components {
             planDigest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
             /** Format: date-time */
             generatedAt: string;
-            /** Format: date-time */
-            validUntil: string;
             basis: {
                 rulesDigest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
                 capabilityDigest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
@@ -722,6 +893,103 @@ export interface components {
             notAfter: string;
             digest: string;
         };
+        Contract_recording_save_9fa579a60a73e081: {
+            /** @constant */
+            kind: "recordingSavePreview";
+            /** @constant */
+            operation: "recordingSave";
+            /** @description Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key. */
+            plan_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+            selected_recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
+            windows: {
+                recording_handle: string;
+                before: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                /** @constant */
+                after: "0s";
+            }[];
+            capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"];
+            /** @description Blocker codes; NoCurrentSource when a repeated save finds no matching running source (follow navigation_uri to list_recordings). */
+            blockers: string[];
+            /** Format: uri */
+            navigation_uri: string;
+            capture_enabled: boolean;
+            incident_pod_cap: number;
+        };
+        Contract_recording_save_b717cd5d08e2c9d9: {
+            /** @description Opaque, principal-bound handle for preview_capture(recording_handles) and watch_live(action=open, source_handles). */
+            recording_handle: string;
+            /** @enum {unknown} */
+            owner_kind: "policy" | "manualSession";
+            policy_name?: string;
+            /**
+             * Format: uuid
+             * @description Manual-session source: the capture that owns it.
+             */
+            capture_id?: string;
+            pod_name: string;
+            action_id: string;
+            /** @enum {unknown} */
+            kind: "packetCapture" | "syscallTrace";
+            /**
+             * @description Shared source states (REQ-LIF-002).
+             * @enum {unknown}
+             */
+            state: "Unavailable" | "Warming" | "Ready" | "Degraded" | "Stopped";
+            /** @enum {unknown} */
+            history: "Unknown" | "Full" | "Partial" | "None";
+            maximum_before: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"] | "0s";
+            save_eligible: boolean;
+            /** @enum {unknown} */
+            save_via: "recordingSave" | "captureOutcome" | "unavailable";
+            /** @description Live projections watch_live can open on this source; empty when live viewing is unavailable. */
+            live_projections: components["schemas"]["Contract_live_watch_990f10221e26ab35"][];
+            /** @description Actionable blocker codes, for example NotSaveEnabled, LiveViewDisabled or SourceStopped. */
+            blockers: string[];
+            incident_pod_cap: number;
+            available_before_seconds?: number;
+            /** Format: date-time */
+            observed_at?: string;
+            /**
+             * Format: date-time
+             * @description Source hard end; watches and saves end by then.
+             */
+            hard_end?: string;
+            execution_authority?: components["schemas"]["Contract_policy_authority_12c1bf2df01fe57b"];
+            /** @description Provenance only. */
+            policy_uid?: string;
+            /** @description Provenance only. */
+            pod_uid?: string;
+        } & (unknown & unknown);
+        /** @enum {unknown} */
+        Contract_live_watch_990f10221e26ab35: "packetMetadata" | "httpHeaders" | "syscallMetadata";
+        Contract_policy_authority_12c1bf2df01fe57b: {
+            /** @constant */
+            mode: "team";
+            executor: components["schemas"]["Contract_common_864d4ca41d092930"];
+            /** @constant */
+            continuesAfterCreatorLeaves: true;
+            /** @description Absent for an envelope without a lifetime ceiling (ADR-335 D6). */
+            notAfter?: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
+            /** @enum {unknown} */
+            state: "Ready" | "DelegationRequired" | "Revoked" | "Expired" | "OwnerAssignmentChanged" | "ReapprovalRequired" | "Unavailable";
+            reasonCodes: string[];
+            ownerTeams: {
+                /** @constant */
+                kind: "Group";
+                /** Format: uri */
+                issuer: string;
+                id: string;
+            }[];
+        };
+        Contract_common_864d4ca41d092930: {
+            /** Format: uri */
+            issuer: string;
+            /** @description OIDC Core: sub is at most 255 ASCII characters. */
+            subject: string;
+            clientID: string;
+            /** @enum {string} */
+            identityType: "human" | "workload";
+        };
         McpOutput_preview_capture: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
             status: "ok";
@@ -792,10 +1060,16 @@ export interface components {
             } & unknown;
         } | {
             /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_recording_save_9fa579a60a73e081"];
+            /** @constant */
+            data_class?: "metadata";
+        } | {
+            /** @constant */
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -813,15 +1087,18 @@ export interface components {
         }) & unknown;
         /** Asservat target v1 */
         Contract_target: ({
-            /** @description Workload cluster of a hub-held DebugPolicy (ADR-228); the namespace names a namespace in that cluster. */
-            cluster?: components["schemas"]["Contract_common_2224a31324a0c811"];
-            namespace: string;
+            /** @description Defaults to the object's own namespace; must equal it when given. */
+            namespace?: string;
             workloadRef?: {
-                /** @enum {string} */
-                apiVersion: "apps/v1" | "v1";
+                /**
+                 * @description Optional; derived from the kind.
+                 * @enum {string}
+                 */
+                apiVersion?: "apps/v1" | "v1";
                 /** @enum {string} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
                 name: string;
+                /** @description Optional pin with adoption: pinUID; otherwise provenance only. */
                 uid?: string;
             } & unknown;
             podSelector?: {
@@ -829,29 +1106,39 @@ export interface components {
                     [key: string]: string;
                 };
             };
-            /** @description Maximum pods collected per occurrence; never the monitoring coverage limit. */
+            /**
+             * @description Maximum pods collected per occurrence; never the monitoring coverage limit.
+             * @default 1
+             */
             maxPods: number;
-            /** @enum {string} */
-            selection: "oldestReady" | "newest" | "allWithinLimit" | "lowestOrdinal" | "triggeringPod";
+            /**
+             * @description Defaults to triggeringPod for policies and oldestReady for manual captures.
+             * @enum {string}
+             */
+            selection?: "oldestReady" | "newest" | "allWithinLimit" | "lowestOrdinal" | "triggeringPod";
             ordinals?: number[];
-            /** @enum {string} */
-            adoption: "pinUID" | "followApprovedReplacement";
+            /**
+             * @default followName
+             * @enum {string}
+             */
+            adoption: "followName" | "pinUID";
         } & unknown) & (unknown | unknown);
         McpInput_request_capture: {
-            /** Format: uuid */
-            cluster_id?: string;
+            /** @description Cluster name as configured in the hub (ADR-335 D4). */
+            cluster?: string;
             target?: components["schemas"]["Contract_target"];
-            recipe_digest?: string;
+            /** @description EvidenceRecipe name; the hub records its digest (ADR-335 D4). */
+            recipe?: string;
             reason?: string;
             idempotency_key: string;
             sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
             result_access?: components["schemas"]["Contract_investigation_access_0d504ecd6bc8c0fd"];
-            /** @description The preview_capture or preview_recording_save request that was reviewed. Submission recomputes its plan. */
-            preview?: (({
+            /** @description The preview_capture request that was reviewed (new capture, history repeat or recording save). Submission recomputes its plan. */
+            preview?: ({
                 target_handle?: string;
                 target_ref?: {
-                    /** Format: uuid */
-                    cluster_id: string;
+                    /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                    cluster: string;
                     namespace: string;
                     /** @enum {unknown} */
                     kind: "Deployment" | "StatefulSet" | "Pod";
@@ -879,17 +1166,13 @@ export interface components {
                  * @enum {unknown}
                  */
                 history_selection?: "currentEligiblePod";
-            } & unknown) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown)) | {
-                recording_handles: string[];
+                recording_handles?: string[];
                 before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-                /** @description Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat. */
-                reason?: string;
-                sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
-                /** Format: uuid */
-                repeated_from_capture_id?: string;
-            };
-            /** @description plan_digest of the reviewed preview. A different current plan returns ReviewChanged. */
+            } & (unknown & unknown)) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown | unknown);
+            /** @description plan_digest of the reviewed preview. A different recomputed plan returns ReviewChanged with the differences; nothing is accepted. */
             expected_plan_digest?: string;
+            /** @description Optional provenance pin: refuse when the named recipe's digest differs. */
+            recipe_digest?: string;
         } & (unknown | unknown);
         McpOutput_request_capture: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
@@ -915,7 +1198,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -934,6 +1217,13 @@ export interface components {
         McpInput_get_capture: {
             /** Format: uuid */
             capture_id: string;
+            /**
+             * @description status (default) reads progress; settings reads the retained immutable parameter snapshot for review/editing: no old grants, secrets, reason or sharing. Settings above the 96 KiB MCP result bound return SettingsTooLarge with browser navigation; repeat by reference still works.
+             * @enum {unknown}
+             */
+            view?: "status" | "settings";
+            /** @description Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged. */
+            after_revision?: number;
         };
         Contract_investigation_access_0b2b78f874cf920d: {
             /** @enum {unknown} */
@@ -941,218 +1231,6 @@ export interface components {
             scopeDigest?: string;
             grantIDs?: string[];
             reason?: string;
-        };
-        McpOutput_get_capture: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: {
-                /** Format: uuid */
-                capture_id: string;
-                revision: number;
-                /** @enum {unknown} */
-                phase: "Pending" | "Validating" | "AwaitingApproval" | "Armed" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
-                actions: {
-                    action_id: string;
-                    /** @enum {unknown} */
-                    phase: "Pending" | "WaitingApproval" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Skipped" | "Denied" | "TimedOut" | "Failed" | "TargetGone" | "Unsupported" | "Indeterminate" | "Cancelled";
-                    /** @description Bounded stable action reason. Failed Go profile acquisition reports ProfileUnavailable when the endpoint is unavailable or disabled, or ProfilerBusy for an existing conflicting profiling session that Asservat did not stop. Other existing reason strings retain their current meaning; a reason never authorizes retry or replacement. */
-                    reason_code?: string;
-                    /**
-                     * Format: uuid
-                     * @description Exact child identity within this parent save. It is not a separate navigation or retry target.
-                     */
-                    action_instance_id?: string;
-                    pod_uid?: string;
-                    pod_name?: string;
-                }[];
-                /** Format: uuid */
-                case_id?: string;
-                /** Format: uri */
-                navigation_uri: string;
-                /** Format: uri */
-                approval_navigation_uri?: string;
-                /** Format: uuid */
-                grant_id?: string;
-                retry_after_seconds?: number;
-                can_cancel: boolean;
-                blockers: {
-                    code: string;
-                    message: string;
-                    /** @enum {unknown} */
-                    responsible_role: "maintainer" | "approver" | "administrator" | "none";
-                    retryable: boolean;
-                }[];
-                /** Format: uuid */
-                repeated_from_capture_id?: string;
-                /** @enum {unknown} */
-                operation?: "collect" | "recordingSave";
-                result_access?: components["schemas"]["Contract_investigation_access_0b2b78f874cf920d"];
-                /** @description Capture-time sharing status, reported separately from collection progress. Present only when the request included sharing. Shared names the concrete share; SharingUnavailable means the result was not shared (collection outcome is unaffected). */
-                sharing?: {
-                    /** @enum {unknown} */
-                    state: "Pending" | "Shared" | "SharingUnavailable";
-                    /** Format: uuid */
-                    share_id?: string;
-                };
-                /** @enum {unknown} */
-                history_state?: "available" | "unavailable";
-                cancellation_requested?: boolean;
-                /** @description Authorized parent Save reason, preserved verbatim; never restored on repeat. */
-                reason?: string;
-                /**
-                 * @description Omitted when no reason was supplied. Unavailable descriptive metadata does not block capture status.
-                 * @enum {unknown}
-                 */
-                reason_state?: "available" | "unavailable";
-            } & (unknown & unknown);
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_cancel_capture: {
-            /** Format: uuid */
-            capture_id: string;
-            expected_revision: number;
-            idempotency_key: string;
-        };
-        McpOutput_cancel_capture: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: {
-                /** Format: uuid */
-                capture_id: string;
-                /** @enum {unknown} */
-                phase: "Pending" | "Validating" | "AwaitingApproval" | "Armed" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
-                revision: number;
-                cancellation_requested: boolean;
-                /** Format: uri */
-                navigation_uri: string;
-            };
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_list_capture_history: {
-            target_handle?: string;
-            target_ref?: {
-                /** Format: uuid */
-                cluster_id: string;
-                namespace: string;
-                /** @enum {unknown} */
-                kind: "Deployment" | "StatefulSet" | "Pod";
-                name: string;
-            };
-            /** Format: uuid */
-            cluster_id?: string;
-            target?: components["schemas"]["Contract_target"];
-            /** @enum {unknown} */
-            origin?: "manual" | "policy" | "discovery" | "all";
-            cursor?: string;
-            limit?: number;
-        } & (unknown | unknown | unknown);
-        Contract_capture_history_5bb857fd69a5246d: {
-            /** @constant */
-            kind: "captureHistoryPage";
-            history: components["schemas"]["Contract_capture_history_d3f629e9c1ad4b52"][];
-            /** @constant */
-            ordering: "acceptedAtDescCaptureIDDesc";
-        };
-        Contract_capture_history_d3f629e9c1ad4b52: {
-            /** Format: uuid */
-            capture_id: string;
-            /** @enum {unknown} */
-            origin: "manual" | "policy" | "discovery";
-            /** Format: date-time */
-            accepted_at: string;
-            /** Format: date-time */
-            summary_expires_at: string;
-            /** @enum {unknown} */
-            phase: "Pending" | "Validating" | "AwaitingApproval" | "Armed" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
-            action_kinds: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
-            /** @enum {unknown} */
-            evidence_state: "pending" | "available" | "partial" | "expired" | "unavailable";
-            /** @enum {unknown} */
-            repeat_state: "available" | "requiresSelection" | "parametersExpired" | "parametersUnavailable" | "targetUnavailable";
-            /** Format: date-time */
-            settings_expires_at?: string;
-            /** Format: uuid */
-            repeated_from_capture_id?: string;
-            /** Format: uri */
-            navigation_uri: string;
-            /** @enum {unknown} */
-            operation?: "collect" | "recordingSave";
-            requester?: {
-                /** Format: uri */
-                issuer: string;
-                subject_id: string;
-                /** @enum {unknown} */
-                identity_type: "human" | "service" | "policy";
-            };
-        } & (unknown & unknown);
-        McpOutput_list_capture_history: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: components["schemas"]["Contract_capture_history_5bb857fd69a5246d"];
-            /** @constant */
-            data_class?: "metadata";
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_get_capture_settings: {
-            /** Format: uuid */
-            capture_id: string;
         };
         Contract_capture_history_6f7c512573a1694c: {
             /** @constant */
@@ -1210,7 +1288,9 @@ export interface components {
                     resolve: "atDispatch";
                 };
                 batch: {
+                    /** @description The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses × maxBytesPerProcess ≤ the action maxBytes and by maxTotalStop. */
                     maxProcesses: number;
+                    /** @description Bounded only by the action and capture byte budget. */
                     maxBytesPerProcess: number;
                     maxStopPerProcess: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
                     maxTotalStop: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
@@ -1396,6 +1476,7 @@ export interface components {
             kind: "command";
             parameters: {
                 argv: string[];
+                /** @description Linux PATH_MAX (4096 bytes). */
                 workingDirectory: string;
                 environmentNames?: string[];
                 /** @enum {string} */
@@ -1466,6 +1547,7 @@ export interface components {
                     profileRef?: string;
                 } & unknown;
                 duration?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                /** @description Bounded by the node's kernel.perf_event_max_sample_rate, which the kernel lowers itself under load. */
                 frequencyHz?: number;
                 forceGC: boolean;
                 /** @enum {unknown} */
@@ -1473,8 +1555,11 @@ export interface components {
             } & (unknown & unknown & unknown & unknown & unknown);
             dependsOn?: string[];
             required: boolean;
-            /** @constant */
-            impact: "intrusive";
+            /**
+             * @description observe for pprof GETs and the eBPF sampler; intrusive for forced GC, sampling changes, traces and attached profilers (ADR-335 D5).
+             * @enum {string}
+             */
+            impact: "observe" | "intrusive";
             limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
             /**
              * @default onTrigger
@@ -1500,76 +1585,6 @@ export interface components {
         Contract_common_118dfa56ea0142d0: {
             maxBytes: number;
             timeout: string;
-        };
-        /** Bounded packet action parameters */
-        Contract_packet_capture: {
-            profile: {
-                /** @constant */
-                kind: "networkHeaders";
-            } | {
-                /** @constant */
-                kind: "httpHeaders";
-                /** @constant */
-                protocol: "http1";
-                projectionRef: {
-                    name: string;
-                    version: string;
-                };
-                maxFlows: number;
-                maxHeaderBytes: number;
-                maxReassemblyBytesPerFlow: number;
-                maxReassemblyBytes: number;
-                idleTimeout: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-            } | {
-                /** @constant */
-                kind: "rawPackets";
-                snaplen: number;
-                protocolSnaplen?: {
-                    /** @enum {unknown} */
-                    protocol: "tcp" | "udp" | "icmp";
-                    bytes: number;
-                }[];
-            };
-            before: string;
-            after: string;
-            /** @description No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size. */
-            filter?: string;
-            /** @description In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node. */
-            ring: {
-                maxAge: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-                maxBytes: number;
-                /** @description Segment count; segment size is maxBytes ÷ segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history. */
-                segments: number;
-            };
-            peers: {
-                entries: ({
-                    cidrs: string[];
-                } | {
-                    podSelector: {
-                        namespace: string;
-                        matchLabels: {
-                            [key: string]: string;
-                        };
-                    };
-                } | {
-                    resourceRef: {
-                        /** @enum {unknown} */
-                        kind: "Pod" | "Deployment" | "StatefulSet" | "Service";
-                        namespace: string;
-                        name: string;
-                        /** @enum {unknown} */
-                        serviceMode?: "backends" | "virtualIP" | "both";
-                        readyOnly?: boolean;
-                    } & unknown;
-                })[];
-                /** @enum {unknown} */
-                protocol: "tcp" | "udp" | "icmp" | "any";
-                ports?: number[];
-                /** @enum {unknown} */
-                resolution: "frozen" | "follow";
-                maxEndpoints: number;
-                maxStaleness: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-            };
         };
         /** Bounded pod-wide syscall acquisition parameters */
         Contract_syscall_trace: {
@@ -1645,7 +1660,69 @@ export interface components {
             /** Format: uri */
             navigation_uri: string;
         };
-        McpOutput_get_capture_settings: components["schemas"]["Contract_mcp_result"] & ({
+        McpOutput_get_capture: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                /** Format: uuid */
+                capture_id: string;
+                revision: number;
+                /** @enum {unknown} */
+                phase: "Pending" | "AwaitingApproval" | "Armed" | "Running" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
+                actions: {
+                    action_id: string;
+                    /** @enum {unknown} */
+                    phase: "Pending" | "WaitingApproval" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Skipped" | "Denied" | "TimedOut" | "Failed" | "TargetGone" | "Unsupported" | "Indeterminate" | "Cancelled";
+                    /** @description Bounded stable action reason. Failed Go profile acquisition reports ProfileUnavailable when the endpoint is unavailable or disabled, or ProfilerBusy for an existing conflicting profiling session that Asservat did not stop. Other existing reason strings retain their current meaning; a reason never authorizes retry or replacement. */
+                    reason_code?: string;
+                    /**
+                     * Format: uuid
+                     * @description Exact child identity within this parent save. It is not a separate navigation or retry target.
+                     */
+                    action_instance_id?: string;
+                    pod_uid?: string;
+                    pod_name?: string;
+                }[];
+                /** Format: uuid */
+                case_id?: string;
+                /** Format: uri */
+                navigation_uri: string;
+                /** Format: uri */
+                approval_navigation_uri?: string;
+                /** Format: uuid */
+                grant_id?: string;
+                can_cancel: boolean;
+                blockers: {
+                    code: string;
+                    message: string;
+                    /** @enum {unknown} */
+                    responsible_role: "maintainer" | "approver" | "administrator" | "none";
+                    retryable: boolean;
+                }[];
+                /** Format: uuid */
+                repeated_from_capture_id?: string;
+                /** @enum {unknown} */
+                operation?: "collect" | "recordingSave";
+                result_access?: components["schemas"]["Contract_investigation_access_0b2b78f874cf920d"];
+                /** @description Capture-time sharing status, reported separately from collection progress. Present only when the request included sharing. Shared names the concrete share; SharingUnavailable means the result was not shared (collection outcome is unaffected). */
+                sharing?: {
+                    /** @enum {unknown} */
+                    state: "Pending" | "Shared" | "SharingUnavailable";
+                    /** Format: uuid */
+                    share_id?: string;
+                };
+                /** @enum {unknown} */
+                history_state?: "available" | "unavailable";
+                cancellation_requested?: boolean;
+                /** @description Authorized parent Save reason, preserved verbatim; never restored on repeat. */
+                reason?: string;
+                /**
+                 * @description Omitted when no reason was supplied. Unavailable descriptive metadata does not block capture status.
+                 * @enum {unknown}
+                 */
+                reason_state?: "available" | "unavailable";
+            } & (unknown & unknown);
+        } | {
             /** @constant */
             status: "ok";
             data: components["schemas"]["Contract_capture_history_6f7c512573a1694c"] | components["schemas"]["Contract_recording_save_f55cbe756b7a0883"];
@@ -1656,7 +1733,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -1672,43 +1749,107 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
-        McpInput_list_capture_profiles: {
-            target_handle?: string;
-            /** @enum {unknown} */
-            catalog?: "builtin" | "organization" | "namespace";
-            cursor?: string;
-            limit?: number;
-            target_ref?: {
+        McpInput_cancel_capture: {
+            /** Format: uuid */
+            capture_id: string;
+            expected_revision: number;
+            idempotency_key: string;
+        };
+        McpOutput_cancel_capture: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
                 /** Format: uuid */
-                cluster_id: string;
+                capture_id: string;
+                /** @enum {unknown} */
+                phase: "Pending" | "AwaitingApproval" | "Armed" | "Running" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
+                revision: number;
+                cancellation_requested: boolean;
+                /** Format: uri */
+                navigation_uri: string;
+            };
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                revision: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_list_capture_history: {
+            target_handle?: string;
+            target_ref?: {
+                /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                cluster: string;
                 namespace: string;
                 /** @enum {unknown} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
                 name: string;
             };
-        } & (unknown | unknown);
-        Contract_guidance_c8c053ecb8f17e88: {
-            code: string;
-            message: string;
+            /** @description Cluster name as configured in the hub (ADR-335 D4). */
+            cluster?: string;
+            target?: components["schemas"]["Contract_target"];
             /** @enum {unknown} */
-            responsible_role: "maintainer" | "approver" | "administrator" | "none";
-            retryable: boolean;
+            origin?: "manual" | "policy" | "discovery" | "all";
+            cursor?: string;
+            limit?: number;
+        } & (unknown | unknown | unknown);
+        Contract_capture_history_5bb857fd69a5246d: {
+            /** @constant */
+            kind: "captureHistoryPage";
+            history: components["schemas"]["Contract_capture_history_d3f629e9c1ad4b52"][];
+            /** @constant */
+            ordering: "acceptedAtDescCaptureIDDesc";
         };
-        McpOutput_list_capture_profiles: components["schemas"]["Contract_mcp_result"] & ({
+        Contract_capture_history_d3f629e9c1ad4b52: {
+            /** Format: uuid */
+            capture_id: string;
+            /** @enum {unknown} */
+            origin: "manual" | "policy" | "discovery";
+            /** Format: date-time */
+            accepted_at: string;
+            /** Format: date-time */
+            summary_expires_at: string;
+            /** @enum {unknown} */
+            phase: "Pending" | "AwaitingApproval" | "Armed" | "Running" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
+            action_kinds: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
+            /** @enum {unknown} */
+            evidence_state: "pending" | "available" | "partial" | "expired" | "unavailable";
+            /** @enum {unknown} */
+            repeat_state: "available" | "requiresSelection" | "parametersExpired" | "parametersUnavailable" | "targetUnavailable";
+            /** Format: date-time */
+            settings_expires_at?: string;
+            /** Format: uuid */
+            repeated_from_capture_id?: string;
+            /** Format: uri */
+            navigation_uri: string;
+            /** @enum {unknown} */
+            operation?: "collect" | "recordingSave";
+            requester?: {
+                /** Format: uri */
+                issuer: string;
+                subject_id: string;
+                /** @enum {unknown} */
+                identity_type: "human" | "service" | "policy";
+            };
+        } & (unknown & unknown);
+        McpOutput_list_capture_history: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
             status: "ok";
-            data: {
-                profiles: {
-                    profile_ref: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
-                    display_name: string;
-                    description: string;
-                    available: boolean;
-                    deprecated: boolean;
-                    approval_required: boolean;
-                    blockers: components["schemas"]["Contract_guidance_c8c053ecb8f17e88"][];
-                    execution_modes: ("onTrigger" | "ongoing")[];
-                }[];
-            };
+            data: components["schemas"]["Contract_capture_history_5bb857fd69a5246d"];
             /** @constant */
             data_class?: "metadata";
         } | {
@@ -1716,7 +1857,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -1736,8 +1877,8 @@ export interface components {
             target_handle?: string;
             profile_ref: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
             target_ref?: {
-                /** Format: uuid */
-                cluster_id: string;
+                /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                cluster: string;
                 namespace: string;
                 /** @enum {unknown} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
@@ -1755,7 +1896,6 @@ export interface components {
                 label: string;
                 description?: string;
             }[];
-            origins?: components["schemas"]["Contract_capture_composition_d3d99d35a2742711"][];
         };
         McpOutput_get_capture_profile: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
@@ -1772,7 +1912,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */

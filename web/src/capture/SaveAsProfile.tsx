@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { operations, operationMessage, OperationFailure, type Operations, type Preview, type Target } from './http';
+import { listProfiles } from './ProfileCatalog';
 import { ManifestError, nextVersion, profileManifest, type Definition } from './profile-manifest';
 
 type Composition = NonNullable<Preview['profile_composition']>;
@@ -26,12 +27,11 @@ export function SaveAsProfile({ session, scope, target, composition, client = op
       // unavailable list leaves Kubernetes' create refusal as the check.
       let versions: string[] = [];
       try {
-        const listed = await client.call('list_capture_profiles', { target_ref: structuredClone(target), catalog: 'namespace' }, session.csrf_token, scope);
-        if (listed.status === 'ok') versions = listed.data.profiles.filter(p => p.profile_ref.catalog === 'namespace').map(p => p.profile_ref.name + '/' + p.profile_ref.version);
+        versions = (await listProfiles(client, target, session.csrf_token, scope, 'namespace')).filter(p => p.profile_ref.catalog === 'namespace').map(p => p.profile_ref.name + '/' + p.version);
       } catch { /* versions stay unknown */ }
       setLoaded({ definition: profile.data.definition, versions });
       const known = versions.filter(v => v.startsWith(component.profileRef.name + '/')).map(v => v.split('/')[1]);
-      setForm(f => ({ ...f, displayName: profile.data.definition.displayName, version: nextVersion(component.profileRef.catalog === 'namespace' ? [...known, component.profileRef.version] : known) }));
+      setForm(f => ({ ...f, displayName: profile.data.definition.displayName, version: nextVersion(component.profileRef.catalog === 'namespace' && component.profileRef.version ? [...known, component.profileRef.version] : known) }));
     } catch (e) { if (!scope.aborted) setError(operationMessage(e)); } finally { setLoading(false); }
   };
   if (!loaded) return <section className="review-section" aria-labelledby="save-profile-heading" aria-busy={loading}>

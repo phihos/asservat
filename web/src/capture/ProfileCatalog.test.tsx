@@ -49,7 +49,7 @@ describe('ProfileCatalog', () => {
   });
   it('composes selected profiles with changed scalar fields and default bounds (REQ-CPR-005)', async () => {
     const client = new SyntheticOperations();
-    client.responder = name => name === 'list_capture_profiles' ? import('./test-fixtures').then(m => m.profilesResult()) : profileResult('network-connections');
+    client.responder = name => name === 'list_diagnostics' ? import('./test-fixtures').then(m => m.profilesResult()) : profileResult('network-connections');
     const onPreview = vi.fn<(c: Composition) => void>();
     render(<ProfileCatalog session={session} scope={new AbortController().signal} target={target} busy={false} onPreview={onPreview} client={client}/>);
     const add = await screen.findAllByRole('button', { name: 'Add profile' });
@@ -63,7 +63,7 @@ describe('ProfileCatalog', () => {
     expect(c.components).toEqual([{ id: 'network-connections', profileRef: { catalog: 'builtin', name: 'network-connections', version: 'v1' }, overrides: [{ actionID: 'sample', field: 'packetAfter', value: '5s' }] }]);
     expect(c.maxTotalBytes).toBe(16 << 20);
     expect(c.maxDuration).toBe('20s');
-    expect(client.calls.map(call => call.name)).toEqual(['list_capture_profiles', 'get_capture_profile']);
+    expect(client.calls.map(call => call.name)).toEqual(['list_diagnostics', 'get_capture_profile']);
   });
   it('proposes the coupled 0s history window for onTrigger and keeps edits made while another profile loads', async () => {
     const client = new SyntheticOperations();
@@ -71,7 +71,7 @@ describe('ProfileCatalog', () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     let fetched = 0;
     client.responder = async name => {
-      if (name === 'list_capture_profiles') return (await import('./test-fixtures')).profilesResult();
+      if (name === 'list_diagnostics') return (await import('./test-fixtures')).profilesResult();
       fetched++;
       if (fetched === 2) await gate;
       return profileResult(fetched === 1 ? 'network-connections' : 'syscall-activity');
@@ -82,7 +82,7 @@ describe('ProfileCatalog', () => {
     fireEvent.click(add[0]);
     const mode = await screen.findByLabelText(/When recording starts/);
     fireEvent.click(add[1]);
-    await waitFor(() => expect(client.calls.map(c => c.name)).toEqual(['list_capture_profiles', 'get_capture_profile', 'get_capture_profile']));
+    await waitFor(() => expect(client.calls.map(c => c.name)).toEqual(['list_diagnostics', 'get_capture_profile', 'get_capture_profile']));
     fireEvent.change(mode, { target: { value: 'onTrigger' } });
     release();
     fireEvent.click(await screen.findByRole('button', { name: 'Set history window to 0s' }));

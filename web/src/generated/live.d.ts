@@ -42,12 +42,12 @@ export interface components {
         Contract_recording_save_5bb857fd69a5246d: {
             /** @constant */
             kind: "recordingPage";
-            recordings: components["schemas"]["Contract_recording_save_29c99fc9ff508a4c"][];
+            recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
             capture_enabled: boolean;
             /** Format: date-time */
             expires_at: string;
         };
-        Contract_recording_save_29c99fc9ff508a4c: {
+        Contract_recording_save_b717cd5d08e2c9d9: {
             /** @description Opaque, principal-bound handle for preview_capture(recording_handles) and watch_live(action=open, source_handles). */
             recording_handle: string;
             /** @enum {unknown} */
@@ -101,13 +101,8 @@ export interface components {
             executor: components["schemas"]["Contract_common_864d4ca41d092930"];
             /** @constant */
             continuesAfterCreatorLeaves: true;
-            notAfter: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
-            limits: {
-                maxExecutions: number;
-                maxBytes: number;
-                maxObservedBytes: number;
-                maxObservedEvents?: number;
-            };
+            /** @description Absent for an envelope without a lifetime ceiling (ADR-335 D6). */
+            notAfter?: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
             /** @enum {unknown} */
             state: "Ready" | "DelegationRequired" | "Revoked" | "Expired" | "OwnerAssignmentChanged" | "ReapprovalRequired" | "Unavailable";
             reasonCodes: string[];
@@ -122,6 +117,7 @@ export interface components {
         Contract_common_864d4ca41d092930: {
             /** Format: uri */
             issuer: string;
+            /** @description OIDC Core: sub is at most 255 ASCII characters. */
             subject: string;
             clientID: string;
             /** @enum {string} */
