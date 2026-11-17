@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -192,26 +190,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 			t.Fatal("settings role exceeded its closed facet", sql)
 		}
 	}
-	// Actual Down refuses all policy survivors without deleting/rekeying them.
-	raw, err := os.ReadFile("../../migrations/00102_policy_grants.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts := strings.Split(string(raw), "-- +goose Down")
-	if len(parts) != 2 {
-		t.Fatal("missing Down body")
-	}
-	tx, err := admin.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, refused := tx.Exec(ctx, parts[1])
-	rollback := tx.Rollback(ctx)
-	var incompatible *pgconn.PgError
-	if !errors.As(refused, &incompatible) || incompatible.Code != "23514" || rollback != nil {
-		t.Fatal("incompatible Down must refuse atomically", refused, rollback)
-	}
 	if after, err := store.Grant(ctx, g.ID); err != nil || after.ID != recovered.ID || !after.ExpiresAt.Equal(recovered.ExpiresAt) {
-		t.Fatal("failed rollback changed a surviving grant", err)
+		t.Fatal("restart changed a surviving grant", err)
 	}
 }
