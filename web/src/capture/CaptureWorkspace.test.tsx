@@ -68,9 +68,9 @@ it('selects bounded follow-up queries and downloads in the same collection revie
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  const sent = client.calls.find(c => c.name === 'request_capture')!.input as Record<string, unknown>;
-  expect(sent.result_access).toMatchObject({ actionIds: [action], operations: ['download_artifact', 'pcap_query'], maxBytes: 9000000, maxArtifacts: 1 });
-  expect(sent.result_access).not.toHaveProperty('clientIDs');
+  const sent = client.calls.find(c => c.name === 'request_capture')!.input as { preview: Record<string, unknown> };
+  expect(sent.preview.result_access).toMatchObject({ actionIds: [action], operations: ['download_artifact', 'pcap_query'], maxBytes: 9000000, maxArtifacts: 1 });
+  expect(sent.preview.result_access).not.toHaveProperty('clientIDs');
 });
 it('labels finite retention and kind choices independently of their options', () => {
   const { controller } = mount();
@@ -269,7 +269,7 @@ it('derives server-advertised mixed query operations without losing either sourc
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [packet, syscall], operations: ['pcap_query', 'syscall_query'], maxArtifacts: 2, maxBytes: 2 * 49152 } });
+  expect((client.calls.find(call => call.name === 'request_capture')!.input as { preview: unknown }).preview).toMatchObject({ result_access: { actionIds: [packet, syscall], operations: ['pcap_query', 'syscall_query'], maxArtifacts: 2, maxBytes: 2 * 49152 } });
 });
 it('includes profile downloads beside server-advertised packet and argument queries', async () => {
   const { client, recording, packet, syscall, profile } = await rawFollowupReview();
@@ -279,9 +279,9 @@ it('includes profile downloads beside server-advertised packet and argument quer
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  const sent = client.calls.find(call => call.name === 'request_capture')!.input as Record<string, unknown>;
-  expect(sent.result_access).toMatchObject({ actionIds: [packet, syscall, profile], operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxArtifacts: 3 });
-  expect(sent.result_access).not.toHaveProperty('clientIDs');
+  const sent = client.calls.find(call => call.name === 'request_capture')!.input as { preview: Record<string, unknown> };
+  expect(sent.preview.result_access).toMatchObject({ actionIds: [packet, syscall, profile], operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxArtifacts: 3 });
+  expect(sent.preview.result_access).not.toHaveProperty('clientIDs');
 });
 it('removes a deselected source query operation and refuses queryless combined selection', async () => {
   const { client, syscall } = await rawFollowupReview();
@@ -295,7 +295,7 @@ it('removes a deselected source query operation and refuses queryless combined s
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [syscall], operations: ['download_artifact', 'syscall_query'], maxArtifacts: 1 } });
+  expect((client.calls.find(call => call.name === 'request_capture')!.input as { preview: unknown }).preview).toMatchObject({ result_access: { actionIds: [syscall], operations: ['download_artifact', 'syscall_query'], maxArtifacts: 1 } });
 });
 it('offers syscall-only follow-up from the server and preserves download-only choices', async () => {
   const { client, controller } = mount();
@@ -312,7 +312,7 @@ it('offers syscall-only follow-up from the server and preserves download-only ch
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [action], operations: ['syscall_query'], maxBytes: 49152 } });
+  expect((client.calls.find(call => call.name === 'request_capture')!.input as { preview: unknown }).preview).toMatchObject({ result_access: { actionIds: [action], operations: ['syscall_query'], maxBytes: 49152 } });
 });
 it('retains the download-only server choice without inventing query options', async () => {
   const { client, controller } = mount();
@@ -328,6 +328,6 @@ it('retains the download-only server choice without inventing query options', as
   client.responder = () => approvalPendingResult();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   await screen.findByRole('link', { name: 'View approval' });
-  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [action], operations: ['download_artifact'] } });
+  expect((client.calls.find(call => call.name === 'request_capture')!.input as { preview: unknown }).preview).toMatchObject({ result_access: { actionIds: [action], operations: ['download_artifact'] } });
 });
-it('derives four parent operations from mixed advertised log packet syscall and profile choices',async()=>{const{client,controller}=mount();const p=recordingPreviewResult();if(p.status!=='ok')throw Error();const ids=p.data.profile_composition!.actionMap.map(a=>a.actionID);p.data.result_access_actions=[{action_id:ids[0],operations:['download_artifact','pcap_query']},{action_id:ids[1],operations:['download_artifact','syscall_query']},{action_id:ids[2],operations:['download_artifact']},{action_id:ids[3],operations:['download_artifact','get_logs']}];client.responder=()=>p;act(()=>controller.setDraft({target,retention:''}));await act(()=>controller.previewComposition(p.data.profile_composition!.authored));fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));fireEvent.change(screen.getByLabelText('Follow-up operations'),{target:{value:'both'}});expect(screen.getByRole('option',{name:'Downloads and saved packet, syscall argument and log queries'})).toBeTruthy();client.responder=()=>approvalPendingResult();fireEvent.click(screen.getByRole('button',{name:'Request approval'}));await screen.findByRole('link',{name:'View approval'});expect(client.calls.find(c=>c.name==='request_capture')!.input).toMatchObject({result_access:{operations:['download_artifact','get_logs','pcap_query','syscall_query'],actionIds:ids,maxArtifacts:4}});});
+it('derives four parent operations from mixed advertised log packet syscall and profile choices',async()=>{const{client,controller}=mount();const p=recordingPreviewResult();if(p.status!=='ok')throw Error();const ids=p.data.profile_composition!.actionMap.map(a=>a.actionID);p.data.result_access_actions=[{action_id:ids[0],operations:['download_artifact','pcap_query']},{action_id:ids[1],operations:['download_artifact','syscall_query']},{action_id:ids[2],operations:['download_artifact']},{action_id:ids[3],operations:['download_artifact','get_logs']}];client.responder=()=>p;act(()=>controller.setDraft({target,retention:''}));await act(()=>controller.previewComposition(p.data.profile_composition!.authored));fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));fireEvent.change(screen.getByLabelText('Follow-up operations'),{target:{value:'both'}});expect(screen.getByRole('option',{name:'Downloads and saved packet, syscall argument and log queries'})).toBeTruthy();client.responder=()=>approvalPendingResult();fireEvent.click(screen.getByRole('button',{name:'Request approval'}));await screen.findByRole('link',{name:'View approval'});expect((client.calls.find(c=>c.name==='request_capture')!.input as { preview: unknown }).preview).toMatchObject({result_access:{operations:['download_artifact','get_logs','pcap_query','syscall_query'],actionIds:ids,maxArtifacts:4}});});

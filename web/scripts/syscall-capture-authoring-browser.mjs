@@ -55,7 +55,6 @@ try {
   await expect(page.getByRole('heading', { name: 'Collect evidence', exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.cookie), '');
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
-  await page.getByLabel('Cluster ID', { exact: true }).fill('00000000-0000-4000-8000-000000000001');
   await page.getByLabel('Namespace', { exact: true }).fill('payments');
   await page.getByLabel('Workload or pod name', { exact: true }).fill('api');
   await page.getByRole('button', { name: 'Find diagnostics', exact: true }).click();
@@ -93,13 +92,13 @@ try {
   assert.equal(first.expected_plan_digest, preview.data.plan_digest);
   assert.equal(typeof first.preview, 'object');
   assert.equal(typeof first.idempotency_key, 'string');
-  assert.deepEqual(first.result_access.actionIds, [choices[0].action_id]);
-  assert.deepEqual(first.result_access.operations, mode === 'query' ? ['syscall_query'] : ['download_artifact', 'syscall_query']);
-  assert.equal(first.result_access.maxArtifacts, 1);
-  assert.equal(first.result_access.maxBytes, maxBytes);
-  assert.equal(first.result_access.maxOperations, 3);
-  assert.equal(first.result_access.clientIDs, undefined, 'C20 resolves the original authenticated console client');
-  const until = Date.parse(first.result_access.notAfter);
+  assert.deepEqual(first.preview.result_access.actionIds, [choices[0].action_id]);
+  assert.deepEqual(first.preview.result_access.operations, mode === 'query' ? ['syscall_query'] : ['download_artifact', 'syscall_query']);
+  assert.equal(first.preview.result_access.maxArtifacts, 1);
+  assert.equal(first.preview.result_access.maxBytes, maxBytes);
+  assert.equal(first.preview.result_access.maxOperations, 3);
+  assert.equal(first.preview.result_access.clientIDs, undefined, 'C20 resolves the original authenticated console client');
+  const until = Date.parse(first.preview.result_access.notAfter);
   assert(until > Date.now() && until <= Date.now() + 3600_000);
   await expect(page.getByRole('link', { name: 'View approval', exact: true })).toHaveAttribute('href', '/approvals/00000000-0000-4000-8000-000000000041');
   const approved = await page.request.post(origin + '/test/argument-approve', { headers: { Origin: origin } });
@@ -118,6 +117,10 @@ try {
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ scope: 'compiled arguments capture authoring; synthetic authority, no acquisition', mode, previews: 1, requests: 2, currentClient: 'console', frozenApprovalResume: true }));
+} catch (error) {
+  // Name the failing stage: the visible page and the calls made so far.
+  console.error(await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable'), JSON.stringify(calls.map(c => c.name)), errors);
+  throw error;
 } finally {
   await context.close();
   await browser.close();

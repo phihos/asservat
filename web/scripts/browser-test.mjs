@@ -62,7 +62,6 @@ try {
   checks.push('actual session handler rejects wrong-origin logout');
 
 
-  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
   await page.getByLabel('Namespace', { exact: true }).fill('payments');
   await page.getByLabel('Workload or pod name').fill('api');
   await page.getByText('Change evidence retention', { exact: true }).click();
@@ -133,7 +132,6 @@ try {
   checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing pushed over the status stream, exact progress reload, real operation CSRF denial');
   await evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads });
   await page.goto(origin + '/captures/new');
-  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
   await page.getByLabel('Namespace', { exact: true }).fill('payments');
   await page.getByLabel('Workload or pod name').fill('api');
   await captureControl('reject-request');

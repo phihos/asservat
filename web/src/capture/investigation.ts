@@ -376,12 +376,15 @@ export class Investigation {
     if (requestablePreview(data)) this.reviewed = { preview: structuredClone(input) as PreviewRequest, expected_plan_digest: data.plan_digest };
     this.publish({ stage: 'review', preview: data, previousPlan, repeatedFrom: data.repeated_from_capture_id });
   }
-  submit = async (resultAccess?: Input<'request_capture'>['result_access']) => {
+  submit = async (resultAccess?: PreviewRequest['result_access']) => {
     if (this.receipt || this.state.busy) return;
     const preview = this.state.preview;
     const reviewed = this.reviewed;
     if (!reviewed || (this.state.stage !== 'reviewed' && (!preview || !requestablePreview(preview)))) return;
-    this.receipt = { submission: { ...structuredClone(reviewed), idempotency_key: this.newID(), ...(resultAccess && { result_access: structuredClone(resultAccess) }) } };
+    // Follow-up access is part of the reviewed preview request (canonical request_capture).
+    const submission = structuredClone(reviewed);
+    if (resultAccess) submission.preview = { ...submission.preview, result_access: structuredClone(resultAccess) };
+    this.receipt = { submission: { ...submission, idempotency_key: this.newID() } };
     this.reviewed = undefined;
     await this.retrySubmission();
   };

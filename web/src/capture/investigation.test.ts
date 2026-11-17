@@ -380,8 +380,8 @@ it('retains selected result access unchanged through uncertain submission and ap
   client.responder = () => { throw new Error('lost response'); };
   await controller.submit(access);
   access.maxBytes = 1; access.actionIds[0] = 'changed'; access.operations.reverse(); access.maxOperations = 1; access.notAfter = new Date(0).toISOString();
-  const first = client.calls.filter(c => c.name === 'request_capture')[0].input;
-  expect(first).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxOperations: 10, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
+  const first = client.calls.filter(c => c.name === 'request_capture')[0].input as { preview: unknown };
+  expect(first.preview).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxOperations: 10, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
   scope.abort(); controller.attach(session, new AbortController().signal);
   client.responder = () => approvalPendingResult();
   await controller.retrySubmission();

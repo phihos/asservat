@@ -248,7 +248,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     {state.stage === 'progress' && <section aria-busy={state.busy}>
       <p className="field-help">Capture <span className="identifier">{state.captureID}</span></p>
       {state.progress ? <>
-        <h2 aria-live="polite">{state.progress.operation === 'recordingSave' && state.progress.phase === 'Running' ? 'Saving recorded history' : phases[state.progress.phase]}</h2>
+        <h2 aria-live="polite">{state.progress.phase === 'Running' && state.progress.actions.length > 0 && state.progress.actions.every(action => action.phase === 'Finalizing') ? 'Verifying and publishing evidence' : state.progress.operation === 'recordingSave' && state.progress.phase === 'Running' ? 'Saving recorded history' : phases[state.progress.phase]}</h2>
         {state.progress.operation === 'recordingSave' && <p>The saved window ends at its first successful server acceptance. Saved settings show that recorded time; a preview or retry cannot change it. This status does not establish complete historical coverage.</p>}
         {state.progress.phase === 'Pending' && <p>Your request was accepted. Collection has not been confirmed.</p>}
         {state.progress.actions.some(action => action.phase === 'Finalizing') && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
