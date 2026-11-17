@@ -7,6 +7,8 @@
 > `helm upgrade` changes images. The schema floor rule (decision 1), the migrator
 > (now a Helm pre-upgrade hook Job with the DDL credential) and image-only
 > rollback (decision 4) remain valid.
+>
+> Decision 1 (schema floor) is superseded (2026-11-17) by expand/contract migrations ([ADR-335](335-usable-by-default.md) D13): a newer schema always serves the previous binary.
 
 Date: 2026-10-25. Status: accepted (maintainer chose to build the upgrade path now); phases 1
 and 2 implemented; phase 3 implemented for the key service, publisher and federation (download workers, regional connector and the chart hook deliberately not built). Implements the upgrade target in [operations](../operations.md#backup-recovery-and-upgrades)

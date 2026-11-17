@@ -4,7 +4,7 @@ Scope: C-07 capacity, C-14 evidence, C-15 privacy and C-21 adapters under I-05/I
 
 ## Records
 
-[Migration 00001](../../migrations/00001_custody.sql) defines the storage facet:
+The [schema baseline](../../migrations/00001_baseline.sql) defines the storage facet:
 
 - `custody_pool`: accepted backing.
 - `custody_allocation`: one workload or service allocation with its byte/object limit and `used` counter.

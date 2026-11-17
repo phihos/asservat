@@ -116,7 +116,7 @@ new settings load; raising it affects only new sessions.
 
 ## Persistence
 
-Migration 00020 provides `browser_login`, `browser_session` and
+The schema provides `browser_login`, `browser_session` and
 `browser_logout`. A session row's ciphertext is bounded by three tokens at
 the 32 KiB compact-token cap ([identity eligibility](identity-eligibility.md))
 plus 4 KiB of fixed fields.

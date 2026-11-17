@@ -2,9 +2,6 @@ package postgres
 
 import (
 	"encoding/json"
-	"fmt"
-	"io/fs"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -13,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	"asservat.local/asservat/migrations"
 )
 
 func syscallScopeFixture(t *testing.T, native string, view analysis.SyscallView) analysis.ContextProjectionScope {
@@ -93,59 +89,4 @@ func TestSyscallKeyChildEncodingRetainsLegacyBound(t *testing.T) {
 		t.Fatal("legacy source gained a larger key child")
 	}
 	t.Logf("maximal escaped filter %d bytes; original16KiB+filter=%d <48KiB key-child bound; partial structural binding=%d bytes (not authority)", len(w), (16<<10)+len(w), len(encoded))
-}
-
-func TestSavedSyscallMigrationRestoresExactPreviousFunctions(t *testing.T) {
-	files, err := fs.Glob(migrations.Files(), "*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	functions := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed", "guard_context_query"}
-	old := map[string]string{}
-	for _, name := range files {
-		if name >= "00132_saved_syscall_projections.sql" {
-			continue
-		}
-		raw, err := fs.ReadFile(migrations.Files(), name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		up, _, _ := strings.Cut(string(raw), "-- +goose Down")
-		for _, function := range functions {
-			re := regexp.MustCompile(`(?s)CREATE (?:OR REPLACE )?FUNCTION ` + regexp.QuoteMeta(function) + `\(.*?-- \+goose StatementEnd`)
-			if match := re.FindString(up); match != "" {
-				old[function] = match
-			}
-		}
-	}
-	raw, err := fs.ReadFile(migrations.Files(), "00132_saved_syscall_projections.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	up, down, ok := strings.Cut(string(raw), "-- +goose Down")
-	if !ok {
-		t.Fatal("missing Down")
-	}
-	for _, name := range functions {
-		re := regexp.MustCompile(`(?s)CREATE OR REPLACE FUNCTION ` + regexp.QuoteMeta(name) + `\(.*?-- \+goose StatementEnd`)
-		if old[name] == "" || re.FindString(down) != old[name] {
-			t.Fatal("Down did not restore exact prior function", name)
-		}
-	}
-	// Audit131's independent existing-artifact raw review must survive this
-	// extension; replaying the older127 mapping would silently remove it.
-	for _, section := range []string{up, down} {
-		if strings.Count(section, "'request_raw_access'") != 2 {
-			t.Fatal("existing raw review mapping lost")
-		}
-	}
-	if !strings.Contains(down, "saved syscall query history cannot be downgraded") || !strings.Contains(down, "intent->>'Name' IN ('get_syscall_summary','get_syscall_events')") {
-		t.Fatal("retained query/audit rollback guard missing")
-	}
-	if strings.Count(up, "CREATE TABLE") != 0 || strings.Contains(up, "GRANT ") {
-		t.Fatal("query extension introduced state or privileges")
-	}
-	if !strings.Contains(up, fmt.Sprintf("<%d", analysis.SyscallProjectionWorkerBytes)) {
-		t.Fatal("SQL worker floor differs from Go")
-	}
 }

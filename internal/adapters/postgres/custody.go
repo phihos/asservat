@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -30,28 +28,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 201
-
-// schemaFloorComment prefixes the version table's comment that records the
-// oldest binary schema the database still serves (ADR-227). Only the schema
-// owner can set a comment; every role reads it without a grant.
-const schemaFloorComment = "asservat:oldest-binary-schema="
+const currentSchemaVersion = 1
 
 // schemaCompatible reports why this binary (compiled head
-// currentSchemaVersion) cannot run against the database, or "" when it can:
-// the database head must be at least the binary's and the recorded floor at
-// most the binary's. Without a recorded floor the head must match exactly.
+// currentSchemaVersion) cannot run against the database, or "" when it can.
+// Migrations are expand/contract, so a newer database still serves this
+// binary; an older one does not.
 func schemaCompatible(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }) string {
-	head, floor, err := schemaState(ctx, q.QueryRow(ctx, schemaStateQuery))
+	head, err := schemaHead(q.QueryRow(ctx, schemaStateQuery))
 	switch {
 	case err != nil:
 		return "unreadable"
 	case head < currentSchemaVersion:
-		return "older than this binary (run installer-upgrade)"
-	case floor > currentSchemaVersion:
-		return "newer than this binary tolerates (use a newer image or restore from backup)"
+		return "older than this binary (run asservat setup)"
 	}
 	return ""
 }
@@ -61,25 +52,15 @@ func schemaRefusal(class error, reason string) error {
 	return fmt.Errorf("%w: database schema %s", class, reason)
 }
 
-const schemaStateQuery = `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`
+const schemaStateQuery = `SELECT version_id,is_applied FROM goose_db_version ORDER BY id DESC LIMIT 1`
 
-// schemaState decodes the database head and floor. Without a recorded floor
-// the floor is the head.
-func schemaState(_ context.Context, row interface{ Scan(...any) error }) (head, floor int64, err error) {
+// schemaHead decodes the database's applied head.
+func schemaHead(row interface{ Scan(...any) error }) (head int64, err error) {
 	var applied bool
-	var comment *string
-	if err = row.Scan(&head, &applied, &comment); err != nil || !applied || head < 1 {
-		return 0, 0, configuration.ErrUnavailable
+	if err = row.Scan(&head, &applied); err != nil || !applied || head < 1 {
+		return 0, configuration.ErrUnavailable
 	}
-	floor = head
-	if comment != nil && strings.HasPrefix(*comment, schemaFloorComment) {
-		n, e := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
-		if e != nil || n < 1 || n > head {
-			return 0, 0, configuration.ErrChanged
-		}
-		floor = n
-	}
-	return head, floor, nil
+	return head, nil
 }
 
 type Ledger struct{ pool *pgxpool.Pool }

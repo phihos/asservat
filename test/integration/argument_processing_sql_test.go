@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,18 +27,6 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
 			t.Fatal(err)
 		}
 		return out
-	}
-	raw, err := fs.ReadFile(migrations.Files(), "00129_syscall_arguments_processing.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, down, ok := strings.Cut(string(raw), "-- +goose Down")
-	if !ok {
-		t.Fatal("SQL129 Down missing")
-	}
-	var originalDefinition string
-	if err := admin.QueryRow(ctx, "SELECT pg_get_functiondef('public.project_context_processing()'::regprocedure)").Scan(&originalDefinition); err != nil {
-		t.Fatal(err)
 	}
 	for _, name := range []string{"arguments", "metadata", "profile", "wrong-class", "wrong-kind", "wrong-mode", "missing-pins", "snapshot-mixture"} {
 		t.Run("processing-"+name, func(t *testing.T) {
@@ -149,25 +135,8 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
 				if _, err = q.RecordSnapshotCancellation(ctx, proof); !errors.Is(err, pgx.ErrNoRows) {
 					t.Fatal("joined proof overwritten", err)
 				}
-				_, err = tx.Exec(ctx, down)
-				if err == nil || !strings.Contains(err.Error(), "retained syscall argument captures") {
-					t.Fatal("retained argument downgrade", err)
-				}
-			} else {
-				// Existing metadata and profile rows do not block129 rollback.
-				// Argument captures committed by earlier cases of this shared
-				// fixture would (their own guard, checked above); hide them inside
-				// this rolled-back transaction so only this case's rows count.
-				exec("SET LOCAL session_replication_role=replica")
-				exec(`UPDATE context_capture SET expectation_json=convert_to(jsonb_set(convert_from(expectation_json,'UTF8')::jsonb,'{NativeType}','"probeHidden"')::text,'UTF8') WHERE id<>$1 AND convert_from(expectation_json,'UTF8')::jsonb->>'NativeType'='syscallArguments'`, accepted.CaptureID)
-				exec("SET LOCAL session_replication_role=origin")
-				exec(down)
 			}
 		})
 	}
-	var restored string
-	if err := admin.QueryRow(ctx, "SELECT pg_get_functiondef('public.project_context_processing()'::regprocedure)").Scan(&restored); err != nil || restored != originalDefinition {
-		t.Fatal("rollback-only probes changed installed processing definition", err)
-	}
-	t.Log("SQL129: raw argument lineage, existing profile/metadata publication, started collection, scoped historical reader and retained-argument downgrade refusal")
+	t.Log("SQL129: raw argument lineage, existing profile/metadata publication, started collection and scoped historical reader")
 }

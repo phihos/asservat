@@ -2,15 +2,12 @@ package postgres
 
 import (
 	"encoding/json"
-	"io/fs"
-	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	execution "asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/migrations"
 )
 
 func TestArgumentProgressOffersStopButRequestRemainsNonterminal(t *testing.T) {
@@ -110,81 +107,5 @@ func TestArgumentCancellationMatchesOnlyOriginalRawWriter(t *testing.T) {
 		if recordingCancellationExpected(x) {
 			t.Fatal("expectation with its own Stop proof accepted", mode)
 		}
-	}
-}
-
-// ADR-313: migration 00146 widens only the request rule from the argument
-// recording to any Recording; Down restores the schema-145 function exactly.
-func TestManualRecordingStopMigrationWidensOnlyRequestRule(t *testing.T) {
-	definition := func(name string, up bool) string {
-		t.Helper()
-		raw, err := fs.ReadFile(migrations.Files(), name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		before, after, ok := strings.Cut(string(raw), "-- +goose Down")
-		if !ok {
-			t.Fatal("missing Down")
-		}
-		s := before
-		if !up {
-			s = after
-		}
-		start := strings.Index(s, "CREATE OR REPLACE FUNCTION guard_snapshot_cancel()")
-		if start < 0 {
-			t.Fatal("missing Stop guard")
-		}
-		s = s[start:]
-		return s[:strings.Index(s, "-- +goose StatementEnd")]
-	}
-	prior := definition("00142_pod_process_discovery.sql", true)
-	if definition("00146_manual_recording_stop.sql", false) != prior {
-		t.Fatal("Down changed the schema-145 Stop guard")
-	}
-	argument := "NOT COALESCE(convert_from(NEW.expectation_json,'UTF8')::jsonb->>'NativeType'='syscallArguments' AND convert_from(NEW.expectation_json,'UTF8')::jsonb->>'DataClass'='raw' AND convert_from(NEW.expectation_json,'UTF8')::jsonb#>>'{Recording,Kind}'='syscallTrace' AND convert_from(NEW.expectation_json,'UTF8')::jsonb#>>'{Recording,Profile}'='arguments' AND jsonb_typeof(convert_from(NEW.expectation_json,'UTF8')::jsonb#>'{Recording,Arguments}')='object',false)"
-	recording := "jsonb_typeof(convert_from(NEW.expectation_json,'UTF8')::jsonb->'Recording') IS DISTINCT FROM 'object'"
-	if strings.Count(prior, argument) != 1 || definition("00146_manual_recording_stop.sql", true) != strings.Replace(prior, argument, recording, 1) {
-		t.Fatal("manual recording Stop changed fencing or joined-proof checks")
-	}
-}
-
-func TestArgumentCancellationMigrationRestoresProfileGuard(t *testing.T) {
-	definition := func(name string, up bool) string {
-		t.Helper()
-		raw, err := fs.ReadFile(migrations.Files(), name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		before, after, ok := strings.Cut(string(raw), "-- +goose Down")
-		if !ok {
-			t.Fatal("missing Down")
-		}
-		s := before
-		if !up {
-			s = after
-		}
-		start := strings.Index(s, "CREATE OR REPLACE FUNCTION guard_snapshot_cancel()")
-		if start < 0 {
-			t.Fatal("missing Stop guard")
-		}
-		s = s[start:]
-		end := strings.Index(s, "-- +goose StatementEnd")
-		if end < 0 {
-			t.Fatal("missing statement end")
-		}
-		return s[:end]
-	}
-	prior := definition("00124_profile_cancellation.sql", true)
-	if definition("00129_syscall_arguments_processing.sql", false) != prior {
-		t.Fatal("Down changed original profile/snapshot Stop")
-	}
-	current := definition("00129_syscall_arguments_processing.sql", true)
-	start := strings.Index(current, " AND NOT COALESCE(convert_from(NEW.expectation_json")
-	if start < 0 {
-		t.Fatal("missing narrow argument addition")
-	}
-	end := strings.Index(current[start:], ",false)")
-	if end < 0 || current[:start]+current[start+end+len(",false)"):] != prior {
-		t.Fatal("argument Stop changed existing fencing or joined-proof checks")
 	}
 }

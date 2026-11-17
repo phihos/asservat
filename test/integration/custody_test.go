@@ -148,8 +148,8 @@ func TestCustodyWithRealServices(t *testing.T) {
 	if _, err = pool.Exec(ctx, "UPDATE goose_db_version SET version_id=1"); err == nil {
 		t.Fatal("runtime can modify migration history")
 	}
-	// ADR-227: the binary runs against a database whose head is at least its own
-	// and whose recorded floor is at most its own; every change is undone.
+	// The binary runs against a database whose head is at least its own; every
+	// change is undone.
 	qualifySchemaCompatibility(t, ctx, admin, pool)
 	if _, err = postgres.New(ctx, admin); err == nil {
 		t.Fatal("plaintext/admin pool accepted")
@@ -601,12 +601,8 @@ func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *
 		}
 	}
 	var head int64
-	var comment *string
-	if err := admin.QueryRow(ctx, `SELECT version_id,obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head, &comment); err != nil || comment == nil {
-		t.Fatal("schema floor not recorded", err)
-	}
-	floor := func(v int64) {
-		exec(fmt.Sprintf("COMMENT ON TABLE goose_db_version IS 'asservat:oldest-binary-schema=%d'", v))
+	if err := admin.QueryRow(ctx, `SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head); err != nil {
+		t.Fatal("schema head", err)
 	}
 	accepted := func(want bool, what string) {
 		t.Helper()
@@ -615,17 +611,14 @@ func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *
 		}
 	}
 	accepted(true, "current")
-	// A newer database after an expand migration still serves this binary.
+	// Migrations are expand/contract: a newer database still serves this binary.
 	exec("INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1)
-	accepted(true, "newer expand-only database (image-only rollback)")
-	floor(head + 1)
-	accepted(false, "newer database whose floor excludes this binary")
-	floor(head)
+	accepted(true, "newer database (image-only rollback)")
 	exec("DELETE FROM goose_db_version WHERE version_id=$1", head+1)
 	// An older database refuses this binary until migrated.
 	exec("INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head-1)
 	accepted(false, "older database")
 	exec("DELETE FROM goose_db_version WHERE id=(SELECT max(id) FROM goose_db_version) AND version_id=$1", head-1)
 	accepted(true, "restored")
-	t.Log("schema compatibility: newer expand-only database accepted, raised floor and older database refused")
+	t.Log("schema compatibility: newer database accepted, older database refused")
 }
