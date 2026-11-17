@@ -1,6 +1,6 @@
 {
   "name": "list_diagnostics",
-  "description": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
+  "description": "List the presets, recipes, capture profiles and discovery diagnostics usable on one target, with execution modes and previewable handles (kind per row). Capture profiles reference profile_ref for preview_capture profile_composition. With goal, returns ranked passive recommendations instead (rationale, gaps, cost/impact/privacy, proposed plan); never acquires evidence or runs a raw query. Evidence strings are untrusted.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -10,13 +10,29 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "target_handle": {
+        "type": "string",
+        "minLength": 1
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
       "target_ref": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "cluster_id": {
+          "cluster": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Cluster name as configured in the hub (ADR-335 D4)."
           },
           "namespace": {
             "type": "string",
@@ -37,81 +53,147 @@
           }
         },
         "required": [
-          "cluster_id",
+          "cluster",
           "namespace",
           "kind",
           "name"
         ]
-      }
-    },
-    "required": [
-      "target_ref"
-    ]
-  },
-  "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
       },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
+      "kind": {
         "enum": [
-          "ok",
-          "pending",
-          "error"
+          "preset",
+          "recipe",
+          "captureProfile",
+          "discovery"
+        ],
+        "description": "Optional row-kind filter."
+      },
+      "catalog": {
+        "enum": [
+          "builtin",
+          "organization",
+          "namespace"
         ]
       },
-      "data": {
-        "type": "object"
+      "goal": {
+        "enum": [
+          "unknown",
+          "crash",
+          "memoryGrowth",
+          "highCPU",
+          "latency",
+          "hang",
+          "network",
+          "dns",
+          "probeFailure"
+        ],
+        "description": "Optional. Ranks applicable diagnostics for this goal as passive recommendations with rationale, gaps and proposed plans, optionally informed by existing discovery captures."
       },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
+      "discovery_capture_ids": {
         "type": "array",
         "items": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "format": "uuid"
         },
-        "maxItems": 32,
-        "minItems": 0,
+        "minItems": 1,
         "uniqueItems": true
       },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
+      "preferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "history_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "max_impact": {
+            "enum": [
+              "observe",
+              "sensitiveRead",
+              "intrusive"
+            ]
+          },
+          "max_ring_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": []
+      },
+      "focus": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "process_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "flow_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
       }
     },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
+    "required": [],
+    "oneOf": [
+      {
+        "required": [
+          "target_handle"
+        ],
+        "not": {
+          "required": [
+            "target_ref"
+          ]
+        }
+      },
+      {
+        "required": [
+          "target_ref"
+        ],
+        "not": {
+          "required": [
+            "target_handle"
+          ]
+        }
+      }
     ],
+    "dependentRequired": {
+      "discovery_capture_ids": [
+        "goal"
+      ],
+      "preferences": [
+        "goal"
+      ],
+      "focus": [
+        "goal",
+        "discovery_capture_ids"
+      ]
+    }
+  },
+  "outputSchema": {
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -130,20 +212,21 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
+                        "diagnostic_handle": {
+                          "type": "string",
+                          "minLength": 1
+                        },
                         "name": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
+                          "minLength": 1
                         },
                         "version": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 32
+                          "minLength": 1
                         },
                         "description": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 512
+                          "minLength": 1
                         },
                         "approval_required": {
                           "type": "boolean"
@@ -159,13 +242,11 @@
                             "properties": {
                               "code": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                                "minLength": 1
                               },
                               "message": {
                                 "type": "string",
-                                "minLength": 1,
-                                "maxLength": 256
+                                "minLength": 1
                               },
                               "responsible_role": {
                                 "enum": [
@@ -186,15 +267,17 @@
                               "retryable"
                             ]
                           },
-                          "minItems": 0,
-                          "maxItems": 16
+                          "minItems": 0
                         },
                         "preset_ref": {
                           "type": "object",
                           "additionalProperties": false,
                           "properties": {
                             "name": {
-                              "const": "pod-status"
+                              "enum": [
+                                "incident-context",
+                                "pod-status"
+                              ]
                             },
                             "version": {
                               "const": "v1"
@@ -204,24 +287,205 @@
                             "name",
                             "version"
                           ]
+                        },
+                        "kind": {
+                          "enum": [
+                            "preset",
+                            "recipe",
+                            "captureProfile",
+                            "discovery"
+                          ]
+                        },
+                        "profile_ref": {
+                          "$ref": "#/$defs/d2"
+                        },
+                        "deprecated": {
+                          "type": "boolean"
+                        },
+                        "display_name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "execution_modes": {
+                          "type": "array",
+                          "items": {
+                            "enum": [
+                              "onTrigger",
+                              "ongoing"
+                            ]
+                          },
+                          "minItems": 1,
+                          "uniqueItems": true
                         }
                       },
                       "required": [
+                        "kind",
                         "name",
                         "version",
                         "description",
                         "approval_required",
                         "available",
                         "blockers",
-                        "preset_ref"
+                        "execution_modes"
+                      ],
+                      "oneOf": [
+                        {
+                          "required": [
+                            "diagnostic_handle"
+                          ],
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "preset_ref"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "profile_ref"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "required": [
+                            "preset_ref"
+                          ],
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "diagnostic_handle"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "profile_ref"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "required": [
+                            "profile_ref"
+                          ],
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "diagnostic_handle"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "preset_ref"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "allOf": [
+                        {
+                          "if": {
+                            "required": [
+                              "preset_ref"
+                            ]
+                          },
+                          "then": {
+                            "properties": {
+                              "version": {
+                                "const": "v1"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "properties": {
+                              "kind": {
+                                "const": "captureProfile"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "profile_ref"
+                            ]
+                          }
+                        },
+                        {
+                          "if": {
+                            "required": [
+                              "profile_ref"
+                            ]
+                          },
+                          "then": {
+                            "properties": {
+                              "kind": {
+                                "const": "captureProfile"
+                              }
+                            }
+                          }
+                        }
                       ]
                     },
-                    "minItems": 0,
-                    "maxItems": 1
+                    "minItems": 0
                   }
                 },
                 "required": [
                   "diagnostics"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d3"
+              },
+              "data_class": {
+                "const": "extract"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
                 ]
               }
             },
@@ -242,21 +506,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -268,8 +529,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -286,6 +546,907 @@
           }
         ]
       }
-    ]
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "enum": [
+              "builtin",
+              "organization",
+              "namespace"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "description": "Optional; omitted, the hub resolves the current version and records it."
+          }
+        },
+        "required": [
+          "catalog",
+          "name"
+        ]
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "observed",
+              "inferred",
+              "ambiguous",
+              "unknown"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "confidence",
+          "reason"
+        ]
+      },
+      "d6": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "responsible_role": {
+            "enum": [
+              "maintainer",
+              "approver",
+              "administrator",
+              "none"
+            ]
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "responsible_role",
+          "retryable"
+        ]
+      },
+      "d7": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "executablePath": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^/"
+              },
+              "executableName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^[^/]+$"
+              },
+              "runtime": {
+                "enum": [
+                  "native",
+                  "go",
+                  "dotnet",
+                  "python",
+                  "node",
+                  "jvm"
+                ]
+              },
+              "buildIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [],
+            "minProperties": 1
+          },
+          "includeDescendants": {
+            "type": "boolean"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resolve": {
+            "const": "atDispatch"
+          }
+        },
+        "required": [
+          "match",
+          "includeDescendants",
+          "maxDepth",
+          "resolve"
+        ]
+      },
+      "d9": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
+      },
+      "d8": {
+        "title": "Bounded packet action parameters",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "networkHeaders"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "httpHeaders"
+                  },
+                  "protocol": {
+                    "const": "http1"
+                  },
+                  "projectionRef": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                      },
+                      "version": {
+                        "type": "string",
+                        "pattern": "^v[1-9][0-9]*$"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  },
+                  "maxHeaderBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32768,
+                    "default": 32768,
+                    "description": "Common HTTP server header limits (nginx large_client_header_buffers 4 \u00d7 8 KiB) bound one request header block."
+                  },
+                  "maxReassemblyBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 16777216,
+                    "description": "Per-target reassembly memory budget; per-flow reassembly is 2 \u00d7 maxHeaderBytes, so tracked flows = maxReassemblyBytes \u00f7 (2 \u00d7 maxHeaderBytes); the default 16 MiB is derived from the node collector memory limit together with the ring budget."
+                  }
+                },
+                "required": [
+                  "kind",
+                  "protocol",
+                  "projectionRef",
+                  "maxHeaderBytes",
+                  "maxReassemblyBytes"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "rawPackets"
+                  },
+                  "snaplen": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "protocolSnaplen": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "protocol": {
+                          "enum": [
+                            "tcp",
+                            "udp",
+                            "icmp"
+                          ]
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": [
+                        "protocol",
+                        "bytes"
+                      ]
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "kind",
+                  "snaplen"
+                ]
+              }
+            ]
+          },
+          "before": {
+            "type": "string",
+            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+          },
+          "after": {
+            "type": "string",
+            "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S",
+            "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
+          },
+          "ring": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "maxAge": {
+                "$ref": "#/$defs/d9"
+              },
+              "maxBytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "segments": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 9007199254740991,
+                "description": "Segment count; segment size is maxBytes \u00f7 segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
+              }
+            },
+            "required": [
+              "maxAge",
+              "maxBytes",
+              "segments"
+            ],
+            "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
+          },
+          "peers": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "entries": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cidrs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "cidrs"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "podSelector": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "namespace": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63
+                            },
+                            "matchLabels": {
+                              "type": "object",
+                              "minProperties": 1,
+                              "additionalProperties": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 63
+                              }
+                            }
+                          },
+                          "required": [
+                            "namespace",
+                            "matchLabels"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "podSelector"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "resourceRef": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "Pod",
+                                "Deployment",
+                                "StatefulSet",
+                                "Service"
+                              ]
+                            },
+                            "namespace": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253
+                            },
+                            "serviceMode": {
+                              "enum": [
+                                "backends",
+                                "virtualIP",
+                                "both"
+                              ]
+                            },
+                            "readyOnly": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "namespace",
+                            "name"
+                          ],
+                          "allOf": [
+                            {
+                              "if": {
+                                "properties": {
+                                  "kind": {
+                                    "const": "Service"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "required": [
+                                  "serviceMode",
+                                  "readyOnly"
+                                ]
+                              },
+                              "else": {
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "serviceMode"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "readyOnly"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "resourceRef"
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "protocol": {
+                "enum": [
+                  "tcp",
+                  "udp",
+                  "icmp",
+                  "any"
+                ]
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "resolution": {
+                "enum": [
+                  "frozen",
+                  "follow"
+                ]
+              }
+            },
+            "required": [
+              "entries",
+              "protocol",
+              "resolution"
+            ],
+            "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
+          }
+        },
+        "required": [
+          "profile",
+          "before",
+          "after",
+          "ring",
+          "peers"
+        ]
+      },
+      "d10": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "enum": [
+              "measuredProjection",
+              "estimated"
+            ]
+          },
+          "retained_bytes_per_second": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "history_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "burst_factor": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "segment_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "segments": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 9007199254740991
+          },
+          "ring_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "basis",
+          "retained_bytes_per_second",
+          "history_seconds",
+          "burst_factor",
+          "segment_bytes",
+          "segments",
+          "ring_bytes",
+          "limitations"
+        ]
+      },
+      "d11": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxProcesses": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses \u00d7 maxBytesPerProcess \u2264 the action maxBytes and by maxTotalStop."
+          },
+          "maxBytesPerProcess": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Bounded only by the action and capture byte budget."
+          },
+          "maxStopPerProcess": {
+            "$ref": "#/$defs/d9"
+          },
+          "maxTotalStop": {
+            "$ref": "#/$defs/d9"
+          },
+          "consistency": {
+            "const": "sequential"
+          }
+        },
+        "required": [
+          "maxProcesses",
+          "maxBytesPerProcess",
+          "maxStopPerProcess",
+          "maxTotalStop",
+          "consistency"
+        ]
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "diagnostic_handle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "answers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "basis": {
+            "$ref": "#/$defs/d5"
+          },
+          "evidence_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "impact": {
+            "enum": [
+              "observe",
+              "sensitiveRead",
+              "intrusive"
+            ]
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "max_process_starts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "retention_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "approval_required": {
+            "type": "boolean"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d6"
+            },
+            "minItems": 0
+          },
+          "process_selector": {
+            "$ref": "#/$defs/d7"
+          },
+          "packet_parameters": {
+            "$ref": "#/$defs/d8"
+          },
+          "ring_sizing": {
+            "$ref": "#/$defs/d10"
+          },
+          "process_batch": {
+            "$ref": "#/$defs/d11"
+          },
+          "process_match_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "process_inventory_complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "diagnostic_handle",
+          "title",
+          "explanation",
+          "answers",
+          "limitations",
+          "basis",
+          "evidence_kinds",
+          "impact",
+          "max_bytes",
+          "max_process_starts",
+          "retention_seconds",
+          "approval_required",
+          "blockers"
+        ],
+        "dependentRequired": {
+          "ring_sizing": [
+            "packet_parameters"
+          ],
+          "process_selector": [
+            "process_batch",
+            "process_match_count",
+            "process_inventory_complete"
+          ],
+          "process_batch": [
+            "process_selector"
+          ]
+        }
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "diagnosticRecommendations"
+          },
+          "target_handle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal": {
+            "enum": [
+              "unknown",
+              "crash",
+              "memoryGrowth",
+              "highCPU",
+              "latency",
+              "hang",
+              "network",
+              "dns",
+              "probeFailure"
+            ]
+          },
+          "catalog_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_capture_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 0
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d4"
+            },
+            "minItems": 1
+          },
+          "missing_observations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "kind",
+          "target_handle",
+          "goal",
+          "catalog_digest",
+          "expires_at",
+          "source_capture_ids",
+          "recommendations",
+          "missing_observations"
+        ]
+      }
+    }
   }
 }

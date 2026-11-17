@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. On-trigger packet/syscall recording requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
+  "description": "Dry run of a new capture, a repeat from history (history_capture_id) or a save of existing recordings (recording_handles, optional before). Validates and resolves the plan without arming sensors, reserving capacity or reading application evidence, stores nothing and returns plan_digest; it is not permission. Submit the same request with request_capture and expected_plan_digest. Repeating a saved-recording entry preselects the same policy actions on current sources or returns NoCurrentSource with the recordings link.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -10,13 +10,20 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "target_handle": {
+        "type": "string",
+        "minLength": 1
+      },
       "target_ref": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "cluster_id": {
+          "cluster": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Cluster name as configured in the hub (ADR-335 D4)."
           },
           "namespace": {
             "type": "string",
@@ -37,18 +44,25 @@
           }
         },
         "required": [
-          "cluster_id",
+          "cluster",
           "namespace",
           "kind",
           "name"
         ]
+      },
+      "diagnostic_handle": {
+        "type": "string",
+        "minLength": 1
       },
       "preset_ref": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "name": {
-            "const": "pod-status"
+            "enum": [
+              "incident-context",
+              "pod-status"
+            ]
           },
           "version": {
             "const": "v1"
@@ -59,32 +73,12 @@
           "version"
         ]
       },
-      "requested_retention_seconds": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 315360000,
-        "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+      "reason": {
+        "type": "string",
+        "minLength": 1
       },
       "sharing": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "recipients": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/d0"
-            },
-            "minItems": 1,
-            "uniqueItems": true,
-            "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
-          },
-          "notAfter": {
-            "$ref": "#/$defs/d1"
-          }
-        },
-        "required": [
-          "recipients"
-        ]
+        "$ref": "#/$defs/d0"
       },
       "history_capture_id": {
         "type": "string",
@@ -94,22 +88,126 @@
         "type": "string",
         "format": "uuid"
       },
+      "profile_composition": {
+        "$ref": "#/$defs/d4"
+      },
+      "result_access": {
+        "$ref": "#/$defs/d23"
+      },
+      "requested_retention_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+      },
       "history_selection": {
         "enum": [
           "currentEligiblePod"
         ],
         "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
       },
-      "profile_composition": {
-        "$ref": "#/$defs/d2"
+      "recording_handles": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "before": {
+        "$ref": "#/$defs/d13"
       }
     },
     "required": [],
     "oneOf": [
       {
-        "required": [
-          "target_ref",
-          "preset_ref"
+        "allOf": [
+          {
+            "oneOf": [
+              {
+                "required": [
+                  "target_handle"
+                ],
+                "not": {
+                  "required": [
+                    "target_ref"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "target_ref"
+                ],
+                "not": {
+                  "required": [
+                    "target_handle"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "oneOf": [
+              {
+                "required": [
+                  "diagnostic_handle"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "preset_ref"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "profile_composition"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "preset_ref"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "diagnostic_handle"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "profile_composition"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "profile_composition"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "diagnostic_handle"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "preset_ref"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
         ],
         "not": {
           "anyOf": [
@@ -120,32 +218,12 @@
             },
             {
               "required": [
-                "profile_composition"
-              ]
-            }
-          ]
-        }
-      },
-      {
-        "required": [
-          "target_ref",
-          "profile_composition"
-        ],
-        "not": {
-          "anyOf": [
-            {
-              "required": [
-                "history_capture_id"
+                "recording_handles"
               ]
             },
             {
               "required": [
-                "preset_ref"
-              ]
-            },
-            {
-              "required": [
-                "sharing"
+                "before"
               ]
             }
           ]
@@ -159,7 +237,17 @@
           "anyOf": [
             {
               "required": [
+                "target_handle"
+              ]
+            },
+            {
+              "required": [
                 "target_ref"
+              ]
+            },
+            {
+              "required": [
+                "diagnostic_handle"
               ]
             },
             {
@@ -169,12 +257,81 @@
             },
             {
               "required": [
-                "requested_retention_seconds"
+                "repeated_from_capture_id"
               ]
             },
             {
               "required": [
                 "profile_composition"
+              ]
+            },
+            {
+              "required": [
+                "requested_retention_seconds"
+              ]
+            },
+            {
+              "required": [
+                "recording_handles"
+              ]
+            },
+            {
+              "required": [
+                "before"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "required": [
+          "recording_handles"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "target_handle"
+              ]
+            },
+            {
+              "required": [
+                "target_ref"
+              ]
+            },
+            {
+              "required": [
+                "diagnostic_handle"
+              ]
+            },
+            {
+              "required": [
+                "preset_ref"
+              ]
+            },
+            {
+              "required": [
+                "profile_composition"
+              ]
+            },
+            {
+              "required": [
+                "result_access"
+              ]
+            },
+            {
+              "required": [
+                "requested_retention_seconds"
+              ]
+            },
+            {
+              "required": [
+                "history_selection"
+              ]
+            },
+            {
+              "required": [
+                "history_capture_id"
               ]
             }
           ]
@@ -202,10 +359,22 @@
             }
           ]
         }
+      },
+      {
+        "if": {
+          "required": [
+            "before"
+          ]
+        },
+        "then": {
+          "required": [
+            "recording_handles"
+          ]
+        }
       }
     ],
     "$defs": {
-      "d0": {
+      "d1": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -222,8 +391,7 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
@@ -232,11 +400,245 @@
           "id"
         ]
       },
-      "d1": {
+      "d2": {
         "type": "string",
         "format": "date-time"
       },
-      "d4": {
+      "d3": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "creator"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "teams"
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "Group"
+                    },
+                    "issuer": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "issuer",
+                    "id"
+                  ]
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mode",
+              "teams"
+            ]
+          }
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
+          },
+          "outputSelection": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "const": "approvedExtracts"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "const": "explicit"
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "actionID": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                        },
+                        "dataClass": {
+                          "enum": [
+                            "metadata",
+                            "extract",
+                            "raw"
+                          ]
+                        },
+                        "projectionRef": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                            },
+                            "version": {
+                              "type": "string",
+                              "pattern": "^v[1-9][0-9]*$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "version"
+                          ]
+                        },
+                        "operations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "list_cases",
+                              "get_case",
+                              "list_artifacts",
+                              "get_extract",
+                              "compare_profiles",
+                              "get_query_result",
+                              "read_memory",
+                              "debugger_command",
+                              "pcap_query",
+                              "syscall_query",
+                              "download_artifact"
+                            ],
+                            "description": "Current MCP tool names; raw operations use the grant vocabulary. get_extract views are further limited by the selected data classes."
+                          },
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "actionID",
+                        "dataClass"
+                      ],
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "dataClass": {
+                                "const": "raw"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "operations"
+                            ],
+                            "not": {
+                              "required": [
+                                "projectionRef"
+                              ]
+                            },
+                            "properties": {
+                              "operations": {
+                                "contains": {
+                                  "enum": [
+                                    "read_memory",
+                                    "debugger_command",
+                                    "pcap_query",
+                                    "syscall_query",
+                                    "download_artifact"
+                                  ]
+                                },
+                                "minContains": 1
+                              }
+                            }
+                          },
+                          "else": {
+                            "required": [
+                              "projectionRef"
+                            ],
+                            "properties": {
+                              "operations": {
+                                "items": {
+                                  "not": {
+                                    "enum": [
+                                      "read_memory",
+                                      "debugger_command",
+                                      "pcap_query",
+                                      "syscall_query",
+                                      "download_artifact"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "mode",
+                  "outputs"
+                ]
+              }
+            ]
+          },
+          "notAfter": {
+            "$ref": "#/$defs/d2"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "management": {
+            "$ref": "#/$defs/d3"
+          }
+        },
+        "required": [
+          "recipients"
+        ]
+      },
+      "d6": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -254,47 +656,215 @@
           "version": {
             "type": "string",
             "pattern": "^v[1-9][0-9]*$",
-            "maxLength": 32
+            "description": "Optional; omitted, the hub resolves the current version and records it."
           }
         },
         "required": [
           "catalog",
-          "name",
-          "version"
+          "name"
         ]
       },
-      "d6": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 63
-      },
-      "d7": {
-        "type": "string",
-        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-        "maxLength": 16
-      },
       "d8": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cidrs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "cidrs"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "podSelector": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "namespace": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "matchLabels": {
+                          "type": "object",
+                          "minProperties": 1,
+                          "additionalProperties": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 63
+                          }
+                        }
+                      },
+                      "required": [
+                        "namespace",
+                        "matchLabels"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "podSelector"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "resourceRef": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "Pod",
+                            "Deployment",
+                            "StatefulSet",
+                            "Service"
+                          ]
+                        },
+                        "namespace": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253
+                        },
+                        "serviceMode": {
+                          "enum": [
+                            "backends",
+                            "virtualIP",
+                            "both"
+                          ]
+                        },
+                        "readyOnly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "namespace",
+                        "name"
+                      ],
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "kind": {
+                                "const": "Service"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "serviceMode",
+                              "readyOnly"
+                            ]
+                          },
+                          "else": {
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "serviceMode"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "readyOnly"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "resourceRef"
+                  ]
+                }
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "protocol": {
+            "enum": [
+              "tcp",
+              "udp",
+              "icmp",
+              "any"
+            ]
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "resolution": {
+            "enum": [
+              "frozen",
+              "follow"
+            ]
+          }
+        },
+        "required": [
+          "entries",
+          "protocol",
+          "resolution"
+        ],
+        "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
+      },
+      "d9": {
         "type": "string",
         "minLength": 1,
         "pattern": "\\S",
         "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
       },
-      "d9": {
-        "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
-      },
       "d10": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
       },
       "d11": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+      },
+      "d13": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
+      },
+      "d12": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxAge": {
-            "$ref": "#/$defs/d7"
+            "$ref": "#/$defs/d13"
           },
           "maxBytes": {
             "type": "integer",
@@ -315,7 +885,103 @@
         ],
         "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
       },
-      "d12": {
+      "d14": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "executablePath": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^/"
+              },
+              "executableName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^[^/]+$"
+              },
+              "runtime": {
+                "enum": [
+                  "native",
+                  "go",
+                  "dotnet",
+                  "python",
+                  "node",
+                  "jvm"
+                ]
+              },
+              "buildIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [],
+            "minProperties": 1
+          },
+          "includeDescendants": {
+            "type": "boolean"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resolve": {
+            "const": "atDispatch"
+          }
+        },
+        "required": [
+          "match",
+          "includeDescendants",
+          "maxDepth",
+          "resolve"
+        ]
+      },
+      "d15": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxProcesses": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses \u00d7 maxBytesPerProcess \u2264 the action maxBytes and by maxTotalStop."
+          },
+          "maxBytesPerProcess": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Bounded only by the action and capture byte budget."
+          },
+          "maxStopPerProcess": {
+            "$ref": "#/$defs/d13"
+          },
+          "maxTotalStop": {
+            "$ref": "#/$defs/d13"
+          },
+          "consistency": {
+            "const": "sequential"
+          }
+        },
+        "required": [
+          "maxProcesses",
+          "maxBytesPerProcess",
+          "maxStopPerProcess",
+          "maxTotalStop",
+          "consistency"
+        ]
+      },
+      "d16": {
         "oneOf": [
           {
             "type": "object",
@@ -353,36 +1019,36 @@
           }
         ]
       },
-      "d13": {
+      "d17": {
         "enum": [
           "metadata",
           "arguments"
         ]
       },
-      "d14": {
+      "d18": {
         "anyOf": [
           {
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d7"
+            "$ref": "#/$defs/d13"
           }
         ]
       },
-      "d15": {
+      "d19": {
         "anyOf": [
           {
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d7"
+            "$ref": "#/$defs/d13"
           }
         ]
       },
-      "d16": {
-        "$ref": "#/$defs/d11"
+      "d20": {
+        "$ref": "#/$defs/d12"
       },
-      "d17": {
+      "d21": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -400,351 +1066,387 @@
           "captureBuffers"
         ]
       },
-      "d18": {
+      "d22": {
         "type": "integer",
         "minimum": 1,
         "maximum": 9007199254740991,
         "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
       },
-      "d5": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "actionID": {
-            "$ref": "#/$defs/d6"
-          },
-          "value": {},
-          "field": {}
-        },
-        "required": [
-          "actionID",
-          "field",
-          "value"
-        ],
+      "d7": {
         "oneOf": [
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetPeers"
               },
               "value": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "entries": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "cidrs": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
-                              },
-                              "minItems": 1,
-                              "maxItems": 128,
-                              "uniqueItems": true
-                            }
-                          },
-                          "required": [
-                            "cidrs"
-                          ]
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "podSelector": {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "properties": {
-                                "namespace": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 63
-                                },
-                                "matchLabels": {
-                                  "type": "object",
-                                  "minProperties": 1,
-                                  "maxProperties": 16,
-                                  "additionalProperties": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 63
-                                  }
-                                }
-                              },
-                              "required": [
-                                "namespace",
-                                "matchLabels"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "podSelector"
-                          ]
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "resourceRef": {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "properties": {
-                                "kind": {
-                                  "enum": [
-                                    "Pod",
-                                    "Deployment",
-                                    "StatefulSet",
-                                    "Service"
-                                  ]
-                                },
-                                "namespace": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 63
-                                },
-                                "name": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 253
-                                },
-                                "serviceMode": {
-                                  "enum": [
-                                    "backends",
-                                    "virtualIP",
-                                    "both"
-                                  ]
-                                },
-                                "readyOnly": {
-                                  "type": "boolean"
-                                }
-                              },
-                              "required": [
-                                "kind",
-                                "namespace",
-                                "name"
-                              ],
-                              "allOf": [
-                                {
-                                  "if": {
-                                    "properties": {
-                                      "kind": {
-                                        "const": "Service"
-                                      }
-                                    }
-                                  },
-                                  "then": {
-                                    "required": [
-                                      "serviceMode",
-                                      "readyOnly"
-                                    ]
-                                  },
-                                  "else": {
-                                    "not": {
-                                      "anyOf": [
-                                        {
-                                          "required": [
-                                            "serviceMode"
-                                          ]
-                                        },
-                                        {
-                                          "required": [
-                                            "readyOnly"
-                                          ]
-                                        }
-                                      ]
-                                    }
-                                  }
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "resourceRef"
-                          ]
-                        }
-                      ]
-                    },
-                    "minItems": 1,
-                    "maxItems": 16,
-                    "uniqueItems": true
-                  },
-                  "protocol": {
-                    "enum": [
-                      "tcp",
-                      "udp",
-                      "icmp",
-                      "any"
-                    ]
-                  },
-                  "ports": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 65535
-                    },
-                    "minItems": 1,
-                    "maxItems": 32,
-                    "uniqueItems": true
-                  },
-                  "resolution": {
-                    "enum": [
-                      "frozen",
-                      "follow"
-                    ]
-                  },
-                  "maxEndpoints": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 4096
-                  },
-                  "maxStaleness": {
-                    "$ref": "#/$defs/d7"
-                  }
-                },
-                "required": [
-                  "entries",
-                  "protocol",
-                  "resolution",
-                  "maxEndpoints",
-                  "maxStaleness"
-                ]
+                "$ref": "#/$defs/d8"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetFilter"
               },
               "value": {
-                "$ref": "#/$defs/d8"
+                "$ref": "#/$defs/d9"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetBefore"
               },
               "value": {
-                "$ref": "#/$defs/d9"
+                "$ref": "#/$defs/d10"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetAfter"
               },
               "value": {
-                "$ref": "#/$defs/d10"
+                "$ref": "#/$defs/d11"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetRing"
               },
               "value": {
-                "$ref": "#/$defs/d11"
-              }
-            }
-          },
-          {
-            "properties": {
-              "field": {
-                "enum": [
-                  "profileDuration",
-                  "actionTimeout"
-                ]
-              },
-              "value": {
-                "$ref": "#/$defs/d7"
-              }
-            }
-          },
-          {
-            "properties": {
-              "field": {
-                "const": "syscallFilter"
-              },
-              "value": {
                 "$ref": "#/$defs/d12"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "field": {
-                "const": "syscallMode"
+              "actionID": {
+                "type": "string",
+                "minLength": 1
               },
-              "value": {
-                "$ref": "#/$defs/d13"
-              }
-            }
-          },
-          {
-            "properties": {
               "field": {
-                "const": "syscallBefore"
+                "const": "processSelector"
               },
               "value": {
                 "$ref": "#/$defs/d14"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallAfter"
+                "const": "processBatch"
               },
               "value": {
                 "$ref": "#/$defs/d15"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallRing"
+                "const": "profileDuration"
+              },
+              "value": {
+                "$ref": "#/$defs/d13"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallFilter"
               },
               "value": {
                 "$ref": "#/$defs/d16"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallArguments"
+                "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d17"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d18"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d19"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d20"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallArguments"
+              },
+              "value": {
+                "$ref": "#/$defs/d21"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d22"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "filePath"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "commandArgv"
+              },
+              "value": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 131072,
+                  "description": "Linux MAX_ARG_STRLEN (131072 bytes) per argument."
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "actionMaxBytes"
               },
@@ -753,10 +1455,42 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "actionTimeout"
+              },
+              "value": {
+                "$ref": "#/$defs/d13"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "actionExecutionMode"
               },
@@ -766,25 +1500,65 @@
                   "ongoing"
                 ]
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "enum": [
-                  "logBefore",
-                  "logAfter"
-                ]
+                "const": "logBefore"
               },
               "value": {
                 "type": "string",
-                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                "maxLength": 16
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "logAfter"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "logStream"
               },
@@ -794,11 +1568,16 @@
                   "both"
                 ]
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           }
         ]
       },
-      "d3": {
+      "d5": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -807,12 +1586,12 @@
             "pattern": "^[a-z][a-z0-9-]{0,23}$"
           },
           "profileRef": {
-            "$ref": "#/$defs/d4"
+            "$ref": "#/$defs/d6"
           },
           "overrides": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d5"
+              "$ref": "#/$defs/d7"
             },
             "minItems": 0
           }
@@ -822,7 +1601,7 @@
           "profileRef"
         ]
       },
-      "d2": {
+      "d4": {
         "title": "Flat bounded capture profile composition",
         "type": "object",
         "additionalProperties": false,
@@ -830,7 +1609,7 @@
           "components": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d3"
+              "$ref": "#/$defs/d5"
             },
             "minItems": 1
           },
@@ -840,84 +1619,78 @@
             "maximum": 9007199254740991
           },
           "maxDuration": {
-            "$ref": "#/$defs/d7"
+            "$ref": "#/$defs/d13"
           }
         },
         "required": [
-          "components",
-          "maxTotalBytes",
-          "maxDuration"
+          "components"
         ]
+      },
+      "d23": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "debugger_command",
+                "download_artifact",
+                "get_logs",
+                "pcap_query",
+                "read_memory",
+                "syscall_query"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "maxArtifacts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxOperations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Optional; defaults to the access end (AccessUntil) of the collected evidence, capped by the administrator maximum. No deadline restarts when an artifact arrives."
+          }
+        },
+        "required": [
+          "actionIds",
+          "operations",
+          "maxArtifacts",
+          "maxBytes",
+          "maxOperations"
+        ],
+        "description": "Result access covers every OAuth client and browser session of the same human; clients carry the user's own evidence access (maintainer decision)."
       }
     }
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "enum": [
-          "metadata",
-          "extract"
-        ]
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -942,17 +1715,17 @@
                   "pod_count": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 100
+                    "maximum": 9007199254740991
                   },
                   "max_bytes": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 109951162777600
+                    "maximum": 9007199254740991
                   },
                   "max_process_starts": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 10000
+                    "maximum": 9007199254740991
                   },
                   "approval_required": {
                     "type": "boolean"
@@ -968,13 +1741,11 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 64
+                          "minLength": 1
                         },
                         "message": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
+                          "minLength": 1
                         },
                         "responsible_role": {
                           "enum": [
@@ -995,38 +1766,34 @@
                         "retryable"
                       ]
                     },
-                    "minItems": 0,
-                    "maxItems": 32
+                    "minItems": 0
                   },
                   "warnings": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
+                      "minLength": 1
                     },
-                    "minItems": 0,
-                    "maxItems": 32
+                    "minItems": 0
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "repeated_from_capture_id": {
                     "type": "string",
                     "format": "uuid"
                   },
                   "profile_composition": {
-                    "$ref": "#/$defs/d0"
+                    "$ref": "#/$defs/d2"
                   },
                   "lifecycle_plan": {
-                    "$ref": "#/$defs/d20"
+                    "$ref": "#/$defs/d24"
                   },
                   "capture_assessment": {
                     "allOf": [
                       {
-                        "$ref": "#/$defs/d21"
+                        "$ref": "#/$defs/d25"
                       },
                       {
                         "properties": {
@@ -1047,12 +1814,18 @@
                       }
                     ]
                   },
+                  "result_access": {
+                    "$ref": "#/$defs/d33"
+                  },
                   "preset_ref": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "name": {
-                        "const": "pod-status"
+                        "enum": [
+                          "incident-context",
+                          "pod-status"
+                        ]
                       },
                       "version": {
                         "const": "v1"
@@ -1099,7 +1872,6 @@
                   "selected_pods": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 100,
                     "uniqueItems": true,
                     "items": {
                       "type": "object",
@@ -1121,8 +1893,7 @@
                         },
                         "uid": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 64
+                          "minLength": 1
                         },
                         "workload": {
                           "type": "object",
@@ -1142,8 +1913,7 @@
                             },
                             "uid": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
+                              "minLength": 1
                             }
                           },
                           "required": [
@@ -1171,20 +1941,18 @@
                   },
                   "result_access_actions": {
                     "type": "array",
-                    "maxItems": 16,
+                    "description": "Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access.",
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
                         "action_id": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 64
+                          "minLength": 1
                         },
                         "operations": {
                           "type": "array",
                           "minItems": 1,
-                          "maxItems": 2,
                           "uniqueItems": true,
                           "items": {
                             "enum": [
@@ -1215,9 +1983,7 @@
                   "warnings",
                   "navigation_uri",
                   "lifecycle_plan",
-                  "capture_assessment",
-                  "target_ref",
-                  "selected_pods"
+                  "capture_assessment"
                 ],
                 "allOf": [
                   {
@@ -1247,9 +2013,6 @@
                       "properties": {
                         "pod_count": {
                           "const": 1
-                        },
-                        "max_bytes": {
-                          "const": 4096
                         },
                         "max_process_starts": {
                           "const": 0
@@ -1292,101 +2055,62 @@
                       }
                     }
                   }
-                ],
-                "oneOf": [
-                  {
-                    "required": [
-                      "preset_ref",
-                      "pod_selection"
-                    ],
-                    "not": {
-                      "required": [
-                        "profile_composition"
-                      ]
-                    }
-                  },
-                  {
-                    "required": [
-                      "profile_composition"
-                    ],
-                    "not": {
-                      "anyOf": [
-                        {
-                          "required": [
-                            "preset_ref"
-                          ]
-                        },
-                        {
-                          "required": [
-                            "pod_selection"
-                          ]
-                        }
-                      ]
-                    },
-                    "anyOf": [
-                      {
-                        "properties": {
-                          "capture_enabled": {
-                            "const": true
-                          },
-                          "approval_required": {
-                            "const": false
-                          },
-                          "blockers": {
-                            "maxItems": 0
-                          }
-                        }
-                      },
-                      {
-                        "properties": {
-                          "capture_enabled": {
-                            "const": false
-                          },
-                          "blockers": {
-                            "minItems": 1
-                          }
-                        }
-                      }
-                    ],
-                    "properties": {
-                      "pod_count": {
-                        "const": 1
-                      },
-                      "max_process_starts": {
-                        "const": 0
-                      }
-                    }
-                  }
                 ]
               }
             },
             "required": [
               "status",
               "data"
-            ],
-            "if": {
-              "properties": {
-                "data": {
-                  "required": [
-                    "profile_composition"
-                  ]
-                }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d34"
+              },
+              "data_class": {
+                "const": "metadata"
               }
             },
-            "then": {
-              "properties": {
-                "data_class": {
-                  "const": "extract"
-                }
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
+                ]
               }
             },
-            "else": {
-              "properties": {
-                "data_class": {
-                  "const": "metadata"
-                }
-              }
-            }
+            "required": [
+              "status",
+              "data"
+            ]
           },
           {
             "type": "object",
@@ -1400,21 +2124,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -1426,8 +2147,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -1435,9 +2155,6 @@
                   "message",
                   "retryable"
                 ]
-              },
-              "data_class": {
-                "const": "metadata"
               }
             },
             "required": [
@@ -1446,10 +2163,162 @@
             ]
           }
         ]
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "ok"
+            },
+            "data": {
+              "required": [
+                "profile_composition"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        "then": {
+          "properties": {
+            "data_class": {
+              "const": "extract"
+            }
+          }
+        }
       }
     ],
     "$defs": {
-      "d3": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d5": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1467,47 +2336,215 @@
           "version": {
             "type": "string",
             "pattern": "^v[1-9][0-9]*$",
-            "maxLength": 32
+            "description": "Optional; omitted, the hub resolves the current version and records it."
           }
         },
         "required": [
           "catalog",
-          "name",
-          "version"
+          "name"
         ]
       },
-      "d5": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 63
-      },
-      "d6": {
-        "type": "string",
-        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-        "maxLength": 16
-      },
       "d7": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cidrs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "cidrs"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "podSelector": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "namespace": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "matchLabels": {
+                          "type": "object",
+                          "minProperties": 1,
+                          "additionalProperties": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 63
+                          }
+                        }
+                      },
+                      "required": [
+                        "namespace",
+                        "matchLabels"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "podSelector"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "resourceRef": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "Pod",
+                            "Deployment",
+                            "StatefulSet",
+                            "Service"
+                          ]
+                        },
+                        "namespace": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253
+                        },
+                        "serviceMode": {
+                          "enum": [
+                            "backends",
+                            "virtualIP",
+                            "both"
+                          ]
+                        },
+                        "readyOnly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "namespace",
+                        "name"
+                      ],
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "kind": {
+                                "const": "Service"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "serviceMode",
+                              "readyOnly"
+                            ]
+                          },
+                          "else": {
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "serviceMode"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "readyOnly"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "resourceRef"
+                  ]
+                }
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "protocol": {
+            "enum": [
+              "tcp",
+              "udp",
+              "icmp",
+              "any"
+            ]
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "resolution": {
+            "enum": [
+              "frozen",
+              "follow"
+            ]
+          }
+        },
+        "required": [
+          "entries",
+          "protocol",
+          "resolution"
+        ],
+        "description": "Peer generations are bounded only by the compiled program limit (BPF_MAXINSNS 4096)."
+      },
+      "d8": {
         "type": "string",
         "minLength": 1,
         "pattern": "\\S",
         "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
       },
-      "d8": {
-        "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
-      },
       "d9": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
       },
       "d10": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+      },
+      "d12": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
+      },
+      "d11": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxAge": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d12"
           },
           "maxBytes": {
             "type": "integer",
@@ -1528,7 +2565,103 @@
         ],
         "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
       },
-      "d11": {
+      "d13": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "executablePath": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^/"
+              },
+              "executableName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^[^/]+$"
+              },
+              "runtime": {
+                "enum": [
+                  "native",
+                  "go",
+                  "dotnet",
+                  "python",
+                  "node",
+                  "jvm"
+                ]
+              },
+              "buildIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [],
+            "minProperties": 1
+          },
+          "includeDescendants": {
+            "type": "boolean"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "resolve": {
+            "const": "atDispatch"
+          }
+        },
+        "required": [
+          "match",
+          "includeDescendants",
+          "maxDepth",
+          "resolve"
+        ]
+      },
+      "d14": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxProcesses": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses \u00d7 maxBytesPerProcess \u2264 the action maxBytes and by maxTotalStop."
+          },
+          "maxBytesPerProcess": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Bounded only by the action and capture byte budget."
+          },
+          "maxStopPerProcess": {
+            "$ref": "#/$defs/d12"
+          },
+          "maxTotalStop": {
+            "$ref": "#/$defs/d12"
+          },
+          "consistency": {
+            "const": "sequential"
+          }
+        },
+        "required": [
+          "maxProcesses",
+          "maxBytesPerProcess",
+          "maxStopPerProcess",
+          "maxTotalStop",
+          "consistency"
+        ]
+      },
+      "d15": {
         "oneOf": [
           {
             "type": "object",
@@ -1566,36 +2699,36 @@
           }
         ]
       },
-      "d12": {
+      "d16": {
         "enum": [
           "metadata",
           "arguments"
         ]
       },
-      "d13": {
+      "d17": {
         "anyOf": [
           {
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d12"
           }
         ]
       },
-      "d14": {
+      "d18": {
         "anyOf": [
           {
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d12"
           }
         ]
       },
-      "d15": {
-        "$ref": "#/$defs/d10"
+      "d19": {
+        "$ref": "#/$defs/d11"
       },
-      "d16": {
+      "d20": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1613,351 +2746,387 @@
           "captureBuffers"
         ]
       },
-      "d17": {
+      "d21": {
         "type": "integer",
         "minimum": 1,
         "maximum": 9007199254740991,
         "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
       },
-      "d4": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "actionID": {
-            "$ref": "#/$defs/d5"
-          },
-          "value": {},
-          "field": {}
-        },
-        "required": [
-          "actionID",
-          "field",
-          "value"
-        ],
+      "d6": {
         "oneOf": [
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetPeers"
               },
               "value": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "entries": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "cidrs": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
-                              },
-                              "minItems": 1,
-                              "maxItems": 128,
-                              "uniqueItems": true
-                            }
-                          },
-                          "required": [
-                            "cidrs"
-                          ]
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "podSelector": {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "properties": {
-                                "namespace": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 63
-                                },
-                                "matchLabels": {
-                                  "type": "object",
-                                  "minProperties": 1,
-                                  "maxProperties": 16,
-                                  "additionalProperties": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 63
-                                  }
-                                }
-                              },
-                              "required": [
-                                "namespace",
-                                "matchLabels"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "podSelector"
-                          ]
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "resourceRef": {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "properties": {
-                                "kind": {
-                                  "enum": [
-                                    "Pod",
-                                    "Deployment",
-                                    "StatefulSet",
-                                    "Service"
-                                  ]
-                                },
-                                "namespace": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 63
-                                },
-                                "name": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 253
-                                },
-                                "serviceMode": {
-                                  "enum": [
-                                    "backends",
-                                    "virtualIP",
-                                    "both"
-                                  ]
-                                },
-                                "readyOnly": {
-                                  "type": "boolean"
-                                }
-                              },
-                              "required": [
-                                "kind",
-                                "namespace",
-                                "name"
-                              ],
-                              "allOf": [
-                                {
-                                  "if": {
-                                    "properties": {
-                                      "kind": {
-                                        "const": "Service"
-                                      }
-                                    }
-                                  },
-                                  "then": {
-                                    "required": [
-                                      "serviceMode",
-                                      "readyOnly"
-                                    ]
-                                  },
-                                  "else": {
-                                    "not": {
-                                      "anyOf": [
-                                        {
-                                          "required": [
-                                            "serviceMode"
-                                          ]
-                                        },
-                                        {
-                                          "required": [
-                                            "readyOnly"
-                                          ]
-                                        }
-                                      ]
-                                    }
-                                  }
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "resourceRef"
-                          ]
-                        }
-                      ]
-                    },
-                    "minItems": 1,
-                    "maxItems": 16,
-                    "uniqueItems": true
-                  },
-                  "protocol": {
-                    "enum": [
-                      "tcp",
-                      "udp",
-                      "icmp",
-                      "any"
-                    ]
-                  },
-                  "ports": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 65535
-                    },
-                    "minItems": 1,
-                    "maxItems": 32,
-                    "uniqueItems": true
-                  },
-                  "resolution": {
-                    "enum": [
-                      "frozen",
-                      "follow"
-                    ]
-                  },
-                  "maxEndpoints": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 4096
-                  },
-                  "maxStaleness": {
-                    "$ref": "#/$defs/d6"
-                  }
-                },
-                "required": [
-                  "entries",
-                  "protocol",
-                  "resolution",
-                  "maxEndpoints",
-                  "maxStaleness"
-                ]
+                "$ref": "#/$defs/d7"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetFilter"
               },
               "value": {
-                "$ref": "#/$defs/d7"
+                "$ref": "#/$defs/d8"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetBefore"
               },
               "value": {
-                "$ref": "#/$defs/d8"
+                "$ref": "#/$defs/d9"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetAfter"
               },
               "value": {
-                "$ref": "#/$defs/d9"
+                "$ref": "#/$defs/d10"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "packetRing"
               },
               "value": {
-                "$ref": "#/$defs/d10"
-              }
-            }
-          },
-          {
-            "properties": {
-              "field": {
-                "enum": [
-                  "profileDuration",
-                  "actionTimeout"
-                ]
-              },
-              "value": {
-                "$ref": "#/$defs/d6"
-              }
-            }
-          },
-          {
-            "properties": {
-              "field": {
-                "const": "syscallFilter"
-              },
-              "value": {
                 "$ref": "#/$defs/d11"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "field": {
-                "const": "syscallMode"
+              "actionID": {
+                "type": "string",
+                "minLength": 1
               },
-              "value": {
-                "$ref": "#/$defs/d12"
-              }
-            }
-          },
-          {
-            "properties": {
               "field": {
-                "const": "syscallBefore"
+                "const": "processSelector"
               },
               "value": {
                 "$ref": "#/$defs/d13"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallAfter"
+                "const": "processBatch"
               },
               "value": {
                 "$ref": "#/$defs/d14"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallRing"
+                "const": "profileDuration"
+              },
+              "value": {
+                "$ref": "#/$defs/d12"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallFilter"
               },
               "value": {
                 "$ref": "#/$defs/d15"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallArguments"
+                "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d16"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d17"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d18"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d19"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallArguments"
+              },
+              "value": {
+                "$ref": "#/$defs/d20"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d21"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "filePath"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "commandArgv"
+              },
+              "value": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 131072,
+                  "description": "Linux MAX_ARG_STRLEN (131072 bytes) per argument."
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "actionMaxBytes"
               },
@@ -1966,10 +3135,42 @@
                 "minimum": 1,
                 "maximum": 9007199254740991
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "actionTimeout"
+              },
+              "value": {
+                "$ref": "#/$defs/d12"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "actionExecutionMode"
               },
@@ -1979,25 +3180,65 @@
                   "ongoing"
                 ]
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
-                "enum": [
-                  "logBefore",
-                  "logAfter"
-                ]
+                "const": "logBefore"
               },
               "value": {
                 "type": "string",
-                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                "maxLength": 16
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           },
           {
+            "type": "object",
+            "additionalProperties": false,
             "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
+              "field": {
+                "const": "logAfter"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1
+              },
               "field": {
                 "const": "logStream"
               },
@@ -2007,11 +3248,16 @@
                   "both"
                 ]
               }
-            }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           }
         ]
       },
-      "d2": {
+      "d4": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2020,12 +3266,12 @@
             "pattern": "^[a-z][a-z0-9-]{0,23}$"
           },
           "profileRef": {
-            "$ref": "#/$defs/d3"
+            "$ref": "#/$defs/d5"
           },
           "overrides": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d4"
+              "$ref": "#/$defs/d6"
             },
             "minItems": 0
           }
@@ -2035,7 +3281,7 @@
           "profileRef"
         ]
       },
-      "d1": {
+      "d3": {
         "title": "Flat bounded capture profile composition",
         "type": "object",
         "additionalProperties": false,
@@ -2043,7 +3289,7 @@
           "components": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d2"
+              "$ref": "#/$defs/d4"
             },
             "minItems": 1
           },
@@ -2053,31 +3299,27 @@
             "maximum": 9007199254740991
           },
           "maxDuration": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d12"
           }
         },
         "required": [
-          "components",
-          "maxTotalBytes",
-          "maxDuration"
+          "components"
         ]
       },
-      "d18": {
+      "d22": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "componentID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 24
+            "minLength": 1
           },
           "profileRef": {
-            "$ref": "#/$defs/d3"
+            "$ref": "#/$defs/d5"
           },
           "sourceUID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           },
           "definitionDigest": {
             "type": "string",
@@ -2089,8 +3331,7 @@
           },
           "sourceNamespaceUID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "minLength": 1
           }
         },
         "required": [
@@ -2143,19 +3384,17 @@
           }
         ]
       },
-      "d19": {
+      "d23": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "componentID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 24
+            "minLength": 1
           },
           "localActionID": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 63
+            "minLength": 1
           },
           "actionID": {
             "type": "string",
@@ -2172,24 +3411,24 @@
           "deduplicated"
         ]
       },
-      "d0": {
+      "d2": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "authored": {
-            "$ref": "#/$defs/d1"
+            "$ref": "#/$defs/d3"
           },
           "resolvedProfiles": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d18"
+              "$ref": "#/$defs/d22"
             },
             "minItems": 1
           },
           "actionMap": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d19"
+              "$ref": "#/$defs/d23"
             },
             "minItems": 1
           }
@@ -2200,7 +3439,7 @@
           "actionMap"
         ]
       },
-      "d20": {
+      "d24": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2223,8 +3462,7 @@
                   "properties": {
                     "actionID": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 63
+                      "minLength": 1
                     },
                     "kind": {
                       "enum": [
@@ -2251,8 +3489,7 @@
                     },
                     "after": {
                       "type": "string",
-                      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-                      "maxLength": 16
+                      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$"
                     }
                   },
                   "required": [
@@ -2303,8 +3540,7 @@
                   "properties": {
                     "actionID": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 63
+                      "minLength": 1
                     },
                     "kind": {
                       "enum": [
@@ -2323,13 +3559,11 @@
                     },
                     "requestedBefore": {
                       "type": "string",
-                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                      "maxLength": 16
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                     },
                     "after": {
                       "type": "string",
-                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                      "maxLength": 16
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                     }
                   },
                   "required": [
@@ -2347,8 +3581,7 @@
                   "properties": {
                     "actionID": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 63
+                      "minLength": 1
                     },
                     "kind": {
                       "const": "logs"
@@ -2358,13 +3591,11 @@
                     },
                     "requestedBefore": {
                       "type": "string",
-                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                      "maxLength": 16
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                     },
                     "after": {
                       "type": "string",
-                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                      "maxLength": 16
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$"
                     }
                   },
                   "required": [
@@ -2387,8 +3618,7 @@
                 }
               ]
             },
-            "minItems": 1,
-            "maxItems": 16
+            "minItems": 1
           },
           "ongoingPodScope": {
             "enum": [
@@ -2463,15 +3693,15 @@
           }
         ]
       },
-      "d22": {
+      "d26": {
         "type": "string",
         "format": "uuid"
       },
-      "d23": {
+      "d27": {
         "type": "string",
         "pattern": "^[a-f0-9]{64}$"
       },
-      "d24": {
+      "d28": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2503,13 +3733,11 @@
               ]
             },
             "minItems": 0,
-            "maxItems": 10,
             "uniqueItems": true
           },
           "explanation": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
@@ -2537,7 +3765,7 @@
           }
         ]
       },
-      "d26": {
+      "d30": {
         "type": "string",
         "enum": [
           "unknown",
@@ -2547,12 +3775,12 @@
           "verifiedNonPersonal"
         ]
       },
-      "d25": {
+      "d29": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "classification": {
-            "$ref": "#/$defs/d26"
+            "$ref": "#/$defs/d30"
           },
           "basis": {
             "enum": [
@@ -2563,8 +3791,7 @@
           },
           "assessmentRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "retainedPossible": {
             "type": "array",
@@ -2580,7 +3807,6 @@
               ]
             },
             "minItems": 0,
-            "maxItems": 7,
             "uniqueItems": true
           },
           "transientOnly": {
@@ -2597,7 +3823,6 @@
               ]
             },
             "minItems": 0,
-            "maxItems": 7,
             "uniqueItems": true
           },
           "unknownContent": {
@@ -2655,7 +3880,7 @@
           }
         ]
       },
-      "d27": {
+      "d31": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2669,25 +3894,24 @@
           "accessAgeSeconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 315360000
+            "maximum": 9007199254740991
           },
           "maximumAgeSeconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 315360000
+            "maximum": 9007199254740991
           },
           "deletionBudgetSeconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 86400
+            "maximum": 9007199254740991
           },
           "policyDigests": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d23"
+              "$ref": "#/$defs/d27"
             },
             "minItems": 1,
-            "maxItems": 64,
             "uniqueItems": true
           },
           "automaticDeletion": {
@@ -2706,7 +3930,7 @@
           "deleteAgeSeconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 315360000
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -2721,7 +3945,7 @@
           "deleteAgeSeconds"
         ]
       },
-      "d28": {
+      "d32": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2770,20 +3994,18 @@
           },
           "sourceRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           },
           "measuredAt": {
             "type": "string",
             "format": "date-time"
           },
           "environmentDigest": {
-            "$ref": "#/$defs/d23"
+            "$ref": "#/$defs/d27"
           },
           "coverage": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
@@ -2830,7 +4052,7 @@
           }
         ]
       },
-      "d21": {
+      "d25": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2838,16 +4060,12 @@
             "const": "capture-assessment/v1"
           },
           "assessmentID": {
-            "$ref": "#/$defs/d22"
+            "$ref": "#/$defs/d26"
           },
           "planDigest": {
-            "$ref": "#/$defs/d23"
+            "$ref": "#/$defs/d27"
           },
           "generatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "validUntil": {
             "type": "string",
             "format": "date-time"
           },
@@ -2856,10 +4074,10 @@
             "additionalProperties": false,
             "properties": {
               "rulesDigest": {
-                "$ref": "#/$defs/d23"
+                "$ref": "#/$defs/d27"
               },
               "capabilityDigest": {
-                "$ref": "#/$defs/d23"
+                "$ref": "#/$defs/d27"
               },
               "metrics": {
                 "type": "object",
@@ -2918,12 +4136,12 @@
               "observationPods": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 1000
+                "maximum": 9007199254740991
               },
               "incidentPods": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 100
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -2932,7 +4150,7 @@
             ]
           },
           "combinedImpact": {
-            "$ref": "#/$defs/d24"
+            "$ref": "#/$defs/d28"
           },
           "actions": {
             "type": "array",
@@ -2942,8 +4160,7 @@
               "properties": {
                 "actionID": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 63
+                  "minLength": 1
                 },
                 "executionMode": {
                   "enum": [
@@ -2952,26 +4169,24 @@
                   ]
                 },
                 "impact": {
-                  "$ref": "#/$defs/d24"
+                  "$ref": "#/$defs/d28"
                 },
                 "data": {
-                  "$ref": "#/$defs/d25"
+                  "$ref": "#/$defs/d29"
                 },
                 "retention": {
-                  "$ref": "#/$defs/d27"
+                  "$ref": "#/$defs/d31"
                 },
                 "quantities": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/$defs/d28"
+                    "$ref": "#/$defs/d32"
                   },
-                  "minItems": 0,
-                  "maxItems": 4
+                  "minItems": 0
                 },
                 "recording_handle": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 128,
                   "description": "For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority."
                 }
               },
@@ -2984,16 +4199,14 @@
                 "quantities"
               ]
             },
-            "minItems": 1,
-            "maxItems": 16
+            "minItems": 1
           },
           "combinedQuantities": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d28"
+              "$ref": "#/$defs/d32"
             },
-            "minItems": 0,
-            "maxItems": 16
+            "minItems": 0
           },
           "interactions": {
             "type": "array",
@@ -3005,11 +4218,9 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 },
                 "kind": {
@@ -3022,8 +4233,7 @@
                 },
                 "message": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 256
+                  "minLength": 1
                 },
                 "blocking": {
                   "type": "boolean"
@@ -3036,8 +4246,7 @@
                 "blocking"
               ]
             },
-            "minItems": 0,
-            "maxItems": 16
+            "minItems": 0
           },
           "alternatives": {
             "type": "array",
@@ -3049,11 +4258,9 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
+                    "minLength": 1
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 },
                 "change": {
@@ -3070,13 +4277,11 @@
                 },
                 "benefit": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 192
+                  "minLength": 1
                 },
                 "coverageLoss": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 192
+                  "minLength": 1
                 }
               },
               "required": [
@@ -3086,8 +4291,7 @@
                 "coverageLoss"
               ]
             },
-            "minItems": 0,
-            "maxItems": 8
+            "minItems": 0
           },
           "handlingCodes": {
             "type": "array",
@@ -3102,13 +4306,11 @@
               ]
             },
             "minItems": 6,
-            "maxItems": 6,
             "uniqueItems": true
           },
           "handlingPolicyRef": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "minLength": 1
           }
         },
         "required": [
@@ -3116,7 +4318,6 @@
           "assessmentID",
           "planDigest",
           "generatedAt",
-          "validUntil",
           "basis",
           "scope",
           "combinedImpact",
@@ -3125,6 +4326,465 @@
           "interactions",
           "alternatives",
           "handlingCodes"
+        ]
+      },
+      "d33": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "debugger_command",
+                "download_artifact",
+                "get_logs",
+                "pcap_query",
+                "read_memory",
+                "syscall_query"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "maxArtifacts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxOperations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "actionIds",
+          "operations",
+          "maxArtifacts",
+          "maxBytes",
+          "maxOperations",
+          "notAfter",
+          "digest"
+        ]
+      },
+      "d36": {
+        "enum": [
+          "packetMetadata",
+          "httpHeaders",
+          "syscallMetadata"
+        ]
+      },
+      "d38": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OIDC Core: sub is at most 255 ASCII characters."
+          },
+          "clientID": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identityType": {
+            "type": "string",
+            "enum": [
+              "human",
+              "workload"
+            ]
+          }
+        },
+        "required": [
+          "issuer",
+          "subject",
+          "clientID",
+          "identityType"
+        ]
+      },
+      "d39": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "d37": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "team"
+          },
+          "executor": {
+            "$ref": "#/$defs/d38"
+          },
+          "continuesAfterCreatorLeaves": {
+            "const": true
+          },
+          "notAfter": {
+            "$ref": "#/$defs/d39",
+            "description": "Absent for an envelope without a lifetime ceiling (ADR-335 D6)."
+          },
+          "state": {
+            "enum": [
+              "Ready",
+              "DelegationRequired",
+              "Revoked",
+              "Expired",
+              "OwnerAssignmentChanged",
+              "ReapprovalRequired",
+              "Unavailable"
+            ]
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "ownerTeams": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "Group"
+                },
+                "issuer": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "kind",
+                "issuer",
+                "id"
+              ]
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "executor",
+          "continuesAfterCreatorLeaves",
+          "state",
+          "reasonCodes",
+          "ownerTeams"
+        ]
+      },
+      "d35": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recording_handle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque, principal-bound handle for preview_capture(recording_handles) and watch_live(action=open, source_handles)."
+          },
+          "owner_kind": {
+            "enum": [
+              "policy",
+              "manualSession"
+            ]
+          },
+          "policy_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "capture_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Manual-session source: the capture that owns it."
+          },
+          "pod_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "packetCapture",
+              "syscallTrace"
+            ]
+          },
+          "state": {
+            "enum": [
+              "Unavailable",
+              "Warming",
+              "Ready",
+              "Degraded",
+              "Stopped"
+            ],
+            "description": "Shared source states (REQ-LIF-002)."
+          },
+          "history": {
+            "enum": [
+              "Unknown",
+              "Full",
+              "Partial",
+              "None"
+            ]
+          },
+          "maximum_before": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/d12"
+              },
+              {
+                "const": "0s"
+              }
+            ]
+          },
+          "save_eligible": {
+            "type": "boolean"
+          },
+          "save_via": {
+            "enum": [
+              "recordingSave",
+              "captureOutcome",
+              "unavailable"
+            ]
+          },
+          "live_projections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d36"
+            },
+            "minItems": 0,
+            "uniqueItems": true,
+            "description": "Live projections watch_live can open on this source; empty when live viewing is unavailable."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "description": "Actionable blocker codes, for example NotSaveEnabled, LiveViewDisabled or SourceStopped."
+          },
+          "incident_pod_cap": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "available_before_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hard_end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Source hard end; watches and saves end by then."
+          },
+          "execution_authority": {
+            "$ref": "#/$defs/d37"
+          },
+          "policy_uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Provenance only."
+          },
+          "pod_uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Provenance only."
+          }
+        },
+        "required": [
+          "recording_handle",
+          "owner_kind",
+          "pod_name",
+          "action_id",
+          "kind",
+          "state",
+          "history",
+          "maximum_before",
+          "save_eligible",
+          "save_via",
+          "live_projections",
+          "blockers",
+          "incident_pod_cap"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "owner_kind": {
+                  "const": "policy"
+                }
+              },
+              "required": [
+                "owner_kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "policy_name"
+              ]
+            },
+            "else": {
+              "required": [
+                "capture_id"
+              ],
+              "properties": {
+                "save_eligible": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "save_eligible": {
+                  "const": true
+                }
+              },
+              "required": [
+                "save_eligible"
+              ]
+            },
+            "then": {
+              "properties": {
+                "save_via": {
+                  "const": "recordingSave"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d34": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "recordingSavePreview"
+          },
+          "operation": {
+            "const": "recordingSave"
+          },
+          "plan_digest": {
+            "$ref": "#/$defs/d27",
+            "description": "Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key."
+          },
+          "selected_recordings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d35"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "recording_handle": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "before": {
+                  "$ref": "#/$defs/d12"
+                },
+                "after": {
+                  "const": "0s"
+                }
+              },
+              "required": [
+                "recording_handle",
+                "before",
+                "after"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "capture_assessment": {
+            "$ref": "#/$defs/d25"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true,
+            "description": "Blocker codes; NoCurrentSource when a repeated save finds no matching running source (follow navigation_uri to list_recordings)."
+          },
+          "navigation_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "capture_enabled": {
+            "type": "boolean"
+          },
+          "incident_pod_cap": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "operation",
+          "plan_digest",
+          "selected_recordings",
+          "windows",
+          "capture_assessment",
+          "blockers",
+          "navigation_uri",
+          "capture_enabled",
+          "incident_pod_cap"
         ]
       }
     }
