@@ -471,7 +471,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if _, ok := h.operations.Tool("request_capture"); ok {
 				scopes = append(scopes, "evidence:capture")
 			}
-			if _, ok := h.operations.Tool("prepare_artifact_download"); ok {
+			if _, ok := h.operations.Tool("download_artifact"); ok {
 				scopes = append(scopes, "evidence:download")
 			}
 			if _, ok := h.operations.Tool("create_share"); ok {
@@ -639,7 +639,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !slices.Contains(i.Scopes, "evidence:read") && !(h.stopSupported() && (route.Method != "tools/call" || route.Name == "cancel_artifact_download")) {
+	if !slices.Contains(i.Scopes, "evidence:read") && !(h.stopSupported() && (route.Method != "tools/call" || route.Name == "download_artifact" && h.validStopInput(body))) {
 		if route.Method != "tools/call" || h.rejectIngress(w, r, current, delivery, route.Name, body, presentation.IngressDenied) {
 			h.challenge(w, 403, "insufficient_scope")
 		}
@@ -648,7 +648,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Authentication/body parsing remains finite. Long normal provider calls
 	// cannot occupy the stop execution slots or its per-principal allowance.
 	if route.Method == "tools/call" {
-		stopCall := route.Name == "cancel_artifact_download" && h.stopSupported() && h.validStopInput(body)
+		stopCall := route.Name == "download_artifact" && h.stopSupported() && h.validStopInput(body)
 		slots := h.normalWork
 		if stopCall {
 			slots = h.stopWork
@@ -912,7 +912,7 @@ func (h *Handler) stopSupported() bool {
 	if h.operations == nil {
 		return false
 	}
-	_, ok := h.operations.Tool("cancel_artifact_download")
+	_, ok := h.operations.Tool("download_artifact")
 	return ok
 }
 func (h *Handler) acquireLaneIdentity(p identity.Principal, stop bool) bool {
@@ -950,5 +950,6 @@ func (h *Handler) validStopInput(body []byte) bool {
 			Arguments json.RawMessage `json:"arguments"`
 		} `json:"params"`
 	}
-	return json.Unmarshal(body, &call) == nil && h.wire.ValidateInput("cancel_artifact_download", call.Params.Arguments) == nil
+	// The stop lane serves only download_artifact action=cancel.
+	return json.Unmarshal(body, &call) == nil && presentation.DownloadAction(call.Params.Arguments) == "cancel" && h.wire.ValidateInput("download_artifact", call.Params.Arguments) == nil
 }

@@ -63,45 +63,61 @@ func (s *ContextDownloadOperations) PublicOrigin() string {
 	}
 	return s.config.PublicOrigin
 }
-func (s *ContextDownloadOperations) ToolNames() []string {
-	names := []string{"prepare_artifact_download", "get_artifact_download"}
-	if s != nil && s.stop != nil {
-		names = append(names, "cancel_artifact_download")
-	}
-	return names
-}
+func (s *ContextDownloadOperations) ToolNames() []string { return []string{downloadTool} }
 func (s *ContextDownloadOperations) Tool(name string) (contracts.InvestigationTool, bool) {
-	if s == nil || !slices.Contains(s.ToolNames(), name) {
+	if s == nil || name != downloadTool {
 		return contracts.InvestigationTool{}, false
 	}
 	return s.contracts.Tool(name)
 }
 
+const downloadTool = "download_artifact"
+
+// ContextDownloadInput is the download_artifact input. after_revision is
+// accepted and ignored here; the shared wait wrapper handles it.
+// representation is accepted: no served artifact kind is a core, so every
+// download is the native file.
 type ContextDownloadInput struct {
-	ArtifactID string `json:"artifact_id,omitempty"`
-	DownloadID string `json:"download_id,omitempty"`
-	Key        string `json:"idempotency_key,omitempty"`
+	Action         string `json:"action"`
+	ArtifactID     string `json:"artifact_id,omitempty"`
+	DownloadID     string `json:"download_id,omitempty"`
+	Key            string `json:"idempotency_key,omitempty"`
+	Representation string `json:"representation,omitempty"`
 }
 
-// Native fields are one verified group, never populated from catalog metadata.
+// DownloadAction returns the action of a download_artifact input, or "".
+func DownloadAction(raw []byte) string {
+	var in struct {
+		Action string `json:"action"`
+	}
+	if json.Unmarshal(raw, &in) != nil {
+		return ""
+	}
+	return in.Action
+}
+
+const downloadNotice = "Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy."
+
+// ContextDownloadData is the canonical Ready status. Only active sessions
+// with verified native facts produce it.
 type ContextDownloadData struct {
-	DownloadID          string                 `json:"download_id"`
-	ArtifactID          string                 `json:"artifact_id"`
-	State               artifact.DownloadState `json:"state"`
-	ExpiresAt           time.Time              `json:"expires_at"`
-	ManagedReadUntil    time.Time              `json:"managed_read_until"`
-	EmittedBytes        int64                  `json:"emitted_bytes"`
-	ResumeAvailable     bool                   `json:"resume_available"`
-	LocalCopyManaged    bool                   `json:"local_copy_managed"`
-	HandlingNotice      string                 `json:"handling_notice"`
-	Filename            string                 `json:"filename,omitempty"`
-	NativeFormat        string                 `json:"native_format,omitempty"`
-	SizeBytes           *int64                 `json:"size_bytes,omitempty"`
-	SHA256              string                 `json:"sha256,omitempty"`
-	ETag                string                 `json:"etag,omitempty"`
-	CoverageNotice      *string                `json:"coverage_notice,omitempty"`
-	ContentPath         string                 `json:"content_path,omitempty"`
-	ContinuePreparation bool                   `json:"continue_preparation,omitempty"`
+	DownloadID       string    `json:"download_id"`
+	ArtifactID       string    `json:"artifact_id"`
+	State            string    `json:"state"`
+	Revision         int64     `json:"revision"`
+	Representation   string    `json:"representation"`
+	Filename         string    `json:"filename"`
+	NativeFormat     string    `json:"native_format"`
+	SizeBytes        int64     `json:"size_bytes"`
+	SHA256           string    `json:"sha256"`
+	ETag             string    `json:"etag"`
+	CoverageNotice   string    `json:"coverage_notice"`
+	ContentPath      string    `json:"content_path"`
+	BrowserURL       string    `json:"browser_url"`
+	AccessUntil      time.Time `json:"access_until"`
+	EmittedBytes     int64     `json:"emitted_bytes"`
+	LocalCopyManaged bool      `json:"local_copy_managed"`
+	HandlingNotice   string    `json:"handling_notice"`
 }
 
 func (s *ContextDownloadOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
@@ -114,14 +130,14 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	if s == nil || ctx == nil || current == nil {
 		return OperationReply{}, artifact.ErrDownloadUnavailable
 	}
-	if !slices.Contains(s.ToolNames(), name) || s.contracts.ValidateInput(name, raw) != nil {
+	if name != downloadTool || s.contracts.ValidateInput(name, raw) != nil {
 		return OperationReply{}, contracts.ErrInvestigationWire
 	}
 	var input ContextDownloadInput
 	if json.Unmarshal(raw, &input) != nil {
 		return OperationReply{}, contracts.ErrInvestigationWire
 	}
-	if name == "cancel_artifact_download" {
+	if input.Action == "cancel" {
 		return s.cancel(ctx, current, call, input)
 	}
 	initial, err := current.ResolveIdentity(ctx)
@@ -138,7 +154,7 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	var view evidence.ContextDownloadView
-	prepare := name == "prepare_artifact_download"
+	prepare := input.Action == "prepare"
 	if !scoped {
 		err = identity.ErrDenied
 	} else if prepare {
@@ -161,12 +177,16 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		if view.Session.Scope.Principal != initial.Principal || prepare && view.Session.Scope.ArtifactID != input.ArtifactID || !prepare && view.Session.ID != input.DownloadID {
 			return OperationReply{}, stopped("download-scope", artifact.ErrDownloadUnavailable)
 		}
-		data, e := contextDownloadData(view, prepare, s.config.Now())
+		data, failure, e := contextDownloadData(view, s.config.Now())
 		if e != nil {
 			return OperationReply{}, stopped("download-view", e)
 		}
 		until = identity.Earlier(until, view.ValidUntil)
-		out.Data = data
+		if failure != nil {
+			out.Status, out.Data = "error", *failure
+		} else {
+			out.Data = data
+		}
 	}
 	final, e := current.ResolveIdentity(ctx)
 	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) {
@@ -185,32 +205,41 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	return OperationReply{Body: body, ValidUntil: until, auditDecision: decision}, nil
 }
 
-func contextDownloadData(v evidence.ContextDownloadView, prepare bool, now time.Time) (ContextDownloadData, error) {
+// contextDownloadData maps the session to the canonical status. Preparing
+// has no public state: the caller repeats prepare with the same key. Terminal
+// sessions no longer hold the verified native facts every canonical status
+// carries, so they return CapabilityUnavailable naming the state.
+func contextDownloadData(v evidence.ContextDownloadView, now time.Time) (ContextDownloadData, *OperationFailure, error) {
 	s := v.Session
-	if !s.Valid() || !now.Before(v.ValidUntil) || v.ValidUntil.After(now.Add(artifact.DownloadLease)) || !now.Before(v.AccessUntil) || !v.AccessUntil.Before(v.DeleteBy) || v.ContinuePreparation && (!prepare || s.State != artifact.DownloadPreparing) {
-		return ContextDownloadData{}, artifact.ErrDownloadUnavailable
+	if !s.Valid() || !now.Before(v.ValidUntil) || v.ValidUntil.After(now.Add(artifact.DownloadLease)) || !now.Before(v.AccessUntil) || !v.AccessUntil.Before(v.DeleteBy) {
+		return ContextDownloadData{}, nil, artifact.ErrDownloadUnavailable
 	}
-	d := ContextDownloadData{DownloadID: s.ID, ArtifactID: s.Scope.ArtifactID, State: s.State, ExpiresAt: identity.Earlier(s.Deadline, v.AccessUntil), ManagedReadUntil: v.AccessUntil, EmittedBytes: s.EmittedBytes, HandlingNotice: "Evidence may contain user data. Asservat automatically deletes managed copies by " + v.DeleteBy.UTC().Format(time.RFC3339) + ". Restrict access and review before sharing. Downloaded copies are outside Asservat and cannot be recalled or automatically deleted.", ContinuePreparation: v.ContinuePreparation}
-	active := s.State == artifact.DownloadReady || s.State == artifact.DownloadStreaming || s.State == artifact.DownloadInterrupted
-	if !s.State.Terminal() && !now.Before(d.ExpiresAt) || active && v.Metadata == nil || s.State == artifact.DownloadPreparing && v.Metadata != nil {
-		return ContextDownloadData{}, artifact.ErrDownloadUnavailable
-	}
-	if m := v.Metadata; m != nil {
-		if m.ReadUntil.IsZero() || m.ReadUntil.After(v.AccessUntil) || m.DeleteBy.After(v.DeleteBy) || !now.Before(m.ReadUntil) || m.Size < 0 || m.Size > artifact.MaxNativeBytes || m.SHA256 == (artifact.Digest{}) {
-			return ContextDownloadData{}, artifact.ErrDownloadUnavailable
+	switch s.State {
+	case artifact.DownloadPreparing:
+		if v.Metadata != nil {
+			return ContextDownloadData{}, nil, artifact.ErrDownloadUnavailable
 		}
-		d.Filename, d.NativeFormat, d.ETag = m.Filename, m.Format, m.ETag
-		coverage := m.Coverage
-		d.CoverageNotice = &coverage
-		size := m.Size
-		d.SizeBytes = &size
-		d.SHA256 = hash(m.SHA256)
+		return ContextDownloadData{}, &OperationFailure{Code: "RetryLater", Message: "This download is still being prepared. Repeat prepare with the same idempotency key.", Retryable: true}, nil
+	case artifact.DownloadReady, artifact.DownloadStreaming, artifact.DownloadInterrupted:
+	default:
+		state := string(s.State)
+		if s.State == artifact.DownloadExpired || s.State == artifact.DownloadDenied {
+			state = "Failed (" + state + ")"
+		}
+		return ContextDownloadData{}, &OperationFailure{Code: "CapabilityUnavailable", Message: "This download session ended: " + state + ". Its verified size and checksum are not kept after the session ends. Prepare a new download to transfer the file again.", Retryable: false}, nil
 	}
-	if active {
-		d.ContentPath = "/api/v1/downloads/" + s.ID + "/content"
-		d.ResumeAvailable = true
+	m := v.Metadata
+	if m == nil || !now.Before(s.Deadline) || m.ReadUntil.IsZero() || m.ReadUntil.After(v.AccessUntil) || m.DeleteBy.After(v.DeleteBy) || !now.Before(m.ReadUntil) || m.Size < 0 || m.Size > artifact.MaxNativeBytes || m.SHA256 == (artifact.Digest{}) {
+		return ContextDownloadData{}, nil, artifact.ErrDownloadUnavailable
 	}
-	return d, nil
+	return ContextDownloadData{DownloadID: s.ID, ArtifactID: s.Scope.ArtifactID, State: "Ready", Revision: downloadRevision(s), Representation: "file", Filename: m.Filename, NativeFormat: m.Format, SizeBytes: m.Size, SHA256: hash(m.SHA256), ETag: m.ETag, CoverageNotice: m.Coverage, ContentPath: "/api/v1/downloads/" + s.ID + "/content", BrowserURL: "/downloads/" + s.ID, AccessUntil: identity.Earlier(s.Deadline, v.AccessUntil), EmittedBytes: s.EmittedBytes, HandlingNotice: downloadNotice}, nil, nil
+}
+
+// downloadRevision changes whenever the session state or its transfer
+// generation changes; status waits compare it.
+func downloadRevision(s artifact.DownloadSession) int64 {
+	order := map[artifact.DownloadState]int64{artifact.DownloadPreparing: 1, artifact.DownloadReady: 2, artifact.DownloadStreaming: 3, artifact.DownloadInterrupted: 4, artifact.DownloadCompleted: 5, artifact.DownloadCancelled: 6, artifact.DownloadExpired: 7, artifact.DownloadDenied: 8, artifact.DownloadFailed: 9}
+	return s.Generation*10 + order[s.State]
 }
 
 type ContextDownloadCancelData struct {
@@ -246,7 +275,7 @@ func (s *ContextDownloadOperations) cancel(ctx context.Context, current identiti
 	}
 	until = identity.Earlier(until, final.ValidUntil)
 	body, e := json.Marshal(out)
-	if e != nil || s.contracts.ValidateOutput("cancel_artifact_download", body) != nil || !s.config.Now().Before(until) {
+	if e != nil || s.contracts.ValidateOutput(downloadTool, body) != nil || !s.config.Now().Before(until) {
 		clear(body)
 		return OperationReply{}, artifact.ErrDownloadUnavailable
 	}
