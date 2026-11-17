@@ -1,14 +1,15 @@
 import type { components } from '../generated/live';
 import * as validators from '../generated/validate-live';
 
-export type Operation = 'list_live_sources' | 'open_live_watch' | 'read_live_watch' | 'update_live_watch' | 'close_live_watch';
+export type Operation = 'list_recordings' | 'watch_live';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
-export type Source = Extract<Output<'list_live_sources'>, {status:'ok'}>['data']['sources'][number];
-export type Watch = Extract<Output<'open_live_watch'>, {status:'ok'}>['data'];
-export type Batch = Extract<Output<'read_live_watch'>, {status:'ok'}>['data'];
+type Watched = Extract<Output<'watch_live'>, {status:'ok'}>;
+export type Source = Extract<Output<'list_recordings'>, {status:'ok'}>['data']['recordings'][number];
+export type Watch = Extract<Watched['data'], {idle_expires_at: string}>;
+export type Batch = Extract<Watched['data'], {batch_id: string}>;
 export type Row = Batch['rows'][number];
-export type Filter = NonNullable<Input<'open_live_watch'>['display_filter']>;
+export type Filter = NonNullable<Input<'watch_live'>['display_filter']>;
 export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }

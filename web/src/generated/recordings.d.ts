@@ -3,18 +3,62 @@ export type paths = Record<string, never>;
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        McpInput_list_recordings: {
-            policy_uid?: string;
-            cursor?: string;
-            limit?: number;
-            target_ref: {
-                /** Format: uuid */
-                cluster_id: string;
-                namespace: string;
-                /** @enum {unknown} */
-                kind: "Deployment" | "StatefulSet" | "Pod";
-                name: string;
+        Contract_common_76a8fd22c9ccd9dc: string;
+        Contract_sharing_request_23966cae8e071ea3: {
+            /** @description No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason). */
+            recipients: components["schemas"]["Contract_common_0e44f1278c675a38"][];
+            outputSelection?: {
+                /** @constant */
+                mode: "approvedExtracts";
+            } | {
+                /** @constant */
+                mode: "explicit";
+                outputs: ({
+                    actionID: string;
+                    /** @enum {unknown} */
+                    dataClass: "metadata" | "extract" | "raw";
+                    projectionRef?: {
+                        name: string;
+                        version: string;
+                    };
+                    operations?: ("list_cases" | "get_case" | "list_artifacts" | "get_extract" | "compare_profiles" | "get_query_result" | "read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
+                } & unknown)[];
             };
+            notAfter?: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
+            reason?: string;
+            management?: components["schemas"]["Contract_management_0d504ecd6bc8c0fd"];
+        };
+        Contract_common_0e44f1278c675a38: {
+            /** @enum {string} */
+            kind: "User" | "Group";
+            /** Format: uri */
+            issuer: string;
+            id: string;
+        };
+        /** Format: date-time */
+        Contract_common_f06a67a70a2b97a5: string;
+        Contract_management_0d504ecd6bc8c0fd: {
+            /** @constant */
+            mode: "creator";
+        } | {
+            /** @constant */
+            mode: "teams";
+            teams: {
+                /** @constant */
+                kind: "Group";
+                /** Format: uri */
+                issuer: string;
+                id: string;
+            }[];
+        };
+        McpInput_preview_recording_save: {
+            recording_handles: string[];
+            before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            /** @description Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat. */
+            reason?: string;
+            sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
+            /** Format: uuid */
+            repeated_from_capture_id?: string;
         };
         /** Asservat mcp-result v1 */
         Contract_mcp_result: {
@@ -38,14 +82,28 @@ export interface components {
             artifactID: string;
             digest: string;
         };
-        Contract_recording_save_5bb857fd69a5246d: {
+        Contract_recording_save_9fa579a60a73e081: {
             /** @constant */
-            kind: "recordingPage";
-            recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
+            kind: "recordingSavePreview";
+            /** @constant */
+            operation: "recordingSave";
+            /** @description Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key. */
+            plan_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+            selected_recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
+            windows: {
+                recording_handle: string;
+                before: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                /** @constant */
+                after: "0s";
+            }[];
+            capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"];
+            blockers: string[];
+            /** Format: uri */
+            navigation_uri: string;
             capture_enabled: boolean;
-            /** Format: date-time */
-            expires_at: string;
+            incident_pod_cap: number;
         };
+        Contract_common_9cbf92fb972157c6: string;
         Contract_recording_save_b717cd5d08e2c9d9: {
             recording_handle?: string;
             policy_uid: string;
@@ -70,7 +128,6 @@ export interface components {
             observed_at?: string;
             execution_authority?: components["schemas"]["Contract_policy_authority_12c1bf2df01fe57b"];
         } & unknown;
-        Contract_common_76a8fd22c9ccd9dc: string;
         Contract_policy_authority_12c1bf2df01fe57b: {
             /** @constant */
             mode: "team";
@@ -103,111 +160,6 @@ export interface components {
             /** @enum {string} */
             identityType: "human" | "workload";
         };
-        /** Format: date-time */
-        Contract_common_f06a67a70a2b97a5: string;
-        McpOutput_list_recordings: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: components["schemas"]["Contract_recording_save_5bb857fd69a5246d"];
-            /** @constant */
-            data_class?: "metadata";
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        Contract_sharing_request_23966cae8e071ea3: {
-            /** @description No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason). */
-            recipients: components["schemas"]["Contract_common_0e44f1278c675a38"][];
-            outputSelection?: {
-                /** @constant */
-                mode: "approvedExtracts";
-            } | {
-                /** @constant */
-                mode: "explicit";
-                outputs: ({
-                    actionID: string;
-                    /** @enum {unknown} */
-                    dataClass: "metadata" | "extract" | "raw";
-                    projectionRef?: {
-                        name: string;
-                        version: string;
-                    };
-                    operations?: ("list_cases" | "get_case" | "list_artifacts" | "get_extract" | "compare_profiles" | "get_query_result" | "read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
-                } & unknown)[];
-            };
-            notAfter?: components["schemas"]["Contract_common_f06a67a70a2b97a5"];
-            reason?: string;
-            management?: components["schemas"]["Contract_management_0d504ecd6bc8c0fd"];
-        };
-        Contract_common_0e44f1278c675a38: {
-            /** @enum {string} */
-            kind: "User" | "Group";
-            /** Format: uri */
-            issuer: string;
-            id: string;
-        };
-        Contract_management_0d504ecd6bc8c0fd: {
-            /** @constant */
-            mode: "creator";
-        } | {
-            /** @constant */
-            mode: "teams";
-            teams: {
-                /** @constant */
-                kind: "Group";
-                /** Format: uri */
-                issuer: string;
-                id: string;
-            }[];
-        };
-        McpInput_preview_recording_save: {
-            recording_handles: string[];
-            before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-            /** @description Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat. */
-            reason?: string;
-            sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
-            /** Format: uuid */
-            repeated_from_capture_id?: string;
-        };
-        Contract_recording_save_9fa579a60a73e081: {
-            /** @constant */
-            kind: "recordingSavePreview";
-            /** @constant */
-            operation: "recordingSave";
-            /** @description Digest of the resolved recording-save/v1 plan. Submit it as request_capture expected_plan_digest with the same preview request and an idempotency key. */
-            plan_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
-            selected_recordings: components["schemas"]["Contract_recording_save_b717cd5d08e2c9d9"][];
-            windows: {
-                recording_handle: string;
-                before: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
-                /** @constant */
-                after: "0s";
-            }[];
-            capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"];
-            blockers: string[];
-            /** Format: uri */
-            navigation_uri: string;
-            capture_enabled: boolean;
-            incident_pod_cap: number;
-        };
-        Contract_common_9cbf92fb972157c6: string;
         Contract_capture_assessment_9c7f9709a5418f1b: {
             /** @constant */
             schemaVersion: "capture-assessment/v1";
