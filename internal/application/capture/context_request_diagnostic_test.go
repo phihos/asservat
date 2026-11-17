@@ -42,7 +42,7 @@ func TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview(t *t
 			var err error
 			want := "request/facts/storage/read"
 			if operation == "request" {
-				_, err = f.svc.Request(ctx, source, p.ID, "original")
+				_, err = f.svc.Request(ctx, source, reviewed(p, "original"))
 			} else {
 				_, err = f.svc.Preview(ctx, source, f.intent())
 				want = "facts/storage"
@@ -56,7 +56,7 @@ func TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview(t *t
 				t.Fatal("diagnostic copied dependency text")
 			}
 			if storage.reads != 1 || storage.until.IsZero() || storage.until.After(originalUntil) ||
-				f.admissions.Load() != 0 || len(f.accepted) != 0 || len(f.previews) != 1 {
+				f.admissions.Load() != 0 || len(f.accepted) != 0 {
 				t.Fatal("diagnostic added I/O, widened the caller or allowed an effect", storage.reads, storage.until)
 			}
 		})
@@ -69,7 +69,7 @@ func TestContextRequestChangedDiagnosticIsNotDuplicated(t *testing.T) {
 	f.target.Pin.ControllerUID = "replacement-controller"
 	var reports []string
 	f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
-	_, err := f.svc.Request(t.Context(), f.source(t, t.Context()), p.ID, "original")
+	_, err := f.svc.Request(t.Context(), f.source(t, t.Context()), reviewed(p, "original"))
 	if !errors.Is(err, value.ErrChanged) || !slices.Equal(reports, []string{"request/changed/target"}) ||
 		f.admissions.Load() != 0 || len(f.accepted) != 0 {
 		t.Fatal("changed-review reporting or refusal changed", err, reports)
@@ -101,7 +101,7 @@ func TestContextRequestStorageReadDetailsAreClosed(t *testing.T) {
 				error: untrustedPreviewError{fmt.Errorf("%w: %w", value.ErrUnavailable, cause)}, stage: detail}}
 			var reports []string
 			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
-			_, err := f.svc.Request(t.Context(), f.source(t, t.Context()), p.ID, "original")
+			_, err := f.svc.Request(t.Context(), f.source(t, t.Context()), reviewed(p, "original"))
 			want := "request/facts/storage/read"
 			switch detail {
 			case "", "private-provider-token", "query/sql-42501", "query/unavailable/private":
@@ -128,9 +128,9 @@ func TestContextRequestStoragePredicateRetainsChangedRefusal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	until, _ := ctx.Deadline()
-	_, err := f.svc.Request(ctx, f.source(t, ctx), p.ID, "original-storage-refusal")
+	_, err := f.svc.Request(ctx, f.source(t, ctx), reviewed(p, "original-storage-refusal"))
 	if !errors.Is(err, value.ErrChanged) || !slices.Equal(reports, []string{"request/facts/storage/read/observation/capacity"}) ||
-		storage.reads != 1 || storage.until.IsZero() || storage.until.After(until) || f.admissions.Load() != 0 || len(f.accepted) != 0 || len(f.previews) != 1 {
+		storage.reads != 1 || storage.until.IsZero() || storage.until.After(until) || f.admissions.Load() != 0 || len(f.accepted) != 0 {
 		t.Fatal("storage predicate changed original refusal, bounds or effects", err, reports, storage.reads)
 	}
 }

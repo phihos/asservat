@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Stateless previews (ADR-330 D9, 2026-11-17)
+
+Branch `clean/previews-api`. A preview stores nothing: `preview_capture` and
+`preview_recording_save` return `plan_digest`; `request_capture` takes the
+reviewed `preview` request, `expected_plan_digest` and `idempotency_key`,
+recomputes the plan and refuses a different one with `ReviewChanged`. The
+request ID and every plan ID (capture, case, attempt, snapshot) derive from
+the requester, key and plan digest, so a retry names the same capture and
+the same pending approval; `context_capture.preview_id`,
+`recording_save_group.preview_id` and `access_grant.preview_id` hold that
+request ID. Migration 00200 drops `context_preview`, its fences and expiry.
+Removed: the preview store, preview cleanup, `resolve_capture_request`,
+`continue_acquisition`, the `capture-resolution` SQL duty, the per-root
+preview cap and `preview_id` in grant replies.
+Gaps: approval does not yet submit the request itself (ADR-335 D5): after
+approval the requester resubmits the same request and key, which the grant
+then covers. A request recomputes the preview's reads before admission.
+Recording handles still expire after one minute.
+
 ## One-step publication (REQ-EVD-001, ADR-330, 2026-11-17)
 
 Branch `clean/publication`. hub-api publishes in the transaction that records
@@ -462,13 +481,10 @@ implement the canonical contract.
 
 | Contract | Canonical change | Runtime still implements (code) |
 | --- | --- | --- |
-| `mcp-tools.json`, `browser-openapi.yaml` | Stateless previews: `plan_digest` out, `preview` + `expected_plan_digest` + `idempotency_key` in; `resolve_capture_request` and `continue_acquisition` removed | Stored preview handles, resolution tool and continue flag: `internal/transport/presentation/context_operations.go`, `recording_save_operations.go`, `recorder_preview.go`; `internal/domain/audit/operation.go`; `internal/bootstrap/public_context.go`; console `web/src/capture`, `web/src/recordings` |
 | `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`get_artifact_download` take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | No `after_revision` wait (the request-scoped identity and audit windows end after 5–20 s); query results keep `retry_after_seconds`: `internal/transport/presentation/context_projection_operations.go` |
 | `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events and the live-watch stream are missing; console still polls queries and live watches |
-| `mcp-tools.json` | `get_grant`/`list_reviews`/`request_policy_grant` drop `preview_id` (`can_resolve` and `resume_requires_original_client` are gone) | `internal/application/authorization/grants.go`, `internal/transport/presentation/grant_operations.go` |
 | `mcp-tools.json` | `explain_access`/`preview_access_change`: `ClusterNotObserved` replaces `PermissionObservationStale`; no `valid_until` | `internal/domain/authorization/explain.go`, `internal/transport/presentation/access_preview_operations.go` |
 | `live-watch.schema.json`, `read_live_watch` | `wait_ms` ≤30000; no `retry_after_ms`, `row_max_age_seconds`, `managed_row_max_age_seconds`, source `handle_expires_at`; row expiry is min(privacy, watch deadline) | `internal/domain/live/watch.go`, `internal/domain/live/source.go`, `internal/application/live/service.go` |
-| `recording-save.schema.json` | Preview has `plan_digest` instead of `preview_id`/`capture_id`/`expires_at`/`save_scope_digest`; no recording `handle_expires_at` | `internal/transport/presentation/recording_save_operations.go`, `internal/domain/live/source.go` |
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |

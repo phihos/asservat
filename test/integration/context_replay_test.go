@@ -2,8 +2,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json/jsontext"
 	"errors"
 	"os"
 	"reflect"
@@ -17,40 +15,15 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	capture "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
-	planDomain "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // This extends the existing actual SQL/S3 fixture, whose source identity and
-// permission initialization remain explicitly synthetic. A preview is passive;
-// these checks do not qualify a public transport or collection executor.
-func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario) {
-	pool := poolFor("context_preview_runtime", "synthetic-context-preview")
-	// poolFor also registers outer-test cleanup. Release this helper's pools
-	// here: the concurrency check can open all 16 connections, and subsequent
-	// publication/download helpers need their own independently scoped roles.
-	defer pool.Close()
-	cleanupPool := poolFor("context_preview_cleanup_runtime", "synthetic-context-preview-cleanup")
-	defer cleanupPool.Close()
-	newStore := func(t *testing.T, root string) *postgres.ContextPreviews {
-		t.Helper()
-		s, err := postgres.NewContextPreviews(ctx, pool, root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return s
-	}
-	newCleanup := func(t *testing.T, root string) *postgres.ContextPreviewCleanup {
-		t.Helper()
-		s, err := postgres.NewContextPreviewCleanup(ctx, cleanupPool, root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return s
-	}
+// permission initialization remain explicitly synthetic. It checks storage
+// placement reads and accepted-request replay; a preview stores nothing.
+func qualifyContextReplay(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario) {
 	blueprint := func(t *testing.T, s captureAdmissionScenario) capture.ContextPreview {
 		t.Helper()
 		a, in := s.a, s.a.Plan.Input
@@ -69,19 +42,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		return p
 	}
-	fork := func(t *testing.T, s captureAdmissionScenario, actor identity.Principal, deadline time.Time) capture.ContextPreview {
-		t.Helper()
-		input := s.a.Plan.Input
-		input.CaptureID, input.Executor, input.Deadline = custodyID(), actor, deadline
-		var err error
-		s.a.Plan, err = planning.CompileContext(input, s.a.Plan.CompiledAt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.a.Registration.Location.ArtifactID, s.a.Registration.Location.AttemptID = custodyID(), custodyID()
-		s.a.CaseID, s.a.OccurrenceID = custodyID(), custodyID()
-		return blueprint(t, s)
-	}
 	query := func(t *testing.T, s captureAdmissionScenario, p capture.ContextPreview) capture.ReplayQuery {
 		t.Helper()
 		i := s.a.Eligibility.VerifiedIdentity
@@ -89,8 +49,6 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
 		return capture.ReplayQuery{RootID: s.a.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: captureapp.ContextRequestDigest(p.ID), Identity: i}
 	}
-
-	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
 
 	t.Run("current-context-placement-is-scoped-and-read-only", func(t *testing.T) {
 		s := create(t, 1)
@@ -134,107 +92,8 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 	})
 
-	t.Run("composition-preview-persists-plan-only-blueprint", func(t *testing.T) {
+	t.Run("accepted-replay-survives-the-preview-deadline", func(t *testing.T) {
 		s := create(t, 1)
-		store := newStore(t, s.a.RootID)
-		p := blueprint(t, s)
-		p.Intent.Diagnostic = ""
-		p.Intent.Composition = &planDomain.ProfileComposition{Components: []planDomain.ProfileComponent{{ID: "net", Profile: planDomain.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planDomain.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"}, {ActionID: "sample", Field: "packetRing", Ring: &planDomain.RingSettings{MaxAge: "40s", MaxBytes: 16 << 20, Segments: 4}}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
-		p.Storage = capture.ContextStorageSelection{}
-		p.AssessmentRulesDigest = planning.RecorderAssessmentRulesDigest()
-		raw, err := readImplementedExample("../../examples/", "resolved-recorder-preview.json")
-		if err != nil {
-			t.Fatal(err)
-		}
-		scope := jsontext.Value(raw)
-		if err := scope.Canonicalize(); err != nil {
-			t.Fatal(err)
-		}
-		p.CanonicalScope, p.ScopeDigest = []byte(scope), artifact.Digest(sha256.Sum256(scope))
-		if !captureapp.ValidContextPreview(p) {
-			t.Fatal("invalid composition blueprint")
-		}
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal(err)
-		}
-		got, err := store.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor)
-		if err != nil || !reflect.DeepEqual(got, p) || got.Intent.Composition == nil || got.Intent.Composition.Components[0].Edits[1].Ring.MaxAge != "40s" {
-			t.Fatal("composition blueprint changed in SQL", err)
-		}
-		var captures, attempts int
-		if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE root_id=$1", s.a.RootID).Scan(&captures); err != nil || captures != 0 {
-			t.Fatal("plan-only preview created a capture", captures, err)
-		}
-		if err := admin.QueryRow(ctx, "SELECT count(*) FROM custody_attempt WHERE allocation_id=$1", s.a.Registration.AllocationID).Scan(&attempts); err != nil || attempts != 0 {
-			t.Fatal("plan-only preview reserved custody", attempts, err)
-		}
-	})
-
-	t.Run("preview-immutable-owner-bound-and-independent-of-observation-age", func(t *testing.T) {
-		s := create(t, 1)
-		store := newStore(t, s.a.RootID)
-		p := blueprint(t, s)
-		p.CreatedAt = p.CreatedAt.Add(-10 * time.Second)
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal("review age incorrectly requires five-second observations", err)
-		}
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal("exact uncertain-create retry failed", err)
-		}
-		got, err := store.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor)
-		if err != nil || !reflect.DeepEqual(got, p) {
-			t.Fatal("preview identity or original deadline changed", err)
-		}
-		changed := p.Clone()
-		changed.Deadline = changed.Deadline.Add(time.Second)
-		if err := store.CreateContextPreview(ctx, changed); !errors.Is(err, capture.ErrConflict) {
-			t.Fatal("immutable retry replaced original preview", err)
-		}
-		actor := p.Actor
-		actor.ClientID = "other-client"
-		if _, err := store.ReadContextPreview(ctx, p.RootID, p.ID, actor); !errors.Is(err, capture.ErrChanged) {
-			t.Fatal("another client read preview", err)
-		}
-		for _, statement := range []string{"UPDATE context_preview SET deadline=deadline+interval '1 second' WHERE id=$1", "DELETE FROM context_preview WHERE id=$1"} {
-			if _, err := pool.Exec(ctx, statement, p.ID); err == nil {
-				t.Fatal("preview role rewrote or deleted active review")
-			}
-		}
-		if _, err := cleanupPool.Exec(ctx, "DELETE FROM context_preview WHERE id=$1", p.ID); err == nil {
-			t.Fatal("cleanup credential deleted active review")
-		}
-		if _, err := admin.Exec(ctx, "UPDATE context_preview SET deadline=deadline+interval '1 second' WHERE id=$1", p.ID); err == nil {
-			t.Fatal("schema did not reject immutable preview mutation")
-		}
-	})
-
-	t.Run("expired-previews-are-deleted-without-capture-side-effects", func(t *testing.T) {
-		s := create(t, 1)
-		store, cleanup := newStore(t, s.a.RootID), newCleanup(t, s.a.RootID)
-		deadline := time.Now().UTC().Truncate(time.Microsecond).Add(time.Second)
-		const previews = 3
-		for i := 0; i < previews; i++ {
-			p := fork(t, s, s.a.Plan.Input.Executor, deadline)
-			if err := store.CreateContextPreview(ctx, p); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != 0 {
-			t.Fatal("deleted live previews", n, err)
-		}
-		time.Sleep(time.Until(deadline) + 10*time.Millisecond)
-		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != previews {
-			t.Fatal("expired previews were not deleted", n, err)
-		}
-		var captures int
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures); err != nil || captures != 0 {
-			t.Fatal("preview expiry created captures", captures, err)
-		}
-	})
-
-	t.Run("accepted-replay-survives-preview-expiry-and-deletion", func(t *testing.T) {
-		s := create(t, 1)
-		store, cleanup := newStore(t, s.a.RootID), newCleanup(t, s.a.RootID)
 		input := s.a.Plan.Input
 		input.Deadline = time.Now().UTC().Truncate(time.Microsecond).Add(time.Second)
 		var err error
@@ -245,20 +104,11 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		s.a.Registration.WriteUntil = input.Deadline
 		p := blueprint(t, s)
 		s.a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
-		if err := store.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal(err)
-		}
 		original, err := s.s.AdmitContext(ctx, s.a)
 		if err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(time.Until(p.Deadline) + 10*time.Millisecond)
-		if n, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || n != 1 {
-			t.Fatal("expired review remains", n, err)
-		}
-		if _, err := store.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor); !errors.Is(err, capture.ErrChanged) {
-			t.Fatal("missing preview readable", err)
-		}
 		in := query(t, s, p)
 		got, found, err := s.s.LookupContextAdmission(ctx, in)
 		original.Replay = true

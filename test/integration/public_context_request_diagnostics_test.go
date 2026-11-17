@@ -17,13 +17,8 @@ func (s publicJourneyPreviewDiagnostics) LookupContextAdmission(c context.Contex
 	s.trace.record(journeyRequestLookup, journeyDiagnosticError(e))
 	return v, found, e
 }
-func (s publicJourneyPreviewDiagnostics) ReadContextPreview(c context.Context, root, id string, actor identity.Principal) (capturevalue.ContextPreview, error) {
-	v, e := s.ContextPreviewStore.ReadContextPreview(c, root, id, actor)
-	s.trace.record(journeyRequestPreview, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyPreviewDiagnostics) AdmitReviewedContext(c context.Context, id string, in capturevalue.Admission) (capturevalue.Accepted, error) {
-	v, e := s.ReviewedAdmissionTransaction.AdmitReviewedContext(c, id, in)
+func (s publicJourneyPreviewDiagnostics) AdmitReviewedContext(c context.Context, p capturevalue.ContextPreview, in capturevalue.Admission) (capturevalue.Accepted, error) {
+	v, e := s.ReviewedAdmissionTransaction.AdmitReviewedContext(c, p, in)
 	s.trace.record(journeyRequestAdmit, journeyDiagnosticError(e))
 	return v, e
 }

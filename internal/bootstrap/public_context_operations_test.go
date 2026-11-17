@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,10 +28,8 @@ import (
 type publicContextOperationPorts struct {
 	permissions.GrantStore
 	permissions.RawQueryGrantStore
-	captureapp.ContextPreviewStore
 	captureapp.ContextAdmissionReplay
 	captureapp.ReviewedAdmissionTransaction
-	captureapp.ContextRequestResolution
 	captureapp.ContextTargets
 	captureapp.ContextEligibilityReader
 	captureapp.ContextCapabilityReader
@@ -68,7 +67,7 @@ func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig,
 	t.Cleanup(mac.Close)
 	native := &evidence.ContextNativeRuntime{} // handle identity only; never exercised
 	return c, PublicContextOperationServices{
-		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Lifetime: time.Minute},
+		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Replay: p, Admission: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Lifetime: time.Minute},
 		Intents:       p,
 		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Router: &contextstart.Router{}},
 		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
@@ -84,11 +83,10 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	var _ presentation.ContextContinuation = v.submission
 	regional, ok := v.submission.Start.(RegionalAPIContextStart)
 	navigator, navOK := v.progress.Navigation.(captureapp.ContextCaseNavigator)
 	cases, caseOK := navigator.Cases.(catalogapp.ContextCaseService)
-	if !ok || v.submission.Intents != s.Intents || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
+	if !ok || v.submission.Intents != s.Intents || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Now == nil || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
 		t.Fatal("assembly replaced original submission, authority, navigation or native owner")
 	}
 	if s.Regional.Runner.Capabilities != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
@@ -98,7 +96,7 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_capture_profiles", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture", "resolve_capture_request"}
+	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_capture_profiles", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture"}
 	if operations.PublicOrigin() != c.PublicOrigin || !slices.Equal(operations.ToolNames(), want) {
 		t.Fatal("incomplete shared operation set", operations.ToolNames())
 	}
@@ -142,12 +140,6 @@ func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) 
 		},
 		"foreign-download-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Downloads.RootID = "10000000-0000-4000-8000-000000000099"
-		},
-		"preview": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
-			s.Investigation.Previews = nil
-		},
-		"resolution": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
-			s.Investigation.Resolution = nil
 		},
 		"admission": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
 			s.Investigation.Admission = nil
@@ -225,8 +217,7 @@ func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testin
 		"list_capture_profiles":     `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
 		"get_capture_profile":       `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
 		"preview_capture":           `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
-		"request_capture":           `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,
-		"resolve_capture_request":   `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,
+		"request_capture":           `{"preview":{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"` + strings.Repeat("a", 64) + `","idempotency_key":"same-original-key"}`,
 		"get_capture":               `{"capture_id":"` + id + `"}`,
 		"get_case":                  `{"case_id":"` + id + `"}`,
 		"prepare_artifact_download": `{"artifact_id":"` + id + `","idempotency_key":"download-key"}`,

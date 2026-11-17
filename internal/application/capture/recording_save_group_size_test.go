@@ -1,7 +1,6 @@
 package capture
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +13,7 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-// Persisted control size only: source target/audience/policy payloads stay in
-// their immutable protected source/current-policy rows and are not duplicated.
+// A maximal recording-save group preview with bounded source payloads.
 func recordingGroupSizePreview(t *testing.T, n int) value.ContextPreview {
 	t.Helper()
 	x, _, _, _ := newRecordingInventoryFixture(t, n)
@@ -56,21 +54,4 @@ func recordingGroupSizePreview(t *testing.T, n int) value.ContextPreview {
 		t.Fatal("actual grouped canonical scope", err)
 	}
 	return p
-}
-
-func TestRecordingSaveGroupMaximumReviewFitsExistingPreviewJournal(t *testing.T) {
-	for _, n := range []int{2, 16} {
-		p := recordingGroupSizePreview(t, n)
-		if !ValidContextPreview(p) {
-			t.Fatal("structurally valid bounded group preview required", n, p.Valid())
-		}
-		raw, err := json.Marshal(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(raw) > value.MaxContextPreviewBytes {
-			t.Fatal("group exceeded existing128KiB journal", n, len(raw))
-		}
-		t.Logf("group_sources=%d max_review_bytes=%d canonical_scope_bytes=%d cap=%d; fullaudience/policy/label payloads notduplicated", n, len(raw), len(p.CanonicalScope), value.MaxContextPreviewBytes)
-	}
 }

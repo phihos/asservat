@@ -58,8 +58,6 @@ export interface components {
                 kind: "policy";
                 /** Format: uuid */
                 capture_id?: string;
-                /** Format: uuid */
-                preview_id?: string;
                 execution_digest: string;
                 review_digest: string;
                 target: {
@@ -317,8 +315,6 @@ export interface components {
                 kind: "adHocCapture" | "policy";
                 /** Format: uuid */
                 capture_id?: string;
-                /** Format: uuid */
-                preview_id?: string;
                 execution_digest: string;
                 review_digest: string;
                 target: {
@@ -636,8 +632,6 @@ export interface components {
                     kind: "adHocCapture" | "policy";
                     /** Format: uuid */
                     capture_id?: string;
-                    /** Format: uuid */
-                    preview_id?: string;
                     execution_digest: string;
                     review_digest: string;
                     target: {

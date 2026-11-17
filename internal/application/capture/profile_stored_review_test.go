@@ -45,7 +45,7 @@ func newStoredProfileReview(t *testing.T, namespace bool) storedProfileReview {
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 	endpoint, grants, catalog := &changingProfileEndpoint{}, &fakeGrants{}, &storedProfileCatalog{}
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableProfile{availableRecording{base}}
+	base.svc.Admission, base.svc.Recorders = f, availableProfile{availableRecording{base}}
 	base.svc.ProfileEndpoints, base.svc.Grants, base.svc.Profiles = endpoint, grants, catalog
 	ref := planning.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}
 	if namespace {
@@ -78,13 +78,13 @@ func newStoredProfileReview(t *testing.T, namespace bool) storedProfileReview {
 	if err != nil || !preview.Recordable {
 		t.Fatal("profile preview", err)
 	}
-	// Exercise the persisted wire boundary: Resolved is deliberately json:"-".
+	// Exercise the wire boundary: Resolved is deliberately json:"-".
 	raw, err := json.Marshal(preview.Preview)
 	var stored value.ContextPreview
 	if err != nil || json.Unmarshal(raw, &stored) != nil || stored.Intent.Composition.Resolved != nil {
-		t.Fatal("preview persistence")
+		t.Fatal("preview serialization")
 	}
-	f.previews[stored.ID] = stored
+	preview.Preview = stored
 	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
 	return storedProfileReview{f, preview, grants, catalog, endpoint, access}
 }
@@ -94,7 +94,7 @@ func TestProfileStoredNamespaceReviewRehydratesCatalog(t *testing.T) {
 	p := x.preview.Preview
 	targetReads, endpointReads := x.f.targetReads.Load(), x.endpoint.calls
 	for attempt := 0; attempt < 2; attempt++ {
-		_, err := x.f.svc.RequestWithResultAccess(t.Context(), x.f.source(t, t.Context()), p.ID, "review", x.access)
+		_, err := x.f.svc.Request(t.Context(), x.f.source(t, t.Context()), withAccess(p, "review", x.access))
 		if !errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 1 {
 			t.Fatal("stored namespace profile did not open exactly one review", err, len(x.grants.requests))
 		}
@@ -105,13 +105,13 @@ func TestProfileStoredNamespaceReviewRehydratesCatalog(t *testing.T) {
 	if in.DataClass != "raw" || !bytes.Equal(in.Scope, p.CanonicalScope) || in.ExecutionDigest != p.ScopeDigest || x.grants.grant.ResultAccessDigest != authapp.ResultAccessDigest(p.CaptureID, p.ScopeDigest, authapp.NormalizeResultAccess(*x.access)) || in.Review.Actions[0].MaxBytes != 16<<20 || profile == nil || profile.Runtime != "go" || profile.Source != "httpEndpoint" || profile.Type != "heap" || profile.Mode != "snapshot" || profile.ForceGC || profile.Duration != "" || profile.Timeout != "5s" || profile.Port != e.Port || profile.SourceRef != e.Request.SourceRef || profile.SourceName != e.SourceName || profile.PathPolicy != e.PathPolicy || profile.AddressMode != e.AddressMode || profile.EndpointDigest != x.preview.Plan.Actions[0].EndpointDigest || !in.Review.Deadline.Equal(p.Deadline) {
 		t.Fatal("stored profile review replaced approved facts", profile)
 	}
-	if x.catalog.reads != 2 || x.f.targetReads.Load() != targetReads || x.endpoint.calls != endpointReads || len(x.f.seen) != 0 || x.f.previews[p.ID].Intent.Composition.Resolved != nil {
-		t.Fatal("review reselected, persisted documents, acquired, or re-read pending grant", x.catalog.reads)
+	if x.catalog.reads != 3 || x.f.targetReads.Load() != targetReads || x.endpoint.calls != endpointReads || len(x.f.seen) != 0 || p.Intent.Composition.Resolved != nil {
+		t.Fatal("review reselected, kept documents or acquired", x.catalog.reads)
 	}
 	x.grants.covering = nil
 	x.grants.grant.ExpiresAt = x.f.now.Add(time.Minute)
-	_, err := x.f.svc.RequestWithResultAccess(t.Context(), x.f.source(t, t.Context()), p.ID, "approved", x.access)
-	if !errors.Is(err, reachedRecordingAdmission) || len(x.f.seen) != 1 || x.catalog.reads != 3 || len(x.grants.requests) != 1 {
+	_, err := x.f.svc.Request(t.Context(), x.f.source(t, t.Context()), withAccess(p, "approved", x.access))
+	if !errors.Is(err, reachedRecordingAdmission) || len(x.f.seen) != 1 || x.catalog.reads != 4 || len(x.grants.requests) != 1 {
 		t.Fatal("approved stored profile did not use the ordinary single catalog read before admission", err, x.catalog.reads)
 	}
 }
@@ -132,7 +132,7 @@ func TestProfileStoredReviewRejectsChangedCatalog(t *testing.T) {
 			case "reader-missing":
 				x.f.svc.Profiles = nil
 			}
-			_, err := x.f.svc.RequestWithResultAccess(t.Context(), x.f.source(t, t.Context()), x.preview.Preview.ID, "review", x.access)
+			_, err := x.f.svc.Request(t.Context(), x.f.source(t, t.Context()), withAccess(x.preview.Preview, "review", x.access))
 			if err == nil || errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 0 || len(x.f.seen) != 0 {
 				t.Fatal("changed catalog opened a review or acquired", change, err)
 			}
@@ -141,7 +141,7 @@ func TestProfileStoredReviewRejectsChangedCatalog(t *testing.T) {
 }
 
 func TestProfileStoredReviewKeepsOriginalBounds(t *testing.T) {
-	for _, change := range []string{"caller-bound", "preview-bound", "cancel", "preview-expired"} {
+	for _, change := range []string{"caller-bound", "preview-bound"} {
 		t.Run(change, func(t *testing.T) {
 			x := newStoredProfileReview(t, true)
 			p := x.preview.Preview
@@ -157,47 +157,24 @@ func TestProfileStoredReviewKeepsOriginalBounds(t *testing.T) {
 				if !ok || !got.Equal(until) || target.Request != p.Target || len(refs) != 1 || refs[0] != p.Intent.Composition.Components[0].Profile {
 					t.Fatal("catalog read lost original target, version or deadline")
 				}
-				if change == "cancel" {
-					cancel()
-				}
-				if change == "preview-expired" {
-					x.f.now = p.Deadline
-				}
 			}
 			var err error
 			if change == "preview-bound" {
-				_, err = x.f.svc.recorderRequest(ctx, x.f.source(t, ctx), x.f.previews[p.ID], "review", x.access)
+				_, err = x.f.svc.recorderRequest(ctx, x.f.source(t, ctx), p, "review", x.access)
 			} else {
-				_, err = x.f.svc.RequestWithResultAccess(ctx, x.f.source(t, ctx), p.ID, "review", x.access)
+				_, err = x.f.svc.Request(ctx, x.f.source(t, ctx), withAccess(p, "review", x.access))
 			}
-			if change == "caller-bound" || change == "preview-bound" {
-				if !errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 1 {
-					t.Fatal("bounded review failed", err)
-				}
-			} else if err == nil || errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 0 {
-				t.Fatal("late/cancelled catalog read opened review", err)
+			if !errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 1 {
+				t.Fatal("bounded review failed", err)
 			}
 		})
 	}
 }
 
-func TestProfileStoredBuiltinAndCoveringGrantNeedNoCatalogRead(t *testing.T) {
+func TestProfileStoredBuiltinNeedsNoCatalogRead(t *testing.T) {
 	x := newStoredProfileReview(t, false)
-	_, err := x.f.svc.RequestWithResultAccess(t.Context(), x.f.source(t, t.Context()), x.preview.Preview.ID, "review", x.access)
+	_, err := x.f.svc.Request(t.Context(), x.f.source(t, t.Context()), withAccess(x.preview.Preview, "review", x.access))
 	if !errors.Is(err, authorization.ErrApprovalRequired) || len(x.grants.requests) != 1 || x.catalog.reads != 0 {
 		t.Fatal("builtin review read catalog or failed", err, x.catalog.reads)
-	}
-	x = newStoredProfileReview(t, true)
-	p := x.preview.Preview
-	_, err = x.f.svc.RequestWithResultAccess(t.Context(), x.f.source(t, t.Context()), p.ID, "review", x.access)
-	if !errors.Is(err, authorization.ErrApprovalRequired) {
-		t.Fatal(err)
-	}
-	x.grants.covering = nil
-	x.catalog.onRead = func(context.Context, targets.PodResolution, []planning.ProfileRef) {
-		t.Fatal("covering grant added a catalog read")
-	}
-	if err := x.f.svc.reviewResultAccess(t.Context(), x.f.source(t, t.Context()), p.ID, "approved", x.access); err != nil || x.catalog.reads != 2 || len(x.grants.requests) != 1 {
-		t.Fatal("covering grant changed its review path", err)
 	}
 }

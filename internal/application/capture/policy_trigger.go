@@ -44,7 +44,7 @@ const occurrenceSettleAge = 2 * time.Minute
 // distinct existing-window preview. Nil keeps source-save execution unavailable.
 type PolicySourceSnapshotCaptures interface {
 	PreviewPolicySnapshot(context.Context, identities.CurrentIdentity, PolicySnapshotSelection) (ContextPreviewResult, error)
-	Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error)
+	Request(context.Context, identities.CurrentIdentity, CaptureRequest) (value.Accepted, error)
 }
 
 type PolicyTrigger struct {
@@ -414,47 +414,52 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 // review is one preview and request of the triggering Pod; it returns the
 // admitted capture, continuing a start refused before any effect.
 func (t PolicyTrigger) review(call context.Context, current policyIdentity, a authorization.AcceptedPolicyAuthority, intent value.ContextIntent, occurrence value.PolicyOccurrence) (string, error) {
-	mark := time.Now()
-	var preview value.ContextPreview
-	var err error
-	if intent.Composition != nil {
-		recorder, e := t.Capture.PreviewComposition(call, current, intent)
-		err = e
-		if err == nil && !recorder.Recordable {
-			err = value.ErrRecorderUnavailable
+	preview := func(ctx context.Context) (value.ContextPreview, error) {
+		mark := time.Now()
+		defer auditapp.MarkStep(call, "policy-preview", mark)
+		var p value.ContextPreview
+		if intent.Composition != nil {
+			recorder, err := t.Capture.PreviewComposition(ctx, current, intent)
+			if err == nil && !recorder.Recordable {
+				err = value.ErrRecorderUnavailable
+			}
+			if err != nil {
+				return p, err
+			}
+			p = recorder.Preview
+		} else {
+			snapshot, err := t.Capture.Preview(ctx, current, intent)
+			if err != nil {
+				return p, err
+			}
+			p = snapshot.Preview
 		}
-		preview = recorder.Preview
-	} else {
-		snapshot, e := t.Capture.Preview(call, current, intent)
-		preview, err = snapshot.Preview, e
+		// The named Pod must still be the triggering Pod of the accepted
+		// workload: a replacement under the same name is never captured.
+		if p.Target.PodUID != occurrence.PodUID || p.Target.Workload.UID != a.WorkloadUID || p.Target.Namespace.UID != a.NamespaceUID {
+			return p, targets.ErrChanged
+		}
+		return p, nil
 	}
-	auditapp.MarkStep(call, "policy-preview", mark)
-	if err != nil {
-		return "", err
-	}
-	// The named Pod must still be the triggering Pod of the accepted workload:
-	// a replacement under the same name is never captured instead.
-	if preview.Target.PodUID != occurrence.PodUID || preview.Target.Workload.UID != a.WorkloadUID || preview.Target.Namespace.UID != a.NamespaceUID {
-		return "", targets.ErrChanged
-	}
-	mark = time.Now()
-	accepted, err := t.Capture.Request(call, current, preview.ID, occurrence.ID)
+	// The occurrence is the idempotency key: one occurrence admits at most
+	// one capture. A start refused before any effect (ADR-212 headroom, a
+	// busy standby) is continued through the accepted-only path; durable
+	// execution state refuses it after any possible start (ADR-223).
+	request := CaptureRequest{Key: occurrence.ID, Preview: preview}
+	mark := time.Now()
+	accepted, err := t.Capture.Request(call, current, request)
 	auditapp.MarkStep(call, "policy-request", mark)
 	if !authorization.UUID(accepted.CaptureID) {
 		return "", err
 	}
-	// Admitted: the capture exists even if a later phase failed. A start
-	// refused before any effect (ADR-212 headroom, a busy standby) is
-	// continued through the explicit accepted-only path; durable execution
-	// state refuses it after any possible start (ADR-223).
 	for attempt := 0; attempt < 3 && err != nil && !errors.Is(err, value.ErrPreparationUncertain) && !errors.Is(err, value.ErrAcquisitionClosed); attempt++ {
 		// The refused exchange closes first; the region opens the next
-		// standby within about two seconds, as for a human continuation.
+		// standby within about two seconds.
 		if pause(call, 2*time.Second) != nil {
 			break
 		}
 		mark = time.Now()
-		_, err = t.Capture.Continue(call, current, preview.ID, occurrence.ID)
+		_, err = t.Capture.Continue(call, current, request)
 		auditapp.MarkStep(call, "policy-continue", mark)
 		if err != nil {
 			t.reportTimed("continue/"+failureClass(err), "")

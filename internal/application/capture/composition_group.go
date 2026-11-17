@@ -97,7 +97,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime), CompositionGroup: &value.CompositionGroupPreview{}}
+	p := value.ContextPreview{ID: planID(ctx, s.NewID), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: planID(ctx, s.NewID), CaseID: planID(ctx, s.NewID), OccurrenceID: planID(ctx, s.NewID), ArtifactID: planID(ctx, s.NewID), AttemptID: planID(ctx, s.NewID), AssessmentID: planID(ctx, s.NewID), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime), CompositionGroup: &value.CompositionGroupPreview{}}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
@@ -108,7 +108,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		if facts[n], err = s.childRetention(ctx, f, c, intent.RequestedSeconds, created); err != nil {
 			return zero, err
 		}
-		child := value.CompositionGroupChild{CaptureID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), OccurrenceID: s.NewID(), AssessmentID: s.NewID(), Composition: *c.Clone(), Retention: retentionReview(facts[n].retention)}
+		child := value.CompositionGroupChild{CaptureID: planID(ctx, s.NewID), ArtifactID: planID(ctx, s.NewID), AttemptID: planID(ctx, s.NewID), OccurrenceID: planID(ctx, s.NewID), AssessmentID: planID(ctx, s.NewID), Composition: *c.Clone(), Retention: retentionReview(facts[n].retention)}
 		plans[n], err = compiler.CompileRecorder(planning.RecorderInput{CaptureID: child.CaptureID, Executor: p.Actor, Target: target, Composition: c, Retention: facts[n].retention, Deadline: p.Deadline, NodeRecorder: true}, s.Filters, s.Now())
 		if errors.As(err, new(compiler.PeerResolutionNeeded)) {
 			// ADR-283 part 2: Kubernetes peers are plan-only; the plan-only
@@ -181,14 +181,11 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) {
-		return zero, previewFailure("before-store/current", value.ErrChanged)
-	}
-	if err = s.Previews.CreateContextPreview(ctx, p.Clone()); err != nil {
-		return zero, previewFailure("store", err)
+		return zero, previewFailure("identity/current", value.ErrChanged)
 	}
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
 	if !current.Eligible || current.Target != t || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !s.Now().Before(coverageUntil) || ctx.Err() != nil {
-		return zero, previewFailure("after-store/current", value.ErrChanged)
+		return zero, previewFailure("current", value.ErrChanged)
 	}
 	until := i.ValidUntil
 	for _, bound := range []time.Time{current.ValidUntil, current.VerifiedIdentity.ValidUntil, f.eligibility.ValidUntil, assessment.ValidUntil, display.ValidUntil, f.storage.Binding.FreshUntil, coverageUntil} {
@@ -203,7 +200,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 // requestCompositionGroup is Request for a reviewed composition group: one
 // approval gate for the parent, both node recorders resolved for the same
 // Pod, and one atomic admission of every child (ADR-276).
-func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity) (value.Accepted, error) {
+func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity, access *authorization.ResultAccess) (value.Accepted, error) {
 	var zero value.Accepted
 	admit, ok := s.Admission.(CompositionGroupAdmissions)
 	if !ok {
@@ -241,7 +238,7 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 		wait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, i.ValidUntil, p.Storage)
 		defer wait.close()
 	}
-	grant, err := s.recorderRequest(ctx, source, p, key, nil)
+	grant, err := s.recorderRequest(ctx, source, p, key, access)
 	if err != nil {
 		return zero, err
 	}

@@ -56,7 +56,7 @@ it('collects again through a fresh reviewed preview of only the history entry', 
   expect(preview[0].input).toEqual({ history_capture_id: id(42) });
   expect(controller.snapshot()).toMatchObject({ stage: 'review', repeatedFrom: id(42) });
   await controller.submit();
-  expect(client.calls.find(call => call.name === 'request_capture')!.input).toEqual({ preview_id: id(173), idempotency_key: id(6) });
+  expect(client.calls.find(call => call.name === 'request_capture')!.input).toEqual({ preview: { history_capture_id: id(42) }, expected_plan_digest: 'b'.repeat(64), idempotency_key: id(6) });
 });
 
 it('rejects a repeat review for another capture and an ordinary review claiming a repeat', async () => {

@@ -195,3 +195,6 @@ WHERE l.root_id=sqlc.arg(root_id)::uuid AND l.artifact_id=sqlc.arg(artifact_id):
  convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
  (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
  (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids);
+
+-- name: LockApprovedContextGrant :one
+SELECT lock_approved_context_grant(sqlc.arg(root_id)::uuid,sqlc.arg(preview_id)::uuid,sqlc.arg(capture_id)::uuid,sqlc.arg(issuer)::text,sqlc.arg(subject)::text,sqlc.arg(client_id)::text,sqlc.arg(execution_digest)::bytea)::timestamptz;

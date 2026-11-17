@@ -4296,10 +4296,6 @@
                             "type": "string",
                             "format": "uuid"
                           },
-                          "preview_id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
                           "execution_digest": {
                             "type": "string",
                             "pattern": "^[a-f0-9]{64}$"
@@ -5281,7 +5277,6 @@
                             "then": {
                               "required": [
                                 "capture_id",
-                                "preview_id",
                                 "preview_deadline"
                               ],
                               "properties": {
@@ -5367,11 +5362,6 @@
                                   {
                                     "required": [
                                       "capture_id"
-                                    ]
-                                  },
-                                  {
-                                    "required": [
-                                      "preview_id"
                                     ]
                                   },
                                   {
@@ -6022,10 +6012,6 @@
                                   "type": "string",
                                   "format": "uuid"
                                 },
-                                "preview_id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
                                 "execution_digest": {
                                   "type": "string",
                                   "pattern": "^[a-f0-9]{64}$"
@@ -6482,7 +6468,6 @@
                                   "then": {
                                     "required": [
                                       "capture_id",
-                                      "preview_id",
                                       "preview_deadline"
                                     ],
                                     "properties": {
@@ -6568,11 +6553,6 @@
                                         {
                                           "required": [
                                             "capture_id"
-                                          ]
-                                        },
-                                        {
-                                          "required": [
-                                            "preview_id"
                                           ]
                                         },
                                         {
@@ -9511,7 +9491,7 @@
     },
     {
       "name": "request_capture",
-      "description": "Disabled by default. Request a recipe-bound capture, optionally sharing its selected results; capture and sharing approvals are independent. A recordingSave preview dispatches only its pinned existing-source snapshots under reviewed policy scope, never the full recipe; the service enforces the preview operation type. For an already accepted preview/key, continue_acquisition:true explicitly attempts the original acquisition under fresh current checks. Ordinary accepted replay and all status/resolution calls remain passive; uncertain or expired original preparation cannot be repeated.",
+      "description": "Disabled by default. Request a recipe-bound capture, optionally sharing its selected results; capture and sharing approvals are independent. Submit the reviewed preview request with its expected_plan_digest; a changed plan returns ReviewChanged. A recordingSave preview dispatches only its pinned existing-source snapshots under reviewed policy scope, never the full recipe. A retry with the same idempotency key returns the original capture and never recollects; a different request under that key is Conflict.",
       "enabledByDefault": false,
       "annotations": {
         "readOnlyHint": false,
@@ -9546,17 +9526,320 @@
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
           },
-          "preview_id": {
-            "type": "string",
-            "format": "uuid"
-          },
           "result_access": {
             "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
           },
-          "continue_acquisition": {
-            "type": "boolean",
-            "const": true,
-            "description": "Explicitly continue acquisition for an already accepted original preview and request key using current permissions. Omission preserves passive accepted replay. This cannot admit a missing request, create another attempt, renew a start interval, or retry uncertain key preparation."
+          "preview": {
+            "description": "The preview_capture or preview_recording_save request that was reviewed. Submission recomputes its plan.",
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "target_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "target_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "cluster_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "kind": {
+                        "enum": [
+                          "Deployment",
+                          "StatefulSet",
+                          "Pod"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253
+                      }
+                    },
+                    "required": [
+                      "cluster_id",
+                      "namespace",
+                      "kind",
+                      "name"
+                    ]
+                  },
+                  "diagnostic_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "preset_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "enum": [
+                          "incident-context",
+                          "pod-status"
+                        ]
+                      },
+                      "version": {
+                        "const": "v1"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "sharing": {
+                    "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+                  },
+                  "history_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "profile_composition": {
+                    "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
+                  },
+                  "result_access": {
+                    "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
+                  },
+                  "requested_retention_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 315360000,
+                    "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+                  },
+                  "history_selection": {
+                    "enum": [
+                      "currentEligiblePod"
+                    ],
+                    "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
+                  }
+                },
+                "required": [],
+                "oneOf": [
+                  {
+                    "allOf": [
+                      {
+                        "oneOf": [
+                          {
+                            "required": [
+                              "target_handle"
+                            ],
+                            "not": {
+                              "required": [
+                                "target_ref"
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "target_ref"
+                            ],
+                            "not": {
+                              "required": [
+                                "target_handle"
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "oneOf": [
+                          {
+                            "required": [
+                              "diagnostic_handle"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "preset_ref"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "profile_composition"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "preset_ref"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "diagnostic_handle"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "profile_composition"
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "required": [
+                              "profile_composition"
+                            ],
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "diagnostic_handle"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "preset_ref"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "not": {
+                      "required": [
+                        "history_capture_id"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "history_capture_id"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "target_handle"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "target_ref"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "diagnostic_handle"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "preset_ref"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "repeated_from_capture_id"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "profile_composition"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "requested_retention_seconds"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "history_selection"
+                      ]
+                    },
+                    "then": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "history_capture_id"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "repeated_from_capture_id"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "recording_handles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "before": {
+                    "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+                  },
+                  "sharing": {
+                    "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+                  },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "recording_handles"
+                ]
+              }
+            ]
+          },
+          "expected_plan_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "plan_digest of the reviewed preview. A different current plan returns ReviewChanged."
           }
         },
         "required": [
@@ -9575,12 +9858,12 @@
               "anyOf": [
                 {
                   "required": [
-                    "preview_id"
+                    "preview"
                   ]
                 },
                 {
                   "required": [
-                    "continue_acquisition"
+                    "expected_plan_digest"
                   ]
                 }
               ]
@@ -9588,7 +9871,8 @@
           },
           {
             "required": [
-              "preview_id"
+              "preview",
+              "expected_plan_digest"
             ],
             "not": {
               "anyOf": [
@@ -9723,183 +10007,6 @@
                       "query_handle",
                       "retry_after_seconds"
                     ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "error"
-                  },
-                  "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "code": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "message": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1024
-                      },
-                      "retryable": {
-                        "type": "boolean"
-                      },
-                      "navigation_uri": {
-                        "type": "string",
-                        "format": "uri",
-                        "maxLength": 2048
-                      },
-                      "responsible_role": {
-                        "enum": [
-                          "maintainer",
-                          "approver",
-                          "administrator",
-                          "none"
-                        ]
-                      },
-                      "retry_after_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 60
-                      }
-                    },
-                    "required": [
-                      "code",
-                      "message",
-                      "retryable"
-                    ]
-                  }
-                },
-                "required": [
-                  "status",
-                  "data"
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "resolve_capture_request",
-      "description": "Resolve an uncertain own reviewed capture request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.",
-      "enabledByDefault": true,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "inputSchema": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "preview_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "idempotency_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          }
-        },
-        "required": [
-          "preview_id",
-          "idempotency_key"
-        ]
-      },
-      "outputSchema": {
-        "allOf": [
-          {
-            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
-          },
-          {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "const": "ok"
-                  },
-                  "data": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "capture_id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "phase": {
-                            "const": "Accepted"
-                          },
-                          "navigation_uri": {
-                            "type": "string",
-                            "format": "uri",
-                            "maxLength": 2048
-                          },
-                          "operation": {
-                            "enum": [
-                              "collect",
-                              "recordingSave"
-                            ]
-                          },
-                          "state": {
-                            "const": "accepted"
-                          }
-                        },
-                        "required": [
-                          "state",
-                          "capture_id",
-                          "phase",
-                          "navigation_uri",
-                          "operation"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                          "state": {
-                            "const": "closed"
-                          }
-                        },
-                        "required": [
-                          "state"
-                        ]
-                      }
-                    ]
-                  },
-                  "data_class": {
-                    "const": "metadata"
-                  },
-                  "truncated": {
-                    "const": false
-                  },
-                  "next_cursor": {
-                    "type": "null"
-                  },
-                  "narrowing_hint": {
-                    "type": "null"
-                  },
-                  "warnings": {
-                    "type": "array",
-                    "maxItems": 0
-                  },
-                  "provenance": {
-                    "type": "array",
-                    "maxItems": 0
                   }
                 },
                 "required": [
@@ -10526,7 +10633,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
+      "description": "Dry run of a new capture, a repeat from history (history_capture_id). Validates and resolves the plan without arming sensors, reserving capacity or reading application evidence, stores nothing and returns plan_digest; it is not permission. Submit the same request with request_capture and expected_plan_digest.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10816,13 +10923,10 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                      "preview_id": {
+                      "plan_digest": {
                         "type": "string",
-                        "format": "uuid"
-                      },
-                      "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "Digest of the resolved plan: immutable target UIDs, dependencies and the normalized request. Submit it as request_capture expected_plan_digest."
                       },
                       "execution_digest": {
                         "type": "string",
@@ -11100,8 +11204,7 @@
                       }
                     },
                     "required": [
-                      "preview_id",
-                      "expires_at",
+                      "plan_digest",
                       "execution_digest",
                       "pod_count",
                       "max_bytes",
@@ -18057,10 +18160,6 @@
                         "type": "string",
                         "format": "uuid"
                       },
-                      "preview_id": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
                       "execution_digest": {
                         "type": "string",
                         "pattern": "^[a-f0-9]{64}$"
@@ -18988,7 +19087,6 @@
                         "then": {
                           "required": [
                             "capture_id",
-                            "preview_id",
                             "preview_deadline"
                           ],
                           "properties": {
@@ -19074,11 +19172,6 @@
                               {
                                 "required": [
                                   "capture_id"
-                                ]
-                              },
-                              {
-                                "required": [
-                                  "preview_id"
                                 ]
                               },
                               {

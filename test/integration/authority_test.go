@@ -6,7 +6,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -910,25 +909,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		var pending int
 		if admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' AND acknowledged_at IS NULL", s.b.RootID).Scan(&pending) != nil || pending != 0 {
 			t.Fatal("review change events not published", pending)
-		}
-		// Request resolution names only the caller's own preview: its Pod's
-		// recorded review is found through the preview, for its actor only.
-		preview := custodyID()
-		blueprint, _ := json.Marshal(map[string]any{"Target": request})
-		actor, _ := json.Marshal(struct {
-			Format string
-			Actor  identity.Principal
-		}{"context-preview-actor/v1", alice.Principal})
-		actorKey, blueprintSum := sha256.Sum256(actor), sha256.Sum256(blueprint)
-		if _, err = admin.Exec(ctx, "INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline) VALUES($1,$2,$3,$4,$5,$5,$6,$7,clock_timestamp(),clock_timestamp()+interval '1 minute')",
-			preview, s.b.RootID, custodyID(), custodyID(), actorKey[:], blueprint, blueprintSum[:]); err != nil {
-			t.Fatal(err)
-		}
-		if got, err := store.RecordedPreviewReviews(ctx, alice.Principal, preview); err != nil || len(got) != 1 || got[0].Target != request {
-			t.Fatalf("recorded preview review %v %+v", err, got)
-		}
-		if got, err := store.RecordedPreviewReviews(ctx, bob.Principal, preview); err != nil || len(got) != 0 {
-			t.Fatalf("another actor found the preview's review %v %+v", err, got)
 		}
 		// Preview of deleting the source: the persistent assignments it minted
 		// are removed (alice and bob hold current decisions: Allow -> Deny).

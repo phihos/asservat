@@ -26,7 +26,7 @@ func TestLogsPreviewAndAdmissionNeedNoNodeOrImplicitRawCollectionReview(t *testi
 	f := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission = f, f
+	base.svc.Admission = f
 	// Actual API deployments may have node recorders too; logs must still use
 	// ordinary exact Pod resolution, not a packet-recorder availability path.
 	recorders := &logsNoNodeRecorders{availableRecording: availableRecording{base}}

@@ -70,12 +70,28 @@ func (f *repeatBrowserFacts) ResolvePacketRecorder(ctx context.Context, r target
 func (f *repeatBrowserFacts) CompileFilter(string) (planning.CompiledFilter, error) {
 	return planning.CompiledFilter{LinkType: planning.FilterLinkType, Snaplen: planning.FilterSnaplen, Program: []planning.BPFInstruction{{Code: 6, K: 65535}}}, nil
 }
-func (f *repeatBrowserFacts) CreateContextPreview(_ context.Context, p value.ContextPreview) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.preview = p.Clone()
-	f.stores.Add(1)
-	return nil
+func (f *repeatBrowserFacts) keep(r app.RecorderPreviewResult, err error) (app.RecorderPreviewResult, error) {
+	if err == nil {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.preview = r.Preview.Clone()
+		f.stores.Add(1)
+	}
+	return r, err
+}
+
+// recordedPreviews keeps the last computed preview for inspection: a preview
+// stores nothing (ADR-330 D9).
+type recordedPreviews struct {
+	app.ContextInvestigation
+	facts *repeatBrowserFacts
+}
+
+func (r recordedPreviews) PreviewComposition(ctx context.Context, current identities.CurrentIdentity, in value.ContextIntent) (app.RecorderPreviewResult, error) {
+	return r.facts.keep(r.ContextInvestigation.PreviewComposition(ctx, current, in))
+}
+func (r recordedPreviews) PreviewCompositionRepeat(ctx context.Context, current identities.CurrentIdentity, in value.ContextIntent, original authorization.Target) (app.RecorderPreviewResult, error) {
+	return r.facts.keep(r.ContextInvestigation.PreviewCompositionRepeat(ctx, current, in, original))
 }
 func (f *repeatBrowserFacts) ListCaptureHistory(context.Context, value.HistoryQuery) (value.HistoryPage, error) {
 	return value.HistoryPage{}, value.ErrUnavailable
@@ -118,8 +134,9 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	defer server.Close()
-	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
-	service.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
+	investigation := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+	investigation.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
+	service := recordedPreviews{investigation, facts}
 	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Now: time.Now}
 	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)
 	if err != nil {
@@ -213,10 +230,6 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 		t.Fatal("edited repeat route", out["data"])
 	}
 	data := out["data"].(map[string]any)
-	deadline, e := time.Parse(time.RFC3339Nano, data["expires_at"].(string))
-	if e != nil || deadline.After(sourceExpiry) || deadline.Nanosecond()%1000 != 0 {
-		t.Fatal("repeat extended or failed to normalize original bound", e)
-	}
 	if data["approval_required"] != false || data["repeated_from_capture_id"] != p.CaptureID || data["execution_digest"] == hex.EncodeToString(p.ScopeDigest[:]) {
 		t.Fatal("repeat did not create a fresh edited preview")
 	}
@@ -224,6 +237,9 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	edited := facts.preview.Clone()
 	facts.settingsError = value.ErrSettingsUnavailable
 	facts.mu.Unlock()
+	if edited.Deadline.After(sourceExpiry) || edited.Deadline.Nanosecond()%1000 != 0 {
+		t.Fatal("repeat extended or failed to normalize original bound")
+	}
 	if edited.Intent.RepeatedFrom == nil || !edited.Intent.RepeatedFrom.ExpiresAt.Equal(sourceExpiry.UTC().Truncate(time.Microsecond)) || edited.Intent.Composition.Components[0].Edits[0].Text != "tcp dst port 8080" || edited.Intent.Composition.Components[0].Edits[1].Text != "3s" {
 		t.Fatal("route lost authored edits")
 	}

@@ -1,6 +1,6 @@
 {
   "name": "request_capture",
-  "description": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same preview again after approval.",
+  "description": "Submit the reviewed preview request with its expected_plan_digest and a stable idempotency key. A changed plan returns ReviewChanged. Acceptance is not collection or evidence success. A retry with the same key returns the original capture and never recollects; a different request under that key is Conflict. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same request again after approval.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,
@@ -10,19 +10,272 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "preview_id": {
+      "preview": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "target_ref": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "cluster_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "kind": {
+                    "enum": [
+                      "Deployment",
+                      "StatefulSet",
+                      "Pod"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 253
+                  }
+                },
+                "required": [
+                  "cluster_id",
+                  "namespace",
+                  "kind",
+                  "name"
+                ]
+              },
+              "preset_ref": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "const": "pod-status"
+                  },
+                  "version": {
+                    "const": "v1"
+                  }
+                },
+                "required": [
+                  "name",
+                  "version"
+                ]
+              },
+              "requested_retention_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 315360000,
+                "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+              },
+              "sharing": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/d0"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
+                  },
+                  "notAfter": {
+                    "$ref": "#/$defs/d1"
+                  }
+                },
+                "required": [
+                  "recipients"
+                ]
+              },
+              "history_capture_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "repeated_from_capture_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "history_selection": {
+                "enum": [
+                  "currentEligiblePod"
+                ],
+                "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
+              },
+              "profile_composition": {
+                "$ref": "#/$defs/d2"
+              }
+            },
+            "required": [],
+            "oneOf": [
+              {
+                "required": [
+                  "target_ref",
+                  "preset_ref"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "history_capture_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "profile_composition"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "target_ref",
+                  "profile_composition"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "history_capture_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "preset_ref"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "sharing"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "history_capture_id"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "target_ref"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "preset_ref"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "requested_retention_seconds"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "profile_composition"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "history_selection"
+                  ]
+                },
+                "then": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "history_capture_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "repeated_from_capture_id"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "recording_handles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "minItems": 1,
+                "maxItems": 16,
+                "uniqueItems": true
+              },
+              "before": {
+                "$ref": "#/$defs/d7"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+              },
+              "sharing": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/d0"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
+                  },
+                  "notAfter": {
+                    "$ref": "#/$defs/d1"
+                  }
+                },
+                "required": [
+                  "recipients"
+                ]
+              },
+              "repeated_from_capture_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "recording_handles"
+            ]
+          }
+        ]
+      },
+      "expected_plan_digest": {
         "type": "string",
-        "format": "uuid"
+        "pattern": "^[a-f0-9]{64}$",
+        "description": "plan_digest of the reviewed preview. A different current plan returns ReviewChanged."
       },
       "idempotency_key": {
         "type": "string",
         "minLength": 1,
         "maxLength": 128
-      },
-      "continue_acquisition": {
-        "type": "boolean",
-        "const": true,
-        "description": "Explicitly continue acquisition for an already accepted original preview and request key using current permissions. Omission preserves passive accepted replay. This cannot admit a missing request, create another attempt, renew a start interval, or retry uncertain key preparation."
       },
       "result_access": {
         "type": "object",
@@ -84,9 +337,656 @@
       }
     },
     "required": [
-      "preview_id",
+      "preview",
+      "expected_plan_digest",
       "idempotency_key"
-    ]
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "kind",
+          "issuer",
+          "id"
+        ]
+      },
+      "d1": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "enum": [
+              "builtin",
+              "organization",
+              "namespace"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "catalog",
+          "name",
+          "version"
+        ]
+      },
+      "d6": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 63
+      },
+      "d7": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "maxLength": 16
+      },
+      "d8": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S",
+        "description": "No length cap on the text; the bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile, and the enclosing Kubernetes object size."
+      },
+      "d9": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d10": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d11": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxAge": {
+            "$ref": "#/$defs/d7"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "segments": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 9007199254740991,
+            "description": "Segment count; segment size is maxBytes \u00f7 segments. At least 2 so the ring can rotate; evicting one segment drops 1/segments of history."
+          }
+        },
+        "required": [
+          "maxAge",
+          "maxBytes",
+          "segments"
+        ],
+        "description": "In-memory ring; a saved window copies at most maxBytes. The collector memory formula (specs/packets.md REQ-NET-003) bounds all rings on a node."
+      },
+      "d12": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "all"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "include"
+              },
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_]{1,64}$"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mode",
+              "names"
+            ]
+          }
+        ]
+      },
+      "d13": {
+        "enum": [
+          "metadata",
+          "arguments"
+        ]
+      },
+      "d14": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d7"
+          }
+        ]
+      },
+      "d15": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d7"
+          }
+        ]
+      },
+      "d16": {
+        "$ref": "#/$defs/d11"
+      },
+      "d17": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxBytesPerEvent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "captureBuffers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxBytesPerEvent",
+          "captureBuffers"
+        ]
+      },
+      "d18": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput. With the ring, it bounds every trace; there is no lifetime event total (ADR-335 D6)."
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "$ref": "#/$defs/d6"
+          },
+          "value": {},
+          "field": {}
+        },
+        "required": [
+          "actionID",
+          "field",
+          "value"
+        ],
+        "oneOf": [
+          {
+            "properties": {
+              "field": {
+                "const": "packetPeers"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cidrs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "minItems": 1,
+                              "maxItems": 128,
+                              "uniqueItems": true
+                            }
+                          },
+                          "required": [
+                            "cidrs"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "podSelector": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "matchLabels": {
+                                  "type": "object",
+                                  "minProperties": 1,
+                                  "maxProperties": 16,
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 63
+                                  }
+                                }
+                              },
+                              "required": [
+                                "namespace",
+                                "matchLabels"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "podSelector"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "resourceRef": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "Pod",
+                                    "Deployment",
+                                    "StatefulSet",
+                                    "Service"
+                                  ]
+                                },
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "serviceMode": {
+                                  "enum": [
+                                    "backends",
+                                    "virtualIP",
+                                    "both"
+                                  ]
+                                },
+                                "readyOnly": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "namespace",
+                                "name"
+                              ],
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "kind": {
+                                        "const": "Service"
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "serviceMode",
+                                      "readyOnly"
+                                    ]
+                                  },
+                                  "else": {
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "serviceMode"
+                                          ]
+                                        },
+                                        {
+                                          "required": [
+                                            "readyOnly"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "resourceRef"
+                          ]
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp",
+                      "icmp",
+                      "any"
+                    ]
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "resolution": {
+                    "enum": [
+                      "frozen",
+                      "follow"
+                    ]
+                  },
+                  "maxEndpoints": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "maxStaleness": {
+                    "$ref": "#/$defs/d7"
+                  }
+                },
+                "required": [
+                  "entries",
+                  "protocol",
+                  "resolution",
+                  "maxEndpoints",
+                  "maxStaleness"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "packetFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d8"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "packetBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d9"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "packetAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d10"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "packetRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d11"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "enum": [
+                  "profileDuration",
+                  "actionTimeout"
+                ]
+              },
+              "value": {
+                "$ref": "#/$defs/d7"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d12"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallMode"
+              },
+              "value": {
+                "$ref": "#/$defs/d13"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d14"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d15"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d16"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallArguments"
+              },
+              "value": {
+                "$ref": "#/$defs/d17"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d18"
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "actionMaxBytes"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "actionExecutionMode"
+              },
+              "value": {
+                "enum": [
+                  "onTrigger",
+                  "ongoing"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "enum": [
+                  "logBefore",
+                  "logAfter"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "logStream"
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "both"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,23}$"
+          },
+          "profileRef": {
+            "$ref": "#/$defs/d4"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d5"
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "id",
+          "profileRef"
+        ]
+      },
+      "d2": {
+        "title": "Flat bounded capture profile composition",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d3"
+            },
+            "minItems": 1
+          },
+          "maxTotalBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxDuration": {
+            "$ref": "#/$defs/d7"
+          }
+        },
+        "required": [
+          "components",
+          "maxTotalBytes",
+          "maxDuration"
+        ]
+      }
+    }
   },
   "outputSchema": {
     "title": "Asservat mcp-result v1",

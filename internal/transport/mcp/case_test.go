@@ -83,7 +83,7 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 			}
 			expected := 1
 			if withCaptures {
-				expected = 5
+				expected = 4
 			}
 			if response.StatusCode != 200 || json.Unmarshal(b, &listed) != nil || len(listed.Result.Tools) != expected {
 				t.Fatalf("discovery: %d %s", response.StatusCode, b)

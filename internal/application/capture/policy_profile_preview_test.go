@@ -25,7 +25,7 @@ func TestPolicyProfilePreviewRetainsFrozenScopeWithoutObservationLease(t *testin
 			current := newPolicyIdentity(owner, authority, authority.authority, f.now.Add(45*time.Second), func() time.Time { return f.now })
 			endpoint := &changingProfileEndpoint{}
 			admission := &retainedRecording{investigationFixture: f}
-			f.svc.Previews, f.svc.Admission = admission, admission
+			f.svc.Admission = admission
 			f.svc.Recorders = availableProfile{availableRecording{f}}
 			f.svc.ProfileEndpoints = endpoint
 			grants := &fakeGrants{}
@@ -44,7 +44,7 @@ func TestPolicyProfilePreviewRetainsFrozenScopeWithoutObservationLease(t *testin
 			case "cancelled-owner":
 				cancel()
 			}
-			_, err = f.svc.Request(t.Context(), current, before.ID, fixtureID(990))
+			_, err = f.svc.Request(t.Context(), current, reviewed(before, fixtureID(990)))
 			if mode != "current" {
 				if err == nil || len(admission.seen) != 0 || len(grants.requests) != 0 {
 					t.Fatal("changed profile reached admission or opened personal review", mode, err)
@@ -58,9 +58,6 @@ func TestPolicyProfilePreviewRetainsFrozenScopeWithoutObservationLease(t *testin
 			profile, _, err := compiler.ProfileForContext(accepted.Plan)
 			if err != nil || accepted.Plan.Input.Profile == nil || accepted.Plan.Input.Recorder != nil || accepted.Plan.Input.Executor != authority.authority.Executor || accepted.Plan.ScopeDigest != before.ScopeDigest || !accepted.Plan.Input.Deadline.Equal(before.Deadline) || !accepted.Registration.WriteUntil.Equal(identity.Earlier(before.Deadline, accepted.Registration.ExpiresAt)) || profile.Type != "cpu" || profile.Mode != "interval" || profile.ForceGC || profile.MaxBytes != 16<<20 || !accepted.Plan.Input.Profile.Endpoints[0].ResolvedAt.Equal(preview.Plan.Input.Endpoints[0].ResolvedAt) {
 				t.Fatal("policy profile changed reviewed source, parameters or original deadline", err)
-			}
-			if stored := f.previews[before.ID]; stored.ScopeDigest != before.ScopeDigest || !stored.CreatedAt.Equal(before.CreatedAt) || !stored.Deadline.Equal(before.Deadline) {
-				t.Fatal("policy profile renewed its original preview")
 			}
 		})
 	}

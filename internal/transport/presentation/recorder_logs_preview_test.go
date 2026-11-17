@@ -34,7 +34,9 @@ func TestFiniteLogsActualCompiledPreviewFitsPublicContract(t *testing.T) {
 			if err := json.Unmarshal([]byte(input), &in); err != nil {
 				t.Fatal(err)
 			}
-			data, _, err := s.recorderPreview(t.Context(), base, in)
+			projected, _, _, err := s.previewCapture(t.Context(), base, in)
+			data, _ := projected.(RecorderPreviewData)
+			data.PlanDigest = wirePlanDigest
 			if err != nil {
 				t.Fatal("actual logs plan projection", err)
 			}

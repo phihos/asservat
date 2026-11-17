@@ -189,13 +189,13 @@ func TestPublicJourneyPoolRetirementIsFinal(t *testing.T) {
 		return p
 	}
 	pools := newPublicJourneyPools(t, open)
-	retired := pools.Open("context_preview_runtime", "synthetic-context-preview")
+	retired := pools.Open("context_storage_read_runtime", "synthetic-context-storage-read")
 	kept := pools.Open("context_progress_read_runtime", "synthetic-context-progress")
-	pools.Retire("context_preview_runtime")
+	pools.Retire("context_storage_read_runtime")
 	if _, err := retired.Acquire(context.Background()); err == nil {
 		t.Fatal("retired pool still usable")
 	}
-	if kept.Stat().MaxConns() < 1 || !pools.retired["context_preview_runtime"] || pools.retired["context_progress_read_runtime"] {
+	if kept.Stat().MaxConns() < 1 || !pools.retired["context_storage_read_runtime"] || pools.retired["context_progress_read_runtime"] {
 		t.Fatal("retirement affected another purpose")
 	}
 }

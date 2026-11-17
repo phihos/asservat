@@ -29,9 +29,6 @@ for (const [file, validator] of [
   ['mcp-pod-status-diagnostics-result', 'validOutput_list_diagnostics'],
   ['mcp-pod-status-preview-input', 'validInput_preview_capture'],
   ['mcp-pod-status-preview-result', 'validOutput_preview_capture'],
-  ['mcp-resolve-capture-input', 'validInput_resolve_capture_request'],
-  ['mcp-resolve-capture-accepted', 'validOutput_resolve_capture_request'],
-  ['mcp-resolve-capture-closed', 'validOutput_resolve_capture_request'],
 ]) {
   const value = JSON.parse(await readFile(exampleURL(file + '.json'), 'utf8'));
   assert.equal(capture[validator](value), true, file);
@@ -49,15 +46,15 @@ assert.equal(capture.validOutput_preview_capture(otherMechanism), true, 'manual 
 const wrongRecorder = structuredClone(otherMechanism);
 wrongRecorder.data.capture_assessment.actions[0].retention.anchorRule = 'firstAcquisitionOrEarlierSource';
 assert.equal(capture.validOutput_preview_capture(wrongRecorder), false, 'manual recorder preview refuses source-snapshot timing');
-assert.equal(capture.validInput_request_capture({ preview_id: id, idempotency_key: id }), true);
-assert.equal(capture.validInput_request_capture({ preview_id: 'invalid', idempotency_key: id }), false);
+const previewInput = JSON.parse(await readFile(exampleURL('mcp-pod-status-preview-input.json'), 'utf8'));
+assert.equal(capture.validInput_request_capture({ preview: previewInput, expected_plan_digest: podStatus.data.plan_digest, idempotency_key: id }), true);
+assert.equal(capture.validInput_request_capture({ preview: previewInput, expected_plan_digest: 'invalid', idempotency_key: id }), false);
+assert.equal(capture.validInput_request_capture({ preview_id: id, idempotency_key: id }), false, 'stateless previews have no preview_id');
 assert.equal(capture.validInput_get_capture({ capture_id: id }), true);
 const result = data => ({ schema_version: 'mcp-result/v1', request_id: id, data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] });
 assert.equal(capture.validOutput_request_capture(result({ capture_id: id, phase: 'Accepted', navigation_uri: 'https://asservat.example.invalid/captures/' + id, operation: 'collect' })), true);
 assert.equal(capture.validOutput_get_capture(result({ capture_id: id, revision: 1, phase: 'Finalizing', actions: [{ action_id: 'pod-status', phase: 'Finalizing' }], navigation_uri: 'https://asservat.example.invalid/captures/' + id, can_cancel: false, blockers: [], retry_after_seconds: 5 })), true);
-for (const data of [{ state: 'closed', capture_id: id }, { state: 'accepted' }, { state: 'pending' }, { state: 'closed', target_ref: {} }]) assert.equal(capture.validOutput_resolve_capture_request(result(data)), false, 'reject mixed/unknown/incomplete disposition');
-assert.equal(capture.validOutput_resolve_capture_request({ ...result({state:'closed'}), warnings:['private target'] }), false, 'closed carries no warning metadata');
-console.log('Native ESM auth and all five capture operation validators passed positive and negative checks.');
+console.log('Native ESM auth and capture operation validators passed positive and negative checks.');
 
 const evidence = await import('../src/generated/validate-evidence.js');
 for (const [file, validator] of [

@@ -159,7 +159,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "api-execution", "policy-automation", "evidence-share", "access-review", "capture-history")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "api-execution", "policy-automation", "evidence-share", "access-review", "capture-history")
 	if err != nil {
 		return nil, err
 	}
@@ -277,20 +277,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.policyAudit = auditapp.PolicyAcceptancePublisher{Ledger: out.policies, Objects: a.policyObjects()}
 	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: out.permissions, Now: time.Now}, Accepted: out.policies, Current: out.automation, Now: time.Now}
-	previews, err := postgres.NewContextPreviews(ctx, sql["capture-preview"], root)
+	previews, err := postgres.NewRecordingSelections(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	previewCleanup, err := postgres.NewContextPreviewCleanup(ctx, sql["capture-preview"], root)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	out.history.PreviewCleanup = previewCleanup
 	admissionsSQL, err := postgres.NewContextAdmissions(ctx, sql["capture-admit"], root, installation)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	resolution, err := postgres.NewContextRequestResolutions(ctx, sql["capture-resolution"], root, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -310,7 +301,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	out.reviews = authapp.AccessReviews{Store: reviewStore, Reviewer: queries, Now: time.Now}
-	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
+	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Replay: admissionsSQL, Admission: admissionsSQL,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
 		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Processing: processing, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.

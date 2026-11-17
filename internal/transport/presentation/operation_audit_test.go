@@ -114,7 +114,7 @@ func TestAuditedOperationsNormalizationIgnoresInputOrder(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	b, e := s.normalize("request_capture", []byte(`{ "idempotency_key": "same-key", "preview_id":"00000000-0000-4000-8000-000000000020" }`))
+	b, e := s.normalize("request_capture", []byte(`{ "idempotency_key": "same-key", "expected_plan_digest": "`+wirePlanDigest+`", "preview": {"requested_retention_seconds":60, "preset_ref":{"version":"v1","name":"pod-status"}, `+wireTarget+`} }`))
 	if e != nil || !bytes.Equal(a, b) {
 		t.Fatal("normalization depends on input order")
 	}
@@ -188,11 +188,10 @@ func TestAuditedOperationsPreservePrivateDenialDecision(t *testing.T) {
 		name, operation, input, status, reason, effect string
 		serviceError                                   error
 		readOnly, disabled                             bool
-		dispatches, resolves                           int
+		dispatches                                     int
 	}{
 		{name: "capture scope absent", operation: "request_capture", input: wireRequest, readOnly: true, status: "denied", reason: "not_available", effect: "none"},
 		{name: "capture target denied", operation: "request_capture", input: wireRequest, serviceError: capturevalue.ErrDenied, dispatches: 1, status: "denied", reason: "not_available", effect: "unknown"},
-		{name: "resolution target denied", operation: "resolve_capture_request", input: wireRequest, serviceError: capturevalue.ErrDenied, resolves: 1, status: "denied", reason: "not_available", effect: "unknown"},
 		{name: "identity denied by service", operation: "request_capture", input: wireRequest, serviceError: identity.ErrDenied, dispatches: 1, status: "denied", reason: "not_available", effect: "unknown"},
 		{name: "target resolver denied", operation: "request_capture", input: wireRequest, serviceError: targets.ErrDenied, dispatches: 1, status: "denied", reason: "not_available", effect: "unknown"},
 		{name: "invalid service request", operation: "request_capture", input: wireRequest, serviceError: capturevalue.ErrInvalid, dispatches: 1, status: "invalid", reason: "invalid_input", effect: "unknown"},
@@ -213,7 +212,7 @@ func TestAuditedOperationsPreservePrivateDenialDecision(t *testing.T) {
 				s.inner.(*InvestigationOperations).captures.config.CollectionEnabled = false
 			}
 			reply, err := s.Call(context.Background(), f, tt.operation, []byte(tt.input))
-			if err != nil || f.requests != tt.dispatches || f.resolutions != tt.resolves || len(g.events) != 1 {
+			if err != nil || f.requests != tt.dispatches || len(g.events) != 1 {
 				t.Fatalf("canonical error envelope lost: err=%v dispatches=%d outcomes=%d", err, f.requests, len(g.events))
 			}
 			out := g.events[0]
@@ -246,22 +245,6 @@ func TestAuditedOperationsPreDispatchRejectionsHaveNoInvocationEffect(t *testing
 		if _, err := s.Call(context.Background(), f, "request_capture", []byte(input)); err == nil || f.requests != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 			t.Fatal("known pre-dispatch rejection has an uncertain invocation effect", err)
 		}
-	}
-}
-
-func TestContinuationAuditBindsExplicitActionWithoutChangingBusinessKey(t *testing.T) {
-	s, f, g := auditedFixture(t)
-	original, err := s.normalize("request_capture", []byte(wireRequest))
-	if err != nil {
-		t.Fatal(err)
-	}
-	input := []byte(`{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key","continue_acquisition":true}`)
-	continuation, err := s.normalize("request_capture", input)
-	if err != nil || bytes.Equal(original, continuation) || !bytes.Contains(continuation, []byte(`"continue_acquisition":true`)) {
-		t.Fatal("audit lost explicit effect selection", err)
-	}
-	if _, err = s.Call(context.Background(), f, "request_capture", input); err != nil || f.continuations != 1 || f.requests != 0 || len(g.events) != 1 {
-		t.Fatal("continuation bypassed audited dispatch", err)
 	}
 }
 

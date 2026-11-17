@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, result, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
+import { SyntheticOperations, session, target, result, previewResult, progressResult, acceptedResult, id, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
@@ -102,14 +102,7 @@ it('offers retry of an uncertain receipt without a new capture button', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Collect pod status' }));
   expect(await screen.findByRole('button', { name: 'Retry same request' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Collect pod status' })).toBeNull();
-  expect(screen.getByText(/does not create another capture/)).toBeTruthy();
-});
-it('offers explicit resolution before editing an uncertain request', async () => {
-  const { client } = await review(); client.responder = () => { throw new Error('lost reply'); };
-  fireEvent.click(screen.getByRole('button', { name: 'Collect pod status' }));
-  expect(await screen.findByRole('button', { name: 'Resolve before editing' })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Edit request' })).toBeNull();
-  expect(screen.getByText(/If it was accepted/)).toBeTruthy();
+  expect(screen.getByText(/never creates another capture/)).toBeTruthy();
 });
 it('keeps an unavailable backend explicit without inventing catalog entries', async () => {
   const { client, controller } = mount(); client.responder = () => { throw new Error('secret target inventory'); };
@@ -157,7 +150,7 @@ it('preserves the reviewed handle through two real session-controller refreshes 
     fireEvent.click(screen.getByRole('button', { name: 'Continue reviewed request' }));
     await act(() => vi.advanceTimersByTimeAsync(1));
     expect(client.calls.filter(call => call.name === 'preview_capture')).toHaveLength(1);
-    expect(client.calls.find(call => call.name === 'request_capture')!.input).toEqual({ preview_id: id(173), idempotency_key: id(6) });
+    expect(client.calls.find(call => call.name === 'request_capture')!.input).toEqual({ preview: { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' }, requested_retention_seconds: 60 }, expected_plan_digest: 'b'.repeat(64), idempotency_key: id(6) });
   } finally { identity.close(); }
 });
 it('preserves only known local routes for sign-in return navigation', () => {
@@ -166,31 +159,16 @@ it('preserves only known local routes for sign-in return navigation', () => {
   for (const path of ['//external.invalid', '/auth/logout', '/captures/new?token=x', '/captures/secret', '/captures/' + id(8) + '/raw']) expect(returnPath(path)).toBe('/');
 });
 
-it('explains closure without claiming a cancelled capture and edits only after acknowledgement', async () => {
+it('offers only a same-request retry while the outcome is uncertain', async () => {
   const { client } = await review(); client.responder = () => { throw new Error('lost reply'); };
   fireEvent.click(screen.getByRole('button', { name: 'Collect pod status' }));
-  await screen.findByRole('button', { name: 'Resolve before editing' });
-  client.responder = () => resolvedClosedResult();
-  fireEvent.click(screen.getByRole('button', { name: 'Resolve before editing' }));
-  await screen.findByRole('heading', { name: 'Request closed' });
-  expect(screen.getByText(/cannot start a capture/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Collect pod status' })).toBeNull();
-  expect(screen.queryByText('payments / api-a')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Edit request' }));
-  expect(screen.getByRole('heading', { name: 'Collect evidence' })).toBeTruthy();
-  expect((screen.getByLabelText('Workload or pod name') as HTMLInputElement).value).toBe('api');
-  expect(client.calls.filter(c => c.name === 'request_capture')).toHaveLength(1);
-  expect(client.calls.filter(c => c.name === 'preview_capture')).toHaveLength(1);
-});
-it('opens progress when resolution finds acceptance, without offering another collection', async () => {
-  const { client } = await review(); client.responder = () => { throw new Error('lost reply'); };
-  fireEvent.click(screen.getByRole('button', { name: 'Collect pod status' }));
-  await screen.findByRole('button', { name: 'Resolve before editing' });
-  client.responder = name => name === 'resolve_capture_request' ? resolvedAcceptedResult() : progressResult();
-  fireEvent.click(screen.getByRole('button', { name: 'Resolve before editing' }));
-  await screen.findByRole('heading', { name: 'Waiting to start' });
+  await screen.findByRole('button', { name: 'Retry same request' });
   expect(screen.queryByRole('button', { name: 'Edit request' })).toBeNull();
-  expect(client.calls.filter(c => c.name === 'request_capture')).toHaveLength(1);
+  client.responder = name => name === 'request_capture' ? acceptedResult() : progressResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry same request' }));
+  await screen.findByRole('heading', { name: 'Waiting to start' });
+  const submits = client.calls.filter(c => c.name === 'request_capture');
+  expect(submits).toHaveLength(2); expect(submits[1].input).toEqual(submits[0].input);
 });
 
 it('links only the currently authorized case supplied by progress', async () => {
@@ -204,17 +182,6 @@ it('links only the currently authorized case supplied by progress', async () => 
   client.responder = () => { throw new Error('permission lost'); }; await act(() => controller.refreshProgress());
   expect(screen.queryByRole('link', { name: 'View evidence' })).toBeNull();
 });
-it('offers explicit acquisition continuation without claiming acceptance means it started', async () => {
-  const { client } = await review(); fireEvent.click(screen.getByRole('button', { name: 'Collect pod status' }));
-  const button = await screen.findByRole('button', { name: 'Continue collection' });
-  expect(client.calls.filter(call => call.name === 'request_capture')).toHaveLength(1);
-  expect(screen.getByText(/Collection has not been confirmed/)).toBeTruthy();
-  fireEvent.click(button);
-  await waitFor(() => expect(client.calls.filter(call => call.name === 'request_capture')).toHaveLength(2));
-  expect(client.calls.filter(call => call.name === 'request_capture')[1].input).toEqual({ preview_id: id(173), idempotency_key: id(6), continue_acquisition: true });
-  expect(screen.getByRole('link', { name: 'Start a new investigation' }).getAttribute('href')).toBe('/captures/new');
-});
-
 it('renders the reviewed recorder assessment and requests approval without claiming collection', async () => {
   const { controller, client } = await review();
   const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
@@ -225,7 +192,7 @@ it('renders the reviewed recorder assessment and requests approval without claim
   expect(screen.queryByText(/No application process is started/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   expect(await screen.findByRole('link', { name: 'View approval' })).toHaveProperty('pathname', '/approvals/' + id(41));
-  expect(screen.getByRole('button', { name: 'Continue after approval' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Submit after approval' })).toBeTruthy();
   expect(controller.snapshot().captureID).toBeUndefined();
 });
 

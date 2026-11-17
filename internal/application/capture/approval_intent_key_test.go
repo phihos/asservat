@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
 )
 
@@ -35,28 +36,9 @@ func TestPublicApprovalIntentKeyCannotCrossActorClientOrPreview(t *testing.T) {
 	if err != nil || !replay.Replay || replay.CaptureID != accepted.CaptureID {
 		t.Fatal("original intent was not recoverable", err)
 	}
-	other := f.preview(t)
-	if _, err := f.request(t, other, key); !errors.Is(err, value.ErrConflict) || f.admissions.Load() != 1 {
+	other := reviewed(f.preview(t), key)
+	other.Plan = artifact.Digest{9}
+	if _, err := f.svc.Request(context.Background(), f.source(t, context.Background()), other); !errors.Is(err, value.ErrConflict) || f.admissions.Load() != 1 {
 		t.Fatal("known key changed its bound preview", err)
-	}
-}
-
-func TestClosedPublicApprovalIntentNeedsNewPreviewEvenWithNewKey(t *testing.T) {
-	f := newInvestigationFixture()
-	p := f.preview(t)
-	key := "approved-preview-" + p.ID
-	ctx := context.Background()
-	closed, err := f.svc.ResolveContextRequest(ctx, f.source(t, ctx), p.ID, key)
-	if err != nil || closed.State != value.RequestClosed {
-		t.Fatal("original intent did not close", err)
-	}
-	for _, attempt := range []string{key, "different-attempt-key"} {
-		if _, err := f.request(t, p, attempt); !errors.Is(err, value.ErrDenied) || f.admissions.Load() != 0 {
-			t.Fatal("closed preview became a fresh start", err)
-		}
-	}
-	fresh := f.preview(t)
-	if _, err := f.request(t, fresh, "approved-preview-"+fresh.ID); err != nil || f.admissions.Load() != 1 {
-		t.Fatal("fresh review could not create a new intent", err)
 	}
 }

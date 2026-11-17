@@ -104,7 +104,7 @@ func groupedSubmissionFixture(t *testing.T, sizes ...int) (ContextSubmission, *g
 	if err != nil {
 		t.Fatal(err)
 	}
-	seed, err := f.svc.Request(t.Context(), current, p.ID, "seed-child")
+	seed, err := f.svc.Request(t.Context(), current, reviewed(p, "seed-child"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,8 +182,7 @@ func TestGroupedSubmissionStartsReadySiblingWhileLastAuditBlocked(t *testing.T) 
 	s.RecordingSaveEnabled = true
 	f := s.ContextInvestigation.Replay.(*investigationFixture)
 	current := f.source(t, t.Context())
-	preview := fixtureID(9800)
-	parent.SubmissionDigest = ContextRequestDigest(preview)
+	parent.SubmissionDigest = requestDigest(s.ContextInvestigation, f.actor, "group")
 	parent.MetadataValidUntil = f.now.Add(5 * time.Second)
 	f.accepted[fixtureKey(f.actor, "group")] = parent
 	started := make(chan struct{})
@@ -202,7 +201,7 @@ func TestGroupedSubmissionStartsReadySiblingWhileLastAuditBlocked(t *testing.T) 
 		}
 	}
 	ports.startHook = func(context.Context, string) error { close(started); return nil }
-	_, err := s.Continue(t.Context(), current, preview, "group")
+	_, err := s.Continue(t.Context(), current, CaptureRequest{Key: "group"})
 	if !errors.Is(err, value.ErrUnavailable) || len(ports.starts) != 1 {
 		t.Fatalf("ready child suppressed by unrelated audit: starts=%v err=%v", ports.starts, err)
 	}
@@ -212,8 +211,7 @@ func TestGroupedSubmissionCancellationJoinsAcknowledgements(t *testing.T) {
 	s, ports, _, _, parent := groupedSubmissionFixture(t, 16)
 	s.RecordingSaveEnabled = true
 	f := s.Replay.(*investigationFixture)
-	preview := fixtureID(9800)
-	parent.SubmissionDigest = ContextRequestDigest(preview)
+	parent.SubmissionDigest = requestDigest(s.ContextInvestigation, f.actor, "group")
 	parent.MetadataValidUntil = f.now.Add(5 * time.Second)
 	f.accepted[fixtureKey(f.actor, "group")] = parent
 	owner, cancel := context.WithCancel(t.Context())
@@ -228,7 +226,7 @@ func TestGroupedSubmissionCancellationJoinsAcknowledgements(t *testing.T) {
 		return ctx.Err()
 	}
 	done := make(chan error, 1)
-	go func() { _, err := s.Continue(owner, current, preview, "group"); done <- err }()
+	go func() { _, err := s.Continue(owner, current, CaptureRequest{Key: "group"}); done <- err }()
 	for range 16 {
 		select {
 		case <-entered:
@@ -256,8 +254,7 @@ func TestGroupedSubmissionRefreshRejectsChangedChild(t *testing.T) {
 			s, ports, _, _, parent := groupedSubmissionFixture(t)
 			s.RecordingSaveEnabled = true
 			f := s.Replay.(*investigationFixture)
-			preview := fixtureID(9800)
-			parent.SubmissionDigest = ContextRequestDigest(preview)
+			parent.SubmissionDigest = requestDigest(s.ContextInvestigation, f.actor, "group")
 			parent.MetadataValidUntil = f.now.Add(time.Millisecond)
 			f.accepted[fixtureKey(f.actor, "group")] = parent
 			replay := &phaseReplay{investigationFixture: f, initialUntil: parent.MetadataValidUntil}
@@ -291,7 +288,7 @@ func TestGroupedSubmissionRefreshRejectsChangedChild(t *testing.T) {
 			s.Replay = replay
 			ports.startHook = func(context.Context, string) error { f.now = f.now.Add(time.Millisecond); return nil }
 			current := f.source(t, t.Context())
-			out, err := s.Continue(t.Context(), current, preview, "group")
+			out, err := s.Continue(t.Context(), current, CaptureRequest{Key: "group"})
 			if err == nil || out.CaptureID != parent.CaptureID || len(ports.starts) != 2 || replay.acceptedReads != 2 {
 				t.Fatal("changed response renewed group or repeated effects", mode, err, len(ports.starts), replay.acceptedReads)
 			}
@@ -308,8 +305,7 @@ func TestGroupedMetadataCarriesLaterShorterIdentityBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	preview := fixtureID(9800)
-	parent.SubmissionDigest = ContextRequestDigest(preview)
+	parent.SubmissionDigest = requestDigest(s.ContextInvestigation, f.actor, "group")
 	parent.MetadataValidUntil = f.now.Add(time.Microsecond)
 	f.accepted[fixtureKey(f.actor, "group")] = parent
 	replay := &phaseReplay{investigationFixture: f, initialUntil: parent.MetadataValidUntil}
@@ -322,7 +318,7 @@ func TestGroupedMetadataCarriesLaterShorterIdentityBound(t *testing.T) {
 	}
 	s.Replay = replay
 	ports.startHook = func(context.Context, string) error { f.now = f.now.Add(600 * time.Millisecond); return nil }
-	out, err := s.Continue(t.Context(), current, preview, "group")
+	out, err := s.Continue(t.Context(), current, CaptureRequest{Key: "group"})
 	if err != nil || len(ports.starts) != 2 || !out.MetadataValidUntil.Equal(shorter) {
 		t.Fatal("final metadata widened known shorter current identity", err, out.MetadataValidUntil, shorter)
 	}
@@ -340,8 +336,7 @@ func TestGroupedSubmissionShorterIdentityJoinsBlockedAcknowledgement(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	preview := fixtureID(9800)
-	parent.SubmissionDigest = ContextRequestDigest(preview)
+	parent.SubmissionDigest = requestDigest(s.ContextInvestigation, f.actor, "group")
 	parent.MetadataValidUntil = f.now.Add(5 * time.Second)
 	f.accepted[fixtureKey(f.actor, "group")] = parent
 	blocked, left := make(chan struct{}), make(chan struct{})
@@ -372,7 +367,7 @@ func TestGroupedSubmissionShorterIdentityJoinsBlockedAcknowledgement(t *testing.
 		err      error
 	}
 	done := make(chan outcome, 1)
-	go func() { a, e := s.Continue(owner, current, preview, "group"); done <- outcome{a, e} }()
+	go func() { a, e := s.Continue(owner, current, CaptureRequest{Key: "group"}); done <- outcome{a, e} }()
 	var until time.Time
 	select {
 	case until = <-shorter:

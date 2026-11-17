@@ -31,12 +31,7 @@ type HistoryMetadataRetention interface {
 // HistoryParameterService operates only on independently admitted captures.
 // Its optional persistence result is not an acquisition outcome and callers
 // must preserve a successfully admitted incident when history is unavailable.
-type ContextPreviewExpiryCleanup interface {
-	DeleteExpiredContextPreviews(context.Context) (int64, error)
-}
-
 type HistoryParameterService struct {
-	PreviewCleanup         ContextPreviewExpiryCleanup
 	RootID, InstallationID string
 	Ledger                 HistoryParameterLedger
 	Regional               fleetapp.HistoryDispatcher
@@ -356,7 +351,7 @@ func (s HistoryParameterService) retire(ctx context.Context, ledger HistoryRetir
 // hint every three idle seconds; successful full pages drain without an idle
 // delay. Failures keep charges and pace retries. No new deployment or watch.
 func (s HistoryParameterService) Run(ctx context.Context, report func(string)) error {
-	if ctx == nil || (!s.configured() && s.PreviewCleanup == nil) {
+	if ctx == nil || !s.configured() {
 		return value.ErrUnavailable
 	}
 	delay := time.NewTimer(3 * time.Second)
@@ -364,17 +359,11 @@ func (s HistoryParameterService) Run(ctx context.Context, report func(string)) e
 	// A process-local keyset advances even across unavailable regions.
 	// Restart may repeat cleanup; a stuck first page cannot starve others.
 	after := ""
-	var nextPreviewCleanup time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-delay.C:
-		}
-		var cleanupErr error
-		nextPreviewCleanup, cleanupErr = s.cleanupExpiredPreviews(ctx, nextPreviewCleanup, time.Now())
-		if cleanupErr != nil && report != nil {
-			report("previews")
 		}
 		var more bool
 		var err error
@@ -394,18 +383,6 @@ func (s HistoryParameterService) Run(ctx context.Context, report func(string)) e
 		}
 		delay.Reset(interval)
 	}
-}
-
-// Cleanup shares the existing owned loop but never depends on history readiness
-// or publication success. Pacing state is not identity or capture authority.
-func (s HistoryParameterService) cleanupExpiredPreviews(ctx context.Context, next, now time.Time) (time.Time, error) {
-	if s.PreviewCleanup == nil || now.Before(next) {
-		return next, nil
-	}
-	cleanup, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	_, err := s.PreviewCleanup.DeleteExpiredContextPreviews(cleanup)
-	return now.Add(30 * time.Second), err
 }
 
 // markHistoryStage records the finished stage's bucketed duration in the

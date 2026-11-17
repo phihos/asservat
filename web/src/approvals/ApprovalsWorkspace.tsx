@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import { operations as captureOperations, type Operations as CaptureOperations } from '../capture/http';
-import { approvalSubmissionKey } from '../capture/approval-intent';
 import { operationMessage } from '../capture/http';
 import { operations as defaultOperations, type Grant, type Operations, type ReviewRow } from './http';
 
@@ -34,7 +32,7 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
   </li>)}</ul>;
 }
 
-function Detail({ grant, busy, onDecide, onRevoke, onResume }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void; onResume: () => void }) {
+function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void }) {
   const [reason, setReason] = useState('');
   const policy = grant.kind === 'policy' ? grant.policy : undefined;
   return <>
@@ -77,7 +75,7 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume }: { grant: Grant; b
         <p>Grant reservations: {policy.executions_used} of {policy.max_executions} action starts; {bytes(policy.collected_bytes_used)} of {bytes(policy.max_collected_bytes)} output; {bytes(policy.observed_bytes_used)} of {bytes(policy.max_observed_bytes)} sensitive observation.{!!policy.max_observed_events && <> {policy.observed_events_used ?? 0} of {policy.max_observed_events} eligible entry and exit probes.</>} Reservations include uncertain work and are not refunded by replacing an approval. Team, workload and admission limits can further restrict collection.</p>
         <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} on {date(grant.requested_at)}. This approval expires {date(grant.not_after!)} from its original request; requester credentials do not renew team execution. Current team authority and permissions still apply.</p>
         <p>This approval grants no evidence access. Inspect or download gathered user data through your current evidence permissions.</p>
-      </> : <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}; the preview was valid until {date(grant.preview_deadline!)}. {grant.capture_deadline_rule === 'acceptanceWithinGrant' ? `After approval, submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.` : 'This legacy plan must start before its preview deadline; create a new preview if it has expired.'} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>}
+      </> : <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}. After approval, the requester submits the same reviewed request again from the capture page; Asservat recomputes the plan and rechecks current access.{grant.capture_deadline_rule === 'acceptanceWithinGrant' && ` Submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.`} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>}
     </section>}
     <section className="review-section" aria-labelledby="approval-state">
       <h2 id="approval-state">Decision</h2>
@@ -93,7 +91,6 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume }: { grant: Grant; b
         <Button className="button" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(true, reason.trim())}>Approve</Button>
         <Button className="button secondary" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(false, reason.trim())}>Deny</Button>
       </>}
-      {grant.can_resume && <div className="actions"><Button className="button" isDisabled={busy} onPress={onResume}>Continue approved capture</Button><p>Uses the exact reviewed preview and original requester client. It can continue the original accepted acquisition; it cannot create another capture.</p></div>}
       {grant.can_revoke && <Button className="button secondary" isDisabled={busy} onPress={onRevoke}>{grant.phase === 'Pending' ? 'Withdraw request' : 'Revoke approval'}</Button>}
     </section>
   </>;
@@ -102,10 +99,8 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume }: { grant: Grant; b
 // ADR-249: the approval inbox. Approvers see the pending requests of other
 // people for workloads where they hold action-approver now; everyone sees
 // their own requests. The detail page shows the exact reviewed plan.
-export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOperations, captureClient = captureOperations, newID = () => crypto.randomUUID(), onAccepted = captureID => window.location.assign('/captures/' + captureID) }: { session: Session; scope: AbortSignal; grantID?: string; client?: Operations; captureClient?: CaptureOperations; newID?: () => string; onAccepted?: (captureID: string) => void }) {
+export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOperations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; grantID?: string; client?: Operations; newID?: () => string }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  const command = useRef<AbortController | undefined>(undefined);
-  useEffect(() => () => command.current?.abort(), [scope]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<ReviewRow[]>();
@@ -144,26 +139,6 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       if (!scope.aborted) setMessage(operationMessage(error) + ' Retrying repeats the same decision.');
     } finally { if (!scope.aborted) setBusy(false); }
   };
-  const continueRequest = async () => {
-    const original = grant;
-    if (!original || original.kind !== 'adHocCapture' || !original.preview_id || busy || scope.aborted || !original.can_resume) return;
-    command.current?.abort();
-    const request = new AbortController(); command.current = request;
-    const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });
-    const input = { preview_id: original.preview_id, idempotency_key: approvalSubmissionKey(original.preview_id) };
-    setBusy(true); setMessage(undefined);
-    try {
-      const result = await captureClient.call('request_capture', { ...input, continue_acquisition: true }, session.csrf_token, request.signal);
-      if (request.signal.aborted || scope.aborted || command.current !== request) return;
-      if (result.status === 'ok') onAccepted(result.data.capture_id);
-      else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Retry this same approved request.');
-    } catch (error) {
-      if (!request.signal.aborted && !scope.aborted) setMessage(operationMessage(error) + ' Retrying uses this same reviewed request.');
-    } finally {
-      scope.removeEventListener('abort', abort);
-      if (!request.signal.aborted && !scope.aborted && command.current === request) setBusy(false);
-    }
-  };
   const decide = (approve: boolean, reason: string) => grant && void act(() => client.call('decide_review', { grant_id: grant.grant_id, decision: approve ? 'approve' : 'deny', reason, idempotency_key: key((approve ? 'approve:' : 'deny:') + reason) }, session.csrf_token, scope));
   const revoke = () => grant && void act(() => client.call('revoke_grant', { grant_id: grant.grant_id, expected_revision: grant.revision, idempotency_key: key('revoke:' + grant.revision) }, session.csrf_token, scope));
   return <div className="capture-workspace">
@@ -171,7 +146,7 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       <p>Sensitive recordings, such as a packet filter that tests payload bytes, need an independent approver before anything is recorded. {grantID ? <a href="/approvals">All approvals</a> : <a href="/captures/new">Collect evidence</a>}</p>
     </div>
     {message && <p role="alert" className="notice">{message}</p>}
-    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke} onResume={() => void continueRequest()}/> : <>
+    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke}/> : <>
       <section className="review-section" aria-labelledby="to-review" aria-busy={busy}>
         <h2 id="to-review">Waiting for your review</h2>
         <Rows rows={pending} empty="No requests are waiting for you." label="Requests to review"/>

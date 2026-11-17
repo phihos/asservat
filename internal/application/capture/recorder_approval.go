@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -23,52 +22,6 @@ import (
 type RecorderGrants interface {
 	Request(context.Context, identities.CurrentIdentity, authapp.GrantRequestInput) (authorization.Grant, bool, error)
 	Covering(context.Context, identities.CurrentIdentity, string, artifact.Digest, authorization.Target) (authorization.Grant, time.Time, error)
-}
-
-// RequestWithResultAccess submits a reviewed packet/syscall preview with an
-// optional same-human result-access instruction (REQ-INV-001). A pod-status
-// preview needs no review and refuses the instruction.
-func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, source identities.CurrentIdentity, previewID, key string, access *authorization.ResultAccess) (value.Accepted, error) {
-	if access == nil {
-		return s.Request(ctx, source, previewID, key)
-	}
-	if err := s.reviewResultAccess(ctx, source, previewID, key, access); err != nil {
-		return value.Accepted{}, err
-	}
-	return s.Request(ctx, source, previewID, key)
-}
-
-// reviewResultAccess passes only when an approved, current grant covers this
-// exact plan and binds this exact result access (its digest); the ordinary
-// submission then rechecks the same covering grant (ADR-279: a raw
-// recording downloads only through these children). It has its own bound;
-// the submission keeps the caller's context and phases.
-func (s ContextInvestigation) reviewResultAccess(ctx context.Context, source identities.CurrentIdentity, previewID, key string, access *authorization.ResultAccess) error {
-	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
-		return value.ErrUnavailable
-	}
-	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
-		return value.ErrInvalid
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	i, err := source.ResolveIdentity(ctx)
-	if err != nil || !i.Valid(s.Now()) {
-		return value.ErrDenied
-	}
-	p, err := s.Previews.ReadContextPreview(ctx, s.RootID, previewID, i.Principal)
-	if err != nil {
-		return err
-	}
-	p = p.Clone()
-	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
-		return value.ErrDenied
-	}
-	if p.Intent.Composition == nil {
-		return value.ErrInvalid
-	}
-	_, err = s.recorderRequest(ctx, source, p, key, access)
-	return err
 }
 
 // recorderRequest decides the approval gate of a reviewed packet/syscall

@@ -50,9 +50,6 @@ type AccessReviewStore interface {
 	// RecordedCaptureReviews returns the principal's recorded reviews of the
 	// Pod of one capture, whoever created it; nothing else of the capture.
 	RecordedCaptureReviews(context.Context, identity.Principal, string) ([]RecordedReview, error)
-	// RecordedPreviewReviews returns the principal's recorded reviews of the
-	// Pod of one of its own previews, closed or not.
-	RecordedPreviewReviews(context.Context, identity.Principal, string) ([]RecordedReview, error)
 	RecordReview(context.Context, ReviewDecision) error
 }
 
@@ -124,19 +121,6 @@ func (s AccessReviews) ReviewCapture(ctx context.Context, i identity.Identity, c
 		return nil
 	}
 	recorded, err := s.Store.RecordedCaptureReviews(ctx, i.Principal, captureID)
-	if err != nil || len(recorded) == 0 {
-		return err
-	}
-	return s.repeat(ctx, i, recorded[0].Target.ClusterID, recorded, func(r targets.Request) bool { return r == recorded[0].Target })
-}
-
-// ReviewPreview repeats the principal's recorded reviews of the Pod of one of
-// its previews: request resolution, which names only the preview.
-func (s AccessReviews) ReviewPreview(ctx context.Context, i identity.Identity, previewID string) error {
-	if !s.configured() || i.Principal.Kind != identity.Human || !value.UUID(previewID) {
-		return nil
-	}
-	recorded, err := s.Store.RecordedPreviewReviews(ctx, i.Principal, previewID)
 	if err != nil || len(recorded) == 0 {
 		return err
 	}

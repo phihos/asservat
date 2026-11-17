@@ -14,10 +14,36 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var _ app.RecordingSelectionStore = (*ContextPreviews)(nil)
-var _ app.RecordingCandidates = (*ContextPreviews)(nil)
+// RecordingSelections holds the short-lived list_recordings selections and
+// the recording source reads of the existing-recording save path.
+type RecordingSelections struct {
+	ledger *Ledger
+	root   string
+}
+
+func NewRecordingSelections(ctx context.Context, pool *pgxpool.Pool, root string) (*RecordingSelections, error) {
+	if !authorization.UUID(root) {
+		return nil, value.ErrInvalid
+	}
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	return &RecordingSelections{ledger: l, root: root}, nil
+}
+
+func selectionActorKey(p identity.Principal) []byte {
+	return digest(struct {
+		Format string
+		Actor  identity.Principal
+	}{"context-preview-actor/v1", p})
+}
+
+var _ app.RecordingSelectionStore = (*RecordingSelections)(nil)
+var _ app.RecordingCandidates = (*RecordingSelections)(nil)
 
 // Byte slices keep digest metadata compact:100 maximally sized references fit
 // within64KiB. No original audience, payload or live source lease is copied.
@@ -73,7 +99,7 @@ func decodeRecordingReferences(raw []byte) ([]value.RecordingReference, error) {
 	return refs, nil
 }
 
-func (s *ContextPreviews) CreateRecordingSelection(ctx context.Context, set value.RecordingSelectionSet) error {
+func (s *RecordingSelections) CreateRecordingSelection(ctx context.Context, set value.RecordingSelectionSet) error {
 	set = set.Clone()
 	if s == nil || s.ledger == nil || !set.Valid() || set.RootID != s.root {
 		return value.ErrInvalid
@@ -93,7 +119,7 @@ func (s *ContextPreviews) CreateRecordingSelection(ctx context.Context, set valu
 		if now.Time.Before(set.CreatedAt) || !now.Time.Before(set.ExpiresAt) {
 			return value.ErrChanged
 		}
-		old, err := q.ReadRecordingSelection(ctx, custodydb.ReadRecordingSelectionParams{RootID: id(s.root), ID: id(set.ID), ActorKey: previewActorKey(set.Actor)})
+		old, err := q.ReadRecordingSelection(ctx, custodydb.ReadRecordingSelectionParams{RootID: id(s.root), ID: id(set.ID), ActorKey: selectionActorKey(set.Actor)})
 		if err == nil {
 			if !bytes.Equal(old.ReferencesJson, raw) || !old.CreatedAt.Time.Equal(set.CreatedAt) || !old.ExpiresAt.Time.Equal(set.ExpiresAt) || old.PolicyUid != set.PolicyUID || uid(old.AfterSourceID) != set.AfterSourceID || old.HasMore != set.More || uid(old.ClusterID) != set.Target.ClusterID || old.NamespaceUid != set.Target.NamespaceUID || old.WorkloadUid != set.Target.WorkloadUID {
 				return value.ErrConflict
@@ -106,14 +132,7 @@ func (s *ContextPreviews) CreateRecordingSelection(ctx context.Context, set valu
 		if _, err = q.DeleteExpiredRecordingSelections(ctx, id(s.root)); err != nil {
 			return err
 		}
-		count, err := q.CountContextPreviews(ctx, id(s.root))
-		if err != nil {
-			return err
-		}
-		if count >= value.MaxPreviewsPerRoot {
-			return value.ErrCapacity
-		}
-		if err = q.InsertRecordingSelection(ctx, custodydb.InsertRecordingSelectionParams{ID: id(set.ID), RootID: id(s.root), ActorKey: previewActorKey(set.Actor), PrincipalKey: principalKey(set.Actor), ClusterID: id(set.Target.ClusterID), NamespaceUid: set.Target.NamespaceUID, WorkloadUid: set.Target.WorkloadUID, ReferencesJson: raw, CreatedAt: ts(set.CreatedAt), ExpiresAt: ts(set.ExpiresAt), PolicyUid: set.PolicyUID, AfterSourceID: id(set.AfterSourceID), HasMore: set.More}); err != nil {
+		if err = q.InsertRecordingSelection(ctx, custodydb.InsertRecordingSelectionParams{ID: id(set.ID), RootID: id(s.root), ActorKey: selectionActorKey(set.Actor), PrincipalKey: principalKey(set.Actor), ClusterID: id(set.Target.ClusterID), NamespaceUid: set.Target.NamespaceUID, WorkloadUid: set.Target.WorkloadUID, ReferencesJson: raw, CreatedAt: ts(set.CreatedAt), ExpiresAt: ts(set.ExpiresAt), PolicyUid: set.PolicyUID, AfterSourceID: id(set.AfterSourceID), HasMore: set.More}); err != nil {
 			return err
 		}
 		now, err = q.CurrentTime(ctx)
@@ -127,13 +146,13 @@ func (s *ContextPreviews) CreateRecordingSelection(ctx context.Context, set valu
 	}))
 }
 
-func (s *ContextPreviews) ReadRecordingSelection(ctx context.Context, actor identity.Principal, selectionID string) (value.RecordingSelectionSet, error) {
+func (s *RecordingSelections) ReadRecordingSelection(ctx context.Context, actor identity.Principal, selectionID string) (value.RecordingSelectionSet, error) {
 	var out value.RecordingSelectionSet
 	if s == nil || s.ledger == nil || !actor.Valid() || !authorization.UUID(selectionID) {
 		return out, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		row, err := q.ReadRecordingSelection(ctx, custodydb.ReadRecordingSelectionParams{RootID: id(s.root), ID: id(selectionID), ActorKey: previewActorKey(actor)})
+		row, err := q.ReadRecordingSelection(ctx, custodydb.ReadRecordingSelectionParams{RootID: id(s.root), ID: id(selectionID), ActorKey: selectionActorKey(actor)})
 		if err != nil {
 			return err
 		}
@@ -154,7 +173,7 @@ func (s *ContextPreviews) ReadRecordingSelection(ctx context.Context, actor iden
 	return out, captureError(err)
 }
 
-func (s *ContextPreviews) RecordingCandidates(ctx context.Context, target authorization.WorkloadTarget, query app.RecordingCandidateQuery) (app.RecordingCandidatePage, error) {
+func (s *RecordingSelections) RecordingCandidates(ctx context.Context, target authorization.WorkloadTarget, query app.RecordingCandidateQuery) (app.RecordingCandidatePage, error) {
 	var out app.RecordingCandidatePage
 	if s == nil || s.ledger == nil || !target.Valid() || query.PolicyUID != "" && !identity.Text(query.PolicyUID, 64) || query.AfterSourceID != "" && !authorization.UUID(query.AfterSourceID) {
 		return out, value.ErrInvalid
@@ -180,7 +199,7 @@ func (s *ContextPreviews) RecordingCandidates(ctx context.Context, target author
 	})
 	return out, captureError(err)
 }
-func (s *ContextPreviews) RecordingSources(ctx context.Context, target authorization.WorkloadTarget, ids []string) ([]app.RecordingCandidate, error) {
+func (s *RecordingSelections) RecordingSources(ctx context.Context, target authorization.WorkloadTarget, ids []string) ([]app.RecordingCandidate, error) {
 	if s == nil || s.ledger == nil || !target.Valid() || len(ids) < 1 || len(ids) > value.MaxRecordingSelections {
 		return nil, value.ErrInvalid
 	}

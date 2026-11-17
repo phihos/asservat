@@ -67,7 +67,7 @@ func TestRecordingRequestComposesTargetAndAvailabilityBeforeStorage(t *testing.T
 	retained := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, retained, f, f
+	base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, f, f
 	p, err := base.svc.PreviewComposition(t.Context(), base.source(t, t.Context()), base.compositionIntent(networkComposition()))
 	if err != nil || !p.Recordable {
 		t.Fatal("preview", err)
@@ -80,7 +80,7 @@ func TestRecordingRequestComposesTargetAndAvailabilityBeforeStorage(t *testing.T
 		f.now = f.now.Add(1800 * time.Millisecond)
 		return base.ContextStorage(ctx, target)
 	})
-	_, err = base.svc.Request(t.Context(), base.source(t, t.Context()), p.Preview.ID, "one-intent")
+	_, err = base.svc.Request(t.Context(), base.source(t, t.Context()), reviewed(p.Preview, "one-intent"))
 	if !errors.Is(err, reachedRecordingAdmission) {
 		t.Fatal("duplicate availability exchange aged original target before admission", err)
 	}
@@ -90,7 +90,7 @@ func TestRecordingRequestComposesTargetAndAvailabilityBeforeStorage(t *testing.T
 	if !f.now.Before(f.until) {
 		t.Fatal("original target deadline changed or expired")
 	}
-	if base.previews[p.Preview.ID].Pin.NodeName != "" {
+	if retained.seen[0].Plan.Input.Target.Pin.NodeName != "" {
 		t.Fatal("API pin acquired node execution identity")
 	}
 }
@@ -103,7 +103,7 @@ func TestRecordingCombinedTargetDoesNotAdmitChangedOrUnavailableTarget(t *testin
 			retained := &retainedRecording{investigationFixture: base}
 			base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 			base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-			base.svc.Previews, base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, retained, f, f
+			base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, f, f
 			p, err := base.svc.PreviewComposition(t.Context(), base.source(t, t.Context()), base.compositionIntent(networkComposition()))
 			if err != nil || !p.Recordable {
 				t.Fatal("preview", err)
@@ -115,7 +115,7 @@ func TestRecordingCombinedTargetDoesNotAdmitChangedOrUnavailableTarget(t *testin
 				f.combinedErr = targets.ErrUnsupported
 				want = value.ErrRecorderUnavailable
 			}
-			if _, err = base.svc.Request(t.Context(), base.source(t, t.Context()), p.Preview.ID, "one-intent"); !errors.Is(err, want) || len(retained.seen) != 0 || f.combinedCalls != 1 || f.recorderCalls != 1 {
+			if _, err = base.svc.Request(t.Context(), base.source(t, t.Context()), reviewed(p.Preview, "one-intent")); !errors.Is(err, want) || len(retained.seen) != 0 || f.combinedCalls != 1 || f.recorderCalls != 1 {
 				t.Fatal("changed/unavailable target reached admission or duplicate query", err, len(retained.seen), f.combinedCalls, f.recorderCalls)
 			}
 		})
@@ -128,7 +128,7 @@ func TestRecordingCombinedQueryRemainsPacketOnly(t *testing.T) {
 	retained := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, retained, f, f
+	base.svc.Admission, base.svc.Recorders, base.svc.Targets = retained, f, f
 	p, err := base.svc.PreviewComposition(t.Context(), base.source(t, t.Context()), base.compositionIntent(networkComposition()))
 	if err != nil || !p.Recordable {
 		t.Fatal(err)
@@ -136,13 +136,12 @@ func TestRecordingCombinedQueryRemainsPacketOnly(t *testing.T) {
 	// A structurally valid retained input must not widen the recorder port to
 	// syscalls, even if it carries a storage selection. Scope remains immutable;
 	// unsupported acquisition is refused before dispatching any target query.
-	stored := base.previews[p.Preview.ID].Clone()
+	stored := p.Preview.Clone()
 	stored.Intent.Composition = &planning.ProfileComposition{Components: []planning.ProfileComponent{{ID: "calls", Profile: planning.ProfileRef{Catalog: "builtin", Name: "syscall-activity", Version: "v1"}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 	if !ValidContextPreview(stored) {
 		t.Fatal("structural fixture invalid")
 	}
-	base.previews[stored.ID] = stored
-	if _, err = base.svc.Request(t.Context(), base.source(t, t.Context()), stored.ID, "one-intent"); !errors.Is(err, value.ErrRecorderUnavailable) || f.combinedCalls != 0 || len(retained.seen) != 0 {
+	if _, err = base.svc.Request(t.Context(), base.source(t, t.Context()), reviewed(stored, "one-intent")); !errors.Is(err, value.ErrRecorderUnavailable) || f.combinedCalls != 0 || len(retained.seen) != 0 {
 		t.Fatal("unsupported recorder dispatched or reached admission", err, f.combinedCalls, len(retained.seen))
 	}
 }

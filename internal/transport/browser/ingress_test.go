@@ -99,6 +99,9 @@ func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Han
 	}
 	return h, server, calls, rows, sessions
 }
+
+const auditedBrowserCaptureRequest = `{"preview":{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"same-key"}`
+
 func auditedBrowserRequest(t *testing.T, s *httptest.Server, name, body string) *http.Request {
 	t.Helper()
 	r, e := http.NewRequest("POST", s.URL+"/api/v1/operations/"+name, strings.NewReader(body))
@@ -109,7 +112,7 @@ func auditedBrowserRequest(t *testing.T, s *httptest.Server, name, body string) 
 	r.Header.Set("Origin", s.URL)
 	r.Header.Set("X-CSRF-Token", strings.Repeat("C", 43))
 	r.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
-	if name == "request_capture" || name == "resolve_capture_request" {
+	if name == "request_capture" {
 		r.Header.Set("Idempotency-Key", "same-key")
 	}
 	return r
@@ -128,11 +131,10 @@ func sendAuditedBrowser(t *testing.T, s *httptest.Server, r *http.Request) (int,
 	return response.StatusCode, b
 }
 func TestAuditedBrowserIngressRejectionsShareOneOwner(t *testing.T) {
-	const body = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key"}`
 	for _, mode := range []string{"key", "unknown", "media", "schema", "scope"} {
 		t.Run(mode, func(t *testing.T) {
 			_, server, calls, rows, sessions := auditedBrowserFixture(t)
-			name, input := "resolve_capture_request", body
+			name, input := "request_capture", auditedBrowserCaptureRequest
 			if mode == "unknown" {
 				name = "unknown-private-name"
 			}
@@ -180,14 +182,13 @@ func TestAuditedBrowserAuthenticationAndOversizeStayPreAdmission(t *testing.T) {
 }
 func TestAuditedBrowserCallsDoNotDuplicateAudit(t *testing.T) {
 	_, server, calls, rows, _ := auditedBrowserFixture(t)
-	const body = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key"}`
-	for _, name := range []string{"request_capture", "resolve_capture_request"} {
+	for name, body := range map[string]string{"request_capture": auditedBrowserCaptureRequest, "get_capture": `{"capture_id":"00000000-0000-4000-8000-000000000030"}`} {
 		status, b := sendAuditedBrowser(t, server, auditedBrowserRequest(t, server, name, body))
 		if status != 200 {
 			t.Fatalf("valid call failed %d %s", status, b)
 		}
 	}
-	if n := rows.count(); n != 2 || calls.collections != 1 || calls.requests != 2 {
+	if n := rows.count(); n != 2 || calls.collections != 1 || calls.requests != 1 {
 		t.Fatal("duplicate audit/dispatch", n, calls)
 	}
 }

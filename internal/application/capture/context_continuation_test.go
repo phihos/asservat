@@ -7,6 +7,7 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -15,24 +16,23 @@ func TestContextContinuationUsesAcceptedKeyWithFreshRequestAfterPassiveReplay(t 
 	f, x, s, p := submissionTest(t)
 	x.current = f.source(t, context.Background())
 	x.intentErr = value.ErrUnavailable
-	accepted, err := s.Request(context.Background(), x.current, p.ID, "original")
+	accepted, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 	if err == nil || accepted.CaptureID != p.CaptureID || x.starts != 0 {
 		t.Fatal("fixture did not retain pending admission", err)
 	}
-	firstIDs, firstReads := f.newIDs.Load(), f.previewReads.Load()
+	firstIDs := f.newIDs.Load()
 	f.now = f.now.Add(6 * time.Second)
-	delete(f.previews, p.ID) // Continuation is not dependent on the passive draft.
 	x.current = f.source(t, context.Background())
 	x.intentErr = nil
-	replay, err := s.Request(context.Background(), x.current, p.ID, "original")
+	replay, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 	if err != nil || !replay.Replay || x.starts != 0 || x.intentReads != 1 {
 		t.Fatal("historical request replay started work", err)
 	}
-	continued, err := s.Continue(context.Background(), x.current, p.ID, "original")
+	continued, err := s.Continue(context.Background(), x.current, reviewed(p, "original"))
 	if err != nil || continued.CaptureID != accepted.CaptureID {
 		t.Fatal("fresh continuation failed", err)
 	}
-	if continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || continued.Pin != accepted.Pin || !continued.Deadline.Equal(accepted.Deadline) || x.starts != 1 || x.intentReads != 2 || f.admissions.Load() != 1 || f.newIDs.Load() != firstIDs || f.previewReads.Load() != firstReads {
+	if continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || continued.Pin != accepted.Pin || !continued.Deadline.Equal(accepted.Deadline) || x.starts != 1 || x.intentReads != 2 || f.admissions.Load() != 1 || f.newIDs.Load() != firstIDs {
 		t.Fatal("continuation replaced original work or consulted preview")
 	}
 }
@@ -43,7 +43,7 @@ func TestContextContinuationMissingForeignOrChangedKeyNeverAdmits(t *testing.T) 
 			f, x, s, p := submissionTest(t)
 			x.current = f.source(t, context.Background())
 			if mode != "missing" {
-				if _, err := f.svc.Request(context.Background(), x.current, p.ID, "original"); err != nil {
+				if _, err := f.svc.Request(context.Background(), x.current, reviewed(p, "original")); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -54,11 +54,13 @@ func TestContextContinuationMissingForeignOrChangedKeyNeverAdmits(t *testing.T) 
 				f.actor.Subject = "other"
 			case "foreign-client":
 				f.actor.ClientID = "other"
-			case "changed-preview":
-				p.ID = fixtureID(999)
+			}
+			req := reviewed(p, "original")
+			if mode == "changed-preview" {
+				req.Plan = artifact.Digest{9}
 			}
 			x.current = f.source(t, context.Background())
-			if _, err := s.Continue(context.Background(), x.current, p.ID, "original"); err == nil || x.starts != 0 || x.intentReads != 0 || f.admissions.Load() != count || f.newIDs.Load() != ids {
+			if _, err := s.Continue(context.Background(), x.current, req); err == nil || x.starts != 0 || x.intentReads != 0 || f.admissions.Load() != count || f.newIDs.Load() != ids {
 				t.Fatal("continuation admitted or selected foreign work", err)
 			}
 		})
@@ -72,7 +74,7 @@ func TestContextContinuationCannotRenewCallerOrAcceptedInterval(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			x.current = f.source(t, ctx)
-			if _, err := f.svc.Request(ctx, x.current, p.ID, "original"); err != nil {
+			if _, err := f.svc.Request(ctx, x.current, reviewed(p, "original")); err != nil {
 				t.Fatal(err)
 			}
 			switch mode {
@@ -91,7 +93,7 @@ func TestContextContinuationCannotRenewCallerOrAcceptedInterval(t *testing.T) {
 			case "preparation-spent":
 				x.startErr = value.ErrPreparationUncertain
 			}
-			_, err := s.Continue(ctx, x.current, p.ID, "original")
+			_, err := s.Continue(ctx, x.current, reviewed(p, "original"))
 			if err == nil || f.admissions.Load() != 1 {
 				t.Fatal("expired or uncertain operation renewed", err)
 			}
@@ -120,7 +122,7 @@ func (s *shortenedContinuationIdentity) ResolveIdentity(ctx context.Context) (id
 func TestContextContinuationCarriesKnownShorterIdentityIntoStart(t *testing.T) {
 	f, x, s, p := submissionTest(t)
 	original := f.source(t, context.Background())
-	if _, err := f.svc.Request(context.Background(), original, p.ID, "original"); err != nil {
+	if _, err := f.svc.Request(context.Background(), original, reviewed(p, "original")); err != nil {
 		t.Fatal(err)
 	}
 	shortened := &shortenedContinuationIdentity{source: original}
@@ -134,7 +136,7 @@ func TestContextContinuationCarriesKnownShorterIdentityIntoStart(t *testing.T) {
 		}
 	}}
 	s.Start = observer
-	if _, err := s.Continue(context.Background(), shortened, p.ID, "original"); err != nil {
+	if _, err := s.Continue(context.Background(), shortened, reviewed(p, "original")); err != nil {
 		t.Fatal(err)
 	}
 }

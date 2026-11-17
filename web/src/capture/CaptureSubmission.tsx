@@ -39,7 +39,6 @@ export function CaptureSubmission({ preview, state, controller }: Props) {
     return source ? `${source.componentID} / ${source.localActionID}` : id;
   };
   const submit = () => {
-    if (state.expired) { void controller.preview(); return; }
     if (invalid) return;
     const access: Input<'request_capture'>['result_access'] = include ? {
       actionIds: chosen.map(choice => choice.action_id), operations, maxArtifacts: chosen.length,
@@ -64,6 +63,6 @@ export function CaptureSubmission({ preview, state, controller }: Props) {
         <p>Only the selected published results can use this shared pool. Each paid query page reserves 24 KiB and one operation, including a lost reply; a query permits at most two paid pages. Downloads spend their transferred bytes. Query-only access need not cover the whole native file.</p>
       </>}
     </fieldset>}
-    <Button className="button" isDisabled={state.busy || (!state.expired && (!requestablePreview(preview) || invalid))} onPress={submit}>{state.busy ? 'Checking…' : state.expired ? 'Refresh review' : preview.approval_required ? 'Request approval' : preview.profile_composition ? 'Collect evidence' : 'Collect pod status'}</Button>
+    <Button className="button" isDisabled={state.busy || !requestablePreview(preview) || invalid} onPress={submit}>{state.busy ? 'Checking…' : preview.approval_required ? 'Request approval' : preview.profile_composition ? 'Collect evidence' : 'Collect pod status'}</Button>
   </div>;
 }

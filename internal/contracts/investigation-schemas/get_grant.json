@@ -126,10 +126,6 @@
                         "type": "string",
                         "format": "uuid"
                       },
-                      "preview_id": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
                       "execution_digest": {
                         "type": "string",
                         "pattern": "^[a-f0-9]{64}$"
@@ -1111,7 +1107,6 @@
                         "then": {
                           "required": [
                             "capture_id",
-                            "preview_id",
                             "preview_deadline"
                           ],
                           "properties": {
@@ -1197,11 +1192,6 @@
                               {
                                 "required": [
                                   "capture_id"
-                                ]
-                              },
-                              {
-                                "required": [
-                                  "preview_id"
                                 ]
                               },
                               {

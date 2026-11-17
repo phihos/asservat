@@ -930,13 +930,10 @@
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "preview_id": {
+                  "plan_digest": {
                     "type": "string",
-                    "format": "uuid"
-                  },
-                  "expires_at": {
-                    "type": "string",
-                    "format": "date-time"
+                    "pattern": "^[a-f0-9]{64}$",
+                    "description": "Digest of the resolved plan: immutable target UIDs, dependencies and the normalized request. Submit it as request_capture expected_plan_digest."
                   },
                   "execution_digest": {
                     "type": "string",
@@ -1207,8 +1204,7 @@
                   }
                 },
                 "required": [
-                  "preview_id",
-                  "expires_at",
+                  "plan_digest",
                   "execution_digest",
                   "pod_count",
                   "max_bytes",

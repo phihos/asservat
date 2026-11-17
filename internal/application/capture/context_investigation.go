@@ -31,9 +31,6 @@ type ContextTargets interface {
 // records allowed reviews only; it never grants by itself.
 type ContextAccessReviews interface {
 	ReviewResolved(context.Context, identity.Identity, targets.Request) error
-	// ReviewPreview repeats the caller's recorded reviews of the Pod of one
-	// of its previews (request resolution).
-	ReviewPreview(context.Context, identity.Identity, string) error
 }
 
 type ContextEligibilityReader interface {
@@ -73,10 +70,8 @@ type ContextInvestigation struct {
 	RecordingGroups        RecordingSaveGroupAdmissions
 	PolicyAccepted         authapp.AcceptedPolicyReader
 	RootID, InstallationID string
-	Previews               ContextPreviewStore
 	Replay                 ContextAdmissionReplay
 	Admission              ReviewedAdmissionTransaction
-	Resolution             ContextRequestResolution
 	Targets                ContextTargets
 	Eligibility            ContextEligibilityReader
 	Capabilities           ContextCapabilityReader
@@ -112,7 +107,7 @@ type ContextInvestigation struct {
 }
 
 // ContextPreviewResult includes a transient assessment of the same reviewed
-// plan. Only Preview is persisted; assessment freshness never becomes authority.
+// plan. Nothing of it is stored; assessment freshness never becomes authority.
 type ContextPreviewResult struct {
 	RecordingSave                          *RecordingSavePreviewMetadata
 	CollectorImageDigest, ProjectionDigest artifact.Digest
@@ -132,7 +127,7 @@ type contextFacts struct {
 }
 
 func (s ContextInvestigation) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Previews != nil && s.Replay != nil && s.Admission != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Storage != nil && s.Processing != nil && s.Lifetime >= time.Second && s.Lifetime <= 5*time.Minute && s.Lifetime%time.Microsecond == 0 && s.Now != nil && s.NewID != nil && compiler.ContextRecipeName == value.ContextDiagnosticName
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Replay != nil && s.Admission != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Storage != nil && s.Processing != nil && s.Lifetime >= time.Second && s.Lifetime <= 5*time.Minute && s.Lifetime%time.Microsecond == 0 && s.Now != nil && s.NewID != nil && compiler.ContextRecipeName == value.ContextDiagnosticName
 }
 
 func (s ContextInvestigation) currentIdentity(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, until time.Time) (identity.Identity, error) {
@@ -301,8 +296,8 @@ func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (plan
 	return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Executor(), Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Snapshot: p.Intent.Snapshot, SnapshotSource: f.snapshotSource}, s.Now())
 }
 
-// Preview observes authorized metadata and writes only a bounded draft. It does
-// not reserve custody/storage, write acquisition intent or start a collector.
+// Preview observes authorized metadata and stores nothing. It does not
+// reserve custody/storage, write acquisition intent or start a collector.
 func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result ContextPreviewResult, failure error) {
 	return s.preview(ctx, source, intent, nil)
 }
@@ -359,12 +354,12 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if original != nil && (target.Request.ClusterID != original.ClusterID || target.Request.Namespace.UID != original.NamespaceUID || target.Request.Workload.UID != original.WorkloadUID || (original.PodUID != "" && target.Request.PodUID != original.PodUID)) {
 		return zero, previewFailure("repeat/target", value.ErrTargetReplaced)
 	}
-	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
+	p := value.ContextPreview{ID: planID(ctx, s.NewID), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: planID(ctx, s.NewID), CaseID: planID(ctx, s.NewID), OccurrenceID: planID(ctx, s.NewID), ArtifactID: planID(ctx, s.NewID), AttemptID: planID(ctx, s.NewID), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.ExecutionClass = target.ExecutionClass
 	if intent.RepeatedFrom != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
-	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.ContextAssessmentRulesDigestForClass(target.ExecutionClass)
+	p.AssessmentID, p.AssessmentRulesDigest = planID(ctx, s.NewID), compiler.ContextAssessmentRulesDigestForClass(target.ExecutionClass)
 	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)
@@ -385,20 +380,13 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || !p.Current(s.Now()) {
 		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
-	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) {
-		return zero, previewFailure("before-store/current", value.ErrChanged)
+	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil {
+		return zero, previewFailure("identity/current", value.ErrChanged)
 	}
-	mark = time.Now()
-	err = s.Previews.CreateContextPreview(ctx, p.Clone())
-	auditapp.MarkStep(ctx, "p-store", mark)
-	if err != nil {
-		return zero, previewFailure("store", err)
-	}
-	// An uncertain draft write may consume one passive slot, never execution.
-	// Current rights and every original observation also bound the response.
+	// Current rights and every original observation bound the response.
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
-		return zero, previewFailure("after-store/current", value.ErrChanged)
+		return zero, previewFailure("current", value.ErrChanged)
 	}
 	until := i.ValidUntil
 	until = identity.Earlier(until, current.ValidUntil)
@@ -443,25 +431,34 @@ func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 	return authorization.UUID(a.CaptureID) && a.CaptureID == e.CaptureUID && a.SubmissionDigest == digest && a.ScopeDigest == e.PlanDigest && e.Validate() == nil && !a.CreatedAt.IsZero() && a.Deadline.After(a.CreatedAt) && a.Pin.Namespace == e.Namespace && a.Pin.NamespaceUID == e.NamespaceUID && a.Pin.UID == e.PodUID
 }
 
-// Request resolves accepted idempotency before touching a preview. Existing
-// operation lookup never needs a live pod or fresh acquisition facts. Only a
-// missing original key may refresh the reviewed blueprint and enter admission.
-func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (value.Accepted, error) {
-	return s.requestWithGroupBounds(ctx, source, previewID, key, nil)
+// Request resolves accepted idempotency before recomputing the preview.
+// Existing operation lookup never needs a live pod or fresh acquisition
+// facts. Only a missing original key recomputes the reviewed plan and enters
+// admission.
+func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, in CaptureRequest) (value.Accepted, error) {
+	return s.requestWithGroupBounds(ctx, source, in, nil)
+}
+
+// requestScope derives the request's plan scope, its ID and submission digest.
+func (s ContextInvestigation) requestScope(ctx context.Context, i identity.Identity, in CaptureRequest) (context.Context, *planScope, string, artifact.Digest) {
+	ctx, scope := requestPlanScope(ctx, s.RootID, i.Principal, in.Key, in.Plan)
+	requestID := seededID(scope.seed, ^uint64(0))
+	return ctx, scope, requestID, ContextRequestDigest(requestID)
 }
 
 // Only the composed request owner can supply ingress bounds, before this
 // method creates its five-second current-observation phase. Direct callers
 // retain the legacy interval; replay returns its original accepted dates.
-func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source identities.CurrentIdentity, previewID, key string, bounds *value.GroupRequestBounds) (result value.Accepted, failure error) {
+func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source identities.CurrentIdentity, in CaptureRequest, bounds *value.GroupRequestBounds) (result value.Accepted, failure error) {
 	defer func() { s.reportRequestFailure(failure) }()
 	var zero value.Accepted
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
-	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
+	if !identity.Text(in.Key, 128) || in.Preview == nil {
 		return zero, value.ErrInvalid
 	}
+	key := in.Key
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	started := s.Now()
@@ -470,7 +467,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, previewFailure("request/identity", value.ErrDenied)
 	}
-	digest := ContextRequestDigest(previewID)
+	planCtx, scope, previewID, digest := s.requestScope(ctx, i, in)
 	q := value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: digest, Identity: i}
 	previous, found, err := s.Replay.LookupContextAdmission(ctx, q)
 	if err != nil {
@@ -487,19 +484,26 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		previous.Replay = true
 		return previous, nil
 	}
-	p, err := s.Previews.ReadContextPreview(ctx, s.RootID, previewID, i.Principal)
+	p, err := in.Preview(planCtx)
 	if err != nil {
 		return zero, err
 	}
 	p = p.Clone()
-	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
+	if in.Plan != (artifact.Digest{}) && scope.digest(p) != in.Plan {
+		return zero, s.requestChanged("plan")
+	}
+	p.ID = previewID
+	if !ValidContextPreview(p) || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
 		return zero, previewFailure("request/preview-owner", value.ErrDenied)
+	}
+	if in.Access != nil && p.Intent.Composition == nil && p.CompositionGroup == nil {
+		return zero, value.ErrInvalid
 	}
 	if (p.Group != nil || p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave") && !s.RecordingSaveEnabled {
 		return zero, value.ErrUnavailable
 	}
 	if p.CompositionGroup != nil {
-		return s.requestCompositionGroup(ctx, source, p, key, i)
+		return s.requestCompositionGroup(ctx, source, p, key, i, in.Access)
 	}
 	if p.Group != nil {
 		return s.requestRecordingSaveGroup(ctx, source, p, key, bounds)
@@ -552,7 +556,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		startStorageWait(false)
 	}
 	if recording {
-		grant, err := s.recorderRequest(ctx, source, p, key, nil)
+		grant, err := s.recorderRequest(ctx, source, p, key, in.Access)
 		if err != nil {
 			return zero, err
 		}
@@ -803,7 +807,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		manualSave.Initiator = currentInitiator
 	}
 	admitStarted := time.Now()
-	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
+	a, err := s.Admission.AdmitReviewedContext(ctx, p.Clone(), value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
 	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
 		label := "request/admit-sql"

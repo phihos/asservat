@@ -17,6 +17,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -431,9 +432,18 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		}
 		return current
 	}
-	preview, err := submission.Preview(ctx, freshCaller(ctx), capturevalue.ContextIntent{Target: n.target, Diagnostic: capturevalue.ContextDiagnosticName})
+	intent := capturevalue.ContextIntent{Target: n.target, Diagnostic: capturevalue.ContextDiagnosticName}
+	planCtx, planDigest := captureapp.WithPlanScope(ctx)
+	preview, err := submission.Preview(planCtx, freshCaller(ctx), intent)
 	if err != nil {
 		t.Fatal("actual C09 preview", err)
+	}
+	// request_capture recomputes the reviewed preview under the caller.
+	request := func(caller identities.CurrentIdentity) captureapp.CaptureRequest {
+		return captureapp.CaptureRequest{Key: s.a.IdempotencyKey, Plan: planDigest(preview.Preview), Preview: func(ctx context.Context) (capturevalue.ContextPreview, error) {
+			r, err := submission.Preview(ctx, caller, intent)
+			return r.Preview, err
+		}}
 	}
 	if regionalMode == "first" {
 		start.regional = regional
@@ -442,11 +452,11 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 	initialContext, stopInitial := context.WithCancel(ctx)
 	initialCaller := freshCaller(initialContext)
 	requestStarted := time.Now()
-	accepted, initialErr := submission.Request(initialContext, initialCaller, preview.Preview.ID, s.a.IdempotencyKey)
+	accepted, initialErr := submission.Request(initialContext, initialCaller, request(initialCaller))
 	t.Logf("native continuation initial request elapsed=%s accepted=%t start-calls=%d error=%v", time.Since(requestStarted), accepted.CaptureID != "", start.calls, initialErr)
 	stopInitial()
-	if accepted.CaptureID != preview.Preview.CaptureID || start.calls != 1 || (regionalMode == "first") != (initialErr == nil) {
-		diagnoseNativeContinuation(t, ctx, admin, s.a.RootID, preview.Preview.ID)
+	if accepted.CaptureID == "" || start.calls != 1 || (regionalMode == "first") != (initialErr == nil) {
+		diagnoseNativeContinuation(t, ctx, admin, s.a.RootID, accepted.CaptureID)
 		t.Fatal("original request did not retain its expected admission/start disposition", initialErr, start.calls)
 	}
 	if regionalMode == "first" {
@@ -456,7 +466,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		}
 	}
 
-	if _, err = submission.Continue(ctx, initialCaller, preview.Preview.ID, s.a.IdempotencyKey); err == nil || start.calls != 1 {
+	if _, err = submission.Continue(ctx, initialCaller, request(initialCaller)); err == nil || start.calls != 1 {
 		t.Fatal("cancelled original caller resumed acquisition", err)
 	}
 
@@ -470,7 +480,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		start.runner = &runner
 	}
 	priorCaptures := collector.calls.Load()
-	passive, err := submission.Request(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
+	passive, err := submission.Request(requestContext, current, request(current))
 	if err != nil || passive.CaptureID != accepted.CaptureID || !passive.Replay || start.calls != 1 || collector.calls.Load() != priorCaptures {
 		t.Fatal("historical accepted request triggered acquisition", err)
 	}
@@ -478,7 +488,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		if regional != nil {
 			regional.standby(t, ctx)
 		}
-		continued, e := submission.Continue(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
+		continued, e := submission.Continue(requestContext, current, request(current))
 		if e != nil || continued.CaptureID != accepted.CaptureID || continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || collector.calls.Load() != 1 {
 			t.Fatalf("explicit native continuation calls=%d error=%v", collector.calls.Load(), e)
 		}

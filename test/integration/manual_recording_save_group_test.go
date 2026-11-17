@@ -258,13 +258,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		}
 		t.Logf("group_sources=%d per_target_facts_ms=%d current_permission_reads=%d retention_reads=%d storage_reads=%d", count, time.Since(factsStarted).Milliseconds(), count, count, count)
 		group, parts := prepareManualRecordingSaveGroup(t, ctx, f, policy, parts)
-		previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], group.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := previews.CreateRecordingGroupPreview(ctx, group.Preview); err != nil {
-			t.Fatal("one protected parent preview", err)
-		}
 		t.Logf("group_sources=%d preparation_ms=%d original_first_proof_remaining_ms=%d", count, time.Since(began).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds())
 		return group, parts
 	}
@@ -360,14 +353,6 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		var unsharedManual int
 		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE group_id=$1 AND history_origin='manual' AND share_instruction IS NULL`, accepted.CaptureID).Scan(&unsharedManual); err != nil || unsharedManual != count {
 			t.Fatal("group inherited recurring sharing or automatic history", unsharedManual, err)
-		}
-		var childJournals int
-		previewIDs := make([]string, len(parts))
-		for index, part := range parts {
-			previewIDs[index] = part.Preview.ID
-		}
-		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=ANY($2::uuid[])`, group.RootID, previewIDs).Scan(&childJournals); err != nil || childJournals != 0 {
-			t.Fatal("child preview journals were persisted", childJournals, err)
 		}
 		if after.Executions != before.Executions+1 || after.Collected != before.Collected+int64(count)*maximumBytes || after.Occurrences != before.Occurrences || after.Observed != before.Observed || after.Shares != before.Shares || after.Reservations != before.Reservations+count {
 			t.Fatal("wrong grouped policy/resource units", after, before)

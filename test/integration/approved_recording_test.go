@@ -70,15 +70,6 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 			Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 			Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: capture.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: oldDeadline}
-		previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
-		defer previewPool.Close()
-		previews, err := postgres.NewContextPreviews(ctx, previewPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = previews.CreateContextPreview(ctx, p); err != nil {
-			t.Fatal("persist preview", err)
-		}
 		role := narrowRole(t, ctx, admin, "approved_grant_", "synthetic-approved-grant", func(role string) []string {
 			sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 			if !ok {
@@ -98,18 +89,8 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal("persist grant", err)
 		}
-		// Pending reviews retain the original blueprint and its quota slot.
+		// The approved plan outlives the reviewed preview's own deadline.
 		time.Sleep(time.Until(oldDeadline) + 10*time.Millisecond)
-		if read, err := previews.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor); err != nil || !read.Deadline.Equal(oldDeadline) {
-			t.Fatal("expired review blueprint lost", err)
-		}
-		cleanup, err := postgres.NewContextPreviewCleanup(ctx, previewPool, p.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if count, err := cleanup.DeleteExpiredContextPreviews(ctx); err != nil || count != 0 {
-			t.Fatal("pending review deleted", count, err)
-		}
 		approver := p.Actor
 		approver.Subject = "synthetic-independent-reviewer"
 		g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"})
@@ -136,7 +117,7 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		if r.WriteUntil.After(r.ExpiresAt) {
 			r.WriteUntil = r.ExpiresAt
 		}
-		accepted, err := s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+		accepted, err := s.s.AdmitReviewedContext(ctx, p, s.a)
 		if err != nil {
 			t.Fatal("approved admission after preview expiry", err)
 		}
@@ -173,7 +154,7 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal("revoked grant usable", err)
 		}
 		// Historical accepted operation remains replayable; no new acquisition.
-		again, err := s.s.AdmitReviewedContext(ctx, p.ID, s.a)
+		again, err := s.s.AdmitReviewedContext(ctx, p, s.a)
 		if err != nil || !again.Replay || again.CaptureID != accepted.CaptureID || !again.Deadline.Equal(accepted.Deadline) {
 			t.Fatal("historical replay changed", err)
 		}
@@ -236,18 +217,6 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: group.Children[0].Retention, Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: scope, ScopeDigest: digest, CreatedAt: now, Deadline: deadline, CompositionGroup: group}
 	if !captureapp.ValidContextPreview(p) {
 		t.Fatal("invalid group preview")
-	}
-	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
-	defer previewPool.Close()
-	previews, err := postgres.NewContextPreviews(ctx, previewPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(ctx, p); err != nil {
-		t.Fatal("persist group preview", err)
-	}
-	if read, err := previews.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor); err != nil || read.CompositionGroup == nil || len(read.CompositionGroup.Children) != 2 {
-		t.Fatal("read group preview", err)
 	}
 	role := narrowRole(t, ctx, admin, "group_grant_", "synthetic-group-grant", func(role string) []string {
 		sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
@@ -355,15 +324,6 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.recovery.installation, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: now.Add(time.Minute)}
-	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
-	defer previewPool.Close()
-	previews, err := postgres.NewContextPreviews(ctx, previewPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(ctx, p); err != nil {
-		t.Fatal("persist preview", err)
-	}
 	role := narrowRole(t, ctx, admin, "adhoc_pool_", "synthetic-adhoc-pool", func(role string) []string {
 		sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {

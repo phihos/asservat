@@ -21,11 +21,10 @@ import (
 )
 
 type mcpCaptureFixture struct {
-	calls         atomic.Int64
-	continuations atomic.Int64
-	after         func()
-	during        func(context.Context)
-	until         time.Time
+	calls  atomic.Int64
+	after  func()
+	during func(context.Context)
+	until  time.Time
 }
 
 func (f *mcpCaptureFixture) deadline() time.Time {
@@ -40,7 +39,14 @@ func (f *mcpCaptureFixture) CheckDiagnostic(context.Context, identities.CurrentI
 func (f *mcpCaptureFixture) Preview(context.Context, identities.CurrentIdentity, value.ContextIntent) (app.ContextPreviewResult, error) {
 	return app.ContextPreviewResult{}, value.ErrUnavailable
 }
-func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
+
+// mcpCaptureRequest is a request_capture input submitting a reviewed
+// pod-status preview.
+func mcpCaptureRequest() map[string]any {
+	return map[string]any{"preview": map[string]any{"target_ref": map[string]any{"cluster_id": "00000000-0000-4000-8000-000000000001", "namespace": "payments", "kind": "Deployment", "name": "api"}, "preset_ref": map[string]any{"name": "pod-status", "version": "v1"}}, "expected_plan_digest": strings.Repeat("11", 32), "idempotency_key": "same-key"}
+}
+
+func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.CurrentIdentity, in app.CaptureRequest) (value.Accepted, error) {
 	if f.during != nil {
 		f.during(ctx)
 		return value.Accepted{}, ctx.Err()
@@ -48,7 +54,7 @@ func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.Curr
 	if _, err := current.ResolveIdentity(context.Background()); err != nil {
 		return value.Accepted{}, err
 	}
-	if preview != "00000000-0000-4000-8000-000000000020" || key != "same-key" {
+	if in.Plan[0] != 0x11 || in.Key != "same-key" || in.Preview == nil {
 		return value.Accepted{}, value.ErrInvalid
 	}
 	f.calls.Add(1)
@@ -56,25 +62,6 @@ func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.Curr
 		f.after()
 	}
 	return value.Accepted{CaptureID: "00000000-0000-4000-8000-000000000030", MetadataValidUntil: f.deadline()}, nil
-}
-func (f *mcpCaptureFixture) Continue(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
-	if _, err := current.ResolveIdentity(ctx); err != nil {
-		return value.Accepted{}, err
-	}
-	if preview != "00000000-0000-4000-8000-000000000020" || key != "same-key" {
-		return value.Accepted{}, value.ErrInvalid
-	}
-	f.continuations.Add(1)
-	return value.Accepted{CaptureID: "00000000-0000-4000-8000-000000000030", MetadataValidUntil: f.deadline()}, nil
-}
-func (f *mcpCaptureFixture) ResolveContextRequest(_ context.Context, current identities.CurrentIdentity, preview, key string) (value.ContextRequestDisposition, error) {
-	if _, err := current.ResolveIdentity(context.Background()); err != nil {
-		return value.ContextRequestDisposition{}, err
-	}
-	if preview != "00000000-0000-4000-8000-000000000020" || key != "same-key" {
-		return value.ContextRequestDisposition{}, value.ErrInvalid
-	}
-	return value.ContextRequestDisposition{State: value.RequestClosed, ValidUntil: f.deadline()}, nil
 }
 func (f *mcpCaptureFixture) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
 	return value.ContextProgress{CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending", ValidUntil: f.deadline()}, nil
@@ -129,9 +116,9 @@ func TestContextMCPRegistersQualifiedSchemasAndRetainsCurrentIdentity(t *testing
 			if response.StatusCode != 200 || json.Unmarshal(b, &listed) != nil {
 				t.Fatalf("list: %d %s", response.StatusCode, b)
 			}
-			expected := 4
+			expected := 3
 			if enabled {
-				expected = 5
+				expected = 4
 			}
 			if len(listed.Result.Tools) != expected {
 				t.Fatalf("discovery count: %d %s", len(listed.Result.Tools), b)
@@ -143,30 +130,16 @@ func TestContextMCPRegistersQualifiedSchemasAndRetainsCurrentIdentity(t *testing
 			if response.StatusCode != 200 || !strings.Contains(string(b), `"structuredContent"`) || !strings.Contains(string(b), `"IntentAuditPending"`) {
 				t.Fatalf("progress: %d %s", response.StatusCode, b)
 			}
-			response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "resolve_capture_request", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}))
-			if response.StatusCode != 200 || !strings.Contains(string(b), `"state":"closed"`) || strings.Contains(string(b), `"capture_id"`) {
-				t.Fatalf("bounded recovery unavailable: %d %s", response.StatusCode, b)
-			}
 			if enabled {
-				response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}))
+				response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": mcpCaptureRequest()}))
 				if response.StatusCode != 200 || !strings.Contains(string(b), `"phase":"Accepted"`) {
 					t.Fatalf("request: %d %s", response.StatusCode, b)
 				}
-				requests, continuations := f.calls.Load(), f.continuations.Load()
-				response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key", "continue_acquisition": true}}))
-				if response.StatusCode != 200 || !strings.Contains(string(b), `"phase":"Accepted"`) || f.calls.Load() != requests || f.continuations.Load() != continuations+1 {
-					t.Fatal("explicit MCP continuation lost same-key branch", response.StatusCode, string(b))
-				}
-				response, b = send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key", "continue_acquisition": false}}))
-				if f.continuations.Load() != continuations+1 || f.calls.Load() != requests || strings.Contains(string(b), `"phase":"Accepted"`) {
-					t.Fatal("false flag executed a request", response.StatusCode, string(b))
-				}
-
 			}
 		}
 		if enabled {
 			f.after = func() { revoked.Store(true) }
-			response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "request_capture", "arguments": map[string]any{"preview_id": "00000000-0000-4000-8000-000000000020", "idempotency_key": "same-key"}}))
+			response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "request_capture", "arguments": mcpCaptureRequest()}))
 			if response.StatusCode != 401 || strings.Contains(string(b), "00000000-0000-4000-8000-000000000030") {
 				t.Fatal("revoked token disclosed accepted receipt")
 			}

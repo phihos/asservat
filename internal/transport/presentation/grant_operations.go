@@ -42,12 +42,6 @@ func (in *ResultAccessInput) access() *authorization.ResultAccess {
 	return &authorization.ResultAccess{ActionIDs: slices.Clone(in.ActionIDs), Operations: slices.Clone(in.Operations), MaxArtifacts: in.MaxArtifacts, MaxBytes: in.MaxBytes, MaxOperations: in.MaxOperations, NotAfter: in.NotAfter.UTC()}
 }
 
-// ContextResultAccessRequest submits a reviewed recorder preview with a
-// result-access instruction; the concrete ContextInvestigation implements it.
-type ContextResultAccessRequest interface {
-	RequestWithResultAccess(context.Context, identities.CurrentIdentity, string, string, *authorization.ResultAccess) (value.Accepted, error)
-}
-
 // ApprovalFailure is the request_capture error of a plan awaiting review: it
 // names the approval page and the responsible role.
 type ApprovalFailure struct {
@@ -288,7 +282,6 @@ type grantData struct {
 	RawAccess            *grantRawAccessData `json:"raw_access,omitempty"`
 	Policy               *grantPolicyData    `json:"policy,omitempty"`
 	CaptureID            string              `json:"capture_id,omitempty"`
-	PreviewID            string              `json:"preview_id,omitempty"`
 	ExecutionDigest      string              `json:"execution_digest"`
 	ReviewDigest         string              `json:"review_digest"`
 	Target               *grantTarget        `json:"target,omitempty"`
@@ -320,7 +313,7 @@ func digestText(d artifact.Digest) string { return hash(d) }
 func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, full bool, now time.Time) grantData {
 	g, r := v.Grant, v.Review
 	requester := g.Requester.Issuer == caller.Issuer && g.Requester.Subject == caller.Subject
-	d := grantData{GrantID: g.ID, Phase: string(v.Phase), Revision: g.Revision, Kind: g.Kind, CaptureID: g.CaptureID, PreviewID: g.PreviewID, ExecutionDigest: digestText(g.ExecutionDigest), ReviewDigest: digestText(g.ReviewDigest),
+	d := grantData{GrantID: g.ID, Phase: string(v.Phase), Revision: g.Revision, Kind: g.Kind, CaptureID: g.CaptureID, ExecutionDigest: digestText(g.ExecutionDigest), ReviewDigest: digestText(g.ReviewDigest),
 		Target: &grantTarget{ClusterID: g.Target.ClusterID, Namespace: r.Namespace, WorkloadKind: r.WorkloadKind, WorkloadName: r.WorkloadName, PodName: r.PodName}, DataClass: g.DataClass, Reasons: []grantReason{}, RequestedBy: principalView(g.Requester),
 		RequestedAt: g.RequestedAt.UTC(), CaptureDeadlineRule: "previewDeadline", LifetimeSeconds: int64(g.Lifetime / time.Second),
 		CanDecide: v.Approver && v.Phase == authorization.GrantPending, CanRevoke: g.RevokedAt.IsZero() && (requester || v.Approver), NavigationURI: s.origin + "/approvals/" + g.ID}
@@ -338,7 +331,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 		d.CanRevoke = v.CanRevoke
 	} else if g.Kind == authorization.GrantRawQuery {
 		d.Target, d.CaptureDeadlineRule = nil, ""
-		d.CaptureID, d.PreviewID = "", ""
+		d.CaptureID = ""
 		if q := r.RawQuery; q != nil {
 			d.RawAccess = &grantRawAccessData{CaseID: q.CaseID, Reason: q.Reason, Operations: slices.Clone(q.Operations), MaxBytes: q.MaxBytes, MaxOperations: q.MaxOperations, NotAfter: q.NotAfter.UTC(), ArtifactCount: len(q.Artifacts), BytesUsed: g.Spent.Bytes, OperationsUsed: g.Spent.Operations}
 			if full {

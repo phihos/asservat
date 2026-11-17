@@ -50,14 +50,7 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	if !captureapp.ValidContextPreview(p) || !bytes.Equal(p.CanonicalScope, scope) || p.ScopeDigest != scopeDigest {
 		t.Fatal("reason changed reviewed collection scope")
 	}
-	previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = previews.CreateContextPreview(ctx, p); err != nil {
-		t.Fatal("real reason preview", err)
-	}
-	accepted, err := admissions.AdmitReviewedContext(ctx, p.ID, a)
+	accepted, err := admissions.AdmitReviewedContext(ctx, p, a)
 	if err != nil {
 		t.Fatal("actual reason admission", err)
 	}
@@ -90,28 +83,6 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	// Expire selection before native start without changing acquisition dates.
 	waitReasonFixtureUntil(t, ctx, f, p.SelectionUntil.Add(time.Millisecond))
 	t.Run("native-after-selection-expiry", func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents) })
-	// Selection expiry does not expire the persisted review row. Observe its
-	// actual SQL cutoff and wait without aging state or changing cleanup rules.
-	if !t.Run("actual-expired-preview-row-deletion", func(t *testing.T) {
-		var readUntil time.Time
-		if err := f.admin.QueryRow(ctx, `SELECT context_preview_read_until($1,$2)`, a.RootID, p.ID).Scan(&readUntil); err != nil {
-			t.Fatal("actual preview read cutoff", err)
-		}
-		waitReasonFixtureUntil(t, ctx, f, readUntil.Add(time.Millisecond))
-		cleanup, err := postgres.NewContextPreviewCleanup(ctx, f.roles["hub-runtime"], a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = cleanup.DeleteExpiredContextPreviews(ctx); err != nil {
-			t.Fatal("real expired preview deletion", err)
-		}
-		var left int
-		if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=$2`, a.RootID, p.ID).Scan(&left); err != nil || left != 0 {
-			t.Fatal("expired preview retained", left, err)
-		}
-	}) {
-		return
-	}
 	f.refreshBase(t)
 	replayIdentity := snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity
 	replayIdentity.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)

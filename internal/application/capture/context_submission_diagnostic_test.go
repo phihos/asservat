@@ -28,7 +28,7 @@ func TestContextSubmissionReportsClosedIntentFailureWithoutChangingAdmission(t *
 				x.changeIntent = true
 				want = "request/intent/record"
 			}
-			accepted, err := s.Request(context.Background(), x.current, p.ID, "original")
+			accepted, err := s.Request(context.Background(), x.current, reviewed(p, "original"))
 			if !errors.Is(err, value.ErrUnavailable) || accepted.CaptureID != p.CaptureID ||
 				!slices.Equal(reports, []string{want}) || x.starts != 0 || x.intentReads != 1 || f.admissions.Load() != 1 {
 				t.Fatal("intent failure lost closed diagnostic or changed accepted work", err, reports, x.starts, x.intentReads, f.admissions.Load())

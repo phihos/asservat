@@ -34,7 +34,6 @@ func TestContextOldAnchorReviewNeedsRefreshButAcceptedRequestRemainsRecoverable(
 			f := fixture()
 			p := f.preview(t)
 			copy(p.AssessmentRulesDigest[:], old)
-			f.previews[p.ID] = p
 			if _, err := f.request(t, p, "unsubmitted-v1"); !errors.Is(err, value.ErrChanged) || f.admissions.Load() != 0 {
 				t.Fatalf("old unsubmitted anchor review admitted: %v", err)
 			}
@@ -48,11 +47,9 @@ func TestContextOldAnchorReviewNeedsRefreshButAcceptedRequestRemainsRecoverable(
 			// An existing accepted registration is independent of the old draft's
 			// explanation. Updating the rule must neither hide it nor reset dates.
 			copy(p.AssessmentRulesDigest[:], old)
-			f.previews[p.ID] = p
-			beforeReads := f.previewReads.Load()
 			f.now = f.now.Add(2 * time.Second)
 			replayed, err := f.request(t, p, "accepted-original")
-			if err != nil || !replayed.Replay || replayed.CaptureID != accepted.CaptureID || f.admissions.Load() != 1 || f.previewReads.Load() != beforeReads {
+			if err != nil || !replayed.Replay || replayed.CaptureID != accepted.CaptureID || f.admissions.Load() != 1 {
 				t.Fatalf("new anchor rules lost accepted-operation replay: %v", err)
 			}
 			if !reflect.DeepEqual(replayed.Expectation.Registration, accepted.Expectation.Registration) || !replayed.CreatedAt.Equal(accepted.CreatedAt) || !replayed.Deadline.Equal(accepted.Deadline) {
@@ -84,7 +81,6 @@ func TestRecorderOldRetentionAnchorReviewNeedsRefresh(t *testing.T) {
 		t.Fatal("manual retention interpretation kept v1 digest")
 	}
 	copy(p.AssessmentRulesDigest[:], old)
-	f.previews[p.ID] = p
 	if _, err := f.request(t, p, "unsubmitted-recorder-v1"); !errors.Is(err, value.ErrChanged) || f.admissions.Load() != 0 {
 		t.Fatalf("old recorder timing reached admission: %v", err)
 	}

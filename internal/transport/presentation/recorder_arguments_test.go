@@ -60,7 +60,8 @@ func TestArgumentPreviewWire(t *testing.T) {
 	if err := json.Unmarshal([]byte(in), &input); err != nil {
 		t.Fatal(err)
 	}
-	data, _, err := s.recorderPreview(t.Context(), f, input)
+	projected, _, _, err := s.previewCapture(t.Context(), f, input)
+	data, _ := projected.(RecorderPreviewData)
 	if err != nil {
 		t.Fatal("argument plan projection", err)
 	}

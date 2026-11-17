@@ -11,7 +11,7 @@ import (
 // LiveSourceTarget returns only a locator in this protected root. Neither a
 // current policy join nor a source UUID grants observation rights. C3 must
 // check current ordinary entitlement before reading the full source/audience.
-func (s *ContextPreviews) LiveSourceTarget(ctx context.Context, sourceID string) (authorization.Target, error) {
+func (s *RecordingSelections) LiveSourceTarget(ctx context.Context, sourceID string) (authorization.Target, error) {
 	var out authorization.Target
 	if s == nil || s.ledger == nil || ctx == nil || !authorization.UUID(sourceID) {
 		return out, value.ErrInvalid

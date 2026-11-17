@@ -78,12 +78,12 @@ func TestManualSnapshotKeepsInitiatorAndPolicyExecutorSeparate(t *testing.T) {
 	f.now = f.now.Add(500 * time.Millisecond)
 	admission := &retainedRecording{investigationFixture: f}
 	f.svc.Admission = admission
-	_, err = f.svc.Request(t.Context(), caller, preview.Preview.ID, "manual-request-key")
+	_, err = f.svc.Request(t.Context(), caller, reviewed(preview.Preview, "manual-request-key"))
 	if !errors.Is(err, value.ErrUnavailable) || len(admission.seen) != 0 {
 		t.Fatal("passive manual preview bypassed unqualified acquisition gate", err)
 	}
 	f.svc.RecordingSaveEnabled = true
-	_, err = f.svc.Request(t.Context(), caller, preview.Preview.ID, "manual-request-key")
+	_, err = f.svc.Request(t.Context(), caller, reviewed(preview.Preview, "manual-request-key"))
 	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 {
 		t.Fatal("manual request did not reach genuine shared admission boundary", err)
 	}
@@ -95,7 +95,7 @@ func TestManualSnapshotKeepsInitiatorAndPolicyExecutorSeparate(t *testing.T) {
 		t.Fatal("manual save selected a live replacement Pod")
 	}
 	caller.denied = true
-	if _, err = f.svc.Request(t.Context(), caller, preview.Preview.ID, "manual-request-key"); err == nil {
+	if _, err = f.svc.Request(t.Context(), caller, reviewed(preview.Preview, "manual-request-key")); err == nil {
 		t.Fatal("revoked initiator retained policy authority")
 	}
 }

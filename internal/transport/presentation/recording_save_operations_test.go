@@ -105,8 +105,8 @@ func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
 	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Operation != "recordingSave" || out.Data.CaptureEnabled || out.Data.IncidentPodCap != 3 || len(out.Data.Selected) != 1 || out.Data.Windows[0].Before != "30s" || out.Data.Windows[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0] != "CollectionDisabled" || f.request.Before != 30*time.Second {
 		t.Fatal("preview became ordinary capture or invented coverage", string(reply.Body))
 	}
-	if !out.Data.ExpiresAt.Equal(f.result.Preview.SelectionUntil) || out.Data.ExpiresAt.Equal(f.result.Preview.Deadline) || len(gate.events) != 1 || actor.requests != 0 {
-		t.Fatal("review expiry became processing authority or acquisition", out.Data)
+	if len(out.Data.PlanDigest) != 64 || len(gate.events) != 1 || actor.requests != 0 {
+		t.Fatal("preview lost its plan digest or started acquisition", out.Data)
 	}
 	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
 		if _, err = audited.Call(t.Context(), actor, "preview_recording_save", []byte(bad)); err == nil || f.previewCalls != 1 {

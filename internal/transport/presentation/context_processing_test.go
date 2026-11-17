@@ -30,10 +30,10 @@ func TestContextProcessingCoverageFailurePreservesUnknownEarlierRequest(t *testi
 	}
 }
 
-func TestAcceptedStartRefusedBeforeEffectNamesContinuation(t *testing.T) {
+func TestAcceptedStartRefusedBeforeEffectIsFinal(t *testing.T) {
 	err := errors.Join(errors.New("local start state unavailable"), value.ErrAcquisitionNotStarted)
 	f := publicCaptureFailure(err, true)
-	if f.Code != "AcquisitionNotStarted" || !f.Retryable || !strings.Contains(f.Message, "continue_acquisition: true") || !strings.Contains(f.Message, "accepted") {
+	if f.Code != "AcquisitionNotStarted" || f.Retryable || !strings.Contains(f.Message, "accepted") {
 		t.Fatalf("request: %+v", f)
 	}
 	if f := publicCaptureFailure(err, false); f.Code != "NotAvailable" {

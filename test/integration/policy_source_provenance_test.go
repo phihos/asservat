@@ -58,8 +58,8 @@ func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireAp
 }
 
 type sourceSnapshotQualificationMode struct {
-	manual, cancellation, requireApproval, reason, dispatch, dispatchRequest, projection bool
-	groupCount                                                                           int
+	manual, cancellation, requireApproval, reason, projection bool
+	groupCount                                                int
 }
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
@@ -82,9 +82,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
 			option.IncidentPods = groupCount
-		}
-		if mode.dispatchRequest {
-			option.PolicyFinalizeTimeout = "30s"
 		}
 		if groupCount > 0 && requireApproval {
 			option.PolicyExecutions = 1
@@ -201,10 +198,6 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				qualifyManualRecordingSaveReason(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
 				return
 			}
-			if mode.dispatch {
-				qualifyManualRecordingSaveDispatch(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, mode.dispatchRequest)
-				return
-			}
 			if groupCount > 0 {
 				var controls []func(value.RecordingSaveGroupAdmission)
 				if mode.projection {
@@ -298,7 +291,7 @@ func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capa
 			t.Fatal("changedT0 must retain reviewed nonclock scope", err)
 		}
 		bad.Plan = plan
-		if _, err = admissions.AdmitReviewedContext(ctx, p.ID, bad); err == nil {
+		if _, err = admissions.AdmitReviewedContext(ctx, p, bad); err == nil {
 			t.Fatal("automatic Save changed persisted occurrence T0")
 		}
 		if count(t) != before {
@@ -348,15 +341,8 @@ func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capa
 		if !captureapp.ValidContextPreview(preview) {
 			t.Fatal("negative passive preview invalid before SQL provenance guard")
 		}
-		previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = previews.CreateContextPreview(ctx, preview); err != nil {
-			t.Fatal("store passive negative selection", err)
-		}
 		bad.SubmissionDigest = captureapp.ContextRequestDigest(preview.ID)
-		if _, err = admissions.AdmitReviewedContext(ctx, preview.ID, bad); err == nil {
+		if _, err = admissions.AdmitReviewedContext(ctx, preview, bad); err == nil {
 			t.Fatal("new current reader acquired original source bytes through passive preview")
 		}
 		if count(t) != before {

@@ -40,7 +40,7 @@ func TestProfileAdmissionRequiresRawReviewAndFrozenEndpoint(t *testing.T) {
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 	endpoint := &changingProfileEndpoint{}
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableProfile{availableRecording{base}}
+	base.svc.Admission, base.svc.Recorders = f, availableProfile{availableRecording{base}}
 	base.svc.ProfileEndpoints = endpoint
 	grants := &fakeGrants{}
 	base.svc.Grants = grants
@@ -54,7 +54,7 @@ func TestProfileAdmissionRequiresRawReviewAndFrozenEndpoint(t *testing.T) {
 		t.Fatal("raw profile without selected result access", err)
 	}
 	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
-	if _, err = base.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), p.ID, "review", access); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
+	if _, err = base.svc.Request(t.Context(), f.source(t, t.Context()), withAccess(p, "review", access)); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
 		t.Fatal("profile review", err)
 	}
 	if grants.requests[0].DataClass != "raw" || grants.requests[0].Review.ObservationLimits != nil || len(f.seen) != 0 {

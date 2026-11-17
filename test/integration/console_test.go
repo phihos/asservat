@@ -344,13 +344,9 @@ type consoleSyntheticCaptures struct {
 	mu               sync.Mutex
 	changes          *browser.Changes
 	state            string
-	preview, key     string
+	plan             artifact.Digest
+	key              string
 	lostReply        bool
-	lostClosureReply bool
-	closed           map[string]bool
-	drafts           map[string]bool
-	resolutions      []string
-	continuations    []string
 	requests         []string
 	requestedSeconds int64
 	previews         int
@@ -385,11 +381,7 @@ func (s *consoleSyntheticCaptures) Preview(ctx context.Context, current app.Curr
 	if seconds == 0 {
 		seconds = 3600
 	}
-	if s.drafts == nil {
-		s.drafts = make(map[string]bool)
-	}
 	previewID := consoleCaptureID(172 + s.previews)
-	s.drafts[previewID] = true
 	p := capture.ContextPreview{ID: previewID, Deadline: now.Add(5 * time.Minute), ScopeDigest: artifact.Digest{1}, Target: targets.Request{ClusterID: in.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: in.Target.Namespace, UID: "synthetic-namespace-uid"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: in.Target.Name, UID: "synthetic-workload-uid"}, PodName: in.Target.Name + "-a", PodUID: "synthetic-pod-uid"}}
 	a := planning.ContextAssessment{ID: consoleCaptureID(174), PlanDigest: p.ScopeDigest, RulesDigest: artifact.Digest{2}, CapabilityDigest: artifact.Digest{3}, GeneratedAt: now, ValidUntil: until, OutputLimit: 4096,
 		Impact:    planning.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"collectorMemory", "storageIO", "uploadContention"}, Explanation: "Uses the Kubernetes API and collector. Current load and combined overhead are unmeasured."},
@@ -398,83 +390,32 @@ func (s *consoleSyntheticCaptures) Preview(ctx context.Context, current app.Curr
 	return captures.ContextPreviewResult{Preview: p, Assessment: a, ValidUntil: until}, nil
 }
 
-func (s *consoleSyntheticCaptures) Request(ctx context.Context, current app.CurrentIdentity, preview, key string) (capture.Accepted, error) {
+// Request records the reviewed plan without recomputing it: this fixture
+// models the console contract only, not preview recomputation.
+func (s *consoleSyntheticCaptures) Request(ctx context.Context, current app.CurrentIdentity, in captures.CaptureRequest) (capture.Accepted, error) {
 	started := time.Now()
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil {
 		return capture.Accepted{}, err
 	}
+	if in.Preview == nil || in.Plan == (artifact.Digest{}) {
+		return capture.Accepted{}, capture.ErrInvalid
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.requests = append(s.requests, key)
-	if s.closed[preview] {
-		return capture.Accepted{}, capture.ErrConflict
-	}
-	if !s.drafts[preview] {
-		return capture.Accepted{}, capture.ErrUnavailable
-	}
-	if s.state == "reject-request" || s.state == "lost-closure" {
+	s.requests = append(s.requests, in.Key)
+	if s.state == "reject-request" {
 		return capture.Accepted{}, capture.ErrChanged
 	}
-	if s.key != "" && (s.preview != preview || s.key != key) {
+	if s.key != "" && (s.plan != in.Plan || s.key != in.Key) {
 		return capture.Accepted{}, capture.ErrConflict
 	}
-	s.preview, s.key = preview, key
+	s.plan, s.key = in.Plan, in.Key
 	if s.state == "lost-reply-always" || (s.state == "lost-reply" && !s.lostReply) {
 		s.lostReply = true
 		return capture.Accepted{}, capture.ErrUnavailable
 	}
 	return capture.Accepted{CaptureID: consoleCaptureID(8), MetadataValidUntil: identity.Earlier(started.Add(5*time.Second), i.ValidUntil)}, nil
-}
-
-// This models only explicit same-key continuation of an already accepted
-// synthetic receipt. Real execution/keys are never supplied by this fixture.
-func (s *consoleSyntheticCaptures) Continue(ctx context.Context, current app.CurrentIdentity, preview, key string) (capture.Accepted, error) {
-	started := time.Now()
-	i, err := current.ResolveIdentity(ctx)
-	if err != nil {
-		return capture.Accepted{}, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	until := identity.Earlier(started.Add(5*time.Second), i.ValidUntil)
-	if ctx.Err() != nil || !time.Now().Before(until) || s.state == "unavailable" || s.key == "" || s.key != key || s.preview != preview || s.closed[preview] {
-		return capture.Accepted{}, capture.ErrUnavailable
-	}
-	s.continuations = append(s.continuations, preview+":"+key)
-	return capture.Accepted{CaptureID: consoleCaptureID(8), MetadataValidUntil: until}, nil
-}
-
-// The fixture models only the accepted-or-closed output contract. Atomic SQL
-// admission/closure races and authorization are qualified by separate tests.
-func (s *consoleSyntheticCaptures) ResolveContextRequest(ctx context.Context, current app.CurrentIdentity, preview, key string) (capture.ContextRequestDisposition, error) {
-	started := time.Now()
-	i, err := current.ResolveIdentity(ctx)
-	if err != nil {
-		return capture.ContextRequestDisposition{}, err
-	}
-	until := identity.Earlier(started.Add(5*time.Second), i.ValidUntil)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if ctx.Err() != nil || !time.Now().Before(until) {
-		return capture.ContextRequestDisposition{}, capture.ErrUnavailable
-	}
-	s.resolutions = append(s.resolutions, preview+":"+key)
-	if s.state == "unavailable" || s.state == "resolve-unavailable" || !s.drafts[preview] {
-		return capture.ContextRequestDisposition{}, capture.ErrUnavailable
-	}
-	if s.key != "" && s.preview == preview {
-		return capture.ContextRequestDisposition{State: capture.RequestAccepted, Accepted: &capture.Accepted{CaptureID: consoleCaptureID(8), MetadataValidUntil: until}, ValidUntil: until}, nil
-	}
-	if s.closed == nil {
-		s.closed = make(map[string]bool)
-	}
-	s.closed[preview] = true
-	if s.state == "lost-closure" && !s.lostClosureReply {
-		s.lostClosureReply = true
-		return capture.ContextRequestDisposition{}, capture.ErrUnavailable
-	}
-	return capture.ContextRequestDisposition{State: capture.RequestClosed, ValidUntil: until}, nil
 }
 
 func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentIdentity, id string) (capture.ContextProgress, error) {
@@ -516,7 +457,7 @@ func (s *consoleSyntheticCaptures) control(w http.ResponseWriter, r *http.Reques
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r.URL.Path == "/test/capture-stats" && r.Method == "GET" {
-		_ = json.NewEncoder(w).Encode(map[string]any{"request_keys": s.requests, "requested_retention_seconds": s.requestedSeconds, "previews": s.previews, "resolution_pairs": s.resolutions, "continuation_pairs": s.continuations})
+		_ = json.NewEncoder(w).Encode(map[string]any{"request_keys": s.requests, "requested_retention_seconds": s.requestedSeconds, "previews": s.previews})
 		return
 	}
 	if r.URL.Path != "/test/capture" || r.Method != "POST" || r.Header.Get("Origin") != origin {
@@ -535,7 +476,7 @@ func (s *consoleSyntheticCaptures) control(w http.ResponseWriter, r *http.Reques
 	switch input.State {
 	case "history-ready", "history-large", "history-unavailable", "history-expired":
 		s.historyMode = input.State
-	case "ready", "unavailable", "lost-reply", "lost-reply-always", "finalizing", "evidence-ready", "reject-request", "lost-closure", "resolve-unavailable":
+	case "ready", "unavailable", "lost-reply", "lost-reply-always", "finalizing", "evidence-ready", "reject-request":
 		s.state = input.State
 		if s.changes != nil {
 			s.changes.Publish(consoleCaptureID(8))

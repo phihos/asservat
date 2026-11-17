@@ -97,7 +97,7 @@ func PublicRuntimeHubRolePurposes() []string {
 // PublicRuntimeHubSharedDuties are typed adapter duties sharing one credential,
 // not additional role identities, projection files or pools (ADR-222).
 func PublicRuntimeHubSharedDuties() []string {
-	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
+	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit", "capture-preview", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
 }
 
 // Permanent role identities are not positions in a configurable or growing

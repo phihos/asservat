@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -25,14 +27,7 @@ import (
 type ContextUseCase interface {
 	CheckDiagnostic(context.Context, identities.CurrentIdentity, targets.WorkloadRequest) (time.Time, error)
 	Preview(context.Context, identities.CurrentIdentity, value.ContextIntent) (app.ContextPreviewResult, error)
-	Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error)
-	ResolveContextRequest(context.Context, identities.CurrentIdentity, string, string) (value.ContextRequestDisposition, error)
-}
-
-// ContextContinuation is implemented only by the concrete accepted-start composition.
-// An admission-only service cannot fall back to admitting on this explicit path.
-type ContextContinuation interface {
-	Continue(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error)
+	Request(context.Context, identities.CurrentIdentity, app.CaptureRequest) (value.Accepted, error)
 }
 type ContextProgressUseCase interface {
 	Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error)
@@ -64,7 +59,9 @@ type ContextOperations struct {
 	captures                         ContextUseCase
 	progress                         ContextProgressUseCase
 	history                          ContextHistoryUseCase
-	contracts                        *contracts.InvestigationContracts
+	// recordingSaves recomputes a recording-save preview on request_capture.
+	recordingSaves RecordingSaveUseCase
+	contracts      *contracts.InvestigationContracts
 }
 
 func (s *ContextOperations) PublicOrigin() string {
@@ -95,7 +92,7 @@ func NewContextOperationsWithHistory(c ContextOperationsConfig, capture ContextU
 }
 
 func (s *ContextOperations) ToolNames() []string {
-	out := []string{"list_diagnostics", "preview_capture", "get_capture", "resolve_capture_request"}
+	out := []string{"list_diagnostics", "preview_capture", "get_capture"}
 	if s != nil && s.config.CollectionEnabled {
 		out = append(out, "request_capture")
 	}
@@ -132,13 +129,19 @@ type PresetReference struct {
 	Version string `json:"version"`
 }
 type ContextOperationInput struct {
-	Target              WorkloadReference `json:"target_ref"`
-	Preset              PresetReference   `json:"preset_ref"`
-	RequestedSeconds    int64             `json:"requested_retention_seconds"`
-	PreviewID           string            `json:"preview_id"`
-	IdempotencyKey      string            `json:"idempotency_key"`
-	CaptureID           string            `json:"capture_id"`
-	ContinueAcquisition bool              `json:"continue_acquisition,omitempty"`
+	Target           WorkloadReference `json:"target_ref"`
+	Preset           PresetReference   `json:"preset_ref"`
+	RequestedSeconds int64             `json:"requested_retention_seconds"`
+	IdempotencyKey   string            `json:"idempotency_key"`
+	CaptureID        string            `json:"capture_id"`
+	// ADR-330 D9: request_capture submits the reviewed preview request and
+	// the plan digest its preview returned.
+	Preview            *ContextOperationInput `json:"preview,omitempty"`
+	ExpectedPlanDigest string                 `json:"expected_plan_digest,omitempty"`
+	// A recording-save preview (preview_recording_save input).
+	RecordingHandles []string `json:"recording_handles,omitempty"`
+	Before           string   `json:"before,omitempty"`
+	Reason           *string  `json:"reason,omitempty"`
 	// Sharing is the optional capture-time share of the result (ADR-235).
 	Sharing *ContextSharingInput `json:"sharing,omitempty"`
 	// ADR-236: the preview_capture history branch and list_capture_history.
@@ -241,8 +244,7 @@ type SelectedPod struct {
 	Workload  SelectedWorkload `json:"workload"`
 }
 type ContextPreviewData struct {
-	PreviewID        string             `json:"preview_id"`
-	ExpiresAt        time.Time          `json:"expires_at"`
+	PlanDigest       string             `json:"plan_digest"`
 	ExecutionDigest  string             `json:"execution_digest"`
 	PodCount         int                `json:"pod_count"`
 	MaxBytes         int64              `json:"max_bytes"`
@@ -267,10 +269,6 @@ type ContextAcceptedData struct {
 	Phase         string `json:"phase"`
 	NavigationURI string `json:"navigation_uri"`
 	Operation     string `json:"operation"`
-}
-type ContextResolutionData struct {
-	State string `json:"state"`
-	*ContextAcceptedData
 }
 
 type ContextActionData struct {
@@ -340,20 +338,20 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 	case request && errors.Is(err, value.ErrAcquisitionNotStarted):
 		// Admitted, and its start was refused before any start effect
 		// (ADR-212): a passive same-key retry would only replay acceptance.
-		return OperationFailure{"AcquisitionNotStarted", "The capture was accepted, but collection has not started. Continue the original capture with the same preview and request key (continue_acquisition: true); do not create another capture.", true}
+		return OperationFailure{"AcquisitionNotStarted", "The capture was accepted, but collection has not started. Check its status; do not create another capture.", false}
 	case errors.Is(err, value.ErrAcquisitionClosed):
 		return OperationFailure{"AcquisitionClosed", "The original collection interval has ended. Check its status for any recorded result. To collect again, start a new investigation explicitly.", false}
 	case errors.Is(err, value.ErrConflict):
 		return OperationFailure{"Conflict", "This submission conflicts with existing request or admission state. Keep the original preview and request key; do not assume an earlier attempt failed.", false}
 	case errors.Is(err, value.ErrPreviewExpired):
-		return OperationFailure{"PreviewExpired", "This preview is no longer valid for a new capture. An earlier attempt may still have been accepted. Keep the original preview and request key while resolving its outcome.", false}
+		return OperationFailure{"PreviewExpired", "The reviewed plan is no longer valid for a new capture. Retry the same request and key to see whether an earlier attempt was accepted, or preview again.", false}
 	case errors.Is(err, value.ErrChanged) && !request:
 		// A preview has no earlier review to resolve: an observation that
 		// changed or lapsed while it was assembled is a retryable unavailability
 		// (installed native 63/69), not ReviewChanged.
 		return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 	case errors.Is(err, value.ErrChanged):
-		return OperationFailure{"ReviewChanged", "The reviewed scope or current conditions changed. An earlier attempt may still have been accepted. Resolve the original request before reviewing a replacement.", false}
+		return OperationFailure{"ReviewChanged", "The reviewed plan or current conditions changed. Nothing new was accepted. Preview again to review the current plan.", false}
 	case errors.Is(err, value.ErrProcessingCoverage):
 		if request {
 			return OperationFailure{"ProcessingCoverageUnavailable", "Evidence cannot currently be kept for the selected duration. Check the original request's status before trying again; an earlier attempt may have been accepted.", false}
@@ -475,73 +473,22 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			}{[]DiagnosticRow{{Name: "Pod status", Version: "v1", Description: "One whole-pod Kubernetes status snapshot, up to 4096 native bytes. This does not collect logs, processes or network traffic.", Available: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Preset: PresetReference{"pod-status", "v1"}}}}
 		}
 	case "preview_capture":
-		var result app.ContextPreviewResult
-		target, repeated := in.Target, ""
-		if in.Composition != nil && in.RepeatedFromCaptureID == "" {
-			// ADR-243: a reviewed packet/syscall plan, blocked by RecorderUnavailable.
-			var data RecorderPreviewData
-			var previewUntil time.Time
-			data, previewUntil, operationErr = s.recorderPreview(ctx, current, in)
-			if operationErr == nil {
-				until = identity.Earlier(until, previewUntil)
-				out.Data, out.DataClass = data, "extract" // full composition settings are a protected extract
-			}
-			break
-		}
-		if in.HistoryCaptureID != "" || in.RepeatedFromCaptureID != "" {
-			// "Collect again" (ADR-236): the history entry supplies the target
-			// and requested retention; the preview runs every current check.
-			if s.history == nil {
-				return OperationReply{}, contracts.ErrInvestigationWire
-			}
-			var settings value.CaptureSettings
-			sourceID := in.HistoryCaptureID
-			if sourceID == "" {
-				sourceID = in.RepeatedFromCaptureID
-			}
-			edits := value.HistoryRepeatEdits{Selection: in.HistorySelection}
-			if in.RepeatedFromCaptureID != "" {
-				target := in.Target.target()
-				edits.Target = &target
-				edits.RequestedSeconds = in.RequestedSeconds
-				if in.Composition != nil {
-					edits.Composition, operationErr = in.Composition.composition()
-				}
-			}
-			if operationErr == nil {
-				if edited, ok := s.history.(interface {
-					PreviewEditedRepeat(context.Context, identities.CurrentIdentity, string, *value.ContextSharing, value.HistoryRepeatEdits) (app.ContextPreviewResult, value.CaptureSettings, error)
-				}); ok {
-					result, settings, operationErr = edited.PreviewEditedRepeat(ctx, current, sourceID, in.Sharing.intent(), edits)
-				} else if in.RepeatedFromCaptureID != "" || in.HistorySelection != "" {
-					operationErr = value.ErrInvalid
-				} else {
-					result, settings, operationErr = s.history.PreviewRepeat(ctx, current, sourceID, in.Sharing.intent())
-				}
-			}
-			target = WorkloadReference{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
-			repeated = sourceID
-		} else {
-			result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
-		}
-		if operationErr == nil && result.Recorder != nil {
-			data, previewUntil, e := s.recorderPreviewResult(*result.Recorder, target)
-			operationErr = e
-			if e == nil {
-				data.RepeatedFrom = repeated
-				until = identity.Earlier(until, previewUntil)
-				out.Data, out.DataClass = data, "extract"
-			}
-			break
-		}
+		planCtx, digest := app.WithPlanScope(ctx)
+		var data any
+		var previewUntil time.Time
+		var p value.ContextPreview
+		data, previewUntil, p, operationErr = s.previewCapture(planCtx, current, in)
 		if operationErr == nil {
-			until = identity.Earlier(until, identity.Earlier(result.ValidUntil, result.Assessment.ValidUntil))
-			p := result.Preview
-			selection := "lexicalEligiblePod"
-			if target.Kind == "Pod" {
-				selection = "explicitPod"
+			until = identity.Earlier(until, previewUntil)
+			plan := hash(digest(p))
+			switch d := data.(type) {
+			case ContextPreviewData:
+				d.PlanDigest = plan
+				out.Data = d
+			case RecorderPreviewData:
+				d.PlanDigest = plan
+				out.Data, out.DataClass = d, "extract" // full composition settings are a protected extract
 			}
-			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection, RepeatedFrom: repeated}
 		}
 	case "list_capture_profiles", "get_capture_profile":
 		if _, ok := s.captures.(ContextProfiles); !ok {
@@ -574,24 +521,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			operationErr = value.ErrDenied
 		} else {
 			var accepted value.Accepted
-			if in.ContinueAcquisition {
-				if continuation, ok := s.captures.(ContextContinuation); ok {
-					accepted, operationErr = continuation.Continue(ctx, current, in.PreviewID, in.IdempotencyKey)
-				} else {
-					auditNoDispatch = true
-					operationErr = value.ErrUnavailable
-				}
-			} else if in.ResultAccess != nil {
-				// ADR-249: only a reviewed recorder plan takes result access.
-				if reviewed, ok := s.captures.(ContextResultAccessRequest); ok {
-					accepted, operationErr = reviewed.RequestWithResultAccess(ctx, current, in.PreviewID, in.IdempotencyKey, in.ResultAccess.access())
-				} else {
-					auditNoDispatch = true
-					operationErr = value.ErrInvalid
-				}
-			} else {
-				accepted, operationErr = s.captures.Request(ctx, current, in.PreviewID, in.IdempotencyKey)
-			}
+			accepted, operationErr = s.request(ctx, current, in)
 			if operationErr == nil {
 				until = identity.Earlier(until, accepted.MetadataValidUntil)
 				data := ContextAcceptedData{CaptureID: accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + accepted.CaptureID, Operation: acceptedRecordingOperation(accepted)}
@@ -604,26 +534,6 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 					data.HistoryState = "available"
 				}
 				out.Data = data
-			}
-		}
-	case "resolve_capture_request":
-		var disposition value.ContextRequestDisposition
-		disposition, operationErr = s.captures.ResolveContextRequest(ctx, current, in.PreviewID, in.IdempotencyKey)
-		if operationErr == nil {
-			until = identity.Earlier(until, disposition.ValidUntil)
-			switch disposition.State {
-			case value.RequestAccepted:
-				if disposition.Accepted == nil {
-					return OperationReply{}, value.ErrUnavailable
-				}
-				out.Data = ContextResolutionData{State: "accepted", ContextAcceptedData: &ContextAcceptedData{CaptureID: disposition.Accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + disposition.Accepted.CaptureID, Operation: acceptedRecordingOperation(*disposition.Accepted)}}
-			case value.RequestClosed:
-				if disposition.Accepted != nil {
-					return OperationReply{}, value.ErrUnavailable
-				}
-				out.Data = ContextResolutionData{State: "closed"}
-			default:
-				return OperationReply{}, value.ErrUnavailable
 			}
 		}
 	case "get_capture":
@@ -661,7 +571,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		return OperationReply{}, contracts.ErrInvestigationWire
 	}
 	if operationErr != nil {
-		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture"), nil
 		if errors.Is(operationErr, value.ErrRecordingSelectionRequired) {
 			out.Data = recordingSelectionFailure(s.config.PublicOrigin)
 		}
@@ -723,4 +633,109 @@ func settingsSizeFailure(origin, captureID string) any {
 		OperationFailure
 		NavigationURI string `json:"navigation_uri"`
 	}{publicCaptureFailure(value.ErrSettingsTooLarge, false), origin + "/captures/" + captureID}
+}
+
+// previewCapture computes the preview of one preview_capture or
+// preview_recording_save input. request_capture recomputes it under the
+// request's plan scope.
+func (s *ContextOperations) previewCapture(ctx context.Context, current identities.CurrentIdentity, in ContextOperationInput) (any, time.Time, value.ContextPreview, error) {
+	var zero value.ContextPreview
+	if len(in.RecordingHandles) > 0 {
+		if s.recordingSaves == nil {
+			return nil, time.Time{}, zero, value.ErrInvalid
+		}
+		var before time.Duration
+		if in.Before != "" {
+			var err error
+			if before, err = time.ParseDuration(in.Before); err != nil {
+				return nil, time.Time{}, zero, value.ErrInvalid
+			}
+		}
+		result, err := s.recordingSaves.Preview(ctx, current, recordingSaveRequest(in.RecordingHandles, before, in.Sharing, in.RepeatedFromCaptureID, in.Reason))
+		return nil, result.ValidUntil, result.Preview, err
+	}
+	if in.Composition != nil && in.RepeatedFromCaptureID == "" {
+		// ADR-243: a reviewed packet/syscall plan.
+		use, ok := s.captures.(RecorderPreviewUseCase)
+		if !ok {
+			return nil, time.Time{}, zero, value.ErrInvalid
+		}
+		composition, err := in.Composition.composition()
+		if err != nil {
+			return nil, time.Time{}, zero, value.ErrInvalid
+		}
+		result, err := use.PreviewComposition(ctx, current, value.ContextIntent{Target: in.Target.target(), RequestedSeconds: in.RequestedSeconds, Composition: composition})
+		if err != nil {
+			return nil, time.Time{}, zero, err
+		}
+		data, until, err := s.recorderPreviewResult(result, in.Target)
+		return data, until, result.Preview, err
+	}
+	var result app.ContextPreviewResult
+	var err error
+	target, repeated := in.Target, ""
+	if in.HistoryCaptureID != "" || in.RepeatedFromCaptureID != "" {
+		// "Collect again" (ADR-236): the history entry supplies the target
+		// and requested retention; the preview runs every current check.
+		if s.history == nil {
+			return nil, time.Time{}, zero, contracts.ErrInvestigationWire
+		}
+		var settings value.CaptureSettings
+		sourceID := in.HistoryCaptureID
+		if sourceID == "" {
+			sourceID = in.RepeatedFromCaptureID
+		}
+		edits := value.HistoryRepeatEdits{Selection: in.HistorySelection}
+		if in.RepeatedFromCaptureID != "" {
+			target := in.Target.target()
+			edits.Target = &target
+			edits.RequestedSeconds = in.RequestedSeconds
+			if in.Composition != nil {
+				if edits.Composition, err = in.Composition.composition(); err != nil {
+					return nil, time.Time{}, zero, err
+				}
+			}
+		}
+		if edited, ok := s.history.(interface {
+			PreviewEditedRepeat(context.Context, identities.CurrentIdentity, string, *value.ContextSharing, value.HistoryRepeatEdits) (app.ContextPreviewResult, value.CaptureSettings, error)
+		}); ok {
+			result, settings, err = edited.PreviewEditedRepeat(ctx, current, sourceID, in.Sharing.intent(), edits)
+		} else if in.RepeatedFromCaptureID != "" || in.HistorySelection != "" {
+			err = value.ErrInvalid
+		} else {
+			result, settings, err = s.history.PreviewRepeat(ctx, current, sourceID, in.Sharing.intent())
+		}
+		target = WorkloadReference{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
+		repeated = sourceID
+	} else {
+		result, err = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
+	}
+	if err != nil {
+		return nil, time.Time{}, zero, err
+	}
+	p := result.Preview
+	if result.Recorder != nil {
+		data, until, err := s.recorderPreviewResult(*result.Recorder, target)
+		data.RepeatedFrom = repeated
+		return data, until, p, err
+	}
+	selection := "lexicalEligiblePod"
+	if target.Kind == "Pod" {
+		selection = "explicitPod"
+	}
+	data := ContextPreviewData{ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection, RepeatedFrom: repeated}
+	return data, identity.Earlier(result.ValidUntil, result.Assessment.ValidUntil), p, nil
+}
+
+// request submits the reviewed preview request of request_capture.
+func (s *ContextOperations) request(ctx context.Context, current identities.CurrentIdentity, in ContextOperationInput) (value.Accepted, error) {
+	plan, err := hex.DecodeString(in.ExpectedPlanDigest)
+	if in.Preview == nil || err != nil || len(plan) != len(artifact.Digest{}) || artifact.Digest(plan) == (artifact.Digest{}) {
+		return value.Accepted{}, value.ErrInvalid
+	}
+	preview := *in.Preview
+	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: in.ResultAccess.access(), Preview: func(ctx context.Context) (value.ContextPreview, error) {
+		_, _, p, err := s.previewCapture(ctx, current, preview)
+		return p, err
+	}})
 }

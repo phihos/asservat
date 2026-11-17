@@ -29,7 +29,11 @@ func (f *policySnapshotServiceFixture) PreviewPolicySnapshot(_ context.Context, 
 	f.selections = append(f.selections, s)
 	return ContextPreviewResult{Preview: value.ContextPreview{ID: fixtureID(910), Actor: s.Authority.Executor, Target: s.Target, Intent: value.ContextIntent{Snapshot: &planning.SourceSnapshotContext{Request: artifact.SourceSnapshotRequest{T0: s.TriggeredAt}}}}}, nil
 }
-func (f *policySnapshotServiceFixture) Request(_ context.Context, _ identities.CurrentIdentity, _ string, key string) (value.Accepted, error) {
+func (f *policySnapshotServiceFixture) Request(ctx context.Context, _ identities.CurrentIdentity, in CaptureRequest) (value.Accepted, error) {
+	if _, err := in.Preview(ctx); err != nil {
+		return value.Accepted{}, err
+	}
+	key := in.Key
 	f.requests++
 	f.key = key
 	f.keys = append(f.keys, key)
