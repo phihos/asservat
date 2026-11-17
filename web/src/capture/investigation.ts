@@ -423,6 +423,9 @@ export class Investigation {
       this.closeEvents();
       void this.openAccepted(this.receipt, id);
     });
+    // A decision without a visible capture (sign-in ended, refused) ends the
+    // wait: read the grant again for its outcome.
+    events.addEventListener('accessLost', () => { if (this.events !== events) return; this.closeEvents(); void this.checkApproval(); });
     events.addEventListener('error', () => { if (this.events === events && events.readyState === EventSource.CLOSED) this.events = undefined; });
   }
   private async openAccepted(receipt: Receipt, captureID: string) {

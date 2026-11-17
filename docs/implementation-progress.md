@@ -27,6 +27,8 @@ the `request_capture` path, so current bindings and denies decide. After that
 end it returns the warning `RequesterReauthenticationRequired`, `get_grant`
 sets `can_resume` and the requester resubmits. The console waits for the
 capture on the status stream, which now waits for a capture not yet visible.
+A grant decision notifies its capture ID; without a visible capture the
+stream ends with `accessLost` and the console rereads the grant.
 
 ## One-step publication (REQ-EVD-001, ADR-330, 2026-11-17)
 

@@ -96,6 +96,16 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal("persist grant", err)
 		}
+		// A decision notifies the grant's capture ID, so a waiting console
+		// rereads the grant (00201).
+		listener, err := admin.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer listener.Release()
+		if _, err = listener.Exec(ctx, "LISTEN asservat_capture_progress"); err != nil {
+			t.Fatal(err)
+		}
 		// The approved plan outlives the reviewed preview's own deadline.
 		time.Sleep(time.Until(oldDeadline) + 10*time.Millisecond)
 		approver := p.Actor
@@ -106,6 +116,12 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		if x := g.Submission; x == nil || !sameJSON(x.Request, submission.Request) || !slices.Equal(x.Groups, submission.Groups) || x.Policy != submission.Policy || !x.Until.Equal(submission.Until) || !g.Decision.DecidedAt.Before(x.Until) {
 			t.Fatal("approved grant lost its submission", x)
+		}
+		wait, stop := context.WithTimeout(ctx, 5*time.Second)
+		n, err := listener.Conn().WaitForNotification(wait)
+		stop()
+		if err != nil || n.Payload != p.CaptureID {
+			t.Fatal("decision did not notify its capture", n, err)
 		}
 		acceptedAt := time.Now().UTC().Truncate(time.Microsecond)
 		in.Deadline = acceptedAt.Add(time.Minute)

@@ -154,4 +154,15 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	if e := next(); e.Type != "capture" || e.ID != "00000000-0000-4000-8000-000000000030" {
 		t.Fatal("awaited capture", e)
 	}
+	// A decision without a visible capture ends the wait, so the console
+	// rereads the grant.
+	calls.hidden.Store(true)
+	decided := get("?capture_id=00000000-0000-4000-8000-000000000030")
+	defer decided.Body.Close()
+	lines = bufio.NewScanner(decided.Body)
+	time.Sleep(50 * time.Millisecond)
+	changes.Publish("00000000-0000-4000-8000-000000000030")
+	if e := next(); e.Type != "accessLost" {
+		t.Fatal("decision without a capture", e)
+	}
 }

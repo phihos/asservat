@@ -345,6 +345,15 @@ it('waits for the capture an approval starts and resubmits only after the sign-i
   await vi.waitFor(() => expect(again.controller.snapshot().resubmit).toBe(true));
   expect(again.client.calls.filter(c => c.name === 'request_capture')).toHaveLength(1);
 
+  // A decision without a capture ends the wait and the grant is read again.
+  const decided = await ready();
+  decided.client.responder = () => approvalPendingResult(); await decided.controller.submit();
+  await vi.waitFor(() => expect(decided.grants.calls).toBe(1));
+  decided.grants.grant = { phase: 'Approved', can_resume: true };
+  FakeEventSource.instances.at(-1)!.emit('accessLost', {});
+  await vi.waitFor(() => expect(decided.controller.snapshot().resubmit).toBe(true));
+  expect(decided.grants.calls).toBe(2);
+
   const approved = await ready();
   approved.client.responder = () => approvalPendingResult(); await approved.controller.submit();
   approved.grants.grant = { phase: 'Approved', can_resume: false };
