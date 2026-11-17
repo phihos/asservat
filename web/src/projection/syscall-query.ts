@@ -3,7 +3,8 @@ import { validInput_query_artifact, validOutput_get_query_result } from '../gene
 import { operations, validQuery, type Operations, type Input, type SyscallQueryData } from './http';
 
 export type SyscallQuerySource = { caseID: string; artifactID: string; version: string; grantID?: string };
-export type SyscallQuerySelection = Pick<Input<'query_artifact'>, 'syscall_names' | 'errors_only' | 'limit'>;
+export type SyscallQuerySelection = { syscall_names?: string[]; errors_only?: boolean; limit?: number };
+type SyscallInput = SyscallQuerySelection & { operation: 'syscalls'; case_id: string; artifact_id: string; grant_id?: string; idempotency_key: string; cursor?: string };
 export type { SyscallQueryData };
 export type SyscallQueryState = {
   phase: 'idle' | 'loading' | 'pending' | 'result' | 'uncertain' | 'approval-required' | 'unavailable' | 'expired';
@@ -18,7 +19,7 @@ export class SyscallQuery {
   private listeners = new Set<() => void>();
   private session?: Session; private scope?: AbortSignal; private source?: SyscallQuerySource;
   private active?: AbortController; private detach?: () => void; private generation = 0;
-  private attempt?: Input<'query_artifact'>; private selection?: SyscallQuerySelection;
+  private attempt?: SyscallInput; private selection?: SyscallQuerySelection;
   private handle?: string; private serverExpiry?: string;
   private cutoff = Infinity; private revision = 1;
   private timer?: ReturnType<typeof setTimeout>;
@@ -56,7 +57,7 @@ export class SyscallQuery {
     if (!this.source.grantID) { this.publish({ phase: 'approval-required' }); return; }
     const names = selection.syscall_names === undefined ? undefined : [...new Set(selection.syscall_names)].sort();
     const selected: SyscallQuerySelection = { ...structuredClone(selection), ...(names ? { syscall_names: names } : {}) };
-    const input: Input<'query_artifact'> = { operation: 'syscalls', ...selected, case_id: this.source.caseID, artifact_id: this.source.artifactID, grant_id: this.source.grantID, idempotency_key: this.newID(), ...(cursor ? { cursor } : {}) };
+    const input: SyscallInput = { operation: 'syscalls', ...selected, case_id: this.source.caseID, artifact_id: this.source.artifactID, grant_id: this.source.grantID, idempotency_key: this.newID(), ...(cursor ? { cursor } : {}) };
     if (!validInput_query_artifact(input)) { this.publish({ phase: 'unavailable' }); return; }
     this.selection = selected; this.attempt = input; this.cutoff = this.now() + 60_000; this.arm(); await this.read(false);
   }
@@ -71,7 +72,7 @@ export class SyscallQuery {
     this.active = request; const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true }); this.publish({ phase: 'loading' });
     let received = false;
     try {
-      const outer = poll ? await this.client.call('get_query_result', { query_handle: this.handle!, after_revision: this.revision }, this.session.csrf_token, request.signal) : await this.client.call('query_artifact', this.attempt, this.session.csrf_token, request.signal);
+      const outer = poll ? await this.client.call('get_query_result', { query_handle: this.handle!, after_revision: this.revision }, this.session.csrf_token, request.signal) : await this.client.call('query_artifact', this.attempt as unknown as Input<'query_artifact'>, this.session.csrf_token, request.signal);
       received = true;
       if (generation !== this.generation || scope.aborted || request.signal.aborted) return;
       if (!(poll ? validOutput_get_query_result(outer) : validQuery('syscalls', outer))) throw new Error('Query unavailable');
@@ -79,7 +80,7 @@ export class SyscallQuery {
         this.attempt = undefined; this.publish({ phase: outer.data.code === 'RawApprovalRequired' ? 'approval-required' : 'unavailable' }); return;
       }
       if (poll && (!('query_handle' in outer.data) || outer.data.query_handle !== this.handle || outer.provenance.length !== 0 || outer.next_cursor !== null || outer.truncated)) throw new Error('Query changed');
-      const expiry = outer.data.query_expires_at, observed = outer.data.query_observed_at;
+      const { query_expires_at: expiry, query_observed_at: observed } = outer.data as { query_observed_at: string; query_expires_at: string };
       const duration = Date.parse(expiry) - Date.parse(observed);
       if (!Number.isFinite(duration) || duration <= 1 || duration > 60_000 || this.serverExpiry !== undefined && this.serverExpiry !== expiry) throw new Error('Query time changed');
       this.serverExpiry = expiry; this.cutoff = Math.min(this.cutoff, started + duration - 1); this.arm();
