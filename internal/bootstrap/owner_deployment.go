@@ -74,7 +74,7 @@ type OwnerDeployment struct {
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	shared      publicShared
+	shared           publicShared
 	// localControls are the control documents this process wrote (the
 	// hub-local download workers'); the trust catalog holds them beside the
 	// mounted worker-controls.json.
