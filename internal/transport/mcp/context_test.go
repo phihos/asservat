@@ -220,10 +220,12 @@ func TestMCPClampsActualSocketToOriginalOperationDeadline(t *testing.T) {
 	if response.StatusCode != 200 || !strings.Contains(string(b), "IntentAuditPending") {
 		t.Fatalf("valid operation failed: %d %s", response.StatusCode, b)
 	}
-	if len(observed) != 2 {
+	// A status read (get_capture) may also lengthen the socket for its
+	// after_revision wait; the last deadline is the final one.
+	if len(observed) < 2 {
 		t.Fatal("missing final actual socket deadline", len(observed))
 	}
-	initial, final := <-observed, <-observed
+	initial, final := <-observed, lastDeadline(observed)
 	if !initial.After(until) || !final.Equal(until) {
 		t.Fatal("operation deadline lost at socket", initial, final, until)
 	}
@@ -261,11 +263,11 @@ func TestMCPFinalIdentityShorteningReachesSocket(t *testing.T) {
 			f.until = time.Now().Add(2 * time.Second)
 			shorter = f.until.Add(-time.Second)
 			response, b := send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "get_capture", "arguments": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}}))
-			if response.StatusCode != 200 || !strings.Contains(string(b), "IntentAuditPending") || len(observed) != 2 || checks.Load() != 4 {
+			if response.StatusCode != 200 || !strings.Contains(string(b), "IntentAuditPending") || len(observed) < 2 || checks.Load() != 4 {
 				t.Fatalf("unexpected path: %d %s checks=%d writes=%d", response.StatusCode, b, checks.Load(), len(observed))
 			}
 			<-observed
-			if final := <-observed; !final.Equal(shorter) {
+			if final := lastDeadline(observed); !final.Equal(shorter) {
 				t.Fatalf("final identity shortening lost: got=%v want=%v", final, shorter)
 			}
 		})
@@ -322,4 +324,13 @@ func TestMCPReportsAFailedOperationCall(t *testing.T) {
 			t.Fatalf("%d %q, want %q", response.StatusCode, reasons, c.want)
 		}
 	}
+}
+
+// lastDeadline drains observed and returns its last deadline.
+func lastDeadline(observed chan time.Time) time.Time {
+	var last time.Time
+	for len(observed) > 0 {
+		last = <-observed
+	}
+	return last
 }
