@@ -303,7 +303,7 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 			failed = errors.Join(failed, value.ErrCapacity)
 			continue
 		}
-		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: rec.Action.EvidenceType, RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
+		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), Labels: resolved.Recorder.Target.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: rec.Action.EvidenceType, RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
 		if e != nil {
 			failed = errors.Join(failed, staged("retention", e))
 			continue

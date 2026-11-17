@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"slices"
 	"time"
 )
@@ -17,6 +18,16 @@ type SourceSnapshotTarget struct {
 	NodeUID, BootID, CollectorPodUID, CollectorEpoch string
 	SourceID, Fence                                  string
 	BindingDigest                                    [32]byte
+	// Labels are the target's labels at arming (privacy.EncodeLabels), kept
+	// as a string so the target stays comparable. Label-scoped retention
+	// policies match them when a window is saved.
+	Labels string `json:",omitempty"`
+}
+
+// Routing is the API-class resolution a saved window runs under: the
+// original identity and labels, no fresh observation.
+func (s SourceSnapshotTarget) Routing() PodResolution {
+	return PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: s.Request, Pin: s.Pin, Labels: privacy.DecodeLabels(s.Labels)}
 }
 
 func (s SourceSnapshotTarget) Target() authorization.Target {

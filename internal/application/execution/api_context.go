@@ -167,7 +167,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 			return out, nil, apiCheckStep{resolveStep, value.ErrDenied}
 		}
 		snapshotObserved = &observed
-		t = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+		t = observed.Original.Routing()
 	} else if argumentRecording(w) {
 		resolveStep = "ResolveArgumentSource"
 		resolver, ok := s.Targets.(interface {

@@ -48,9 +48,9 @@ gate set.
 Label selectors (migration 00198): target resolution reads the namespace and
 workload labels, `MatchPolicies` applies matchLabels, and admission records the
 labels on `context_capture.target_labels` so policy events and the admission
-trigger shorten only matching artifacts. Rows without recorded labels (older
-rows, source snapshots) take a labeled policy cluster-wide; a source snapshot
-still refuses collection under a covering labeled policy.
+trigger shorten only matching artifacts. Policy recorders and saved windows
+use the labels resolved at arming. Rows without recorded labels (older rows)
+take a labeled policy cluster-wide.
 Open: policy status writes (no RBAC or status code yet; the log line is the
 signal), connector-pushed local policies, one-step publication.
 

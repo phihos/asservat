@@ -137,3 +137,20 @@ func TestMatchPoliciesRefusesCoveringRejectedPolicy(t *testing.T) {
 		t.Fatal("covering rejected policy admitted", err)
 	}
 }
+
+func TestLabelsTextRoundTrip(t *testing.T) {
+	l := &TargetLabels{Namespace: map[string]string{"team": "shop", "example.com/env": ""}, Workload: map[string]string{"tier": "web"}}
+	text := EncodeLabels(l)
+	got := DecodeLabels(text)
+	if got == nil || got.Namespace["team"] != "shop" || got.Namespace["example.com/env"] != "" || len(got.Namespace) != 2 || got.Workload["tier"] != "web" || len(got.Workload) != 1 || EncodeLabels(got) != text {
+		t.Fatal("round trip", text, got)
+	}
+	if e := DecodeLabels(EncodeLabels(&TargetLabels{})); e == nil || len(e.Namespace)+len(e.Workload) != 0 {
+		t.Fatal("observed empty labels must stay observed", e)
+	}
+	for _, bad := range []string{"", "n:team=shop", "labels,x:team=shop", "labels,n:=v", "labels,n:team"} {
+		if DecodeLabels(bad) != nil {
+			t.Fatal("decoded", bad)
+		}
+	}
+}

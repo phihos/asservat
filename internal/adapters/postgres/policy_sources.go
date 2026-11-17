@@ -20,6 +20,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -336,7 +337,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				return value.ErrInvalid
 			}
 			raw, _ := json.Marshal(b)
-			originalTarget := targets.SourceSnapshotTarget{Request: in.Target.Request, Pin: in.Target.Pin, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, SourceID: b.SourceID, Fence: b.Fence, BindingDigest: deliveryapp.SourceBindingDigest(b)}
+			originalTarget := targets.SourceSnapshotTarget{Request: in.Target.Request, Pin: in.Target.Pin, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, SourceID: b.SourceID, Fence: b.Fence, BindingDigest: deliveryapp.SourceBindingDigest(b), Labels: privacy.EncodeLabels(in.Target.Labels)}
 			if !originalTarget.Valid() {
 				return value.ErrInvalid
 			}

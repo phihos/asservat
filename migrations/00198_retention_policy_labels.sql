@@ -8,7 +8,7 @@
 -- takes the labels of its capture's row. retention_policy_effect matches a
 -- policy's matchLabels (namespaceLabels, workloadLabels in the effect) by
 -- jsonb containment. A row without recorded labels (admitted before this
--- migration, or a source snapshot whose target was not re-read) takes every
+-- migration, or saved from a source armed before it) takes every
 -- policy of its cluster scope: a privacy maximum errs towards earlier
 -- deletion. The admission trigger of 00190 calls this function, so it
 -- applies label-scoped policies to the new row without change.

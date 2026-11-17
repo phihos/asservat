@@ -192,6 +192,7 @@ func targetReadError(err error) error {
 func ownerMatches(owner *meta.OwnerReference, kind, name, uid string) bool {
 	return owner != nil && owner.APIVersion == "apps/v1" && owner.Kind == kind && owner.Name == name && string(owner.UID) == uid
 }
+
 // chain checks the Pod's owner chain up to the requested workload and
 // returns the workload's resourceVersion and labels (the Pod's own for a
 // bare Pod), which label-scoped retention policies match.

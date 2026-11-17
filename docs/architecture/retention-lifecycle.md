@@ -42,8 +42,9 @@ wins (`privacy.MatchPolicies`, `privacy.Resolve`). Rules select by privacy
 class and evidence type; every collector records evidence as potential user
 data. Label selectors use matchLabels semantics against the namespace labels
 and the workload labels (Deployment or StatefulSet, or the bare Pod) that
-target resolution reads. A target resolved without labels (a source snapshot)
-refuses new collection under a covering labeled policy.
+target resolution reads. A saved recording window uses the labels its source
+recorded at arming (`SourceSnapshotTarget.Labels`). A target without observed
+labels refuses new collection under a covering labeled policy.
 
 ## Stored deadlines
 

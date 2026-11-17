@@ -435,3 +435,35 @@ func TestPolicySourceArmsOneSourcePerRecorder(t *testing.T) {
 		}
 	}
 }
+
+// labelRecordingRetention records the labels each policy-recorder retention
+// resolution receives.
+type labelRecordingRetention struct {
+	f      *investigationFixture
+	labels *[]*privacy.TargetLabels
+}
+
+func (s labelRecordingRetention) Resolve(ctx context.Context, in privacy.Input) (privacy.Resolution, error) {
+	*s.labels = append(*s.labels, in.Labels)
+	return s.f.Resolve(ctx, in)
+}
+
+// A policy-triggered recorder resolves retention with the labels of its
+// regional target resolution, so label-scoped policies can match it.
+func TestPolicySourceRetentionUsesTargetLabels(t *testing.T) {
+	f := newSourceCohortFixture(t, 1)
+	f.f.target.Labels = &privacy.TargetLabels{Namespace: map[string]string{"team": "shop"}, Workload: map[string]string{"tier": "web"}}
+	var seen []*privacy.TargetLabels
+	f.runtime.Retention = labelRecordingRetention{f.f, &seen}
+	if err := f.maintain(0); err != nil || f.dispatches != 1 {
+		t.Fatal("initial source", err, f.dispatches)
+	}
+	if len(seen) == 0 {
+		t.Fatal("no retention resolution")
+	}
+	for _, l := range seen {
+		if l == nil || l.Workload["tier"] != "web" || l.Namespace["team"] != "shop" {
+			t.Fatalf("retention resolved without target labels: %+v", l)
+		}
+	}
+}

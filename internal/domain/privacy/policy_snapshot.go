@@ -66,6 +66,54 @@ type TargetLabels struct {
 	Workload  map[string]string `json:"workload,omitempty"`
 }
 
+// EncodeLabels is the canonical text of l ("" for nil): sorted
+// "n:key=value" and "w:key=value" entries joined by ",". Kubernetes label
+// keys and values cannot contain "=" or ",", so the text is unambiguous.
+func EncodeLabels(l *TargetLabels) string {
+	if l == nil {
+		return ""
+	}
+	entries := []string{"labels"}
+	for prefix, labels := range map[string]map[string]string{"n:": l.Namespace, "w:": l.Workload} {
+		for k, v := range labels {
+			entries = append(entries, prefix+k+"="+v)
+		}
+	}
+	slices.Sort(entries)
+	return strings.Join(entries, ",")
+}
+
+// DecodeLabels reverses EncodeLabels; text it cannot read is nil (labels
+// not observed), which refuses collection under a covering labeled policy.
+func DecodeLabels(text string) *TargetLabels {
+	entries := strings.Split(text, ",")
+	if !slices.Contains(entries, "labels") {
+		return nil
+	}
+	out := &TargetLabels{}
+	for _, e := range entries {
+		if e == "labels" {
+			continue
+		}
+		k, v, ok := strings.Cut(e[min(2, len(e)):], "=")
+		var into *map[string]string
+		switch {
+		case strings.HasPrefix(e, "n:"):
+			into = &out.Namespace
+		case strings.HasPrefix(e, "w:"):
+			into = &out.Workload
+		}
+		if !ok || into == nil || k == "" {
+			return nil
+		}
+		if *into == nil {
+			*into = map[string]string{}
+		}
+		(*into)[k] = v
+	}
+	return out
+}
+
 // Selects applies matchLabels semantics: every selector key must be present
 // with its value. An unlabeled scope selects every target.
 func (s PolicyScope) Selects(l TargetLabels) bool {
