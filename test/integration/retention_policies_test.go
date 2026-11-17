@@ -256,5 +256,22 @@ func qualifyRetentionPolicies(t *testing.T, ctx context.Context, admin *pgxpool.
 		if mine == nil || mine.Scanned != 4 || mine.Affected != 2 || mine.Unknown != 2 {
 			t.Fatal("labeled preview aggregate", rows)
 		}
+
+		// A cluster-wide shortening in the same proposal does not hide that
+		// the labeled one could shorten unlabeled artifacts further. It reaches
+		// all six artifacts, including the two admitted above.
+		wide := retentionPolicyFixture(custodyID(), 1, cluster, 200, 60)
+		if rows, err = preview.PreviewRetentionEffects(ctx, []privacy.PolicyEffect{privacy.Effect(wide), privacy.Effect(stricter)}); err != nil {
+			t.Fatal(err)
+		}
+		mine = nil
+		for i := range rows {
+			if rows[i].ClusterID == cluster && !rows[i].CaseMetadata {
+				mine = &rows[i]
+			}
+		}
+		if mine == nil || mine.Scanned != 6 || mine.Affected != 6 || mine.Unknown != 2 {
+			t.Fatal("mixed preview aggregate", rows)
+		}
 	})
 }
