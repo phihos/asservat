@@ -19,6 +19,7 @@ type publicContextRoutes struct {
 	sessions, investigations, mcp, content, console      http.Handler // content nil without a configured worker
 	processing, processingRules                          http.Handler // nil without a capacity processing source
 	events                                               http.Handler // nil without a progress listener
+	liveEvents                                           http.Handler
 	mcpPath, mcpMetadata, contentPrefix, contentMetadata string
 }
 
@@ -76,6 +77,10 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// The inventory handler owns its finite cursor/query contract.
 	if path == browser.ProcessingRulesPath && h.processingRules != nil {
 		h.processingRules.ServeHTTP(w, r)
+		return
+	}
+	if _, ok := browser.LiveWatchID(path); ok && h.liveEvents != nil {
+		h.liveEvents.ServeHTTP(w, r)
 		return
 	}
 	if path == browser.EventsPath && h.events != nil {

@@ -28,6 +28,8 @@ const (
 	MaxRows = 100
 	// MaxWaitMS is the longest read wait (30 s, the MCP long-wait bound).
 	MaxWaitMS = 30000
+	// HeadCursor reads no rows: it returns the watch's current cursor.
+	HeadCursor = "head"
 	// IdleAge closes a watch nobody reads (ADR-335 D9); each read renews it.
 	IdleAge = 10 * time.Minute
 )

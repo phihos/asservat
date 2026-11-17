@@ -1032,3 +1032,31 @@ func TestLiveCommittedChargeLapseRedeliversWithoutSecondCharge(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveHeadReadAndPausedWaitEndsOnUpdate(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	head, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: v.HeadCursor})
+	if e != nil || len(head.Rows) != 0 || head.Cursor != *w.Cursor || f.reads != 0 {
+		t.Fatal("head read must return the current cursor without rows", head, e)
+	}
+	paused, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: 1, Key: "pause", Mode: "Paused"}, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_, _ = s.Update(context.Background(), i, v.Update{ID: w.ID, Revision: 2, Key: "resume", Mode: "Active"}, false)
+	}()
+	started := time.Now()
+	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *paused.Cursor, WaitMS: 3000}); e == nil {
+		t.Fatal("a paused read woken by an update must report the changed revision")
+	}
+	if waited := time.Since(started); waited < 50*time.Millisecond || waited > 2*time.Second {
+		t.Fatal("paused read did not wait for the update", waited)
+	}
+}

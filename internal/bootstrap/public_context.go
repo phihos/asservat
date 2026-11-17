@@ -117,8 +117,13 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		handler.Report = eventLog(os.Stderr, "status event unavailable")
 		events = handler
 	}
+	live, e := browser.NewLiveEventsHandler(sessions, audited)
+	if e != nil {
+		return nil, &fixedStepError{"live-events", e}
+	}
+	live.Report = eventLog(os.Stderr, "live event unavailable")
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules, events: events,
+		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules, events: events, liveEvents: live,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,
