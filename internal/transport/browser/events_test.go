@@ -28,7 +28,7 @@ func (s *shortSession) Resolve(ctx context.Context, cookie string, refresh bool)
 }
 
 func TestChangesDeliverOnlyWatchedIDsAndAnyChange(t *testing.T) {
-	changes := NewChanges()
+	changes := presentation.NewChanges()
 	s := changes.Subscribe([]string{"a"})
 	defer s.Close()
 	changes.Publish("b")
@@ -54,7 +54,7 @@ func TestEventsStreamEndsAtSessionDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &shortSession{expiresAt: time.Now().Add(time.Second)}}, ops, NewChanges())
+	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &shortSession{expiresAt: time.Now().Add(time.Second)}}, ops, presentation.NewChanges())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changes := NewChanges()
+	changes := presentation.NewChanges()
 	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &investigationSession{}}, ops, changes)
 	if err != nil {
 		t.Fatal(err)

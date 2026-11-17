@@ -28,6 +28,11 @@ var (
 // observation and lease inside it keeps its own shorter ValidUntil.
 const EvidenceReadRequestWindow = 20 * time.Second
 
+// StatusWaitRequestWindow bounds one HTTP request of a status read with
+// after_revision: the 30-second server-side wait (mcp-tools.json) and two
+// ordinary five-second reads. Each read keeps its own operation window.
+const StatusWaitRequestWindow = 40 * time.Second
+
 // AuthorityRecheckInterval bounds how long one operation's authority snapshot
 // (identity, eligibility, recovery) may be used before it is checked again
 // (ADR-311). It never extends an original session, grant, retention or source

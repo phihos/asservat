@@ -187,7 +187,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	// Same per-operation window as MCP: evidence reads get the longer window.
-	window := audit.OperationRequestWindow(name)
+	window := audit.OperationTransportWindow(name)
 	ctx, cancel := context.WithTimeout(r.Context(), window)
 	defer cancel()
 	r = r.WithContext(ctx)

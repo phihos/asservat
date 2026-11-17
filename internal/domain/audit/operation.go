@@ -116,6 +116,20 @@ func OperationLane(name string) string {
 	return "normal"
 }
 
+// StatusWait is the longest server-side after_revision wait of a status read
+// (mcp-tools.json: "or 30 seconds pass").
+const StatusWait = 30 * time.Second
+
+// OperationTransportWindow bounds one HTTP request: for the status reads it
+// also covers one after_revision wait and the second read.
+func OperationTransportWindow(name string) time.Duration {
+	switch name {
+	case "get_capture", "get_grant", "download_artifact":
+		return max(OperationRequestWindow(name), identity.StatusWaitRequestWindow)
+	}
+	return OperationRequestWindow(name)
+}
+
 // OperationRequestWindow is the maximum request interval of an operation.
 func OperationRequestWindow(name string) time.Duration {
 	if k, ok := operations[name]; ok {
