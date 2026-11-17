@@ -30,8 +30,8 @@ export const operations: Operations = {
 // postOperation is the one session-authenticated metadata operation request:
 // generated input/output validation, CSRF, an optional identical
 // Idempotency-Key header, fixed request/response bounds, and no automatic replay.
-// Preview composition matches the server's fifteen-second outer window; other
-// capture operations retain ten seconds. Caller cancellation always wins.
+// Preview composition and decide_review (an approval submits the request)
+// match the server's fifteen-second outer window; others retain ten seconds. Caller cancellation always wins.
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
@@ -40,7 +40,7 @@ export async function postOperation(name: string, input: unknown, csrf: string, 
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });
   if (signal.aborted) abort();
-  const timer = setTimeout(abort, name === 'preview_capture' ? 15_000 : 10_000);
+  const timer = setTimeout(abort, name === 'preview_capture' || name === 'decide_review' ? 15_000 : 10_000);
   try {
     const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
     if (idempotencyKey !== undefined) headers['Idempotency-Key'] = idempotencyKey;

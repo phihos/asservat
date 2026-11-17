@@ -503,7 +503,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		return zero, value.ErrUnavailable
 	}
 	if p.CompositionGroup != nil {
-		return s.requestCompositionGroup(ctx, source, p, key, i, in.Access)
+		return s.requestCompositionGroup(ctx, source, p, i, in)
 	}
 	if p.Group != nil {
 		return s.requestRecordingSaveGroup(ctx, source, p, key, bounds)
@@ -556,7 +556,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		startStorageWait(false)
 	}
 	if recording {
-		grant, err := s.recorderRequest(ctx, source, p, key, in.Access)
+		grant, err := s.recorderRequest(ctx, source, p, in)
 		if err != nil {
 			return zero, err
 		}

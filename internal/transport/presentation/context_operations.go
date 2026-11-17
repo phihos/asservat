@@ -734,8 +734,31 @@ func (s *ContextOperations) request(ctx context.Context, current identities.Curr
 		return value.Accepted{}, value.ErrInvalid
 	}
 	preview := *in.Preview
-	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: in.ResultAccess.access(), Preview: func(ctx context.Context) (value.ContextPreview, error) {
+	submission, err := json.Marshal(ContextOperationInput{Preview: in.Preview, ExpectedPlanDigest: in.ExpectedPlanDigest, IdempotencyKey: in.IdempotencyKey, ResultAccess: in.ResultAccess})
+	if err != nil {
+		return value.Accepted{}, value.ErrInvalid
+	}
+	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: in.ResultAccess.access(), Submission: submission, Preview: func(ctx context.Context) (value.ContextPreview, error) {
 		_, _, p, err := s.previewCapture(ctx, current, preview)
 		return p, err
 	}})
+}
+
+// SubmitApproved submits a request_capture input that an approval stored,
+// as the recorded requester current (ADR-335 D5). It takes the same path as
+// request_capture: current bindings and denies decide, and a retry with the
+// same key returns the same capture.
+func (s *ContextOperations) SubmitApproved(ctx context.Context, current identities.CurrentIdentity, submission []byte) (string, error) {
+	var in ContextOperationInput
+	if s == nil || json.Unmarshal(submission, &in) != nil {
+		return "", value.ErrInvalid
+	}
+	if !s.config.CollectionEnabled {
+		return "", value.ErrUnavailable
+	}
+	if i, err := current.ResolveIdentity(ctx); err != nil || !slices.Contains(i.Scopes, "evidence:capture") {
+		return "", value.ErrDenied
+	}
+	a, err := s.request(ctx, current, in)
+	return a.CaptureID, err
 }

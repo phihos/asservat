@@ -160,7 +160,7 @@ func TestProfileStoredReviewKeepsOriginalBounds(t *testing.T) {
 			}
 			var err error
 			if change == "preview-bound" {
-				_, err = x.f.svc.recorderRequest(ctx, x.f.source(t, ctx), p, "review", x.access)
+				_, err = x.f.svc.recorderRequest(ctx, x.f.source(t, ctx), p, CaptureRequest{Key: "review", Access: x.access})
 			} else {
 				_, err = x.f.svc.Request(ctx, x.f.source(t, ctx), withAccess(p, "review", x.access))
 			}

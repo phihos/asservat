@@ -27,6 +27,7 @@ type contextOperationFixture struct {
 	requests      int
 	key           string
 	plan          artifact.Digest
+	submission    []byte
 	metadataUntil time.Time
 	afterResolve  func()
 	sharing       *value.ContextSharingStatus
@@ -51,7 +52,7 @@ func (f *contextOperationFixture) Preview(_ context.Context, _ identities.Curren
 }
 func (f *contextOperationFixture) Request(_ context.Context, _ identities.CurrentIdentity, in app.CaptureRequest) (value.Accepted, error) {
 	f.requests++
-	f.key, f.plan = in.Key, in.Plan
+	f.key, f.plan, f.submission = in.Key, in.Plan, in.Submission
 	return value.Accepted{MetadataValidUntil: f.metadataUntil, CaptureID: "00000000-0000-4000-8000-000000000030"}, f.err
 }
 func (f *contextOperationFixture) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {

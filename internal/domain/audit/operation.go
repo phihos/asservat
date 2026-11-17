@@ -56,7 +56,8 @@ func OperationLane(name string) string {
 // five seconds otherwise. Every contained authority retains its own bound.
 func OperationRequestWindow(name string) time.Duration {
 	switch name {
-	case "request_capture":
+	case "request_capture", "decide_review":
+		// An approval submits the reviewed request (ADR-335 D5).
 		return identity.RecordingSaveRequestWindow
 	case "preview_capture":
 		return identity.CapturePreviewRequestWindow

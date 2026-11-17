@@ -19,6 +19,23 @@ page.on('request', request => {
   if (url.origin !== origin) external.push(request.url());
   if (url.pathname.startsWith('/api/v1/operations/')) calls.push({ name: url.pathname.split('/').at(-1), input: request.postDataJSON() });
 });
+// The console's own fetch keeps a copy of each operation body it consumes.
+// Chromium drops an inspector body after the console's same-document
+// navigation (history.replaceState), so the inspector copy is not read.
+await context.addInitScript(() => {
+  const original = window.fetch.bind(window);
+  const replies = new Map();
+  Object.defineProperty(window, '__operationReplies', { value: replies });
+  window.fetch = async (input, init) => {
+    const response = await original(input, init);
+    const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+    if (path.startsWith('/api/v1/operations/')) {
+      const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
+      response.clone().text().then(text => replies.set(key, text), () => {});
+    }
+    return response;
+  };
+});
 const waitOperation = name => page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/operations/' + name && response.request().method() === 'POST');
 const checked = async (response, validate) => {
   assert.equal(response.status(), 200);
@@ -27,7 +44,8 @@ const checked = async (response, validate) => {
   assert.equal(headers.origin, origin);
   assert.equal(headers['x-csrf-token'], 'C'.repeat(43));
   assert.equal(headers.authorization, undefined);
-  const reply = await response.json();
+  const key = new URL(response.url()).pathname + '\n' + (request.postData() ?? '');
+  const reply = JSON.parse(await (await page.waitForFunction(k => { const text = window.__operationReplies.get(k); window.__operationReplies.delete(k); return text; }, key)).jsonValue());
   assert(validate(reply), 'actual Go response must satisfy generated browser contract');
   return reply;
 };
@@ -87,7 +105,8 @@ try {
   const approved = await page.request.post(origin + '/test/argument-approve', { headers: { Origin: origin } });
   assert.equal(approved.status(), 204);
   const resumedWait = waitOperation('request_capture');
-  await page.getByRole('button', { name: 'Submit after approval', exact: true }).click();
+  // ADR-335 D5: the console reads the approved request back with its key.
+  await page.getByRole('button', { name: 'Check approval', exact: true }).click();
   const resumedResponse = await resumedWait;
   const accepted = await checked(resumedResponse, validOutput_request_capture);
   assert.equal(accepted.status, 'ok');

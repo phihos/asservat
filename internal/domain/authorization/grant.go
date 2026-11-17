@@ -166,6 +166,19 @@ type Grant struct {
 	Revision       int64
 	Spent          GrantSpend
 	PolicySpend    PolicyGrantSpend `json:",omitzero"`
+	// Submission lets approval submit the reviewed request (ADR-335 D5).
+	Submission *GrantSubmission `json:"-"`
+}
+
+// GrantSubmission is what approval needs to submit an ad hoc request as its
+// requester: the reviewed request_capture input and the requester's verified
+// groups, scopes and identity policy revision. Until is the end of the
+// requester's authentication. These groups are never used after Until.
+type GrantSubmission struct {
+	Request        []byte
+	Groups, Scopes []string
+	Policy         identity.Revision
+	Until          time.Time
 }
 
 func validDataClass(c string) bool { return c == "metadata" || c == "extract" || c == "raw" }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ type investigationCalls struct {
 	collections int
 	after       func()
 	validUntil  time.Time
+	hidden      atomic.Bool
 }
 
 func (f *investigationCalls) CheckDiagnostic(context.Context, identities.CurrentIdentity, targets.WorkloadRequest) (time.Time, error) {
@@ -67,6 +69,9 @@ func (f *investigationCalls) receipt() (value.Accepted, error) {
 	return value.Accepted{MetadataValidUntil: until, CaptureID: "00000000-0000-4000-8000-000000000030"}, nil
 }
 func (f *investigationCalls) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
+	if f.hidden.Load() {
+		return value.ContextProgress{}, value.ErrDenied
+	}
 	until := f.validUntil
 	if until.IsZero() {
 		until = time.Now().Add(time.Second)

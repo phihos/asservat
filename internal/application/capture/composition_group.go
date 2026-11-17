@@ -200,7 +200,8 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 // requestCompositionGroup is Request for a reviewed composition group: one
 // approval gate for the parent, both node recorders resolved for the same
 // Pod, and one atomic admission of every child (ADR-276).
-func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity, access *authorization.ResultAccess) (value.Accepted, error) {
+func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, i identity.Identity, in CaptureRequest) (value.Accepted, error) {
+	key := in.Key
 	var zero value.Accepted
 	admit, ok := s.Admission.(CompositionGroupAdmissions)
 	if !ok {
@@ -238,7 +239,7 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 		wait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, i.ValidUntil, p.Storage)
 		defer wait.close()
 	}
-	grant, err := s.recorderRequest(ctx, source, p, key, access)
+	grant, err := s.recorderRequest(ctx, source, p, in)
 	if err != nil {
 		return zero, err
 	}

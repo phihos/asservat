@@ -1,4 +1,5 @@
 import { approvalPath } from './approval-intent';
+import { operations as grantOperations, type Operations as GrantOperations } from '../approvals/http';
 import type { Session } from '../auth/session';
 import type { Recipient } from '../sharing/shares';
 import { planFromPreview, planFromSettings, type PlanSnapshot, type PreviousPlan } from './plan-diff';
@@ -11,6 +12,8 @@ export type State = {
   stage: 'target' | 'diagnostics' | 'recordings' | 'review' | 'reviewed' | 'uncertain' | 'progress' | 'approval';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
   cancellationStatus?: 'requested' | 'unconfirmed'; progress?: Progress; captureID?: string; approvalURI?: string; error?: string; stale?: boolean;
+  // ADR-335 D5: resubmit only when approval came after the requester's sign-in ended.
+  resubmit?: boolean;
   // ADR-236: recent captures of the draft target and the capture a review repeats.
   history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
   recordingRepeat?: { policyUID: string; captureID: string; before?: string };
@@ -55,7 +58,7 @@ export class Investigation {
   private historyExpiry?: ReturnType<typeof setTimeout>;
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(readonly client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
+  constructor(readonly client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private grants: GrantOperations = grantOperations) {}
   private publish(patch: Partial<State>) {
     if ('history' in patch) {
       clearTimeout(this.historyExpiry);
@@ -89,6 +92,7 @@ export class Investigation {
     scope.addEventListener('abort', abort, { once: true });
     if (scope.aborted) abort();
     else if (this.receipt?.captureID) void this.refreshProgress();
+    else if (this.receipt?.approvalURI) void this.checkApproval();
     return () => { scope.removeEventListener('abort', abort); abort(); };
   }
 
@@ -132,7 +136,7 @@ export class Investigation {
         const path = approvalPath('navigation_uri' in result.data ? result.data.navigation_uri : undefined);
         if (path) {
           this.receipt.approvalURI = path;
-          this.publish({ stage: 'approval', approvalURI: path, error: undefined });
+          this.publish({ stage: 'approval', approvalURI: path, error: undefined, resubmit: undefined });
           return;
         }
       }
@@ -384,17 +388,53 @@ export class Investigation {
     // a commit, and only this exact retry (same request and key) is offered.
     this.publish({ stage: 'uncertain', preview: undefined, diagnostics: undefined });
     const data = await this.run('request_capture', structuredClone(receipt.submission));
+    if (!data && receipt === this.receipt && this.state.stage === 'approval') void this.checkApproval();
     if (!data || receipt !== this.receipt) return;
     if (receipt.operation && data.operation !== receipt.operation) { this.publish({ error: 'The saved recording outcome could not be verified. Retry the same request.' }); return; }
     await this.openAccepted(receipt, data.capture_id);
   };
+  // ADR-335 D5: approval submits the stored request itself. While the review
+  // is pending the tab waits for its capture. An approved request is read
+  // back with the same key, which never collects twice. Only an approval
+  // after the requester's sign-in ended needs a new submission.
+  checkApproval = async () => {
+    const receipt = this.receipt, session = this.session, scope = this.scope;
+    const grantID = receipt?.approvalURI?.split('/').pop();
+    if (!receipt || receipt.captureID || !grantID || !session || !scope || scope.aborted || this.state.busy) return;
+    let result: Awaited<ReturnType<GrantOperations['call']>>;
+    this.publish({ busy: true, error: undefined });
+    try { result = await this.grants.call('get_grant', { grant_id: grantID }, session.csrf_token, scope); }
+    catch (error) { if (receipt === this.receipt) this.publish({ busy: false, error: operationMessage(error) }); return; }
+    if (receipt !== this.receipt || scope.aborted) return;
+    this.publish({ busy: false });
+    const grant = result.status === 'ok' && 'capture_id' in result.data ? result.data : undefined;
+    if (!grant?.capture_id) { this.publish({ error: result.status === 'error' ? result.data.message : 'The approval could not be read. Check it again.' }); return; }
+    if (grant.phase === 'Pending') { this.awaitCapture(grant.capture_id); return; }
+    if (grant.phase !== 'Approved') { this.closeEvents(); this.publish({ error: 'The approval ended (' + grant.phase + '). Nothing was collected. Review a new preview to ask again.' }); return; }
+    if (grant.can_resume) { this.closeEvents(); this.publish({ resubmit: true }); return; }
+    await this.retrySubmission();
+  };
+  private awaitCapture(id: string) {
+    if (this.events) return;
+    const events = new EventSource('/api/v1/events?capture_id=' + encodeURIComponent(id));
+    this.events = events;
+    events.addEventListener('capture', () => {
+      if (this.events !== events || !this.receipt) return;
+      this.closeEvents();
+      void this.openAccepted(this.receipt, id);
+    });
+    // A decision without a visible capture (sign-in ended, refused) ends the
+    // wait: read the grant again for its outcome.
+    events.addEventListener('accessLost', () => { if (this.events !== events) return; this.closeEvents(); void this.checkApproval(); });
+    events.addEventListener('error', () => { if (this.events === events && events.readyState === EventSource.CLOSED) this.events = undefined; });
+  }
   private async openAccepted(receipt: Receipt, captureID: string) {
     if (receipt !== this.receipt) return;
     if (receipt.captureID && receipt.captureID !== captureID) {
       this.publish({ error: 'The request outcome could not be verified. Keep the original request and check it again.' }); return;
     }
     receipt.captureID = captureID; delete receipt.approvalURI;
-    this.publish({ stage: 'progress', captureID, error: undefined });
+    this.publish({ stage: 'progress', captureID, error: undefined, resubmit: undefined });
     window.history.replaceState(null, '', '/captures/' + captureID);
     await this.refreshProgress();
   }

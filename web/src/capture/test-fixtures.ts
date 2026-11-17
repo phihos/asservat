@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import type { Session } from '../auth/session';
 import type { Input, Output, Operation, Operations } from './http';
+import type { Operations as GrantOperations, Operation as GrantOperation, Output as GrantOutput } from '../approvals/http';
 
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const session: Session = { principal: { issuer: 'https://identity.invalid', subject_id: 'synthetic-developer', kind: 'user' }, roles: [], csrf_token: 'C'.repeat(43), expires_at: new Date(Date.now() + 120_000).toISOString(), step_up: 'unavailable' };
@@ -56,6 +57,16 @@ export class SyntheticOperations implements Operations {
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
     return await this.responder(name) as Output<N>;
+  }
+}
+
+// get_grant of the approval approvalPendingResult names, for capture id(8).
+export class SyntheticGrants implements GrantOperations {
+  calls = 0;
+  grant: { phase: string; can_resume?: boolean } = { phase: 'Pending' };
+  async call<N extends GrantOperation>(): Promise<GrantOutput<N>> {
+    this.calls++;
+    return { ...result<'get_capture'>({}), data: { grant_id: id(41), capture_id: id(8), ...this.grant } } as unknown as GrantOutput<N>;
   }
 }
 

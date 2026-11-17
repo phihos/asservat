@@ -3,6 +3,9 @@ package integration
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
+	"reflect"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +19,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -85,9 +89,22 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 		g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonRecordingApproval}}, Lifetime: time.Hour, Revision: 1}
 		g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
+		// ADR-335 D5: the request stores what approval submits.
+		submission := &authorization.GrantSubmission{Request: []byte(`{"idempotency_key":"approval"}`), Groups: []string{"synthetic-devs"}, Scopes: []string{"evidence:read", "evidence:capture"}, Policy: identity.Revision{UID: "synthetic", Generation: 1, Digest: [32]byte{1}}, Until: now.Add(time.Hour)}
+		g.Submission = submission
 		g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "approval", RequestDigest: sha256.Sum256([]byte("synthetic-request"))})
 		if err != nil {
 			t.Fatal("persist grant", err)
+		}
+		// A decision notifies the grant's capture ID, so a waiting console
+		// rereads the grant (00201).
+		listener, err := admin.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer listener.Release()
+		if _, err = listener.Exec(ctx, "LISTEN asservat_capture_progress"); err != nil {
+			t.Fatal(err)
 		}
 		// The approved plan outlives the reviewed preview's own deadline.
 		time.Sleep(time.Until(oldDeadline) + 10*time.Millisecond)
@@ -96,6 +113,15 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 		g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic reviewed recording", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"})
 		if err != nil {
 			t.Fatal("decision", err)
+		}
+		if x := g.Submission; x == nil || !sameJSON(x.Request, submission.Request) || !slices.Equal(x.Groups, submission.Groups) || x.Policy != submission.Policy || !x.Until.Equal(submission.Until) || !g.Decision.DecidedAt.Before(x.Until) {
+			t.Fatal("approved grant lost its submission", x)
+		}
+		wait, stop := context.WithTimeout(ctx, 5*time.Second)
+		n, err := listener.Conn().WaitForNotification(wait)
+		stop()
+		if err != nil || n.Payload != p.CaptureID {
+			t.Fatal("decision did not notify its capture", n, err)
 		}
 		acceptedAt := time.Now().UTC().Truncate(time.Microsecond)
 		in.Deadline = acceptedAt.Add(time.Minute)
@@ -159,6 +185,12 @@ func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.
 			t.Fatal("historical replay changed", err)
 		}
 	})
+}
+
+// sameJSON compares JSON by value: jsonb does not keep the original spacing.
+func sameJSON(a, b []byte) bool {
+	var x, y any
+	return json.Unmarshal(a, &x) == nil && json.Unmarshal(b, &y) == nil && reflect.DeepEqual(x, y)
 }
 
 func reviewOf(r privacy.Resolution) capture.ContextRetentionReview {

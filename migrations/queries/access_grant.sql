@@ -10,11 +10,11 @@ SELECT parent.* FROM access_grant parent WHERE parent.root_id=$1 AND (parent.cap
 -- The request time is the database clock; a review stays decidable until its
 -- own absolute bound (not_after), never a fixed window.
 INSERT INTO access_grant(id,root_id,kind,preview_id,capture_id,cluster_id,namespace_uid,workload_uid,pod_uid,execution_digest,result_access_digest,review_digest,data_class,reasons,review,scope,
- requester_issuer,requester_subject,requester_client,lifetime_seconds,result_access,not_after,max_artifacts,max_bytes,max_operations,idempotency_key,request_digest,requested_at,review_until)
+ requester_issuer,requester_subject,requester_client,lifetime_seconds,result_access,not_after,max_artifacts,max_bytes,max_operations,idempotency_key,request_digest,requested_at,review_until,submission)
 SELECT @id::uuid, @root_id::uuid, 'adHocCapture', @preview_id::uuid, @capture_id::uuid, @cluster_id::uuid, @namespace_uid::text, @workload_uid::text, @pod_uid::text,
  @execution_digest::bytea, sqlc.narg(result_access_digest)::bytea, @review_digest::bytea, @data_class::text, @reasons::jsonb, @review::bytea, @scope::bytea,
  @requester_issuer::text, @requester_subject::text, @requester_client::text, @lifetime_seconds::integer, sqlc.narg(result_access)::jsonb, sqlc.narg(not_after)::timestamptz,
- @max_artifacts::integer, @max_bytes::bigint, @max_operations::bigint, @idempotency_key::text, @request_digest::bytea, t.n, NULL
+ @max_artifacts::integer, @max_bytes::bigint, @max_operations::bigint, @idempotency_key::text, @request_digest::bytea, t.n, NULL, sqlc.narg(submission)::jsonb
 FROM (SELECT clock_timestamp() AS n) t
 RETURNING *;
 

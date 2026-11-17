@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, result, previewResult, progressResult, acceptedResult, id, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
+import { SyntheticOperations, SyntheticGrants, session, target, result, previewResult, progressResult, acceptedResult, id, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
@@ -32,7 +32,7 @@ it('opens saved recorder settings, edits the filter and window, and prepares a f
 });
 afterEach(() => { cleanup(); for (const controller of controllers) controller.reset(); controllers.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 function mount() {
-  const client = new SyntheticOperations(); const controller = new Investigation(client, () => id(6)); controllers.push(controller);
+  const client = new SyntheticOperations(); const controller = new Investigation(client, () => id(6), new SyntheticGrants()); controllers.push(controller);
   render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
   return { client, controller };
 }
@@ -192,7 +192,7 @@ it('renders the reviewed recorder assessment and requests approval without claim
   expect(screen.queryByText(/No application process is started/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
   expect(await screen.findByRole('link', { name: 'View approval' })).toHaveProperty('pathname', '/approvals/' + id(41));
-  expect(screen.getByRole('button', { name: 'Submit after approval' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Check approval' })).toBeTruthy();
   expect(controller.snapshot().captureID).toBeUndefined();
 });
 
