@@ -60,6 +60,11 @@ func TestSavedSyscallViewsAreOptIn(t *testing.T) {
 	if err != nil || !bytes.Contains(reply.Body, []byte(`"CapabilityUnavailable"`)) {
 		t.Fatalf("uncomposed view: %v %s", err, reply.Body)
 	}
+	_ = reply.Close(t.Context())
+	reply, err = s.Call(t.Context(), f, "get_extract", []byte(`{"view":"runtimeSummary","case_id":"`+bridgeID+`","artifact_id":"`+bridgeID+`"}`))
+	if err != nil || !bytes.Contains(reply.Body, []byte(`"CapabilityUnavailable"`)) {
+		t.Fatalf("unimplemented view: %v %s", err, reply.Body)
+	}
 	if _, ok := f.s.SyscallQueries(); ok {
 		t.Fatal("route implicitly enabled")
 	}
