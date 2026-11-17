@@ -269,7 +269,7 @@ func installedBrowserSame(what string, mcp, browser map[string]any, required ...
 // Per-call identities and clocks. Execution and plan digests bind the
 // preview's own capture ID and deadline, so they differ for two previews of
 // the same normalized plan; asOf is the read time of a handling notice.
-var installedBrowserPreviewVolatile = []string{"preview_id", "expires_at", "execution_digest", "assessmentID", "planDigest", "generatedAt", "validUntil"}
+var installedBrowserPreviewVolatile = []string{"plan_digest", "expires_at", "execution_digest", "assessmentID", "planDigest", "generatedAt"}
 
 // qualifyInstalledBrowserJourney is the S-02 browser half after the MCP
 // capture is published and downloaded: as the same Keycloak user through the
@@ -554,8 +554,8 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 }
 
 // qualifyInstalledBrowserSubmission is the optional browser-submitted request:
-// a console preview, request_capture under its own idempotency key and the
-// same resolve/continue recovery as MCP, then the passive wait until the
+// a console preview, request_capture under its own idempotency key with the
+// same same-key retry as MCP, then the passive wait until the
 // capture is collected and its case publishes one artifact. It consumes one
 // more capture record, resolution-lane records and a full collection and
 // publication (up to five minutes). Call it before the MCP capture so it does
@@ -567,15 +567,15 @@ func qualifyInstalledBrowserSubmission(t *testing.T, ctx context.Context, identi
 	for attempt := 1; ; attempt++ {
 		accepted = installedJourneyAcceptedReceipt{}
 		var preview struct {
-			PreviewID      string `json:"preview_id"`
+			PlanDigest     string `json:"plan_digest"`
 			CaptureEnabled bool   `json:"capture_enabled"`
 		}
 		b.read(ctx, "preview_capture", previewArguments, &preview)
-		if !preview.CaptureEnabled || preview.PreviewID == "" {
+		if !preview.CaptureEnabled || preview.PlanDigest == "" {
 			t.Fatal("browser preview does not permit capture")
 		}
 		key := fmt.Sprintf("installed-browser-capture-%d", attempt)
-		request := map[string]any{"preview_id": preview.PreviewID, "idempotency_key": key}
+		request := installedJourneyReviewedRequest(previewArguments, preview.PlanDigest, key)
 		submit := func(input map[string]any) string {
 			t.Helper()
 			reply, status, err := b.operation(ctx, "request_capture", input, key)
@@ -604,53 +604,19 @@ func qualifyInstalledBrowserSubmission(t *testing.T, ctx context.Context, identi
 			}
 			return ""
 		}
-		resolve := func() (installedJourneyDisposition, error) {
-			reply, _, err := b.operation(ctx, "resolve_capture_request", request, key)
-			if err != nil {
-				return installedJourneyDisposition{}, err
+		code := submit(request)
+		for retry := 1; installedJourneyRetryableRequest(code) && retry <= 4; retry++ {
+			if installedJourneyPause(ctx, 2*time.Second) != nil {
+				t.Fatal("browser capture request", ctx.Err())
 			}
-			if reply.Status != "ok" {
-				return installedJourneyDisposition{}, errors.New("original browser capture request remains unresolved")
-			}
-			var d installedJourneyDisposition
-			err = installedJourneyDecode(reply.Data, &d)
-			if err == nil && d.State == "accepted" {
-				err = accepted.remember(d.CaptureID, time.Now())
-			}
-			return d, err
+			code = submit(request)
 		}
-		closed, err := installedJourneyRecoverCapture(ctx, submit(request), resolve, func() (string, string) {
-			return submit(map[string]any{"preview_id": preview.PreviewID, "idempotency_key": key, "continue_acquisition": true}), accepted.CaptureID
-		}, func() error {
-			d, err := resolve()
-			if err != nil {
-				return err
-			}
-			if accepted.CaptureID == "" || d.State != "accepted" || d.CaptureID != accepted.CaptureID {
-				return errors.New("browser request was not accepted once")
-			}
-			return nil
-		}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
-			var p installedJourneyCaptureProgress
-			reply, _, err := b.operation(ctx, "get_capture", map[string]string{"capture_id": id}, "")
-			if err != nil {
-				return p, err
-			}
-			if reply.Status != "ok" {
-				return p, errors.New("original accepted browser capture progress is unavailable")
-			}
-			return p, installedJourneyDecode(reply.Data, &p)
-		})
-		if err != nil {
-			diagnose()
-			t.Fatal("browser capture request was not accepted", err)
-		}
-		if !closed {
+		if code == "" {
 			break
 		}
-		if attempt == 3 {
+		if code != "ReviewChanged" && code != "PreviewExpired" || attempt == 3 {
 			diagnose()
-			t.Fatal("browser capture requests closed without admission after three reviews")
+			t.Fatal("browser capture request was not accepted", code)
 		}
 		if installedJourneyPause(ctx, 2*time.Second) != nil {
 			t.Fatal("browser capture request", ctx.Err())

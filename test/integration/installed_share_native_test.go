@@ -212,7 +212,7 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		arguments[k] = v
 	}
 	var previewed struct {
-		PreviewID string   `json:"preview_id"`
+		PlanDigest string   `json:"plan_digest"`
 		Warnings  []string `json:"warnings"`
 	}
 	var accepted struct {
@@ -228,12 +228,12 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		}
 		return call(developer, name, arguments, data)
 	}, func(attempt int) (map[string]any, error) {
-		previewed.PreviewID, previewed.Warnings = "", nil
-		if status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
+		previewed.PlanDigest, previewed.Warnings = "", nil
+		if status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PlanDigest == "" || len(previewed.Warnings) != 1 {
 			diagnose()
 			t.Fatal("installed sharing preview", status, code, err, previewed)
 		}
-		return map[string]any{"preview_id": previewed.PreviewID, "idempotency_key": fmt.Sprintf("installed-capture-share-%d", attempt)}, nil
+		return installedJourneyReviewedRequest(arguments, previewed.PlanDigest, fmt.Sprintf("installed-capture-share-%d", attempt)), nil
 	})
 	if err != nil {
 		diagnose()
