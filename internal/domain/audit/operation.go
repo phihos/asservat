@@ -44,6 +44,7 @@ const (
 // authority checks around a bounded node wait; measured installed reads take
 // four to six seconds.
 var operations = map[string]operationKind{
+	"activate_policy":            {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"cancel_capture":             {contextInput, ordinaryWindow, true, OperationOutputLimit},
 	"compare_profiles":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
 	"create_share":               {contextInput, ordinaryWindow, true, OperationOutputLimit},
