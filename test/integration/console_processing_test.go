@@ -166,7 +166,7 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 		t.Fatal(err)
 	}
 	t.Cleanup(mac.Close)
-	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: rootID, Now: time.Now, NewID: custodyID}, operations, &memoryAuditEvents{}, mac)
+	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: rootID, Now: time.Now, NewID: custodyID}, operations, facts, mac)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -80,7 +80,7 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mac.Close()
-	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: rootID, Now: time.Now, NewID: custodyID}, operations, &memoryAuditEvents{}, mac)
+	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: rootID, Now: time.Now, NewID: custodyID}, operations, facts, mac)
 	if err != nil {
 		t.Fatal(err)
 	}
