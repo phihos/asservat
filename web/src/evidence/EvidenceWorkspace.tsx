@@ -171,8 +171,8 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
           <Button className="button" isDisabled={state.busy} onPress={() => void controller.retryPreparation()}>Retry same download request</Button>
         </>}
         {state.ended && <>
-          <h2 role="status">Download ended</h2>
-          <p>{state.ended}</p>
+          <h2>Download ended</h2>
+          <p role="status">{state.ended}</p>
           <Button className="button secondary" isDisabled={state.busy} onPress={controller.newDownload}>Return to evidence</Button>
         </>}
         {state.cancellation && <>
