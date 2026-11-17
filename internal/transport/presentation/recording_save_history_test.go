@@ -35,6 +35,10 @@ func TestRecordingSaveHistorySettingsNeverBecomeRecipeOrOldSourceReplay(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A repeat addresses the saved cluster by its configured name.
+	if !strings.Contains(string(reply.Body), `"cluster":"local"`) {
+		t.Fatal("settings omit the saved cluster name", string(reply.Body))
+	}
 	if !strings.Contains(string(reply.Body), `"kind":"recordingSaveSettings"`) || strings.Contains(string(reply.Body), "recipe_spec") || strings.Contains(string(reply.Body), "dependency_pins") || strings.Contains(string(reply.Body), "recording_handle") {
 		t.Fatal("recording preferences became ordinary recipe/source authority", string(reply.Body))
 	}

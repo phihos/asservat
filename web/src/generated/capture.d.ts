@@ -1239,6 +1239,8 @@ export interface components {
             capture_id: string;
             /** Format: uuid */
             cluster_id: string;
+            /** @description Configured name of the cluster (ADR-335 D4) that a repeat addresses; absent when that cluster is no longer configured. */
+            cluster?: string;
             namespace_uid: string;
             /** Format: date-time */
             accepted_at: string;
@@ -1636,6 +1638,8 @@ export interface components {
             capture_id: string;
             /** Format: uuid */
             cluster_id: string;
+            /** @description Configured name of the cluster (ADR-335 D4) that a repeat addresses; absent when that cluster is no longer configured. */
+            cluster?: string;
             namespace_uid: string;
             /** Format: date-time */
             accepted_at: string;

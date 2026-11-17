@@ -173,10 +173,10 @@ export class Investigation {
     this.receipt = { operation: 'recordingSave', submission: { preview: structuredClone(preview), expected_plan_digest: digest, idempotency_key: this.newID() } };
     await this.retrySubmission();
   };
-  // Settings carry only the cluster UUID: the cluster name stays the draft's
-  // ("local" when none was entered).
+  // A repeat addresses the cluster the saved capture names; without a
+  // configured name (cluster removed) the draft's stays and current checks decide.
   private savedTarget(settings: Settings, workload: { kind: Target['kind']; name: string }): Pick<Draft, 'target'> {
-    return { target: { cluster: this.state.draft.target.cluster || 'local', namespace: settings.settings.target.namespace ?? this.state.draft.target.namespace, kind: workload.kind, name: workload.name } };
+    return { target: { cluster: settings.cluster ?? (this.state.draft.target.cluster || 'local'), namespace: settings.settings.target.namespace ?? this.state.draft.target.namespace, kind: workload.kind, name: workload.name } };
   }
   selectRecordingsAgain = (settings: Settings) => {
     if (this.state.busy || settings.kind !== 'recordingSaveSettings' || Date.parse(settings.expires_at) <= Date.now()) return;

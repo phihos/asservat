@@ -220,7 +220,7 @@ func TestContextHistoryWireIsCanonical(t *testing.T) {
 	// Settings: the canonical record, extract class and an exact digest.
 	out = call("get_capture", `{"capture_id":"`+historyCapture+`","view":"settings"}`)
 	data := out["data"].(map[string]any)
-	if out["data_class"] != "extract" || data["kind"] != "captureSettings" {
+	if out["data_class"] != "extract" || data["kind"] != "captureSettings" || data["cluster"] != "local" {
 		t.Fatal("settings", out)
 	}
 	b, _ := json.Marshal(data["settings"])

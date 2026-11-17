@@ -56,6 +56,7 @@ type CaptureSettingsRecord struct {
 	Kind            string              `json:"kind"`
 	CaptureID       string              `json:"capture_id"`
 	ClusterID       string              `json:"cluster_id"`
+	Cluster         string              `json:"cluster,omitempty"`
 	NamespaceUID    string              `json:"namespace_uid"`
 	AcceptedAt      time.Time           `json:"accepted_at"`
 	ExpiresAt       time.Time           `json:"expires_at"`
@@ -111,7 +112,8 @@ func (s *ContextOperations) settings(ctx context.Context, current identities.Cur
 		if settings.SettingsKey != ([32]byte{}) {
 			d = settings.SettingsKey
 		}
-		return CaptureSettingsRecord{Kind: "captureSettings", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt, ExpiresAt: settings.ExpiresAt,
+		cluster, _ := s.config.Clusters.Name(settings.ClusterID)
+		return CaptureSettingsRecord{Kind: "captureSettings", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, Cluster: cluster, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt, ExpiresAt: settings.ExpiresAt,
 			SettingsDigest: hex.EncodeToString(d[:]), ExecutionDigest: hash(settings.ExecutionDigest), Settings: canonicalView, NavigationURI: s.config.PublicOrigin + "/captures/" + settings.CaptureID}, settings.ValidUntil, nil
 	}
 }

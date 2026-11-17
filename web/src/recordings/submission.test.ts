@@ -43,12 +43,14 @@ it('history repeat restores only preferences and requires fresh source selection
   const name = 'mcp-recording-save-settings-result.json';
   const saved = JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   saved.data.expires_at = new Date(Date.now() + 60_000).toISOString();
+  saved.data.cluster = 'eu-west'; // a joined cluster, not the draft's local
   const client = new SyntheticOperations(); const base = client.responder;
   client.responder = (name, input) => isSettings(name, input) ? saved : base(name, input);
   const controller = new Investigation(client); controllers.push(controller);
   controller.attach(session, new AbortController().signal); controller.setDraft({ target, retention: '' });
   await controller.showSettings(saved.data.capture_id); controller.selectRecordingsAgain(controller.snapshot().settings!);
   expect(controller.snapshot()).toMatchObject({ stage: 'recordings', recordingRepeat: { policyUID: saved.data.settings.policy.policyUID, captureID: saved.data.capture_id } });
+  expect(controller.snapshot().draft.target.cluster).toBe('eu-west');
   expect(client.calls.map(call => call.name)).toEqual(['get_capture']);
   expect(JSON.stringify(controller.snapshot().recordingRepeat)).not.toMatch(/recording_handle|sharing|grant/);
 });

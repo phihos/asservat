@@ -30,6 +30,7 @@ type RecordingSaveSettingsRecord struct {
 	Operation       string                `json:"operation"`
 	CaptureID       string                `json:"capture_id"`
 	ClusterID       string                `json:"cluster_id"`
+	Cluster         string                `json:"cluster,omitempty"`
 	NamespaceUID    string                `json:"namespace_uid"`
 	AcceptedAt      time.Time             `json:"accepted_at"`
 	ExpiresAt       time.Time             `json:"expires_at"`
@@ -60,7 +61,8 @@ func (s *ContextOperations) recordingSaveSettings(settings value.CaptureSettings
 	if settings.SettingsKey != (artifact.Digest{}) {
 		digest = settings.SettingsKey
 	}
-	return RecordingSaveSettingsRecord{Kind: "recordingSaveSettings", Operation: "recordingSave", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt.UTC(), ExpiresAt: settings.ExpiresAt.UTC(), SettingsDigest: hash(digest), ExecutionDigest: hash(settings.ExecutionDigest), Settings: view, NavigationURI: s.config.PublicOrigin + "/captures/new"}, settings.ValidUntil, nil
+	cluster, _ := s.config.Clusters.Name(settings.ClusterID)
+	return RecordingSaveSettingsRecord{Kind: "recordingSaveSettings", Operation: "recordingSave", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, Cluster: cluster, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt.UTC(), ExpiresAt: settings.ExpiresAt.UTC(), SettingsDigest: hash(digest), ExecutionDigest: hash(settings.ExecutionDigest), Settings: view, NavigationURI: s.config.PublicOrigin + "/captures/new"}, settings.ValidUntil, nil
 }
 func recordingSelectionFailure(origin string) any {
 	return struct {
