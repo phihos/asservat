@@ -256,7 +256,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		return OperationReply{}, stopped("identity", identity.ErrDenied)
 	}
 	// A download stop runs without the evidence-read scope check below.
-	if rejection == 0 && name == "cancel_artifact_download" {
+	if rejection == 0 && name == downloadTool && DownloadAction(raw) == "cancel" {
 		if _, ok := s.inner.Tool(name); ok && s.contracts.ValidateInput(name, raw) == nil {
 			select {
 			case s.stopSlots <- struct{}{}:
@@ -299,7 +299,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			rejection = IngressInvalid
 		} else if name != processingDiscoveryOperation && name != processingErasureStatusOperation && name != processingReportOperation && !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
-		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+		} else if name == downloadTool && !slices.Contains(initial.Scopes, "evidence:download") {
 			rejection, downloadScopeDenied = IngressDenied, true
 		}
 	}
@@ -366,7 +366,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		timing.call = time.Now()
 		reply.boundCleanup(intent.WriteUntil)
 		// Only a proven pre-dispatch rejection rules out an effect.
-		effectPossible = !reply.auditNoDispatch
+		effectPossible = !reply.auditNoDispatch && (name != downloadTool || DownloadAction(raw) == "prepare")
 	}
 	out, e := s.result(intent, reply, callErr, effectPossible)
 	if e != nil {
@@ -466,7 +466,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 	if queryOperation(name) {
 		return normalizeQueryInput(name, raw)
 	}
-	if name == "prepare_artifact_download" || name == "get_artifact_download" {
+	if name == downloadTool {
 		var in ContextDownloadInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -559,7 +559,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_recordings" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == downloadTool || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_recordings" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -671,7 +671,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"
 			}
-			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
+			if in.Name == downloadTool && out.Effect == "unknown" && refs.DownloadID != "" {
 				out.Effect = "accepted"
 			}
 			if in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" {

@@ -395,6 +395,12 @@
             ],
             "description": "An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal."
           },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Changes whenever the session state or transfer generation changes; pass it as after_revision to wait for the next change."
+          },
           "filename": {
             "type": "string",
             "maxLength": 255,
@@ -470,6 +476,7 @@
           "download_id",
           "artifact_id",
           "state",
+          "revision",
           "size_bytes",
           "sha256",
           "access_until",

@@ -1,13 +1,9 @@
 activate_policy
-cancel_artifact_download
 deactivate_policy
 decide_review
-get_artifact_download
-get_case
 get_grant
 get_policy_status
 list_reviews
-prepare_artifact_download
 request_policy_grant
 request_raw_access
 revoke_grant

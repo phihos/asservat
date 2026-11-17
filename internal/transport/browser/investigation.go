@@ -55,7 +55,7 @@ func NewAuditedInvestigationHandler(sessions SessionHandler, operations *present
 	if operations == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	if _, ok := operations.Tool("prepare_artifact_download"); ok {
+	if _, ok := operations.Tool("download_artifact"); ok {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	h, err := NewInvestigationHandler(sessions, operations, maxConcurrent)
@@ -71,10 +71,7 @@ func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations 
 	if operations == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	if _, ok := operations.Tool("prepare_artifact_download"); !ok {
-		return nil, presentation.ErrOperationsConfiguration
-	}
-	if _, ok := operations.Tool("cancel_artifact_download"); !ok {
+	if _, ok := operations.Tool("download_artifact"); !ok {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	h, e := NewInvestigationHandler(sessions, operations, maxConcurrent)
@@ -223,7 +220,11 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.rejectIngress(w, r, current, name, body, 404)
 		return
 	}
-	if name == "cancel_capture" || name == "request_capture" || name == "prepare_artifact_download" || name == "cancel_artifact_download" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" || name == "request_policy_grant" || name == "request_raw_access" {
+	action := ""
+	if name == "download_artifact" {
+		action = presentation.DownloadAction(body)
+	}
+	if name == "download_artifact" && action != "status" || name == "cancel_capture" || name == "request_capture" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" || name == "request_policy_grant" || name == "request_raw_access" {
 		var input struct {
 			Key string `json:"idempotency_key"`
 		}
@@ -236,7 +237,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	slots := h.slots
-	if name == "cancel_artifact_download" && h.contracts.ValidateInput(name, body) == nil {
+	if action == "cancel" && h.contracts.ValidateInput(name, body) == nil {
 		if _, ok := h.operations.Tool(name); ok {
 			slots = h.stopSlots
 		}

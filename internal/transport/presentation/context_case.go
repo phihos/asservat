@@ -133,8 +133,11 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 	if name != "get_case" || s.contracts.ValidateInput(name, raw) != nil {
 		return OperationReply{}, contracts.ErrInvestigationWire
 	}
+	// The catalog records no timeline events yet, so the timeline is one empty
+	// page: limit is accepted and no cursor is ever issued.
 	var input struct {
 		CaseID string `json:"case_id"`
+		Cursor string `json:"cursor"`
 	}
 	if json.Unmarshal(raw, &input) != nil {
 		return OperationReply{}, contracts.ErrInvestigationWire
@@ -149,8 +152,12 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 	}
 	out := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID, DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	until := initial.ValidUntil
-	view, lookupErr := s.cases.GetContextCase(ctx, current, input.CaseID)
-	if lookupErr != nil {
+	var view catalog.ContextCase
+	var lookupErr error
+	if input.Cursor != "" {
+		out.Status = "error"
+		out.Data = OperationFailure{Code: "InvalidCursor", Message: "Refresh this view to continue with current access.", Retryable: false}
+	} else if view, lookupErr = s.cases.GetContextCase(ctx, current, input.CaseID); lookupErr != nil {
 		// Existence, publication, owner, rights and provider failures have the same
 		// nondisclosing outcome. No case ID, target, count or error body is echoed.
 		out.Status = "error"
@@ -162,9 +169,9 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		until = identity.Earlier(until, view.ValidUntil)
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
-			kind := "pod-status"
-			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" || a.EvidenceType == "profile" || a.EvidenceType == "logs" {
-				kind = a.EvidenceType
+			kind := a.EvidenceType
+			if kind == "context" || kind == "" {
+				kind = "pod-status"
 			}
 			if a.Shared {
 				// ADR-232: the view contains an artifact admitted by a share.
@@ -178,7 +185,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 			if a.NativeType == artifact.LogsArtifact {
 				completeness = "unknown"
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ProfileAcquisition: profileAcquisitionData(a.ProfileAcquisition), VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: completeness, ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ProfileAcquisition: profileAcquisitionData(a.ProfileAcquisition), VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: completeness, ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "pending", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}

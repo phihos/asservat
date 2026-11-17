@@ -19,8 +19,8 @@ var (
 )
 
 // EvidenceReadRequestWindow bounds one public evidence-read request
-// (get_extract, query_artifact, get_query_result, prepare_artifact_download,
-// get_artifact_download); ordinary public requests keep five seconds except
+// (get_extract, query_artifact, get_query_result, download_artifact prepare
+// and status); ordinary public requests keep five seconds except
 // RecordingSaveRequestWindow or CapturePreviewRequestWindow composition. Installed
 // native78-80 showed the approved read's audit, authorization, SQL fences,
 // worker wake-up, three key unwraps and the object read cannot complete within
