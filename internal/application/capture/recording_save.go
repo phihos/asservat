@@ -7,6 +7,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
@@ -39,6 +40,19 @@ type RecordingTargetResolver interface {
 // List resolves only the named workload identity. No Pod selection or live
 // Pod proof is required to discover still-authorized stopped source windows.
 func (s RecordingSaves) List(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, policyUID, cursor string, limit int) (RecordingPage, error) {
+	return s.list(ctx, current, target, func(ctx context.Context, t authorization.WorkloadTarget) (RecordingPage, error) {
+		return s.Inventory.List(ctx, current, t, policyUID, cursor, limit)
+	})
+}
+
+// Select returns save rows for exactly these source IDs of the workload.
+func (s RecordingSaves) Select(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, ids []string) (RecordingPage, error) {
+	return s.list(ctx, current, target, func(ctx context.Context, t authorization.WorkloadTarget) (RecordingPage, error) {
+		return s.Inventory.Select(ctx, current, t, ids)
+	})
+}
+
+func (s RecordingSaves) list(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, read func(context.Context, authorization.WorkloadTarget) (RecordingPage, error)) (RecordingPage, error) {
 	var zero RecordingPage
 	if ctx == nil || current == nil || s.Targets == nil || s.Inventory.Now == nil {
 		return zero, value.ErrUnavailable
@@ -62,7 +76,7 @@ func (s RecordingSaves) List(ctx context.Context, current identities.CurrentIden
 	until := identity.Earlier(i.ValidUntil, resolved.FreshUntil)
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
-	page, err := s.Inventory.List(bounded, current, resolved.Target(), policyUID, cursor, limit)
+	page, err := read(bounded, resolved.Target())
 	if err != nil {
 		return zero, err
 	}

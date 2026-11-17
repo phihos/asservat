@@ -42,7 +42,7 @@ func TestRecordingSaveHistorySettingsNeverBecomeRecipeOrOldSourceReplay(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(reply.Body), `"code":"RecordingSelectionRequired"`) || !strings.Contains(string(reply.Body), `"navigation_uri":"https://console.invalid/captures/new"`) {
+	if !strings.Contains(string(reply.Body), `"code":"NoCurrentSource"`) || !strings.Contains(string(reply.Body), `"navigation_uri":"https://console.invalid/captures/new"`) {
 		t.Fatal("old recording settings silently invoked a recipe", string(reply.Body))
 	}
 }

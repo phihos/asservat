@@ -160,8 +160,8 @@ func (s *Service) actor(ctx context.Context, current CurrentIdentity) (identity.
 	slices.Sort(i.Scopes)
 	return i, nil
 }
-func (s *Service) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) (v.SourcePage, string, error) {
-	var zero v.SourcePage
+func (s *Service) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) ([]v.Listed, string, error) {
+	var zero []v.Listed
 	i, err := s.actor(ctx, current)
 	if err != nil {
 		return zero, "", err
@@ -188,7 +188,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 	if err != nil || !sameLiveIdentity(i, final) {
 		return zero, "", fmt.Errorf("%w: service:168", v.ErrDenied)
 	}
-	out := v.SourcePage{Sources: make([]v.SourceRow, 0, len(sources))}
+	out := make([]v.Listed, 0, len(sources))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.cfg.Now()
@@ -209,7 +209,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 		if e != nil {
 			return zero, "", e
 		}
-		out.Sources = append(out.Sources, v.SourceRow{Handle: id, ID: source.ID(), WorkloadUID: source.Target.WorkloadUID, PodUID: source.Target.PodUID, ActionID: source.Action(), OwnerKind: source.OwnerKind, OwnerID: source.OwnerID, State: source.State, Projections: append([]string{}, source.Projections...), Eligible: eligible, Blockers: blockers, SaveVia: source.SaveVia, LeaseUntil: source.LeaseUntil})
+		out = append(out, v.Listed{Handle: id, Source: source.Clone(), Live: eligible, Blockers: blockers})
 	}
 	return out, next, nil
 }

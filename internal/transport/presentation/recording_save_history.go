@@ -66,5 +66,5 @@ func recordingSelectionFailure(origin string) any {
 	return struct {
 		OperationFailure
 		NavigationURI string `json:"navigation_uri"`
-	}{OperationFailure{"RecordingSelectionRequired", "Choose current recordings to repeat this saved window. Previous sources and grants are not reused.", false}, origin + "/captures/new"}
+	}{OperationFailure{"NoCurrentSource", "No matching recording runs on the workload now; choose a current recording to save.", false}, origin + "/captures/new"}
 }
