@@ -253,8 +253,8 @@ func TestAuditedOperationsPreDispatchRejectionsHaveNoInvocationEffect(t *testing
 func TestAuditedDownloadWithoutDownloadScopeIsADenialReply(t *testing.T) {
 	s, f, g := auditedFixture(t)
 	f.i.Scopes = []string{"evidence:read"}
-	reply, err := s.Call(context.Background(), f, "prepare_artifact_download", []byte(`{"artifact_id":"00000000-0000-4000-8000-000000000030","idempotency_key":"key"}`))
-	if err != nil || len(g.events) != 1 || g.events[0].Effect != "none" || !bytes.Contains(reply.Body, []byte(`"status":"error"`)) || s.contracts.ValidateOutput("prepare_artifact_download", reply.Body) != nil {
+	reply, err := s.Call(context.Background(), f, "download_artifact", []byte(`{"action":"prepare","artifact_id":"00000000-0000-4000-8000-000000000030","idempotency_key":"key"}`))
+	if err != nil || len(g.events) != 1 || g.events[0].Effect != "none" || !bytes.Contains(reply.Body, []byte(`"status":"error"`)) || s.contracts.ValidateOutput("download_artifact", reply.Body) != nil {
 		t.Fatalf("err=%v outcomes=%d body=%s", err, len(g.events), reply.Body)
 	}
 }

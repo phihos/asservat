@@ -60,7 +60,7 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 		}
 		return out
 	}
-	denied := call("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "approved-only-download-denied"})
+	denied := call("download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "approved-only-download-denied"})
 	if denied.Status != "error" {
 		t.Fatal("read-only OAuth session obtained download preparation")
 	}

@@ -227,7 +227,7 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 		{"preview_capture", map[string]any{"target_ref": target, "preset_ref": preset, "requested_retention_seconds": installedJourneyRetention}, map[string]any{"target_ref": absent, "preset_ref": preset, "requested_retention_seconds": installedJourneyRetention}},
 		{"request_capture", map[string]string{"preview_id": previewID, "idempotency_key": key}, map[string]string{"preview_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
 		{"get_case", map[string]string{"case_id": caseID}, map[string]string{"case_id": uuid.NewString()}},
-		{"prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key}, map[string]string{"artifact_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
+		{"download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": key}, map[string]string{"action": "prepare", "artifact_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
 	} {
 		var failure error
 		for attempt := 1; attempt <= 3; attempt++ {

@@ -49,7 +49,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_extract|get_query_result|prepare_artifact_download|get_artifact_download)$/.test(path)) && response.status === 200) {
+      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_extract|get_query_result|download_artifact)$/.test(path)) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -253,24 +253,28 @@ try {
       stage = 'heap-native-prepare';
       let from = seen.length;
       await panel.locator('..').getByRole('button', { name: 'Download', exact: true }).click();
-      let response = await observed('prepare_artifact_download', from);
+      let response = await observed('download_artifact', from);
       let original, key, deadline;
       const end = Date.now() + 180_000; // Existing native helper ceiling; parent Go context still wins.
       for (;;) {
         event({ kind: 'operation', ...response });
         assert(Object.values(response.transport).every(Boolean), 'original native browser transport');
+        assert.equal(response.input.action, 'prepare');
+        if (key === undefined) key = response.input.idempotency_key;
+        assert.equal(response.input.idempotency_key, key);
+        // RetryLater: the console repeats prepare with the same key.
+        if (response.reply.status === 'error') {
+          assert.equal(response.reply.data.code, 'RetryLater');
+          assert(Date.now() < end, 'finite native preparation');
+          response = await observed('download_artifact', response.responseIndex);
+          continue;
+        }
         assert.equal(response.reply.status, 'ok');
         const data = response.reply.data;
         assert.equal(data.artifact_id, config.artifactID);
-        if (original === undefined) { original = data.download_id; deadline = data.expires_at; key = response.input.idempotency_key; }
-        assert.equal(data.download_id, original);
-        assert.equal(data.expires_at, deadline);
-        if (response.name === 'prepare_artifact_download') assert.equal(response.input.idempotency_key, key);
-        else assert.equal(response.input.download_id, original);
-        assert(['Preparing', 'Ready'].includes(data.state), 'finite native preparation');
-        if (data.state === 'Ready') break;
-        assert(Date.now() < Math.min(end, Date.parse(deadline)), 'original preparation deadline');
-        response = await observed(['prepare_artifact_download', 'get_artifact_download'], response.responseIndex);
+        original = data.download_id; deadline = data.access_until;
+        assert.equal(data.state, 'Ready');
+        break;
       }
       const ready = response.reply.data;
       assert.equal(ready.content_path, '/api/v1/downloads/' + original + '/content');

@@ -6,6 +6,10 @@ export interface components {
         McpInput_get_case: {
             /** Format: uuid */
             case_id: string;
+            /** @description Continues the timeline. */
+            cursor?: string;
+            /** @description Timeline events per page. */
+            limit?: number;
         };
         /** Asservat mcp-result v1 */
         Contract_mcp_result: {
@@ -37,7 +41,7 @@ export interface components {
             /** Format: date-time */
             deleteBy: string;
             /** @enum {unknown} */
-            deletionState: "scheduled" | "inProgress" | "verified" | "overdue" | "unknown" | "restrictedPreservation";
+            deletionState: "pending" | "verified" | "overdue" | "restrictedPreservation";
             /** @constant */
             automaticDeletion: true;
             /** @constant */
@@ -68,6 +72,7 @@ export interface components {
                     /** Format: uuid */
                     cluster_id?: string;
                 };
+                /** @description First 100 artifacts (page size); list_artifacts pages through all of them. */
                 artifacts: ({
                     /** Format: uuid */
                     artifact_id: string;
@@ -183,7 +188,7 @@ export interface components {
             status: "pending";
             data: {
                 query_handle: string;
-                retry_after_seconds: number;
+                revision: number;
             };
         } | {
             /** @constant */
@@ -199,129 +204,82 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
-        McpInput_prepare_artifact_download: {
+        McpInput_download_artifact: {
+            /**
+             * @description Selects the action; each value has its own strict argument set.
+             * @enum {unknown}
+             */
+            action: "prepare" | "status" | "cancel";
             /** Format: uuid */
-            artifact_id: string;
+            artifact_id?: string;
+            idempotency_key?: string;
+            /**
+             * @description Core artifacts only: bundle (default) is the debugger-ready tar with executable, libraries, debug files and gdb.cmd/dlv.sh; file is the bare core. Ignored for other kinds.
+             * @default bundle
+             * @enum {unknown}
+             */
+            representation: "bundle" | "file";
             /** Format: uuid */
-            grant_id?: string;
-            idempotency_key: string;
-        };
-        /** @description Current authorized transfer status. Completed records the server transfer outcome, not local file persistence. Terminal status may omit native file metadata and remains readable after the transfer deadline while current evidence metadata authority permits it. Any included native metadata is the complete verified group; status reads never prepare or decrypt a file. */
+            download_id?: string;
+            /** @description Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged. */
+            after_revision?: number;
+        } & (unknown & unknown & unknown);
+        /** @description Current authorized transfer status. Prepare returns Ready with the catalog's verified metadata in the same request. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never decrypt a file. */
         Contract_artifact_download_0b2b78f874cf920d: {
             /** Format: uuid */
             download_id: string;
             /** Format: uuid */
             artifact_id: string;
-            /** @enum {unknown} */
-            state: "Preparing" | "Ready" | "Streaming" | "Completed" | "Interrupted" | "Cancelled" | "Expired" | "Denied" | "Failed";
+            /**
+             * @description An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal.
+             * @enum {unknown}
+             */
+            state: "Ready" | "Completed" | "Failed" | "Cancelled";
+            /** @description Changes whenever the session state or transfer generation changes; pass it as after_revision to wait for the next change. */
+            revision: number;
+            /** @description <workload>-<pod>-<time>.<ext> from recorded provenance (core bundle: .core.tar). */
             filename?: string;
             native_format?: string;
-            size_bytes?: number;
-            sha256?: string;
+            /** @description Verified size from the catalog; present in every status while the caller may read the artifact's metadata. */
+            size_bytes: number;
+            /** @description Verified full-file SHA-256 from the catalog; present in every status. */
+            sha256: string;
             content_path?: string;
-            /**
-             * Format: date-time
-             * @description Effective transfer deadline, no later than the original session deadline or current managed evidence access expiry. A past deadline is valid for terminal status and never renews preparation, transfer or resume authority.
-             */
-            expires_at: string;
-            /** Format: date-time */
-            managed_read_until: string;
             emitted_bytes: number;
-            resume_available: boolean;
             /** @constant */
             local_copy_managed: false;
             handling_notice: string;
             coverage_notice?: string;
             /** @description Strong opaque native-representation version; use with If-Match when resuming. */
             etag?: string;
+            /** @enum {unknown} */
+            failure_reason?: "Expired" | "Denied" | "Integrity" | "Deleted" | "Unavailable";
+            /** @enum {unknown} */
+            representation?: "bundle" | "file";
+            /** @description Console page that downloads this session in the signed-in browser of the same human without another consent or approval. */
+            browser_url?: string;
             /**
-             * @description Only an acknowledged Preparing response to the explicit preparation operation permits bounded automatic continuation with the original key and deadline. Passive status never supplies this instruction.
-             * @constant
+             * Format: date-time
+             * @description AccessUntil: the artifact's access end (retention, share or grant end), never extended by status reads. Resumes are allowed until then; the caller's token lifetime does not shorten a started response (ADR-312).
              */
-            continue_preparation?: true;
-        } & (unknown & unknown & unknown & unknown);
-        McpOutput_prepare_artifact_download: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: components["schemas"]["Contract_artifact_download_0b2b78f874cf920d"];
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                /** @description RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but no current whole-file grant covers it. Other failures must not open approval. */
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_get_artifact_download: {
-            /** Format: uuid */
-            download_id: string;
-        };
-        McpOutput_get_artifact_download: components["schemas"]["Contract_mcp_result"] & ({
-            /** @constant */
-            status: "ok";
-            data: components["schemas"]["Contract_artifact_download_0b2b78f874cf920d"] & unknown;
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
-        } | {
-            /** @constant */
-            status: "error";
-            data: {
-                code: string;
-                message: string;
-                retryable: boolean;
-                /** Format: uri */
-                navigation_uri?: string;
-                /** @enum {unknown} */
-                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
-                retry_after_seconds?: number;
-            };
-        });
-        McpInput_cancel_artifact_download: {
-            /** Format: uuid */
-            download_id: string;
-            idempotency_key: string;
-        };
-        /** @description A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6). */
+            access_until: string;
+        } & (unknown & unknown);
+        /** @description A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6). */
         Contract_artifact_download_b566de55874898e7: {
             /** Format: uuid */
             download_id: string;
             /** @enum {unknown} */
             state: "Cancelled" | "AlreadyTerminal";
         };
-        McpOutput_cancel_artifact_download: components["schemas"]["Contract_mcp_result"] & ({
+        McpOutput_download_artifact: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
             status: "ok";
-            data: (components["schemas"]["Contract_artifact_download_0b2b78f874cf920d"] & unknown) | components["schemas"]["Contract_artifact_download_b566de55874898e7"];
-        } | {
-            /** @constant */
-            status: "pending";
-            data: {
-                query_handle: string;
-                retry_after_seconds: number;
-            };
+            data: components["schemas"]["Contract_artifact_download_0b2b78f874cf920d"] | components["schemas"]["Contract_artifact_download_b566de55874898e7"];
         } | {
             /** @constant */
             status: "error";
             data: {
+                /** @description RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but neither the equivalent Kubernetes right nor a current grant covers the raw file; navigation_uri opens the prefilled review. Other failures must not open approval. */
                 code: string;
                 message: string;
                 retryable: boolean;

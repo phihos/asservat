@@ -96,7 +96,7 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture"}
+	want := []string{"download_artifact", "get_capture", "get_capture_profile", "get_case", "list_diagnostics", "preview_capture", "request_capture"}
 	if operations.PublicOrigin() != c.PublicOrigin || !slices.Equal(operations.ToolNames(), want) {
 		t.Fatal("incomplete shared operation set", operations.ToolNames())
 	}
@@ -213,15 +213,13 @@ func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testin
 	}
 	const id = "10000000-0000-4000-8000-000000000003"
 	inputs := map[string]string{
-		"list_diagnostics":          `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}}`,
-		"get_capture_profile":       `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
-		"preview_capture":           `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
-		"request_capture":           `{"preview":{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"` + strings.Repeat("a", 64) + `","idempotency_key":"same-original-key"}`,
-		"get_capture":               `{"capture_id":"` + id + `"}`,
-		"get_case":                  `{"case_id":"` + id + `"}`,
-		"prepare_artifact_download": `{"artifact_id":"` + id + `","idempotency_key":"download-key"}`,
-		"get_artifact_download":     `{"download_id":"` + id + `"}`,
-		"cancel_artifact_download":  `{"download_id":"` + id + `","idempotency_key":"stop-key"}`,
+		"list_diagnostics":    `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}}`,
+		"get_capture_profile": `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
+		"preview_capture":     `{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
+		"request_capture":     `{"preview":{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"` + strings.Repeat("a", 64) + `","idempotency_key":"same-original-key"}`,
+		"get_capture":         `{"capture_id":"` + id + `"}`,
+		"get_case":            `{"case_id":"` + id + `"}`,
+		"download_artifact":   `{"action":"prepare","artifact_id":"` + id + `","idempotency_key":"download-key"}`,
 	}
 	for _, name := range operations.ToolNames() {
 		t.Run(name, func(t *testing.T) {

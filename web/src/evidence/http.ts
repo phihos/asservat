@@ -1,14 +1,17 @@
 import type { components } from '../generated/evidence';
 import * as validators from '../generated/validate-evidence';
 
-export type Operation = 'get_case' | 'prepare_artifact_download' | 'get_artifact_download' | 'cancel_artifact_download';
-export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
+export type Operation = 'get_case' | 'download_artifact';
+// The generated type marks the defaulted representation as required; the
+// wire schema validates each action's argument set.
+type DownloadInput = { action: 'prepare'; artifact_id: string; idempotency_key: string; representation?: 'bundle' | 'file' } | { action: 'status'; download_id: string; after_revision?: number } | { action: 'cancel'; download_id: string; idempotency_key: string };
+export type Input<N extends Operation> = N extends 'download_artifact' ? DownloadInput : components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];
 export type CaseDetails = Data<'get_case'>;
 export type Artifact = CaseDetails['artifacts'][number];
-export type Download = Data<'get_artifact_download'>;
-export type CancellationReceipt = Exclude<Data<'cancel_artifact_download'>, { artifact_id: string }>;
+export type Download = Extract<Data<'download_artifact'>, { artifact_id: string }>;
+export type CancellationReceipt = Exclude<Data<'download_artifact'>, { artifact_id: string }>;
 
 export class OperationFailure extends Error {
   constructor(readonly status: number, readonly code = '', readonly detail = '') { super('Evidence request unavailable'); }
@@ -17,7 +20,7 @@ export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }
 
-// All four routes are fixed, local and session authenticated. Their presence in
+// Both routes are fixed, local and session authenticated. Their presence in
 // a generated client does not imply that the backend implements them. Native evidence
 // transfers have a different transport; this client only accepts metadata.
 export const operations: Operations = {
@@ -30,7 +33,8 @@ export const operations: Operations = {
     const timer = setTimeout(abort, 10_000);
     try {
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
-      if (name === 'prepare_artifact_download' || name === 'cancel_artifact_download') headers['Idempotency-Key'] = (input as Input<'prepare_artifact_download'>).idempotency_key;
+      const download = input as { action?: string; idempotency_key?: string };
+      if (name === 'download_artifact' && download.action !== 'status' && download.idempotency_key) headers['Idempotency-Key'] = download.idempotency_key;
       const response = await fetch('/api/v1/operations/' + name, {
         method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         headers, body: JSON.stringify(input), signal: request.signal,

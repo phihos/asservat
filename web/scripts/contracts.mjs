@@ -117,7 +117,7 @@ async function operationBundle(names, bundle, direct = []) {
 }
 await operationBundle([], 'processing', ['ProcessingInventory', 'ProcessingChange', 'ProcessingReceipt']);
 await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_profile'], 'capture');
-await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
+await operationBundle(['get_case', 'download_artifact'], 'evidence');
 await operationBundle(['get_extract', 'query_artifact', 'compare_profiles', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');

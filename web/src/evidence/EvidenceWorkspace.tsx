@@ -22,9 +22,9 @@ import { SharePanel } from '../sharing/SharePanel';
 export const evidenceController = new Evidence();
 const date = (value: string) => new Date(value).toLocaleString();
 const bytes = (value: number) => new Intl.NumberFormat().format(value) + ' bytes';
-const states: Record<Download['state'], string> = { Preparing: 'Preparing the native file', Ready: 'Ready to download', Streaming: 'Sending the file', Completed: 'Transfer recorded', Interrupted: 'Download interrupted', Cancelled: 'Download cancelled', Expired: 'Download expired', Denied: 'Download access unavailable', Failed: 'Download failed' };
+const states: Record<Download['state'], string> = { Ready: 'Ready to download', Completed: 'Transfer recorded', Cancelled: 'Download cancelled', Failed: 'Download failed' };
 const contentNames: Record<string, string> = { userContent: 'user content', credentials: 'credentials', personalIdentifiers: 'personal identifiers', networkAddresses: 'network addresses', paths: 'paths', profileLabels: 'profile labels', unknownApplicationData: 'other application data' };
-const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
+const terminal = new Set(['Completed', 'Cancelled', 'Failed']);
 const kindName = (kind: string, dataClass?: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind === 'packetCapture' ? (dataClass === 'raw' ? 'Packet capture (raw packets)' : 'Packet capture (headers only)') : kind;
 const classLine = (artifact: Artifact) => `${artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · ${artifact.completeness}`;
 function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
@@ -98,7 +98,7 @@ function Handling({ artifact }: { artifact: Artifact }) {
   const notice = artifact.handling_notice;
   return <>
     <p>{notice.classification === 'verifiedNonPersonal' ? 'Classified as non-personal data.' : `May contain user data${notice.mayContain.length ? ': ' + notice.mayContain.map(value => contentNames[value]).join(', ') : ''}.`}</p>
-    <dl className="facts"><dt>Access until</dt><dd>{date(notice.expiresAt)}</dd><dt>Managed deletion</dt><dd>{notice.deletionState === 'verified' ? 'Deletion verified' : notice.deletionState === 'restrictedPreservation' ? 'Restricted preservation applies' : notice.deletionState === 'overdue' ? 'Deletion overdue; administrator action is needed' : notice.deletionState === 'unknown' ? 'Deletion status is unavailable' : `By ${date(notice.deleteBy)}${notice.deletionState === 'inProgress' ? ' · in progress' : ''}`}</dd></dl>
+    <dl className="facts"><dt>Access until</dt><dd>{date(notice.expiresAt)}</dd><dt>Managed deletion</dt><dd>{notice.deletionState === 'verified' ? 'Deletion verified' : notice.deletionState === 'restrictedPreservation' ? 'Restricted preservation applies' : notice.deletionState === 'overdue' ? 'Deletion overdue; administrator action is needed' : `By ${date(notice.deleteBy)}`}</dd></dl>
   </>;
 }
 function ProfileCollectionTiming({ artifacts }: { artifacts: Artifact[] }) {
@@ -170,6 +170,11 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
           <h2>{state.rawApprovalArtifact ? 'Download approval needed' : 'Confirming the download request'}</h2><p>{state.rawApprovalArtifact ? 'Review the selected existing artifact above. Keep this tab open; after approval, retry this same download request.' : 'The request may have been accepted. Keep this tab open; retry uses the same request and reservation.'}</p>
           <Button className="button" isDisabled={state.busy} onPress={() => void controller.retryPreparation()}>Retry same download request</Button>
         </>}
+        {state.ended && <>
+          <h2 role="status">Download ended</h2>
+          <p>{state.ended}</p>
+          <Button className="button secondary" isDisabled={state.busy} onPress={controller.newDownload}>Return to evidence</Button>
+        </>}
         {state.cancellation && <>
           <h2 role="status">{state.cancellation.state === 'Cancelled' ? 'Download cancelled' : 'Download already ended'}</h2>
           <p>This download cannot be started or resumed. Copies already received remain outside Asservat.</p>
@@ -177,15 +182,10 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         </>}
         {download && <>
           <h2 aria-live="polite">{state.cancelling && !terminal.has(download.state) ? 'Confirming cancellation' : states[download.state]}</h2>
-          {download.state === 'Preparing' && <p>Asservat is verifying the native file. Size, format and checksum appear when preparation finishes.</p>}
-          {download.filename !== undefined && <dl className="facts"><dt>Native file</dt><dd>{download.filename}</dd><dt>Format</dt><dd>{download.native_format}</dd><dt>Size</dt><dd>{bytes(download.size_bytes!)}</dd><dt>SHA-256</dt><dd className="identifier">{download.sha256}</dd><dt>Coverage</dt><dd>{download.coverage_notice}</dd></dl>}
-          <p>Download access ends {date(download.expires_at)}. Managed evidence access ends {date(download.managed_read_until)}.</p>
-          {download.state === 'Completed' && <>
-            <p>The server recorded the transfer. Check the file saved by your browser; Asservat cannot confirm local disk storage.</p>
-            <p>{download.sha256 ? 'Verify the saved file against the SHA-256 shown above before relying on it.' : 'Native file details and checksum are unavailable in this transfer status.'}</p>
-          </>}
-          {download.state === 'Interrupted' && <p>Starting again downloads the whole file and may use more transfer allowance. A compatible authenticated client can resume a partial file when permitted.</p>}
-          {controller.canStart() && <a className="button" href={download.content_path} download={download.filename} onClick={event => { if (!controller.canStart()) { event.preventDefault(); void controller.checkDownload(); } else controller.startDownload(); }}>{download.state === 'Interrupted' ? 'Download again from beginning' : 'Download native file'}</a>}
+          <dl className="facts">{download.filename !== undefined && <><dt>Native file</dt><dd>{download.filename}</dd><dt>Format</dt><dd>{download.native_format}</dd></>}<dt>Size</dt><dd>{bytes(download.size_bytes)}</dd><dt>SHA-256</dt><dd className="identifier">{download.sha256}</dd>{download.coverage_notice !== undefined && <><dt>Coverage</dt><dd>{download.coverage_notice}</dd></>}</dl>
+          <p>Download access ends {date(download.access_until)}.</p>
+          {download.state === 'Completed' && <p>The server recorded the transfer. Check the file saved by your browser; Asservat cannot confirm local disk storage. Verify the saved file against the SHA-256 shown above before relying on it.</p>}
+          {controller.canStart() && <a className="button" href={download.content_path} download={download.filename} onClick={event => { if (!controller.canStart()) { event.preventDefault(); void controller.checkDownload(); } else controller.startDownload(); }}>Download native file</a>}
           {state.started && <p role="status">Download requested in your browser. Check its downloads for the saved file.</p>}
           {terminal.has(download.state) && <Button className="button secondary" isDisabled={state.busy} onPress={controller.newDownload}>Return to evidence</Button>}
         </>}
@@ -194,7 +194,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
           <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.restartDownload()}>Start a new download</Button>
         </>}
         {state.cancelling && (!download || !terminal.has(download.state)) && <p role="status">Cancellation is not yet confirmed. Retry cancellation uses the original request; it does not start a new download.</p>}
-        {(!state.uncertain || controller.canCancel()) && !state.cancellation && (!download || !terminal.has(download.state)) && <div className="actions">
+        {(!state.uncertain || controller.canCancel()) && !state.cancellation && !state.ended && (!download || !terminal.has(download.state)) && <div className="actions">
           <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.checkDownload()}>Check download status</Button>
           <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.cancel()}>{state.cancelling ? 'Retry cancellation' : 'Cancel download'}</Button>
         </div>}

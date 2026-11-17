@@ -124,15 +124,14 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     checks.push('idle artifact expiry removes Download and explains expiry without metadata polling or renewing retention');
 
     // Native worker/session/relay composition is intentionally absent. The
-    // real dispatch returns 404, not fabricated Preparing or transfer success.
-    const prepareReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/prepare_artifact_download');
+    // real dispatch returns 404, not a fabricated transfer success.
+    const prepareReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/download_artifact');
     await page.getByRole('button', { name: 'Download', exact: true }).click();
     const missing = await prepareReply;
     assert.equal(missing.status(), 404);
     assert.notEqual(missing.headers()['content-type'], 'text/html; charset=utf-8');
     await expect(page.getByRole('alert')).toContainText('unavailable');
     await expect(page.getByRole('button', { name: 'Retry same download request', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Preparing the native file', exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Download native file', exact: true })).toHaveCount(0);
     await expect(page.getByText('SHA-256', { exact: true })).toHaveCount(0);
     await scan('native-download-unavailable');

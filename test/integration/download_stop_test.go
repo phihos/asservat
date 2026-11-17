@@ -135,7 +135,7 @@ func qualifyDownloadStop(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		// ADR-330 D6: one audit row, written with the stop; replays add none.
 		var rows int64
 		var kind, operation string
-		if err = admin.QueryRow(ctx, "SELECT count(*),min(kind),min(operation) FROM audit_event WHERE operation_id=$1", requestID).Scan(&rows, &kind, &operation); err != nil || rows != 1 || kind != "download.stop" || operation != "cancel_artifact_download" {
+		if err = admin.QueryRow(ctx, "SELECT count(*),min(kind),min(operation) FROM audit_event WHERE operation_id=$1", requestID).Scan(&rows, &kind, &operation); err != nil || rows != 1 || kind != "download.stop" || operation != "download_artifact" {
 			t.Fatal("stop audit row", rows, kind, operation, err)
 		}
 		if err = admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE kind='download.stop' AND $1=ANY(artifact_ids)", scope.ArtifactID).Scan(&rows); err != nil || rows != 1 {

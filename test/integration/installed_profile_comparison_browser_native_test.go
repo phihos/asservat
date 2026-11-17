@@ -247,6 +247,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 		var original, key string
 		var deadline time.Time
 		var ready installedJourneyDownload
+		retry := false
 		for {
 			e := read()
 			if e.Kind == "native" {
@@ -264,35 +265,57 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 				native, readErr := io.ReadAll(io.LimitReader(f, artifact.MaxPprofBytes+1))
 				_ = f.Close()
 				digest := sha256.Sum256(native)
-				if readErr != nil || ready.SizeBytes == nil || int64(len(native)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 {
+				if readErr != nil || int64(len(native)) != ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 {
 					fail("native metadata/bytes mismatch")
 				}
 				return native, ready
 			}
-			if e.Kind != "operation" || e.Name != "prepare_artifact_download" && e.Name != "get_artifact_download" || !e.Transport.Post || !e.Transport.SameOrigin || !e.Transport.CSRF || !e.Transport.NoBearer || browser.wire.ValidateOutput(e.Name, e.Reply) != nil {
+			if e.Kind != "operation" || e.Name != "download_artifact" || !e.Transport.Post || !e.Transport.SameOrigin || !e.Transport.CSRF || !e.Transport.NoBearer || browser.wire.ValidateOutput(e.Name, e.Reply) != nil {
 				fail("native operation contract")
 			}
 			var reply installedComparisonReply
 			var args map[string]string
-			var current installedJourneyDownload
-			if json.Unmarshal(e.Reply, &reply) != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || json.Unmarshal(e.Input, &args) != nil || current.ArtifactID != source.ArtifactID {
+			if json.Unmarshal(e.Reply, &reply) != nil || json.Unmarshal(e.Input, &args) != nil {
 				fail("native operation association")
 			}
-			if e.Name == "prepare_artifact_download" {
-				if args["artifact_id"] != source.ArtifactID || args["idempotency_key"] == "" || key != "" && (key != args["idempotency_key"] || !ready.ContinuePreparation) {
+			switch args["action"] {
+			case "prepare":
+				// Only an acknowledged RetryLater permits another same-key prepare.
+				if args["artifact_id"] != source.ArtifactID || args["idempotency_key"] == "" || key != "" && (key != args["idempotency_key"] || !retry) {
 					fail("native preparation key changed")
 				}
 				key = args["idempotency_key"]
-			} else if original == "" || args["download_id"] != original {
-				fail("native status identity changed")
+			case "status":
+				if original == "" || args["download_id"] != original {
+					fail("native status identity changed")
+				}
+			default:
+				fail("native operation action")
+			}
+			retry = false
+			if reply.Status == "error" {
+				// A session still preparing has no public state yet.
+				var failure struct {
+					Code      string `json:"code"`
+					Retryable bool   `json:"retryable"`
+				}
+				if json.Unmarshal(reply.Data, &failure) != nil || failure.Code != "RetryLater" || !failure.Retryable || original != "" {
+					fail("native preparation outcome")
+				}
+				retry = true
+				continue
+			}
+			var current installedJourneyDownload
+			if reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || current.ArtifactID != source.ArtifactID {
+				fail("native operation association")
 			}
 			if original == "" {
-				original, deadline = current.DownloadID, current.ExpiresAt
+				original, deadline = current.DownloadID, current.AccessUntil
 			}
-			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.ExpiresAt.Equal(deadline) || deadline.After(source.Expires) || current.State != "Preparing" && current.State != "Ready" {
+			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.AccessUntil.Equal(deadline) || deadline.After(source.Expires) || current.State != "Ready" {
 				fail("native original identity/deadline/state")
 			}
-			if current.State == "Ready" && (current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes == nil || *current.SizeBytes < 1 || *current.SizeBytes > artifact.MaxPprofBytes) {
+			if current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes < 1 || current.SizeBytes > artifact.MaxPprofBytes {
 				fail("native ready metadata")
 			}
 			ready = current

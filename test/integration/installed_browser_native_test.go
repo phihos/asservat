@@ -379,41 +379,38 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	t.Log("installed browser journey: console case and approved pod-status extract equal the MCP replies")
 
 	// (c) Native download through the console route, bound to this session.
-	prepare := map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-browser-download"}
-	prepareOnce := func() installedJourneyDownload {
-		t.Helper()
+	prepare := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "installed-browser-download"}
+	var download installedJourneyDownload
+	limit, stop := context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
+	defer stop()
+	for {
 		// An uncertain prepare is never replayed; only an acknowledged
-		// continue_preparation permits the same-key call again.
-		reply, status, err := b.operation(ctx, "prepare_artifact_download", prepare, prepare["idempotency_key"])
-		var d installedJourneyDownload
-		if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &d) != nil {
+		// RetryLater (session still preparing) permits the same-key call again.
+		reply, status, err := b.operation(limit, "download_artifact", prepare, prepare["idempotency_key"])
+		if err == nil && installedJourneyPreparing(reply) {
+			if installedJourneyPause(limit, 2*time.Second) != nil {
+				diagnose()
+				t.Fatal("browser download stayed Preparing")
+			}
+			continue
+		}
+		if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &download) != nil {
 			diagnose()
 			t.Fatal("browser download preparation", status, reply.Status, reply.RequestID, err)
 		}
-		return d
+		break
 	}
-	download := prepareOnce()
-	original, until := download.DownloadID, download.ExpiresAt
+	original, until := download.DownloadID, download.AccessUntil
 	if original == "" || until.IsZero() || until.After(expires) {
 		t.Fatal("browser download deadline", until)
 	}
-	limit, stop := context.WithDeadline(ctx, installedJourneyEarlier(until, time.Now().Add(5*time.Minute)))
-	defer stop()
-	for download.State == "Preparing" {
-		if installedJourneyPause(limit, 2*time.Second) != nil {
-			diagnose()
-			t.Fatal("browser download stayed Preparing")
-		}
-		if download.ContinuePreparation {
-			download = prepareOnce()
-		} else {
-			b.read(limit, "get_artifact_download", map[string]string{"download_id": original}, &download)
-		}
-		if download.DownloadID != original || !download.ExpiresAt.Equal(until) {
-			t.Fatal("browser download changed its original identity/deadline")
-		}
+	// A status read (no Idempotency-Key) keeps the original identity/deadline.
+	var observed installedJourneyDownload
+	b.read(limit, "download_artifact", map[string]string{"action": "status", "download_id": original}, &observed)
+	if observed.DownloadID != original || !observed.AccessUntil.Equal(until) {
+		t.Fatal("browser download changed its original identity/deadline")
 	}
-	if download.State != "Ready" || download.ContentPath != "/api/v1/downloads/"+original+"/content" || download.SizeBytes == nil || download.SHA256 == "" {
+	if download.State != "Ready" || download.ContentPath != "/api/v1/downloads/"+original+"/content" || download.SHA256 == "" {
 		diagnose()
 		t.Fatal("browser download was not prepared", download.State)
 	}
@@ -434,7 +431,7 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	bytesRead, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
 	response.Body.Close()
 	got, want := sha256.Sum256(bytesRead), sha256.Sum256(native)
-	if err != nil || response.StatusCode != http.StatusOK || int64(len(bytesRead)) != *download.SizeBytes || hex.EncodeToString(got[:]) != download.SHA256 || got != want {
+	if err != nil || response.StatusCode != http.StatusOK || int64(len(bytesRead)) != download.SizeBytes || hex.EncodeToString(got[:]) != download.SHA256 || got != want {
 		diagnose()
 		t.Fatal("browser native download differs from its metadata or the MCP-downloaded bytes", response.StatusCode, len(bytesRead), err)
 	}
