@@ -55,8 +55,8 @@ export function RecordingsPanel({ session, scope, target, repeat, submit, contro
     {state.rows?.length === 0 && <p>No eligible recordings are available for this target.</p>}
     {state.rows && state.rows.length > 0 && <fieldset disabled={state.busy}><legend>Current recording sources</legend>
       {state.rows.map((row, index) => <article className="diagnostic" key={row.recording_handle ?? `${row.policy_uid}:${row.pod_uid}:${row.action_id}:${index}`}>
-        <label><input type="checkbox" checked={state.selected.some(selected => selected.recording_handle === row.recording_handle)} disabled={!row.recording_handle || !row.save_eligible || row.blockers.length > 0 || state.expired} onChange={event => { controller.select(row, event.currentTarget.checked); if (controller.snapshot().selected.length > 0 && !controller.snapshot().error) void controller.review(); }}/> {row.pod_name} · {row.action_id}</label>
-        <p>{names[row.kind] ?? row.kind} · policy {row.policy_uid}</p>
+        <label><input type="checkbox" checked={state.selected.some(selected => selected.recording_handle === row.recording_handle)} disabled={!row.recording_handle || !row.save_eligible || state.expired} onChange={event => { controller.select(row, event.currentTarget.checked); if (controller.snapshot().selected.length > 0 && !controller.snapshot().error) void controller.review(); }}/> {row.pod_name} · {row.action_id}</label>
+        <p>{names[row.kind] ?? row.kind} · {row.owner_kind === 'policy' ? `policy ${row.policy_name}` : 'manual capture'}</p>
         <p>Source state: {row.state}. History: {row.history}. Configured maximum lookback: {row.maximum_before}. Incident pod cap: {row.incident_pod_cap}.</p>
         {row.history === 'Unknown' && <p>Available history and gaps have not been measured. A running source or this list is not proof of complete coverage.</p>}
         {row.blockers.map(code => <p className="notice" key={code}>{blockers[code] ?? code}</p>)}

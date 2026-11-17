@@ -23,6 +23,9 @@ func (f *mcpRecordingFixture) List(context.Context, identities.CurrentIdentity, 
 	now := time.Now()
 	return app.RecordingPage{ExpiresAt: now.Add(time.Minute), ValidUntil: now.Add(time.Second)}, nil
 }
+func (f *mcpRecordingFixture) Select(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, ids []string) (app.RecordingPage, error) {
+	return f.List(ctx, current, target, "", "", len(ids))
+}
 func (*mcpRecordingFixture) Preview(context.Context, identities.CurrentIdentity, app.RecordingSavePreviewRequest) (app.ContextPreviewResult, error) {
 	return app.ContextPreviewResult{}, value.ErrUnavailable
 }
@@ -46,6 +49,13 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	}
 	composed, err := presentation.NewInvestigationRecordingSaveOperations(aggregate, saves)
 	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := presentation.NewLiveOperations(presentation.LiveOperationsConfig{PublicOrigin: server.URL, Recordings: f, Clusters: presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000010"}), Now: time.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if composed, err = presentation.NewInvestigationLiveOperations(composed, list); err != nil {
 		t.Fatal(err)
 	}
 	handler, err = NewContextHandler(Config{PublicOrigin: server.URL, Issuer: "https://id.example.invalid/realm", Version: "test", MaxConcurrent: 4, MaxPerIdentity: 2}, resolverFunc(func(context.Context, string) (identity.Identity, error) {
@@ -95,7 +105,7 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	if !names["list_recordings"] || !names["preview_recording_save"] || names["request_capture"] || names["cancel_capture"] {
 		t.Fatal("wrong source tool set", names)
 	}
-	args := map[string]any{"target_ref": map[string]any{"cluster_id": "00000000-0000-4000-8000-000000000010", "namespace": "apps", "kind": "Deployment", "name": "api"}}
+	args := map[string]any{"target_ref": map[string]any{"cluster": "local", "namespace": "apps", "kind": "Deployment", "name": "api"}}
 	response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "list_recordings", "arguments": args}))
 	if response.StatusCode != 200 || !strings.Contains(string(b), `"capture_enabled":false`) || !strings.Contains(string(b), `"recordings":[]`) || f.calls != 1 {
 		t.Fatal(response.StatusCode, string(b), f.calls)

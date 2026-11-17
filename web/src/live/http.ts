@@ -10,6 +10,14 @@ export type Watch = Extract<Watched['data'], {idle_expires_at: string}>;
 export type Batch = Extract<Watched['data'], {batch_id: string}>;
 export type Row = Batch['rows'][number];
 export type Filter = NonNullable<Input<'watch_live'>['display_filter']>;
+export type Target = Input<'list_recordings'>['target_ref'];
+// Pages whose target still carries a cluster ID pass it through as the name;
+// an unknown name returns TargetGone.
+export type AnyTarget = Target | (Omit<Target, 'cluster'> & { cluster_id: string });
+export function listTarget(target: AnyTarget): Target {
+  const { cluster_id: id, cluster, ...rest } = structuredClone(target) as Target & { cluster_id?: string };
+  return { ...rest, cluster: cluster ?? id ?? '' };
+}
 export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }
