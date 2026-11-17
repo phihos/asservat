@@ -121,3 +121,17 @@ func TestRawLogCaptureProfileAdvertisesTypedEdits(t *testing.T) {
 		t.Fatal("public catalog lost exact declared log edits", fields)
 	}
 }
+
+func TestUnknownClusterNameIsADomainError(t *testing.T) {
+	s, f := operationFixture(t, false)
+	for _, name := range []string{"list_diagnostics", "preview_capture"} {
+		in := `{"target_ref":{"cluster":"elsewhere","namespace":"payments","kind":"Deployment","name":"api"}}`
+		if name == "preview_capture" {
+			in = `{"target_ref":{"cluster":"elsewhere","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}}`
+		}
+		reply, err := s.Call(t.Context(), f, name, []byte(in))
+		if err != nil || !bytes.Contains(reply.Body, []byte(`"code":"UnknownCluster"`)) {
+			t.Fatal(name, err, string(reply.Body))
+		}
+	}
+}

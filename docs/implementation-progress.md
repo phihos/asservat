@@ -5,7 +5,9 @@
 Branch `clean/api-capture`. `list_diagnostics`, `preview_capture`,
 `request_capture`, `get_capture`, `cancel_capture`, `list_capture_history`
 and `get_capture_profile` validate against the canonical schemas.
-`target_ref` names its cluster (`local` for the hub's own). Retired names:
+`target_ref` names its cluster (`local` for the hub's own); an unknown name
+is `UnknownCluster`. Packet peers lost `maxEndpoints`/`maxStaleness` (the
+planner defaults the regional member bound and five seconds). Retired names:
 `get_capture_settings` (now `get_capture` `view=settings`),
 `list_capture_profiles` (rows of `list_diagnostics`) and
 `preview_recording_save` (the `recording_handles` branch of
@@ -13,7 +15,10 @@ and `get_capture_profile` validate against the canonical schemas.
 MCP result bound. Gaps, refused with `CapabilityUnavailable`: `target_handle`,
 `diagnostic_handle`, the `incident-context` preset, ranked recommendations
 (`goal`), recipe and discovery rows, the explicit `request_capture` shape,
-sharing `outputSelection`/`management`/`reason`, pod selectors and UID pins.
+sharing `outputSelection`/`management`/`reason`, sharing with a
+`profile_composition`, `result_access` without `notAfter` or with
+`read_memory`/`debugger_command`, pod selectors and UID pins. Sixteen
+worst-case recording-save sources exceed 96 KiB and return `PlanTooLarge`.
 A regional profile LIST still stops at 100 versions.
 
 ## Stateless previews (ADR-330 D9, 2026-11-17)
