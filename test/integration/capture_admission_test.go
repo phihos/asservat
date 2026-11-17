@@ -339,9 +339,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
-	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
-	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
-	qualifyOperationAuditOverdue(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextPreviews(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)
 	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)

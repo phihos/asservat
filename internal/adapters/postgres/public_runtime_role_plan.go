@@ -112,9 +112,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}
-	if out, ok := publicRuntimeCaptureCleanupGrants(purpose); ok {
-		return out, true
-	}
 	if out, ok := publicRuntimeConnectorGrants(purpose); ok {
 		return out, true
 	}
@@ -294,9 +291,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent", "policy_executions_spent", "policy_bytes_spent")
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
-	case "capture-journal", "capture-ack":
-		// Unused since ADR-330 D6 removed the capture audit pair; the logins
-		// remain only for the capacity setup role layout.
 	case "capture-preview":
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Passive private blueprints only. SQL33/36 prohibit live deletion,
@@ -505,8 +499,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
-	case "capture-intent-read":
-		// Unused since ADR-330 D6; kept only for the capacity setup role layout.
 	case "download-source":
 		// Exact ciphertext receipts and minimized routing only. In particular,
 		// there is no allocation/session/audit/key/native-operation mutation.
@@ -524,28 +516,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "audit":
 		// REQ-AUT-005: append-only rows; no UPDATE or DELETE.
 		add("audit_event", "INSERT")
-	case "audit-normal-journal", "audit-resolution-journal", "audit-normal-ack", "audit-resolution-ack":
-		// The HTTP lanes use separate physical pools and login limits. These
-		// existing public audit tables do not implement per-login human-lane
-		// filtering; private peer/capture/processing authority remains in its
-		// separately pinned SQL guards. No source/backing or cleanup grant is
-		// inherited merely because OperationLifecycles also exposes those methods.
-		read("fleet_current_trust", "operation_audit")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("operation_audit", "UPDATE", "id")
-		if strings.HasSuffix(purpose, "-journal") {
-			read("operation_audit_pool", "operation_audit_account", "operation_audit_lifecycle")
-			add("operation_audit_pool", "UPDATE", "root_id")
-			add("operation_audit", "INSERT")
-			add("operation_audit", "UPDATE", "intent_started", "outcome", "outcome_started")
-			// Positive writer completion uses pool -> account ->
-			// audit -> lifecycle locks and exact database-incarnation reads.
-			add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
-			add("operation_audit_account", "UPDATE", "root_id")
-			add("operation_audit_lifecycle", "UPDATE", "operation_id", "intent_completion", "outcome_completion")
-		} else {
-			add("operation_audit", "UPDATE", "intent_receipt", "outcome_receipt")
-		}
 	case "browser-session":
 		read("browser_login", "browser_session", "browser_logout")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {

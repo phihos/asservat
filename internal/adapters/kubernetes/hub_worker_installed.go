@@ -40,11 +40,6 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		contracts.CapacityDeploymentFile, contracts.CapacityCredentialManifestFile, contracts.CaptureAccountKeyFile,
 		"sql-capacity.json", "sql-capacity-capture.json",
 	})
-	add(contracts.HubWorkerCleanupProjectionName(installationID), contracts.HubWorkerCleanupProjectionDirectory, []string{
-		contracts.HubWorkerCleanupDeploymentFile, contracts.HubWorkerCleanupManifestFile,
-		"sql-capture-cleanup.json", "sql-capture-verifier.json", "sql-capture-finalizer.json",
-		"cleanup-storage.json", "verify-storage.json",
-	})
 	add(contracts.PermissionRuntimeProjectionName(installationID), contracts.PermissionWorkerProjectionDirectory, []string{
 		contracts.PermissionDeploymentFile, contracts.PermissionCredentialManifestFile,
 		"sql-permission-accept.json", "sql-permission-audit.json",
@@ -73,7 +68,7 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 	// No private role journal, arbitrary Secret, SQL admin or token-mint grant is
 	// added. The fixed runtime reader still pins actual UIDs and current guards.
 	w.Role.Rules = append(w.Role.Rules,
-		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{"asservat-runtime-resources-" + strings.ReplaceAll(installationID, "-", ""), contracts.CapacityRuntimeProjectionName(installationID), contracts.HubWorkerCleanupProjectionName(installationID), contracts.PermissionRuntimeProjectionName(installationID)}, Verbs: []string{"get"}},
+		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{"asservat-runtime-resources-" + strings.ReplaceAll(installationID, "-", ""), contracts.CapacityRuntimeProjectionName(installationID), contracts.PermissionRuntimeProjectionName(installationID)}, Verbs: []string{"get"}},
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{names.Worker}, Verbs: []string{"get"}},
 		rbac.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{names.Worker}, Verbs: []string{"get"}},
 		// The existing native workload guard independently rejects this exact

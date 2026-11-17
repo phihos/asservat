@@ -58,7 +58,6 @@ type HubWorkerConfig struct {
 	KeyService  HubWorkerKeyService  `json:"keyService"`
 	Provider    HubWorkerProvider    `json:"provider"`
 	Capacity    *HubWorkerCapacity   `json:"capacity,omitempty"`
-	Cleanup     *HubWorkerCleanup    `json:"cleanup,omitempty"`
 	Permission  *HubWorkerPermission `json:"permission,omitempty"`
 }
 
@@ -95,19 +94,14 @@ type HubWorkerProvider struct {
 	// (ADR-204); zero without the permission workerConfiguration section.
 	WorkerConfigurationAudit OwnerPublicTransit `json:"-"`
 	// ContextDeletionSigning is the context deletion signing key (ADR-205),
-	// on the audit mount; zero without cleanup or context deletion.
+	// on the audit mount; zero without context deletion.
 	ContextDeletionSigning OwnerPublicTransit `json:"-"`
 }
 
-// HubWorkerProviderRoles names the auth roles. The cleanup roles are empty
-// without the cleanup section.
+// HubWorkerProviderRoles names the auth roles.
 type HubWorkerProviderRoles struct {
-	AuditWrap     string `json:"auditWrap"`
-	AuditUnwrap   string `json:"auditUnwrap"`
-	CleanupWrap   string `json:"cleanupWrap,omitempty"`
-	CleanupOpen   string `json:"cleanupOpen,omitempty"`
-	CleanupVerify string `json:"cleanupVerify,omitempty"`
-	CleanupSign   string `json:"cleanupSign,omitempty"`
+	AuditWrap   string `json:"auditWrap"`
+	AuditUnwrap string `json:"auditUnwrap"`
 }
 
 var ErrHubWorkerConfig = errors.New("invalid hub-worker configuration")

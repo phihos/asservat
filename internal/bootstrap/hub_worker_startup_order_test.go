@@ -44,25 +44,6 @@ func TestHubWorkerAwaitCapacityWaitsForStoreID(t *testing.T) {
 	}
 }
 
-func TestHubWorkerCleanupStartsAfterCapacity(t *testing.T) {
-	w := cleanupTestWorker()
-	w.config.Capacity = &contracts.HubWorkerCapacity{}
-	short, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	// The test worker has no inputs, so an open attempt fails at once with a
-	// configuration error; waiting instead proves no attempt was made.
-	if err := w.runCleanup(short); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("cleanup before capacity: %v, want it to wait", err)
-	}
-	if err := w.publishEvidenceStoreID("30000000-0000-4000-8000-000000000007"); err != nil {
-		t.Fatal(err)
-	}
-	var config *cleanupConfigError
-	if err := w.runCleanup(context.Background()); !errors.As(err, &config) {
-		t.Fatalf("cleanup after capacity: %v, want the open attempt", err)
-	}
-}
-
 func TestPermissionAwaitReadyPollsUntilReady(t *testing.T) {
 	calls := 0
 	ready := func() bool { calls++; return calls >= 3 }

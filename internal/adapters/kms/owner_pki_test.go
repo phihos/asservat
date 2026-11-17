@@ -1,10 +1,6 @@
 package kms
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -15,6 +11,11 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestOwnerIssuerWireTypesPurposeAndNoAutomaticRetry(t *testing.T) {

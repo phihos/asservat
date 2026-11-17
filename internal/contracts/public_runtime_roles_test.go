@@ -44,16 +44,6 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 			t.Fatal("unbounded installed role", purpose)
 		}
 	}
-	for n, purpose := range PublicRuntimeCaptureCleanupPurposes() {
-		id, ok := PublicRuntimeRoleOrdinal(purpose)
-		if !ok || id != 43+n || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
-			t.Fatal("cleanup compartment or permanent identity changed", purpose)
-		}
-		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit != 3 {
-			t.Fatal("cleanup exceeds two retained processes plus verifier", purpose)
-		}
-	}
 	for n, purpose := range []string{"capacity", "capacity-capture"} {
 		id, ok := PublicRuntimeRoleOrdinal(purpose)
 		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)

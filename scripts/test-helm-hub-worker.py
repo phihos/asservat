@@ -23,7 +23,7 @@ spec = importlib.util.spec_from_file_location("helm_checks", Path(__file__).with
 helm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helm)
 
-CONFIG_KEYS = {"format", "namespace", "serviceAccount", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission", "capacity", "cleanup"}
+CONFIG_KEYS = {"format", "namespace", "serviceAccount", "ownerSource", "leaderLease", "postgres", "auditStore", "keyService", "provider", "permission", "capacity"}
 KEEP = ("_", "hub-worker-", "hub-retention-baseline.yaml", "provider-roots.yaml", "download-worker.yaml")
 FULL = os.environ.get("ASSERVAT_HELM_FULL") == "1"
 
@@ -110,7 +110,7 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(c["auditStore"], {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bucket": "asservat-audit"})
         # Mounts, audience and key names derive in Go; none is rendered.
         self.assertEqual(c["keyService"], {"endpoint": "https://asservat-openbao.asservat-system.svc:8200"})
-        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
+        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap"})
         p = c["permission"]
         self.assertEqual(p["statusUsers"], ["system:serviceaccount:asservat-system:asservat-hub-worker"])
         self.assertEqual(p["identity"], {"settings": "asservat-identity-settings", "issuer": "https://login.example.org/realms/asservat"})
@@ -123,7 +123,7 @@ class HubWorkerChart(unittest.TestCase):
         self.assertEqual(wait["command"], ["/asservat", "setup", "--wait-schema", "--config", "/run/asservat/hub-worker/config.json",
                                            "--credential", "/run/asservat/hub-worker/sql-configuration-fleet.json", "--ca", "/run/asservat/hub-worker/roots/postgres.crt"])
         files, tokens, whole = sources(w)
-        # Capacity's own mounts are checked in test_capacity_cleanup_deletion_and_retention.
+        # Capacity's own mounts are checked in test_capacity_deletion_and_retention.
         self.assertLessEqual({"config.json": ("asservat-hub-worker-config", "config.json"), "kube-ca.crt": ("kube-root-ca.crt", "ca.crt"),
                               "audit-storage.json": ("asservat-s3-configuration-audit", "credentials.json"),
                               "roots/postgres.crt": ("asservat-postgres-state", "ca.crt"), "roots/audit-store.crt": ("asservat-objectstore-state", "ca.crt"),
@@ -190,7 +190,7 @@ class HubWorkerChart(unittest.TestCase):
         values["capacity"]["namespaceLimit"] = "25%"
         self.render(values)
 
-    def test_capacity_cleanup_deletion_and_retention(self):
+    def test_capacity_deletion_and_retention(self):
         values = copy.deepcopy(self.bundled)
         values["capacity"] = {"evidenceStorage": "8Gi", "workload": {"share": "256Mi"}}
         values["retention"] = context_public()["retentionBaseline"]
@@ -198,16 +198,13 @@ class HubWorkerChart(unittest.TestCase):
         w = self.worker(docs)
         c = self.config(w)
         self.assertEqual(set(c), CONFIG_KEYS)
-        self.assertEqual(c["cleanup"], {})
         self.assertEqual(c["capacity"]["processingSource"], "asservat-processing-source")
         self.assertEqual((c["capacity"]["paths"], c["capacity"]["sharedQueries"]), ([], True))
         self.assertTrue(c["permission"]["retention"])
         self.assertEqual(c["permission"]["contextDeletion"]["evidenceStore"], dict(c["auditStore"], bucket="asservat-evidence"))
-        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
+        self.assertEqual(set(c["provider"]["roles"]), {"auditWrap", "auditUnwrap"})
         files, tokens, _ = sources(w)
         self.assertEqual(files["capture-account.key"], ("asservat-audit-mac", "accountKey"))
-        self.assertEqual(files["cleanup-storage.json"], ("asservat-s3-operation-cleanup", "credentials.json"))
-        self.assertEqual(files["verify-storage.json"], ("asservat-s3-operation-verify", "credentials.json"))
         self.assertEqual(files["evidence-delete-storage.json"], ("asservat-s3-evidence-delete", "credentials.json"))
         self.assertNotIn("cluster-observation.token", tokens)
         self.assertEqual((c["capacity"]["evidenceStorage"], c["capacity"]["revision"]), (values["capacity"]["evidenceStorage"], 1))

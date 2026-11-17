@@ -2,19 +2,14 @@ package integration
 
 import (
 	"context"
-	"errors"
-	"reflect"
 	"sync"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/domain/identity"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
-	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
@@ -158,63 +153,6 @@ func (s *publicJourneyDiagnostics) Report(t *testing.T) {
 	if calls[journeyRunnerEligibilityIdentity] != 0 {
 		t.Logf("journey original eligibility identity calls-context-canceled=%d calls-context-deadline=%d", identityCanceled, identityDeadline)
 	}
-}
-
-type publicJourneyAuditDiagnostics struct {
-	auditapp.OperationJournal
-	auditapp.OperationAcknowledgements
-	auditapp.ClosedOperationObjects
-	auditapp.OperationCompletions
-	trace *publicJourneyDiagnostics
-}
-
-func (s publicJourneyAuditDiagnostics) ReserveOperation(c context.Context, in auditvalue.OperationIntent) (auditvalue.OperationSnapshot, error) {
-	v, e := s.OperationJournal.ReserveOperation(c, in)
-	s.trace.record(0, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyAuditDiagnostics) ClaimOperationWrite(c context.Context, in auditvalue.OperationIntent, phase string) (bool, error) {
-	v, e := s.OperationJournal.ClaimOperationWrite(c, in, phase)
-	if phase == "intent" {
-		s.trace.record(1, journeyDiagnosticError(e))
-	} else if phase == "outcome" {
-		s.trace.record(6, journeyDiagnosticError(e))
-	}
-	return v, e
-}
-func (s publicJourneyAuditDiagnostics) FreezeOperationOutcome(c context.Context, out auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error) {
-	s.trace.freeze(out.Status)
-	v, e := s.OperationJournal.FreezeOperationOutcome(c, out)
-	s.trace.record(5, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyAuditDiagnostics) AcknowledgeOperation(c context.Context, in auditvalue.OperationIntent, phase string, r auditvalue.Receipt) error {
-	e := s.OperationAcknowledgements.AcknowledgeOperation(c, in, phase, r)
-	if phase == "intent" {
-		s.trace.record(4, journeyDiagnosticError(e))
-	} else if phase == "outcome" {
-		s.trace.record(9, journeyDiagnosticError(e))
-	}
-	return e
-}
-func (s publicJourneyAuditDiagnostics) CreateClosedOperationIntent(c context.Context, in auditvalue.OperationIntent) (auditvalue.OperationWriteCompletion, error) {
-	v, e := s.ClosedOperationObjects.CreateClosedOperationIntent(c, in)
-	s.trace.record(2, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyAuditDiagnostics) CreateClosedOperationOutcome(c context.Context, out auditvalue.OperationOutcome) (auditvalue.OperationWriteCompletion, error) {
-	v, e := s.ClosedOperationObjects.CreateClosedOperationOutcome(c, out)
-	s.trace.record(7, journeyDiagnosticError(e))
-	return v, e
-}
-func (s publicJourneyAuditDiagnostics) RecordOperationCompletion(c context.Context, in auditvalue.OperationIntent, phase string, v auditvalue.OperationWriteCompletion) error {
-	e := s.OperationCompletions.RecordOperationCompletion(c, in, phase, v)
-	if phase == "intent" {
-		s.trace.record(3, journeyDiagnosticError(e))
-	} else if phase == "outcome" {
-		s.trace.record(8, journeyDiagnosticError(e))
-	}
-	return e
 }
 
 // ReadOperationCompletion is deliberately the embedded original method: first
@@ -401,102 +339,11 @@ func (*journeyDiagnosticPrivateError) Error() string { panic("private error rend
 func (*journeyDiagnosticPrivateError) Unwrap() error { panic("private cause inspected") }
 func (*journeyDiagnosticPrivateError) Is(error) bool { panic("private error inspected") }
 
-type journeyDiagnosticJournal struct {
-	auditapp.OperationJournal
-	reserve func(context.Context, auditvalue.OperationIntent) (auditvalue.OperationSnapshot, error)
-	claim   func(context.Context, auditvalue.OperationIntent, string) (bool, error)
-	freeze  func(context.Context, auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error)
-}
-
-func (s journeyDiagnosticJournal) ReserveOperation(c context.Context, v auditvalue.OperationIntent) (auditvalue.OperationSnapshot, error) {
-	return s.reserve(c, v)
-}
-func (s journeyDiagnosticJournal) ClaimOperationWrite(c context.Context, v auditvalue.OperationIntent, p string) (bool, error) {
-	return s.claim(c, v, p)
-}
-func (s journeyDiagnosticJournal) FreezeOperationOutcome(c context.Context, v auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error) {
-	return s.freeze(c, v)
-}
-
 // Run the actual auditor's Begin/Finish dispatch and normalization, not a
 // second diagnostic-only rendition. A private failure is observed once and
 // never becomes the public error, while the explanatory first stage survives.
-func TestPublicJourneyDiagnosticsOriginalAuditDispatch(t *testing.T) {
-	n := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
-	in := auditvalue.OperationIntent{ID: "00000000-0000-4000-8000-000000000001", TraceID: "00000000-0000-4000-8000-000000000001", RootID: "00000000-0000-4000-8000-000000000002", Name: "preview_capture", InputFormat: "context-input/v1", MACVersion: "v1", AccountVersion: "v1", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{1}, InputDigest: artifact.Digest{2}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
-	out := auditvalue.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{3}, MetadataUntil: in.RequestUntil, RecordedAt: n}
-	if !in.Valid() || !out.Valid() {
-		t.Fatal("invalid audit test input")
-	}
-	for _, phase := range []string{"reserve", "claim", "finish"} {
-		t.Run(phase, func(t *testing.T) {
-			c := context.WithValue(context.Background(), struct{}{}, "original-context")
-			private := &journeyDiagnosticPrivateError{}
-			var got []string
-			journal := journeyDiagnosticJournal{}
-			journal.reserve = func(ctx context.Context, v auditvalue.OperationIntent) (auditvalue.OperationSnapshot, error) {
-				if ctx != c || !reflect.DeepEqual(v, in) {
-					t.Fatal("reserve replaced original input")
-				}
-				got = append(got, "reserve")
-				if phase == "reserve" {
-					return auditvalue.OperationSnapshot{}, private
-				}
-				return auditvalue.OperationSnapshot{Intent: v}, nil
-			}
-			journal.claim = func(ctx context.Context, v auditvalue.OperationIntent, p string) (bool, error) {
-				if ctx != c || !reflect.DeepEqual(v, in) || p != "intent" {
-					t.Fatal("claim replaced original input")
-				}
-				got = append(got, "claim")
-				return false, private
-			}
-			journal.freeze = func(ctx context.Context, v auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error) {
-				if ctx != c || !reflect.DeepEqual(v, out) {
-					t.Fatal("freeze replaced original outcome")
-				}
-				got = append(got, "finish")
-				return auditvalue.OperationSnapshot{}, private
-			}
-			trace := &publicJourneyDiagnostics{}
-			probe := publicJourneyAuditDiagnostics{OperationJournal: journal, trace: trace}
-			auditor := auditapp.OperationAuditor{Journal: probe, Acknowledgements: probe, Objects: &objectstoreDiagnosticUnused{}, Now: func() time.Time { return n }}
-			var err error
-			if phase == "finish" {
-				err = auditor.Finish(c, out)
-			} else {
-				err = auditor.Begin(c, in)
-			}
-			// Normalized to the sentinel (a closed step may name where it
-			// stopped); the private cause is never reachable.
-			if !errors.Is(err, auditapp.ErrUnavailable) || errors.Is(err, private) {
-				t.Fatal("audit normalization changed")
-			}
-			expected := []string{phase}
-			stage := 0
-			if phase == "claim" {
-				expected = []string{"reserve", "claim"}
-				stage = 1
-			}
-			if phase == "finish" {
-				stage = 5
-			}
-			if !reflect.DeepEqual(got, expected) || trace.first != stage+1 || trace.refusals[stage] != 1 || trace.reasons[stage] != 9 {
-				t.Fatal("actual dispatch/first refusal changed")
-			}
-			trace.record(17, 4)
-			if trace.first != stage+1 {
-				t.Fatal("later refusal overwrote original")
-			}
-			trace.Report(t) // Rendering must never touch the private error methods.
-		})
-	}
-}
-
 // The actual auditor refuses before these embedded, deliberately unavailable
 // object methods. Calling one would panic and expose an unexpected dispatch.
-type objectstoreDiagnosticUnused struct{ auditapp.OperationObjects }
-
 type journeyDiagnosticStorage struct {
 	call func(context.Context, authorization.Target) (captureapp.ContextStorageObservation, error)
 }

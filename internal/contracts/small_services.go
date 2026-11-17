@@ -109,7 +109,6 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 		return append(PublicRuntimeHubRolePurposes(), OwnerIdentityRolePurposes()...), true
 	case "hub-worker":
 		out := ConfigurationRuntimeRolePurposes()
-		out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 		out = append(out, CapacityRuntimePurposes()...)
 		out = append(out, PublicRuntimePermissionPurposes()...)
 		out = append(out, PublicRuntimeRetentionPurposes()...)
@@ -128,7 +127,7 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 // ObjectStorePrincipals are the bundled SeaweedFS principals with a
 // `<name>-s3-<principal>` Secret; combined mode adds the local region's.
 func ObjectStorePrincipals(mode string) []string {
-	out := []string{"configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete", "operation-cleanup", "operation-verify"}
+	out := []string{"configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete"}
 	if mode == "combined" {
 		out = append(out, "regional-write", "regional-history")
 	}

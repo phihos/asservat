@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -21,7 +20,6 @@ import (
 	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -218,43 +216,14 @@ func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Durat
 	return reply, s.lastID, err
 }
 
-// Consume only the already accepted normal/resolution backing. Unlike legacy
-// audit helpers this does not provision a replacement pool or refill a quota.
 func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents captureapp.ContextAcceptedIntents, workflow *manualSnapshotWorkflow, who identity.Identity, history *dispatchHistoryPersistence) *dispatchWorkflowOperations {
 	t.Helper()
-	profiles := f.readAuditProfiles(t)
-	journalPool := f.fixturePool("operation_audit_runtime", "synthetic-operation-journal")
-	ackPool := f.fixturePool("operation_audit_ack_runtime", "synthetic-operation-ack")
-	gates := map[string]*auditapp.HealthyOperationAuditor{}
 	material := f.installed.mac
 	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(mac.Close)
-	for _, p := range []audit.OperationLifecyclePolicy{profiles.Normal.Policy, profiles.Resolution.Policy} {
-		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ack, err := postgres.NewOperationAcknowledgements(ctx, ackPool, p.RootID, p.Lane, policy.Scenario.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lifecycle, err := postgres.NewOperationLifecycles(ctx, journalPool, p.RootID, p.Lane, policy.Scenario.recovery.installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		closed, err := objectstore.NewClosedOperationAuditObjects(f.store, p.StoreID, f.keys, f.keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gate, err := auditapp.NewHealthyOperationAuditor(p, journal, ack, &objectstore.OperationAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, closed, lifecycle, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gates[p.Lane] = gate
-	}
 	previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID)
 	if err != nil {
 		t.Fatal(err)

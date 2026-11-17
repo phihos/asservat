@@ -26,7 +26,6 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -69,7 +68,6 @@ type queryLedgerFixture struct {
 	workerConfig         *postgres.WorkerConfigurations
 	scenario             captureAdmissionScenario
 	published            artifact.PublishedContext
-	audit                audit.AcceptedCapacityAuditProfiles
 	root                 capacityRoot
 	initialResultGrantID string
 }
@@ -198,7 +196,6 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 		t.Fatal(err)
 	}
 	query.refresh(t)
-	query.audit = f.readAuditProfiles(t)
 	qualify(t, query)
 }
 

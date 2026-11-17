@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"strings"
 	"time"
 )
 
@@ -9,13 +8,6 @@ import (
 // optional projections have no authority until the original resource journal
 // records their exact completed dispositions. Legacy omission remains separate.
 const HubWorkerInstalledLayout = "asservat-hub-worker-installed/v1"
-const HubWorkerCleanupProjectionDirectory = "cleanup"
-const HubWorkerCleanupManifestFile = "cleanup-roles.json"
-const HubWorkerCleanupDeploymentFile = "cleanup-deployment.json"
-
-func HubWorkerCleanupProjectionName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-cleanup"
-}
 
 // Original public provenance for the one installation continuation. The input
 // deliberately cannot name a SQL role root that does not exist yet, supply

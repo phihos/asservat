@@ -121,7 +121,7 @@ func TestInstalledProviderAuditFamiliesOwnCredentialAndJoinedIO(t *testing.T) {
 				}
 				var in contracts.OwnerDeployment
 				in.AuditStore = contracts.OwnerAuditStore{Endpoint: server.URL, Region: "us-east-1", Bucket: "synthetic"}
-				s := &installedOperationAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, storeID: records.window.Window.AuditStoreID, slots: make(chan struct{}, 1)}
+				s := &installedAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, storeID: records.window.Window.AuditStoreID, slots: make(chan struct{}, 1)}
 				layout := publicAuditStore{operation: s} // No shared static/dynamic store exists in this layout.
 				ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 				defer cancel()
@@ -232,7 +232,7 @@ func TestInstalledAuditSlotsRemainOwnedUntilVerificationJoins(t *testing.T) {
 	creds := &operationCredentialFixture{until: time.Now().Add(100 * time.Millisecond)}
 	var in contracts.OwnerDeployment
 	in.AuditStore = contracts.OwnerAuditStore{Endpoint: server.URL, Region: "us-east-1", Bucket: "synthetic"}
-	s := &installedOperationAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, slots: make(chan struct{}, 1)}
+	s := &installedAudit{input: in, providers: creds, http: server.Client(), seal: keys, open: keys, slots: make(chan struct{}, 1)}
 	records := providerAuditRecords(t)
 	go func() {
 		_, err := s.WriteDownloadWorkerIntent(context.Background(), records.worker.Intent)

@@ -123,7 +123,7 @@ type publicAuditStore struct {
 	seal      *kms.Sealer
 	open      *kms.Opener
 	keys      *http.Client
-	operation *installedOperationAudit
+	operation *installedAudit
 }
 
 // publicShared are the owner native composition's retention topology and

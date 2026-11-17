@@ -27,7 +27,6 @@ type InitialRuntimeResourceState struct {
 	OwnerIdentity      *OwnerIdentityProjectionClaim   `json:"ownerIdentity,omitempty"`
 	OwnerLaunch        *OwnerIdentityLaunchClaim       `json:"ownerLaunch,omitempty"`
 	WorkerLayout       string                          `json:"workerLayout,omitempty"`
-	CleanupProjection  *CaptureCleanupProjectionClaim  `json:"cleanupProjection,omitempty"`
 	CapacityProjection *CapacityRuntimeProjectionClaim `json:"capacityProjection,omitempty"`
 	// PermissionProjection is the ADR-189 permission runtime claim.
 	PermissionProjection *PermissionRuntimeProjectionClaim `json:"permissionProjection,omitempty"`

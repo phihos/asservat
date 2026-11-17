@@ -13,7 +13,7 @@ const CapacityRootSetupMaxBytes = 144 << 10
 // This list is a required subset of original, completed role receipts. It
 // neither adds purposes to the creatable inventory nor chooses SQL privileges.
 func CapacitySetupRolePurposes() []string {
-	return []string{"capacity", "capacity-capture", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack", "capture-cleanup", "capture-verifier", "capture-finalizer", "capture-intent-read"}
+	return []string{"capacity", "capacity-capture", "capacity-profile-read", "capture-admit"}
 }
 
 // Generated, protected administrator input. Qualification is the closed C-07

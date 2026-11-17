@@ -17,7 +17,7 @@ const SeaweedConfigKey = "s3.json"
 const SeaweedConfigLimit = 768 << 10 // Below the existing Kubernetes Secret data limit.
 var ErrSeaweedStorage = errors.New("bundled object store configuration unavailable")
 var seaweedBucket = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete", "operation-cleanup", "operation-verify", "regional-write", "regional-history"}
+var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete", "regional-write", "regional-history"}
 
 func SeaweedPrincipalName(k contracts.SeaweedPrincipalKey) (string, error) {
 	if !slices.Contains(seaweedPurposes, k.Purpose) || !authorization.UUID(k.ScopeID) {
@@ -191,8 +191,6 @@ func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) 
 	switch purpose {
 	case "evidence-delete":
 		statements = append(statements, statement("Delete", "Allow", []string{"s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload"}, resources, nil), statement("Read", "Deny", []string{"s3:GetObject", "s3:GetObjectVersion"}, resource+"/*", nil), statement("Write", "Deny", []string{"s3:PutObject"}, resource+"/*", map[string]any{"StringNotEquals": map[string]any{"s3:RequestMethod": "DELETE"}}))
-	case "operation-cleanup":
-		statements = append(statements, statement("Delete", "Allow", []string{"s3:DeleteObjectVersion", "s3:AbortMultipartUpload"}, resources, nil), statement("Certificate", "Allow", []string{"s3:PutObject"}, resource+"/"+prefixes[0]+"*/deletion-certificate", nil))
 	case "regional-history":
 		statements = append(statements, statement("History", "Allow", []string{"s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, resources, nil), statement("Evidence", "Deny", []string{"s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, resource+"/v1/*", nil))
 	default:
@@ -227,12 +225,6 @@ func seaweedScope(g contracts.SeaweedGrant) (prefixes []string, read, write, lis
 	case "evidence-delete":
 		prefixes = []string{"v1/"}
 		list = true
-	case "operation-cleanup", "operation-verify":
-		if !authorization.UUID(g.RootID) {
-			return fail()
-		}
-		prefixes = []string{"operation-audit/v1/" + g.RootID + "/"}
-		read, list = true, true
 	case "regional-write":
 		if !authorization.UUID(g.ClusterID) {
 			return fail()

@@ -10,7 +10,6 @@ import (
 // or PKI effect. Effect calls cannot trigger login or renew their borrowed token.
 type configurationProviderEffects struct {
 	wrap, unwrap *ownerProviderLifetime
-	cleanup      [4]*ownerProviderLifetime
 	seal         *Sealer
 	open         *Opener
 	cancel       context.CancelFunc
@@ -45,20 +44,6 @@ func newConfigurationProviderEffects(ctx context.Context, in ConfigurationProvid
 			return nil, err
 		}
 		*fixed.target = slot
-	}
-	if in.cleanup() {
-		for i, role := range []string{in.Roles.CleanupWrap, in.Roles.CleanupOpen, in.Roles.CleanupVerify, in.Roles.CleanupSign} {
-			control, err := newConfigurationProviderControl(in, role, client, now)
-			if err != nil {
-				return nil, err
-			}
-			slot, err := newOwnerProviderLifetime(root, control, jwt, proof, 1)
-			if err != nil {
-				control.close()
-				return nil, err
-			}
-			out.cleanup[i] = slot
-		}
 	}
 	wrap, err := newOwnerProviderEffectClient(out.wrap, in.AuditMount+"/encrypt/"+in.AuditKey)
 	if err != nil {
@@ -122,16 +107,5 @@ func (s *configurationProviderEffects) joinClosed() {
 }
 
 func (s *configurationProviderEffects) slots() []*ownerProviderLifetime {
-	return append([]*ownerProviderLifetime{s.wrap, s.unwrap}, s.cleanup[:]...)
-}
-func (s *configurationProviderEffects) cleanupSlot(slot *ownerProviderLifetime) bool {
-	if slot == nil {
-		return false
-	}
-	for _, candidate := range s.cleanup {
-		if candidate == slot {
-			return true
-		}
-	}
-	return false
+	return []*ownerProviderLifetime{s.wrap, s.unwrap}
 }

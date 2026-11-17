@@ -46,9 +46,6 @@ func initialRuntimeProviderUIDsDistinct(v contracts.InitialRuntimeResourceState)
 	if p := v.CapacityProjection; p != nil && (selected(p.Setup.RoleRootUID) || p.Receipt != nil && selected(p.Receipt.Secret.UID)) {
 		return false
 	}
-	if p := v.CleanupProjection; p != nil && (selected(p.Setup.RoleRootUID) || p.Receipt != nil && selected(p.Receipt.Secret.UID)) {
-		return false
-	}
 	if p := v.PermissionProjection; p != nil && p.Receipt != nil && selected(p.Receipt.Secret.UID) {
 		return false
 	}

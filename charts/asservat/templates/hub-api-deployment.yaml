@@ -136,7 +136,7 @@ spec:
               - secret:
                   name: {{ $sql | quote }}
                   items:
-                    {{- range list "hub-runtime" "capture-intent-read" "worker-config-read" "capacity-profile-read" "capture-admit" "capture-journal" "capture-ack" }}
+                    {{- range list "hub-runtime" "worker-config-read" "capacity-profile-read" "capture-admit" }}
                     - {key: {{ printf "sql-%s.json" . }}, path: {{ printf "sql-public-%s.json" . }}}
                     {{- end }}
               - secret:

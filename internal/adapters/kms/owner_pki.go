@@ -1,17 +1,18 @@
 package kms
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	app "asservat.local/asservat/internal/application/fleet"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	bao "github.com/openbao/openbao/api/v2"
 	"io"
 	"net/http"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
+	bao "github.com/openbao/openbao/api/v2"
 )
 
 type OwnerCertificateIssuer struct {

@@ -19,7 +19,7 @@ type configurationProviderRefreshOperation struct {
 }
 
 func (s *InstalledConfigurationProviderEffects) beginRefresh(ctx context.Context, slot *ownerProviderLifetime) (*configurationProviderRefreshOperation, time.Time, error) {
-	if s == nil || s.effects == nil || (slot != s.effects.wrap && slot != s.effects.unwrap && !s.effects.cleanupSlot(slot)) {
+	if s == nil || s.effects == nil || (slot != s.effects.wrap && slot != s.effects.unwrap) {
 		return nil, time.Time{}, ErrKeyService
 	}
 	return s.beginConfigurationOperation(ctx)

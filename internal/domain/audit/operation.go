@@ -78,7 +78,6 @@ type OperationIntent struct {
 	Actor                                                              identity.Principal `json:",omitzero"`
 	PrincipalDigest, InputDigest                                       artifact.Digest
 	CreatedAt, RequestUntil, WriteUntil, RetainUntil                   time.Time
-	Lifecycle                                                          *OperationLifecycleBinding `json:",omitempty"`
 }
 
 func (r OperationIntent) Valid() bool {
@@ -87,7 +86,7 @@ func (r OperationIntent) Valid() bool {
 			return false
 		}
 	}
-	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
+	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
 		r.Actor.Valid() && humanOperationInputValid(r.Name, r.InputFormat) && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
 		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, OperationRequestWindow(r.Name)) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
@@ -113,7 +112,7 @@ func (r OperationOutcome) Valid() bool {
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false
 	}
-	if r.Effect != "none" && !r.Intent.processingOperation() && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
+	if r.Effect != "none" && r.Intent.Name != "restrict_processing" && r.Intent.Name != "release_processing" && r.Intent.Name != "request_early_erasure" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {
@@ -132,22 +131,6 @@ func (r OperationOutcome) Valid() bool {
 		}
 	}
 	return true
-}
-func OperationAuditKey(root, id, phase string) string {
-	return "operation-audit/v1/" + root + "/" + id + "/" + phase
-}
-func (r Receipt) ValidOperation(root, id, phase string) bool {
-	return authorization.UUID(root) && authorization.UUID(id) && (phase == "intent" || phase == "outcome") && r.Key == OperationAuditKey(root, id, phase) &&
-		(r.Version == "" || identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= OperationCipherLimit && r.SHA256 != (artifact.Digest{})
-}
-
-// Snapshot is private audit-journal state. None of its fields grants access or
-// permits redispatch of the business operation.
-type OperationSnapshot struct {
-	Intent                        OperationIntent
-	IntentStarted, OutcomeStarted bool
-	IntentReceipt, OutcomeReceipt *Receipt
-	Outcome                       *OperationOutcome
 }
 
 // Closed internal classification, separate from public tool discovery. Keeping

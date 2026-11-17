@@ -31,8 +31,6 @@ type ConfigurationProviderInput struct {
 	TokenFile, AuditCredentialFile string
 }
 
-func (in ConfigurationProviderInput) cleanup() bool { return in.Roles.CleanupWrap != "" }
-
 // InstalledConfigurationProviderEffects owns the worker's fixed finite
 // provider credentials. Every login and renewal is bounded by its caller
 // deadline; the audit object-store credential is the mounted Secret file. Files and the SQL pool remain owned by the enclosing worker
@@ -53,8 +51,7 @@ type InstalledConfigurationProviderEffects struct {
 
 func NewInstalledConfigurationProviderEffects(ctx context.Context, input ConfigurationProviderInput, files *os.Root, admission *fleetapp.WorkerRuntimeAdmission) (*InstalledConfigurationProviderEffects, error) {
 	if ctx == nil || ctx.Err() != nil || files == nil || admission == nil || !keyName.MatchString(input.AuditMount) || !keyName.MatchString(input.AuditKey) ||
-		input.TokenFile == "" || input.AuditCredentialFile == "" || input.Roles.AuditWrap == "" || input.Roles.AuditUnwrap == "" ||
-		input.cleanup() && (input.Roles.CleanupOpen == "" || input.Roles.CleanupVerify == "" || input.Roles.CleanupSign == "" || input.ContextDeletionSigning == (contracts.OwnerPublicTransit{})) {
+		input.TokenFile == "" || input.AuditCredentialFile == "" || input.Roles.AuditWrap == "" || input.Roles.AuditUnwrap == "" {
 		return nil, ErrKeyService
 	}
 	input.Roots = slices.Clone(input.Roots)
