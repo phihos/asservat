@@ -59,7 +59,7 @@ func TestAuditedBrowserHTTP2MetadataBodyLifetime(t *testing.T) {
 			reports := make(chan string, 4)
 			var protocol int
 			done := make(chan struct{})
-			h, server, _, normal, _, _ := auditedBrowserTransportFixture(t, true, func(next http.Handler) http.Handler {
+			h, server, _, rows, _ := auditedBrowserTransportFixture(t, true, func(next http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					defer close(done)
 					protocol = r.ProtoMajor
@@ -75,9 +75,9 @@ func TestAuditedBrowserHTTP2MetadataBodyLifetime(t *testing.T) {
 			response.Body.Close()
 			<-done
 			original := <-expected
-			begin, finish := normal.count()
-			if protocol != 2 || response.StatusCode != 200 || begin != 1 || finish != 1 || !json.Valid(original) {
-				t.Fatal("not actual audited HTTP2 metadata", protocol, response.StatusCode, begin, finish)
+			n := rows.count()
+			if protocol != 2 || response.StatusCode != 200 || n != 1 || !json.Valid(original) {
+				t.Fatal("not actual audited HTTP2 metadata", protocol, response.StatusCode, n)
 			}
 			if !deadlineFault {
 				if readErr != nil || !bytes.Equal(body, original) || !json.Valid(body) {

@@ -10,7 +10,6 @@ import (
 	"slices"
 	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -429,10 +428,10 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 			continue
 		}
 		childCall, cancel := context.WithDeadline(call, end)
-		r, err := s.Intents.AcknowledgedCaptureIntent(childCall, child.CaptureID)
+		r, err := s.Intents.AcceptedCaptureIntent(childCall, child.CaptureID)
 		cancel()
 		if err != nil {
-			s.reportGroupFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
+			s.reportGroupFailure("request/intent")
 			failures = append(failures, value.ErrUnavailable)
 			continue
 		}

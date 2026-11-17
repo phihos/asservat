@@ -98,8 +98,8 @@ func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if r.owner == nil || f.reads != 1 || len(gate.outcomes) != 3 || gate.outcomes[2].Effect != "accepted" {
-		t.Fatal("missing audited transient owner", f.reads, gate.outcomes)
+	if r.owner == nil || f.reads != 1 || len(gate.events) != 3 || gate.events[2].Effect != "accepted" {
+		t.Fatal("missing audited transient owner", f.reads, gate.events)
 	}
 	if e = r.CheckDisclosure(t.Context()); e != nil {
 		t.Fatal(e)
@@ -121,7 +121,7 @@ func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 		t.Fatal("live operation acquired evidence")
 	}
 }
-func TestLiveAuditInputBindsFilterAndNoPreAuditSourceReads(t *testing.T) {
+func TestLiveAuditInputBindsFilterAndFailedAuditDiscardsResult(t *testing.T) {
 	a, actor, gate, f := liveBoundaryFixture(t)
 	first := []byte(`{"source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":0}]},"idempotency_key":"k"}`)
 	second := []byte(`{"source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":1}]},"idempotency_key":"k"}`)
@@ -133,9 +133,9 @@ func TestLiveAuditInputBindsFilterAndNoPreAuditSourceReads(t *testing.T) {
 	if e != nil || string(x) == string(y) {
 		t.Fatal("filter omitted from keyed audit input", e)
 	}
-	gate.beginFail = true
-	if _, e = a.Call(t.Context(), actor, "list_live_sources", []byte(`{`+wireTarget+`}`)); e == nil || f.reads != 0 || len(f.controls) != 0 {
-		t.Fatal("effect before audit")
+	gate.fail = true
+	if r, e := a.Call(t.Context(), actor, "list_live_sources", []byte(`{`+wireTarget+`}`)); e == nil || len(r.Body) != 0 || f.reads != 0 || len(f.controls) != 0 {
+		t.Fatal("unaudited result escaped or source read")
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -49,11 +48,6 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 			if err != nil {
 				t.Fatal(err)
 			}
-			open := func(user, password string) *pgxpool.Pool {
-				p := poolFor(user, password)
-				t.Cleanup(p.Close)
-				return p
-			}
 			sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 			sharedPool := sharedPools.ordinary
 			executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, s.recovery.installation)
@@ -61,13 +55,6 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				t.Fatal(err)
 			}
 			prepare, read := executionSQL, executionSQL
-			intents, err := postgres.NewCaptureIntentAudits(ctx, open("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-				t.Fatal(err)
-			}
 			// Fresh observations may change timestamps, never this process or the
 			// original admitted capture, attempt, retention anchor and plan scope.
 			process := value.APIProcessBinding{NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}

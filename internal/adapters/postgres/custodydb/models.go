@@ -123,7 +123,63 @@ type ArtifactDownload struct {
 	EmittedBytes      int64
 	Generation        int64
 	ActiveBatch       pgtype.UUID
-	StopProtocol      pgtype.Text
+}
+
+type ArtifactDownloadStop struct {
+	DownloadID pgtype.UUID
+	RootID     pgtype.UUID
+	RequestID  pgtype.UUID
+	KeyDigest  []byte
+	State      string
+	StoppedAt  pgtype.Timestamptz
+}
+
+type AuditEvent struct {
+	EventID       pgtype.UUID
+	RecordedAt    pgtype.Timestamptz
+	OperationID   pgtype.UUID
+	Kind          string
+	Operation     string
+	Issuer        string
+	Subject       string
+	ClientID      string
+	IdentityType  string
+	InputDigest   []byte
+	Status        string
+	Reason        string
+	Effect        string
+	CaseIds       []string
+	ArtifactIds   []string
+	CaptureIds    []string
+	ShareIds      []string
+	GrantIds      []string
+	ReservationID pgtype.UUID
+	OutputBytes   int64
+	OutputDigest  []byte
+}
+
+type AuditEventDefault struct {
+	EventID       pgtype.UUID
+	RecordedAt    pgtype.Timestamptz
+	OperationID   pgtype.UUID
+	Kind          string
+	Operation     string
+	Issuer        string
+	Subject       string
+	ClientID      string
+	IdentityType  string
+	InputDigest   []byte
+	Status        string
+	Reason        string
+	Effect        string
+	CaseIds       []string
+	ArtifactIds   []string
+	CaptureIds    []string
+	ShareIds      []string
+	GrantIds      []string
+	ReservationID pgtype.UUID
+	OutputBytes   int64
+	OutputDigest  []byte
 }
 
 type AuthorityAudit struct {
@@ -203,48 +259,6 @@ type CapacitySetting struct {
 	Revision               int64
 }
 
-type CaptureAuditAllocation struct {
-	RootID            pgtype.UUID
-	AllocationID      pgtype.UUID
-	AccountVersion    string
-	AccountDigest     []byte
-	Revision          int64
-	Paused            bool
-	ValidUntil        pgtype.Timestamptz
-	GuaranteedRecords int64
-	Policy            []byte
-}
-
-type CaptureAuditBinding struct {
-	CaptureID          pgtype.UUID
-	RootID             pgtype.UUID
-	AllocationID       pgtype.UUID
-	OperationID        pgtype.UUID
-	CaptureDigest      []byte
-	IntentReads        int16
-	OutcomeReads       int16
-	IntentFirstUntil   pgtype.Timestamptz
-	IntentSecondUntil  pgtype.Timestamptz
-	OutcomeFirstUntil  pgtype.Timestamptz
-	OutcomeSecondUntil pgtype.Timestamptz
-}
-
-type CaptureAuditRoot struct {
-	RootID          pgtype.UUID
-	InstallationID  pgtype.UUID
-	SourceRole      pgtype.Uint32
-	AdmissionRole   pgtype.Uint32
-	JournalRole     pgtype.Uint32
-	AcknowledgeRole pgtype.Uint32
-	CleanupRole     pgtype.Uint32
-	VerifierRole    pgtype.Uint32
-	FinalizerRole   pgtype.Uint32
-	ReaderRole      pgtype.Uint32
-	Revision        int64
-	Paused          bool
-	ValidUntil      pgtype.Timestamptz
-}
-
 type CaptureHistoryParameter struct {
 	RootID               pgtype.UUID
 	CaptureID            pgtype.UUID
@@ -279,137 +293,6 @@ type CaptureHistoryQuotum struct {
 	Used        int32
 }
 
-type CaptureOperationAccount struct {
-	RootID          pgtype.UUID
-	Lane            string
-	PrincipalDigest []byte
-	Charged         int64
-}
-
-type CaptureOperationAudit struct {
-	ID              pgtype.UUID
-	RootID          pgtype.UUID
-	Lane            string
-	IssuerEpoch     pgtype.UUID
-	PrincipalDigest []byte
-	Intent          []byte
-	RequestUntil    pgtype.Timestamptz
-	WriteUntil      pgtype.Timestamptz
-	RetainUntil     pgtype.Timestamptz
-	IntentStarted   bool
-	IntentReceipt   []byte
-	Outcome         []byte
-	OutcomeStarted  bool
-	OutcomeReceipt  []byte
-}
-
-type CaptureOperationHistory struct {
-	RootID          pgtype.UUID
-	Lane            string
-	PrincipalDigest []byte
-	ReleaseAt       pgtype.Timestamptz
-	DeleteBy        pgtype.Timestamptz
-	HardDeleteBy    pgtype.Timestamptz
-	EligibleAt      pgtype.Timestamptz
-	InstallationID  pgtype.UUID
-	IssuerEpoch     pgtype.UUID
-	PostmasterAt    pgtype.Timestamptz
-	DatabaseOid     pgtype.Uint32
-	HorizonSeconds  int64
-	HistoryPolicy   []byte
-	Records         int64
-	Overdue         bool
-	DrainXid        pgtype.Uint64
-}
-
-type CaptureOperationIntent struct {
-	ID                        pgtype.UUID
-	RootID                    pgtype.UUID
-	RequestKey                []byte
-	SubmissionDigest          []byte
-	ScopeDigest               []byte
-	ScopeJson                 []byte
-	ExpectationJson           []byte
-	PodPinJson                []byte
-	AttemptID                 pgtype.UUID
-	PermissionEpoch           pgtype.UUID
-	PermissionSequence        int64
-	IdentityPolicyUid         string
-	IdentityPolicyGeneration  int64
-	IdentityPolicyDigest      []byte
-	CreatedAt                 pgtype.Timestamptz
-	Deadline                  pgtype.Timestamptz
-	State                     string
-	IntentAcknowledgedAt      pgtype.Timestamptz
-	IntentDigest              []byte
-	IntentObjectKey           pgtype.Text
-	IntentObjectVersion       pgtype.Text
-	IntentObjectEtag          pgtype.Text
-	IntentObjectBytes         pgtype.Int8
-	IntentObjectSha256        []byte
-	ProgressRevision          int64
-	DeadlineObservedAt        pgtype.Timestamptz
-	PreviewID                 pgtype.UUID
-	IntentOperationID         pgtype.UUID
-	ShareInstruction          []byte
-	HistoryClusterID          pgtype.UUID
-	HistoryNamespaceUid       pgtype.Text
-	HistoryWorkloadUid        pgtype.Text
-	HistoryOrigin             pgtype.Text
-	HistoryParametersRequired bool
-	RepeatedFromCaptureID     pgtype.UUID
-	RepeatedFromExpiresAt     pgtype.Timestamptz
-	ReasonRef                 []byte
-}
-
-type CaptureOperationLifecycle struct {
-	OperationID               pgtype.UUID
-	RootID                    pgtype.UUID
-	Lane                      string
-	PrincipalDigest           []byte
-	InstallationID            pgtype.UUID
-	IssuerEpoch               pgtype.UUID
-	PostmasterAt              pgtype.Timestamptz
-	DatabaseOid               pgtype.Uint32
-	Binding                   []byte
-	OriginalPurgeAt           pgtype.Timestamptz
-	CertificatePurgeAt        pgtype.Timestamptz
-	LiveRetireBy              pgtype.Timestamptz
-	IntentCompletion          []byte
-	OutcomeCompletion         []byte
-	LeaseFence                int64
-	Lease                     []byte
-	Retirement                []byte
-	CertificateStarted        bool
-	CertificateCompletion     []byte
-	CertificateReceipt        []byte
-	CertificateAcknowledgedAt pgtype.Timestamptz
-	TerminalPurge             []byte
-	TerminalAcknowledgedAt    pgtype.Timestamptz
-	FinalizationXid           pgtype.Uint64
-	OverdueSelectedAt         pgtype.Timestamptz
-	OverduePurge              []byte
-	CertificateVerifyAttempts int64
-	ShareEffectTarget         pgtype.UUID
-	ShareEffectXid            pgtype.Uint64
-}
-
-type CaptureOperationPool struct {
-	RootID              pgtype.UUID
-	Lane                string
-	AccountVersion      string
-	Revision            int64
-	Paused              bool
-	ValidUntil          pgtype.Timestamptz
-	AccountLimit        int64
-	RecordsPerAccount   int64
-	Accounts            int64
-	RetainedSeconds     int64
-	HistoryProfile      []byte
-	HistoryBackingUntil pgtype.Timestamptz
-	ProofWindowMissed   int64
-}
-
 type ContextCapture struct {
 	ID                        pgtype.UUID
 	RootID                    pgtype.UUID
@@ -427,14 +310,6 @@ type ContextCapture struct {
 	IdentityPolicyDigest      []byte
 	CreatedAt                 pgtype.Timestamptz
 	Deadline                  pgtype.Timestamptz
-	State                     string
-	IntentAcknowledgedAt      pgtype.Timestamptz
-	IntentDigest              []byte
-	IntentObjectKey           pgtype.Text
-	IntentObjectVersion       pgtype.Text
-	IntentObjectEtag          pgtype.Text
-	IntentObjectBytes         pgtype.Int8
-	IntentObjectSha256        []byte
 	ProgressRevision          int64
 	DeadlineObservedAt        pgtype.Timestamptz
 	PreviewID                 pgtype.UUID
@@ -458,7 +333,7 @@ type ContextCapture struct {
 	SnapshotCancelProofDigest []byte
 	GroupID                   pgtype.UUID
 	GroupOrdinal              pgtype.Int2
-	ReasonRef                 []byte
+	Reason                    pgtype.Text
 }
 
 type ContextCaseLocator struct {
@@ -551,7 +426,6 @@ type ContextPreview struct {
 	ClosedRequestKey       []byte
 	ClosedSubmissionDigest []byte
 	PreviewKind            string
-	ReasonEnvelope         []byte
 }
 
 type ContextPreviewFence struct {
@@ -962,97 +836,6 @@ type DownloadResponse struct {
 	Closed           bool
 }
 
-type DownloadStop struct {
-	DownloadID     pgtype.UUID
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	InstallationID pgtype.UUID
-	IssuerEpoch    pgtype.UUID
-	StoreID        pgtype.UUID
-	ReservedAt     pgtype.Timestamptz
-	RetainUntil    pgtype.Timestamptz
-	KeyDigest      []byte
-	RequestID      pgtype.UUID
-	RequestedAt    pgtype.Timestamptz
-	WriteUntil     pgtype.Timestamptz
-	Decision       []byte
-	WriteStarted   bool
-	LookupAttempts int64
-	Receipt        []byte
-}
-
-type DownloadStopBacking struct {
-	AllocationID pgtype.UUID
-	RootID       pgtype.UUID
-	Slots        int64
-	Charged      int64
-}
-
-type DownloadStopHistory struct {
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	InstallationID pgtype.UUID
-	IssuerEpoch    pgtype.UUID
-	PolicyDigest   []byte
-	ReleaseAt      pgtype.Timestamptz
-	DeleteBy       pgtype.Timestamptz
-	HardDeleteBy   pgtype.Timestamptz
-	EligibleAt     pgtype.Timestamptz
-	HorizonSeconds int64
-	Records        int64
-	Overdue        bool
-	DrainXid       pgtype.Uint64
-}
-
-type DownloadStopLifecycle struct {
-	DownloadID                pgtype.UUID
-	RootID                    pgtype.UUID
-	AllocationID              pgtype.UUID
-	InstallationID            pgtype.UUID
-	IssuerEpoch               pgtype.UUID
-	Binding                   []byte
-	OriginalPurgeAt           pgtype.Timestamptz
-	CertificatePurgeAt        pgtype.Timestamptz
-	LiveRetireBy              pgtype.Timestamptz
-	OriginalCompletion        []byte
-	ClosedAt                  pgtype.Timestamptz
-	Mode                      pgtype.Text
-	OverdueSelectedAt         pgtype.Timestamptz
-	Lease                     []byte
-	LeaseFence                int64
-	Retirement                []byte
-	CertificateStarted        bool
-	CertificateVerifyAttempts int64
-	CertificateCompletion     []byte
-	CertificateReceipt        []byte
-	CertificateAcknowledgedAt pgtype.Timestamptz
-	TerminalPurge             []byte
-	TerminalAcknowledgedAt    pgtype.Timestamptz
-	FinalizationXid           pgtype.Uint64
-}
-
-type DownloadStopPool struct {
-	RootID               pgtype.UUID
-	InstallationID       pgtype.UUID
-	StoreID              pgtype.UUID
-	PolicyID             pgtype.UUID
-	BackupProfileID      pgtype.UUID
-	PolicyDigest         []byte
-	BackupProfileDigest  []byte
-	Slots                int64
-	CipherBytes          int64
-	KeyAttempts          int64
-	BackupBytes          int64
-	WalBytes             int64
-	RetainedSeconds      int64
-	BackupHorizonSeconds int64
-	ValidUntil           pgtype.Timestamptz
-	Revision             int64
-	Allocated            int64
-	LifecyclePolicy      []byte
-	HistoryBackingUntil  pgtype.Timestamptz
-}
-
 type DownloadWindow struct {
 	ID                pgtype.UUID
 	ResponseID        pgtype.UUID
@@ -1135,34 +918,31 @@ type DownloadWorkerOwner struct {
 }
 
 type EvidenceShare struct {
-	ID                  pgtype.UUID
-	RootID              pgtype.UUID
-	ArtifactID          pgtype.UUID
-	CaseID              pgtype.UUID
-	ClusterID           pgtype.UUID
-	NamespaceUid        string
-	WorkloadUid         string
-	PodUid              string
-	Version             []byte
-	CreatorIssuer       string
-	CreatorSubject      string
-	CreatorClient       string
-	Management          []byte
-	Recipients          []byte
-	RecipientKeys       []string
-	IdempotencyKey      string
-	RequestDigest       []byte
-	CreatedAt           pgtype.Timestamptz
-	ExpiresAt           pgtype.Timestamptz
-	RevokedAt           pgtype.Timestamptz
-	RevokeKey           pgtype.Text
-	Revision            int64
-	TransferKey         pgtype.Text
-	TransferDigest      []byte
-	PolicyAcceptanceID  pgtype.UUID
-	CreatingOperationID pgtype.UUID
-	RetireBy            pgtype.Timestamptz
-	LastOperationID     pgtype.UUID
+	ID                 pgtype.UUID
+	RootID             pgtype.UUID
+	ArtifactID         pgtype.UUID
+	CaseID             pgtype.UUID
+	ClusterID          pgtype.UUID
+	NamespaceUid       string
+	WorkloadUid        string
+	PodUid             string
+	Version            []byte
+	CreatorIssuer      string
+	CreatorSubject     string
+	CreatorClient      string
+	Management         []byte
+	Recipients         []byte
+	RecipientKeys      []string
+	IdempotencyKey     string
+	RequestDigest      []byte
+	CreatedAt          pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+	RevokedAt          pgtype.Timestamptz
+	RevokeKey          pgtype.Text
+	Revision           int64
+	TransferKey        pgtype.Text
+	TransferDigest     []byte
+	PolicyAcceptanceID pgtype.UUID
 }
 
 type FleetCurrentTrust struct {
@@ -1292,97 +1072,6 @@ type LocalKeyVersion struct {
 	KeyID          string
 	Version        int32
 	Fingerprint    []byte
-}
-
-type OperationAudit struct {
-	ID              pgtype.UUID
-	RootID          pgtype.UUID
-	Lane            string
-	IssuerEpoch     pgtype.UUID
-	PrincipalDigest []byte
-	Intent          []byte
-	RequestUntil    pgtype.Timestamptz
-	WriteUntil      pgtype.Timestamptz
-	RetainUntil     pgtype.Timestamptz
-	IntentStarted   bool
-	IntentReceipt   []byte
-	Outcome         []byte
-	OutcomeStarted  bool
-	OutcomeReceipt  []byte
-}
-
-type OperationAuditAccount struct {
-	RootID          pgtype.UUID
-	Lane            string
-	PrincipalDigest []byte
-	Charged         int64
-}
-
-type OperationAuditHistory struct {
-	RootID          pgtype.UUID
-	Lane            string
-	PrincipalDigest []byte
-	ReleaseAt       pgtype.Timestamptz
-	DeleteBy        pgtype.Timestamptz
-	HardDeleteBy    pgtype.Timestamptz
-	EligibleAt      pgtype.Timestamptz
-	InstallationID  pgtype.UUID
-	IssuerEpoch     pgtype.UUID
-	PostmasterAt    pgtype.Timestamptz
-	DatabaseOid     pgtype.Uint32
-	HorizonSeconds  int64
-	HistoryPolicy   []byte
-	Records         int64
-	Overdue         bool
-	DrainXid        pgtype.Uint64
-}
-
-type OperationAuditLifecycle struct {
-	OperationID               pgtype.UUID
-	RootID                    pgtype.UUID
-	Lane                      string
-	PrincipalDigest           []byte
-	InstallationID            pgtype.UUID
-	IssuerEpoch               pgtype.UUID
-	PostmasterAt              pgtype.Timestamptz
-	DatabaseOid               pgtype.Uint32
-	Binding                   []byte
-	OriginalPurgeAt           pgtype.Timestamptz
-	CertificatePurgeAt        pgtype.Timestamptz
-	LiveRetireBy              pgtype.Timestamptz
-	IntentCompletion          []byte
-	OutcomeCompletion         []byte
-	LeaseFence                int64
-	Lease                     []byte
-	Retirement                []byte
-	CertificateStarted        bool
-	CertificateCompletion     []byte
-	CertificateReceipt        []byte
-	CertificateAcknowledgedAt pgtype.Timestamptz
-	TerminalPurge             []byte
-	TerminalAcknowledgedAt    pgtype.Timestamptz
-	FinalizationXid           pgtype.Uint64
-	OverdueSelectedAt         pgtype.Timestamptz
-	OverduePurge              []byte
-	CertificateVerifyAttempts int64
-	ShareEffectTarget         pgtype.UUID
-	ShareEffectXid            pgtype.Uint64
-}
-
-type OperationAuditPool struct {
-	RootID              pgtype.UUID
-	Lane                string
-	AccountVersion      string
-	Revision            int64
-	Paused              bool
-	ValidUntil          pgtype.Timestamptz
-	AccountLimit        int64
-	RecordsPerAccount   int64
-	Accounts            int64
-	RetainedSeconds     int64
-	HistoryProfile      []byte
-	HistoryBackingUntil pgtype.Timestamptz
-	ProofWindowMissed   int64
 }
 
 type PermissionAcceptance struct {
@@ -1690,20 +1379,15 @@ type ProcessingDecision struct {
 	RootID           pgtype.UUID
 	RuleID           pgtype.UUID
 	ExpectedRevision int64
-	ReleaseAccount   []byte
 	ActorDigest      []byte
 	RequestDigest    []byte
 	Scope            []byte
 	Action           string
-	IntentSeed       []byte
-	DecisionDigest   []byte
 	CreatedAt        pgtype.Timestamptz
 	RequestUntil     pgtype.Timestamptz
 	ValidUntil       pgtype.Timestamptz
 	RetireBy         pgtype.Timestamptz
-	OutcomeJson      []byte
 	AppliedAt        pgtype.Timestamptz
-	AuditDigest      []byte
 	ResultRevision   pgtype.Int8
 	ResultSequence   pgtype.Int8
 	ErasureDecision  []byte
@@ -1717,7 +1401,6 @@ type ProcessingRoot struct {
 	SourceUid          pgtype.UUID
 	ProtectionDigest   []byte
 	Backing            []byte
-	ReleasePolicy      []byte
 	BackingRevision    int64
 	ValidUntil         pgtype.Timestamptz
 	RetireBy           pgtype.Timestamptz
@@ -1735,7 +1418,6 @@ type ProcessingRoot struct {
 type ProcessingRule struct {
 	RootID          pgtype.UUID
 	ID              pgtype.UUID
-	ReleaseAccount  []byte
 	Scope           []byte
 	Revision        int64
 	Decisions       int64

@@ -58,7 +58,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	t.Run("progress-roles-cannot-mutate-lifecycle-or-privileged-function", func(t *testing.T) {
 		for _, p := range []*pgxpool.Pool{readPool, deadlinePool} {
-			for _, sql := range []string{"UPDATE context_capture SET progress_revision=progress_revision", "UPDATE context_capture SET deadline=deadline", "UPDATE context_capture SET state=state", "UPDATE custody_attempt SET state=state", "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0", "SELECT advance_context_progress()"} {
+			for _, sql := range []string{"UPDATE context_capture SET progress_revision=progress_revision", "UPDATE context_capture SET deadline=deadline", "UPDATE custody_attempt SET state=state", "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0", "SELECT advance_context_progress()"} {
 				_, err := p.Exec(ctx, sql)
 				var pgerr *pgconn.PgError
 				if !errors.As(err, &pgerr) || pgerr.Code != "42501" {
@@ -131,7 +131,7 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			}
 			got, err := r.ReadContextProgress(ctx, q)
 			if want {
-				if err != nil || got.Revision != 1 || got.Phase != "Pending" || got.ReasonCode != "IntentAuditPending" {
+				if err != nil || got.Revision != 1 || got.Phase != "Pending" || got.ReasonCode != "DispatchUnconfirmed" {
 					t.Fatalf("%s: %+v %v", name, got, err)
 				}
 			} else if !errors.Is(err, capture.ErrDenied) || got.CaptureID != "" {

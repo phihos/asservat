@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -231,41 +230,14 @@ func (r *projectionReadFake) WithProjectionClosed(ctx context.Context, b value.C
 	return next(ctx)
 }
 
+// projectionInvocationFake is one public call: its request ID and typed input.
 type projectionInvocationFake struct {
-	call           value.ContextQueryCall
-	input          ContextQueryInput
-	outcome        *ContextProjectionDelivery
-	intentErr      error
-	invocationHook func(context.Context)
+	id    string
+	input ContextQueryInput
 }
 
-func (i *projectionInvocationFake) Invocation(ctx context.Context) (value.ContextQueryCall, error) {
-	if i.invocationHook != nil {
-		i.invocationHook(ctx)
-	}
-	return i.call, nil
-}
-func (i *projectionInvocationFake) CheckInput(_ context.Context, in ContextQueryInput) error {
-	if !reflect.DeepEqual(in, i.input) {
-		return value.ErrUnavailable
-	}
-	return nil
-}
-func (i *projectionInvocationFake) CheckIntent(_ context.Context, call value.ContextQueryCall) error {
-	if call != i.call {
-		return value.ErrUnavailable
-	}
-	return i.intentErr
-}
-func (i *projectionInvocationFake) CheckOutcome(_ context.Context, d *ContextProjectionDelivery) error {
-	if i.outcome != d {
-		return value.ErrUnavailable
-	}
-	return nil
-}
 func (f *projectionFixture) invocation(tool string) *projectionInvocationFake {
-	i := &projectionInvocationFake{call: value.ContextQueryCall{ID: f.next(), RootID: projectionID, Tool: tool, InputFormat: "context-query-input/v1", MACVersion: "v1",
-		InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: f.i.Principal, StartedAt: f.now, Until: f.now.Add(4 * time.Second), WriteUntil: f.now.Add(30 * time.Second)}}
+	i := &projectionInvocationFake{id: f.next()}
 	if tool == "get_file_excerpt" {
 		i.input.Selection = value.ContextExcerptSelection{CaseID: f.a.Scope.CaseID, ArtifactID: f.a.Scope.ArtifactID, Selection: f.a.Scope.Selection}
 	} else {
@@ -276,20 +248,18 @@ func (f *projectionFixture) invocation(tool string) *projectionInvocationFake {
 func (f *projectionFixture) begin(t *testing.T) (*ContextProjectionDelivery, *projectionInvocationFake) {
 	t.Helper()
 	i := f.invocation("get_file_excerpt")
-	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	d, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return d, i
 }
 
-func TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent(t *testing.T) {
+func TestQueryAdmissionRequiresQualifiedBacking(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*projectionFixture, *projectionInvocationFake)
 	}{
-		{"unaudited", func(f *projectionFixture, i *projectionInvocationFake) { i.intentErr = value.ErrUnavailable }},
-		{"wrong-input", func(f *projectionFixture, i *projectionInvocationFake) { i.input.Selection.Selection.LineStart = 2 }},
 		{"missing-qualified-dimension", func(f *projectionFixture, i *projectionInvocationFake) { f.p.Profile.Cost.BackupBytes = 0 }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -297,7 +267,7 @@ func TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent(t *testing.T) {
 			i := f.invocation("get_file_excerpt")
 			selection := value.ContextExcerptSelection{CaseID: f.a.Scope.CaseID, ArtifactID: f.a.Scope.ArtifactID, Selection: f.a.Scope.Selection}
 			tc.change(f, i)
-			if _, err := f.s.BeginExcerpt(context.Background(), f, i, selection); err == nil {
+			if _, err := f.s.BeginExcerpt(context.Background(), f, i.id, selection); err == nil {
 				t.Fatal("invalid prerequisite accepted")
 			}
 			if f.admissions+f.starts+f.reads != 0 {
@@ -316,7 +286,7 @@ func TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent(t *testing.T) {
 			f := newProjectionFixture(t)
 			tc.change(f)
 			i := f.invocation("get_file_excerpt")
-			if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
+			if _, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection); err == nil {
 				t.Fatal("unknown/replayed admission dispatched")
 			}
 			if f.starts+f.reads != 0 {
@@ -326,14 +296,11 @@ func TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent(t *testing.T) {
 	}
 }
 
-func TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose(t *testing.T) {
+func TestQueryDeliveryRemainsActiveThroughJoinedClose(t *testing.T) {
 	f := newProjectionFixture(t)
-	d, i := f.begin(t)
+	d, _ := f.begin(t)
 	if f.starts != 1 || f.reads != 1 || !f.active || f.completions != 0 {
 		t.Fatal("missing owned active batch")
-	}
-	if d.CheckDisclosure(context.Background()) == nil {
-		t.Fatal("disclosed before exact outcome acknowledgement")
 	}
 	x, ok := d.Excerpt()
 	if !ok || len(x.Lines) != 14 {
@@ -345,18 +312,17 @@ func TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose(t *testing.
 	if x.Lines[0] != original {
 		t.Fatal("caller mutated retained result")
 	}
-	i.outcome = d
 	if err := d.CheckDisclosure(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	poll := f.invocation("get_query_result")
-	if _, err := f.s.Results.GetQueryResult(context.Background(), f, poll, f.q.ID); err == nil {
+	if _, err := f.s.Results.GetQueryResult(context.Background(), f, poll.id, f.q.ID); err == nil {
 		t.Fatal("second batch started during outward delivery")
 	}
 	if f.reads != 1 || f.batches != 1 || f.starts != 1 {
 		t.Fatal("passive poll dispatched or overlapped")
 	}
-	cleanup, cancel := context.WithDeadline(context.Background(), i.call.WriteUntil)
+	cleanup, cancel := context.WithDeadline(context.Background(), d.CleanupUntil())
 	defer cancel()
 	if err := d.Close(cleanup); err != nil {
 		t.Fatal(err)
@@ -386,14 +352,13 @@ func TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker(t *testing.T) {
 	}
 	f.refresh(f.now.Add(5 * time.Second))
 	i := f.invocation("get_query_result")
-	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID)
 	if err != nil {
 		t.Fatal("fresh current request could not read original unexpired query", err)
 	}
 	if f.starts != 1 || f.reads != 2 || f.batches != 2 || !f.q.Equal(original) || d2.association.Generation != 2 {
 		t.Fatal("retry reset worker/query/spend")
 	}
-	i.outcome = d2
 	if err = d2.CheckDisclosure(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +366,7 @@ func TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 	i = f.invocation("get_query_result")
-	if _, err = f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID); err == nil {
+	if _, err = f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID); err == nil {
 		t.Fatal("third batch admitted")
 	}
 	if f.reads != 2 || f.starts != 1 {
@@ -418,7 +383,7 @@ func TestQueryUncertainPrivateCloseAndUnknownStartStayCharged(t *testing.T) {
 	}
 	f.refresh(f.now.Add(5 * time.Second))
 	i := f.invocation("get_query_result")
-	if _, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID); err == nil {
+	if _, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID); err == nil {
 		t.Fatal("lease expiry substituted for joined private closure")
 	}
 	if f.reads != 1 || f.starts != 1 || f.batches != 1 {
@@ -436,7 +401,7 @@ func TestQueryUncertainPrivateCloseAndUnknownStartStayCharged(t *testing.T) {
 			f := newProjectionFixture(t)
 			tc.change(f)
 			i := f.invocation("get_file_excerpt")
-			if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
+			if _, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection); err == nil {
 				t.Fatal("uncertain/repeated start accepted")
 			}
 			if f.reads != 0 || !f.active || f.batches != 1 {
@@ -446,23 +411,19 @@ func TestQueryUncertainPrivateCloseAndUnknownStartStayCharged(t *testing.T) {
 	}
 }
 
-func TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard(t *testing.T) {
+func TestQueryPendingPollCannotDispatch(t *testing.T) {
 	f := newProjectionFixture(t)
 	f.ready = false
 	d, i := f.begin(t)
 	if !d.Pending() || f.starts != 1 || f.batches != 0 || d.Effect() != ContextQueryAdmitted {
 		t.Fatal("wrong pending disposition")
 	}
-	if d.CheckDisclosure(context.Background()) == nil {
-		t.Fatal("pending handle bypassed outcome audit")
-	}
-	i.outcome = d
 	if err := d.CheckDisclosure(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	_ = d.Close(context.Background())
 	i = f.invocation("get_query_result")
-	next, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	next, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID)
 	if err != nil || !next.Pending() || f.starts != 1 || f.polls != 1 || next.Effect() != ContextQueryPollCharged {
 		t.Fatal("poll dispatched new worker or omitted finite accounting", err)
 	}
@@ -483,8 +444,7 @@ func TestQueryRequestObservationAndCurrentSQLFence(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newProjectionFixture(t)
-			d, i := f.begin(t)
-			i.outcome = d
+			d, _ := f.begin(t)
 			original, err := d.owner.CheckCurrent(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -498,14 +458,13 @@ func TestQueryRequestObservationAndCurrentSQLFence(t *testing.T) {
 				t.Fatal(err)
 			}
 			next := f.invocation("get_query_result")
-			if result, err := f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID); err == nil || result != nil || f.authorityReads != 2 {
+			if result, err := f.s.Results.GetQueryResult(context.Background(), f, next.id, f.q.ID); err == nil || result != nil || f.authorityReads != 2 {
 				t.Fatal("new poll reused prior request authority", err, f.authorityReads)
 			}
 		})
 	}
 	f := newProjectionFixture(t)
-	d, i := f.begin(t)
-	i.outcome = d
+	d, _ := f.begin(t)
 	f.permitErr = value.ErrUnavailable
 	if d.CheckDisclosure(context.Background()) == nil {
 		t.Fatal("current SQL fence bypassed")
@@ -517,21 +476,21 @@ func TestQueryOriginalRequestCancellation(t *testing.T) {
 	f := newProjectionFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	i := f.invocation("get_file_excerpt")
-	d, err := f.s.BeginExcerpt(ctx, f, i, i.input.Selection)
+	writeUntil := f.now.Add(value.ContextQueryCallWrite)
+	d, err := f.s.BeginExcerpt(ctx, f, i.id, i.input.Selection)
 	if err != nil {
 		t.Fatal(err)
 	}
-	i.outcome = d
 	cancel()
 	if d.CheckDisclosure(context.Background()) == nil {
 		t.Fatal("Background detached original request cancellation")
 	}
-	cleanup, done := context.WithDeadline(context.Background(), i.call.WriteUntil.Add(-time.Second))
+	cleanup, done := context.WithDeadline(context.Background(), writeUntil.Add(-time.Second))
 	defer done()
 	if err = d.Close(cleanup); err != nil {
 		t.Fatal("prepaid restrictive completion denied after request cancellation", err)
 	}
-	if !f.lastRead.cleanupUntil.Equal(i.call.WriteUntil.Add(-time.Second)) {
+	if !f.lastRead.cleanupUntil.Equal(writeUntil.Add(-time.Second)) {
 		t.Fatal("cleanup renewed earlier caller deadline")
 	}
 }
@@ -544,7 +503,7 @@ func TestQueryRechecksAfterBlockingObservation(t *testing.T) {
 		f := newProjectionFixture(t)
 		f.observeHook = func() { mutate(f) }
 		i := f.invocation("get_file_excerpt")
-		if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
+		if _, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection); err == nil {
 			t.Fatal("stale observation started read")
 		}
 		if f.batches+f.reads != 0 {
@@ -581,7 +540,7 @@ func TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff(t *testing.T) {
 				f.claimHook = wait
 			}
 			i := f.invocation("get_file_excerpt")
-			if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
+			if _, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection); err == nil {
 				t.Fatal("expired port returned usable result")
 			}
 			if f.reads != 0 {
@@ -595,7 +554,7 @@ func TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse(t *testing.T) {
 	f := newProjectionFixture(t)
 	f.observeHook = func() { f.i.Groups[0] = "changed-in-place" }
 	i := f.invocation("get_file_excerpt")
-	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	d, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,7 +565,7 @@ func TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	next := f.invocation("get_query_result")
-	d, err = f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID)
+	d, err = f.s.Results.GetQueryResult(context.Background(), f, next.id, f.q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -635,24 +594,8 @@ func TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun(t *testing.T) {
 			}
 			return identity.Identity{}, value.ErrUnavailable
 		})
-		if _, err := f.s.BeginExcerpt(context.Background(), current, i, i.input.Selection); err == nil || !called || f.admissions != 0 {
+		if _, err := f.s.BeginExcerpt(context.Background(), current, i.id, i.input.Selection); err == nil || !called || f.admissions != 0 {
 			t.Fatal("invalid first identity boundary")
-		}
-	})
-	t.Run("audit-lineage", func(t *testing.T) {
-		f := newProjectionFixture(t)
-		i := f.invocation("get_file_excerpt")
-		until := f.now.Add(80 * time.Millisecond)
-		f.i.ValidUntil = until
-		i.invocationHook = func(ctx context.Context) {
-			d, ok := ctx.Deadline()
-			if !ok || !d.Equal(until) {
-				t.Fatal("audit lineage read renewed identity bound", d)
-			}
-			<-ctx.Done()
-		}
-		if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil || f.admissions != 0 {
-			t.Fatal("expired lineage read admitted query")
 		}
 	})
 }
@@ -676,7 +619,7 @@ func TestQueryExpiredPublicContextCannotActAsCleanupPermit(t *testing.T) {
 func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
 	f := newProjectionFixture(t)
 	d, i := f.begin(t)
-	if !d.QueryDeadline().Equal(f.q.Deadline) || !d.ObservedAt().Equal(f.now) || !d.CleanupUntil().Equal(i.call.WriteUntil) || !d.ValidUntil().Before(d.QueryDeadline()) {
+	if !d.QueryDeadline().Equal(f.q.Deadline) || !d.ObservedAt().Equal(f.now) || !d.CleanupUntil().Equal(f.now.Add(value.ContextQueryCallWrite)) || !d.ValidUntil().Before(d.QueryDeadline()) {
 		t.Fatal("query, observation, cleanup and request bounds were conflated")
 	}
 	if err := d.Close(context.Background()); err != nil {
@@ -684,14 +627,13 @@ func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
 	}
 	f.refresh(f.now.Add(9 * time.Second))
 	i = f.invocation("get_query_result")
-	d, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	d, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !d.ObservedAt().Equal(f.now) || d.QueryDeadline().Sub(d.ObservedAt()) != time.Second {
 		t.Fatal("late poll used query creation to renew remaining lifetime")
 	}
-	i.outcome = d
 	if err = d.CheckDisclosure(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +683,7 @@ func TestQueryPendingReplySkipsPermitFence(t *testing.T) {
 	f.ready = false
 	f.permitErr = value.ErrUnavailable
 	i := f.invocation("get_file_excerpt")
-	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	d, err := f.s.BeginExcerpt(context.Background(), f, i.id, i.input.Selection)
 	if err != nil || !d.Pending() || f.batches != 0 {
 		t.Fatal("pending reply ran the read permit", err)
 	}
@@ -760,11 +702,10 @@ func TestQueryOneAuthorityPerRequestAcrossPrepareAndFrames(t *testing.T) {
 	}
 	f.authorityReads, f.frames = 0, 8
 	i := f.invocation("get_query_result")
-	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	i.outcome = d2
 	for range 3 {
 		if err = d2.CheckDisclosure(context.Background()); err != nil {
 			t.Fatal(err)
@@ -796,7 +737,7 @@ func TestQuerySQLFenceRefusesNextFrameWithinOneRequest(t *testing.T) {
 		}
 	}
 	i := f.invocation("get_query_result")
-	if out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID); err == nil || out != nil {
+	if out, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID); err == nil || out != nil {
 		t.Fatal("frame after SQL revocation was accepted")
 	}
 	if f.frameChecks != 3 || f.authorityReads != 1 {
@@ -828,14 +769,12 @@ func TestQueryTwelveSecondReadWithinOneEvidenceRequest(t *testing.T) {
 		}
 	}
 	i := f.invocation("get_query_result")
-	i.call.Until = window
-	out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	out, err := f.s.Results.GetQueryResult(context.Background(), f, i.id, f.q.ID)
 	if err != nil {
 		var s interface{ FixedStep() string }
 		_ = errors.As(err, &s)
 		t.Fatal("twelve-second read refused:", s.FixedStep())
 	}
-	i.outcome = out
 	if f.frameChecks != 8 || f.authorityReads != 1 || out.CheckDisclosure(context.Background()) != nil {
 		t.Fatal("read did not complete on one current authority", f.frameChecks, f.authorityReads)
 	}

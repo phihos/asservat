@@ -1,18 +1,19 @@
 package kms
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	bao "github.com/openbao/openbao/api/v2"
 	"io"
 	"net/http"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	bao "github.com/openbao/openbao/api/v2"
 )
 
 type WorkerCertificateIssuer struct {

@@ -43,7 +43,7 @@ func (s *ContextRetirementReads) ContextRetirementDependencies(ctx context.Conte
 		if err != nil {
 			return err
 		}
-		out = app.ContextRetirementDependencies{ObservedAt: now.Time, CustodyDeleted: row.CustodyState == "deleted", IntentAuditPending: !row.IntentAcknowledgedAt.Valid, VerificationAuditPending: row.VerificationAuditPending, ExecutionUnresolved: row.ExecutionUnresolved, RetainedCopyReceipts: row.RetainedCopyReceipts, DownloadDependents: row.DownloadDependents, RetentionAuditPending: row.RetentionAuditPending}
+		out = app.ContextRetirementDependencies{ObservedAt: now.Time, CustodyDeleted: row.CustodyState == "deleted", VerificationAuditPending: row.VerificationAuditPending, ExecutionUnresolved: row.ExecutionUnresolved, RetainedCopyReceipts: row.RetainedCopyReceipts, DownloadDependents: row.DownloadDependents, RetentionAuditPending: row.RetentionAuditPending}
 		return ctx.Err()
 	})
 	if err != nil {

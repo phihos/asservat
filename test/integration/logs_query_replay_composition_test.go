@@ -40,7 +40,7 @@ func qualifyLogsQueryReplayApplication(t *testing.T, ctx context.Context, q quer
 	if !ok {
 		t.Fatal("replay service unavailable")
 	}
-	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, app.ContextQueryInput{RawLogs: input}}, input)
+	delivery, err := reads.Begin(ctx, caller, r.Call.ID, input)
 	if delivery != nil {
 		defer func() {
 			if err := delivery.Close(context.WithoutCancel(ctx)); err != nil {

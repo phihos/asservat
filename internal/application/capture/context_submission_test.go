@@ -25,7 +25,7 @@ type submissionFixture struct {
 	started               map[string]bool
 }
 
-func (s *submissionFixture) AcknowledgedCaptureIntent(ctx context.Context, id string) (audit.CaptureIntent, error) {
+func (s *submissionFixture) AcceptedCaptureIntent(ctx context.Context, id string) (audit.CaptureIntent, error) {
 	s.intentReads++
 	var a value.Accepted
 	for _, v := range s.f.accepted {

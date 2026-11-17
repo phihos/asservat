@@ -12,71 +12,61 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"sync"
 	"time"
 	"unicode/utf8"
 )
 
-// These arguments are private accepted installation composition. This wrapper
-// is not wired by bootstrap: protected keys, finite cleanup and capacity
-// provisioning are still required before enablement.
+// AuditedOperationsConfig is accepted installation composition.
 type AuditedOperationsConfig struct {
-	RootID                                                            string
-	Retention                                                         time.Duration
-	NormalConcurrency, ResolutionConcurrency, PerPrincipalConcurrency int
-	NormalPerSecond, ResolutionPerSecond                              int
-	Now                                                               func() time.Time
-	NewID                                                             func() string
-}
-type auditRate struct {
-	started time.Time
-	used    int
+	RootID string
+	Now    func() time.Time
+	NewID  func() string
 }
 type auditTarget interface {
 	Operations
 	CallWithContext(context.Context, identities.CurrentIdentity, OperationCall, string, json.RawMessage) (OperationReply, error)
 }
-type auditGate interface {
-	Begin(context.Context, audit.OperationIntent) error
-	Finish(context.Context, audit.OperationOutcome) error
+
+// AuditRecorder appends one audit row (REQ-AUT-005).
+type AuditRecorder interface {
+	Record(context.Context, audit.Event) error
 }
+
+// AuditedOperations writes one `call` audit row per admitted operation before
+// it returns output (REQ-AUT-005, ADR-330 D6). A failed row fails the call.
 type AuditedOperations struct {
 	config    AuditedOperationsConfig
 	inner     auditTarget
-	audit     map[string]auditGate
+	recorder  AuditRecorder
 	mac       *auditapp.OperationMAC
 	contracts *contracts.InvestigationContracts
-	lanes     map[string]chan struct{}
 	stopSlots chan struct{}
-	mu        sync.Mutex
-	active    map[string]int
-	rate      map[string]auditRate
-	// Timing receives a fixed operation lane separately from stage durations.
+	// Timing receives a fixed operation name separately from stage durations.
 	// No input, identity or result enters either argument.
 	Timing func(event, timing string)
 }
 
 // callTiming marks stage ends of one audited call for Timing.
 type callTiming struct {
-	start, admitted, begin, call, finish time.Time
+	start, call, finish time.Time
 }
 
-func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(string, string)) {
+func (t callTiming) report(event string, steps *auditapp.StepTimes, out func(string, string)) {
 	if out == nil {
 		return
 	}
-	line := "pre" + durationBucket(t.admitted, t.start) + " begin" + durationBucket(t.begin, t.admitted)
+	line := ""
 	if !t.call.IsZero() {
-		line += " call" + durationBucket(t.call, t.begin)
+		line += "call" + durationBucket(t.call, t.start)
 	}
 	if !t.finish.IsZero() {
-		line += " finish" + durationBucket(t.finish, t.call)
+		line += " audit" + durationBucket(t.finish, t.call)
 	}
 	line += " total" + durationBucket(time.Now(), t.start)
 	if s := steps.String(); s != "" {
 		line += " [" + s + "]"
 	}
-	out(lane, line)
+	out(event, line)
 }
 
 // durationBucket keeps timing lines in a finite vocabulary.
@@ -102,39 +92,15 @@ func durationBucket(end, start time.Time) string {
 	}
 }
 
-func NewAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, normal, resolution auditapp.OperationAuditor, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
-	if normal.Journal == nil || normal.Acknowledgements == nil || normal.Objects == nil || normal.Now == nil || resolution.Journal == nil || resolution.Acknowledgements == nil || resolution.Objects == nil || resolution.Now == nil {
-		return nil, ErrOperationsConfiguration
-	}
-	return newAuditedOperations(c, inner, normal, resolution, mac)
-}
-
-// NewHealthyAuditedOperations selects the positive-writer lifecycle for both
-// independently backed lanes. Accepted policy/credentials still come from
-// protected installation composition; this constructor enables no runtime.
-// HealthyAuditGate is a configured healthy lane auditor: a fixed-policy
-// auditor or the ADR-190 selecting auditor.
-type HealthyAuditGate interface {
-	auditGate
-	Configured() bool
-}
-
-func NewHealthyAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, normal, resolution HealthyAuditGate, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
-	if !normal.Configured() || !resolution.Configured() {
-		return nil, ErrOperationsConfiguration
-	}
-	return newAuditedOperations(c, inner, normal, resolution, mac)
-}
-
-func newAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, normal, resolution auditGate, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
-	if !authorization.UUID(c.RootID) || c.Retention < time.Minute || c.Retention > 3660*24*time.Hour || c.NormalConcurrency < 1 || c.NormalConcurrency > 64 || c.ResolutionConcurrency < 1 || c.ResolutionConcurrency > 16 || c.PerPrincipalConcurrency < 1 || c.PerPrincipalConcurrency > 16 || c.NormalPerSecond < 1 || c.NormalPerSecond > 10000 || c.ResolutionPerSecond < 1 || c.ResolutionPerSecond > 1000 || c.Now == nil || c.NewID == nil || inner == nil || mac == nil || normal == nil || resolution == nil {
+func NewAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, recorder AuditRecorder, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
+	if !authorization.UUID(c.RootID) || c.Now == nil || c.NewID == nil || inner == nil || mac == nil || recorder == nil {
 		return nil, ErrOperationsConfiguration
 	}
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
 		return nil, err
 	}
-	return &AuditedOperations{config: c, inner: inner, audit: map[string]auditGate{"normal": normal, "resolution": resolution}, mac: mac, contracts: wire, stopSlots: make(chan struct{}, 4), lanes: map[string]chan struct{}{"normal": make(chan struct{}, c.NormalConcurrency), "resolution": make(chan struct{}, c.ResolutionConcurrency)}, active: map[string]int{}, rate: map[string]auditRate{}}, nil
+	return &AuditedOperations{config: c, inner: inner, recorder: recorder, mac: mac, contracts: wire, stopSlots: make(chan struct{}, 4)}, nil
 }
 func (s *AuditedOperations) PublicOrigin() string {
 	if s == nil {
@@ -153,46 +119,6 @@ func (s *AuditedOperations) Tool(n string) (contracts.InvestigationTool, bool) {
 		return contracts.InvestigationTool{}, false
 	}
 	return s.inner.Tool(n)
-}
-
-// Each lane owns independent finite provider slots. Account maps exist only for
-// admitted in-flight requests and therefore cannot grow beyond total slots.
-func (s *AuditedOperations) acquire(lane string, principal artifact.Digest) (func(), bool) {
-	slots := s.lanes[lane]
-	select {
-	case slots <- struct{}{}:
-	default:
-		return nil, false
-	}
-	key := lane + string(principal[:])
-	s.mu.Lock()
-	now := s.config.Now()
-	r := s.rate[lane]
-	limit := s.config.NormalPerSecond
-	if lane == "resolution" {
-		limit = s.config.ResolutionPerSecond
-	}
-	if r.started.IsZero() || !now.Before(r.started.Add(time.Second)) {
-		r = auditRate{started: now}
-	}
-	if r.used >= limit || s.active[key] >= s.config.PerPrincipalConcurrency {
-		s.mu.Unlock()
-		<-slots
-		return nil, false
-	}
-	r.used++
-	s.rate[lane] = r
-	s.active[key]++
-	s.mu.Unlock()
-	return func() {
-		s.mu.Lock()
-		s.active[key]--
-		if s.active[key] == 0 {
-			delete(s.active, key)
-		}
-		s.mu.Unlock()
-		<-slots
-	}, true
 }
 
 // IngressRejectionKind is a closed pre-dispatch classification. A rejection is
@@ -230,34 +156,28 @@ func (s *AuditedOperations) Call(ctx context.Context, current identities.Current
 }
 
 func (s *AuditedOperations) call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, rejection IngressRejectionKind) (OperationReply, error) {
-	// Transport inputs are bounded before authentication/audit admission. Leave
-	// room for the fixed MAC framing; never allocate from an unbounded name.
+	// Transport inputs are bounded before authentication and audit.
 	if s == nil || ctx == nil || current == nil || ctx.Err() != nil || len(raw) > 32<<10 || len(name) > 8192 {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
 	timing := callTiming{start: time.Now()}
-	lane := ""
 	var steps *auditapp.StepTimes
 	if s.Timing != nil {
 		ctx, steps = auditapp.WithStepTimes(ctx)
 	}
 	event := ""
 	defer func() {
-		if lane != "" {
+		if event != "" {
 			timing.report(event, steps, s.Timing)
 		}
 	}()
 	initial, err := current.ResolveIdentity(ctx)
 	checkedAt := s.config.Now()
 	now := checkedAt.UTC().Truncate(time.Microsecond)
-	// SQL precision only changes persisted boundaries. Flooring the live check
-	// can put an otherwise current nanosecond observation in its "future".
 	if err != nil || !initial.Valid(checkedAt) {
 		return OperationReply{}, stopped("identity", identity.ErrDenied)
 	}
-	// Prepaid safe stop is its own immutable cancellation obligation. It has
-	// no normal/resolution audit admission dependency and no evidence-read gate.
-	// Invalid input remains the normal bounded rejection path below.
+	// A download stop runs without the evidence-read scope check below.
 	if rejection == 0 && name == "cancel_artifact_download" {
 		if _, ok := s.inner.Tool(name); ok && s.contracts.ValidateInput(name, raw) == nil {
 			select {
@@ -266,15 +186,28 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			default:
 				return OperationReply{}, auditapp.ErrUnavailable
 			}
-			return s.inner.CallWithContext(ctx, current, OperationCall{requestID: s.config.NewID()}, name, raw)
+			requestID := s.config.NewID()
+			reply, callErr := s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID}, name, raw)
+			// REQ-AUT-005: the stop writes its call row like every other
+			// operation, before any output leaves; the effect row is separate.
+			row := audit.Event{ID: s.config.NewID(), OperationID: requestID, Kind: "call", Operation: name, Actor: initial.Principal, Status: "success", Reason: "prepared", Effect: "accepted", OutputBytes: int64(len(reply.Body))}
+			if callErr != nil {
+				row.Status, row.Reason, row.Effect, row.OutputBytes = "unavailable", "authority_unavailable", "unknown", 0
+			}
+			auditCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			e := s.recorder.Record(auditCtx, row)
+			cancel()
+			if e != nil {
+				clear(reply.Body)
+				return OperationReply{}, stoppedAt("audit", e, auditapp.ErrUnavailable)
+			}
+			return reply, callErr
 		}
 	}
 	actorDigest, err := s.mac.Principal(initial.Principal)
 	if err != nil {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
-	// Determine rejection BEFORE choosing a lane. Invalid schemas and missing
-	// read scope must not spend the protected resolution allowance.
 	format := "context-input/v1"
 	if queryOperation(name) {
 		format = "context-query-input/v1"
@@ -306,19 +239,9 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		normalized = append(normalized, raw...)
 	}
 	defer clear(normalized)
-	if len(normalized) > 64<<10 || audit.OperationLane(op) == "" {
+	if len(normalized) > 64<<10 {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
-	release, ok := s.acquire(audit.OperationLane(op), actorDigest)
-	if !ok {
-		return OperationReply{}, stopped("busy", auditapp.ErrUnavailable)
-	}
-	transferred := false
-	defer func() {
-		if !transferred {
-			release()
-		}
-	}()
 	inputDigest, err := s.mac.Digest(format, normalized)
 	clear(normalized)
 	if err != nil {
@@ -330,28 +253,20 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	until = until.UTC().Truncate(time.Microsecond)
 	requestID := s.config.NewID()
-	intent := audit.OperationIntent{ID: requestID, TraceID: requestID, RootID: s.config.RootID, Name: op, InputFormat: format, MACVersion: s.mac.Version(), AccountVersion: s.mac.AccountVersion(), Actor: initial.Principal, PrincipalDigest: actorDigest, InputDigest: inputDigest, CreatedAt: now, RequestUntil: until, WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(s.config.Retention).UTC().Truncate(time.Microsecond)}
+	// The intent value is the invocation description the live owners bind;
+	// it is not stored.
+	intent := audit.OperationIntent{ID: requestID, TraceID: requestID, RootID: s.config.RootID, Name: op, InputFormat: format, MACVersion: s.mac.Version(), AccountVersion: s.mac.AccountVersion(), Actor: initial.Principal, PrincipalDigest: actorDigest, InputDigest: inputDigest, CreatedAt: now, RequestUntil: until, WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
 	if !intent.Valid() {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
 	ctx, cancel := context.WithDeadline(ctx, until)
+	transferred := false
 	defer func() {
 		if !transferred {
 			cancel()
 		}
 	}()
-	lane, timing.admitted = audit.OperationLane(op), time.Now()
-	// Longer composed operations get their own timing sequence, so infrequent
-	// previews, captures or evidence reads still reach the doubling report.
-	event = lane
-	if audit.OperationRequestWindow(op) > 5*time.Second {
-		event = op
-	}
-	e := s.audit[lane].Begin(ctx, intent)
-	timing.begin = time.Now()
-	if e != nil {
-		return OperationReply{}, stoppedAt("audit-begin", e, auditapp.ErrUnavailable)
-	}
+	event = op
 	var reply OperationReply
 	clearReply := func() {
 		if reply.owner != nil {
@@ -369,26 +284,11 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	} else if rejection == IngressDenied {
 		callErr = identity.ErrDenied
 	} else {
-		// Recheck after blocking audit before any service work.
-		fresh, e := current.ResolveIdentity(ctx)
-		if e != nil || !sameAuditIdentity(initial, fresh, s.config.Now()) || ctx.Err() != nil {
-			callErr = identity.ErrDenied
-		} else {
-			call := OperationCall{requestID: requestID}
-			if queryOperation(name) {
-				// The private owner exists only after this invocation's existing
-				// Begin acknowledgement. Neither a DTO nor a public context value
-				// can manufacture it; SQL still checks the acknowledged row.
-				call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
-			}
-			reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
-			timing.call = time.Now()
-			reply.boundCleanup(intent.WriteUntil)
-			// Only a private, proven pre-dispatch rejection can rule out an
-			// effect from this invocation. A service error or response timeout
-			// cannot establish the original logical request's disposition.
-			effectPossible = !reply.auditNoDispatch
-		}
+		reply, callErr = s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID}, name, raw)
+		timing.call = time.Now()
+		reply.boundCleanup(intent.WriteUntil)
+		// Only a proven pre-dispatch rejection rules out an effect.
+		effectPossible = !reply.auditNoDispatch
 	}
 	out, e := s.result(intent, reply, callErr, effectPossible)
 	if e != nil {
@@ -400,9 +300,6 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			return OperationReply{}, stopped("audit-result", auditapp.ErrUnavailable)
 		}
 	}
-	// A failed service's existing bounded timings must be visible even while
-	// synchronous audit completion is still pending. The deferred final report
-	// retains its original event and includes the completion stages.
 	if s.Timing != nil && (ctx.Err() != nil || !timing.call.IsZero() && (callErr != nil || out.Status != "success")) {
 		failed := event + "/service-failed"
 		if reply.failureStep != "" {
@@ -410,33 +307,22 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		}
 		timing.report(failed, steps, s.Timing)
 	}
-	// Once an outcome exists, completing its audit is allowed without reviving
-	// request authority. This bounded synchronous completion never redispatches.
+	// The row is written before any output leaves; a failed row fails the call.
 	auditCtx, finishCancel := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)
-	e = s.audit[audit.OperationLane(op)].Finish(auditCtx, out)
+	e = s.recorder.Record(auditCtx, callEvent(s.config.NewID(), out))
 	timing.finish = time.Now()
 	finishCancel()
 	if e != nil {
 		clearReply()
-		return OperationReply{}, stoppedAt("audit-finish", e, auditapp.ErrUnavailable)
+		return OperationReply{}, stoppedAt("audit", e, auditapp.ErrUnavailable)
 	}
 	if e = reply.acknowledge(ctx, out); e != nil {
 		clearReply()
 		return OperationReply{}, stopped("result-acknowledgement", auditapp.ErrUnavailable)
 	}
-	final, e := current.ResolveIdentity(ctx)
-	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) || !s.config.Now().Before(until) {
-		clearReply()
-		if ctx.Err() != nil || !s.config.Now().Before(until) {
-			return OperationReply{}, stopped("request-expired", identity.ErrDenied)
-		}
-		return OperationReply{}, stopped("final-identity", identity.ErrDenied)
-	}
 	if callErr != nil {
-		// Acknowledged errors carry only the original delivery bound, no body or
-		// evidence grant. Strict transports must preserve it through the write.
 		clearReply()
-		bound := OperationReply{ValidUntil: identity.Earlier(until, final.ValidUntil)}
+		bound := OperationReply{ValidUntil: until}
 		if errors.Is(callErr, identity.ErrDenied) {
 			// A missing download scope is an ordinary audited refusal for the
 			// client, not a service outage (native61/62).
@@ -451,25 +337,33 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		if errors.Is(callErr, contracts.ErrInvestigationWire) {
 			return bound, contracts.ErrInvestigationWire
 		}
-		// The service's own closed stage, if any, names this refusal in the
-		// transport report; the returned class is unchanged.
 		return bound, stoppedAt("service", callErr, auditapp.ErrUnavailable)
 	}
 	if !s.config.Now().Before(reply.ValidUntil) {
 		clearReply()
 		return OperationReply{}, stopped("reply-expired", auditapp.ErrUnavailable)
 	}
-	reply.ValidUntil = identity.Earlier(reply.ValidUntil, identity.Earlier(until, final.ValidUntil))
+	reply.ValidUntil = identity.Earlier(reply.ValidUntil, until)
 	if e = reply.CheckDisclosure(ctx); e != nil {
 		clearReply()
 		return OperationReply{}, stopped("final-disclosure", auditapp.ErrUnavailable)
 	}
 	if reply.owner != nil {
-		reply.transfer(cancel, release, intent.WriteUntil)
+		reply.transfer(cancel, func() {}, intent.WriteUntil)
 		transferred = true
 	}
 	return reply, nil
 }
+
+// callEvent is the `call` row of one invocation.
+func callEvent(eventID string, out audit.OperationOutcome) audit.Event {
+	in := out.Intent
+	digest, output := in.InputDigest, out.OutputDigest
+	return audit.Event{ID: eventID, OperationID: in.ID, Kind: "call", Operation: in.Name, Actor: in.Actor, InputDigest: &digest,
+		Status: out.Status, Reason: out.Reason, Effect: out.Effect, CaseIDs: out.CaseIDs, ArtifactIDs: out.ArtifactIDs, CaptureIDs: out.CaptureIDs,
+		OutputBytes: out.OutputBytes, OutputDigest: &output}
+}
+
 func sameAuditIdentity(a, b identity.Identity, now time.Time) bool {
 	return a.Valid(now) && b.Valid(now) && a.Principal == b.Principal && a.Policy == b.Policy && sameAuditSet(a.Groups, b.Groups) && sameAuditSet(a.Scopes, b.Scopes)
 }

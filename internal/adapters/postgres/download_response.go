@@ -139,9 +139,6 @@ func (s *Downloads) beginDownloadResponse(ctx context.Context, sessionID string,
 			return e
 		}
 		if firstContext {
-			if current.StopProtocol != artifact.DownloadStopProtocol {
-				return artifact.ErrDownloadUnavailable
-			}
 			w, e := q.LatestDownloadWorker(ctx, custodydb.LatestDownloadWorkerParams{SessionID: id(sessionID), RootID: id(s.root)})
 			if e != nil {
 				return e

@@ -16,72 +16,32 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
-// Explicit test-only journal with pre-acknowledged synthetic receipts. It proves
-// transport composition, not SQL/object custody or production audit authority.
+// Test-only recorder of the wrapper's call rows. It proves transport
+// composition, not SQL audit storage.
 type ingressAuditFixture struct {
-	mu        sync.Mutex
-	intents   []audit.OperationIntent
-	outcomes  []audit.OperationOutcome
-	onReserve func(context.Context)
-	onOutcome func()
-	fail      bool
+	mu     sync.Mutex
+	events []audit.Event
+	fail   bool
 }
 
-func ingressReceipt(in audit.OperationIntent, phase string) *audit.Receipt {
-	return &audit.Receipt{Key: audit.OperationAuditKey(in.RootID, in.ID, phase), ETag: "synthetic", Bytes: 100, SHA256: artifact.Digest{1}}
-}
-func (f *ingressAuditFixture) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
+func (f *ingressAuditFixture) Record(_ context.Context, e audit.Event) error {
 	f.mu.Lock()
-	f.intents = append(f.intents, in)
+	f.events = append(f.events, e)
 	f.mu.Unlock()
-	if f.onReserve != nil {
-		f.onReserve(ctx)
-	}
 	if f.fail {
-		return audit.OperationSnapshot{}, errors.New("private provider error")
+		return errors.New("private provider error")
 	}
-	return audit.OperationSnapshot{Intent: in, IntentReceipt: ingressReceipt(in, "intent")}, nil
+	return nil
 }
-func (f *ingressAuditFixture) FreezeOperationOutcome(_ context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
-	f.mu.Lock()
-	f.outcomes = append(f.outcomes, out)
-	f.mu.Unlock()
-	if f.onOutcome != nil {
-		f.onOutcome()
-	}
-	return audit.OperationSnapshot{Intent: out.Intent, IntentReceipt: ingressReceipt(out.Intent, "intent"), Outcome: &out, OutcomeReceipt: ingressReceipt(out.Intent, "outcome")}, nil
-}
-func (*ingressAuditFixture) ClaimOperationWrite(context.Context, audit.OperationIntent, string) (bool, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) AcknowledgeOperation(context.Context, audit.OperationIntent, string, audit.Receipt) error {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) CreateOperationIntent(context.Context, audit.OperationIntent) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) FindOperationIntent(context.Context, audit.OperationIntent) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) CreateOperationOutcome(context.Context, audit.OperationOutcome) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (*ingressAuditFixture) FindOperationOutcome(context.Context, audit.OperationOutcome) (audit.Receipt, error) {
-	panic("fixture receipt must exist")
-}
-func (f *ingressAuditFixture) count() (int, int) {
+func (f *ingressAuditFixture) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.intents), len(f.outcomes)
-}
-func (f *ingressAuditFixture) auditor(now func() time.Time) auditapp.OperationAuditor {
-	return auditapp.OperationAuditor{Journal: f, Objects: f, Acknowledgements: f, Now: now}
+	return len(f.events)
 }
 
 type auditBrowserSession struct {
@@ -96,12 +56,12 @@ func (s *auditBrowserSession) Resolve(ctx context.Context, cookie string, refres
 	}
 	return v, e
 }
-func auditedBrowserFixture(t *testing.T) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *ingressAuditFixture, *auditBrowserSession) {
+func auditedBrowserFixture(t *testing.T) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *auditBrowserSession) {
 	t.Helper()
 	return auditedBrowserTransportFixture(t, false, nil)
 }
 
-func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Handler) http.Handler) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *ingressAuditFixture, *auditBrowserSession) {
+func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Handler) http.Handler) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *auditBrowserSession) {
 	t.Helper()
 	var h *InvestigationHandler
 	var serve http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) })
@@ -127,9 +87,9 @@ func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Han
 		t.Fatal(e)
 	}
 	t.Cleanup(mac.Close)
-	normal, resolution := &ingressAuditFixture{}, &ingressAuditFixture{}
+	rows := &ingressAuditFixture{}
 	var sequence atomic.Uint64
-	opsAudit, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: func() string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence.Add(1)) }}, inner, normal.auditor(time.Now), resolution.auditor(time.Now), mac)
+	opsAudit, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Now: time.Now, NewID: func() string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence.Add(1)) }}, inner, rows, mac)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -137,7 +97,7 @@ func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Han
 	if e != nil {
 		t.Fatal(e)
 	}
-	return h, server, calls, normal, resolution, sessions
+	return h, server, calls, rows, sessions
 }
 func auditedBrowserRequest(t *testing.T, s *httptest.Server, name, body string) *http.Request {
 	t.Helper()
@@ -171,7 +131,7 @@ func TestAuditedBrowserIngressRejectionsShareOneOwner(t *testing.T) {
 	const body = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key"}`
 	for _, mode := range []string{"key", "unknown", "media", "schema", "scope"} {
 		t.Run(mode, func(t *testing.T) {
-			_, server, calls, normal, resolution, sessions := auditedBrowserFixture(t)
+			_, server, calls, rows, sessions := auditedBrowserFixture(t)
 			name, input := "resolve_capture_request", body
 			if mode == "unknown" {
 				name = "unknown-private-name"
@@ -190,10 +150,9 @@ func TestAuditedBrowserIngressRejectionsShareOneOwner(t *testing.T) {
 				req.Header.Set("Content-Type", "text/plain")
 			}
 			status, b := sendAuditedBrowser(t, server, req)
-			n, o := normal.count()
-			r, ro := resolution.count()
-			if status < 400 || n != 1 || o != 1 || r != 0 || ro != 0 || calls.requests != 0 || normal.intents[0].Name != "invalid_operation" || normal.outcomes[0].Effect != "none" || bytes.Contains(b, []byte("private-user-input")) {
-				t.Fatalf("rejection audit/dispatch %d %s normal=%d/%d resolution=%d/%d requests=%d", status, b, n, o, r, ro, calls.requests)
+			n := rows.count()
+			if status < 400 || n != 1 || calls.requests != 0 || rows.events[0].Operation != "invalid_operation" || rows.events[0].Effect != "none" || bytes.Contains(b, []byte("private-user-input")) {
+				t.Fatalf("rejection audit/dispatch %d %s rows=%d requests=%d", status, b, n, calls.requests)
 			}
 		})
 	}
@@ -201,7 +160,7 @@ func TestAuditedBrowserIngressRejectionsShareOneOwner(t *testing.T) {
 func TestAuditedBrowserAuthenticationAndOversizeStayPreAdmission(t *testing.T) {
 	for _, mode := range []string{"csrf", "oversize"} {
 		t.Run(mode, func(t *testing.T) {
-			h, server, calls, normal, resolution, _ := auditedBrowserFixture(t)
+			h, server, calls, rows, _ := auditedBrowserFixture(t)
 			body := "{}"
 			if mode == "oversize" {
 				body = strings.Repeat("x", (32<<10)+1)
@@ -211,17 +170,16 @@ func TestAuditedBrowserAuthenticationAndOversizeStayPreAdmission(t *testing.T) {
 				req.Header.Set("X-CSRF-Token", "invalid")
 			}
 			status, _ := sendAuditedBrowser(t, server, req)
-			n, _ := normal.count()
-			r, _ := resolution.count()
+			n := rows.count()
 			count := h.SecurityCounters()
-			if status < 400 || n != 0 || r != 0 || calls.requests != 0 || count.PreAdmission+count.Oversized != 1 {
-				t.Fatal("unbounded pre-admission audit", status, n, r, count)
+			if status < 400 || n != 0 || calls.requests != 0 || count.PreAdmission+count.Oversized != 1 {
+				t.Fatal("unbounded pre-admission audit", status, n, count)
 			}
 		})
 	}
 }
 func TestAuditedBrowserCallsDoNotDuplicateAudit(t *testing.T) {
-	_, server, calls, normal, resolution, _ := auditedBrowserFixture(t)
+	_, server, calls, rows, _ := auditedBrowserFixture(t)
 	const body = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key"}`
 	for _, name := range []string{"request_capture", "resolve_capture_request"} {
 		status, b := sendAuditedBrowser(t, server, auditedBrowserRequest(t, server, name, body))
@@ -229,15 +187,13 @@ func TestAuditedBrowserCallsDoNotDuplicateAudit(t *testing.T) {
 			t.Fatalf("valid call failed %d %s", status, b)
 		}
 	}
-	n, o := normal.count()
-	r, ro := resolution.count()
-	if n != 1 || o != 1 || r != 1 || ro != 1 || calls.collections != 1 || calls.requests != 2 {
-		t.Fatal("duplicate audit/dispatch", n, o, r, ro, calls)
+	if n := rows.count(); n != 2 || calls.collections != 1 || calls.requests != 2 {
+		t.Fatal("duplicate audit/dispatch", n, calls)
 	}
 }
 func TestAuditedBrowserRejectRequiresAcknowledgement(t *testing.T) {
-	h, server, calls, normal, _, _ := auditedBrowserFixture(t)
-	normal.fail = true
+	h, server, calls, rows, _ := auditedBrowserFixture(t)
+	rows.fail = true
 	status, b := sendAuditedBrowser(t, server, auditedBrowserRequest(t, server, "unknown", "{}"))
 	if status != 503 || calls.requests != 0 || bytes.Contains(b, []byte("provider")) || h.SecurityCounters().AuditUnavailable != 1 {
 		t.Fatalf("unaudited rejection escaped: %d %s", status, b)
@@ -254,12 +210,12 @@ type finalRejectionIdentity struct {
 
 func (f *finalRejectionIdentity) ResolveIdentity(context.Context) (identity.Identity, error) {
 	f.calls++
-	if f.late && f.calls == 3 {
+	if f.late && f.calls == 2 {
 		<-time.After(time.Until(f.until.Add(time.Millisecond)))
 	}
 	now := time.Now()
 	until := f.until
-	if f.calls == 3 {
+	if f.calls == 2 {
 		until = now.Add(5 * time.Second)
 	}
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read"}, VerifiedAt: now, ValidUntil: until}, nil
@@ -273,13 +229,13 @@ type deadlineRecorder struct {
 func (w *deadlineRecorder) SetWriteDeadline(until time.Time) error { w.until = until; return nil }
 func TestBrowserRejectionPreservesOriginalDeadlineThroughFinalRead(t *testing.T) {
 	for _, late := range []bool{false, true} {
-		h, _, _, normal, _, _ := auditedBrowserFixture(t)
+		h, _, _, rows, _ := auditedBrowserFixture(t)
 		current := &finalRejectionIdentity{until: time.Now().Add(100 * time.Millisecond), late: late}
 		req := httptest.NewRequest("POST", "https://example.invalid/api/v1/operations/unknown", nil)
 		w := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
 		h.rejectIngress(w, req, current, "unknown", []byte("{}"), 400)
-		if n, o := normal.count(); n != 1 || o != 1 {
-			t.Fatal("missing audit", n, o)
+		if n := rows.count(); n != 1 {
+			t.Fatal("missing audit", n)
 		}
 		if late {
 			if w.Code != 503 || !w.until.IsZero() {

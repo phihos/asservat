@@ -39,11 +39,11 @@ type ProfileSummaryReads struct {
 	Routes  ContextProjectionRouteReader
 }
 
-func (s ProfileSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.ProfileSummaryRequest) (*ContextProjectionDelivery, error) {
+func (s ProfileSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, requestID string, request value.ProfileSummaryRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
-		d, err = s.Service.begin(ctx, current, invocation, "get_profile_summary", ContextQueryInput{Profile: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
+		d, err = s.Service.begin(ctx, current, requestID, "get_profile_summary", ContextQueryInput{Profile: request}, func(ctx context.Context, caller identity.Identity) (value.ContextProjectionCandidate, error) {
 			c, err := s.Routes.ResolveProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller)
 			if err != nil || !c.RouteValid() || c.CaseID != request.CaseID || c.ArtifactID != request.ArtifactID || c.Selection != (value.LineSelection{}) || c.NativeType != "" || c.Headers != (value.HTTPHeaderWindow{}) || c.Profile != (value.ProfileSummarySelection{}) {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)

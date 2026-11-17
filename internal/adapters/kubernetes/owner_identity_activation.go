@@ -46,13 +46,6 @@ func ownerIdentityResourceStateValid(v contracts.InitialRuntimeResourceState, no
 			uids[c.Receipt.Secret.UID] = true
 		}
 	}
-	if c := v.CleanupProjection; c != nil {
-		ids[c.OperationID], ids[c.Setup.OperationID], ids[c.Setup.RoleSetupID] = true, true, true
-		uids[c.Setup.RoleRootUID] = true
-		if c.Receipt != nil {
-			uids[c.Receipt.Secret.UID] = true
-		}
-	}
 	if c := v.PermissionProjection; c != nil {
 		ids[c.OperationID] = true
 		if c.Receipt != nil {

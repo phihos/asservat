@@ -113,8 +113,7 @@ func TestReadBatchRequiresExactWorkerInvocationAndOriginalBounds(t *testing.T) {
 	}
 	w := ContextQueryWorker{QueryID: q.ID, WorkerID: q.WorkerID, PeerID: queryTestID, PodUID: queryTestID, ProcessEpoch: queryTestID,
 		Certificate: artifact.Digest{1}, Configuration: q.Plan.Profile.Path.WorkerConfiguration}
-	r := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "get_file_excerpt", InputFormat: "context-query-input/v1",
-		MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: q.Scope.Principal,
+	r := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "get_file_excerpt", Principal: q.Scope.Principal,
 		StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
 	b := ContextReadBatch{QueryID: q.ID, ID: queryTestID, OperationID: r.Call.ID, Generation: 1, Worker: w, Request: r,
 		StartedAt: a.CheckedAt, Until: a.ValidUntil, CleanupUntil: q.CleanupUntil}
@@ -123,7 +122,7 @@ func TestReadBatchRequiresExactWorkerInvocationAndOriginalBounds(t *testing.T) {
 	}
 	for _, mutate := range []func(*ContextReadBatch){
 		func(b *ContextReadBatch) { b.Worker.ProcessEpoch = "" }, func(b *ContextReadBatch) { b.Worker.WorkerID = queryOtherID },
-		func(b *ContextReadBatch) { b.Request.OwnerID = "" }, func(b *ContextReadBatch) { b.Request.Call.PrincipalDigest = artifact.Digest{} },
+		func(b *ContextReadBatch) { b.Request.OwnerID = "" }, func(b *ContextReadBatch) { b.Request.Call.RootID = "" },
 		func(b *ContextReadBatch) { b.OperationID = queryOtherID }, func(b *ContextReadBatch) { b.Generation = 3 },
 		func(b *ContextReadBatch) { b.Until = b.Request.Call.Until.Add(time.Second) }, func(b *ContextReadBatch) { b.CleanupUntil = b.Until },
 	} {
@@ -221,7 +220,7 @@ func TestProfileSummaryRequiresDeclaredWorkerMemoryWithoutChangingOldQueries(t *
 
 func TestLogQueryCallUsesExistingOriginalInvocationBounds(t *testing.T) {
 	a := testAuthority()
-	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "get_logs", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
+	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "get_logs", Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
 	if !call.Valid(a.CheckedAt) {
 		t.Fatal("actual logs invocation rejected before admission")
 	}

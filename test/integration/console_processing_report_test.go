@@ -53,7 +53,7 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 	}
 	sessions := &consoleSyntheticSessions{origin: origin, state: "ready", expiresAt: time.Now().Add(3 * time.Minute)}
 	session := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	facts := &consoleReportFacts{rows: consoleReportRows(time.Now().UTC().Truncate(time.Microsecond)), intents: map[string]audit.OperationIntent{}, outcomes: map[string]audit.OperationOutcome{}}
+	facts := &consoleReportFacts{rows: consoleReportRows(time.Now().UTC().Truncate(time.Microsecond)), events: map[string]audit.Event{}}
 	rootID := consoleCaptureID(41)
 	report := &privacyapp.ProcessingReport{RootID: rootID, InstallationID: rootID, Policies: facts, Reports: facts, Now: time.Now}
 	processing, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
@@ -80,10 +80,7 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mac.Close()
-	audited, err := presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{
-		RootID: rootID, Retention: time.Hour, NormalConcurrency: 4, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2,
-		NormalPerSecond: 64, ResolutionPerSecond: 1, Now: time.Now, NewID: custodyID,
-	}, operations, facts, facts, mac)
+	audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: rootID, Now: time.Now, NewID: custodyID}, operations, facts, mac)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,11 +106,10 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 	pageCount := 0
 	records := readProcessingReportExports(t, driver, output, func(summary reportPageSummary, page value.ProcessingReportPage) {
 		facts.mu.Lock()
-		outcome, ok := facts.outcomes[summary.RequestID]
+		event, ok := facts.events[summary.RequestID]
 		facts.mu.Unlock()
-		if !ok || outcome.Status != "success" || outcome.Effect != "none" || outcome.OutputBytes != summary.ResponseBytes ||
-			outcome.Intent.Name != "get_processing_report" || audit.OperationLane(outcome.Intent.Name) != "normal" {
-			t.Fatal("exported page differs from independently acknowledged actual response audit")
+		if !ok || event.Status != "success" || event.Effect != "none" || event.OutputBytes != summary.ResponseBytes || event.Operation != "get_processing_report" {
+			t.Fatal("exported page differs from its audit row")
 		}
 		pageCount++
 		if len(sections) == 0 || sections[len(sections)-1] != page.Section {
@@ -197,10 +193,9 @@ func qualifyConsoleReportResponseCapture(t *testing.T) {
 
 type consoleReportFacts struct {
 	consoleProcessingFacts
-	mu       sync.Mutex
-	rows     map[string][]value.ProcessingReportRecord
-	intents  map[string]audit.OperationIntent
-	outcomes map[string]audit.OperationOutcome
+	mu     sync.Mutex
+	rows   map[string][]value.ProcessingReportRecord
+	events map[string]audit.Event
 }
 
 func (f *consoleReportFacts) Configured() bool { return true }
@@ -209,22 +204,13 @@ func (f *consoleReportFacts) DownloadPolicy(ctx context.Context) (value.Download
 	policy.Processors = reportFixtureProcessors()
 	return policy, err
 }
-func (f *consoleReportFacts) Begin(ctx context.Context, in audit.OperationIntent) error {
+func (f *consoleReportFacts) Record(ctx context.Context, e audit.Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if ctx.Err() != nil || !in.Valid() || in.Name != "get_processing_report" || f.intents[in.ID].ID != "" {
+	if ctx.Err() != nil || !e.Valid() || e.Operation != "get_processing_report" || f.events[e.OperationID].ID != "" {
 		return auditapp.ErrUnavailable
 	}
-	f.intents[in.ID] = in
-	return nil
-}
-func (f *consoleReportFacts) Finish(ctx context.Context, out audit.OperationOutcome) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if ctx.Err() != nil || !out.Valid() || f.intents[out.Intent.ID].ID == "" || f.outcomes[out.Intent.ID].Intent.ID != "" {
-		return auditapp.ErrUnavailable
-	}
-	f.outcomes[out.Intent.ID] = out
+	f.events[e.OperationID] = e
 	return nil
 }
 func (f *consoleReportFacts) ReadProcessingReport(ctx context.Context, authority value.ProcessingAuthority, query value.ProcessingReportQuery) (value.ProcessingReportPage, error) {

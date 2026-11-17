@@ -14,29 +14,19 @@ import (
 	"time"
 )
 
+// presentationAuditGate records the call rows the wrapper writes.
 type presentationAuditGate struct {
-	intents               []audit.OperationIntent
-	outcomes              []audit.OperationOutcome
-	beginFail, finishFail bool
-	onBegin, onFinish     func()
+	events   []audit.Event
+	fail     bool
+	onRecord func()
 }
 
-func (g *presentationAuditGate) Begin(_ context.Context, in audit.OperationIntent) error {
-	g.intents = append(g.intents, in)
-	if g.onBegin != nil {
-		g.onBegin()
+func (g *presentationAuditGate) Record(_ context.Context, e audit.Event) error {
+	g.events = append(g.events, e)
+	if g.onRecord != nil {
+		g.onRecord()
 	}
-	if g.beginFail {
-		return auditapp.ErrUnavailable
-	}
-	return nil
-}
-func (g *presentationAuditGate) Finish(_ context.Context, out audit.OperationOutcome) error {
-	g.outcomes = append(g.outcomes, out)
-	if g.onFinish != nil {
-		g.onFinish()
-	}
-	if g.finishFail {
+	if g.fail {
 		return auditapp.ErrUnavailable
 	}
 	return nil
@@ -59,7 +49,7 @@ func auditedFixture(t *testing.T) (*AuditedOperations, *contextOperationFixture,
 	}
 	t.Cleanup(mac.Close)
 	gate := &presentationAuditGate{}
-	s := &AuditedOperations{config: AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Retention: time.Hour, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: inner.config.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000080" }}, inner: combined, audit: map[string]auditGate{"normal": gate, "resolution": gate}, mac: mac, contracts: inner.contracts, lanes: map[string]chan struct{}{"normal": make(chan struct{}, 1), "resolution": make(chan struct{}, 1)}, active: map[string]int{}, rate: map[string]auditRate{}}
+	s := &AuditedOperations{config: AuditedOperationsConfig{RootID: "00000000-0000-4000-8000-000000000010", Now: inner.config.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000080" }}, inner: combined, recorder: gate, mac: mac, contracts: inner.contracts, stopSlots: make(chan struct{}, 4)}
 	return s, f, gate
 }
 func TestAuditedOperationsUseOneServerIDAndNoPreAuditEffects(t *testing.T) {
@@ -69,49 +59,30 @@ func TestAuditedOperationsUseOneServerIDAndNoPreAuditEffects(t *testing.T) {
 		t.Fatal(e)
 	}
 	var b OperationEnvelope
-	if json.Unmarshal(reply.Body, &b) != nil || b.RequestID != g.intents[0].ID || b.RequestID != "00000000-0000-4000-8000-000000000080" {
+	if json.Unmarshal(reply.Body, &b) != nil || b.RequestID != g.events[0].OperationID || b.RequestID != "00000000-0000-4000-8000-000000000080" {
 		t.Fatal("inner generated second correlation ID")
 	}
-	if len(g.outcomes) != 1 || g.outcomes[0].Effect != "accepted" || g.outcomes[0].ClientReceipt != "unknown" || f.requests != 1 {
+	if len(g.events) != 1 || g.events[0].Kind != "call" || g.events[0].Operation != "request_capture" || g.events[0].Effect != "accepted" || f.requests != 1 {
 		t.Fatal(g, f.requests)
 	}
 	s, f, g = auditedFixture(t)
-	g.beginFail = true
-	if reply, e = s.Call(context.Background(), f, "request_capture", []byte(wireRequest)); e == nil || len(reply.Body) != 0 || f.requests != 0 {
-		t.Fatal("unaudited operation ran")
-	}
-	s, f, g = auditedFixture(t)
-	g.finishFail = true
+	g.fail = true
 	if reply, e = s.Call(context.Background(), f, "request_capture", []byte(wireRequest)); e == nil || len(reply.Body) != 0 || f.requests != 1 {
 		t.Fatal("unaudited result escaped")
 	}
 }
-func TestAuditedOperationsOriginalDeadlineRevocationAndCancellation(t *testing.T) {
-	for _, mode := range []string{"deadline", "groups", "scope", "policy", "cancel"} {
+func TestAuditedOperationsOriginalDeadline(t *testing.T) {
+	for _, mode := range []string{"deadline"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g := auditedFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			g.onFinish = func() {
-				switch mode {
-				case "deadline":
-					s.config.Now = func() time.Time { return f.metadataUntil }
-				case "groups":
-					f.i.Groups = []string{"changed"}
-				case "scope":
-					f.i.Scopes = nil
-				case "policy":
-					f.i.Policy.Generation++
-				case "cancel":
-					cancel()
-				}
+			g.onRecord = func() {
+				s.config.Now = func() time.Time { return f.metadataUntil }
 			}
 			reply, e := s.Call(ctx, f, "request_capture", []byte(wireRequest))
-			if e == nil || len(reply.Body) != 0 || len(g.outcomes) != 1 || f.requests != 1 {
+			if e == nil || len(reply.Body) != 0 || len(g.events) != 1 || f.requests != 1 {
 				t.Fatal("late audit renewed result", e)
-			}
-			if g.outcomes[0].ClientReceipt != "unknown" {
-				t.Fatal("delivery claimed")
 			}
 		})
 	}
@@ -119,26 +90,26 @@ func TestAuditedOperationsOriginalDeadlineRevocationAndCancellation(t *testing.T
 func TestAuditedOperationsRecordInvalidScopeAndUnknownCommitWithoutArguments(t *testing.T) {
 	s, f, g := auditedFixture(t)
 	f.i.Scopes = nil
-	if _, e := s.Call(context.Background(), f, "request_capture", []byte(wireRequest)); !errors.Is(e, identity.ErrDenied) || f.requests != 0 || len(g.outcomes) != 1 || g.outcomes[0].Status != "denied" {
+	if _, e := s.Call(context.Background(), f, "request_capture", []byte(wireRequest)); !errors.Is(e, identity.ErrDenied) || f.requests != 0 || len(g.events) != 1 || g.events[0].Status != "denied" {
 		t.Fatal("scope denial not audited", e)
 	}
 	s, f, g = auditedFixture(t)
-	if _, e := s.Call(context.Background(), f, "preview_capture", []byte(`{"reason":"private-free-text"}`)); e == nil || f.requests != 0 || len(g.outcomes) != 1 || g.outcomes[0].Status != "invalid" {
+	if _, e := s.Call(context.Background(), f, "preview_capture", []byte(`{"reason":"private-free-text"}`)); e == nil || f.requests != 0 || len(g.events) != 1 || g.events[0].Status != "invalid" {
 		t.Fatal("invalid request not audited")
 	}
-	b, _ := json.Marshal(g.intents)
+	b, _ := json.Marshal(g.events)
 	if bytes.Contains(b, []byte("private-free-text")) {
 		t.Fatal("raw request persisted")
 	}
 	s, f, g = auditedFixture(t)
 	f.err = errors.New("secret SQL connection details")
 	reply, e := s.Call(context.Background(), f, "request_capture", []byte(wireRequest))
-	if e != nil || g.outcomes[0].Effect != "unknown" || len(g.outcomes[0].CaptureIDs) != 0 || bytes.Contains(reply.Body, []byte("secret")) {
+	if e != nil || g.events[0].Effect != "unknown" || len(g.events[0].CaptureIDs) != 0 || bytes.Contains(reply.Body, []byte("secret")) {
 		t.Fatal("unknown commit misreported", e)
 	}
 }
-func TestAuditedOperationsNormalizationAndReservedResolutionLane(t *testing.T) {
-	s, f, _ := auditedFixture(t)
+func TestAuditedOperationsNormalizationIgnoresInputOrder(t *testing.T) {
+	s, _, _ := auditedFixture(t)
 	a, e := s.normalize("request_capture", []byte(wireRequest))
 	if e != nil {
 		t.Fatal(e)
@@ -147,31 +118,16 @@ func TestAuditedOperationsNormalizationAndReservedResolutionLane(t *testing.T) {
 	if e != nil || !bytes.Equal(a, b) {
 		t.Fatal("normalization depends on input order")
 	}
-	p, _ := s.mac.Principal(f.i.Principal)
-	release, ok := s.acquire("normal", p)
-	if !ok {
-		t.Fatal("first slot unavailable")
-	}
-	defer release()
-	if _, e = s.Call(context.Background(), f, "get_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030"}`)); e == nil {
-		t.Fatal("normal pool unlimited")
-	}
-	if _, e = s.Call(context.Background(), f, "resolve_capture_request", []byte(wireRequest)); e != nil || f.resolutions != 1 {
-		t.Fatal("normal pool starved resolution", e)
-	}
-	if len(s.active) != 1 {
-		t.Fatal("completed account map leaked")
-	}
 }
 
-func TestAuditedOperationFloorsSQLPrecisionWithoutExtendingCaller(t *testing.T) {
+func TestAuditedOperationDoesNotExtendCallerDeadline(t *testing.T) {
 	s, f, g := auditedFixture(t)
 	deadline := time.Now().Add(4*time.Second + 321*time.Nanosecond)
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 	reply, e := s.Call(ctx, f, "get_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030"}`))
-	if e != nil || len(g.intents) != 1 || g.intents[0].RequestUntil.After(deadline) || g.intents[0].RequestUntil.Nanosecond()%1000 != 0 || reply.ValidUntil.After(deadline) {
-		t.Fatal("SQL precision reset deadline", e)
+	if e != nil || len(g.events) != 1 || reply.ValidUntil.After(deadline) {
+		t.Fatal("reply outlived caller deadline", e)
 	}
 }
 
@@ -194,7 +150,7 @@ func TestAuditedOperationsCaseUsesSameIDAndOnlyAuthorizedReferences(t *testing.T
 		t.Fatal(e)
 	}
 	var envelope OperationEnvelope
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.RequestID != g.intents[0].ID || len(g.outcomes[0].CaseIDs) != 1 || g.outcomes[0].CaseIDs[0] != caseID || len(g.outcomes[0].ArtifactIDs) != 1 || g.outcomes[0].ArtifactIDs[0] != artifactID || len(g.outcomes[0].CaptureIDs) != 0 {
+	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.RequestID != g.events[0].OperationID || len(g.events[0].CaseIDs) != 1 || g.events[0].CaseIDs[0] != caseID || len(g.events[0].ArtifactIDs) != 1 || g.events[0].ArtifactIDs[0] != artifactID || len(g.events[0].CaptureIDs) != 0 {
 		t.Fatal("case audit projected private or wrong references")
 	}
 	if !reply.ValidUntil.Equal(view.view.ValidUntil) {
@@ -219,7 +175,7 @@ func TestAuditedOperationsPreserveDisabledBrowserExplanation(t *testing.T) {
 		t.Fatal("audit wrapper enabled mutation")
 	}
 	reply, e := s.Call(context.Background(), f, "request_capture", []byte(wireRequest))
-	if e != nil || f.requests != 0 || len(g.outcomes) != 1 || !bytes.Contains(reply.Body, []byte("CollectionDisabled")) {
+	if e != nil || f.requests != 0 || len(g.events) != 1 || !bytes.Contains(reply.Body, []byte("CollectionDisabled")) {
 		t.Fatal("disabled request changed behavior", e)
 	}
 }
@@ -257,18 +213,18 @@ func TestAuditedOperationsPreservePrivateDenialDecision(t *testing.T) {
 				s.inner.(*InvestigationOperations).captures.config.CollectionEnabled = false
 			}
 			reply, err := s.Call(context.Background(), f, tt.operation, []byte(tt.input))
-			if err != nil || f.requests != tt.dispatches || f.resolutions != tt.resolves || len(g.outcomes) != 1 {
-				t.Fatalf("canonical error envelope lost: err=%v dispatches=%d outcomes=%d", err, f.requests, len(g.outcomes))
+			if err != nil || f.requests != tt.dispatches || f.resolutions != tt.resolves || len(g.events) != 1 {
+				t.Fatalf("canonical error envelope lost: err=%v dispatches=%d outcomes=%d", err, f.requests, len(g.events))
 			}
-			out := g.outcomes[0]
+			out := g.events[0]
 			if out.Status != tt.status || out.Reason != tt.reason || out.Effect != tt.effect {
 				t.Fatalf("audit decision = %s/%s/%s, want %s/%s/%s", out.Status, out.Reason, out.Effect, tt.status, tt.reason, tt.effect)
 			}
-			if out.ClientReceipt != "unknown" || len(out.CaptureIDs) != 0 || len(out.CaseIDs) != 0 || len(out.ArtifactIDs) != 0 || out.OutputBytes != int64(len(reply.Body)) {
+			if len(out.CaptureIDs) != 0 || len(out.CaseIDs) != 0 || len(out.ArtifactIDs) != 0 || out.OutputBytes != int64(len(reply.Body)) {
 				t.Fatal("error audit invented a result or lost exact output size")
 			}
 			expectedDigest, digestErr := s.mac.Digest("mcp-result/v1", reply.Body)
-			if digestErr != nil || out.OutputDigest != expectedDigest {
+			if digestErr != nil || out.OutputDigest == nil || *out.OutputDigest != expectedDigest {
 				t.Fatal("private classification replaced the exact prepared-output digest")
 			}
 			if s.contracts.ValidateOutput(tt.operation, reply.Body) != nil || bytes.Contains(reply.Body, []byte("private")) || bytes.Contains(reply.Body, []byte("audit")) {
@@ -287,7 +243,7 @@ func TestAuditedOperationsPreDispatchRejectionsHaveNoInvocationEffect(t *testing
 		} else {
 			f.i.Scopes = nil
 		}
-		if _, err := s.Call(context.Background(), f, "request_capture", []byte(input)); err == nil || f.requests != 0 || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" {
+		if _, err := s.Call(context.Background(), f, "request_capture", []byte(input)); err == nil || f.requests != 0 || len(g.events) != 1 || g.events[0].Effect != "none" {
 			t.Fatal("known pre-dispatch rejection has an uncertain invocation effect", err)
 		}
 	}
@@ -304,7 +260,7 @@ func TestContinuationAuditBindsExplicitActionWithoutChangingBusinessKey(t *testi
 	if err != nil || bytes.Equal(original, continuation) || !bytes.Contains(continuation, []byte(`"continue_acquisition":true`)) {
 		t.Fatal("audit lost explicit effect selection", err)
 	}
-	if _, err = s.Call(context.Background(), f, "request_capture", input); err != nil || f.continuations != 1 || f.requests != 0 || len(g.outcomes) != 1 {
+	if _, err = s.Call(context.Background(), f, "request_capture", input); err != nil || f.continuations != 1 || f.requests != 0 || len(g.events) != 1 {
 		t.Fatal("continuation bypassed audited dispatch", err)
 	}
 }
@@ -315,7 +271,7 @@ func TestAuditedDownloadWithoutDownloadScopeIsADenialReply(t *testing.T) {
 	s, f, g := auditedFixture(t)
 	f.i.Scopes = []string{"evidence:read"}
 	reply, err := s.Call(context.Background(), f, "prepare_artifact_download", []byte(`{"artifact_id":"00000000-0000-4000-8000-000000000030","idempotency_key":"key"}`))
-	if err != nil || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" || !bytes.Contains(reply.Body, []byte(`"status":"error"`)) || s.contracts.ValidateOutput("prepare_artifact_download", reply.Body) != nil {
-		t.Fatalf("err=%v outcomes=%d body=%s", err, len(g.outcomes), reply.Body)
+	if err != nil || len(g.events) != 1 || g.events[0].Effect != "none" || !bytes.Contains(reply.Body, []byte(`"status":"error"`)) || s.contracts.ValidateOutput("prepare_artifact_download", reply.Body) != nil {
+		t.Fatalf("err=%v outcomes=%d body=%s", err, len(g.events), reply.Body)
 	}
 }

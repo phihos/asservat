@@ -324,7 +324,7 @@ func (s *consoleRestartDownloads) CancelContextDownload(ctx context.Context, c a
 		return artifact.DownloadStopReceipt{}, artifact.ErrDownloadConflict
 	}
 	now := time.Now()
-	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: s.stopRequest, State: "Cancelled", AuditState: "pending", ObservedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), i.ValidUntil)}, nil
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: s.stopRequest, State: "Cancelled", ObservedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), i.ValidUntil)}, nil
 }
 func (s *consoleRestartDownloads) loseReply(name string) bool {
 	s.mu.Lock()

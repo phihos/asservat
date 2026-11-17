@@ -11,7 +11,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
@@ -103,13 +102,6 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				executionSQL := newExecution(sharedPool)
 				prepare, execute, read := executionSQL, executionSQL, executionSQL
-				intents, err := postgres.NewCaptureIntentAudits(ctx, pool("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-					t.Fatal(err)
-				}
 				// ADR-176: the executor Pod is also the connector process whose client
 				// leaf wraps this attempt's keysets.
 				executorPod := custodyID()
@@ -368,7 +360,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				if erasure != nil {
 					erasure.policy.value.Processors = reportFixtureProcessors()
-					unknown := stageProcessingReportUnknown(t, ctx, erasure)
+					unknown := stageProcessingReportCall(t, ctx, sharedPool, erasure, accepted.Expectation)
 					stageProcessingReportRule(t, ctx, erasure, accepted.Expectation)
 					qualifyProcessingReport(t, ctx, sharedPool, s, erasure, accepted.Expectation, artifact.StoredUnpublished, unknown)
 					qualifyProcessingEarlyErasure(t, ctx, admin, sharedPool, poolFor, store, bound, keys, s3admin, bucket, s, erasure, published)

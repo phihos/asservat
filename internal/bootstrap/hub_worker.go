@@ -125,7 +125,7 @@ func completeHubWorkerConfig(c *contracts.HubWorkerConfig, ids contracts.Install
 	if c.Permission != nil && c.Permission.WorkerConfiguration != nil {
 		c.Provider.WorkerConfigurationAudit = contracts.OwnerPublicTransit{Mount: audit, Key: n.WorkerConfigurationAuditKey}
 	}
-	if c.Cleanup != nil || c.Permission != nil && c.Permission.ContextDeletion != nil {
+	if c.Permission != nil && c.Permission.ContextDeletion != nil {
 		c.Provider.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: audit, Key: n.DeletionSigningKey}
 	}
 }
@@ -378,9 +378,6 @@ func (w *hubWorker) children() []hubWorkerChild {
 	out := []hubWorkerChild{{"configuration", w.runConfiguration}}
 	if w.config.Capacity != nil {
 		out = append(out, hubWorkerChild{"capacity", w.runCapacity})
-	}
-	if w.config.Cleanup != nil {
-		out = append(out, hubWorkerChild{"cleanup", w.runCleanup})
 	}
 	if w.config.Permission != nil {
 		out = append(out, hubWorkerChild{"permission", w.runPermission})

@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -128,15 +127,6 @@ func qualifyArgumentObservationCompanion(t *testing.T, ctx context.Context, admi
 	}
 	statuses, err := postgres.NewPolicyTriggers(ctx, hub, s.a.RootID, authority.InstallationID)
 	if err != nil {
-		t.Fatal(err)
-	}
-	intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-	defer intentPool.Close()
-	intents, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 		t.Fatal(err)
 	}
 	e := accepted.Expectation

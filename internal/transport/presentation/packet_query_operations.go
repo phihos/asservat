@@ -10,7 +10,7 @@ import (
 )
 
 type PacketQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.PacketQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.PacketQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 func (s *ContextProjectionOperations) WithPacketQueries(q PacketQueryService) (*ContextProjectionOperations, error) {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -26,7 +25,7 @@ import (
 // Same current SQL/authority preflight as the encrypted completion fixture,
 // without creating a node writer, object or packet. Process/target facts remain
 // explicitly synthetic component inputs; SQL admission/start/cancellation are real.
-func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, start bool) (*postgres.APIContextExecutions, executionapp.APIExecutionCheck, executionvalue.APIExecution) {
+func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents captureapp.ContextAcceptedIntents, start bool) (*postgres.APIContextExecutions, executionapp.APIExecutionCheck, executionvalue.APIExecution) {
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
@@ -34,7 +33,7 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	if e.Snapshot == nil || e.Recording != nil {
 		t.Fatal("not an admitted existing-source snapshot")
 	}
-	if _, err := intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
+	if _, err := intents.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("audited exact snapshot intent", err)
 	}
 	hub := f.roles["hub-runtime"]
@@ -127,7 +126,7 @@ func manualCancellationExecution(t *testing.T, ctx context.Context, f *capacityS
 	return executions, check, execution
 }
 
-func qualifyManualRecordingSaveCancellation(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, source captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
+func qualifyManualRecordingSaveCancellation(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, source captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, intents captureapp.ContextAcceptedIntents) {
 	t.Helper()
 	baseline := readManualSaveCounters(t, ctx, f, policy)
 	var originalSource []byte

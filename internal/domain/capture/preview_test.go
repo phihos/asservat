@@ -31,8 +31,9 @@ func TestContextPreviewStructuralBounds(t *testing.T) {
 		"duplicate policy":         func(p *ContextPreview) { p.Retention.Policies = append(p.Retention.Policies, p.Retention.Policies[0]) },
 		"no report rule":           func(p *ContextPreview) { p.AssessmentRulesDigest = artifact.Digest{} },
 		"oversized scope":          func(p *ContextPreview) { p.CanonicalScope = make([]byte, MaxContextPreviewScope+1) },
-		"raw reason substitute": func(p *ContextPreview) {
-			p.Intent.Reason = &ProtectedReasonRef{ID: "free text", CiphertextDigest: artifact.Digest{5}, ExpiresAt: p.Deadline}
+		"empty reason": func(p *ContextPreview) {
+			empty := ""
+			p.Intent.Reason = &empty
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -64,9 +65,10 @@ func TestContextPreviewRelativeRetentionAndPodNormalization(t *testing.T) {
 
 func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 	p := domainPreview()
-	p.Intent.Reason = &ProtectedReasonRef{ID: "00000000-0000-4000-8000-000000000099", CiphertextDigest: artifact.Digest{8}, ExpiresAt: p.Deadline}
+	reason := "investigating a crash"
+	p.Intent.Reason = &reason
 	if !p.Valid() {
-		t.Fatal("valid protected reference rejected")
+		t.Fatal("valid reason rejected")
 	}
 	p.Intent.RepeatedFrom = &HistoryLineage{CaptureID: "00000000-0000-4000-8000-000000000098", ExpiresAt: p.Deadline}
 	copy := p.Clone()
@@ -77,13 +79,9 @@ func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 	copy.CanonicalScope[0] = '!'
 	copy.Audience[0].SubjectID = "other"
 	copy.Retention.Policies[0].UID = "other"
-	copy.Intent.Reason.CiphertextDigest[0]++
-	if p.CanonicalScope[0] != '{' || p.Audience[0].SubjectID != "developer" || p.Retention.Policies[0].UID != "retention" || p.Intent.Reason.CiphertextDigest[0] != 8 {
+	*copy.Intent.Reason = "other"
+	if p.CanonicalScope[0] != '{' || p.Audience[0].SubjectID != "developer" || p.Retention.Policies[0].UID != "retention" || *p.Intent.Reason != "investigating a crash" {
 		t.Fatal("clone aliases mutable state")
-	}
-	p.Intent.Reason.ExpiresAt = p.CreatedAt.Add(time.Minute)
-	if !p.Valid() {
-		t.Fatal("descriptive reason expiry changed capture review lifetime")
 	}
 }
 

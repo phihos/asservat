@@ -750,7 +750,7 @@ func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProvi
 		return publicAuditStore{}, err
 	}
 	d.closers = append(d.closers, keys.CloseIdleConnections)
-	return publicAuditStore{seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedOperationAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener(), slots: make(chan struct{}, c.Concurrency)}}, nil
+	return publicAuditStore{seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener(), slots: make(chan struct{}, c.Concurrency)}}, nil
 }
 
 // backendInputs is the backend root: the installed observation projection

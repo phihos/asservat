@@ -183,7 +183,6 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	p.roles = []openBaoRole{
 		worker("audit-wrap", read(use(encrypt, key(audit, n.WorkerConfigurationAuditKey, "encrypt"), sign), audit+"/keys/"+n.DeletionSigningKey)),
 		worker("audit-unwrap", use(decrypt, key(audit, n.WorkerConfigurationAuditKey, "decrypt"))),
-		worker("cleanup-wrap", use(encrypt)), worker("cleanup-open", use(decrypt)), worker("cleanup-verify", use(decrypt)), worker("cleanup-sign", read(use(sign), audit+"/keys/"+n.DeletionSigningKey)),
 		owner("hub-api", hub, "audit-wrap", use(encrypt)), owner("hub-api", hub, "audit-unwrap", use(decrypt)),
 		owner("hub-api", hub, "server-sign", use(ownerPKI+"/sign/"+n.OwnerServerRole)), owner("hub-api", hub, "client-sign", use(ownerPKI+"/sign/"+n.OwnerClientRole)),
 		owner("hub-api", hub, "browser-seal", use(key(transit, n.BrowserSessionKey, "encrypt"))), owner("hub-api", hub, "browser-open", use(key(transit, n.BrowserSessionKey, "decrypt"))),

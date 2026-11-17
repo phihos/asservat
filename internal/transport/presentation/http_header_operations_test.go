@@ -97,7 +97,7 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		len(pending.Data) != 2 || pending.Data["query_handle"] != f.q.ID {
 		t.Fatalf("not the canonical pending reply: %s", first.Body)
 	}
-	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.intents[0].InputFormat != "context-query-input/v1" || g.outcomes[0].Effect != "accepted" {
+	if f.admissions != 1 || f.starts != 1 || f.reads != 0 || g.events[0].Effect != "accepted" {
 		t.Fatal("begin did not admit one audited query")
 	}
 	if f.q.Scope.BeginTool() != "get_http_headers" || f.q.Scope.Headers != (value.HTTPHeaderWindow{Limit: 100}) {
@@ -112,7 +112,7 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer second.Close(context.Background())
-	if s.contracts.ValidateOutput("get_query_result", second.Body) != nil || p.last.delivery == nil || p.last.delivery.Tool() != "get_http_headers" {
+	if s.contracts.ValidateOutput("get_query_result", second.Body) != nil || p.last == nil || p.last.Tool() != "get_http_headers" {
 		t.Fatal("invalid nested page")
 	}
 	var poll struct {
@@ -130,7 +130,7 @@ func TestHTTPHeaderQueryBeginsPendingAndServesPageByPoll(t *testing.T) {
 		*page.NextCursor != value.HTTPHeaderCursor(100, headerDigest) || len(page.Provenance) != 1 || page.Provenance[0].ArtifactID != bridgeID {
 		t.Fatalf("wrong page: %s", poll.Data.Result)
 	}
-	if f.reads != 1 || g.outcomes[1].Effect != "accepted" || g.outcomes[1].Status != "success" {
+	if f.reads != 1 || g.events[1].Effect != "accepted" || g.events[1].Status != "success" {
 		t.Fatal("page not charged and audited as a read")
 	}
 }
@@ -174,7 +174,7 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 		reply, err := s.Call(context.Background(), f, "get_http_headers", headerInput("1:zz", 0))
 		var body headerPageBody
 		if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "InvalidCursor" ||
-			f.admissions != 0 || g.outcomes[0].Effect != "none" || g.outcomes[0].Status != "invalid" {
+			f.admissions != 0 || g.events[0].Effect != "none" || g.events[0].Status != "invalid" {
 			t.Fatalf("malformed cursor: %v %s", err, reply.Body)
 		}
 	})
@@ -192,8 +192,8 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 		reply, err := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID))
 		var body headerPageBody
 		if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "InvalidCursor" ||
-			s.contracts.ValidateOutput("get_query_result", reply.Body) != nil || f.reads != 1 || g.outcomes[1].Effect != "accepted" || g.outcomes[1].Status != "invalid" {
-			t.Fatalf("worker cursor refusal: %v %s %+v", err, reply.Body, g.outcomes)
+			s.contracts.ValidateOutput("get_query_result", reply.Body) != nil || f.reads != 1 || g.events[1].Effect != "accepted" || g.events[1].Status != "invalid" {
+			t.Fatalf("worker cursor refusal: %v %s %+v", err, reply.Body, g.events)
 		}
 	})
 	t.Run("worker-too-large", func(t *testing.T) {
@@ -215,8 +215,8 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 			} `json:"data"`
 		}
 		if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "AnalysisUnavailable" || body.Data.Retryable ||
-			s.contracts.ValidateOutput("get_query_result", reply.Body) != nil || g.outcomes[1].Effect != "accepted" || g.outcomes[1].Status != "denied" {
-			t.Fatalf("worker too-large refusal: %v %s %+v", err, reply.Body, g.outcomes)
+			s.contracts.ValidateOutput("get_query_result", reply.Body) != nil || g.events[1].Effect != "accepted" || g.events[1].Status != "denied" {
+			t.Fatalf("worker too-large refusal: %v %s %+v", err, reply.Body, g.events)
 		}
 	})
 }

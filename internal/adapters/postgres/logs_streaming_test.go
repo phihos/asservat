@@ -45,7 +45,7 @@ func (d *logsStreamBindingDB) Exec(_ context.Context, sql string, args ...any) (
 // This exercises adapter effects, not PostgreSQL role/rollback qualification.
 func TestLogsStreamBindsOriginalProcessBeforeOneShotWriter(t *testing.T) {
 	var e artifact.ContextExpectation
-	if err := json.Unmarshal(progressFactsFixture(t, "pending").ContextCapture.ExpectationJson, &e); err != nil {
+	if err := json.Unmarshal(progressFactsFixture(t, "accepted").ContextCapture.ExpectationJson, &e); err != nil {
 		t.Fatal(err)
 	}
 	e.ExecutionClass, e.NodeUID, e.NodeBootID = artifact.ContextAPIExecution, "", ""

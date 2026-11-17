@@ -69,7 +69,7 @@ func TestProcessingInventoryRequiresCurrentOperatorBeforeSQLAndPreservesOriginal
 		})
 	}
 }
-func TestProcessingArtifactSelectorResolvesUnderOneOriginalAuthorityBeforeCanonicalAudit(t *testing.T) {
+func TestProcessingArtifactSelectorResolvesUnderOneOriginalAuthority(t *testing.T) {
 	base, s, _ := newProcessingFixture(t)
 	f := &processingInventoryFixture{processingFixture: base, scope: value.ProcessingScope{Kind: "artifact", Location: artifact.Location{ClusterID: processingID(10), ArtifactID: processingID(11), AttemptID: processingID(12)}}}
 	s.ArtifactScopes = f
@@ -91,7 +91,7 @@ func TestProcessingArtifactSelectorResolvesUnderOneOriginalAuthorityBeforeCanoni
 	if err != nil || string(raw) == "" {
 		t.Fatal(err)
 	}
-	if again, err := s.Change(context.Background(), f, c); err != nil || again.OperationID != result.OperationID || f.begins != 1 {
+	if again, err := s.Change(context.Background(), f, c); err != nil || again.OperationID != result.OperationID || f.applies != 1 {
 		t.Fatal("same-key selector replay changed effect", again, err)
 	}
 }
@@ -110,7 +110,7 @@ func TestProcessingArtifactSelectorCannotSurviveExpiredLookupOrResolveForOrdinar
 				f.scope.Location.ArtifactID = processingID(99)
 			}
 			_, err := s.Change(t.Context(), f, value.ProcessingChange{Action: "restrict_processing", RequestID: processingID(21), RuleID: processingID(22), RequestedArtifactID: processingID(11)})
-			if err == nil || f.begins != 0 || f.prepared != nil {
+			if err == nil || f.applies != 0 || f.prepared != nil {
 				t.Fatal("selector crossed original authority", err)
 			}
 			if mode == "ordinary" && f.scopeReads != 0 {

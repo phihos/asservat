@@ -52,7 +52,7 @@ func compiledRecordingReplayRow(t *testing.T, raw bool) custodydb.ContextCapture
 	if err != nil || recording.RequireApproval || (plan.Approval != nil) != raw {
 		t.Fatal("independent raw approval", recording.RequireApproval, err)
 	}
-	row := progressFactsFixture(t, "pending").ContextCapture
+	row := progressFactsFixture(t, "accepted").ContextCapture
 	var e artifact.ContextExpectation
 	if err = json.Unmarshal(row.ExpectationJson, &e); err != nil {
 		t.Fatal(err)

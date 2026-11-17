@@ -11,7 +11,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
@@ -83,15 +82,6 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 			t.Fatal("protected intent", err)
 		}
 	} else {
-		intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-		defer intentPool.Close()
-		intent, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: intent, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-			t.Fatal("raw companion acknowledged capture intent", err)
-		}
 	}
 	e := accepted.Expectation
 	program := admission.Plan.Input.Recorder.Filters[0].Filter.Program

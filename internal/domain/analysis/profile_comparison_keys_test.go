@@ -18,7 +18,7 @@ func comparisonKeyFixture(t *testing.T) (ContextQuery, ContextReadBatch, Context
 		t.Fatal(err)
 	}
 	w := ContextQueryWorker{QueryID: q.ID, WorkerID: q.WorkerID, PeerID: queryTestID, PodUID: queryTestID, ProcessEpoch: queryTestID, Certificate: artifact.Digest{1}, Configuration: q.Plan.Profile.Path.WorkerConfiguration}
-	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "compare_profiles", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
+	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "compare_profiles", Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
 	batch := ContextReadBatch{QueryID: q.ID, ID: queryTestID, OperationID: queryTestID, Generation: 1, Worker: w, Request: request, StartedAt: a.CheckedAt, Until: a.ValidUntil, CleanupUntil: q.CleanupUntil}
 	if !batch.Current(q, a, a.CheckedAt) {
 		t.Fatal("invalid compound batch")
@@ -119,7 +119,7 @@ func TestProfileComparisonActualControlEncodingBounds(t *testing.T) {
 	}
 	digest := a.DecisionDigest
 	w := ContextQueryWorker{QueryID: q.ID, WorkerID: q.WorkerID, PeerID: queryTestID, PodUID: queryTestID, ProcessEpoch: queryTestID, Certificate: digest, Configuration: q.Plan.Profile.Path.WorkerConfiguration}
-	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "compare_profiles", InputFormat: "context-query-input/v1", MACVersion: strings.Repeat("<", 64), InputDigest: digest, PrincipalDigest: digest, Principal: a.Scope.Principal, StartedAt: start, Until: a.ValidUntil, WriteUntil: start.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
+	request := ContextQueryRequest{Call: ContextQueryCall{ID: queryTestID, RootID: q.Scope.RootID, Tool: "compare_profiles", Principal: a.Scope.Principal, StartedAt: start, Until: a.ValidUntil, WriteUntil: start.Add(30 * time.Second)}, OwnerID: queryTestID, HubProcessEpoch: queryTestID}
 	b := ContextReadBatch{QueryID: q.ID, ID: queryTestID, OperationID: queryTestID, Generation: 1, Worker: w, Request: request, StartedAt: start, Until: a.ValidUntil, CleanupUntil: q.CleanupUntil}
 	if !b.Current(q, a, start) {
 		t.Fatal("maximum complete batch invalid")

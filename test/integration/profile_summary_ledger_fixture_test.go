@@ -1,20 +1,15 @@
 package integration
 
 import (
-	"context"
 	"crypto/sha256"
 	"errors"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/migrations"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -177,7 +172,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityR
 		t.Fatal("profile admitted with wrong shape")
 	}
 
-	if _, err = publisher.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
+	if _, err = publisher.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("managed profile capture intent", err)
 	}
 	execSQL, err := postgres.NewAPIContextExecutions(ctx, pools.ordinary, p.RootID, s.recovery.installation)
@@ -284,99 +279,4 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 		t.Fatal("profile source start", err)
 	}
 	return started, refresh
-}
-
-func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	db := stdlib.OpenDB(*f.base.admin.Config().ConnConfig)
-	defer db.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	head, err := provider.GetDBVersion(f.base.ctx)
-	if err != nil || head < 127 {
-		t.Fatal("summary rollback requires schema127 or newer", head, err)
-	}
-	// A retained verified byte count is a stronger rollback fence introduced
-	// after summary queries. Never erase it to reach the older127 guard.
-	stop, refusal := int64(127), "profile summary query history cannot be downgraded"
-	if head >= 130 {
-		var retainedLength bool
-		if err = f.base.admin.QueryRow(f.base.ctx, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE native_bytes IS NOT NULL)").Scan(&retainedLength); err != nil {
-			t.Fatal("retained native-length observation", err)
-		}
-		if retainedLength {
-			stop, refusal = 130, "retained native-length verification prevents rollback"
-		}
-	}
-	if head >= 134 {
-		var retainedTiming bool
-		if err = f.base.admin.QueryRow(f.base.ctx, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)").Scan(&retainedTiming); err != nil {
-			t.Fatal("retained acquisition-window observation", err)
-		}
-		if retainedTiming {
-			stop, refusal = 134, "retained acquisition-window verification prevents rollback"
-		}
-	}
-	// Exclude only133's nullable route column so the snapshot compares the
-	// same immutable queries and spend across the supported schema prefix.
-	snapshot := func(ctx context.Context) (string, error) {
-		var b []byte
-		err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-ARRAY['baseline_allocation_id','invocation_key','request_digest'] ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
-		if err != nil {
-			return "", err
-		}
-		if stop == 134 {
-			var verification []byte
-			if err = f.base.admin.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(v) ORDER BY capture_id) FROM context_verification v WHERE root_id=$1`, f.base.input.PermissionRootID).Scan(&verification); err != nil {
-				return "", err
-			}
-			return string(b) + "\n" + string(verification), nil
-		}
-		if stop == 130 {
-			var sizes []byte
-			if err = f.base.admin.QueryRow(ctx, `SELECT jsonb_agg(jsonb_build_object('capture',capture_id,'bytes',native_bytes,'copies',encode(copies_digest,'hex')) ORDER BY capture_id) FROM context_verification WHERE root_id=$1`, f.base.input.PermissionRootID).Scan(&sizes); err != nil {
-				return "", err
-			}
-			return string(b) + "\n" + string(sizes), nil
-		}
-		return string(b), nil
-	}
-	before, err := snapshot(f.base.ctx)
-	if err != nil {
-		t.Fatal("summary pre-rollback snapshot", err)
-	}
-	// Goose may have committed later Down migrations before the retained
-	// source refuses. Repair that prefix on every exit, including Fatal/cancel.
-	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
-		defer cancel()
-		if _, err := provider.UpTo(cleanup, head); err != nil {
-			t.Error("restore schema after summary rollback", err)
-			return
-		}
-		grants(cleanup)
-		restored, err := provider.GetDBVersion(cleanup)
-		if err != nil || restored != head {
-			t.Error("summary rollback did not restore original schema head", restored, head, err)
-		}
-		after, err := snapshot(cleanup)
-		if err != nil || after != before {
-			t.Error("summary rollback restoration changed retained query/spend state", err)
-		}
-	}()
-	if _, err = provider.DownTo(f.base.ctx, stop-1); err == nil || !strings.Contains(err.Error(), refusal) {
-		t.Fatal("retained summary/source rollback", stop, err)
-	}
-	afterHead, err := provider.GetDBVersion(f.base.ctx)
-	if err != nil || afterHead != stop {
-		t.Fatal("refused rollback left unexpected schema prefix", afterHead, stop, err)
-	}
-	after, err := snapshot(f.base.ctx)
-	if err != nil || after != before {
-		t.Fatal("refused summary/source rollback changed query identity or spend", err)
-	}
-	t.Logf("retained summary/source rollback%d->%d refused by %s; query identity/limits/spend unchanged; original schema%d restoration readback follows", stop, stop-1, refusal, head)
 }

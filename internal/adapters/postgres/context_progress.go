@@ -57,13 +57,10 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 	if c.ProgressRevision < 1 || c.ProgressRevision > value.MaxProgressRevision || !bytes.Equal(f.RequestDigest, digest(normalized(accepted.Expectation.Registration))) {
 		return out, value.ErrUnavailable
 	}
-	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}
-	if intent.ReasonRef != nil {
-		parent := intent.CaptureID
-		if intent.Group != nil {
-			parent = intent.Group.ParentCaptureID
-		}
-		out.ReasonMetadata = &value.CaptureReasonMetadata{RootID: intent.RootID, CaptureID: parent, AuditCaptureID: intent.CaptureID, Reference: value.ProtectedReasonRef{ID: intent.ReasonRef.ID, CiphertextDigest: intent.ReasonRef.CiphertextDigest, ExpiresAt: intent.ReasonRef.ExpiresAt}, Requester: intent.Requester(), ScopeDigest: intent.ScopeDigest}
+	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed"}
+	if c.Reason.Valid {
+		reason := c.Reason.String
+		out.Reason = &reason
 	}
 	out.Operation, out.ActionID = "collect", accepted.Expectation.ActionID
 	if e := accepted.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
@@ -72,12 +69,8 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 	if out.ShareID, err = captureShareID(c.ShareInstruction); err != nil {
 		return out, err
 	}
-	audited := c.State == value.IntentAudited
-	if audited {
-		if _, err = historicalPublication(c); err != nil {
-			return value.ContextProgressObservation{}, value.ErrUnavailable
-		}
-		out.ReasonCode = "DispatchUnconfirmed"
+	if _, err = historicalPublication(c); err != nil {
+		return value.ContextProgressObservation{}, value.ErrUnavailable
 	}
 	out.CancellationRequested = c.SnapshotCancelRequestedAt.Valid
 	if c.SnapshotCancelJoinedAt.Valid {
@@ -182,7 +175,7 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		out.ActionPhase = "Indeterminate"
 		out.ReasonCode = "DeadlineOutcomeUnconfirmed"
 	} else if verified || f.CustodyState == artifact.StoredUnpublished {
-		if !audited || len(f.CopiesDigest) != 32 {
+		if len(f.CopiesDigest) != 32 {
 			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
 		out.Phase = "Finalizing"

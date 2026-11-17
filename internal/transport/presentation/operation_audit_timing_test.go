@@ -68,7 +68,7 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 			}
 			entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var unblock sync.Once
-			gate.onFinish = func() { close(entered); <-release }
+			gate.onRecord = func() { close(entered); <-release }
 			type sample struct{ event, line string }
 			samples := make(chan sample, 3)
 			s.Timing = func(event, line string) { samples <- sample{event, line} }
@@ -95,7 +95,7 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 			early := mode != "success"
 			select {
 			case got := <-samples:
-				if !early || got.event != "preview_capture/service-failed" || !strings.Contains(got.line, " call@") || !strings.Contains(got.line, "p-target@") || strings.Contains(got.line, "finish") || strings.Contains(got.line, "private") || strings.Contains(got.line, "api") || len(got.line) > 2048 || strings.Count(got.line, "p-target@") != 64 {
+				if !early || got.event != "preview_capture/service-failed" || !strings.HasPrefix(got.line, "call@") || !strings.Contains(got.line, "p-target@") || strings.Contains(got.line, "finish") || strings.Contains(got.line, "private") || strings.Contains(got.line, "api") || len(got.line) > 2048 || strings.Count(got.line, "p-target@") != 64 {
 					t.Fatal("unbounded, late or unexpected failure timing", got)
 				}
 			default:
@@ -119,7 +119,7 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 			if mode == "success" {
 				wantEvent = "request_capture"
 			}
-			if final.event != wantEvent || !strings.Contains(final.line, " finish@") {
+			if final.event != wantEvent || !strings.Contains(final.line, " audit@") {
 				t.Fatal("original final timing lost", final)
 			}
 			select {
@@ -127,12 +127,12 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 				t.Fatal("duplicate timing", extra)
 			default:
 			}
-			if preview.calls+f.requests != 1 || len(gate.intents) != 1 || len(gate.outcomes) != 1 {
-				t.Fatal("diagnostic redispatched service or audit", preview.calls, len(gate.intents), len(gate.outcomes))
+			if preview.calls+f.requests != 1 || len(gate.events) != 1 {
+				t.Fatal("diagnostic redispatched service or audit", preview.calls, len(gate.events))
 			}
 			if preview.expire {
 				if callErr == nil {
-					t.Fatal("expired operation result changed", callErr, gate.outcomes[0].Status)
+					t.Fatal("expired operation result changed", callErr, gate.events[0].Status)
 				}
 				return
 			}
@@ -160,24 +160,24 @@ func TestAuditedPreview750MillisecondSuccessTail(t *testing.T) {
 	preview := &timingPreview{contextOperationFixture: f, readyAt: originalEnd.Add(-750 * time.Millisecond), assessment: &assessment}
 	s.inner.(*InvestigationOperations).captures.captures = preview
 	var finished time.Time
-	gate.onFinish = func() { finished = time.Now() }
+	gate.onRecord = func() { finished = time.Now() }
 	reply, err := s.Call(ctx, f, "preview_capture", []byte(wirePreview))
 	returned := time.Now()
 	var envelope OperationEnvelope
-	if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || len(reply.Body) == 0 || preview.calls != 1 || len(gate.intents) != 1 || len(gate.outcomes) != 1 || finished.IsZero() {
+	if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || len(reply.Body) == 0 || preview.calls != 1 || len(gate.events) != 1 || finished.IsZero() {
 		var stopped interface{ FixedStep() string }
 		step := "none"
 		if errors.As(err, &stopped) {
 			step = stopped.FixedStep()
 		}
 		status, reason := "none", "none"
-		if len(gate.outcomes) == 1 {
-			status, reason = gate.outcomes[0].Status, gate.outcomes[0].Reason
+		if len(gate.events) == 1 {
+			status, reason = gate.events[0].Status, gate.events[0].Reason
 		}
 		t.Fatal("composed success tail", err, step, status, reason, envelope.Status, len(reply.Body), preview.calls, "remaining", time.Until(originalEnd))
 	}
 	end, _ := ctx.Deadline()
-	if ctx.Err() != nil || !returned.Before(originalEnd) || !reply.ValidUntil.Equal(originalEnd) || !gate.intents[0].RequestUntil.Equal(originalEnd) || !f.i.ValidUntil.Equal(originalEnd) || !end.Equal(originalEnd) {
+	if ctx.Err() != nil || !returned.Before(originalEnd) || !reply.ValidUntil.Equal(originalEnd) || !f.i.ValidUntil.Equal(originalEnd) || !end.Equal(originalEnd) {
 		t.Fatal("success tail changed original request/identity end", ctx.Err())
 	}
 	t.Logf("C20 preview/audit/schema/response PASS: tail_work=%s audit_finish_offset=%s remaining=%s bytes=%d original5s unchanged; injected preview/in-memory audit, not external latency", returned.Sub(preview.completedAt), finished.Sub(preview.completedAt), originalEnd.Sub(returned), len(reply.Body))

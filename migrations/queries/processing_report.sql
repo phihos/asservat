@@ -26,12 +26,12 @@ WHERE p.root_id=sqlc.arg(root_id)::uuid AND p.retire_by>sqlc.arg(observed_at)::t
 ORDER BY p.cluster_id,p.artifact_id,p.attempt_id LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ReportProcessingShares :many
-SELECT s.id,s.artifact_id,s.created_at,s.expires_at,s.revoked_at,LEAST(s.retire_by,p.retire_by)::timestamptz AS retire_by,
+SELECT s.id,s.artifact_id,s.created_at,s.expires_at,s.revoked_at,p.retire_by,
  recipient.ordinality::bigint AS ordinal,recipient.value::jsonb AS recipient
 FROM evidence_share s
 JOIN context_processing p ON p.root_id=s.root_id AND p.artifact_id=s.artifact_id
 CROSS JOIN LATERAL jsonb_array_elements(s.recipients) WITH ORDINALITY recipient(value,ordinality)
-WHERE s.root_id=sqlc.arg(root_id)::uuid AND LEAST(s.retire_by,p.retire_by)>sqlc.arg(observed_at)::timestamptz
+WHERE s.root_id=sqlc.arg(root_id)::uuid AND p.retire_by>sqlc.arg(observed_at)::timestamptz
  AND s.created_at<=sqlc.arg(created_before)::timestamptz
  AND (s.created_at,s.id,recipient.ordinality)>(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid,sqlc.arg(after_ordinal)::bigint)
 ORDER BY s.created_at,s.id,recipient.ordinality LIMIT sqlc.arg(page_limit)::integer;
@@ -50,26 +50,17 @@ WHERE d.root_id=sqlc.arg(root_id)::uuid AND d.id>sqlc.arg(after_id)::uuid
 ORDER BY d.id LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ReportProcessingOperations :many
-SELECT a.id,a.lane,(a.intent->'Actor')::jsonb AS actor,(a.intent->>'Name')::text AS operation_name,
- (a.intent->>'CreatedAt')::timestamptz AS created_at,
- (a.intent_receipt IS NOT NULL)::boolean AS intent_acknowledged,(a.outcome_receipt IS NOT NULL)::boolean AS outcome_acknowledged,
- COALESCE(a.outcome->>'Status','unknown')::text AS status,
- COALESCE((a.outcome->>'OutputBytes')::bigint,-1)::bigint AS output_bytes,
- COALESCE(ref.ordinality,0)::bigint AS ordinal,
- COALESCE(ref.value#>>'{}','')::text AS artifact_id,
- LEAST(a.retain_until,l.live_retire_by)::timestamptz AS visible_until
-FROM operation_audit a
-JOIN operation_audit_lifecycle l ON l.root_id=a.root_id AND l.operation_id=a.id
-LEFT JOIN LATERAL jsonb_array_elements(
- CASE WHEN jsonb_typeof(a.outcome->'ArtifactIDs')='array'
- THEN a.outcome->'ArtifactIDs' ELSE '[]'::jsonb END
-) WITH ORDINALITY ref(value,ordinality) ON true
-WHERE a.root_id=sqlc.arg(root_id)::uuid AND a.lane IN ('normal','resolution','processing')
- AND jsonb_typeof(a.intent->'Actor')='object' AND a.intent->>'Name'<>'get_processing_report'
- AND (a.intent->>'CreatedAt')::timestamptz<=sqlc.arg(created_before)::timestamptz
- AND LEAST(a.retain_until,l.live_retire_by)>sqlc.arg(observed_at)::timestamptz
- AND (a.id,COALESCE(ref.ordinality,0))>(sqlc.arg(after_id)::uuid,sqlc.arg(after_ordinal)::bigint)
-ORDER BY a.id,ordinal LIMIT sqlc.arg(page_limit)::integer;
+-- REQ-AUT-005: public calls and processing decisions each have one audit row
+-- per operation ID. Rows stay until their time partition is dropped.
+SELECT e.operation_id AS id,e.operation AS operation_name,e.issuer,e.subject,e.client_id,e.identity_type,
+ e.recorded_at AS created_at,e.status,e.output_bytes,
+ COALESCE(ref.ordinality,0)::bigint AS ordinal,COALESCE(ref.value,'')::text AS artifact_id
+FROM audit_event e
+LEFT JOIN LATERAL unnest(e.artifact_ids) WITH ORDINALITY ref(value,ordinality) ON true
+WHERE (e.kind='call' OR e.kind IN ('initialize_processing','restrict_processing','release_processing','request_early_erasure'))
+ AND e.operation<>'get_processing_report' AND e.recorded_at<=sqlc.arg(created_before)::timestamptz
+ AND (e.operation_id,COALESCE(ref.ordinality,0))>(sqlc.arg(after_id)::uuid,sqlc.arg(after_ordinal)::bigint)
+ORDER BY e.operation_id,ordinal LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ReportProcessingRules :many
 SELECT r.id,r.revision,r.state,r.scope,r.valid_until,r.retire_by,d.created_at

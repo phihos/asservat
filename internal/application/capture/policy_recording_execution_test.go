@@ -117,7 +117,7 @@ func (s *teamRecordingAdmission) AdmitReviewedContext(_ context.Context, _ strin
 // the original atomic capacity transaction.
 type teamNeverStart struct{ t *testing.T }
 
-func (s teamNeverStart) AcknowledgedCaptureIntent(context.Context, string) (audit.CaptureIntent, error) {
+func (s teamNeverStart) AcceptedCaptureIntent(context.Context, string) (audit.CaptureIntent, error) {
 	s.t.Fatal("refused admission attempted capture audit")
 	return audit.CaptureIntent{}, value.ErrUnavailable
 }

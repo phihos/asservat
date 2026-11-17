@@ -177,21 +177,13 @@
               "Cancelled",
               "AlreadyTerminal"
             ]
-          },
-          "audit_state": {
-            "enum": [
-              "pending",
-              "recorded",
-              "overdue"
-            ]
           }
         },
         "required": [
           "download_id",
-          "state",
-          "audit_state"
+          "state"
         ],
-        "description": "A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. Pending/overdue audit never reverses the enforced stop."
+        "description": "A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6)."
       }
     }
   }

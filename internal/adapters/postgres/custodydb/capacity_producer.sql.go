@@ -101,35 +101,6 @@ func (q *Queries) ReadCapacityAccount(ctx context.Context, arg ReadCapacityAccou
 	return allocation_id, err
 }
 
-const readCapacityAuditProfiles = `-- name: ReadCapacityAuditProfiles :one
-SELECT read_capacity_audit_profiles($1::uuid,$2::uuid,$3::uuid,$4::bytea,$5::text,$6::timestamptz,$7::timestamptz)::jsonb AS profiles
-`
-
-type ReadCapacityAuditProfilesParams struct {
-	RootID              pgtype.UUID
-	InstallationID      pgtype.UUID
-	QualificationID     pgtype.UUID
-	QualificationDigest []byte
-	AccountVersion      string
-	ObservedAt          pgtype.Timestamptz
-	FreshUntil          pgtype.Timestamptz
-}
-
-func (q *Queries) ReadCapacityAuditProfiles(ctx context.Context, arg ReadCapacityAuditProfilesParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readCapacityAuditProfiles,
-		arg.RootID,
-		arg.InstallationID,
-		arg.QualificationID,
-		arg.QualificationDigest,
-		arg.AccountVersion,
-		arg.ObservedAt,
-		arg.FreshUntil,
-	)
-	var profiles []byte
-	err := row.Scan(&profiles)
-	return profiles, err
-}
-
 const readManagedCapacityAdmission = `-- name: ReadManagedCapacityAdmission :one
 SELECT capacity_managed_admission_until($1::uuid,$2::uuid,$3::text,clock_timestamp())::timestamptz AS until_at
 `

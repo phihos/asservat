@@ -6,7 +6,6 @@ import (
 	"slices"
 	"testing"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
 	value "asservat.local/asservat/internal/domain/capture"
 )
 
@@ -16,18 +15,15 @@ func (untrustedSubmissionDiagnostic) Error() string     { return "private-provid
 func (untrustedSubmissionDiagnostic) FixedStep() string { return "private-provider-detail" }
 
 func TestContextSubmissionReportsClosedIntentFailureWithoutChangingAdmission(t *testing.T) {
-	for _, mode := range []string{"dependency", "publication", "record"} {
+	for _, mode := range []string{"dependency", "record"} {
 		t.Run(mode, func(t *testing.T) {
 			f, x, s, p := submissionTest(t)
 			var reports []string
 			s.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			x.current = f.source(t, context.Background())
-			want := "request/intent/unavailable"
+			want := "request/intent"
 			if mode == "dependency" {
 				x.intentErr = untrustedSubmissionDiagnostic{}
-			} else if mode == "publication" {
-				_, x.intentErr = (auditapp.CaptureOperationPublication{}).AcknowledgedCaptureIntent(context.Background(), p.CaptureID)
-				want = "request/intent/configuration"
 			} else {
 				x.changeIntent = true
 				want = "request/intent/record"

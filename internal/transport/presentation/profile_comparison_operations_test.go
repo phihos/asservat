@@ -6,10 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	analysisapp "asservat.local/asservat/internal/application/analysis"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -57,9 +55,6 @@ func comparisonBridge(t *testing.T, same bool) (*AuditedOperations, *pairedBridg
 	f.a.Baseline = &b
 	pair := &pairedBridge{f, plan}
 	f.s.ComparisonRoutes, f.s.Plans = pair, pair
-	gate := &refusalOutcomeGate{presentationAuditGate: g, acknowledged: map[string]audit.OperationOutcome{}}
-	ledger := &refusalOutcomeLedger{ContextQueryLedger: f, gate: gate}
-	s.audit["normal"], f.s.Results.Ledger = gate, ledger
 	reads, _ := f.s.ProfileComparisons()
 	adapter, e := NewContextProjectionOperations(f.s, f.s.Results)
 	if e == nil {
@@ -78,7 +73,7 @@ func comparisonInput(f *pairedBridge) []byte {
 	return b
 }
 func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {
-	for _, mode := range []string{"distinct", "same", "mismatch", "mismatch-close-failure", "mismatch-audit-failure"} {
+	for _, mode := range []string{"distinct", "same", "mismatch", "mismatch-close-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g, p := comparisonBridge(t, mode == "same")
 			f.ready = false
@@ -97,30 +92,21 @@ func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {
 			if mismatch {
 				f.result = &value.ProjectionResult{IncompatibleProfiles: true}
 			}
-			if mode == "mismatch-audit-failure" {
-				g.finishFail = true
-			}
 			if mode == "mismatch-close-failure" {
 				f.closeErr = value.ErrUnavailable
 			}
 			out, e := s.Call(t.Context(), f, "get_query_result", bridgePoll(f.q.ID))
-			if mode == "mismatch-audit-failure" {
-				if e == nil || len(out.Body) != 0 || !f.active || f.completions != 0 {
-					t.Fatal("failed audit exposed mismatch or leaked joined read", e)
-				}
-				return
-			}
 			if e != nil {
 				t.Fatal("result", e)
 			}
 			if s.contracts.ValidateOutput("get_query_result", out.Body) != nil || f.reads != 1 || f.starts != 1 || f.completions != 0 || !f.active || out.CheckDisclosure(t.Context()) != nil {
 				t.Fatal("owner not retained", e)
 			}
-			if p.last.delivery.Association().Profile != (value.ProfileSummarySelection{}) {
+			if p.last.Association().Profile != (value.ProfileSummarySelection{}) {
 				t.Fatal("mixed summary/comparison association")
 			}
 			if mismatch {
-				if !strings.Contains(string(out.Body), `"code":"IncompatibleProfiles"`) || strings.Contains(string(out.Body), `"rows"`) || g.outcomes[len(g.outcomes)-1].Status != "denied" {
+				if !strings.Contains(string(out.Body), `"code":"IncompatibleProfiles"`) || strings.Contains(string(out.Body), `"rows"`) || g.events[len(g.events)-1].Status != "denied" {
 					t.Fatalf("mismatch envelope %s", out.Body)
 				}
 			} else {
@@ -156,35 +142,6 @@ func TestProfileComparisonPublicPendingReadyAndRetainedRefusal(t *testing.T) {
 			}
 			if e != nil || f.active || f.completions != 1 {
 				t.Fatal("joined close failed", e)
-			}
-		})
-	}
-}
-func TestProfileComparisonAuditedInputRejectsRoleOrNormalizationSubstitution(t *testing.T) {
-	for _, mode := range []string{"baseline", "incident", "normalization", "mixed"} {
-		t.Run(mode, func(t *testing.T) {
-			s, f, _, p := comparisonBridge(t, false)
-			p.mutate = func(call *OperationCall, raw *json.RawMessage) {
-				var in ProfileComparisonOperationInput
-				_ = json.Unmarshal(*raw, &in)
-				switch mode {
-				case "baseline":
-					in.BaselineArtifactID = bridgeID
-				case "incident":
-					in.ArtifactID = in.BaselineArtifactID
-				case "normalization":
-					in.Normalization = "perSecond"
-				case "mixed":
-					if call.queryInvocation.CheckInput(t.Context(), analysisapp.ContextQueryInput{Comparison: value.ProfileComparisonRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, BaselineCaseID: in.BaselineCaseID, BaselineArtifactID: in.BaselineArtifactID, Selection: value.ProfileComparisonSelection{SampleType: "cpu", Normalization: "none", TopN: 20}}, QueryID: bridgeID}) == nil {
-						t.Fatal("mixed input accepted")
-					}
-					call.queryInvocation = nil
-				}
-				*raw, _ = json.Marshal(in)
-			}
-			out, e := s.Call(t.Context(), f, "compare_profiles", comparisonInput(f))
-			if e == nil || len(out.Body) != 0 || f.admissions != 0 || f.starts != 0 {
-				t.Fatal("unreviewed pair dispatched", e)
 			}
 		})
 	}

@@ -127,8 +127,6 @@ func (a DownloadAllocation) Covers(s DownloadScope) bool {
 }
 
 type DownloadSession struct {
-	// Absent only for historical/component sessions; public acquisition requires prepaid stop.
-	StopProtocol                             string `json:",omitzero"`
 	ID, AllocationID                         string
 	Scope                                    DownloadScope
 	RequestDigest                            Digest
@@ -160,7 +158,7 @@ type DownloadBatch struct {
 }
 
 func (s DownloadSession) Valid() bool {
-	return (s.StopProtocol == "" || s.StopProtocol == DownloadStopProtocol) && uuid(s.ID) && uuid(s.AllocationID) && s.Scope.Valid() && s.RequestDigest != (Digest{}) && s.State.Valid() && !s.CreatedAt.IsZero() && s.Deadline.After(s.CreatedAt) && s.OutputLimit > 0 && s.OutputLimit <= MaxDownloadOutput && s.ReadLimit > 0 && s.ReadLimit <= MaxDownloadReadWork && s.ChargedOutput >= 0 && s.ChargedOutput <= s.OutputLimit && s.ChargedRead >= 0 && s.ChargedRead <= s.ReadLimit && s.EmittedBytes >= 0 && s.EmittedBytes <= s.ChargedOutput && s.Generation >= 0
+	return uuid(s.ID) && uuid(s.AllocationID) && s.Scope.Valid() && s.RequestDigest != (Digest{}) && s.State.Valid() && !s.CreatedAt.IsZero() && s.Deadline.After(s.CreatedAt) && s.OutputLimit > 0 && s.OutputLimit <= MaxDownloadOutput && s.ReadLimit > 0 && s.ReadLimit <= MaxDownloadReadWork && s.ChargedOutput >= 0 && s.ChargedOutput <= s.OutputLimit && s.ChargedRead >= 0 && s.ChargedRead <= s.ReadLimit && s.EmittedBytes >= 0 && s.EmittedBytes <= s.ChargedOutput && s.Generation >= 0
 }
 
 // current requires a complete check. Only a started response's windows and

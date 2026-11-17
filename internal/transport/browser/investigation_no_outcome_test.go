@@ -33,16 +33,16 @@ func (o noOutcomeOperations) Call(context.Context, identities.CurrentIdentity, s
 }
 
 func TestBrowserNoOutcomeReportsOnlyClosedTopLevelStage(t *testing.T) {
-	for _, step := range []string{"identity", "busy", "audit-begin", "audit-result", "audit-finish", "result-acknowledgement", "request-expired", "final-identity", "reply-expired", "final-disclosure", "unknown-private-provider-secret", "audit-begin/private-provider-secret", "audit-finish/private-provider-secret", "no-fixed-step"} {
+	for _, step := range []string{"identity", "audit-result", "audit", "result-acknowledgement", "reply-expired", "final-disclosure", "unknown-private-provider-secret", "audit/private-provider-secret", "no-fixed-step"} {
 		t.Run(step, func(t *testing.T) {
-			h, server, _, _, _, _ := auditedBrowserFixture(t)
+			h, server, _, _, _ := auditedBrowserFixture(t)
 			rendered := false
 			var injected error = noOutcomeStep{step: step, rendered: &rendered}
 			if step == "no-fixed-step" {
 				injected = noOutcomeOpaque{rendered: &rendered}
 			}
 			// Explicit inner-operation failure at the actual strict handler boundary;
-			// the separate real-auditor case below exercises genuine Begin failure.
+			// the separate real-recorder case below exercises a genuine audit failure.
 			h.operations = noOutcomeOperations{Operations: h.operations, err: injected}
 			reportedCh := make(chan string, 1)
 			h.Report = func(v string) { reportedCh <- v }
@@ -67,9 +67,9 @@ func TestBrowserNoOutcomeReportsOnlyClosedTopLevelStage(t *testing.T) {
 	}
 }
 
-func TestBrowserNoOutcomeRealAuditBeginFailure(t *testing.T) {
-	h, server, calls, normal, _, _ := auditedBrowserFixture(t)
-	normal.fail = true
+func TestBrowserNoOutcomeRealAuditFailure(t *testing.T) {
+	h, server, _, rows, _ := auditedBrowserFixture(t)
+	rows.fail = true
 	reportedCh := make(chan string, 1)
 	h.Report = func(v string) { reportedCh <- v }
 	response, err := server.Client().Do(auditedBrowserRequest(t, server, "get_capture", `{"capture_id":"00000000-0000-4000-8000-000000000030"}`))
@@ -79,8 +79,8 @@ func TestBrowserNoOutcomeRealAuditBeginFailure(t *testing.T) {
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
 	reported := <-reportedCh
-	begin, finish := normal.count()
-	if err != nil || response.StatusCode != 503 || reported != "call-no-outcome/audit-begin" || begin != 1 || finish != 0 || calls.requests != 0 || strings.Contains(string(body), "audit-begin") {
-		t.Fatal("real audited no-outcome failure", response.StatusCode, reported, begin, finish, calls.requests)
+	n := rows.count()
+	if err != nil || response.StatusCode != 503 || reported != "call-no-outcome/audit" || n != 1 || strings.Contains(string(body), "audit") {
+		t.Fatal("real audited no-outcome failure", response.StatusCode, reported, n)
 	}
 }

@@ -76,7 +76,7 @@ try {
   const stopReply = await positiveStop;
   assert.equal(stopReply.wire.status, 'ok');
   assert.equal(stopReply.wire.data.download_id, '00000000-0000-4000-8000-000000000090');
-  assert.equal(stopReply.wire.data.state, 'Cancelled'); assert.equal(stopReply.wire.data.audit_state, 'pending');
+  assert.equal(stopReply.wire.data.state, 'Cancelled');
   assert.equal(stopReply.body.idempotency_key, stoppedUnknown.stop_keys[0]);
   await expect(page.getByRole('button', { name: 'Retry same download request', exact: true })).toBeEnabled();
   await expect(page.getByRole('alert')).toBeVisible();

@@ -1,10 +1,6 @@
 package kms
 
 import (
-	app "asservat.local/asservat/internal/application/authorization"
-	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -12,6 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	app "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type materialSourceFunc func(context.Context) (app.KeyMaterial, error)

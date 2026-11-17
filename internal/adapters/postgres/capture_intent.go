@@ -1,36 +1,41 @@
 package postgres
 
 import (
-	"asservat.local/asservat/internal/application/planning"
 	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"time"
+
+	"asservat.local/asservat/internal/application/planning"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type CaptureIntentAudits struct {
+// CaptureIntents reads an accepted capture's provenance back from its SQL
+// row. It cannot start acquisition or disclose this provenance publicly.
+type CaptureIntents struct {
 	ledger *Ledger
 	root   string
 }
 
-var _ auditapp.CaptureIntentLedger = (*CaptureIntentAudits)(nil)
-var _ auditapp.ExactCaptureIntentReader = (*CaptureIntentAudits)(nil)
+func NewCaptureIntents(ctx context.Context, pool *pgxpool.Pool, root string) (*CaptureIntents, error) {
+	if !authorization.UUID(root) {
+		return nil, capture.ErrInvalid
+	}
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, capture.ErrUnavailable
+	}
+	return &CaptureIntents{l, root}, nil
+}
 
-// ReadCaptureIntent observes one accepted row under the audit reader credential.
-// It cannot acknowledge a receipt, start acquisition, or disclose this private
-// provenance publicly. Unlike the pending page it cannot select another capture.
-func (s *CaptureIntentAudits) ReadCaptureIntent(ctx context.Context, captureID string) (auditapp.CaptureIntentSnapshot, error) {
-	var out auditapp.CaptureIntentSnapshot
+func (s *CaptureIntents) AcceptedCaptureIntent(ctx context.Context, captureID string) (audit.CaptureIntent, error) {
+	var out audit.CaptureIntent
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(captureID) {
 		return out, capture.ErrInvalid
 	}
@@ -39,54 +44,13 @@ func (s *CaptureIntentAudits) ReadCaptureIntent(ctx context.Context, captureID s
 		if err != nil {
 			return err
 		}
-		out, err = exactCaptureIntent(row)
+		out, err = captureIntent(row)
 		return err
 	})
 	if err != nil || ctx.Err() != nil {
-		return auditapp.CaptureIntentSnapshot{}, capture.ErrUnavailable
+		return audit.CaptureIntent{}, capture.ErrUnavailable
 	}
 	return out, nil
-}
-
-func exactCaptureIntent(row custodydb.ContextCapture) (auditapp.CaptureIntentSnapshot, error) {
-	var out auditapp.CaptureIntentSnapshot
-	if row.IntentOperationID.Valid {
-		return out, capture.ErrUnavailable
-	}
-	r, err := captureIntent(row)
-	if err != nil {
-		return out, err
-	}
-	out.Intent = r
-	if !row.IntentAcknowledgedAt.Valid {
-		if row.State != capture.PendingAudit || row.IntentDigest != nil || row.IntentObjectKey.Valid || row.IntentObjectVersion.Valid || row.IntentObjectEtag.Valid || row.IntentObjectBytes.Valid || row.IntentObjectSha256 != nil {
-			return auditapp.CaptureIntentSnapshot{}, capture.ErrUnavailable
-		}
-		return out, nil
-	}
-	receipt := audit.Receipt{Key: row.IntentObjectKey.String, Version: row.IntentObjectVersion.String, ETag: row.IntentObjectEtag.String, Bytes: row.IntentObjectBytes.Int64}
-	copy(receipt.SHA256[:], row.IntentObjectSha256)
-	if row.State != capture.IntentAudited || !bytes.Equal(row.IntentDigest, digest(r)) || !row.IntentObjectKey.Valid || !row.IntentObjectVersion.Valid || !row.IntentObjectEtag.Valid || !row.IntentObjectBytes.Valid || len(row.IntentObjectSha256) != 32 || !receipt.ValidCaptureIntent(r.RootID, r.CaptureID) {
-		return auditapp.CaptureIntentSnapshot{}, capture.ErrUnavailable
-	}
-	out.Receipt = &receipt
-	return out, nil
-}
-
-func NewCaptureIntentAudits(ctx context.Context, pool *pgxpool.Pool, root string) (*CaptureIntentAudits, error) {
-	if !authorization.UUID(root) {
-		return nil, capture.ErrInvalid
-	}
-	l, err := New(ctx, pool)
-	if err != nil {
-		return nil, capture.ErrUnavailable
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if why := schemaCompatible(ctx, pool); why != "" {
-		return nil, schemaRefusal(capture.ErrUnavailable, why)
-	}
-	return &CaptureIntentAudits{l, root}, nil
 }
 
 func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
@@ -140,79 +104,18 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))
-	if row.ReasonRef != nil {
-		var ref audit.CaptureReasonRef
-		d := json.NewDecoder(bytes.NewReader(row.ReasonRef))
-		d.DisallowUnknownFields()
-		if d.Decode(&ref) != nil || !ref.Valid() {
-			return out, capture.ErrUnavailable
-		}
-		out.ReasonRef = &ref
-	}
 	if !out.Valid() {
 		return audit.CaptureIntent{}, capture.ErrUnavailable
 	}
 	return out, nil
 }
-func (s *CaptureIntentAudits) PendingCaptureIntents(ctx context.Context) ([]audit.CaptureIntent, error) {
-	var out []audit.CaptureIntent
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.PendingCaptureIntents(ctx, id(s.root))
-		if err != nil {
-			return err
-		}
-		out = nil
-		for _, row := range rows {
-			r, err := captureIntent(row)
-			if err != nil {
-				return err
-			}
-			out = append(out, r)
-		}
-		return nil
-	})
+
+// captureIntentDigest binds verification and execution records to the
+// accepted capture's provenance. It is nil for a malformed row.
+func captureIntentDigest(row custodydb.ContextCapture) []byte {
+	intent, err := captureIntent(row)
 	if err != nil {
-		return nil, captureError(err)
-	}
-	return out, nil
-}
-func (s *CaptureIntentAudits) AcknowledgeCaptureIntent(ctx context.Context, r audit.CaptureIntent, receipt audit.Receipt) error {
-	if r.RootID != s.root || !r.Valid() || !receipt.ValidCaptureIntent(r.RootID, r.CaptureID) {
-		return capture.ErrInvalid
-	}
-	return captureError(s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		// Audit acknowledgement survives revocation/expiry, so the intent remains
-		// explainable. It never renews authority, deadlines or storage reservations.
-		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
-		}
-		row, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(r.CaptureID), RootID: id(s.root)})
-		if err != nil {
-			return err
-		}
-		if row.IntentOperationID.Valid {
-			return capture.ErrUnavailable
-		}
-		frozen, err := captureIntent(row)
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(digest(frozen), digest(r)) {
-			return capture.ErrChanged
-		}
-		if row.IntentAcknowledgedAt.Valid {
-			if !bytes.Equal(row.IntentDigest, digest(r)) || row.IntentObjectKey.String != receipt.Key || row.IntentObjectVersion.String != receipt.Version || row.IntentObjectEtag.String != receipt.ETag || row.IntentObjectBytes.Int64 != receipt.Bytes || !bytes.Equal(row.IntentObjectSha256, receipt.SHA256[:]) {
-				return capture.ErrChanged
-			}
-			return nil
-		}
-		changed, err := q.AcknowledgeCaptureIntent(ctx, custodydb.AcknowledgeCaptureIntentParams{ID: row.ID, IntentDigest: digest(r), IntentObjectKey: pgtype.Text{String: receipt.Key, Valid: true}, IntentObjectVersion: pgtype.Text{String: receipt.Version, Valid: true}, IntentObjectEtag: pgtype.Text{String: receipt.ETag, Valid: true}, IntentObjectBytes: pgtype.Int8{Int64: receipt.Bytes, Valid: true}, IntentObjectSha256: receipt.SHA256[:]})
-		if err != nil {
-			return err
-		}
-		if changed != 1 {
-			return capture.ErrChanged
-		}
 		return nil
-	}))
+	}
+	return digest(intent)
 }

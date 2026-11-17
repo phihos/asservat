@@ -56,7 +56,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Fatal(err)
 	}
 	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Processing: processing, Shares: store, Now: time.Now}
-	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
+	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, NewID: custodyID, Now: time.Now}}
 	issuer := s.a.Eligibility.VerifiedIdentity.Principal.Issuer
 	batch := s.batch
 	refresh := func() {
@@ -113,6 +113,15 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		return share
 	}
 	user := []authorization.ShareRecipient{{Kind: "User", Issuer: issuer, ID: "synthetic-recipient"}}
+	// REQ-AUT-005: each new effect commits exactly one audit row; replays and
+	// refusals write none.
+	audited := func(kind, shareID string, want int) {
+		t.Helper()
+		var n int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE kind=$1 AND $2=ANY(share_ids) AND status='success' AND effect='accepted'`, kind, shareID).Scan(&n); err != nil || n != want {
+			t.Fatal("share effect audit rows", kind, err, n, want)
+		}
+	}
 
 	// ADR-233: the actual download authorizer with the real share ledger, and
 	// the SQL download fence over a share-admitted decision.
@@ -241,6 +250,8 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if _, _, err := shares.Revoke(ctx, owner(), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 1, IdempotencyKey: "revoke-other"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second revocation under another key", err)
 	}
+	audited("share.create", first.ID, 1)
+	audited("share.revoke", first.ID, 1)
 	// A current team member manages the share (ADR-232 increment 4), so a
 	// second revocation is a conflict for them; a stranger is refused.
 	if _, _, err := shares.Revoke(ctx, as("synthetic-other-owner", []string{"other-owners"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 2, IdempotencyKey: "foreign"}); !errors.Is(err, capture.ErrConflict) {
@@ -324,6 +335,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-2", 1, "other-owners")); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("stale transfer revision", err)
 	}
+	audited("share.transfer", moved.ID, 1)
 	if !reads(recipient()) {
 		t.Fatal("transferred share unreadable")
 	}

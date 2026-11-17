@@ -63,19 +63,6 @@ func TestRemoteContextDeletionMatchesInProcessSignatures(t *testing.T) {
 	if remote.VerifyContextDeletion(ctx, changed, remoteSig) == nil {
 		t.Fatal("signature verified for another record")
 	}
-	// The key signs only deletion records: an operation retirement signature
-	// by the same key and key ID never verifies as one.
-	retirement, err := NewRemoteOperationRetirementSignatures(r.RootID, "deletion-v1", keys, func(ctx context.Context) crypto.Signer { return retirementRequestSigner{ctx, key, false, &calls} })
-	if err != nil {
-		t.Fatal(err)
-	}
-	other, err := retirement.SignOperationRetirement(ctx, remoteRetirementFixture())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if remote.VerifyContextDeletion(ctx, r, other) == nil || local.VerifyContextDeletion(ctx, r, other) == nil {
-		t.Fatal("operation retirement signature verified as a deletion record")
-	}
 	// Records signed by an earlier version verify against its retained key.
 	old, oldKey, _ := ed25519.GenerateKey(rand.Reader)
 	earlier, err := NewContextDeletionSignatures(r.RootID, "deletion-v0", oldKey, map[string]ed25519.PublicKey{"deletion-v0": old})
@@ -161,4 +148,24 @@ func TestRemoteContextDeletionRefusesUnpinnedKeysAndKeepsDeadlines(t *testing.T)
 			}
 		})
 	}
+}
+
+type retirementRequestSigner struct {
+	ctx     context.Context
+	key     ed25519.PrivateKey
+	blocked bool
+	calls   *int
+}
+
+func (s retirementRequestSigner) Public() crypto.PublicKey { return s.key.Public() }
+func (s retirementRequestSigner) Sign(_ io.Reader, p []byte, o crypto.SignerOpts) ([]byte, error) {
+	*s.calls++
+	if s.blocked {
+		<-s.ctx.Done()
+		return nil, s.ctx.Err()
+	}
+	if err := s.ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.key.Sign(rand.Reader, p, o)
 }

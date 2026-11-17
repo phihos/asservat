@@ -10,16 +10,15 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // Initial admission and passive results are separate consumer capabilities.
 // Both return the concrete C-18 owner; arbitrary result DTOs are insufficient.
 type ContextExcerptService interface {
-	BeginExcerpt(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.ContextExcerptSelection) (*analysisapp.ContextProjectionDelivery, error)
+	BeginExcerpt(context.Context, identities.CurrentIdentity, string, value.ContextExcerptSelection) (*analysisapp.ContextProjectionDelivery, error)
 }
 type ContextQueryResults interface {
-	GetQueryResult(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, string) (*analysisapp.ContextProjectionDelivery, error)
+	GetQueryResult(context.Context, identities.CurrentIdentity, string, string) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 // This adapter deliberately has no ToolNames, Tool or unaudited Call. Explicit
@@ -98,15 +97,16 @@ func (s *ContextProjectionOperations) toolNames() []string {
 
 func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	noDispatch := OperationReply{auditNoDispatch: true, auditEffect: operationEffectNone}
-	if s == nil || ctx == nil || ctx.Err() != nil || current == nil || call.queryInvocation == nil ||
+	if s == nil || ctx == nil || ctx.Err() != nil || current == nil || call.requestID == "" ||
 		!s.serves(name) || s.contracts.ValidateInput(name, raw) != nil {
 		return noDispatch, stopped("query-call", ErrOperationDelivery)
 	}
-	i := call.queryInvocation
-	record, err := i.Invocation(ctx)
-	if err != nil || record.ID != call.requestID || record.Tool != name {
-		return noDispatch, stopped("query-invocation", ErrOperationDelivery)
+	// The audited wrapper bounds every call with its original deadline.
+	until, bounded := ctx.Deadline()
+	if !bounded {
+		return noDispatch, stopped("query-call", ErrOperationDelivery)
 	}
+	requestID := call.requestID
 	var input analysisapp.ContextQueryInput
 	switch name {
 	case "get_logs":
@@ -116,7 +116,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		}
 		r, e := in.request()
 		if e != nil {
-			return s.refusal(record.ID, name, record.Until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
+			return s.refusal(requestID, name, until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
 		}
 		input.RawLogs = r
 	case "syscall_query":
@@ -126,7 +126,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		}
 		r, e := in.request()
 		if e != nil {
-			return s.refusal(record.ID, name, record.Until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
+			return s.refusal(requestID, name, until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
 		}
 		input.RawSyscalls = r
 	case "pcap_query":
@@ -152,7 +152,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			if errors.Is(e, value.ErrInvalidCursor) {
 				failure, decision = syscallInvalidCursor, operationAuditInvalid
 			}
-			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
+			return s.refusal(requestID, name, until, failure, decision, operationEffectNone, true)
 		}
 		input.Syscalls = value.SyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection.Window()}
 	case "compare_profiles":
@@ -189,7 +189,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			if errors.Is(e, value.ErrInvalidCursor) {
 				failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
 			}
-			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
+			return s.refusal(requestID, name, until, failure, decision, operationEffectNone, true)
 		}
 		input.Headers = sel
 	case "get_file_excerpt":
@@ -216,54 +216,50 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		}
 		input.QueryID = in.QueryHandle
 	}
-	if i.CheckInput(ctx, input) != nil {
-		return noDispatch, stopped("query-input", ErrOperationDelivery)
-	}
 	var d *analysisapp.ContextProjectionDelivery
+	var err error
 	switch name {
 	case "get_logs":
-		d, err = s.rawLogs.Begin(ctx, current, i, input.RawLogs)
+		d, err = s.rawLogs.Begin(ctx, current, requestID, input.RawLogs)
 	case "syscall_query":
-		d, err = s.rawSyscalls.Begin(ctx, current, i, input.RawSyscalls)
+		d, err = s.rawSyscalls.Begin(ctx, current, requestID, input.RawSyscalls)
 	case "pcap_query":
-		d, err = s.packetQueries.Begin(ctx, current, i, input.PacketQuery)
+		d, err = s.packetQueries.Begin(ctx, current, requestID, input.PacketQuery)
 	case "get_pcap_summary":
-		d, err = s.packets.Begin(ctx, current, i, input.Packet)
+		d, err = s.packets.Begin(ctx, current, requestID, input.Packet)
 	case "get_syscall_summary", "get_syscall_events":
-		d, err = s.syscalls.Begin(ctx, current, i, input.Syscalls)
+		d, err = s.syscalls.Begin(ctx, current, requestID, input.Syscalls)
 	case "compare_profiles":
-		d, err = s.comparisons.Begin(ctx, current, i, input.Comparison)
+		d, err = s.comparisons.Begin(ctx, current, requestID, input.Comparison)
 	case "get_profile_summary":
-		d, err = s.profiles.Begin(ctx, current, i, input.Profile)
+		d, err = s.profiles.Begin(ctx, current, requestID, input.Profile)
 	case "get_file_excerpt":
-		d, err = s.excerpts.BeginExcerpt(ctx, current, i, input.Selection)
+		d, err = s.excerpts.BeginExcerpt(ctx, current, requestID, input.Selection)
 	case "get_http_headers":
-		d, err = s.headers.Begin(ctx, current, i, input.Headers)
+		d, err = s.headers.Begin(ctx, current, requestID, input.Headers)
 	default:
-		d, err = s.results.GetQueryResult(ctx, current, i, input.QueryID)
+		d, err = s.results.GetQueryResult(ctx, current, requestID, input.QueryID)
 	}
 	// Any dispatched error may have spent query/read/control capacity. Closing
 	// an accompanying handle is mandatory and never establishes no effect.
 	transferred := false
 	defer func() {
 		if !transferred {
-			i.close()
 			if d != nil {
-				until := identity.Earlier(record.WriteUntil, d.CleanupUntil())
-				cleanup, cancel := context.WithDeadline(context.WithoutCancel(ctx), until)
+				cleanup, cancel := context.WithDeadline(context.WithoutCancel(ctx), d.CleanupUntil())
 				_ = d.Close(cleanup)
 				cancel()
 			}
 		}
 	}()
 	if d == nil && name == "get_logs" && analysisapp.RawLogQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover get_logs for this saved log artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover get_logs for this saved log artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if d == nil && name == "syscall_query" && analysisapp.RawSyscallQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover syscall_query for this saved argument artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover syscall_query for this saved argument artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if d == nil && name == "pcap_query" && analysisapp.PacketQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover pcap_query for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover pcap_query for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if d == nil && name == "pcap_query" {
 		if invalid, known := analysisapp.PacketQueryFilterRefusedBeforeAdmission(err); known {
@@ -273,17 +269,17 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 				failure = OperationFailure{Code: "InvalidInput", Message: "Use the supported bounded tcpdump/libpcap packet-filter subset. Names, protocol-offset predicates and unsupported instructions are unavailable.", Retryable: false}
 				status = operationAuditInvalid
 			}
-			return s.refusal(record.ID, name, record.Until, failure, status, operationEffectNone, true)
+			return s.refusal(requestID, name, until, failure, status, operationEffectNone, true)
 		}
 	}
 	if d == nil && name == "get_pcap_summary" && analysisapp.PacketSummaryUnavailableBeforeAdmission(err) {
-		return s.refusal(record.ID, name, record.Until, packetSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
+		return s.refusal(requestID, name, until, packetSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if d == nil && name == "get_profile_summary" && analysisapp.ProfileSummaryUnavailableBeforeAdmission(err) {
 		// C18 proved no query admission was attempted. Access, missing/unsupported
 		// source and provider failures share one nondisclosing result; audit and the
 		// original final identity/deadline checks still precede delivery.
-		return s.refusal(record.ID, name, record.Until, profileSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
+		return s.refusal(requestID, name, until, profileSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if err != nil || d == nil {
 		// The service's own closed stage names this refusal in the report.
@@ -296,27 +292,22 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var reply OperationReply
 	if d.Refusal() != analysisapp.ContextProjectionNoRefusal {
-		reply, err = s.deliveryRefusal(record.ID, name, d)
+		reply, err = s.deliveryRefusal(requestID, name, d)
 	} else {
-		reply.Body, err = s.serialize(call.requestID, name, d)
+		reply.Body, err = s.serialize(requestID, name, d)
 		reply.ValidUntil, reply.auditEffect = d.ValidUntil(), operationEffectAccepted
 		if d.Effect() == analysisapp.ContextQueryReplayed {
 			reply.auditEffect = operationEffectNone
 		}
 		if errors.Is(err, value.ErrRecordTooLarge) && d.RefuseOversizedResult() {
-			reply, err = s.deliveryRefusal(record.ID, name, d)
+			reply, err = s.deliveryRefusal(requestID, name, d)
 		}
 	}
 	if err != nil {
 		return OperationReply{}, stopped("query-output", ErrOperationDelivery)
 	}
-	if i.bind(ctx, d, int64(len(reply.Body))) != nil {
-		clear(reply.Body)
-		return OperationReply{}, stopped("query-bind", ErrOperationDelivery)
-	}
 	body := reply.Body
-	reply, err = ownOperationReply(ctx, reply, &contextProjectionGuard{delivery: d, invocation: i, preparedUntil: reply.ValidUntil},
-		identity.Earlier(record.WriteUntil, d.CleanupUntil()), i.acknowledge)
+	reply, err = ownOperationReply(ctx, reply, &contextProjectionGuard{delivery: d, preparedUntil: reply.ValidUntil}, d.CleanupUntil(), nil)
 	if err != nil {
 		clear(body)
 		return OperationReply{}, stoppedAt("query-reply", err, err)
@@ -600,7 +591,6 @@ func (s *ContextProjectionOperations) refusal(requestID, name string, until time
 
 type contextProjectionGuard struct {
 	delivery      *analysisapp.ContextProjectionDelivery
-	invocation    *contextQueryInvocation
 	preparedUntil time.Time
 }
 
@@ -616,16 +606,13 @@ func (g *contextProjectionGuard) CheckDisclosure(ctx context.Context) error {
 	}
 	return nil
 }
-func (g *contextProjectionGuard) Done() <-chan struct{} { return g.delivery.Done() }
-func (g *contextProjectionGuard) Close(ctx context.Context) error {
-	g.invocation.close()
-	return g.delivery.Close(ctx)
-}
+func (g *contextProjectionGuard) Done() <-chan struct{}           { return g.delivery.Done() }
+func (g *contextProjectionGuard) Close(ctx context.Context) error { return g.delivery.Close(ctx) }
 
 // ProfileSummaryQueryService admits one closed aggregate through the existing
 // query pipeline. Installing this optional facet is a separate qualification gate.
 type ProfileSummaryQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.ProfileSummaryRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.ProfileSummaryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 func (s *ContextProjectionOperations) WithProfileSummaries(profiles ProfileSummaryQueryService) (*ContextProjectionOperations, error) {
@@ -645,7 +632,7 @@ var profileSummaryTooLarge = OperationFailure{Code: "AnalysisUnavailable", Messa
 
 // WithProfileComparisons opts into the fixed two-source admission facet.
 type ProfileComparisonQueryService interface {
-	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.ProfileComparisonRequest) (*analysisapp.ContextProjectionDelivery, error)
+	Begin(context.Context, identities.CurrentIdentity, string, value.ProfileComparisonRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
 func (s *ContextProjectionOperations) WithProfileComparisons(comparisons ProfileComparisonQueryService) (*ContextProjectionOperations, error) {

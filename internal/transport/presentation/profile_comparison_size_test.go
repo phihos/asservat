@@ -64,22 +64,22 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 					tool, input = "get_query_result", bridgePoll(f.q.ID)
 				}
 				if mode == "failed-audit" {
-					g.finishFail = true
+					g.fail = true
 				}
 				if mode == "unknown-close" {
 					f.closeErr = value.ErrUnavailable
 				}
 				out, e := s.Call(t.Context(), f, tool, input)
 				if mode == "failed-audit" {
-					if e == nil || len(out.Body) != 0 || !f.active || f.completions != 0 || !f.lastRead.closed {
-						t.Fatal("failed acknowledgement lost conservative charged cleanup", e)
+					if e == nil || len(out.Body) != 0 || !f.lastRead.closed {
+						t.Fatal("failed audit row disclosed output or kept the read open", e)
 					}
 					return
 				}
 				if e != nil {
 					t.Fatal("authenticated size refusal lost its response owner", e)
 				}
-				if !f.active || f.completions != 0 || p.last.delivery == nil || out.CheckDisclosure(t.Context()) != nil {
+				if !f.active || f.completions != 0 || p.last == nil || out.CheckDisclosure(t.Context()) != nil {
 					t.Fatal("read closed before outcome and transport join")
 				}
 				var body struct {
@@ -90,7 +90,7 @@ func TestProfileComparisonSizeRefusalRetainsAuditedReadOwner(t *testing.T) {
 				if json.Unmarshal(out.Body, &body) != nil || body.Status != "error" || body.DataClass != "metadata" || body.Data.Code != "AnalysisUnavailable" || !strings.Contains(body.Data.Message, "Select fewer functions") || strings.Contains(string(out.Body), `"rows"`) {
 					t.Fatalf("size refusal leaked result or lost recovery guidance: %s", out.Body)
 				}
-				outcome := g.outcomes[len(g.outcomes)-1]
+				outcome := g.events[len(g.events)-1]
 				if outcome.Status != "denied" || outcome.Reason != "not_available" || outcome.Effect != "accepted" {
 					t.Fatal("wrong charged refusal outcome")
 				}

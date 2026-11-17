@@ -45,7 +45,7 @@ PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "sta
 # Files the loader and runtime open under each mount.
 INPUT_FILES = {"sql-owner-runtime.json", "owner-pod.token", "kube-observer.token", "provider-auth.token", "provider-audit-storage.json",
                "kube-ca.crt", "postgres-ca.crt", "audit-store-ca.crt", "key-service-ca.crt", "identity-ca.crt", "download-key-service-ca.crt"}
-PUBLIC_SQL = ["hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"]
+PUBLIC_SQL = ["hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"]
 
 
 def merge(base, extra):

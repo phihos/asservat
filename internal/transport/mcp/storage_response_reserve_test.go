@@ -92,16 +92,11 @@ func (f *reserveFacts) AdmitReviewedContext(context.Context, string, value.Admis
 	return value.Accepted{}, value.ErrUnavailable
 }
 
-type reserveAudit struct{ begins, finishes atomic.Int64 }
+type reserveAudit struct{ records atomic.Int64 }
 
-func (*reserveAudit) Configured() bool { return true }
-func (a *reserveAudit) Begin(ctx context.Context, _ audit.OperationIntent) error {
-	a.begins.Add(1)
-	return ctx.Err()
-}
-func (a *reserveAudit) Finish(ctx context.Context, _ audit.OperationOutcome) error {
-	a.finishes.Add(1)
-	// A finite audit acknowledgement still needs live original request time.
+func (a *reserveAudit) Record(ctx context.Context, _ audit.Event) error {
+	a.records.Add(1)
+	// A finite audit row write still needs live original request time.
 	timer := time.NewTimer(100 * time.Millisecond)
 	defer timer.Stop()
 	select {
@@ -146,7 +141,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mac.Close()
-			audited, err := presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: reserveID(1), Retention: time.Hour, NormalConcurrency: 1, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 10, ResolutionPerSecond: 10, Now: time.Now, NewID: func() string { return reserveID(501) }}, combined, gate, gate, mac)
+			audited, err := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: reserveID(1), Now: time.Now, NewID: func() string { return reserveID(501) }}, combined, gate, mac)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -162,7 +157,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			started := time.Now()
 			response, err := server.Client().Do(request)
 			if err != nil {
-				t.Fatalf("no audited typed response before original socket deadline: %v (elapsed %s, reads %d demands %d Begin/Finish %d/%d)", err, time.Since(started), facts.storageReads.Load(), facts.demands.Load(), gate.begins.Load(), gate.finishes.Load())
+				t.Fatalf("no audited typed response before original socket deadline: %v (elapsed %s, reads %d demands %d audit rows %d)", err, time.Since(started), facts.storageReads.Load(), facts.demands.Load(), gate.records.Load())
 			}
 			defer response.Body.Close()
 			body, err := io.ReadAll(io.LimitReader(response.Body, MaxResponseBytes+1))
@@ -184,8 +179,8 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			if result.Status != "ok" || facts.stores.Load() != 1 || facts.demands.Load() != 0 || (facts.storageReads.Load() < 1 || facts.storageReads.Load() > 2) {
 				t.Fatalf("short live parent lost fast fresh result: %s stores=%d reads=%d demands=%d", body, facts.stores.Load(), facts.storageReads.Load(), facts.demands.Load())
 			}
-			if gate.begins.Load() != 1 || gate.finishes.Load() != 1 || facts.admissions.Load() != 0 || facts.storageActive.Load() != 0 {
-				t.Fatalf("audit/effect/owned I/O mismatch: Begin/Finish %d/%d admission=%d active=%d", gate.begins.Load(), gate.finishes.Load(), facts.admissions.Load(), facts.storageActive.Load())
+			if gate.records.Load() != 1 || facts.admissions.Load() != 0 || facts.storageActive.Load() != 0 {
+				t.Fatalf("audit/effect/owned I/O mismatch: audit rows %d admission=%d active=%d", gate.records.Load(), facts.admissions.Load(), facts.storageActive.Load())
 			}
 			t.Logf("HTTP/2 original request remains live for audited %s response: %s; storage reads=%d demand=%d", mode, time.Since(started), facts.storageReads.Load(), facts.demands.Load())
 		})

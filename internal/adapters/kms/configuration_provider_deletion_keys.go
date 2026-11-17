@@ -3,8 +3,11 @@ package kms
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -42,4 +45,40 @@ func (s *InstalledConfigurationProviderEffects) ContextDeletionSigningPublicKeys
 		return 0, nil, ErrKeyService
 	}
 	return parseTransitSigningKey(b, sign.Key)
+}
+
+// parseTransitSigningKey accepts a nonexportable Ed25519 Transit key read
+// response with 1..32 versions, each with a 32-byte public key.
+func parseTransitSigningKey(b []byte, name string) (int, map[int]ed25519.PublicKey, error) {
+	var result struct {
+		Data struct {
+			Name          string `json:"name"`
+			Type          string `json:"type"`
+			Exportable    bool   `json:"exportable"`
+			LatestVersion int    `json:"latest_version"`
+			Keys          map[string]struct {
+				PublicKey string `json:"public_key"`
+			} `json:"keys"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(b, &result) != nil {
+		return 0, nil, ErrKeyService
+	}
+	d := result.Data
+	if d.Name != name || d.Type != "ed25519" || d.Exportable || d.LatestVersion < 1 || d.LatestVersion > 2147483647 || len(d.Keys) < 1 || len(d.Keys) > 32 {
+		return 0, nil, ErrKeyService
+	}
+	out := make(map[int]ed25519.PublicKey, len(d.Keys))
+	for v, k := range d.Keys {
+		version, err := strconv.Atoi(v)
+		key, decodeErr := base64.StdEncoding.Strict().DecodeString(k.PublicKey)
+		if err != nil || strconv.Itoa(version) != v || version < 1 || version > d.LatestVersion || decodeErr != nil || len(key) != ed25519.PublicKeySize {
+			return 0, nil, ErrKeyService
+		}
+		out[version] = key
+	}
+	if out[d.LatestVersion] == nil {
+		return 0, nil, ErrKeyService
+	}
+	return d.LatestVersion, out, nil
 }

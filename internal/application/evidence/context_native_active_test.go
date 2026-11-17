@@ -107,9 +107,9 @@ type stopActiveOrder struct {
 	calls int
 }
 
-func (a *stopActiveOrder) CancelDownloadTransfers(ctx context.Context, d artifact.DownloadStopDecision) error {
+func (a *stopActiveOrder) CancelDownloadTransfers(ctx context.Context, d artifact.DownloadStop) error {
 	a.calls++
-	if a.f.stops != 1 || a.f.creates != 0 || d != a.f.snapshot.Decision {
+	if a.f.stops != 1 || a.f.stored == nil || d != *a.f.stored {
 		return artifact.ErrIntegrity
 	}
 	if a.fail {
@@ -117,22 +117,21 @@ func (a *stopActiveOrder) CancelDownloadTransfers(ctx context.Context, d artifac
 	}
 	return ctx.Err()
 }
-func TestNativeContentStopRestrictionBeforeJoinedCancellationBeforeAudit(t *testing.T) {
+func TestNativeContentStopCancelsJoinedTransfersAfterSQLStop(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		f, s := newStopFixture(t)
 		active := &stopActiveOrder{f: f, fail: fail}
 		s.Active = active
-		d := f.snapshot.Decision
-		out, e := s.CancelContextDownload(t.Context(), f, d.DownloadID, "same-key", d.RequestID)
+		out, e := s.CancelContextDownload(t.Context(), f, stopDownloadID, "same-key", stopRequestID)
 		if active.calls != 1 || f.stops != 1 {
 			t.Fatal("stop boundary not executed")
 		}
 		if fail {
-			if e == nil || out.DownloadID != "" || f.creates != 0 || f.acks != 0 {
+			if e == nil || out.DownloadID != "" {
 				t.Fatal("unjoined cancellation claimed completion")
 			}
-		} else if e != nil || f.creates != 1 || f.acks != 1 {
-			t.Fatal("joined cancellation skipped audit", e)
+		} else if e != nil || out.State != "Cancelled" {
+			t.Fatal("joined cancellation failed", e)
 		}
 	}
 }

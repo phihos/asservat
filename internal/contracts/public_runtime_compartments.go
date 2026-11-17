@@ -9,10 +9,6 @@ import "slices"
 const PublicRuntimeRetainedWorkerProcesses = 2
 const PublicRuntimeWorkerRoleConnections = PublicRuntimeRetainedWorkerProcesses + 1
 
-func PublicRuntimeCaptureCleanupPurposes() []string {
-	return []string{"capture-cleanup", "capture-verifier", "capture-finalizer"}
-}
-
 // ADR-170: connector-facing hub duties run in a separate federation process
 // kind, so they never count against the 32-connection hub replica budget.
 const PublicRuntimeRetainedFederationProcesses = 2
@@ -39,7 +35,7 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		limit, _ := PublicRuntimeRolePoolLimit(purpose)
 		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
-	if slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
+	if purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {

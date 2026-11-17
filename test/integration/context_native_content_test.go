@@ -19,7 +19,6 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/browser"
@@ -42,27 +41,6 @@ type nativeContextFixture struct {
 	configuration *postgres.WorkerConfigurations
 }
 
-func bindContextNativeStopFixture(t *testing.T, ctx context.Context, cfg *postgres.Downloads, a artifact.DownloadAllocation, installation, store string, poolFor func(string, string) *pgxpool.Pool) {
-	t.Helper()
-	p := audit.DownloadStopLifecyclePolicy{RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: custodyID(), BackupProfileID: custodyID(), QualificationID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, QualificationDigest: artifact.Digest{3}, Layout: audit.DownloadStopHistoryLayout, CleanupBudgetSeconds: 6, ProofWindowSeconds: 3, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1, MaxPurgeLeases: 8}
-	c, k, b, w := p.SlotBacking()
-	const slots = int64(10) // stop slots per allocation, as sessions were before
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	backing := artifact.DownloadStopBacking{AllocationID: a.ID, RootID: a.RootID, InstallationID: installation, StoreID: store, PolicyID: p.PolicyID, BackupProfileID: p.BackupProfileID, PolicyDigest: p.PolicyDigest, BackupProfileDigest: p.BackupProfileDigest, Slots: slots, AllocationSlots: slots, CipherBytes: c * slots, KeyAttempts: k * slots, BackupBytes: b * slots, WALBytes: w * slots, RetainedSeconds: 3600, ObservedAt: n, ValidUntil: a.ValidUntil}
-	if e := cfg.BindDownloadStopBacking(ctx, backing); e != nil {
-		t.Fatal("accepted synthetic Stop backing", e)
-	}
-	pool := poolFor("download_stop_lifecycle_config_runtime", "synthetic-stop-lifecycle-config")
-	defer pool.Close()
-	s, e := postgres.NewDownloadStopLifecycles(ctx, pool, a.RootID, installation)
-	if e != nil {
-		t.Fatal(e)
-	}
-	n = time.Now().UTC().Truncate(time.Microsecond)
-	if e = s.Configure(ctx, p, n, n.Add(5*time.Second)); e != nil {
-		t.Fatal(e)
-	}
-}
 func contextNativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
 	t.Helper()
 	// Add only the read sets needed by the new paired adapters. Runtime effect
@@ -73,7 +51,7 @@ func contextNativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		"CREATE ROLE native_plan_runtime LOGIN PASSWORD 'synthetic-native-plan'",
 		"GRANT CONNECT ON DATABASE custody_test TO native_plan_runtime",
 		"GRANT USAGE ON SCHEMA public TO native_plan_runtime",
-		"GRANT SELECT ON goose_db_version,fleet_current_trust,download_allocation,download_control_allocation,download_native_backing,download_stop_backing,download_stop_pool TO native_plan_runtime",
+		"GRANT SELECT ON goose_db_version,fleet_current_trust,download_allocation,download_control_allocation,download_native_backing TO native_plan_runtime",
 		"GRANT UPDATE(installation_id) ON fleet_current_trust TO native_plan_runtime",
 	} {
 		if strings.HasPrefix(q, "CREATE ROLE ") {
@@ -260,7 +238,7 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if (f.content.retry == nil || !f.content.retry.second) && (e != nil || plan.HardUntil.IsZero() || plan.HardUntil.After(f.allocation.ValidUntil)) {
 		t.Fatal("accepted allocation plan", e)
 	}
-	for _, q := range []string{"UPDATE download_allocation SET reserved_output=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1", "DELETE FROM download_stop_backing WHERE allocation_id=$1"} {
+	for _, q := range []string{"UPDATE download_allocation SET reserved_output=0 WHERE id=$1", "UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1"} {
 		_, e = planPool.Exec(ctx, q, f.allocation.ID)
 		var pg *pgconn.PgError
 		if !errors.As(e, &pg) || pg.Code != "42501" {
@@ -686,11 +664,11 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 	if e != nil || response.StatusCode != http.StatusOK || int64(len(body)) != m.Size || artifact.Digest(sha256.Sum256(body)) != m.SHA256 {
 		t.Fatal("exact native HTTP bytes", response.StatusCode, len(body), e)
 	}
-	var intents, outcomes int
-	if e = f.admin.QueryRow(ctx, "SELECT count(*),count(*) FILTER(WHERE outcome_receipt IS NOT NULL) FROM operation_audit WHERE root_id=$1 AND intent->>'Name'='download_artifact_content'", f.allocation.RootID).Scan(&intents, &outcomes); e != nil || intents != 2 || outcomes != 2 {
-		t.Fatal("conditional/content preflight acknowledged pairs", intents, outcomes, e)
+	var rows int
+	if e = f.admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation='download_artifact_content' AND kind='call'").Scan(&rows); e != nil || rows != 2 {
+		t.Fatal("conditional/content audit rows", rows, e)
 	}
-	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both preflight audit pairs completed", len(body))
+	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both GETs wrote an audit row", len(body))
 }
 func nativeContentAuditFixture(t *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
 	t.Helper()
@@ -706,85 +684,16 @@ func nativeOperationAuditServices(t, owner *testing.T, ctx context.Context, root
 	if len(diagnostics) > 1 || len(diagnostics) == 1 && diagnostics[0] == nil {
 		t.Fatal("invalid fixed journey diagnostic")
 	}
-	open := func(role, password string) *pgxpool.Pool {
-		p := poolFor(role, password)
-		owner.Cleanup(p.Close)
-		return p
-	}
-	cp := open("operation_audit_config_runtime", "synthetic-operation-config")
-	defer cp.Close() // Both audit lanes are provisioned before returning their runtime services.
-	jp := open("operation_audit_runtime", "synthetic-operation-journal")
-	ap := open("operation_audit_ack_runtime", "synthetic-operation-ack")
-	config, e := postgres.New(ctx, cp)
+	recorder, e := postgres.NewAuditEvents(admin)
 	if e != nil {
 		t.Fatal(e)
-	}
-	provision := func(lane string) audit.OperationLifecyclePolicy {
-		n := time.Now().UTC().Truncate(time.Microsecond)
-		backing := auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}
-		if lane == "normal" {
-			// The processing fixture already provisioned revision one. Extend
-			// that synthetic configuration through its real revisioned API.
-			// Fund all four HTTP preflights independently of transfer depletion.
-			var revision, accounts, records int64
-			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 2 {
-				t.Fatal("original processing audit backing", revision, accounts, records, e)
-			}
-			backing.ExpectedRevision = revision
-			backing.RecordsPerAccount = normalRecords
-		}
-		if e = config.ProvisionOperationAuditPool(ctx, backing); e != nil {
-			t.Fatal(e)
-		}
-		policy := audit.OperationLifecyclePolicy{RootID: root, Lane: lane, InstallationID: installation, StoreID: storeID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: backing.ExpectedRevision + 1, MetadataSlots: backing.Accounts * backing.RecordsPerAccount, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
-		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
-		policy.BackupReservedBytes = bb * policy.MetadataSlots
-		policy.WALReservedBytes = ww * policy.MetadataSlots
-		return policy
-	}
-	// Provision both finite lanes before opening their runtime connections.
-	// The setup-only role is never retained by either returned auditor.
-	normalPolicy, resolutionPolicy := provision("normal"), provision("resolution")
-	cp.Close()
-	makeAudit := func(policy audit.OperationLifecyclePolicy) *auditapp.HealthyOperationAuditor {
-		lane := policy.Lane
-		j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy)
-		if e != nil {
-			t.Fatal(e)
-		}
-		ack, e := postgres.NewOperationAcknowledgements(ctx, ap, policy.RootID, lane, installation)
-		if e != nil {
-			t.Fatal(e)
-		}
-		lifecycle, e := postgres.NewOperationLifecycles(ctx, jp, policy.RootID, lane, installation)
-		if e != nil {
-			t.Fatal(e)
-		}
-		objects, e := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
-		if e != nil {
-			t.Fatal(e)
-		}
-		var journal auditapp.OperationJournal = j
-		var acknowledgements auditapp.OperationAcknowledgements = ack
-		var closed auditapp.ClosedOperationObjects = objects
-		var completions auditapp.OperationCompletions = lifecycle
-		if len(diagnostics) == 1 {
-			probe := publicJourneyAuditDiagnostics{OperationJournal: j, OperationAcknowledgements: ack, ClosedOperationObjects: objects, OperationCompletions: lifecycle, trace: diagnostics[0]}
-			journal, acknowledgements, closed, completions = probe, probe, probe, probe
-		}
-		gate, e := auditapp.NewHealthyOperationAuditor(policy, journal, acknowledgements, &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, closed, completions, time.Now)
-		if e != nil {
-			t.Fatal(e)
-		}
-		return gate
 	}
 	mac, e := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))
 	if e != nil {
 		t.Fatal(e)
 	}
 	owner.Cleanup(mac.Close)
-	cfg := presentation.AuditedOperationsConfig{RootID: root, Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 2, NormalPerSecond: 100, ResolutionPerSecond: 10, Now: time.Now, NewID: custodyID}
-	out, e := presentation.NewHealthyAuditedOperations(cfg, inner, makeAudit(normalPolicy), makeAudit(resolutionPolicy), mac)
+	out, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: custodyID}, inner, recorder, mac)
 	if e != nil {
 		t.Fatal(e)
 	}

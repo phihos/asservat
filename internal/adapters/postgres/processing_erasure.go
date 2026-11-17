@@ -12,19 +12,21 @@ import (
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
-// Prepare the unchanged lifecycle wire record before audit. The SQL guard
-// independently checks these exact retained facts under the custody locks.
-func prepareProcessingErasure(ctx context.Context, q *custodydb.Queries, draft app.ProcessingDecision) ([]byte, error) {
+// Prepare the lifecycle wire record. The SQL guard independently checks these
+// exact retained facts under the custody locks.
+func prepareProcessingErasure(ctx context.Context, q *custodydb.Queries, root string, draft app.ProcessingDecision, requestDigest []byte) ([]byte, error) {
 	loc := draft.Change.Scope.Location
+	var source artifact.Digest
+	copy(source[:], requestDigest)
 	a, err := q.ReadAttempt(ctx, id(loc.AttemptID))
 	if err != nil || a.ArtifactID != id(loc.ArtifactID) || a.ClusterID != id(loc.ClusterID) || a.State != artifact.StoredUnpublished {
 		return nil, value.ErrUnavailable
 	}
-	c, err := q.ReadRetainedContext(ctx, custodydb.ReadRetainedContextParams{RootID: id(draft.Intent.RootID), AttemptID: a.ID})
+	c, err := q.ReadRetainedContext(ctx, custodydb.ReadRetainedContextParams{RootID: id(root), AttemptID: a.ID})
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}
-	r, err := retainedContextOrigins(ctx, q, draft.Intent.RootID, c, a)
+	r, err := retainedContextOrigins(ctx, q, root, c, a)
 	if err != nil || r.Registration.Location != loc {
 		return nil, value.ErrUnavailable
 	}
@@ -33,9 +35,9 @@ func prepareProcessingErasure(ctx context.Context, q *custodydb.Queries, draft a
 	effective.ExpiresAt = previous.AnchorAt
 	d := value.LifecycleDecision{
 		ID: draft.Change.RequestID, RootID: r.RootID, Location: loc, Target: r.Input.Target, Sequence: r.Sequence + 1,
-		RegistrationDigest: app.RegistrationDigest(r.Registration), PolicyRevision: value.ErasureLifecycleSource(draft.Change.RequestID, draft.DecisionDigest),
+		RegistrationDigest: app.RegistrationDigest(r.Registration), PolicyRevision: value.ErasureLifecycleSource(draft.Change.RequestID, source),
 		Policies: slices.Clone(r.OriginPolicies), Origins: slices.Clone(r.OriginPolicies), Previous: previous, Effective: effective,
-		ObservedAt: draft.Intent.CreatedAt.UTC(), ValidUntil: draft.Intent.RequestUntil.UTC(),
+		ObservedAt: draft.CreatedAt.UTC(), ValidUntil: draft.RequestUntil.UTC(),
 	}
 	if !d.Valid() {
 		return nil, value.ErrUnavailable
@@ -55,8 +57,8 @@ func verifyProcessingErasure(ctx context.Context, q *custodydb.Queries, row cust
 		return value.ErrUnavailable
 	}
 	var prepared artifact.Digest
-	copy(prepared[:], row.DecisionDigest)
-	if len(row.DecisionDigest) != len(prepared) || d.PolicyRevision != value.ErasureLifecycleSource(uid(row.ID), prepared) {
+	copy(prepared[:], row.RequestDigest)
+	if len(row.RequestDigest) != len(prepared) || d.PolicyRevision != value.ErasureLifecycleSource(uid(row.ID), prepared) {
 		return value.ErrUnavailable
 	}
 	a, err := q.ReadAttempt(ctx, id(d.Location.AttemptID))

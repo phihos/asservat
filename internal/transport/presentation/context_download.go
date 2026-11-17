@@ -216,7 +216,6 @@ func contextDownloadData(v evidence.ContextDownloadView, prepare bool, now time.
 type ContextDownloadCancelData struct {
 	DownloadID string `json:"download_id"`
 	State      string `json:"state"`
-	AuditState string `json:"audit_state"`
 }
 
 func (s *ContextDownloadOperations) cancel(ctx context.Context, current identities.CurrentIdentity, call OperationCall, in ContextDownloadInput) (OperationReply, error) {
@@ -239,7 +238,7 @@ func (s *ContextDownloadOperations) cancel(ctx context.Context, current identiti
 		}
 		until = identity.Earlier(until, receipt.ValidUntil)
 		out.RequestID = receipt.RequestID
-		out.Data = ContextDownloadCancelData{DownloadID: receipt.DownloadID, State: receipt.State, AuditState: receipt.AuditState}
+		out.Data = ContextDownloadCancelData{DownloadID: receipt.DownloadID, State: receipt.State}
 	}
 	final, e := current.ResolveIdentity(ctx)
 	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) {

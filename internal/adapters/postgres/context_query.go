@@ -116,8 +116,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 		})
 	}, func(callback context.Context) error {
 		return s.ledger.transaction(callback, func(tx *custodydb.Queries) error {
-			trust, e := currentTrust(callback, tx, s.installation)
-			if e != nil {
+			if _, e := currentTrust(callback, tx, s.installation); e != nil {
 				return queryRefusal("trust", e)
 			}
 			permissions, e := tx.LockPermissionStream(callback, id(s.root))
@@ -141,14 +140,14 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 				return queryRefusal("allocation-lock", e)
 			}
 			fence := func() error {
-				if e := s.fence(callback, tx, query, request, authority, trust, permissions, backing, allocation); e != nil {
+				if e := s.fence(callback, tx, query, request, authority, permissions, backing, allocation); e != nil {
 					return e
 				}
 				if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
 					return nil
 				}
 				baselineQuery, baselineAuthority := projectionQuerySource(query, authority, true)
-				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, trust, permissions, backing, baselineAllocation)
+				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, permissions, backing, baselineAllocation)
 			}
 			if e = fence(); e != nil {
 				return e
@@ -168,7 +167,7 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 	return nil
 }
 
-func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, trust custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
+func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
 	now, e := tx.CurrentTime(ctx)
 	if e != nil {
 		return queryRefusal("fence-time", e)
@@ -217,9 +216,6 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	linked, e := tx.ContextQueryCaseExists(ctx, custodydb.ContextQueryCaseExistsParams{RootID: id(s.root), CaseID: id(q.Scope.CaseID), CaptureID: id(q.Scope.CaptureID), ArtifactID: id(q.Scope.ArtifactID)})
 	if e != nil || !linked {
 		return queryRefusal("fence-case", nil)
-	}
-	if e = queryIntentFence(ctx, tx, r.Call, trust); e != nil {
-		return queryRefusal("fence-intent", e)
 	}
 	profileBody, e := queryJSON(q.Plan.Profile)
 	if e != nil {
@@ -385,8 +381,8 @@ func (s *ContextQueries) AdmitQueryPoll(ctx context.Context, q value.ContextQuer
 	})
 }
 
-// RegisterQueryReplayCall binds a newly acknowledged repetition of the exact
-// normalized Begin input to its immutable query. It charges one existing control
+// RegisterQueryReplayCall binds a repetition of the same idempotency key and
+// request digest (matched by LookupQueryInvocation) to its immutable query. It charges one existing control
 // on first insertion, not a poll, read, worker, query unit or grant use.
 func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
 	supported := q.Scope.DisplayVersion == value.PacketQueryDisplayVersion && q.Scope.PacketQuery.Valid() ||
@@ -398,7 +394,7 @@ func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.Co
 	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
 		row, e := queryExact(ctx, tx, q)
 		var original value.ContextQueryRequest
-		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil || r.Call.InputFormat != original.Call.InputFormat || r.Call.MACVersion != original.Call.MACVersion || r.Call.InputDigest != original.Call.InputDigest {
+		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil {
 			return value.ErrUnavailable
 		}
 		// An original operation ID can only repeat its exact already-bound request.

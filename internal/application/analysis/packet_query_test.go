@@ -59,7 +59,7 @@ func (f *packetQueryLedgerFixture) PermitQuery(ctx context.Context, q value.Cont
 	return f.projectionFixture.PermitQuery(ctx, q, r, a)
 }
 func (f *packetQueryLedgerFixture) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
-	if ctx.Err() != nil || !q.Equal(f.q) || !q.Current(a, f.now) || !r.Valid(f.now) || r.Call.Tool != q.Scope.BeginTool() || r.Call.ID == q.OperationID || r.Call.Principal != q.Scope.Principal || !q.InvocationKey.Valid() || r.Call.InputFormat != f.initialRequest.Call.InputFormat || r.Call.MACVersion != f.initialRequest.Call.MACVersion || r.Call.InputDigest != f.initialRequest.Call.InputDigest {
+	if ctx.Err() != nil || !q.Equal(f.q) || !q.Current(a, f.now) || !r.Valid(f.now) || r.Call.Tool != q.Scope.BeginTool() || r.Call.ID == q.OperationID || r.Call.Principal != q.Scope.Principal || !q.InvocationKey.Valid() {
 		return value.ErrUnavailable
 	}
 	if f.registerHook != nil {
@@ -116,13 +116,12 @@ func TestPacketQueryOriginalKeyReplayNeverCompilesOrStartsAgain(t *testing.T) {
 	}
 	inv := f.invocation("pcap_query")
 	inv.input = ContextQueryInput{PacketQuery: r}
-	d, e := reads.Begin(t.Context(), f, inv, r)
+	d, e := reads.Begin(t.Context(), f, inv.id, r)
 	if e != nil {
 		t.Fatalf("initial %v stage=%#v calls auth=%d admissions=%d", e, e, f.authorityReads, f.admissions)
 	}
 	id := d.Association().QueryID
 	deadline := d.QueryDeadline()
-	inv.outcome = d
 	if f.q.Scope.QueryUnits() != 4 || f.q.Scope.ReadBatches() != 2 || f.starts != 1 || f.reads != 0 {
 		t.Fatal("queryfunding", f.q.Scope.QueryUnits())
 	}
@@ -131,11 +130,10 @@ func TestPacketQueryOriginalKeyReplayNeverCompilesOrStartsAgain(t *testing.T) {
 	}
 	replay := f.invocation("pcap_query")
 	replay.input = ContextQueryInput{PacketQuery: r}
-	again, e := reads.Begin(t.Context(), f, replay, r)
+	again, e := reads.Begin(t.Context(), f, replay.id, r)
 	if e != nil || !again.Pending() || again.Association().QueryID != id || !again.QueryDeadline().Equal(deadline) || again.Effect() != ContextQueryReplayed || compiler.calls != 1 || f.admissions != 1 || f.starts != 1 || f.observations != 1 || f.reads != 0 || f.polls != 0 || ledger.registrations != 1 {
 		t.Fatal("replaycausedwork", e, compiler.calls, f.admissions, f.starts, f.observations)
 	}
-	replay.outcome = again
 	if e = again.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
@@ -143,13 +141,13 @@ func TestPacketQueryOriginalKeyReplayNeverCompilesOrStartsAgain(t *testing.T) {
 	changed.MaxPackets = 2
 	bad := f.invocation("pcap_query")
 	bad.input = ContextQueryInput{PacketQuery: changed}
-	if d, e := reads.Begin(t.Context(), f, bad, changed); e == nil || d != nil || compiler.calls != 1 || f.admissions != 1 {
+	if d, e := reads.Begin(t.Context(), f, bad.id, changed); e == nil || d != nil || compiler.calls != 1 || f.admissions != 1 {
 		t.Fatal("changedkeyreplayed", e)
 	}
 }
 
 func TestPacketQueryReplayRegistrationRefusesChangedMACAndRetainsOriginalBudget(t *testing.T) {
-	for _, mode := range []string{"registered", "missing-facet", "registration-failed", "input-digest", "input-format", "mac-version", "cancel-after-register", "original-expired"} {
+	for _, mode := range []string{"registered", "missing-facet", "registration-failed", "cancel-after-register", "original-expired"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProjectionFixture(t)
 			f.ready = false
@@ -170,11 +168,10 @@ func TestPacketQueryReplayRegistrationRefusesChangedMACAndRetainsOriginalBudget(
 			reads, _ := f.s.PacketQueries()
 			first := f.invocation("pcap_query")
 			first.input = ContextQueryInput{PacketQuery: r}
-			d, e := reads.Begin(t.Context(), f, first, r)
+			d, e := reads.Begin(t.Context(), f, first.id, r)
 			if e != nil {
 				t.Fatal(e)
 			}
-			first.outcome = d
 			original := f.q
 			if e = d.Close(context.Background()); e != nil {
 				t.Fatal(e)
@@ -199,20 +196,11 @@ func TestPacketQueryReplayRegistrationRefusesChangedMACAndRetainsOriginalBudget(
 			}
 			replay := f.invocation("pcap_query")
 			replay.input = ContextQueryInput{PacketQuery: r}
-			switch mode {
-			case "input-digest":
-				replay.call.InputDigest[0] ^= 1
-			case "input-format":
-				replay.call.InputFormat = "other-input/v1"
-			case "mac-version":
-				replay.call.MACVersion = "other"
-			}
-			d, e = reads.Begin(call, f, replay, r)
+			d, e = reads.Begin(call, f, replay.id, r)
 			if mode == "registered" {
 				if e != nil || d == nil || !d.Pending() || d.Association().QueryID != original.ID || d.Effect() != ContextQueryReplayed || ledger.registrations != 1 {
 					t.Fatal("registered replay", e)
 				}
-				replay.outcome = d
 				if e = d.Close(context.Background()); e != nil {
 					t.Fatal(e)
 				}

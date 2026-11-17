@@ -12,8 +12,8 @@ import (
 )
 
 const applyProcessingDecision = `-- name: ApplyProcessingDecision :one
-UPDATE processing_decision SET applied_at=clock_timestamp(),audit_digest=(SELECT sha256(convert_to(a.outcome_receipt::text,'UTF8')) FROM operation_audit a WHERE a.root_id=processing_decision.root_id AND a.id=processing_decision.id)
-WHERE processing_decision.root_id=$1 AND processing_decision.id=$2 AND processing_decision.applied_at IS NULL RETURNING processing_decision.id, processing_decision.root_id, processing_decision.rule_id, processing_decision.expected_revision, processing_decision.release_account, processing_decision.actor_digest, processing_decision.request_digest, processing_decision.scope, processing_decision.action, processing_decision.intent_seed, processing_decision.decision_digest, processing_decision.created_at, processing_decision.request_until, processing_decision.valid_until, processing_decision.retire_by, processing_decision.outcome_json, processing_decision.applied_at, processing_decision.audit_digest, processing_decision.result_revision, processing_decision.result_sequence, processing_decision.erasure_decision
+UPDATE processing_decision SET applied_at=clock_timestamp()
+WHERE root_id=$1 AND id=$2 AND applied_at IS NULL RETURNING id, root_id, rule_id, expected_revision, actor_digest, request_digest, scope, action, created_at, request_until, valid_until, retire_by, applied_at, result_revision, result_sequence, erasure_decision
 `
 
 type ApplyProcessingDecisionParams struct {
@@ -29,20 +29,15 @@ func (q *Queries) ApplyProcessingDecision(ctx context.Context, arg ApplyProcessi
 		&i.RootID,
 		&i.RuleID,
 		&i.ExpectedRevision,
-		&i.ReleaseAccount,
 		&i.ActorDigest,
 		&i.RequestDigest,
 		&i.Scope,
 		&i.Action,
-		&i.IntentSeed,
-		&i.DecisionDigest,
 		&i.CreatedAt,
 		&i.RequestUntil,
 		&i.ValidUntil,
 		&i.RetireBy,
-		&i.OutcomeJson,
 		&i.AppliedAt,
-		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
 		&i.ErasureDecision,
@@ -51,8 +46,8 @@ func (q *Queries) ApplyProcessingDecision(ctx context.Context, arg ApplyProcessi
 }
 
 const insertProcessingDecision = `-- name: InsertProcessingDecision :one
-INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,release_account,actor_digest,request_digest,scope,action,intent_seed,decision_digest,created_at,request_until,outcome_json,erasure_decision)
-VALUES($1,$2,$3,$4,$13,sha256(convert_to($14::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$10,$11,$12,$15) RETURNING id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision
+INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,actor_digest,request_digest,scope,action,created_at,request_until,erasure_decision)
+VALUES($1,$2,$3,$4,sha256(convert_to($10::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$11) RETURNING id, root_id, rule_id, expected_revision, actor_digest, request_digest, scope, action, created_at, request_until, valid_until, retire_by, applied_at, result_revision, result_sequence, erasure_decision
 `
 
 type InsertProcessingDecisionParams struct {
@@ -63,12 +58,8 @@ type InsertProcessingDecisionParams struct {
 	RequestDigest    []byte
 	Scope            []byte
 	Action           string
-	IntentSeed       []byte
-	DecisionDigest   []byte
 	CreatedAt        pgtype.Timestamptz
 	RequestUntil     pgtype.Timestamptz
-	OutcomeJson      []byte
-	ReleaseAccount   []byte
 	Actor            []byte
 	ErasureDecision  []byte
 }
@@ -82,12 +73,8 @@ func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProces
 		arg.RequestDigest,
 		arg.Scope,
 		arg.Action,
-		arg.IntentSeed,
-		arg.DecisionDigest,
 		arg.CreatedAt,
 		arg.RequestUntil,
-		arg.OutcomeJson,
-		arg.ReleaseAccount,
 		arg.Actor,
 		arg.ErasureDecision,
 	)
@@ -97,20 +84,15 @@ func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProces
 		&i.RootID,
 		&i.RuleID,
 		&i.ExpectedRevision,
-		&i.ReleaseAccount,
 		&i.ActorDigest,
 		&i.RequestDigest,
 		&i.Scope,
 		&i.Action,
-		&i.IntentSeed,
-		&i.DecisionDigest,
 		&i.CreatedAt,
 		&i.RequestUntil,
 		&i.ValidUntil,
 		&i.RetireBy,
-		&i.OutcomeJson,
 		&i.AppliedAt,
-		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
 		&i.ErasureDecision,
@@ -119,8 +101,8 @@ func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProces
 }
 
 const insertProcessingRoot = `-- name: InsertProcessingRoot :exec
-INSERT INTO processing_root(root_id,installation_id,issuer_epoch,epoch,source_uid,protection_digest,backing,release_policy,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions)
-VALUES($1,$2,$3,$4,$5,$6,$7,$13,1,$8,$9,$10,$11,$12)
+INSERT INTO processing_root(root_id,installation_id,issuer_epoch,epoch,source_uid,protection_digest,backing,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions)
+VALUES($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10,$11,$12)
 `
 
 type InsertProcessingRootParams struct {
@@ -136,7 +118,6 @@ type InsertProcessingRootParams struct {
 	MaxCaptures        int64
 	MaxRules           int64
 	MaxRootTransitions int64
-	ReleasePolicy      []byte
 }
 
 func (q *Queries) InsertProcessingRoot(ctx context.Context, arg InsertProcessingRootParams) error {
@@ -153,29 +134,22 @@ func (q *Queries) InsertProcessingRoot(ctx context.Context, arg InsertProcessing
 		arg.MaxCaptures,
 		arg.MaxRules,
 		arg.MaxRootTransitions,
-		arg.ReleasePolicy,
 	)
 	return err
 }
 
 const insertProcessingRule = `-- name: InsertProcessingRule :exec
-INSERT INTO processing_rule(root_id,id,scope,release_account) VALUES($1,$2,$3,$4)
+INSERT INTO processing_rule(root_id,id,scope) VALUES($1,$2,$3)
 `
 
 type InsertProcessingRuleParams struct {
-	RootID         pgtype.UUID
-	ID             pgtype.UUID
-	Scope          []byte
-	ReleaseAccount []byte
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+	Scope  []byte
 }
 
 func (q *Queries) InsertProcessingRule(ctx context.Context, arg InsertProcessingRuleParams) error {
-	_, err := q.db.Exec(ctx, insertProcessingRule,
-		arg.RootID,
-		arg.ID,
-		arg.Scope,
-		arg.ReleaseAccount,
-	)
+	_, err := q.db.Exec(ctx, insertProcessingRule, arg.RootID, arg.ID, arg.Scope)
 	return err
 }
 
@@ -228,7 +202,7 @@ func (q *Queries) ListProcessingInventoryRules(ctx context.Context, arg ListProc
 }
 
 const lockProcessingDecision = `-- name: LockProcessingDecision :one
-SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8')) FOR UPDATE
+SELECT id, root_id, rule_id, expected_revision, actor_digest, request_digest, scope, action, created_at, request_until, valid_until, retire_by, applied_at, result_revision, result_sequence, erasure_decision FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8')) FOR UPDATE
 `
 
 type LockProcessingDecisionParams struct {
@@ -245,20 +219,15 @@ func (q *Queries) LockProcessingDecision(ctx context.Context, arg LockProcessing
 		&i.RootID,
 		&i.RuleID,
 		&i.ExpectedRevision,
-		&i.ReleaseAccount,
 		&i.ActorDigest,
 		&i.RequestDigest,
 		&i.Scope,
 		&i.Action,
-		&i.IntentSeed,
-		&i.DecisionDigest,
 		&i.CreatedAt,
 		&i.RequestUntil,
 		&i.ValidUntil,
 		&i.RetireBy,
-		&i.OutcomeJson,
 		&i.AppliedAt,
-		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
 		&i.ErasureDecision,
@@ -267,7 +236,7 @@ func (q *Queries) LockProcessingDecision(ctx context.Context, arg LockProcessing
 }
 
 const lockProcessingRoot = `-- name: LockProcessingRoot :one
-SELECT root_id, installation_id, issuer_epoch, epoch, source_uid, protection_digest, backing, release_policy, backing_revision, valid_until, retire_by, max_captures, max_rules, max_root_transitions, captures, rules, root_transitions, sequence, initialized_at, initialization_id FROM processing_root WHERE root_id=$1 FOR UPDATE
+SELECT root_id, installation_id, issuer_epoch, epoch, source_uid, protection_digest, backing, backing_revision, valid_until, retire_by, max_captures, max_rules, max_root_transitions, captures, rules, root_transitions, sequence, initialized_at, initialization_id FROM processing_root WHERE root_id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockProcessingRoot(ctx context.Context, rootID pgtype.UUID) (ProcessingRoot, error) {
@@ -281,7 +250,6 @@ func (q *Queries) LockProcessingRoot(ctx context.Context, rootID pgtype.UUID) (P
 		&i.SourceUid,
 		&i.ProtectionDigest,
 		&i.Backing,
-		&i.ReleasePolicy,
 		&i.BackingRevision,
 		&i.ValidUntil,
 		&i.RetireBy,
@@ -299,7 +267,7 @@ func (q *Queries) LockProcessingRoot(ctx context.Context, rootID pgtype.UUID) (P
 }
 
 const lockProcessingRule = `-- name: LockProcessingRule :one
-SELECT root_id, id, release_account, scope, revision, decisions, valid_until, retire_by, state, current_decision FROM processing_rule WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT root_id, id, scope, revision, decisions, valid_until, retire_by, state, current_decision FROM processing_rule WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type LockProcessingRuleParams struct {
@@ -313,7 +281,6 @@ func (q *Queries) LockProcessingRule(ctx context.Context, arg LockProcessingRule
 	err := row.Scan(
 		&i.RootID,
 		&i.ID,
-		&i.ReleaseAccount,
 		&i.Scope,
 		&i.Revision,
 		&i.Decisions,
@@ -334,45 +301,6 @@ func (q *Queries) ProcessingCatalogEmpty(ctx context.Context, rootID pgtype.UUID
 	var empty bool
 	err := row.Scan(&empty)
 	return empty, err
-}
-
-const readProcessingDecision = `-- name: ReadProcessingDecision :one
-SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8'))
-`
-
-type ReadProcessingDecisionParams struct {
-	RootID pgtype.UUID
-	ID     pgtype.UUID
-	Actor  []byte
-}
-
-func (q *Queries) ReadProcessingDecision(ctx context.Context, arg ReadProcessingDecisionParams) (ProcessingDecision, error) {
-	row := q.db.QueryRow(ctx, readProcessingDecision, arg.RootID, arg.ID, arg.Actor)
-	var i ProcessingDecision
-	err := row.Scan(
-		&i.ID,
-		&i.RootID,
-		&i.RuleID,
-		&i.ExpectedRevision,
-		&i.ReleaseAccount,
-		&i.ActorDigest,
-		&i.RequestDigest,
-		&i.Scope,
-		&i.Action,
-		&i.IntentSeed,
-		&i.DecisionDigest,
-		&i.CreatedAt,
-		&i.RequestUntil,
-		&i.ValidUntil,
-		&i.RetireBy,
-		&i.OutcomeJson,
-		&i.AppliedAt,
-		&i.AuditDigest,
-		&i.ResultRevision,
-		&i.ResultSequence,
-		&i.ErasureDecision,
-	)
-	return i, err
 }
 
 const readProcessingNode = `-- name: ReadProcessingNode :one
@@ -406,7 +334,7 @@ func (q *Queries) ReadProcessingNode(ctx context.Context, arg ReadProcessingNode
 }
 
 const readProcessingRoot = `-- name: ReadProcessingRoot :one
-SELECT root_id, installation_id, issuer_epoch, epoch, source_uid, protection_digest, backing, release_policy, backing_revision, valid_until, retire_by, max_captures, max_rules, max_root_transitions, captures, rules, root_transitions, sequence, initialized_at, initialization_id FROM processing_root WHERE root_id=$1
+SELECT root_id, installation_id, issuer_epoch, epoch, source_uid, protection_digest, backing, backing_revision, valid_until, retire_by, max_captures, max_rules, max_root_transitions, captures, rules, root_transitions, sequence, initialized_at, initialization_id FROM processing_root WHERE root_id=$1
 `
 
 func (q *Queries) ReadProcessingRoot(ctx context.Context, rootID pgtype.UUID) (ProcessingRoot, error) {
@@ -420,7 +348,6 @@ func (q *Queries) ReadProcessingRoot(ctx context.Context, rootID pgtype.UUID) (P
 		&i.SourceUid,
 		&i.ProtectionDigest,
 		&i.Backing,
-		&i.ReleasePolicy,
 		&i.BackingRevision,
 		&i.ValidUntil,
 		&i.RetireBy,
@@ -438,7 +365,7 @@ func (q *Queries) ReadProcessingRoot(ctx context.Context, rootID pgtype.UUID) (P
 }
 
 const readProcessingRules = `-- name: ReadProcessingRules :many
-SELECT root_id, id, release_account, scope, revision, decisions, valid_until, retire_by, state, current_decision FROM processing_rule WHERE root_id=$1 AND state<>'reserved' ORDER BY id LIMIT 1025
+SELECT root_id, id, scope, revision, decisions, valid_until, retire_by, state, current_decision FROM processing_rule WHERE root_id=$1 AND state<>'reserved' ORDER BY id LIMIT 1025
 `
 
 func (q *Queries) ReadProcessingRules(ctx context.Context, rootID pgtype.UUID) ([]ProcessingRule, error) {
@@ -453,7 +380,6 @@ func (q *Queries) ReadProcessingRules(ctx context.Context, rootID pgtype.UUID) (
 		if err := rows.Scan(
 			&i.RootID,
 			&i.ID,
-			&i.ReleaseAccount,
 			&i.Scope,
 			&i.Revision,
 			&i.Decisions,
@@ -497,7 +423,7 @@ func (q *Queries) ResolveProcessingArtifactScope(ctx context.Context, arg Resolv
 }
 
 const updateProcessingBacking = `-- name: UpdateProcessingBacking :execrows
-UPDATE processing_root SET backing=$3,release_policy=$9,backing_revision=backing_revision+1,valid_until=$4,retire_by=$5,max_captures=$6,max_rules=$7,max_root_transitions=$8,root_transitions=root_transitions+1,sequence=sequence+1
+UPDATE processing_root SET backing=$3,backing_revision=backing_revision+1,valid_until=$4,retire_by=$5,max_captures=$6,max_rules=$7,max_root_transitions=$8,root_transitions=root_transitions+1,sequence=sequence+1
 WHERE root_id=$1 AND backing_revision=$2
 `
 
@@ -510,7 +436,6 @@ type UpdateProcessingBackingParams struct {
 	MaxCaptures        int64
 	MaxRules           int64
 	MaxRootTransitions int64
-	ReleasePolicy      []byte
 }
 
 func (q *Queries) UpdateProcessingBacking(ctx context.Context, arg UpdateProcessingBackingParams) (int64, error) {
@@ -523,7 +448,6 @@ func (q *Queries) UpdateProcessingBacking(ctx context.Context, arg UpdateProcess
 		arg.MaxCaptures,
 		arg.MaxRules,
 		arg.MaxRootTransitions,
-		arg.ReleasePolicy,
 	)
 	if err != nil {
 		return 0, err

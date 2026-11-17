@@ -47,7 +47,6 @@ func recordingGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custody
 		return out, value.ErrUnavailable
 	}
 	group := &value.RecordingSaveGroupAccepted{Children: make([]value.Accepted, 0, len(rows))}
-	state := value.IntentAudited
 	for n, child := range rows {
 		accepted, err := admittedRecord(child)
 		if err != nil || child.ID != row.ChildIds[n] || child.GroupID != row.ID || !child.GroupOrdinal.Valid || int(child.GroupOrdinal.Int16) != n || !bytes.Equal(child.ScopeDigest, row.ScopeDigest) || !bytes.Equal(child.ScopeJson, row.ScopeJson) || !child.CreatedAt.Time.Equal(row.AcceptedAt.Time) || child.Deadline.Time.After(row.Deadline.Time) || accepted.Expectation.Snapshot == nil || !accepted.Expectation.Snapshot.T0.Equal(row.AcceptedAt.Time) {
@@ -62,12 +61,9 @@ func recordingGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custody
 		} else if group.CaseID != accepted.Expectation.CaseID {
 			return value.Accepted{}, value.ErrUnavailable
 		}
-		if accepted.State != value.IntentAudited {
-			state = value.PendingAudit
-		}
 		group.Children = append(group.Children, accepted)
 	}
-	out = value.Accepted{Group: group, CaptureID: uid(row.ID), State: state, ScopeDigest: scope, CreatedAt: row.AcceptedAt.Time.UTC(), Deadline: row.Deadline.Time.UTC()}
+	out = value.Accepted{Group: group, CaptureID: uid(row.ID), ScopeDigest: scope, CreatedAt: row.AcceptedAt.Time.UTC(), Deadline: row.Deadline.Time.UTC()}
 	copy(out.SubmissionDigest[:], row.SubmissionDigest)
 	return out, nil
 }
@@ -83,7 +79,6 @@ func compositionGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custo
 		return out, value.ErrUnavailable
 	}
 	group := &value.RecordingSaveGroupAccepted{Children: make([]value.Accepted, 0, len(rows))}
-	state := value.IntentAudited
 	for n, child := range rows {
 		accepted, err := admittedRecord(child)
 		if err != nil || child.ID != row.ChildIds[n] || uid(child.ID) != parsed.ChildCapture[n] || child.GroupID != row.ID || !child.GroupOrdinal.Valid || int(child.GroupOrdinal.Int16) != n || !bytes.Equal(child.ScopeDigest, parsed.ChildScope[n][:]) || !child.CreatedAt.Time.Equal(row.AcceptedAt.Time) || child.Deadline.Time.After(row.Deadline.Time) || (accepted.Expectation.Recording == nil && accepted.Expectation.Logs == nil) {
@@ -101,12 +96,9 @@ func compositionGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custo
 		} else if group.CaseID != accepted.Expectation.CaseID {
 			return value.Accepted{}, value.ErrUnavailable
 		}
-		if accepted.State != value.IntentAudited {
-			state = value.PendingAudit
-		}
 		group.Children = append(group.Children, accepted)
 	}
-	out = value.Accepted{Group: group, CaptureID: uid(row.ID), State: state, ScopeDigest: scope, CreatedAt: row.AcceptedAt.Time.UTC(), Deadline: row.Deadline.Time.UTC()}
+	out = value.Accepted{Group: group, CaptureID: uid(row.ID), ScopeDigest: scope, CreatedAt: row.AcceptedAt.Time.UTC(), Deadline: row.Deadline.Time.UTC()}
 	copy(out.SubmissionDigest[:], row.SubmissionDigest)
 	return out, nil
 }

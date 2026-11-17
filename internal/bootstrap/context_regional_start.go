@@ -133,7 +133,7 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 		return e
 	}
 	a := accepted.Accepted
-	if accepted.Actor != caller.Principal || a.CaptureID != id || a.State != capturevalue.IntentAudited || accepted.Target.ClusterID != a.Expectation.Registration.Location.ClusterID {
+	if accepted.Actor != caller.Principal || a.CaptureID != id || accepted.Target.ClusterID != a.Expectation.Registration.Location.ClusterID {
 		return execution.ErrDenied
 	}
 	narrow("deadline", a.Deadline)

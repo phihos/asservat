@@ -193,6 +193,10 @@ func qualifyCaptureShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		if again := shares(t, s.a.RootID); len(again) != 1 || again[0].ID != shareID {
 			t.Fatal("publication replay created another share", again)
 		}
+		var audited int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE kind='share.create' AND operation='publish_capture' AND share_ids=ARRAY[$1] AND capture_ids=ARRAY[$2]`, shareID, f.e.CaptureUID).Scan(&audited); err != nil || audited != 1 {
+			t.Fatal("materialized share lacks exactly one publication audit row", err, audited)
+		}
 		store, err := postgres.NewEvidenceShares(ctx, hubPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)

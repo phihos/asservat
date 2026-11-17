@@ -62,7 +62,7 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 		// Both callers immediately resolve this incomplete private value from
 		// the exact retained source row before any work can be returned/used.
 		out = app.APIContextWork{Accepted: accepted, Actor: intent.Actor, Initiator: intent.Initiator}
-		copy(out.IntentDigest[:], c.IntentDigest)
+		copy(out.IntentDigest[:], digest(intent))
 		return out, nil
 	}
 	type scopeTarget struct {
@@ -90,7 +90,7 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 		return out, value.ErrUnavailable
 	}
 	out = app.APIContextWork{Accepted: accepted, Target: request, Actor: intent.Actor}
-	copy(out.IntentDigest[:], c.IntentDigest)
+	copy(out.IntentDigest[:], digest(intent))
 	return out, nil
 }
 func apiExecution(row custodydb.ContextExecution) (value.APIExecution, error) {

@@ -8,17 +8,11 @@ import (
 	"asservat.local/asservat/internal/contracts"
 )
 
-func TestSharedPublicPoolKeepsResolutionReservationsAndRefusesRetiredFacets(t *testing.T) {
+func TestSharedPublicPoolRefusesRetiredFacets(t *testing.T) {
 	for _, duty := range []string{"api-execution", "hub-metadata-read", "download-session", "capture-preview"} {
 		role, key, limit, hot, ok := publicPoolPlan(duty)
-		if !ok || role != "hub-runtime" || key != "hub-runtime" || limit != 18 || !hot {
+		if !ok || role != "hub-runtime" || key != "hub-runtime" || limit != 20 || !hot {
 			t.Fatal("ordinary duty did not share its governed pool", duty)
-		}
-	}
-	for _, duty := range []string{"audit-resolution-journal", "audit-resolution-ack"} {
-		role, key, limit, hot, ok := publicPoolPlan(duty)
-		if !ok || role != "hub-runtime" || key != duty || limit != 1 || !hot {
-			t.Fatal("resolution duty lost its reserved connection", duty)
 		}
 	}
 	in, dir, c := ownerInputFixture(t)

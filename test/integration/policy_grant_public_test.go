@@ -18,7 +18,6 @@ import (
 	planningapp "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -118,27 +117,6 @@ type publicPolicyNoCapture struct {
 	presentation.ContextUseCase
 	presentation.ContextProgressUseCase
 }
-type publicPolicyAuditObjects struct {
-	auditapp.OperationObjects
-	loseIntent, loseOutcome bool
-}
-
-func (s *publicPolicyAuditObjects) CreateOperationIntent(ctx context.Context, in audit.OperationIntent) (audit.Receipt, error) {
-	r, e := s.OperationObjects.CreateOperationIntent(ctx, in)
-	if e == nil && s.loseIntent {
-		s.loseIntent = false
-		return audit.Receipt{}, auditapp.ErrUnavailable
-	}
-	return r, e
-}
-func (s *publicPolicyAuditObjects) CreateOperationOutcome(ctx context.Context, in audit.OperationOutcome) (audit.Receipt, error) {
-	r, e := s.OperationObjects.CreateOperationOutcome(ctx, in)
-	if e == nil && s.loseOutcome {
-		s.loseOutcome = false
-		return audit.Receipt{}, auditapp.ErrUnavailable
-	}
-	return r, e
-}
 
 type publicPolicyProjection struct {
 	actual authapp.WorkloadProjectionReader
@@ -223,37 +201,6 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	if e != nil {
 		t.Fatal(e)
 	}
-	configPool := poolFor("operation_audit_config_runtime", "synthetic-operation-config")
-	defer configPool.Close()
-	config, e := postgres.New(ctx, configPool)
-	if e != nil {
-		t.Fatal(e)
-	}
-	journalPool := poolFor("operation_audit_runtime", "synthetic-operation-journal")
-	defer journalPool.Close()
-	ackPool := poolFor("operation_audit_ack_runtime", "synthetic-operation-ack")
-	defer ackPool.Close()
-	objects := &publicPolicyAuditObjects{OperationObjects: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}}
-	gates := map[string]auditapp.OperationAuditor{}
-	for _, lane := range []string{"normal", "resolution"} {
-		j, e := postgres.NewOperationJournal(ctx, journalPool, root, lane, a.InstallationID)
-		if e != nil {
-			t.Fatal(e)
-		}
-		ack, e := postgres.NewOperationAcknowledgements(ctx, ackPool, root, lane, a.InstallationID)
-		if e != nil {
-			t.Fatal(e)
-		}
-		gates[lane] = auditapp.OperationAuditor{Journal: j, Acknowledgements: ack, Objects: objects, Now: clock}
-	}
-	// Provision each finite audit pool once. Replaying configuration cannot
-	// change its original ValidUntil, revision or consumed record/account pools.
-	poolObserved := clock()
-	for _, lane := range []string{"normal", "resolution"} {
-		if e := config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 4, RecordsPerAccount: 64, RetainedSeconds: 3600, ObservedAt: poolObserved, FreshUntil: poolObserved.Add(5 * time.Second), ValidUntil: poolObserved.Add(time.Hour)}); e != nil {
-			t.Fatalf("initial %s audit pool: %v", lane, e)
-		}
-	}
 	refresh := func() {
 		t.Helper()
 		now := clock()
@@ -310,7 +257,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		t.Fatal(e)
 	}
 	defer mac.Close()
-	audited, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Retention: time.Hour, NormalConcurrency: 2, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: clock, NewID: custodyID}, inner, gates["normal"], gates["resolution"], mac)
+	audited, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: root, Now: clock, NewID: custodyID}, inner, &memoryAuditEvents{}, mac)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -345,34 +292,9 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		}
 		return rows, receipts
 	}
-	sourceObserved := func() time.Time {
-		var observed time.Time
-		if e := admin.QueryRow(ctx, "SELECT observed_at FROM policy_source WHERE root_id=$1 AND policy_uid=$2", root, a.PolicyUID).Scan(&observed); e != nil {
-			t.Fatal(e)
-		}
-		return observed
-	}
-	beforeIntent := sourceObserved()
-	objects.loseIntent = true
-	if _, e = call(actor, "request_policy_grant", request); e == nil {
-		t.Fatal("unknown encrypted intent allowed public request")
-	}
-	if !sourceObserved().Equal(beforeIntent) {
-		t.Fatal("source observation mutated before acknowledged request intent")
-	}
-	if rows, receipts := counts(); rows != 0 || receipts != 0 {
-		t.Fatal("mutation before acknowledged public intent", rows, receipts)
-	}
-	objects.loseOutcome = true
-	if _, e = call(actor, "request_policy_grant", request); e == nil {
-		t.Fatal("unknown encrypted outcome returned public success")
-	}
-	if rows, receipts := counts(); rows != 1 || receipts != 0 {
-		t.Fatal("unknown outcome erased or duplicated request", rows, receipts)
-	}
 	result, e := call(actor, "request_policy_grant", request)
 	if e != nil || result["status"] != "ok" {
-		t.Fatal("same-key public request recovery", result, e)
+		t.Fatal("public policy request", result, e)
 	}
 	data := result["data"].(map[string]any)
 	grantID := data["grant_id"].(string)
@@ -397,23 +319,11 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		t.Fatal("independent public approval", result, e)
 	}
 	attachment := map[string]any{"policy_name": observation.Name, "grant_id": grantID, "idempotency_key": "public-attachment"}
-	beforeIntent = sourceObserved()
-	objects.loseIntent = true
-	if _, e = call(actor, "activate_policy", attachment); e == nil {
-		t.Fatal("unknown attachment intent returned success")
+	if result, e = call(actor, "activate_policy", attachment); e != nil || result["status"] != "ok" {
+		t.Fatal("public attachment", result, e)
 	}
-	if !sourceObserved().Equal(beforeIntent) {
-		t.Fatal("source observation mutated before acknowledged attachment intent")
-	}
-	if _, receipts := counts(); receipts != 0 {
-		t.Fatal("attachment ran before encrypted intent")
-	}
-	objects.loseOutcome = true
-	if _, e = call(actor, "activate_policy", attachment); e == nil {
-		t.Fatal("unknown attachment outcome returned success")
-	}
-	if _, receipts := counts(); receipts != 1 {
-		t.Fatal("unknown outcome discarded immutable attachment", receipts)
+	if rows, receipts := counts(); rows != 1 || receipts != 1 {
+		t.Fatal("request and attachment did not commit exactly once", rows, receipts)
 	}
 	// A changed-and-restored authored reference clears the pointer. Exact public
 	// retry returns its historical receipt without restoring current attachment.
@@ -443,11 +353,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	if e != nil || current.ActiveID != acceptance || current.ExecutionsSpent != 0 || current.CollectedBytesSpent != 0 {
 		t.Fatal("public controls reaccepted or spent policy", current, e)
 	}
-	var acknowledged, uncertain int64
-	if e = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL),count(*) FILTER(WHERE outcome IS NOT NULL AND outcome_receipt IS NULL) FROM operation_audit WHERE root_id=$1", root).Scan(&acknowledged, &uncertain); e != nil || acknowledged < 5 || uncertain < 2 {
-		t.Fatal("independent encrypted receipts/uncertainty absent", acknowledged, uncertain, e)
-	}
-	t.Logf("public policy request/review/attachment: one grant, one immutable attachment, original expiry, zero execution/output spend; encrypted acknowledged=%d uncertain outcomes=%d", acknowledged, uncertain)
+	t.Log("public policy request/review/attachment: one grant, one immutable attachment, original expiry, zero execution/output spend")
 	// Actual original reviewer and step-up bounds under a held SQL grant row.
 	for _, mode := range []string{"eligibility", "step-up"} {
 		t.Run("held-row-original-"+mode+"-deadline", func(t *testing.T) {

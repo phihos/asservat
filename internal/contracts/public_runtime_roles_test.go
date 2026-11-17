@@ -8,7 +8,7 @@ import (
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	// Physical hub credentials are consolidated; separate process roles remain.
-	if len(all) != 32 || len(hub) != 7 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	if len(all) != 26 || len(hub) != 4 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
@@ -42,16 +42,6 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
 		if !ok || limit < 1 {
 			t.Fatal("unbounded installed role", purpose)
-		}
-	}
-	for n, purpose := range PublicRuntimeCaptureCleanupPurposes() {
-		id, ok := PublicRuntimeRoleOrdinal(purpose)
-		if !ok || id != 43+n || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
-			t.Fatal("cleanup compartment or permanent identity changed", purpose)
-		}
-		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit != 3 {
-			t.Fatal("cleanup exceeds two retained processes plus verifier", purpose)
 		}
 	}
 	for n, purpose := range []string{"capacity", "capacity-capture"} {

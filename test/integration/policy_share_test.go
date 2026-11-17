@@ -292,7 +292,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// Runtime acknowledges this selected capture immediately. Later test
 		// waits may exhaust its original writer window and cannot authorize a
 		// new pair write or renew that window.
-		if _, err := qualifiedCapture.publication.AcknowledgedCaptureIntent(ctx, got.CaptureID); err != nil {
+		if _, err := qualifiedCapture.publication.AcceptedCaptureIntent(ctx, got.CaptureID); err != nil {
 			t.Fatal("policy capture original intent pair", shareFixtureFailureStage(err), err)
 		}
 		// A replayed admission (a lost reply) returns the same capture and
@@ -371,7 +371,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		// a process restart cannot invent a replacement admission identity.
 		pool := poolFor(qualifiedCapture.admissionRole, "synthetic-share-capture-admit")
 		t.Cleanup(pool.Close)
-		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, installation, qualifiedCapture.mac)
+		a, err := postgres.NewContextAdmissions(ctx, pool, root, installation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -433,7 +433,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	publish(f2)
 	// Each selected capture already persisted its own genuine pair immediately
 	// after admission; c4's prepaid API work consumes that acknowledgement.
-	assertPolicyAPIWorkSource(t, ctx, admin, c4, true)
+	assertPolicyAPIWorkSource(t, ctx, admin, c4)
 	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
 		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
 	}, func() { refresh(); observe() })

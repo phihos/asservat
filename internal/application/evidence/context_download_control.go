@@ -224,9 +224,6 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 	if err != nil {
 		return zero, err
 	}
-	if lookup.Found && session.StopProtocol != artifact.DownloadStopProtocol {
-		return zero, collapsed("stop-protocol", artifact.ErrDownloadUnavailable, nil)
-	}
 	// A replay observes the original result. Terminal/expired sessions and
 	// active prepared sessions require no startup availability or new work.
 	if lookup.Found && (session.State != artifact.DownloadPreparing || !s.Now().Before(session.Deadline)) {
@@ -260,7 +257,7 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 			return zero, collapsed("plan-expired", artifact.ErrDownloadUnavailable, ctx.Err())
 		}
 		now := s.Now().UTC().Truncate(time.Microsecond)
-		session = artifact.DownloadSession{StopProtocol: artifact.DownloadStopProtocol, ID: s.NewID(), AllocationID: plan.Allocation.ID, Scope: scope, RequestDigest: ContextDownloadRequestDigest(artifactID), State: artifact.DownloadPreparing, CreatedAt: now, Deadline: identity.Earlier(a.AccessUntil, plan.Allocation.ValidUntil).UTC().Truncate(time.Microsecond), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit}
+		session = artifact.DownloadSession{ID: s.NewID(), AllocationID: plan.Allocation.ID, Scope: scope, RequestDigest: ContextDownloadRequestDigest(artifactID), State: artifact.DownloadPreparing, CreatedAt: now, Deadline: identity.Earlier(a.AccessUntil, plan.Allocation.ValidUntil).UTC().Truncate(time.Microsecond), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit}
 		if !plan.HardUntil.IsZero() {
 			session.Deadline = identity.Earlier(session.Deadline, plan.HardUntil).UTC().Truncate(time.Microsecond)
 		}
@@ -281,9 +278,6 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 	}
 	if !session.Valid() || session.Scope != scope || session.RequestDigest != ContextDownloadRequestDigest(artifactID) {
 		return zero, collapsed("session", artifact.ErrDownloadUnavailable, nil)
-	}
-	if session.StopProtocol != artifact.DownloadStopProtocol {
-		return zero, collapsed("stop-protocol", artifact.ErrDownloadUnavailable, nil)
 	}
 	pending := false
 	if session.State == artifact.DownloadPreparing {

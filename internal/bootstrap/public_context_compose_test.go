@@ -50,12 +50,3 @@ func TestPublicRoutingRefusesUnknownClusters(t *testing.T) {
 		t.Fatal("capability of an uninstalled cluster")
 	}
 }
-
-func TestPublicDigestRequiresCanonicalNonzeroHex(t *testing.T) {
-	if _, ok := publicDigest("00"); ok {
-		t.Fatal("short digest")
-	}
-	if _, ok := publicDigest("0000000000000000000000000000000000000000000000000000000000000000"); ok {
-		t.Fatal("zero digest")
-	}
-}

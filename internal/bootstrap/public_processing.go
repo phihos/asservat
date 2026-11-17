@@ -5,42 +5,24 @@ import (
 	"errors"
 	"time"
 
-	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
-// publicProcessingChanges composes the ADR-210 privacy-operator change. The
-// normal and reserved release policies are read from the current accepted
-// capacity profile for each call, like their selected auditors: a renewal
-// between those reads fails closed and the change is retried.
+// publicProcessingChanges composes the ADR-210 privacy-operator change. Each
+// decision writes its own audit row in its SQL transaction (REQ-AUT-005).
 type publicProcessingChanges struct {
 	root, installation string
-	profiles           auditapp.CapacityAuditProfiles
 	policies           privacy.ProcessingPolicyReader
 	decisions          privacy.ProcessingDecisions
 	artifactScopes     privacy.ProcessingArtifactScopes
-	audit              privacy.ProcessingAudit
-	releaseAudit       privacy.ProcessingAudit
-	mac                *auditapp.OperationMAC
 	// refused receives a fixed step name per refusal; diagnostics only.
 	refused func(string)
 }
 
 func (s publicProcessingChanges) Change(ctx context.Context, current identities.CurrentIdentity, c value.ProcessingChange) (value.ProcessingReceipt, error) {
-	var zero value.ProcessingReceipt
-	accepted, err := s.profiles.ReadCapacityAuditProfiles(ctx)
-	if err != nil {
-		s.refuse("profiles")
-		return zero, value.ErrUnavailable
-	}
-	retainedSeconds := accepted.Normal.RetainedSeconds
-	if c.Action == "release_processing" {
-		retainedSeconds = accepted.Processing.RetainedSeconds
-	}
-	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Decisions: s.decisions, ArtifactScopes: s.artifactScopes,
-		Audit: s.audit, ReleaseAudit: s.releaseAudit, MAC: s.mac, AuditPolicy: accepted.Normal.Policy, ReleaseAuditPolicy: accepted.Processing.Policy, RetainedSeconds: retainedSeconds, Now: time.Now}.Change(ctx, current, c)
+	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Decisions: s.decisions, ArtifactScopes: s.artifactScopes, Now: time.Now}.Change(ctx, current, c)
 	if err != nil {
 		s.refuse(s.refusedStep(ctx, current))
 	}

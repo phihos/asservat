@@ -26,19 +26,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type processingErasureAuditFence struct {
-	*postgres.ProcessingDecisions
-	beforeAudit func(context.Context, value.ProcessingAuthority, privacyapp.ProcessingDecision)
-}
-
-func (s processingErasureAuditFence) PrepareProcessing(ctx context.Context, a value.ProcessingAuthority, d privacyapp.ProcessingDecision) (privacyapp.ProcessingPrepared, error) {
-	out, err := s.ProcessingDecisions.PrepareProcessing(ctx, a, d)
-	if err == nil && out.Receipt == nil {
-		s.beforeAudit(ctx, a, out.Decision)
-	}
-	return out, err
-}
-
 // Starts with an independently verified, published, closed-writer attempt
 // and uses the compiled hub login for erasure and status. Identity, protected
 // privacy policy and signing keys are synthetic inputs in this service fixture.
@@ -68,32 +55,12 @@ func qualifyProcessingEarlyErasure(t *testing.T, ctx context.Context, admin, hub
 	if _, err := statusReader.Get(ctx, processing.actor, request.RequestID); !errors.Is(err, value.ErrUnavailable) {
 		t.Fatal("unknown erasure request acquired a status", err)
 	}
-	unaudited := 0
 	service := processing.service
 	service.ArtifactScopes = scopes
-	service.Decisions = processingErasureAuditFence{decisions, func(call context.Context, a value.ProcessingAuthority, d privacyapp.ProcessingDecision) {
-		unaudited++
-		if d.Change.RequestID != request.RequestID || d.Change.Scope.Location != loc || d.Intent.Lifecycle == nil || d.Intent.Lifecycle.Policy.Lane != "normal" {
-			t.Fatal("prepared erasure changed its exact target or normal audit lane")
-		}
-		if _, err := decisions.ApplyProcessing(call, a, d); err == nil {
-			t.Fatal("erasure applied without the independent operation audit")
-		}
-		installedJourneyReadOnly(t, call, admin, func(tx pgx.Tx) error {
-			var unchanged bool
-			err := tx.QueryRow(call, `SELECT effective_expires_at=expires_at AND effective_delete_by=delete_by AND retention_sequence=0
- AND NOT EXISTS(SELECT 1 FROM retention_decision WHERE attempt_id=custody_attempt.id)
- AND NOT EXISTS(SELECT 1 FROM operation_audit WHERE root_id=$1 AND id=$2)
- FROM custody_attempt WHERE id=$3`, root, request.RequestID, loc.AttemptID).Scan(&unchanged)
-			if err != nil || !unchanged {
-				t.Fatal("unaudited erasure altered custody or recorded an audit", err)
-			}
-			return nil
-		})
-	}}
+	service.Decisions = decisions
 	accepted, err := service.Change(ctx, processing.actor, request)
-	if err != nil || accepted.State != "erasureRequested" || accepted.RequestID != request.RequestID || accepted.OperationID != request.RequestID || unaudited != 1 {
-		t.Fatal("exact erasure was not accepted after normal audit", accepted, err, unaudited)
+	if err != nil || accepted.State != "erasureRequested" || accepted.RequestID != request.RequestID || accepted.OperationID != request.RequestID {
+		t.Fatal("exact erasure was not accepted", accepted, err)
 	}
 	var raw []byte
 	installedJourneyReadOnly(t, ctx, admin, func(tx pgx.Tx) error {
@@ -103,19 +70,14 @@ SELECT d.decision_json, a.anchor_at=$4 AND a.expires_at=$5 AND a.delete_by=$6
   AND a.effective_expires_at=$4 AND a.effective_delete_by=$6 AND a.retention_sequence=1
   AND d.previous_expires_at=$5 AND d.previous_delete_by=$6 AND d.expires_at=$4 AND d.delete_by=$6
   AND d.audit_acknowledged_at IS NULL,
- o.lane='normal' AND o.intent->>'Name'='request_early_erasure'
-  AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL
-  AND p.audit_digest=sha256(convert_to(o.outcome_receipt::text,'UTF8'))
-  AND h.binding=o.intent->'Lifecycle'
-  AND h.intent_completion->'Receipt'=o.intent_receipt AND h.outcome_completion->'Receipt'=o.outcome_receipt
+ (SELECT count(*)=1 FROM audit_event e WHERE e.operation_id=p.id AND e.kind='request_early_erasure'
+  AND e.status='success' AND e.effect='accepted' AND e.artifact_ids=ARRAY[$7::text])
 FROM processing_decision p
 JOIN retention_decision d ON d.id=p.id AND d.root_id=p.root_id
 JOIN custody_attempt a ON a.id=d.attempt_id
-JOIN operation_audit o ON o.id=p.id AND o.root_id=p.root_id
-JOIN operation_audit_lifecycle h ON h.operation_id=o.id AND h.root_id=o.root_id AND h.lane=o.lane
-WHERE p.root_id=$1 AND p.id=$2 AND p.applied_at IS NOT NULL AND a.id=$3`, root, request.RequestID, loc.AttemptID, reg.AnchorAt, reg.ExpiresAt, reg.DeleteBy).Scan(&raw, &effect, &audited)
+WHERE p.root_id=$1 AND p.id=$2 AND p.applied_at IS NOT NULL AND a.id=$3`, root, request.RequestID, loc.AttemptID, reg.AnchorAt, reg.ExpiresAt, reg.DeleteBy, loc.ArtifactID).Scan(&raw, &effect, &audited)
 		if err != nil || !effect || !audited {
-			t.Fatal("erasure lacked the exact retained cutoff or independently acknowledged audit", err)
+			t.Fatal("erasure lacked the exact retained cutoff or its audit row", err)
 		}
 		return nil
 	})
@@ -139,7 +101,7 @@ WHERE p.root_id=$1 AND p.id=$2 AND p.applied_at IS NOT NULL AND a.id=$3`, root, 
 	pending := readStatus(value.ProcessingErasureAuditPending, value.ProcessingErasureDeletionPending)
 	replay, err := service.Change(ctx, processing.actor, request)
 	if err != nil || replay.RequestID != accepted.RequestID || replay.OperationID != accepted.OperationID ||
-		replay.Sequence != accepted.Sequence || replay.Revision != accepted.Revision || replay.State != accepted.State || unaudited != 1 {
+		replay.Sequence != accepted.Sequence || replay.Revision != accepted.Revision || replay.State != accepted.State {
 		t.Fatal("same-key erasure replay changed the original effect", replay, err)
 	}
 	replayed := readStatus(value.ProcessingErasureAuditPending, value.ProcessingErasureDeletionPending)

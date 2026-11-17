@@ -10,14 +10,6 @@ import (
 
 func configurationRole(purpose string) string { return "asservat-hub-worker-" + purpose }
 
-// withConfigurationCleanup enables the four cleanup roles and the deletion
-// signing key (ADR-205).
-func withConfigurationCleanup(in *ConfigurationProviderInput) {
-	in.Roles.CleanupWrap, in.Roles.CleanupOpen = configurationRole("cleanup-wrap"), configurationRole("cleanup-open")
-	in.Roles.CleanupVerify, in.Roles.CleanupSign = configurationRole("cleanup-verify"), configurationRole("cleanup-sign")
-	in.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: in.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
-}
-
 // change optionally extends the input (for example with ADR-205's context
 // deletion signing key) before the control is built.
 func configurationControlFixture(t *testing.T, purpose string, change ...func(*ConfigurationProviderInput)) (*ownerProviderControlFixture, ConfigurationProviderInput) {

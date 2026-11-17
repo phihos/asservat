@@ -145,7 +145,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	authorityPool := authorityOpen("authority_runtime", "synthetic-authority")
 	capturePool := poolFor("capture_runtime", "synthetic-capture")
 	custodyPool := poolFor("custody_runtime", "synthetic-runtime")
-	auditPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
 	for _, sql := range []string{"UPDATE permission_stream SET suspended=false", "UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'", "UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'", "DELETE FROM context_capture"} {
 		if _, err := capturePool.Exec(ctx, sql); err == nil {
 			t.Fatal("capture role has unnecessary authority", sql)
@@ -340,10 +339,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
-	qualifyOperationAudits(t, ctx, admin, poolFor, store, keys, create)
-	qualifyOperationAuditLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
-	qualifyCaptureIntentLifecycle(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
-	qualifyOperationAuditOverdue(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextPreviews(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)
 	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
@@ -366,7 +361,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		admin.Reset()
 		capturePool.Reset()
 		custodyPool.Reset()
-		auditPool.Reset()
 		resetRetention()
 	})
 	qualifyRetentionPolicies(t, ctx, admin, poolFor, create)
@@ -405,7 +399,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			if r.MetadataValidUntil.IsZero() || r.MetadataValidUntil.After(s.a.Eligibility.ValidUntil) {
 				t.Fatal("accepted reply lost original metadata authority deadline")
 			}
-			if r.State != capture.PendingAudit || r.CaptureID != s.a.Plan.Input.CaptureID || !r.Deadline.Equal(s.a.Plan.Input.Deadline) || len(r.Expectation.Audience) != 2 || r.Expectation.Validate() != nil {
+			if r.CaptureID != s.a.Plan.Input.CaptureID || !r.Deadline.Equal(s.a.Plan.Input.Deadline) || len(r.Expectation.Audience) != 2 || r.Expectation.Validate() != nil {
 				t.Fatalf("incorrect acceptance: %+v", r)
 			}
 		}
@@ -502,65 +496,23 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		}
 		charges(t, s, 0)
 	})
-	t.Run("intent-audit-is-immutable-encrypted-and-retryable", func(t *testing.T) {
+	t.Run("admission-writes-one-audit-row", func(t *testing.T) {
 		s := create(t, 1)
+		id := s.a.Plan.Input.CaptureID
+		rows := func() (n int) {
+			if err := admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation_id=$1 AND kind='capture.start' AND status='success' AND effect='accepted' AND capture_ids=ARRAY[$2::text] AND case_ids=ARRAY[$3::text] AND subject=$4", id, id, s.a.CaseID, s.a.Plan.Input.Executor.Subject).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
 		if _, err := s.s.AdmitContext(ctx, s.a); err != nil {
 			t.Fatal(err)
 		}
-		audits, err := postgres.NewCaptureIntentAudits(ctx, auditPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
+		if rows() != 1 {
+			t.Fatal("admission did not write its audit row")
 		}
-		pending, err := audits.PendingCaptureIntents(ctx)
-		if err != nil || len(pending) != 1 {
-			t.Fatal("missing intent", err)
-		}
-		intent := pending[0]
-		if intent.Actor != s.a.Plan.Input.Executor || intent.ReservedBytes != s.a.Registration.ReservedBytes() {
-			t.Fatal("wrong frozen intent")
-		}
-		broken := &objectstore.CaptureIntentObjects{Store: store, Open: keys}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: audits, Objects: broken}).PublishCaptureIntents(ctx); err == nil {
-			t.Fatal("failed audit acknowledged")
-		}
-		pending, err = audits.PendingCaptureIntents(ctx)
-		if err != nil || len(pending) != 1 {
-			t.Fatal("intent lost after failure", err)
-		}
-		writer := &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}
-		receipt, err := writer.WriteCaptureIntent(ctx, intent)
-		if err != nil {
-			t.Fatal(err)
-		}
-		retry, err := writer.WriteCaptureIntent(ctx, intent)
-		if err != nil || retry != receipt {
-			t.Fatal("retry did not return stored version", err)
-		}
-		changed := intent
-		changed.ScopeDigest[0]++
-		if _, err = writer.WriteCaptureIntent(ctx, changed); err == nil {
-			t.Fatal("different intent replaced immutable object")
-		}
-		if err = audits.AcknowledgeCaptureIntent(ctx, changed, receipt); !errors.Is(err, capture.ErrChanged) {
-			t.Fatal("different intent acknowledged", err)
-		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: audits, Objects: writer}).PublishCaptureIntents(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err = audits.AcknowledgeCaptureIntent(ctx, intent, receipt); err != nil {
-			t.Fatal("duplicate receipt not idempotent", err)
-		}
-		pending, err = audits.PendingCaptureIntents(ctx)
-		if err != nil || len(pending) != 0 {
-			t.Fatal("acknowledged intent still pending", err)
-		}
-		record, err := s.s.AdmitContext(ctx, s.a)
-		if err != nil || record.State != capture.IntentAudited || !record.Replay {
-			t.Fatal("audit state missing on replay", err)
-		}
-		receipt.SHA256[0]++
-		if err = audits.AcknowledgeCaptureIntent(ctx, intent, receipt); !errors.Is(err, capture.ErrChanged) {
-			t.Fatal("receipt identity replaced", err)
+		if record, err := s.s.AdmitContext(ctx, s.a); err != nil || !record.Replay || rows() != 1 {
+			t.Fatal("replay wrote another audit row", err)
 		}
 		charges(t, s, 1)
 	})

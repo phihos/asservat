@@ -20,8 +20,10 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-type ContextIntentPublication interface {
-	AcknowledgedCaptureIntent(context.Context, string) (audit.CaptureIntent, error)
+// ContextAcceptedIntents reads an accepted capture's provenance back from its
+// SQL row. It grants no acquisition authority.
+type ContextAcceptedIntents interface {
+	AcceptedCaptureIntent(context.Context, string) (audit.CaptureIntent, error)
 }
 type ContextAcceptedStart interface {
 	StartContext(context.Context, identities.CurrentIdentity, string) error
@@ -39,7 +41,7 @@ type ContextHistoryPersistence interface {
 type ContextSubmission struct {
 	History ContextHistoryPersistence
 	ContextInvestigation
-	Intents ContextIntentPublication
+	Intents ContextAcceptedIntents
 	Start   ContextAcceptedStart
 }
 
@@ -228,12 +230,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		return a, err
 	}
 	intentStarted := time.Now()
-	r, err := s.Intents.AcknowledgedCaptureIntent(call, a.CaptureID)
+	r, err := s.Intents.AcceptedCaptureIntent(call, a.CaptureID)
 	auditapp.MarkStep(call, "s-intent", intentStarted)
 	b, encodeErr := json.Marshal(a.Expectation)
 	if err != nil {
 		if s.ReportPreviewFailure != nil {
-			s.ReportPreviewFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
+			s.ReportPreviewFailure("request/intent")
 		}
 		return a, value.ErrUnavailable
 	}
@@ -336,7 +338,7 @@ func (s ContextSubmission) dispatchRecordingSaveGroup(ctx context.Context, curre
 				results <- acknowledgement{index: n, err: value.ErrAcquisitionClosed}
 				return
 			}
-			r, err := s.Intents.AcknowledgedCaptureIntent(call, child.CaptureID)
+			r, err := s.Intents.AcceptedCaptureIntent(call, child.CaptureID)
 			results <- acknowledgement{n, r, err}
 		}()
 	}

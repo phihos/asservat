@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
@@ -113,32 +112,12 @@ func publishQueryLedgerLogs(t *testing.T, f *capacitySQLFixture, s captureAdmiss
 
 // Reconstruct the already accepted root's existing capture publication facets;
 // unlike prepareManagedContext this does not initialize a new retention epoch.
-func logsExistingCapturePublisher(t *testing.T, f *queryLedgerFixture) auditapp.CaptureOperationPublication {
+func logsExistingCapturePublisher(t *testing.T, f *queryLedgerFixture) *postgres.CaptureIntents {
 	t.Helper()
 	b := f.base
-	material := b.installed.mac
-	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
+	intents, err := postgres.NewCaptureIntents(b.ctx, b.roles["capture-admit"], b.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(mac.Close)
-	policy := b.qualification.RootBacking.Capture.Policy
-	policy.ValidUntil, policy.BackingRevision = f.root.PlannedUntil, f.root.Revision
-	journal, err := postgres.NewCaptureAuditJournal(b.ctx, b.roles["capture-journal"], policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ack, err := postgres.NewCaptureAuditAcknowledgements(b.ctx, b.roles["capture-ack"], policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completed, err := postgres.NewCaptureOperationIntents(b.ctx, b.roles["capture-intent-read"], b.input.PermissionRootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writer, err := objectstore.NewClosedOperationAuditObjects(b.store, policy.StoreID, b.keys, b.keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return auditapp.CaptureOperationPublication{RootID: b.input.PermissionRootID, Completed: completed, Journal: journal, Acknowledgements: ack, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: b.store, Seal: b.keys, Open: b.keys}, MAC: mac, Now: time.Now}
+	return intents
 }

@@ -173,12 +173,12 @@ func TestHubWorkerChildrenFollowSections(t *testing.T) {
 	if c := w.children(); len(c) != 1 || c[0].name != "configuration" {
 		t.Fatal("unexpected children without sections")
 	}
-	w.config.Capacity, w.config.Cleanup, w.config.Permission = &contracts.HubWorkerCapacity{}, &contracts.HubWorkerCleanup{}, &contracts.HubWorkerPermission{}
+	w.config.Capacity, w.config.Permission = &contracts.HubWorkerCapacity{}, &contracts.HubWorkerPermission{}
 	var names []string
 	for _, c := range w.children() {
 		names = append(names, c.name)
 	}
-	if strings.Join(names, ",") != "configuration,capacity,cleanup,permission" {
+	if strings.Join(names, ",") != "configuration,capacity,permission" {
 		t.Fatal("children", names)
 	}
 }
@@ -211,8 +211,7 @@ func TestHubWorkerChildrenJoinBeforeReturn(t *testing.T) {
 // the installation ID; Helm renders none of them.
 func TestHubWorkerConfigCompletesDerivedNames(t *testing.T) {
 	c := hubWorkerTestConfig()
-	c.Cleanup = &contracts.HubWorkerCleanup{}
-	c.Permission = &contracts.HubWorkerPermission{WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-downloads", Source: "asservat-worker-profile"}}
+	c.Permission = &contracts.HubWorkerPermission{ContextDeletion: &contracts.HubWorkerContextDeletion{}, WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-downloads", Source: "asservat-worker-profile"}}
 	ids := hubWorkerTestIDs()
 	completeHubWorkerConfig(&c, ids)
 	n := providerconfig.OpenBaoNamesFor(ids.InstallationID)
@@ -251,10 +250,6 @@ func TestHubWorkerConfigRendered(t *testing.T) {
 		if err := validateHubWorkerCapacity(c.Capacity, hubWorkerTestIDs(), c.Namespace); err != nil {
 			t.Fatal("capacity section refused", err)
 		}
-		w := &hubWorker{config: c, ids: hubWorkerTestIDs()}
-		if err := w.validCleanupConfig(); c.Cleanup == nil || err != nil {
-			t.Fatal("cleanup section refused", err)
-		}
 	}
-	t.Logf("sections capacity=%t cleanup=%t permission=%t", c.Capacity != nil, c.Cleanup != nil, c.Permission != nil)
+	t.Logf("sections capacity=%t permission=%t", c.Capacity != nil, c.Permission != nil)
 }

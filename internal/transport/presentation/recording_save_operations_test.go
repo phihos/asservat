@@ -84,12 +84,12 @@ func TestRecordingSaveOperationsUseExistingAuditAndPassiveNamedTarget(t *testing
 	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || len(out.Data.Recordings) != 1 || out.Data.CaptureEnabled || out.Data.Recordings[0].History != "Unknown" || out.Data.Recordings[0].MaximumBefore != "90s" || out.Data.Recordings[0].IncidentPodCap != 3 || out.NextCursor == nil || f.limit != 20 || f.target.Name != "api" {
 		t.Fatal("lost bounded passive inventory", string(reply.Body))
 	}
-	if len(gate.intents) != 1 || gate.intents[0].Name != "list_recordings" || len(gate.outcomes) != 1 || !reply.ValidUntil.Equal(f.page.ValidUntil) || actor.requests != 0 {
+	if len(gate.events) != 1 || gate.events[0].Operation != "list_recordings" || !reply.ValidUntil.Equal(f.page.ValidUntil) || actor.requests != 0 {
 		t.Fatal("lost original audit/freshness or acquired work", gate, reply.ValidUntil)
 	}
-	gate.beginFail = true
-	if _, err = audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+wireTarget+`}`)); err == nil || f.listCalls != 1 {
-		t.Fatal("inventory ran before acknowledged audit", err, f.listCalls)
+	gate.fail = true
+	if reply, err = audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+wireTarget+`}`)); err == nil || len(reply.Body) != 0 {
+		t.Fatal("inventory escaped without its audit row", err)
 	}
 }
 func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
@@ -105,7 +105,7 @@ func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
 	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Operation != "recordingSave" || out.Data.CaptureEnabled || out.Data.IncidentPodCap != 3 || len(out.Data.Selected) != 1 || out.Data.Windows[0].Before != "30s" || out.Data.Windows[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0] != "CollectionDisabled" || f.request.Before != 30*time.Second {
 		t.Fatal("preview became ordinary capture or invented coverage", string(reply.Body))
 	}
-	if !out.Data.ExpiresAt.Equal(f.result.Preview.SelectionUntil) || out.Data.ExpiresAt.Equal(f.result.Preview.Deadline) || len(gate.outcomes) != 1 || actor.requests != 0 {
+	if !out.Data.ExpiresAt.Equal(f.result.Preview.SelectionUntil) || out.Data.ExpiresAt.Equal(f.result.Preview.Deadline) || len(gate.events) != 1 || actor.requests != 0 {
 		t.Fatal("review expiry became processing authority or acquisition", out.Data)
 	}
 	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
@@ -232,8 +232,8 @@ func TestRecordingCancellationReportsDurableRequestWithoutClaimingJoin(t *testin
 		if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.Phase != "Running" || !envelope.Data.Requested || envelope.Data.Revision != 4 || len(envelope.Warnings) != 1+btoi(uncertain) {
 			t.Fatal(string(reply.Body))
 		}
-		if f.calls != 1 || f.request.ExpectedRevision != 3 || f.request.IdempotencyKey != "cancel-once" || len(gate.outcomes) != 1 || gate.outcomes[0].Effect != "accepted" || strings.Contains(string(reply.Body), "private transport") {
-			t.Fatal("lost durable request audit", f.request, gate.outcomes, string(reply.Body))
+		if f.calls != 1 || f.request.ExpectedRevision != 3 || f.request.IdempotencyKey != "cancel-once" || len(gate.events) != 1 || gate.events[0].Effect != "accepted" || strings.Contains(string(reply.Body), "private transport") {
+			t.Fatal("lost durable request audit", f.request, gate.events, string(reply.Body))
 		}
 		if uncertain && !strings.Contains(strings.Join(envelope.Warnings, " "), "does not confirm that the application stopped profiling") {
 			t.Fatal(string(reply.Body))

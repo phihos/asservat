@@ -38,7 +38,6 @@ func qualifyProfileAcquisitionFixture(t *testing.T, legacy bool) {
 		t.Run("profile-acquisition-publication", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, f *queryLedgerFixture) {
 				if !legacy {
-					refuseRetainedProfileSummaryDowngrade(t, f)
 				}
 			}, true, false, legacy)
 		})

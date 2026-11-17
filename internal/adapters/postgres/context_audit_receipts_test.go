@@ -3,7 +3,6 @@ package postgres
 import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/audit"
-	"bytes"
 	"github.com/jackc/pgx/v5/pgtype"
 	"testing"
 )
@@ -20,14 +19,12 @@ func publishedReceiptFixture(t *testing.T) custodydb.ReadPublishedContextRow {
 	v.AuditObjectSha256 = digest("synthetic-verification-receipt")
 	return custodydb.ReadPublishedContextRow{ContextCapture: c, ContextVerification: v, PublishedAt: f.PublishedAt, EffectiveExpiresAt: f.EffectiveExpiresAt, EffectiveDeleteBy: f.EffectiveDeleteBy}
 }
-func TestCurrentCatalogRequiresBothOriginalAuditReceipts(t *testing.T) {
+func TestCurrentCatalogRequiresVerificationAuditReceipt(t *testing.T) {
 	row := publishedReceiptFixture(t)
 	if _, e := currentPublishedContext(row); e != nil {
 		t.Fatal("original committed context", e)
 	}
 	for name, mutate := range map[string]func(*custodydb.ReadPublishedContextRow){
-		"intent-empty":          func(r *custodydb.ReadPublishedContextRow) { r.ContextCapture.IntentObjectVersion.String = "" },
-		"intent-null":           func(r *custodydb.ReadPublishedContextRow) { r.ContextCapture.IntentObjectVersion.String = "null" },
 		"verification-empty":    func(r *custodydb.ReadPublishedContextRow) { r.ContextVerification.AuditObjectVersion.String = "" },
 		"verification-null":     func(r *custodydb.ReadPublishedContextRow) { r.ContextVerification.AuditObjectVersion.String = "null" },
 		"verification-sql-null": func(r *custodydb.ReadPublishedContextRow) { r.ContextVerification.AuditObjectVersion.Valid = false },
@@ -52,21 +49,6 @@ func TestCurrentCatalogRequiresBothOriginalAuditReceipts(t *testing.T) {
 		})
 	}
 }
-func TestUnversionedHistoryRemainsHistoricalProgress(t *testing.T) {
-	for _, version := range []string{"", "null"} {
-		f := progressFactsFixture(t, "published")
-		f.ContextCapture.IntentObjectVersion.String = version
-		before := digest(f)
-		if _, e := acceptedPublication(f.ContextCapture); e == nil {
-			t.Fatal("historical acknowledgement became current authority")
-		}
-		got, e := progressFacts(f)
-		if e != nil || got.Phase != "Succeeded" || !bytes.Equal(digest(f), before) {
-			t.Fatal("historical outcome lost or mutated", e)
-		}
-	}
-}
-
 func TestCurrentCatalogNativeLengthIsOptionalButBounded(t *testing.T) {
 	row := publishedReceiptFixture(t)
 	e, err := currentPublishedContext(row)

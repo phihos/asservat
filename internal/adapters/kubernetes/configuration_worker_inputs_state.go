@@ -85,13 +85,6 @@ func configurationWorkerInputsStateValid(installation string, state contracts.In
 			return false
 		}
 	}
-	if v := state.CleanupProjection; v != nil {
-		if !addID(v.OperationID) || v.Receipt != nil && !addUID(v.Receipt.Secret.UID) {
-			return false
-		}
-		ids[v.Setup.OperationID], ids[v.Setup.RoleSetupID] = true, true
-		uids[v.Setup.RoleRootUID] = true
-	}
 	if !addUID(state.OwnerProvider.AuditCredentials.UID) {
 		return false
 	}

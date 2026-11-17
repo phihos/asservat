@@ -45,7 +45,7 @@ func (a publicAuditStore) projectionWorkerObjects() auditapp.ProjectionWorkerWri
 	}
 	return &objectstore.WorkerEnrollmentAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}
 }
-func (s *installedOperationAudit) WriteProjectionWorkerIntent(ctx context.Context, i analysis.ContextProjectionWorkerIntent) (audit.Receipt, error) {
+func (s *installedAudit) WriteProjectionWorkerIntent(ctx context.Context, i analysis.ContextProjectionWorkerIntent) (audit.Receipt, error) {
 	if !i.Valid() {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
@@ -53,7 +53,7 @@ func (s *installedOperationAudit) WriteProjectionWorkerIntent(ctx context.Contex
 		return (&objectstore.WorkerEnrollmentAuditObjects{Store: store, Seal: s.seal, Open: s.open}).WriteProjectionWorkerIntent(call, i)
 	})
 }
-func (s *installedOperationAudit) WriteAcquisitionEnrollment(ctx context.Context, e value.AcquisitionEnrollment) (audit.Receipt, error) {
+func (s *installedAudit) WriteAcquisitionEnrollment(ctx context.Context, e value.AcquisitionEnrollment) (audit.Receipt, error) {
 	if !e.Valid() {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
@@ -61,7 +61,7 @@ func (s *installedOperationAudit) WriteAcquisitionEnrollment(ctx context.Context
 		return (&objectstore.WorkerEnrollmentAuditObjects{Store: store, Seal: s.seal, Open: s.open}).WriteAcquisitionEnrollment(call, e)
 	})
 }
-func (s *installedOperationAudit) WriteAcquisitionCertificate(ctx context.Context, c audit.AcquisitionCertificate) (audit.Receipt, error) {
+func (s *installedAudit) WriteAcquisitionCertificate(ctx context.Context, c audit.AcquisitionCertificate) (audit.Receipt, error) {
 	if !c.Valid() {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}

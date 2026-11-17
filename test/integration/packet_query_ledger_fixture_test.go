@@ -15,21 +15,16 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	analysisapp "asservat.local/asservat/internal/application/analysis"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
 // Each managed root owns a pristine database and closes its pools on return.
@@ -175,45 +170,21 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			gate.PacketGrants = grantService
 		}
 	}
-	policy := f.audit.Normal.Policy
-	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completions, err := postgres.NewOperationLifecycles(ctx, compiled("hub-runtime"), root, "normal", s.recovery.installation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	closedObjects, err := objectstore.NewClosedOperationAuditObjects(base.store, policy.StoreID, base.keys, base.keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	auditor, err := auditapp.NewHealthyOperationAuditor(policy, journal, acknowledgements, &objectstore.OperationAuditObjects{Store: base.store, Seal: base.keys, Open: base.keys}, closedObjects, completions, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	hubProcess := custodyID()
-	request := func(tool string, replay ...bool) (*sharedProjectionOwner, audit.OperationIntent, context.CancelFunc) {
+	request := func(tool string, replay ...bool) (*sharedProjectionOwner, context.CancelFunc) {
 		t.Helper()
 		f.refresh(t)
 		n := time.Now().UTC().Truncate(time.Microsecond)
-		intent := audit.OperationIntent{ID: custodyID(), RootID: root, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: base.input.AccountVersion, Actor: scope.Principal, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Duration(f.audit.Normal.RetainedSeconds) * time.Second)}
-		call, stop := context.WithDeadline(ctx, intent.RequestUntil)
+		until := n.Add(5 * time.Second)
+		call, stop := context.WithDeadline(ctx, until)
 		t.Cleanup(stop)
-		if e := auditor.Begin(call, intent); e != nil {
-			t.Fatal("real invocation intent", e)
-		}
 		who := s.a.Eligibility.VerifiedIdentity
 		who.Principal = scope.Principal
 		who.Scopes = []string{"evidence:read"}
 		if rawPacket {
 			who.Scopes = append(who.Scopes, "evidence:raw")
 		}
-		who.VerifiedAt, who.ValidUntil = n, intent.RequestUntil
+		who.VerifiedAt, who.ValidUntil = n, until
 		var a query.ContextProjectionAuthority
 		var e error
 		if tool == scope.BeginTool() && !(len(replay) > 0 && replay[0]) {
@@ -236,23 +207,12 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			}
 			t.Fatalf("actual read-only authority stage=%q grantScope=%t grantPrincipal=%t grantPool=%t grantExpired=%t grantRevoked=%t grantDenied=%t deadline=%t canceled=%t", stage, errors.Is(cause, value.ErrGrantScope), errors.Is(cause, value.ErrGrantPrincipal), errors.Is(cause, value.ErrGrantPoolExhausted), errors.Is(cause, value.ErrGrantExpired), errors.Is(cause, value.ErrGrantRevoked), errors.Is(cause, value.ErrGrantDenied), errors.Is(cause, context.DeadlineExceeded), errors.Is(cause, context.Canceled))
 		}
-		a.ValidUntil = identity.Earlier(a.ValidUntil, intent.RequestUntil)
+		a.ValidUntil = identity.Earlier(a.ValidUntil, until)
 		if !a.Valid(time.Now()) {
 			t.Fatal("authority expired during preparation")
 		}
-		r := query.ContextQueryRequest{Call: query.ContextQueryCall{ID: intent.ID, RootID: root, Tool: tool, InputFormat: intent.InputFormat, MACVersion: intent.MACVersion, InputDigest: intent.InputDigest, PrincipalDigest: intent.PrincipalDigest, Principal: scope.Principal, StartedAt: n, Until: intent.RequestUntil, WriteUntil: intent.WriteUntil}, OwnerID: custodyID(), HubProcessEpoch: hubProcess}
-		return &sharedProjectionOwner{ctx: call, request: r, authority: a}, intent, stop
-	}
-	finish := func(in audit.OperationIntent, effect ...string) {
-		recordedEffect := "accepted"
-		if len(effect) > 0 {
-			recordedEffect = effect[0]
-		}
-		t.Helper()
-		out := audit.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: recordedEffect, ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-		if e := auditor.Finish(ctx, out); e != nil {
-			t.Fatal("real outcome acknowledgement", e)
-		}
+		r := query.ContextQueryRequest{Call: query.ContextQueryCall{ID: custodyID(), RootID: root, Tool: tool, Principal: scope.Principal, StartedAt: n, Until: until, WriteUntil: n.Add(30 * time.Second)}, OwnerID: custodyID(), HubProcessEpoch: hubProcess}
+		return &sharedProjectionOwner{ctx: call, request: r, authority: a}, stop
 	}
 	enrollment := func(purpose string) *postgres.ProjectionEnrollments {
 		t.Helper()
@@ -267,7 +227,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	jobs := &sharedProjectionJobs{podUID: custodyID()}
 	admission := evidence.ProjectionWorkerAdmission{Ledger: workers, Jobs: jobs, Audit: objects, Now: time.Now}
 	runtime := evidence.ProjectionRuntime{Workers: workers, Identities: workers, Jobs: jobs, Now: time.Now}
-	initial, intent, stopInitial := request(scope.BeginTool())
+	initial, stopInitial := request(scope.BeginTool())
 	var q query.ContextQuery
 
 	plan, e := f.current.ContextQueryPlan(initial.ctx, initial.authority)
@@ -288,7 +248,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		publicRequest = packetQueryReplayRequest(scope, invocation.Key)
 		invocation.RequestDigest = analysisapp.PacketQueryRequestDigest(publicRequest)
 	}
-	q, err = query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond), invocation)
+	q, err = query.NewContextQuery(custodyID(), initial.request.Call.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond), invocation)
 
 	if err != nil {
 		t.Fatal(err)
@@ -319,13 +279,12 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err = admission.AdmitProjectionWorker(initial.ctx, q, initial); err != nil || jobs.creates != 1 || jobs.finds != 1 {
 		t.Fatal("worker replay", jobs.creates, jobs.finds, err)
 	}
-	finish(intent)
 	stopInitial()
 	if initial.ctx.Err() == nil {
 		t.Fatal("original human operation did not close")
 	}
-	// Replay owns a fresh acknowledged call after the original caller closes.
-	replayOwner, replayIntent, stopReplay := request(scope.BeginTool(), true)
+	// Replay owns a fresh call after the original caller closes.
+	replayOwner, stopReplay := request(scope.BeginTool(), true)
 	if err = ledger.PermitQuery(replayOwner.ctx, q, replayOwner.request, replayOwner.authority); err == nil {
 		t.Fatal("unregistered Begin replay permitted")
 	}
@@ -345,8 +304,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate)
 	}
 	assertPacketReplayDelta(t, beforeReplay, readPacketReplayState(t, ctx, base.admin, q), 1)
-	qualifyPacketReplayBindings(t, ctx, base.admin, compiled("hub-runtime"), ledger, q, replayOwner.request, replayOwner.authority, auditor, replayIntent)
-	finish(replayIntent, "none")
+	qualifyPacketReplayBindings(t, ctx, base.admin, compiled("hub-runtime"), ledger, q, replayOwner.request, replayOwner.authority)
 	stopReplay()
 	// This independent admitted-worker request must need no live human owner.
 	_, private, err := ed25519.GenerateKey(rand.Reader)
@@ -373,7 +331,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 
 	var lastBatch query.ContextReadBatch
 	for generation := 1; generation <= 2; generation++ {
-		poll, pollIntent, stopPoll := request("get_query_result")
+		poll, stopPoll := request("get_query_result")
 		defer stopPoll()
 		a, r := poll.authority, poll.request
 		if err = ledger.AdmitQueryPoll(poll.ctx, q, r, a); err != nil {
@@ -384,12 +342,11 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("actual activated identity", ready, err)
 		}
 		if generation == 1 {
-			noRead, noReadIntent, stopNoRead := request(scope.BeginTool(), true)
+			noRead, stopNoRead := request(scope.BeginTool(), true)
 			if err = ledger.RegisterQueryReplayCall(noRead.ctx, q, noRead.request, noRead.authority); err != nil {
 				t.Fatal("fresh replay control before no-read proof", err)
 			}
 			qualifyPacketReplayCannotRead(t, noRead.ctx, base.admin, compiled("hub-runtime"), ledger, q, noRead.request, ready.Worker, noRead.authority, rawPacket)
-			finish(noReadIntent, "none")
 			stopNoRead()
 		}
 		if rawPacket && generation == 1 {
@@ -501,15 +458,14 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			}
 		}
 		if err = ledger.CompleteReadBatch(poll.ctx, start.Batch, querySQLClosed{start.Batch}); err == nil {
-			t.Fatal("private closure without outcome acknowledgement released batch")
+			t.Fatal("batch released before private native close")
 		}
 		// This SQL qualifier supplies the positive transport-join input explicitly.
 		if err = operations.CompleteProjectionNative(poll.ctx, lease); err != nil {
 			t.Fatal("record positive private native close", err)
 		}
-		finish(pollIntent)
 		if err = ledger.CompleteReadBatch(ctx, start.Batch, querySQLClosed{start.Batch}); err != nil {
-			t.Fatal("closed batch after real encrypted outcome", err)
+			t.Fatal("closed batch after native close", err)
 		}
 		lastBatch = start.Batch
 		if generation == 2 {
@@ -557,7 +513,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if e := keyPool.QueryRow(ctx, "SELECT context_packet_query_grant_current($1,$2,$3)", root, q.ID, lastBatch.ID).Scan(&live); e != nil || !live {
 			t.Fatal("spent batch not current before revoke", e)
 		}
-		revokedReplay, revokedReplayIntent, stopRevokedReplay := request(scope.BeginTool(), true)
+		revokedReplay, stopRevokedReplay := request(scope.BeginTool(), true)
 		if !q.Current(revokedReplay.authority, time.Now()) || !revokedReplay.request.Valid(time.Now()) {
 			t.Fatal("revocation replay control not current")
 		}
@@ -577,16 +533,11 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("revoked replay denial obscured by expired independent proof")
 		}
 		assertPacketReplayDelta(t, beforeRevokedReplay, readPacketReplayState(t, ctx, base.admin, q), 0)
-		refused := audit.OperationOutcome{Intent: revokedReplayIntent, Status: "unavailable", Reason: "not_available", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{97}, OutputBytes: 0, MetadataUntil: revokedReplayIntent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
-		if e = auditor.Finish(ctx, refused); e != nil {
-			t.Fatal("revoked Begin replay refusal audit", e)
-		}
 		stopRevokedReplay()
 		if e = keyPool.QueryRow(ctx, "SELECT context_packet_query_grant_current($1,$2,$3)", root, q.ID, lastBatch.ID).Scan(&live); e != nil || live {
 			t.Fatal("isolated key predicate ignored current revocation", e)
 		}
 	}
-	refuseRetainedPacketQueryDowngrade(t, f)
 
 	stored, err = ledger.LookupQuery(ctx, scope.Principal, q.ID)
 	if err != nil || !stored.Equal(q) {
@@ -629,29 +580,6 @@ func assertPacketQueryUses(t *testing.T, f *queryLedgerFixture, parent string, w
 	if err != nil || usedBytes != wantBytes || usedOps != wantOps || count != wantOps || rows != count {
 		t.Fatalf("per actual batch debit bytes=%d/%d operations=%d/%d uses=%d joinedbatches=%d err=%v", usedBytes, wantBytes, usedOps, wantOps, count, rows, err)
 	}
-}
-func refuseRetainedPacketQueryDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	db := stdlib.OpenDB(*f.base.admin.Config().ConnConfig)
-	defer db.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, expectedHead := int64(138), int64(139)
-	if f.published.Expectation.NativeType == artifact.LogsArtifact {
-		target, expectedHead = 140, 141
-	} else if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
-		target, expectedHead = 139, 140
-	}
-	if _, err = provider.DownTo(f.base.ctx, target); err == nil {
-		t.Fatal("retained packet query/grant/use downgraded")
-	}
-	var head int64
-	if err = f.base.admin.QueryRow(f.base.ctx, "SELECT max(version_id) FROM goose_db_version WHERE is_applied").Scan(&head); err != nil || head != expectedHead {
-		t.Fatal("refused downgrade changed head", head, err)
-	}
-	t.Log("retained139 packet query/grant/use prevents138 rollback, no spend refund")
 }
 
 // Compiled hub role, same existing UPDATE/use/INSERT statements: a bad batch

@@ -24,6 +24,7 @@ type mcpCaptureFixture struct {
 	calls         atomic.Int64
 	continuations atomic.Int64
 	after         func()
+	during        func(context.Context)
 	until         time.Time
 }
 
@@ -39,7 +40,11 @@ func (f *mcpCaptureFixture) CheckDiagnostic(context.Context, identities.CurrentI
 func (f *mcpCaptureFixture) Preview(context.Context, identities.CurrentIdentity, value.ContextIntent) (app.ContextPreviewResult, error) {
 	return app.ContextPreviewResult{}, value.ErrUnavailable
 }
-func (f *mcpCaptureFixture) Request(_ context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
+func (f *mcpCaptureFixture) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
+	if f.during != nil {
+		f.during(ctx)
+		return value.Accepted{}, ctx.Err()
+	}
 	if _, err := current.ResolveIdentity(context.Background()); err != nil {
 		return value.Accepted{}, err
 	}

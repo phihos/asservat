@@ -27,13 +27,12 @@ func publicRuntimeProjectionGrants(purpose string) []publicRuntimeGrant {
 	default:
 		return nil
 	}
-	for _, table := range []string{"context_case_locator", "operation_audit", "operation_audit_lifecycle", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding"} {
+	for _, table := range []string{"context_case_locator", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding"} {
 		add(table, "SELECT")
 	}
-	for _, table := range []string{"operation_audit", "context_query_allocation", "context_query_principal", "context_query"} {
+	for _, table := range []string{"context_query_allocation", "context_query_principal", "context_query"} {
 		add(table, "UPDATE", "id")
 	}
-	add("operation_audit_lifecycle", "UPDATE", "operation_id")
 	add("context_query_backing", "UPDATE", "root_id")
 	add("context_query_batch", "UPDATE", "id")
 	function("lock_context_query_capacity(uuid,uuid)")
@@ -41,9 +40,6 @@ func publicRuntimeProjectionGrants(purpose string) []publicRuntimeGrant {
 	function("context_query_shared_profile_current(uuid,jsonb)")
 	function("context_packet_query_grant_current(uuid,uuid,uuid)")
 	if purpose == "key-acquisition" {
-		// queryIntentFence binds the paid invocation to the original database
-		// incarnation; the current-trust view does not expose these columns.
-		add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
 		add("context_query_key_binding", "UPDATE", "used_roles")
 		return out
 	}

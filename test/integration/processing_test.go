@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	privacyvalue "asservat.local/asservat/internal/domain/privacy"
@@ -21,8 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Actual SQL processing decisions and encrypted independently acknowledged
-// audit; the accepted privacy operator/backing remain explicit test inputs.
+// Actual SQL processing decisions and their audit rows; the accepted privacy
+// operator/backing remain explicit test inputs.
 // The callback deliberately publishes only after the restriction has committed.
 func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, catalog *postgres.ContextPublications, f *processingTestFixture, publish func() error) {
 	t.Helper()
@@ -39,9 +37,14 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	if err != nil || blocked.State != "restricted" || blocked.Revision != 1 {
 		t.Fatal("actual pre-publication restriction", blocked, err)
 	}
-	var charged, limit int64
-	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 1 || limit != 2 {
-		t.Fatal("normal audit account charged once for the restriction", charged, limit, err)
+	auditRows := func(operation string) (n int) {
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM audit_event WHERE operation_id=$1 AND kind=operation AND status='success' AND effect='accepted' AND subject=$2", operation, f.actor.value.Principal.Subject).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := auditRows(restrict.RequestID); n != 1 {
+		t.Fatal("restriction did not commit exactly one audit row", n)
 	}
 	if err = publish(); err != nil {
 		t.Fatal("restricted evidence must still be safely published", err)
@@ -116,25 +119,19 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	if _, err = f.service.Change(ctx, f.actor, wrong); err == nil {
 		t.Fatal("different scope removed restriction")
 	}
-	releaseService := f.service
-	releaseService.Decisions = processingReplayLockProbe{ProcessingDecisions: releaseService.Decisions, admin: admin}
-	released, err := releaseService.Change(ctx, f.actor, release)
+	released, err := f.service.Change(ctx, f.actor, release)
 	if err != nil || released.State != "released" || released.Revision != 2 || released.Sequence <= blocked.Sequence {
-		t.Fatal("prepaid release while normal pool full", released, err)
-	}
-	var normalCount, releaseCount int
-	if err = admin.QueryRow(ctx, "SELECT count(*) FILTER(WHERE lane='normal'),count(*) FILTER(WHERE lane='processing') FROM operation_audit WHERE root_id=$1", s.a.RootID).Scan(&normalCount, &releaseCount); err != nil || normalCount != 1 || releaseCount != 1 {
-		t.Fatal("release used a new normal account or duplicated audit", normalCount, releaseCount, err)
+		t.Fatal("release", released, err)
 	}
 	replay, err := f.service.Change(ctx, f.actor, release)
 	if err != nil || replay.Revision != released.Revision || replay.Sequence != released.Sequence || replay.OperationID != released.OperationID {
 		t.Fatal("same-key release replay changed effect", replay, err)
 	}
-	if err = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit WHERE root_id=$1 AND lane='processing'", s.a.RootID).Scan(&releaseCount); err != nil || releaseCount != 1 {
-		t.Fatal("replay spent another audit pair", releaseCount, err)
+	if n := auditRows(release.RequestID); n != 1 {
+		t.Fatal("release replay added a second audit row", n)
 	}
 	if p, err := readProof(); err != nil || !p.Valid(time.Now()) || p.Sequence != released.Sequence {
-		t.Fatal("independently audited release did not restore current read", p, err)
+		t.Fatal("audited release did not restore current read", p, err)
 	}
 	refreshPermission()
 	if view, err := cases.GetContextCase(ctx, readActor, e.CaseID); err != nil || view.CaseID != e.CaseID || len(view.Artifacts) != 1 {
@@ -337,74 +334,4 @@ func qualifyProcessingDownloadEffects(t *testing.T, ctx context.Context, poolFor
 	if err != nil || got.ChargedOutput != 1024 || got.EmittedBytes != 0 || got.Active == nil || got.Active.ID != bytes.ID {
 		t.Fatal("resume changed original spend/session", got, err)
 	}
-}
-
-// Uses the exact pool -> audit row order from ReserveOperation replay while
-// the actual ApplyProcessing transaction is blocked. Before the SQL50 fix,
-// apply already held the audit row and these two transactions formed a cycle.
-// This fixture deliberately owns the barrier transaction; it grants no runtime
-// permission and performs no synthetic audit acknowledgement or business write.
-type processingReplayLockProbe struct {
-	privacyapp.ProcessingDecisions
-	admin *pgxpool.Pool
-}
-
-func (p processingReplayLockProbe) ApplyProcessing(ctx context.Context, a privacyvalue.ProcessingAuthority, d privacyapp.ProcessingDecision) (privacyvalue.ProcessingReceipt, error) {
-	var zero privacyvalue.ProcessingReceipt
-	tx, err := p.admin.Begin(ctx)
-	if err != nil {
-		return zero, err
-	}
-	defer tx.Rollback(context.Background())
-	if _, err = tx.Exec(ctx, "SELECT root_id FROM operation_audit_pool WHERE root_id=$1 AND lane='processing' FOR UPDATE", d.Intent.RootID); err != nil {
-		return zero, err
-	}
-	type result struct {
-		receipt privacyvalue.ProcessingReceipt
-		err     error
-	}
-	done := make(chan result, 1)
-	go func() { r, e := p.ProcessingDecisions.ApplyProcessing(ctx, a, d); done <- result{r, e} }()
-	joined := false
-	defer func() {
-		if !joined {
-			_ = tx.Rollback(context.Background())
-			<-done
-		}
-	}()
-	waitUntil := time.Now().Add(time.Second)
-	for {
-		var blocked bool
-		err = p.admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename='processing_decision_runtime' AND $1=ANY(pg_blocking_pids(pid)))", tx.Conn().PgConn().PID()).Scan(&blocked)
-		if err != nil {
-			return zero, err
-		}
-		if blocked {
-			break
-		}
-		select {
-		case r := <-done:
-			joined = true
-			return zero, fmt.Errorf("processing apply did not reach pool lock barrier: %w", r.err)
-		default:
-		}
-		if !time.Now().Before(waitUntil) {
-			return zero, fmt.Errorf("processing apply never reached held audit pool")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	// A short diagnostic bound detects the cycle without waiting for PostgreSQL
-	// deadlock detection or consuming the operation's whole original deadline.
-	lockCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	_, err = tx.Exec(lockCtx, "SELECT id FROM operation_audit WHERE root_id=$1 AND id=$2 FOR UPDATE", d.Intent.RootID, d.Intent.ID)
-	cancel()
-	if err != nil {
-		return zero, fmt.Errorf("pool-to-audit replay lock order blocked behind apply: %w", err)
-	}
-	if err = tx.Commit(ctx); err != nil {
-		return zero, err
-	}
-	r := <-done
-	joined = true
-	return r.receipt, r.err
 }

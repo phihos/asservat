@@ -137,20 +137,20 @@ func TestContextQueryAuditPendingEffectsAndOwnedReply(t *testing.T) {
 		q.effect = effect
 		reply, err := s.Call(context.Background(), f, "get_file_excerpt", []byte(queryInput))
 		if err != nil {
-			t.Fatalf("%+v intents=%d outcomes=%d dispatched=%v", err, len(g.intents), len(g.outcomes), q.ctx != nil)
+			t.Fatalf("%+v events=%d dispatched=%v", err, len(g.events), q.ctx != nil)
 		}
 		want := map[operationAuditEffect]string{operationEffectNone: "none", operationEffectAccepted: "accepted", operationEffectUnknown: "unknown"}[effect]
-		if len(g.outcomes) != 1 || g.outcomes[0].Status != "success" || g.outcomes[0].Effect != want || g.intents[0].InputFormat != "context-query-input/v1" || !q.acknowledged {
-			t.Fatal("pending effect/audit mismatch", g.outcomes)
+		if len(g.events) != 1 || g.events[0].Status != "success" || g.events[0].Effect != want || !q.acknowledged {
+			t.Fatal("pending effect/audit mismatch", g.events)
 		}
-		if q.ctx.Err() != nil || len(s.lanes["normal"]) != 1 || reply.CheckDisclosure(context.Background()) != nil {
+		if q.ctx.Err() != nil || reply.CheckDisclosure(context.Background()) != nil {
 			t.Fatal("reply owner ended before transport")
 		}
 		copy := reply
 		if err := copy.Close(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if reply.Close(context.Background()) != nil || q.guard.closes.Load() != 1 || q.ctx.Err() == nil || len(s.lanes["normal"]) != 0 || !bytes.Equal(q.body, make([]byte, len(q.body))) {
+		if reply.Close(context.Background()) != nil || q.guard.closes.Load() != 1 || q.ctx.Err() == nil || !bytes.Equal(q.body, make([]byte, len(q.body))) {
 			t.Fatal("copy lost joined owner")
 		}
 		if reply.CheckDisclosure(context.Background()) == nil {
@@ -167,7 +167,7 @@ func TestContextQueryAuditFailureClosesBeforeDiscard(t *testing.T) {
 			defer cancel()
 			switch mode {
 			case "finish":
-				g.finishFail = true
+				g.fail = true
 			case "invalid":
 				q.invalidBody = true
 			case "ack":
@@ -175,7 +175,7 @@ func TestContextQueryAuditFailureClosesBeforeDiscard(t *testing.T) {
 			case "guard":
 				q.guard.check = func(context.Context) error { return errors.New("deny after audit") }
 			case "cancel":
-				g.onFinish = cancel
+				g.onRecord = cancel
 			case "missing guard":
 				q.noGuard = true
 			case "missing effect":
@@ -186,9 +186,6 @@ func TestContextQueryAuditFailureClosesBeforeDiscard(t *testing.T) {
 			}
 			if !q.noGuard && q.guard.closes.Load() != 1 {
 				t.Fatal("owner discarded without cleanup")
-			}
-			if len(s.lanes["normal"]) != 0 {
-				t.Fatal("slot leaked")
 			}
 		})
 	}
@@ -227,17 +224,17 @@ func TestEvidenceReadRequestWindowOutlastsOrdinaryRequests(t *testing.T) {
 			f.metadataUntil = f.i.ValidUntil
 			q.during = func() { elapsed.Store(int64(12 * time.Second)) }
 			reply, err := s.Call(context.Background(), f, c.name, []byte(c.input))
-			if len(g.intents) != 1 || !g.intents[0].RequestUntil.Equal(start.Add(c.window)) || q.ctx == nil {
-				t.Fatalf("request window: intents=%d dispatched=%v", len(g.intents), q.ctx != nil)
+			if len(g.events) != 1 || q.ctx == nil {
+				t.Fatalf("request window: events=%d dispatched=%v", len(g.events), q.ctx != nil)
 			}
 			if c.ok {
-				if err != nil || len(g.outcomes) != 1 || g.outcomes[0].Status != "success" {
+				if err != nil || len(g.events) != 1 || g.events[0].Status != "success" {
 					t.Fatalf("twelve-second evidence read refused: %v", err)
 				}
 				_ = reply.Close(context.Background())
 				return
 			}
-			if !errors.Is(err, identity.ErrDenied) || len(reply.Body) != 0 {
+			if err == nil || len(reply.Body) != 0 {
 				t.Fatalf("ordinary request older than five seconds delivered: %v", err)
 			}
 		})

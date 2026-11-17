@@ -18,15 +18,12 @@ const hubAPIHotConnections = contracts.PublicRuntimeHubConnections + 3
 
 func publicPoolPlan(duty string) (role, key string, limit int, hot, ok bool) {
 	if slices.Contains(contracts.PublicRuntimeHubSharedDuties(), duty) || duty == "hub-runtime" {
-		if duty == "audit-resolution-journal" || duty == "audit-resolution-ack" {
-			return "hub-runtime", duty, 1, true, true
-		}
 		return "hub-runtime", "hub-runtime", contracts.PublicRuntimeHubOrdinaryConnections, true, true
 	}
 	switch duty {
-	case "capture-admit", "capture-journal", "capture-ack":
+	case "capture-admit":
 		return duty, duty, 1, true, true
-	case "capture-intent-read", "capacity-profile-read", "worker-config-read":
+	case "capacity-profile-read", "worker-config-read":
 		return duty, duty, 1, false, true
 	default:
 		return "", "", 0, false, false

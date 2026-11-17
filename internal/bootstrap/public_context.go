@@ -34,7 +34,7 @@ type PublicContextServices struct {
 	Sessions                      *identities.BrowserSessions
 	MCPIdentity, DownloadIdentity identities.Resolver
 	Operations                    *presentation.InvestigationOperations
-	NormalAudit, ResolutionAudit  presentation.HealthyAuditGate
+	Audit                         presentation.AuditRecorder
 	AuditMAC                      *auditapp.OperationMAC
 	Native                        *evidence.ContextNativeRuntime
 	Transfer                      evidence.DownloadResponseTransfer
@@ -66,7 +66,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	if e != nil {
 		return nil, &fixedStepError{"console", e}
 	}
-	audited, e := presentation.NewHealthyAuditedOperations(c.Audit, s.Operations, s.NormalAudit, s.ResolutionAudit, s.AuditMAC)
+	audited, e := presentation.NewAuditedOperations(c.Audit, s.Operations, s.Audit, s.AuditMAC)
 	if e != nil {
 		return nil, &fixedStepError{"audited", e}
 	}

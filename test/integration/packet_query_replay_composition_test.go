@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -18,36 +17,6 @@ import (
 func packetQueryReplayRequest(scope query.ContextProjectionScope, key string) query.PacketQueryRequest {
 	s := scope.PacketQuery.Selection()
 	return query.PacketQueryRequest{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, GrantID: scope.RawGrantID, IdempotencyKey: key, Fields: s.Fields, StartTime: s.StartTime, EndTime: s.EndTime, TCPFlags: s.TCPFlags, FramePrefix: s.FramePrefix, MaxPackets: s.MaxPackets, MaxScanBytes: s.MaxScanBytes}
-}
-
-type replayCompositionInvocation struct {
-	request query.ContextQueryRequest
-	input   app.ContextQueryInput
-}
-
-func (i replayCompositionInvocation) Invocation(ctx context.Context) (query.ContextQueryCall, error) {
-	if ctx.Err() != nil || !i.request.Valid(time.Now()) {
-		return query.ContextQueryCall{}, query.ErrUnavailable
-	}
-	return i.request.Call, nil
-}
-func (i replayCompositionInvocation) CheckInput(ctx context.Context, input app.ContextQueryInput) error {
-	if ctx.Err() != nil || !reflect.DeepEqual(input, i.input) {
-		return query.ErrUnavailable
-	}
-	return nil
-}
-func (i replayCompositionInvocation) CheckIntent(ctx context.Context, call query.ContextQueryCall) error {
-	if ctx.Err() != nil || call != i.request.Call {
-		return query.ErrUnavailable
-	}
-	return nil
-}
-
-// This helper never fabricates an acknowledged public outcome or discloses a
-// page. The enclosing fixture owns the real C8 Finish after this pending replay.
-func (replayCompositionInvocation) CheckOutcome(context.Context, *app.ContextProjectionDelivery) error {
-	return query.ErrUnavailable
 }
 
 type replayCompositionNoEffects struct{ calls []string }
@@ -82,7 +51,7 @@ func (p *replayCompositionNoEffects) ReadProjection(context.Context, query.Conte
 }
 
 // The ledger and current C3 below are the fixture's actual compiled-
-// role adapters and C8 has already acknowledged the passed call. Human/bootstrap
+// role adapters for the passed call. Human/bootstrap
 // facts remain synthetic. This is C18+SQL composition, not browser/installed proof.
 func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.PacketQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority) {
 	t.Helper()
@@ -102,7 +71,7 @@ func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q qu
 	if !ok {
 		t.Fatal("replay service unavailable")
 	}
-	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, app.ContextQueryInput{PacketQuery: app.NormalizePacketQueryRequest(input)}}, input)
+	delivery, err := reads.Begin(ctx, caller, r.Call.ID, input)
 	if delivery != nil {
 		defer func() {
 			if err := delivery.Close(context.WithoutCancel(ctx)); err != nil {
@@ -150,7 +119,7 @@ func qualifyRawSyscallQueryReplayApplication(t *testing.T, ctx context.Context, 
 	if !ok {
 		t.Fatal("replay service unavailable")
 	}
-	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, app.ContextQueryInput{RawSyscalls: input}}, input)
+	delivery, err := reads.Begin(ctx, caller, r.Call.ID, input)
 	if delivery != nil {
 		defer func() {
 			if err := delivery.Close(context.WithoutCancel(ctx)); err != nil {

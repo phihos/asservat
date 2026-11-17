@@ -8,19 +8,9 @@ GRANT INSERT,DELETE ON permission_review_source TO authority_runtime; GRANT UPDA
 
 CREATE ROLE capture_runtime LOGIN PASSWORD 'synthetic-capture'; GRANT CONNECT ON DATABASE custody_test TO capture_runtime; GRANT USAGE ON SCHEMA public TO capture_runtime; GRANT SELECT ON goose_db_version,permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,capture_history_parameter,workload_name TO capture_runtime; GRANT UPDATE(id) ON permission_stream TO capture_runtime; GRANT UPDATE(source_uid) ON context_storage_binding TO capture_runtime; GRANT SELECT,INSERT ON context_capture TO capture_runtime; GRANT SELECT,INSERT,UPDATE ON custody_pool,custody_allocation,custody_attempt,custody_copy,custody_event TO capture_runtime;
 
-CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRANT CONNECT ON DATABASE custody_test TO capture_audit_runtime; GRANT USAGE ON SCHEMA public TO capture_audit_runtime; GRANT SELECT ON goose_db_version,permission_stream,context_capture TO capture_audit_runtime; GRANT UPDATE(id) ON permission_stream TO capture_audit_runtime; GRANT UPDATE(state,intent_acknowledged_at,intent_digest,intent_object_key,intent_object_version,intent_object_etag,intent_object_bytes,intent_object_sha256) ON context_capture TO capture_audit_runtime;
+CREATE ROLE capture_audit_runtime LOGIN PASSWORD 'synthetic-capture-audit'; GRANT CONNECT ON DATABASE custody_test TO capture_audit_runtime; GRANT USAGE ON SCHEMA public TO capture_audit_runtime; GRANT SELECT ON goose_db_version,permission_stream,context_capture TO capture_audit_runtime; GRANT UPDATE(id) ON permission_stream TO capture_audit_runtime;
 
 CREATE ROLE peer_read_runtime LOGIN PASSWORD 'synthetic-peer-read'; GRANT CONNECT ON DATABASE custody_test TO peer_read_runtime; GRANT USAGE ON SCHEMA public TO peer_read_runtime; GRANT SELECT ON goose_db_version,fleet_trust TO peer_read_runtime;
-
-
-
-
-
-
-
-
-
-
 
 CREATE ROLE context_verify_runtime LOGIN PASSWORD 'synthetic-context-verify'; GRANT CONNECT ON DATABASE custody_test TO context_verify_runtime; GRANT USAGE ON SCHEMA public TO context_verify_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,authority_audit,context_capture,custody_pool,custody_allocation,custody_attempt,custody_copy,context_verification TO context_verify_runtime;
@@ -314,7 +304,6 @@ GRANT INSERT,DELETE ON context_preview_fence TO context_request_resolution_runti
 GRANT DELETE ON context_preview TO context_request_resolution_runtime;
 -- ADR-266: resolution reads a recording save group (production capture-resolution).
 GRANT SELECT ON recording_save_group,recording_selection_set TO context_request_resolution_runtime;
-GRANT EXECUTE ON FUNCTION capture_preview_reason_copied(context_preview) TO context_request_resolution_runtime;
 GRANT SELECT ON context_preview,context_preview_fence TO capture_runtime;
 GRANT SELECT,DELETE ON context_preview_fence TO context_preview_runtime,context_preview_cleanup_runtime;
 -- 00108: previews create and expire recording selections, as the
@@ -333,7 +322,6 @@ CREATE ROLE context_retirement_read_runtime LOGIN PASSWORD 'synthetic-context-re
 GRANT CONNECT ON DATABASE custody_test TO context_retirement_read_runtime;
 GRANT USAGE ON SCHEMA public TO context_retirement_read_runtime;
 GRANT SELECT ON goose_db_version,context_capture,custody_attempt,custody_copy,context_verification,context_execution,artifact_download,retention_decision TO context_retirement_read_runtime;
-
 
 -- Migration54: mirror the production capture-admit/storage-read function grant.
 -- This reads the current managed cutoff; it grants no capacity configuration.
@@ -383,95 +371,15 @@ GRANT SELECT(attempt_id,writer_protocol) ON context_execution TO custody_runtime
 GRANT UPDATE(finalization_xid) ON context_deletion_checkpoint TO context_cleanup_finalize_runtime;
 
 -- Operation audit is independent from capture/evidence budgets and authority.
-CREATE ROLE operation_audit_config_runtime LOGIN PASSWORD 'synthetic-operation-config';
-CREATE ROLE operation_audit_runtime LOGIN PASSWORD 'synthetic-operation-journal';
-CREATE ROLE operation_audit_ack_runtime LOGIN PASSWORD 'synthetic-operation-ack';
-GRANT CONNECT ON DATABASE custody_test TO operation_audit_config_runtime,operation_audit_runtime,operation_audit_ack_runtime;
-GRANT USAGE ON SCHEMA public TO operation_audit_config_runtime,operation_audit_runtime,operation_audit_ack_runtime;
-GRANT SELECT ON goose_db_version,operation_audit_pool TO operation_audit_config_runtime,operation_audit_runtime,operation_audit_ack_runtime;
-GRANT SELECT ON operation_audit_account TO operation_audit_config_runtime;
-GRANT SELECT ON permission_stream TO operation_audit_config_runtime;
-GRANT UPDATE(id) ON permission_stream TO operation_audit_config_runtime;
-GRANT INSERT ON operation_audit_pool TO operation_audit_config_runtime;
-GRANT UPDATE(root_id,revision,paused,valid_until,account_limit,records_per_account,retained_seconds) ON operation_audit_pool TO operation_audit_config_runtime;
-GRANT SELECT ON operation_audit,operation_audit_account,fleet_current_trust TO operation_audit_runtime,operation_audit_ack_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO operation_audit_runtime,operation_audit_ack_runtime;
-GRANT UPDATE(root_id) ON operation_audit_pool TO operation_audit_runtime;
-GRANT INSERT ON operation_audit TO operation_audit_runtime;
-GRANT UPDATE(id,intent_started,outcome,outcome_started) ON operation_audit TO operation_audit_runtime;
-GRANT UPDATE(id,intent_receipt,outcome_receipt) ON operation_audit TO operation_audit_ack_runtime;
 
--- Positive audit completion and terminal retirement are separate capabilities.
-CREATE ROLE operation_audit_cleanup_runtime LOGIN PASSWORD 'synthetic-operation-cleanup';
-CREATE ROLE operation_audit_retire_runtime LOGIN PASSWORD 'synthetic-operation-retire';
-GRANT CONNECT ON DATABASE custody_test TO operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT USAGE ON SCHEMA public TO operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT SELECT ON goose_db_version,operation_audit_pool,operation_audit_account,operation_audit,operation_audit_lifecycle,fleet_current_trust TO operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT SELECT ON operation_audit_lifecycle TO operation_audit_runtime,operation_audit_ack_runtime;
-GRANT SELECT(installation_id,activated_postmaster_at,activated_database_oid) ON fleet_trust TO operation_audit_runtime,operation_audit_ack_runtime,operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(root_id) ON operation_audit_pool TO operation_audit_ack_runtime,operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(root_id) ON operation_audit_account TO operation_audit_runtime,operation_audit_ack_runtime,operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(id) ON operation_audit TO operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO operation_audit_runtime,operation_audit_ack_runtime,operation_audit_cleanup_runtime,operation_audit_retire_runtime;
-GRANT UPDATE(intent_completion,outcome_completion) ON operation_audit_lifecycle TO operation_audit_runtime;
-GRANT UPDATE(lease_fence,lease,retirement,certificate_started,certificate_completion,terminal_purge) ON operation_audit_lifecycle TO operation_audit_cleanup_runtime;
-GRANT UPDATE(certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at) ON operation_audit_lifecycle TO operation_audit_ack_runtime;
-GRANT EXECUTE ON FUNCTION finish_operation_audit_retirement(uuid,uuid,uuid) TO operation_audit_retire_runtime;
-
-GRANT SELECT ON operation_audit_history TO operation_audit_runtime,operation_audit_cleanup_runtime,operation_audit_ack_runtime,operation_audit_retire_runtime;
-GRANT EXECUTE ON FUNCTION finish_operation_audit_history(uuid,text,bytea,timestamptz,timestamptz,uuid) TO operation_audit_retire_runtime;
-
--- Overdue cleanup can fence certificate creation and record a result only.
-GRANT UPDATE(overdue_selected_at,overdue_purge) ON operation_audit_lifecycle TO operation_audit_cleanup_runtime;
--- No runtime role can reset or directly increment proof_window_missed.
-
--- Prepaid native stop: fixture identities represent independently wired roles.
--- The public stop writer has no ordinary catalog/native metadata permission.
-GRANT SELECT ON download_stop_pool,download_stop_backing TO download_config_runtime;
-GRANT INSERT ON download_stop_pool,download_stop_backing TO download_config_runtime;
-GRANT UPDATE(revision,valid_until) ON download_stop_pool TO download_config_runtime;
-GRANT INSERT(stop_protocol) ON artifact_download TO download_runtime;
+-- Download stop (ADR-330 D6): one transaction fences the session, stores the
+-- stop and appends its audit row. No catalog/native metadata permission.
 CREATE ROLE download_stop_runtime LOGIN PASSWORD 'synthetic-download-stop';
-CREATE ROLE download_stop_writer_runtime LOGIN PASSWORD 'synthetic-download-stop-writer';
-CREATE ROLE download_stop_ack_runtime LOGIN PASSWORD 'synthetic-download-stop-ack';
-GRANT CONNECT ON DATABASE custody_test TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT USAGE ON SCHEMA public TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT SELECT ON goose_db_version,download_stop TO download_stop_runtime,download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT SELECT ON artifact_download TO download_stop_runtime;
+GRANT CONNECT ON DATABASE custody_test TO download_stop_runtime;
+GRANT USAGE ON SCHEMA public TO download_stop_runtime;
+GRANT SELECT ON goose_db_version,artifact_download,artifact_download_stop TO download_stop_runtime;
 GRANT UPDATE(id,state) ON artifact_download TO download_stop_runtime;
-GRANT UPDATE(download_id,key_digest,request_id,requested_at,write_until,decision) ON download_stop TO download_stop_runtime;
-GRANT UPDATE(download_id,write_started,lookup_attempts) ON download_stop TO download_stop_writer_runtime;
-GRANT UPDATE(download_id,receipt) ON download_stop TO download_stop_ack_runtime;
-
-GRANT SELECT ON fleet_current_trust TO download_stop_writer_runtime,download_stop_ack_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO download_stop_writer_runtime,download_stop_ack_runtime;
-
--- Stop lifecycle uses independent producer, cleanup, verification and retirement
--- facets. Immutable-column UPDATE only permits the necessary row locks.
-CREATE ROLE download_stop_lifecycle_config_runtime LOGIN PASSWORD 'synthetic-stop-lifecycle-config';
-CREATE ROLE download_stop_cleanup_runtime LOGIN PASSWORD 'synthetic-stop-cleanup';
-CREATE ROLE download_stop_verify_runtime LOGIN PASSWORD 'synthetic-stop-verify';
-CREATE ROLE download_stop_retire_runtime LOGIN PASSWORD 'synthetic-stop-retire';
-GRANT CONNECT ON DATABASE custody_test TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT USAGE ON SCHEMA public TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT SELECT ON goose_db_version,fleet_current_trust,download_stop_pool,download_stop_backing,download_stop,download_stop_lifecycle,download_stop_history TO download_stop_writer_runtime,download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(root_id) ON download_stop_pool TO download_stop_writer_runtime,download_stop_lifecycle_config_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(allocation_id) ON download_stop_backing TO download_stop_writer_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(download_id) ON download_stop TO download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(download_id) ON download_stop_lifecycle TO download_stop_writer_runtime,download_stop_cleanup_runtime,download_stop_verify_runtime,download_stop_retire_runtime;
-GRANT UPDATE(lifecycle_policy) ON download_stop_pool TO download_stop_lifecycle_config_runtime;
-GRANT UPDATE(original_completion) ON download_stop_lifecycle TO download_stop_writer_runtime;
-GRANT UPDATE(closed_at,mode,overdue_selected_at,lease,lease_fence,retirement,certificate_started,certificate_completion,terminal_purge) ON download_stop_lifecycle TO download_stop_cleanup_runtime;
--- Cleanup can only clear a terminal acknowledgement while advancing an exact
--- finite lease; the guard forbids it from installing an acknowledgement.
-GRANT UPDATE(certificate_verify_attempts,certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at) ON download_stop_lifecycle TO download_stop_verify_runtime;
-GRANT EXECUTE ON FUNCTION finish_download_stop_retirement(uuid,uuid,uuid),finish_download_stop_history(uuid,uuid,bytea,timestamptz,timestamptz,uuid) TO download_stop_retire_runtime;
-
--- Independently credentialed pre-provider verification spend. Neither the
--- producer nor cleanup may acquire, reset or erase these attempts.
-GRANT UPDATE(certificate_verify_attempts) ON operation_audit_lifecycle TO operation_audit_ack_runtime;
+GRANT INSERT ON artifact_download_stop,audit_event TO download_stop_runtime;
 
 -- SQL50 synthetic roles: current processing reads never write completeness or
 -- lift restrictions. Protected configuration and exact decision facets differ.
@@ -484,12 +392,12 @@ GRANT SELECT ON goose_db_version,fleet_current_trust,permission_stream,processin
 GRANT UPDATE(installation_id) ON fleet_current_trust TO processing_config_runtime,processing_decision_runtime,processing_read_runtime;
 GRANT UPDATE(id) ON permission_stream TO processing_config_runtime,processing_decision_runtime;
 GRANT INSERT ON processing_root TO processing_config_runtime;
-GRANT UPDATE(backing,release_policy,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions,root_transitions,sequence) ON processing_root TO processing_config_runtime;
+GRANT UPDATE(backing,backing_revision,valid_until,retire_by,max_captures,max_rules,max_root_transitions,root_transitions,sequence) ON processing_root TO processing_config_runtime;
 GRANT UPDATE(root_id) ON processing_root TO processing_decision_runtime;
-GRANT SELECT ON context_processing,processing_rule,processing_decision,context_catalog,operation_audit TO processing_decision_runtime;
-GRANT INSERT ON processing_rule,processing_decision TO processing_decision_runtime;
+GRANT SELECT ON context_processing,processing_rule,processing_decision,context_catalog,audit_event TO processing_decision_runtime;
+GRANT INSERT ON processing_rule,processing_decision,audit_event TO processing_decision_runtime;
 GRANT UPDATE(id) ON processing_rule TO processing_decision_runtime;
-GRANT UPDATE(id,applied_at,audit_digest) ON processing_decision TO processing_decision_runtime;
+GRANT UPDATE(id,applied_at) ON processing_decision TO processing_decision_runtime;
 GRANT SELECT ON context_processing,processing_rule TO processing_read_runtime;
 -- Existing effect consumers run the same current processing fence; these are
 -- read-only projections and confer no independent authorization or mutation.
@@ -502,21 +410,12 @@ GRANT UPDATE(installation_id) ON fleet_current_trust TO context_catalog_read_run
 
 -- SQL52 private capture-intent roles. Synthetic credentials only; production
 -- provisioning/pinning is a separate accepted installation prerequisite.
-CREATE ROLE capture_operation_source_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-source';
 CREATE ROLE capture_operation_admit_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-admit';
-CREATE ROLE capture_operation_journal_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-journal';
-CREATE ROLE capture_operation_ack_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-ack';
-CREATE ROLE capture_operation_cleanup_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-cleanup';
-CREATE ROLE capture_operation_verify_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-verify';
-CREATE ROLE capture_operation_retire_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-retire';
-CREATE ROLE capture_operation_read_runtime LOGIN NOINHERIT PASSWORD 'synthetic-capture-operation-read';
-GRANT CONNECT ON DATABASE custody_test TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
-GRANT USAGE ON SCHEMA public TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
-GRANT SELECT ON goose_db_version TO capture_operation_source_runtime,capture_operation_admit_runtime,capture_operation_journal_runtime,capture_operation_ack_runtime,capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime,capture_operation_read_runtime;
-GRANT EXECUTE ON FUNCTION configure_capture_audit_backing(uuid,jsonb,jsonb,timestamptz,timestamptz) TO capture_operation_source_runtime;
-GRANT EXECUTE ON FUNCTION lock_capture_audit_admission(uuid,uuid),reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz),capacity_managed_admission_until(uuid,uuid,text,timestamptz) TO capture_operation_admit_runtime;
-GRANT EXECUTE ON FUNCTION read_capture_operation(uuid,uuid),capture_audit_journal(uuid,jsonb,text,jsonb),claim_capture_reconciliation(uuid,jsonb,text) TO capture_operation_journal_runtime;
-GRANT EXECUTE ON FUNCTION capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb),acknowledge_capture_pair(uuid,jsonb) TO capture_operation_ack_runtime;
+GRANT CONNECT ON DATABASE custody_test TO capture_operation_admit_runtime;
+GRANT USAGE ON SCHEMA public TO capture_operation_admit_runtime;
+GRANT SELECT ON goose_db_version TO capture_operation_admit_runtime;
+GRANT EXECUTE ON FUNCTION capacity_managed_admission_until(uuid,uuid,text,timestamptz) TO capture_operation_admit_runtime;
+GRANT INSERT ON audit_event TO capture_runtime,capture_operation_admit_runtime;
 -- Admission retains the existing exact authority/custody/control transaction,
 -- without inheriting another role or gaining audit/provider acknowledgement.
 GRANT SELECT ON permission_stream,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit,context_storage_binding,context_preview,context_preview_fence,workload_name TO capture_operation_admit_runtime;
@@ -530,21 +429,6 @@ GRANT UPDATE(id,state,copies_digest,deletion_fence,lease_until,deleted_at) ON cu
 GRANT SELECT ON retention_policy,retention_decision TO capture_operation_admit_runtime;
 GRANT SELECT ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO capture_operation_admit_runtime;
--- Fixed filtered cleanup views; no SELECT or UPDATE on human/other lanes.
-GRANT EXECUTE ON FUNCTION capture_audit_role_ok(uuid,text) TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT SELECT ON capture_operation_pool,capture_operation_account,capture_operation_audit,capture_operation_lifecycle,capture_operation_history,fleet_current_trust TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT SELECT(installation_id,activated_postmaster_at,activated_database_oid) ON fleet_trust TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT UPDATE(root_id) ON capture_operation_pool,capture_operation_account TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT UPDATE(id) ON capture_operation_audit TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT UPDATE(operation_id) ON capture_operation_lifecycle TO capture_operation_cleanup_runtime,capture_operation_verify_runtime,capture_operation_retire_runtime;
-GRANT UPDATE(lease_fence,lease,retirement,certificate_started,certificate_completion,terminal_purge,overdue_selected_at,overdue_purge) ON capture_operation_lifecycle TO capture_operation_cleanup_runtime;
-GRANT UPDATE(certificate_verify_attempts,certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at) ON capture_operation_lifecycle TO capture_operation_verify_runtime;
-GRANT EXECUTE ON FUNCTION finish_capture_operation_retirement(uuid,uuid,uuid),finish_capture_operation_history(uuid,text,bytea,timestamptz,timestamptz,uuid) TO capture_operation_retire_runtime;
-
--- Passive retained acknowledgement: no base-table read or write privilege.
-GRANT EXECUTE ON FUNCTION capture_audit_role_ok(uuid,text) TO capture_operation_read_runtime;
-GRANT SELECT ON capture_operation_intents TO capture_operation_read_runtime;
 
 -- ADR-206 SQL component fixture only. These are not installed runtime grants.
 -- Protected backing and C-14 worker/key bindings are seeded by the owned fixture
@@ -555,13 +439,12 @@ GRANT USAGE ON SCHEMA public TO context_query_runtime;
 GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,
  retention_policy,retention_decision,
  context_catalog,context_capture,context_verification,custody_attempt,context_case_locator,
- processing_root,context_processing,processing_rule,operation_audit,operation_audit_lifecycle,
+ processing_root,context_processing,processing_rule,
  context_query_backing,context_query_allocation,context_query_principal,context_query,context_query_call,context_query_worker,context_query_batch
  TO context_query_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO context_query_runtime;
-GRANT UPDATE(id) ON permission_stream,operation_audit,context_query_allocation,context_query_principal,context_query TO context_query_runtime;
+GRANT UPDATE(id) ON permission_stream,context_query_allocation,context_query_principal,context_query TO context_query_runtime;
 GRANT UPDATE(root_id) ON context_query_backing TO context_query_runtime;
-GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO context_query_runtime;
 GRANT INSERT ON context_query_principal,context_query,context_query_call,context_query_batch TO context_query_runtime;
 GRANT UPDATE(claim_id,closed) ON context_query_batch TO context_query_runtime;
 GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid),context_query_shared_profile_current(uuid,jsonb) TO context_query_runtime;

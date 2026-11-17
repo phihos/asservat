@@ -6,41 +6,25 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestIngressRejectionHasNoDispatchAndPreservesFinalDeadline(t *testing.T) {
 	for _, kind := range []IngressRejectionKind{IngressInvalid, IngressDenied} {
 		s, f, g := auditedFixture(t)
 		until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{"resolve_capture_request", []byte("sensitive-user-data"), kind})
-		if err != nil || until.IsZero() || until.After(f.i.ValidUntil) || f.requests != 0 || f.resolutions != 0 || len(g.intents) != 1 || g.intents[0].Name != "invalid_operation" || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" {
+		if err != nil || until.IsZero() || until.After(f.i.ValidUntil) || f.requests != 0 || f.resolutions != 0 || len(g.events) != 1 || g.events[0].Operation != "invalid_operation" || g.events[0].Effect != "none" {
 			t.Fatal("rejection dispatched or lacks bounded audit", err)
 		}
-		raw, _ := json.Marshal(g.intents)
+		raw, _ := json.Marshal(g.events)
 		if bytes.Contains(raw, []byte("sensitive-user-data")) || bytes.Contains(raw, []byte("resolve_capture_request")) {
 			t.Fatal("rejected input persisted as plaintext")
 		}
 	}
-	for _, mode := range []string{"expiry", "cancel", "acknowledgement"} {
-		t.Run(mode, func(t *testing.T) {
-			s, f, g := auditedFixture(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			g.onFinish = func() {
-				switch mode {
-				case "expiry":
-					s.config.Now = func() time.Time { return f.i.ValidUntil }
-				case "cancel":
-					cancel()
-				case "acknowledgement":
-					g.finishFail = true
-				}
-			}
-			until, err := s.RejectBeforeDispatch(ctx, f, IngressRejection{RequestedOperation: "resolve_capture_request", Input: []byte("{}"), Kind: IngressInvalid})
-			if err == nil || !until.IsZero() || len(g.outcomes) != 1 || f.resolutions != 0 {
-				t.Fatal("late rejection disclosed or dispatched")
-			}
-		})
+	s, f, g := auditedFixture(t)
+	g.fail = true
+	until, err := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{RequestedOperation: "resolve_capture_request", Input: []byte("{}"), Kind: IngressInvalid})
+	if err == nil || !until.IsZero() || len(g.events) != 1 || f.resolutions != 0 {
+		t.Fatal("unaudited rejection disclosed or dispatched")
 	}
 }
 func TestIngressNamesAreBoundedAndBinaryExactUnderMAC(t *testing.T) {
@@ -50,10 +34,10 @@ func TestIngressNamesAreBoundedAndBinaryExactUnderMAC(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	if g.intents[1].InputDigest == g.intents[2].InputDigest {
+	if *g.events[1].InputDigest == *g.events[2].InputDigest {
 		t.Fatal("invalid UTF-8 names collapsed")
 	}
-	if _, e := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{strings.Repeat("x", 8193), nil, IngressInvalid}); e == nil || len(g.intents) != 3 {
+	if _, e := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{strings.Repeat("x", 8193), nil, IngressInvalid}); e == nil || len(g.events) != 3 {
 		t.Fatal("unbounded name admitted")
 	}
 	if _, e := s.RejectBeforeDispatch(context.Background(), f, IngressRejection{"get_case", nil, 99}); e == nil {

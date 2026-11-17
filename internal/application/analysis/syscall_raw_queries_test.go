@@ -43,7 +43,7 @@ func TestRawSyscallBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 	}
 	invoke := f.invocation("syscall_query")
 	invoke.input = ContextQueryInput{RawSyscalls: r}
-	d, e := service.Begin(t.Context(), f, invoke, r)
+	d, e := service.Begin(t.Context(), f, invoke.id, r)
 	if e != nil {
 		t.Fatalf("raw query admission: %v", e)
 	}
@@ -51,17 +51,15 @@ func TestRawSyscallBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 		t.Fatal("query funding or immutable grant/key missing")
 	}
 	id, deadline := d.Association().QueryID, d.QueryDeadline()
-	invoke.outcome = d
 	if e = d.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
 	replay := f.invocation("syscall_query")
 	replay.input = ContextQueryInput{RawSyscalls: r}
-	again, e := service.Begin(t.Context(), f, replay, r)
+	again, e := service.Begin(t.Context(), f, replay.id, r)
 	if e != nil || !again.Pending() || again.Effect() != ContextQueryReplayed || again.Association().QueryID != id || !again.QueryDeadline().Equal(deadline) || f.starts != 1 || f.admissions != 1 || f.reads != 0 || f.observations != 1 || ledger.lookups != 2 || ledger.registrations != 1 {
 		t.Fatal("replay caused successor or effects", e)
 	}
-	replay.outcome = again
 	if e = again.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
@@ -69,7 +67,7 @@ func TestRawSyscallBeginPinsInvocationBeforeAdmissionAndReplay(t *testing.T) {
 	changed.Selection.Limit--
 	bad := f.invocation("syscall_query")
 	bad.input = ContextQueryInput{RawSyscalls: changed}
-	if d, e = service.Begin(t.Context(), f, bad, changed); e == nil || d != nil || f.starts != 1 || f.admissions != 1 {
+	if d, e = service.Begin(t.Context(), f, bad.id, changed); e == nil || d != nil || f.starts != 1 || f.admissions != 1 {
 		t.Fatal("changed key accepted", e)
 	}
 	if RawSyscallQueryRequestDigest(r) == PacketQueryRequestDigest(value.PacketQueryRequest{IdempotencyKey: r.IdempotencyKey}) {
@@ -111,7 +109,7 @@ func TestRawSyscallDeliveryOwnsValuesAndRefusesUnvalidatedOutput(t *testing.T) {
 			s, _ := f.s.RawSyscallQueries()
 			inv := f.invocation("syscall_query")
 			inv.input = ContextQueryInput{RawSyscalls: r}
-			d, e := s.Begin(t.Context(), f, inv, r)
+			d, e := s.Begin(t.Context(), f, inv.id, r)
 			if wrong {
 				if e == nil || d != nil || f.reads != 1 || f.lastRead == nil || !f.lastRead.closed {
 					t.Fatal("malformed raw result delivered/unjoined", e)
@@ -131,7 +129,6 @@ func TestRawSyscallDeliveryOwnsValuesAndRefusesUnvalidatedOutput(t *testing.T) {
 			if again.Events[0].Arguments[0].Value != "decimal:0" || *again.Events[0].DurationNS != 1 {
 				t.Fatal("borrowed raw page")
 			}
-			inv.outcome = d
 			if e = d.Close(context.Background()); e != nil {
 				t.Fatal(e)
 			}
@@ -155,7 +152,7 @@ func TestRawSyscallMissingApprovalIsOnlyBeforeAdmission(t *testing.T) {
 	s, _ := f.s.RawSyscallQueries()
 	inv := f.invocation("syscall_query")
 	inv.input = ContextQueryInput{RawSyscalls: r}
-	d, e := s.Begin(t.Context(), f, inv, r)
+	d, e := s.Begin(t.Context(), f, inv.id, r)
 	if d != nil || !RawSyscallQueryApprovalRequiredBeforeAdmission(e) || f.starts != 0 || f.admissions != 0 || f.reads != 0 {
 		t.Fatal("missing approval became effect or opaque failure", e)
 	}
@@ -166,11 +163,10 @@ func TestRawSyscallKeyCannotBecomePacketQuery(t *testing.T) {
 	s, _ := f.s.RawSyscallQueries()
 	inv := f.invocation("syscall_query")
 	inv.input = ContextQueryInput{RawSyscalls: r}
-	d, e := s.Begin(t.Context(), f, inv, r)
+	d, e := s.Begin(t.Context(), f, inv.id, r)
 	if e != nil {
 		t.Fatal(e)
 	}
-	inv.outcome = d
 	if e = d.Close(context.Background()); e != nil {
 		t.Fatal(e)
 	}
@@ -181,23 +177,22 @@ func TestRawSyscallKeyCannotBecomePacketQuery(t *testing.T) {
 	pcq, _ := f.s.PacketQueries()
 	call := f.invocation("pcap_query")
 	call.input = ContextQueryInput{PacketQuery: other}
-	if d, e = pcq.Begin(t.Context(), f, call, other); e == nil || d != nil || compiler.calls != 0 || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
+	if d, e = pcq.Begin(t.Context(), f, call.id, other); e == nil || d != nil || compiler.calls != 0 || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 		t.Fatal("cross-tool key caused compile/admission/read", e)
 	}
 }
 
 func TestRawSyscallReplayRegistrationKeepsOriginalGrantAndControl(t *testing.T) {
-	for _, mode := range []string{"registered", "missing-facet", "registration-failed", "changed-mac", "changed-grant", "cancelled", "expired"} {
+	for _, mode := range []string{"registered", "missing-facet", "registration-failed", "changed-grant", "cancelled", "expired"} {
 		t.Run(mode, func(t *testing.T) {
 			f, ledger, r := rawSyscallAdmissionFixture(t)
 			service, _ := f.s.RawSyscallQueries()
 			first := f.invocation("syscall_query")
 			first.input = ContextQueryInput{RawSyscalls: r}
-			d, e := service.Begin(t.Context(), f, first, r)
+			d, e := service.Begin(t.Context(), f, first.id, r)
 			if e != nil {
 				t.Fatal(e)
 			}
-			first.outcome = d
 			original := f.q
 			if e = d.Close(context.Background()); e != nil {
 				t.Fatal(e)
@@ -225,15 +220,11 @@ func TestRawSyscallReplayRegistrationKeepsOriginalGrantAndControl(t *testing.T) 
 			}
 			replay := f.invocation("syscall_query")
 			replay.input = ContextQueryInput{RawSyscalls: r}
-			if mode == "changed-mac" {
-				replay.call.InputDigest[0] ^= 1
-			}
-			d, e = service.Begin(ctx, f, replay, r)
+			d, e = service.Begin(ctx, f, replay.id, r)
 			if mode == "registered" {
 				if e != nil || d == nil || !d.Pending() || d.Effect() != ContextQueryReplayed || d.Association().QueryID != original.ID || !d.QueryDeadline().Equal(original.Deadline) || ledger.registrations != 1 {
 					t.Fatal("raw registered replay", e)
 				}
-				replay.outcome = d
 				if e = d.Close(context.Background()); e != nil {
 					t.Fatal(e)
 				}

@@ -254,25 +254,25 @@ func (w ContextQueryWorker) Matches(q ContextQuery) bool {
 		w.Configuration == q.Plan.Profile.Path.WorkerConfiguration
 }
 
-// ContextQueryCall is a minimized snapshot of the existing C-08 invocation.
-// The SQL facets independently require its exact acknowledged intent; this DTO
-// cannot stand in for that acknowledgement or current identity.
+// ContextQueryCall names one public call by its request ID, the operation ID
+// of its audit `call` row (ADR-330 D6). WriteUntil bounds cleanup.
 type ContextQueryCall struct {
-	ID, RootID, Tool, InputFormat, MACVersion string
-	InputDigest, PrincipalDigest              artifact.Digest
-	Principal                                 identity.Principal
-	StartedAt, Until, WriteUntil              time.Time
+	ID, RootID, Tool             string
+	Principal                    identity.Principal
+	StartedAt, Until, WriteUntil time.Time
 }
+
+// ContextQueryCallWrite is the cleanup allowance after a call starts.
+const ContextQueryCallWrite = 30 * time.Second
 
 func (r ContextQueryCall) Valid(now time.Time) bool {
-	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
-		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
+	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) &&
 		(r.Tool == "get_logs" || r.Tool == "syscall_query" || r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
-		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
+		!r.WriteUntil.After(r.StartedAt.Add(ContextQueryCallWrite))
 }
 
-// ContextQueryRequest names an already audited live invocation, not a reusable
+// ContextQueryRequest names one live public call, not a reusable
 // credential. Its opaque application owner retains the original cancellation.
 type ContextQueryRequest struct {
 	Call                     ContextQueryCall

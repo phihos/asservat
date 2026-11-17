@@ -30,7 +30,7 @@ installation ID in Go, object UIDs are read by name.
 {{- $perm := default dict $w.permission -}}
 {{- $p := fromJson (include "asservat.providers" .) -}}
 {{- $role := dict -}}
-{{- range $purpose := list "audit-wrap" "audit-unwrap" "cleanup-wrap" "cleanup-open" "cleanup-verify" "cleanup-sign" -}}
+{{- range $purpose := list "audit-wrap" "audit-unwrap" -}}
 {{- $_ := set $role $purpose (include "asservat.openBaoRole" (list $ "hub-worker" $purpose)) -}}
 {{- end -}}
 {{- $roles := dict "auditWrap" (get $role "audit-wrap") "auditUnwrap" (get $role "audit-unwrap") -}}
@@ -55,11 +55,6 @@ installation ID in Go, object UIDs are read by name.
 {{- $_ := set $c "sharedQueries" (gt (int (default 0 $.Values.hub.publisher.replicas)) 0) -}}
 {{- with include "asservat.hubApi.clusters" $ | fromJsonArray }}{{ $_ := set $c "remoteClusters" . }}{{ end -}}
 {{- $_ := set $v "capacity" $c -}}
-{{- $_ := set $v "cleanup" dict -}}
-{{- $_ := set $roles "cleanupWrap" (get $role "cleanup-wrap") -}}
-{{- $_ := set $roles "cleanupOpen" (get $role "cleanup-open") -}}
-{{- $_ := set $roles "cleanupVerify" (get $role "cleanup-verify") -}}
-{{- $_ := set $roles "cleanupSign" (get $role "cleanup-sign") -}}
 {{- $_ := set $permission "contextDeletion" (dict "evidenceStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.evidenceBucket)) -}}
 {{- end -}}
 {{- $_ := set $v "permission" $permission -}}

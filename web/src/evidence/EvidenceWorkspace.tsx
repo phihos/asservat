@@ -173,7 +173,6 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         {state.cancellation && <>
           <h2 role="status">{state.cancellation.state === 'Cancelled' ? 'Download cancelled' : 'Download already ended'}</h2>
           <p>This download cannot be started or resumed. Copies already received remain outside Asservat.</p>
-          {state.cancellation.audit_state !== 'recorded' && <p className="field-help">The stop is enforced. {state.cancellation.audit_state === 'overdue' ? 'Its audit needs administrator attention.' : 'Its audit confirmation is pending.'}</p>}
           <Button className="button secondary" isDisabled={state.busy} onPress={controller.newDownload}>Return to evidence</Button>
         </>}
         {download && <>

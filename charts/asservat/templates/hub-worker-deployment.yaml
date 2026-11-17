@@ -72,11 +72,9 @@ spec:
               - secret:
                   name: {{ include "asservat.secretName" (list . "audit-mac") | quote }}
                   items: [{key: accountKey, path: capture-account.key}]
-              {{- range $principal, $file := dict "operation-cleanup" "cleanup-storage.json" "operation-verify" "verify-storage.json" "evidence-delete" "evidence-delete-storage.json" }}
               - secret:
-                  name: {{ include "asservat.secretName" (list $ (printf "s3-%s" $principal)) | quote }}
-                  items: [{key: credentials.json, path: {{ $file }}}]
-              {{- end }}
+                  name: {{ include "asservat.secretName" (list . "s3-evidence-delete") | quote }}
+                  items: [{key: credentials.json, path: evidence-delete-storage.json}]
               {{- end }}
               {{- include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "roots/postgres.crt") | nindent 14 }}
               {{- include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "roots/audit-store.crt") | nindent 14 }}

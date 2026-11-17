@@ -112,9 +112,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}
-	if out, ok := publicRuntimeCaptureCleanupGrants(purpose); ok {
-		return out, true
-	}
 	if out, ok := publicRuntimeConnectorGrants(purpose); ok {
 		return out, true
 	}
@@ -152,13 +149,14 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_decision", "retention_policy")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
-		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
+		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
+			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
+		}
 		// A workload enrolls on its first storage read.
 		out = append(out, publicRuntimeGrant{"function", "capacity_enroll(uuid,uuid,text,text,uuid,uuid,bytea)", "", "EXECUTE"})
 	case "capacity-profile-read":
 		// SQL54 independently pins this actual session_user OID and original
 		// provenance. Root/qualification arguments are not a role boundary.
-		out = append(out, publicRuntimeGrant{"function", "read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)", "", "EXECUTE"})
 		out = append(out, publicRuntimeGrant{"function", "read_capacity_qualification_pin(uuid,uuid)", "", "EXECUTE"})
 	case "capture-history":
 		read("recording_save_group")
@@ -198,7 +196,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// restriction, lineage or counter mutation is delegated to admission.
 		read("processing_root", "processing_rule")
 		// The only effects are one reviewed capture, its original custody
-		// reservation and the atomically prepaid private audit pair. Existing
+		// reservation and its audit_event row. Existing
 		// storage binding and quota/source configuration remain read-only.
 		// ADR-228: a policy executor re-checks its acceptance after locks.
 		read("policy_source", "policy_acceptance")
@@ -219,9 +217,11 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, table := range []string{"context_capture", "custody_attempt", "custody_copy", "custody_event"} {
 			add(table, "INSERT")
 		}
-		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
+		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
+		// ADR-330 D6: the admission writes its audit row in its transaction.
+		add("audit_event", "INSERT")
 	case "policy-automation":
 		out = append(out, publicRuntimePolicySourceGrants()...)
 		// ADR-228: hub-api policy activation, source observation, acceptance
@@ -268,8 +268,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("fleet_current_trust", "context_case_locator", "evidence_share")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("evidence_share", "INSERT")
-		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision", "management", "transfer_key", "transfer_digest", "last_operation_id")
-		out = append(out, publicRuntimeGrant{"function", "begin_share_effect(uuid,uuid,text,text,text,text,uuid)", "", "EXECUTE"})
+		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision", "management", "transfer_key", "transfer_digest")
+		// REQ-AUT-005: each share effect writes its audit row in its transaction.
+		add("audit_event", "INSERT")
 		// ADR-239: revoke-all of a policy acceptance's recurring sharing reads
 		// its instruction and marks it stopped or revoked once (a trigger keeps it so).
 		read("policy_acceptance")
@@ -287,14 +288,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent", "policy_executions_spent", "policy_bytes_spent")
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
-	case "capture-journal":
-		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "read_capture_reason(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
-			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
-		}
-	case "capture-ack":
-		for _, signature := range []string{"capture_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb,jsonb)", "acknowledge_capture_pair(uuid,jsonb)"} {
-			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
-		}
 	case "capture-preview":
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Passive private blueprints only. SQL33/36 prohibit live deletion,
@@ -312,9 +305,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "capture-resolution":
 		// Fencing counts the caller's live previews, which include selections.
 		read("recording_save_group", "recording_selection_set")
-		// Closing a preview runs context_preview_immutable, whose reason check
-		// calls this SECURITY DEFINER predicate (00110 revoked it from PUBLIC).
-		out = append(out, publicRuntimeGrant{"function", "capture_preview_reason_copied(context_preview)", "", "EXECUTE"})
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.
@@ -487,9 +477,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 			add("custody_event", "INSERT")
 		}
-	case "capture-intent-read":
-		read("capture_operation_intents")
-		out = append(out, publicRuntimeGrant{"function", "capture_audit_role_ok(uuid,text)", "", "EXECUTE"})
 	case "download-source":
 		// Exact ciphertext receipts and minimized routing only. In particular,
 		// there is no allocation/session/audit/key/native-operation mutation.
@@ -497,34 +484,15 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 	case "download-plan":
-		read("download_allocation", "download_control_allocation", "download_native_backing", "download_stop_backing", "download_stop_pool", "fleet_current_trust")
+		read("download_allocation", "download_control_allocation", "download_native_backing", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 	case "worker-config-read":
 		read("download_worker_configuration", "download_worker_configuration_revision", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
-	case "audit-normal-journal", "audit-resolution-journal", "audit-normal-ack", "audit-resolution-ack":
-		// The HTTP lanes use separate physical pools and login limits. These
-		// existing public audit tables do not implement per-login human-lane
-		// filtering; private peer/capture/processing authority remains in its
-		// separately pinned SQL guards. No source/backing or cleanup grant is
-		// inherited merely because OperationLifecycles also exposes those methods.
-		read("fleet_current_trust", "operation_audit")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("operation_audit", "UPDATE", "id")
-		if strings.HasSuffix(purpose, "-journal") {
-			read("operation_audit_pool", "operation_audit_account", "operation_audit_lifecycle")
-			add("operation_audit_pool", "UPDATE", "root_id")
-			add("operation_audit", "INSERT")
-			add("operation_audit", "UPDATE", "intent_started", "outcome", "outcome_started")
-			// Positive writer completion uses pool -> account ->
-			// audit -> lifecycle locks and exact database-incarnation reads.
-			add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
-			add("operation_audit_account", "UPDATE", "root_id")
-			add("operation_audit_lifecycle", "UPDATE", "operation_id", "intent_completion", "outcome_completion")
-		} else {
-			add("operation_audit", "UPDATE", "intent_receipt", "outcome_receipt")
-		}
+	case "audit":
+		// REQ-AUT-005: append-only rows; no UPDATE or DELETE.
+		add("audit_event", "INSERT")
 	case "browser-session":
 		read("browser_login", "browser_session", "browser_logout")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {

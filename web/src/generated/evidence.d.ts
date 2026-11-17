@@ -300,14 +300,12 @@ export interface components {
             download_id: string;
             idempotency_key: string;
         };
-        /** @description A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. Pending/overdue audit never reverses the enforced stop. */
+        /** @description A minimal receipt for stopping the original caller/client download, even after evidence access is lost. AlreadyTerminal intentionally hides the finer prior state. No artifact or native metadata. The audit row is written in the same transaction (ADR-330 D6). */
         Contract_artifact_download_b566de55874898e7: {
             /** Format: uuid */
             download_id: string;
             /** @enum {unknown} */
             state: "Cancelled" | "AlreadyTerminal";
-            /** @enum {unknown} */
-            audit_state: "pending" | "recorded" | "overdue";
         };
         McpOutput_cancel_artifact_download: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */

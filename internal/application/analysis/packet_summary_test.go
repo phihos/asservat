@@ -47,7 +47,7 @@ func packetServiceFixture(t *testing.T) (*projectionFixture, value.PacketSummary
 	return f, value.PacketSummaryRequest{CaseID: s.CaseID, ArtifactID: s.ArtifactID}, summary
 }
 func TestPacketSummaryAdmissionPinsToolRouteBudgetAndInput(t *testing.T) {
-	for _, mode := range []string{"ready", "pending", "disabled", "wrong-tool", "wrong-input", "source-in-route", "selection-in-route", "underfunded-memory", "underfunded-transient", "authority-refused", "admit-error", "cancelled"} {
+	for _, mode := range []string{"ready", "pending", "disabled", "source-in-route", "selection-in-route", "underfunded-memory", "underfunded-transient", "authority-refused", "admit-error", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			f, request, summary := packetServiceFixture(t)
 			f.ready = mode != "pending"
@@ -58,10 +58,6 @@ func TestPacketSummaryAdmissionPinsToolRouteBudgetAndInput(t *testing.T) {
 			switch mode {
 			case "disabled":
 				f.s.PacketRoutes = nil
-			case "wrong-tool":
-				inv.call.Tool = "get_profile_summary"
-			case "wrong-input":
-				inv.input.Packet.ArtifactID = f.next()
 			case "source-in-route":
 				c := f.a.Scope.Candidate()
 				f.s.PacketRoutes = profileRouteFixture{c}
@@ -85,7 +81,7 @@ func TestPacketSummaryAdmissionPinsToolRouteBudgetAndInput(t *testing.T) {
 			if enabled != (mode != "disabled") {
 				t.Fatal("optional facet changed")
 			}
-			d, err := service.Begin(ctx, f, inv, request)
+			d, err := service.Begin(ctx, f, inv.id, request)
 			if mode != "ready" && mode != "pending" {
 				if err == nil || d != nil || f.starts+f.reads != 0 {
 					t.Fatal("refused input reached worker/read", mode, err)
@@ -101,7 +97,6 @@ func TestPacketSummaryAdmissionPinsToolRouteBudgetAndInput(t *testing.T) {
 			if err != nil || d == nil || d.Pending() != (mode == "pending") || d.Tool() != "get_pcap_summary" || f.admissions != 1 || f.starts != 1 || f.q.Scope.QueryUnits() != 2 || f.q.Scope.ReadBatches() != 1 {
 				t.Fatal("packet query changed original admission", err)
 			}
-			inv.outcome = d
 			if mode == "ready" {
 				first, ok := d.PacketSummary()
 				if !ok || !first.Valid() || f.reads != 1 {
@@ -138,7 +133,7 @@ func TestPacketSummaryPollUsesSamePaidQueryAndDoesNotAcquire(t *testing.T) {
 	inv := f.invocation("get_pcap_summary")
 	inv.input = ContextQueryInput{Packet: request}
 	reads, _ := f.s.PacketSummaries()
-	pending, err := reads.Begin(t.Context(), f, inv, request)
+	pending, err := reads.Begin(t.Context(), f, inv.id, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +144,7 @@ func TestPacketSummaryPollUsesSamePaidQueryAndDoesNotAcquire(t *testing.T) {
 	f.ready = true
 	poll := f.invocation("get_query_result")
 	poll.input = ContextQueryInput{QueryID: id}
-	d, err := f.s.Results.GetQueryResult(t.Context(), f, poll, id)
+	d, err := f.s.Results.GetQueryResult(t.Context(), f, poll.id, id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -93,7 +93,7 @@ func (r comparisonReadFixture) Projection(context.Context) (value.ProjectionResu
 }
 
 func TestProfileComparisonServiceBindsTwoRoutesPlansAndOriginalInput(t *testing.T) {
-	for _, mode := range []string{"pending", "ready", "disabled", "missing-pair-plans", "wrong-input", "wrong-tool", "baseline-source-selection", "baseline-version", "incident-source-selection", "bad-baseline-account", "underfunded", "cancelled", "wrong-source-version"} {
+	for _, mode := range []string{"pending", "ready", "disabled", "missing-pair-plans", "baseline-source-selection", "baseline-version", "incident-source-selection", "bad-baseline-account", "underfunded", "cancelled", "wrong-source-version"} {
 		t.Run(mode, func(t *testing.T) {
 			f, request := newComparisonServiceFixture(t)
 			f.ready = mode == "ready"
@@ -106,10 +106,6 @@ func TestProfileComparisonServiceBindsTwoRoutesPlansAndOriginalInput(t *testing.
 				f.s.ComparisonRoutes = nil
 			case "missing-pair-plans":
 				f.s.Plans = f.projectionFixture
-			case "wrong-input":
-				invocation.input.Comparison.BaselineArtifactID = projectionID
-			case "wrong-tool":
-				invocation.call.Tool = "get_profile_summary"
 			case "baseline-source-selection":
 				f.routes[0].Profile = f.a.Scope.Profile
 			case "baseline-version":
@@ -129,7 +125,7 @@ func TestProfileComparisonServiceBindsTwoRoutesPlansAndOriginalInput(t *testing.
 			if enabled != (mode != "disabled") {
 				t.Fatal("optional facet changed")
 			}
-			d, err := service.Begin(ctx, f, invocation, request)
+			d, err := service.Begin(ctx, f, invocation.id, request)
 			if mode != "pending" && mode != "ready" {
 				if err == nil || d != nil || f.admissions+f.starts+f.reads != 0 {
 					t.Fatal("effect preceded exact pair validation", err)
@@ -165,7 +161,7 @@ func TestProfileComparisonPaidPollRetainsResultOwnerAndDeepClones(t *testing.T) 
 	begin := f.invocation("compare_profiles")
 	begin.input = ContextQueryInput{Comparison: request}
 	service, _ := f.s.ProfileComparisons()
-	pending, err := service.Begin(t.Context(), f, begin, request)
+	pending, err := service.Begin(t.Context(), f, begin.id, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +171,7 @@ func TestProfileComparisonPaidPollRetainsResultOwnerAndDeepClones(t *testing.T) 
 	}
 	f.ready = true
 	poll := f.invocation("get_query_result")
-	d, err := f.s.Results.GetQueryResult(t.Context(), f, poll, id)
+	d, err := f.s.Results.GetQueryResult(t.Context(), f, poll.id, id)
 	if err != nil || d == nil || f.starts != 1 || f.admissions != 1 || f.polls != 1 || f.reads != 1 || !f.active {
 		t.Fatal("poll acquired/replaced worker or lost paid result", err)
 	}
@@ -191,10 +187,6 @@ func TestProfileComparisonPaidPollRetainsResultOwnerAndDeepClones(t *testing.T) 
 	if !ok || *original.Rows[0].Function == "changed" || *original.Baseline.DurationSeconds == 99 || original.Incident.Period.Value == 99 || original.Limitations[0] == "changed" {
 		t.Fatal("getter leaked mutable result")
 	}
-	if err := d.CheckDisclosure(t.Context()); err == nil {
-		t.Fatal("unacknowledged result disclosed")
-	}
-	poll.outcome = d
 	if err := d.CheckDisclosure(t.Context()); err != nil {
 		t.Fatal("acknowledged result lost original authority", err)
 	}
@@ -213,13 +205,13 @@ func TestProfileComparisonPaidPollRetainsResultOwnerAndDeepClones(t *testing.T) 
 	}
 }
 
-func TestProfileComparisonMismatchRetainsChargedOwnerUntilAcknowledgedClose(t *testing.T) {
+func TestProfileComparisonMismatchRetainsChargedOwnerUntilClose(t *testing.T) {
 	f, request := newComparisonServiceFixture(t)
 	f.result = value.ProjectionResult{IncompatibleProfiles: true}
 	invocation := f.invocation("compare_profiles")
 	invocation.input = ContextQueryInput{Comparison: request}
 	service, _ := f.s.ProfileComparisons()
-	d, err := service.Begin(t.Context(), f, invocation, request)
+	d, err := service.Begin(t.Context(), f, invocation.id, request)
 	if err != nil || d == nil || d.Pending() || d.Refusal() != ContextProjectionIncompatibleProfiles || d.Effect() != ContextQueryReadCharged || f.completions != 0 || f.lastRead.closed || !f.active {
 		t.Fatal("typed mismatch lost charged owner", err)
 	}
@@ -229,10 +221,6 @@ func TestProfileComparisonMismatchRetainsChargedOwnerUntilAcknowledgedClose(t *t
 	if d.RefuseOversizedResult() {
 		t.Fatal("prepared mismatch changed refusal")
 	}
-	if err := d.CheckDisclosure(t.Context()); err == nil {
-		t.Fatal("mismatch bypassed outcome acknowledgement")
-	}
-	invocation.outcome = d
 	if err := d.CheckDisclosure(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +256,7 @@ func TestProfileComparisonResultRefusesMalformedMixedAndOversizedWorkerOutput(t 
 			invocation := f.invocation("compare_profiles")
 			invocation.input = ContextQueryInput{Comparison: request}
 			service, _ := f.s.ProfileComparisons()
-			d, err := service.Begin(t.Context(), f, invocation, request)
+			d, err := service.Begin(t.Context(), f, invocation.id, request)
 			if err == nil || d != nil || f.reads != 1 || !f.lastRead.closed || f.completions != 1 || f.active {
 				t.Fatal("invalid worker result escaped or leaked owner", err)
 			}
@@ -283,7 +271,7 @@ func TestProfileComparisonPaidPollCannotRebindEitherSourceVersion(t *testing.T) 
 		invocation := f.invocation("compare_profiles")
 		invocation.input = ContextQueryInput{Comparison: request}
 		service, _ := f.s.ProfileComparisons()
-		d, err := service.Begin(t.Context(), f, invocation, request)
+		d, err := service.Begin(t.Context(), f, invocation.id, request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,7 +290,7 @@ func TestProfileComparisonPaidPollCannotRebindEitherSourceVersion(t *testing.T) 
 		}
 		f.ready = true
 		poll := f.invocation("get_query_result")
-		result, err := f.s.Results.GetQueryResult(t.Context(), f, poll, queryID)
+		result, err := f.s.Results.GetQueryResult(t.Context(), f, poll.id, queryID)
 		if err == nil || result != nil || f.polls != 0 || f.reads != 0 || f.starts != 1 || f.admissions != 1 {
 			t.Fatal("poll rebound immutable source or acquired replacement", err)
 		}
@@ -316,11 +304,10 @@ func TestProfileComparisonMismatchFailedCloseRetainsCharge(t *testing.T) {
 	invocation := f.invocation("compare_profiles")
 	invocation.input = ContextQueryInput{Comparison: request}
 	service, _ := f.s.ProfileComparisons()
-	d, err := service.Begin(t.Context(), f, invocation, request)
+	d, err := service.Begin(t.Context(), f, invocation.id, request)
 	if err != nil || d == nil || d.Refusal() != ContextProjectionIncompatibleProfiles {
 		t.Fatal(err)
 	}
-	invocation.outcome = d
 	if err := d.CheckDisclosure(t.Context()); err != nil {
 		t.Fatal(err)
 	}

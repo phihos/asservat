@@ -8,7 +8,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -41,11 +40,6 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 		if err != nil {
 			t.Fatal(err)
 		}
-		open := func(user, password string) *pgxpool.Pool {
-			p := poolFor(user, password)
-			t.Cleanup(p.Close)
-			return p
-		}
 		sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 		sharedPool := sharedPools.ordinary
 		executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, s.recovery.installation)
@@ -53,13 +47,6 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 			t.Fatal(err)
 		}
 		prepare, read := executionSQL, executionSQL
-		intents, err := postgres.NewCaptureIntentAudits(ctx, open("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-			t.Fatal(err)
-		}
 		// Observe once after fixture provisioning, then retain exactly this check
 		// through successful preparation and the subsequent blocked bind effect.
 		now := time.Now().UTC().Truncate(time.Microsecond)

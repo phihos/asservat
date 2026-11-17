@@ -18,9 +18,8 @@ var ErrPublicRuntimeLayout = errors.New("unsupported development SQL credential 
 // The role ceiling is installation-wide. Most credentials have one connection
 // per process; the ordinary hub credential has twenty aggregate connections.
 // One extra slot verifies installation.
-const PublicRuntimeHubOrdinaryConnections = 18
-const PublicRuntimeHubResolutionConnections = 2
-const PublicRuntimeHubConnections = PublicRuntimeHubOrdinaryConnections + PublicRuntimeHubResolutionConnections
+const PublicRuntimeHubOrdinaryConnections = 20
+const PublicRuntimeHubConnections = PublicRuntimeHubOrdinaryConnections
 const PublicRuntimeRetainedHubProcesses = 4
 const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 
@@ -29,7 +28,6 @@ const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 // can be enabled until the entire public graph and role layout are qualified.
 func PublicRuntimeRolePurposes() []string {
 	out := PublicRuntimeHubRolePurposes()
-	out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 	out = append(out, PublicRuntimeFederationPurposes()...)
 	out = append(out, PublicRuntimePublisherPurposes()...)
 	out = append(out, "capacity", "capacity-capture")
@@ -94,13 +92,13 @@ func PublicRuntimePermissionPurposes() []string {
 // Reconciler credentials must never enter the hub merely because the installer
 // learns how to create another fixed purpose.
 func PublicRuntimeHubRolePurposes() []string {
-	return []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
+	return []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
 }
 
 // PublicRuntimeHubSharedDuties are typed adapter duties sharing one credential,
 // not additional role identities, projection files or pools (ADR-222).
 func PublicRuntimeHubSharedDuties() []string {
-	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
+	return []string{"identity-read", "browser-session", "hub-metadata-read", "download-source", "download-plan", "audit", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "regional-capacity", "processing-decision", "policy-automation", "evidence-share", "access-review", "capture-history", "live-watch"}
 }
 
 // Permanent role identities are not positions in a configurable or growing
@@ -108,24 +106,12 @@ func PublicRuntimeHubSharedDuties() []string {
 // product grants and separate projection have been implemented and qualified.
 func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	switch purpose {
-	case "capture-intent-read":
-		return 16, true
 	case "worker-config-read":
 		return 20, true
 	case "capacity-profile-read":
 		return 34, true
 	case "capture-admit":
 		return 40, true
-	case "capture-journal":
-		return 41, true
-	case "capture-ack":
-		return 42, true
-	case "capture-cleanup":
-		return 43, true
-	case "capture-verifier":
-		return 44, true
-	case "capture-finalizer":
-		return 45, true
 	case "connector-delivery":
 		return 52, true
 	case "connector-owner-read":

@@ -229,7 +229,7 @@ func newConsoleLive(t *testing.T, origin string) (*presentation.AuditedOperation
 	if e != nil {
 		t.Fatal(e)
 	}
-	out, e := presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: consoleCaptureID(1), Retention: time.Hour, NormalConcurrency: 4, ResolutionConcurrency: 2, PerPrincipalConcurrency: 4, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: newID}, base, f, f, mac)
+	out, e := presentation.NewAuditedOperations(presentation.AuditedOperationsConfig{RootID: consoleCaptureID(1), Now: time.Now, NewID: newID}, base, &memoryAuditEvents{}, mac)
 	if e != nil {
 		t.Fatal(e)
 	}

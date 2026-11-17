@@ -11,43 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const beginShareEffect = `-- name: BeginShareEffect :one
-SELECT effect_available::boolean,retire_by::timestamptz,effect_until::timestamptz FROM begin_share_effect(
- $1::uuid,$2::uuid,$3::text,
- $4::text,$5::text,$6::text,$7::uuid)
-`
-
-type BeginShareEffectParams struct {
-	RootID      pgtype.UUID
-	OperationID pgtype.UUID
-	Action      string
-	Issuer      string
-	Subject     string
-	Client      string
-	Target      pgtype.UUID
-}
-
-type BeginShareEffectRow struct {
-	EffectAvailable bool
-	RetireBy        pgtype.Timestamptz
-	EffectUntil     pgtype.Timestamptz
-}
-
-func (q *Queries) BeginShareEffect(ctx context.Context, arg BeginShareEffectParams) (BeginShareEffectRow, error) {
-	row := q.db.QueryRow(ctx, beginShareEffect,
-		arg.RootID,
-		arg.OperationID,
-		arg.Action,
-		arg.Issuer,
-		arg.Subject,
-		arg.Client,
-		arg.Target,
-	)
-	var i BeginShareEffectRow
-	err := row.Scan(&i.EffectAvailable, &i.RetireBy, &i.EffectUntil)
-	return i, err
-}
-
 const countPolicyShareRevocations = `-- name: CountPolicyShareRevocations :one
 SELECT count(*) FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoke_key=$3
 `
@@ -66,14 +29,14 @@ func (q *Queries) CountPolicyShareRevocations(ctx context.Context, arg CountPoli
 }
 
 const insertShare = `-- name: InsertShare :one
-INSERT INTO evidence_share(id,root_id,artifact_id,case_id,cluster_id,namespace_uid,workload_uid,pod_uid,version,creator_issuer,creator_subject,creator_client,management,recipients,recipient_keys,idempotency_key,request_digest,expires_at,creating_operation_id,last_operation_id)
+INSERT INTO evidence_share(id,root_id,artifact_id,case_id,cluster_id,namespace_uid,workload_uid,pod_uid,version,creator_issuer,creator_subject,creator_client,management,recipients,recipient_keys,idempotency_key,request_digest,expires_at)
 SELECT $1::uuid, r.root_id, r.artifact_id, r.case_id, r.cluster_id, r.namespace_uid, r.workload_uid, r.pod_uid, $2::bytea, $3, $4, $5::text,
- $6::jsonb, $7::jsonb, $8::text[], $9::text, $10::bytea, $11::timestamptz,$12::uuid,$12::uuid
+ $6::jsonb, $7::jsonb, $8::text[], $9::text, $10::bytea, $11::timestamptz
 FROM context_case_locator r
-WHERE r.root_id=$13::uuid AND r.artifact_id=$14::uuid AND r.case_id=$15::uuid AND r.cluster_id=$16::uuid
- AND r.namespace_uid=$17::text AND r.workload_uid=$18::text AND r.pod_uid=$19::text
+WHERE r.root_id=$12::uuid AND r.artifact_id=$13::uuid AND r.case_id=$14::uuid AND r.cluster_id=$15::uuid
+ AND r.namespace_uid=$16::text AND r.workload_uid=$17::text AND r.pod_uid=$18::text
  AND $11::timestamptz>clock_timestamp()
-RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id
+RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id
 `
 
 type InsertShareParams struct {
@@ -88,7 +51,6 @@ type InsertShareParams struct {
 	IdempotencyKey string
 	RequestDigest  []byte
 	ExpiresAt      pgtype.Timestamptz
-	OperationID    pgtype.UUID
 	RootID         pgtype.UUID
 	ArtifactID     pgtype.UUID
 	CaseID         pgtype.UUID
@@ -113,7 +75,6 @@ func (q *Queries) InsertShare(ctx context.Context, arg InsertShareParams) (Evide
 		arg.IdempotencyKey,
 		arg.RequestDigest,
 		arg.ExpiresAt,
-		arg.OperationID,
 		arg.RootID,
 		arg.ArtifactID,
 		arg.CaseID,
@@ -149,15 +110,12 @@ func (q *Queries) InsertShare(ctx context.Context, arg InsertShareParams) (Evide
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }
 
 const listAdministeredShares = `-- name: ListAdministeredShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1::uuid AND retire_by>clock_timestamp()
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1::uuid
  AND (NOT $2::boolean OR (created_at,id)<($3::timestamptz,$4::uuid))
 ORDER BY created_at DESC, id DESC LIMIT $5
 `
@@ -213,9 +171,6 @@ func (q *Queries) ListAdministeredShares(ctx context.Context, arg ListAdminister
 			&i.TransferKey,
 			&i.TransferDigest,
 			&i.PolicyAcceptanceID,
-			&i.CreatingOperationID,
-			&i.RetireBy,
-			&i.LastOperationID,
 		); err != nil {
 			return nil, err
 		}
@@ -228,7 +183,7 @@ func (q *Queries) ListAdministeredShares(ctx context.Context, arg ListAdminister
 }
 
 const listOwnedShares = `-- name: ListOwnedShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp()
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1
  AND ((creator_issuer=$2 AND creator_subject=$3)
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY($4::jsonb[])))
  AND (NOT $5::boolean OR (created_at,id)<($6::timestamptz,$7::uuid))
@@ -294,9 +249,6 @@ func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams
 			&i.TransferKey,
 			&i.TransferDigest,
 			&i.PolicyAcceptanceID,
-			&i.CreatingOperationID,
-			&i.RetireBy,
-			&i.LastOperationID,
 		); err != nil {
 			return nil, err
 		}
@@ -309,7 +261,7 @@ func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams
 }
 
 const listReceivedShares = `-- name: ListReceivedShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1::uuid AND retire_by>clock_timestamp() AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1::uuid AND recipient_keys && $2::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
  AND (NOT $3::boolean OR (created_at,id)<($4::timestamptz,$5::uuid))
 ORDER BY created_at DESC, id DESC LIMIT $6
 `
@@ -366,9 +318,6 @@ func (q *Queries) ListReceivedShares(ctx context.Context, arg ListReceivedShares
 			&i.TransferKey,
 			&i.TransferDigest,
 			&i.PolicyAcceptanceID,
-			&i.CreatingOperationID,
-			&i.RetireBy,
-			&i.LastOperationID,
 		); err != nil {
 			return nil, err
 		}
@@ -461,7 +410,7 @@ func (q *Queries) ReadPolicySharingAcceptance(ctx context.Context, arg ReadPolic
 }
 
 const readRecipientShares = `-- name: ReadRecipientShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND retire_by>clock_timestamp() AND revoked_at IS NULL AND expires_at>clock_timestamp() AND recipient_keys && $3::text[]
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() AND recipient_keys && $3::text[]
 ORDER BY created_at, id
 `
 
@@ -507,9 +456,6 @@ func (q *Queries) ReadRecipientShares(ctx context.Context, arg ReadRecipientShar
 			&i.TransferKey,
 			&i.TransferDigest,
 			&i.PolicyAcceptanceID,
-			&i.CreatingOperationID,
-			&i.RetireBy,
-			&i.LastOperationID,
 		); err != nil {
 			return nil, err
 		}
@@ -522,7 +468,7 @@ func (q *Queries) ReadRecipientShares(ctx context.Context, arg ReadRecipientShar
 }
 
 const readShare = `-- name: ReadShare :one
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND id=$2 AND retire_by>clock_timestamp()
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1 AND id=$2
 `
 
 type ReadShareParams struct {
@@ -559,16 +505,13 @@ func (q *Queries) ReadShare(ctx context.Context, arg ReadShareParams) (EvidenceS
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }
 
 const readShareByKey = `-- name: ReadShareByKey :one
 
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND creator_issuer=$2 AND creator_subject=$3 AND idempotency_key=$4
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1 AND creator_issuer=$2 AND creator_subject=$3 AND idempotency_key=$4
 `
 
 type ReadShareByKeyParams struct {
@@ -613,15 +556,12 @@ func (q *Queries) ReadShareByKey(ctx context.Context, arg ReadShareByKeyParams) 
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }
 
 const readShareForUpdate = `-- name: ReadShareForUpdate :one
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id FROM evidence_share WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id FROM evidence_share WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type ReadShareForUpdateParams struct {
@@ -658,33 +598,24 @@ func (q *Queries) ReadShareForUpdate(ctx context.Context, arg ReadShareForUpdate
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }
 
 const revokePolicyShares = `-- name: RevokePolicyShares :many
-UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1,last_operation_id=$4::uuid
-WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoked_at IS NULL AND retire_by>clock_timestamp() RETURNING id
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
+WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoked_at IS NULL RETURNING id
 `
 
 type RevokePolicySharesParams struct {
 	RootID             pgtype.UUID
 	PolicyAcceptanceID pgtype.UUID
 	RevokeKey          pgtype.Text
-	OperationID        pgtype.UUID
 }
 
 // Every still-unrevoked share materialized from exactly this acceptance.
 func (q *Queries) RevokePolicyShares(ctx context.Context, arg RevokePolicySharesParams) ([]pgtype.UUID, error) {
-	rows, err := q.db.Query(ctx, revokePolicyShares,
-		arg.RootID,
-		arg.PolicyAcceptanceID,
-		arg.RevokeKey,
-		arg.OperationID,
-	)
+	rows, err := q.db.Query(ctx, revokePolicyShares, arg.RootID, arg.PolicyAcceptanceID, arg.RevokeKey)
 	if err != nil {
 		return nil, err
 	}
@@ -723,24 +654,18 @@ func (q *Queries) RevokePolicySharing(ctx context.Context, arg RevokePolicyShari
 }
 
 const revokeShare = `-- name: RevokeShare :one
-UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1,last_operation_id=$4::uuid
-WHERE root_id=$1 AND id=$2 AND revoked_at IS NULL RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
+WHERE root_id=$1 AND id=$2 AND revoked_at IS NULL RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id
 `
 
 type RevokeShareParams struct {
-	RootID      pgtype.UUID
-	ID          pgtype.UUID
-	RevokeKey   pgtype.Text
-	OperationID pgtype.UUID
+	RootID    pgtype.UUID
+	ID        pgtype.UUID
+	RevokeKey pgtype.Text
 }
 
 func (q *Queries) RevokeShare(ctx context.Context, arg RevokeShareParams) (EvidenceShare, error) {
-	row := q.db.QueryRow(ctx, revokeShare,
-		arg.RootID,
-		arg.ID,
-		arg.RevokeKey,
-		arg.OperationID,
-	)
+	row := q.db.QueryRow(ctx, revokeShare, arg.RootID, arg.ID, arg.RevokeKey)
 	var i EvidenceShare
 	err := row.Scan(
 		&i.ID,
@@ -768,9 +693,6 @@ func (q *Queries) RevokeShare(ctx context.Context, arg RevokeShareParams) (Evide
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }
@@ -797,15 +719,14 @@ func (q *Queries) StopPolicySharing(ctx context.Context, arg StopPolicySharingPa
 }
 
 const transferShare = `-- name: TransferShare :one
-UPDATE evidence_share SET management=$1::jsonb, transfer_key=$2::text, transfer_digest=$3::bytea, revision=revision+1,last_operation_id=$4::uuid
-WHERE root_id=$5::uuid AND id=$6::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp() AND revision<1000000000 RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id, creating_operation_id, retire_by, last_operation_id
+UPDATE evidence_share SET management=$1::jsonb, transfer_key=$2::text, transfer_digest=$3::bytea, revision=revision+1
+WHERE root_id=$4::uuid AND id=$5::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp() AND revision<1000000000 RETURNING id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest, policy_acceptance_id
 `
 
 type TransferShareParams struct {
 	Management     []byte
 	TransferKey    string
 	TransferDigest []byte
-	OperationID    pgtype.UUID
 	RootID         pgtype.UUID
 	ID             pgtype.UUID
 }
@@ -816,7 +737,6 @@ func (q *Queries) TransferShare(ctx context.Context, arg TransferShareParams) (E
 		arg.Management,
 		arg.TransferKey,
 		arg.TransferDigest,
-		arg.OperationID,
 		arg.RootID,
 		arg.ID,
 	)
@@ -847,9 +767,6 @@ func (q *Queries) TransferShare(ctx context.Context, arg TransferShareParams) (E
 		&i.TransferKey,
 		&i.TransferDigest,
 		&i.PolicyAcceptanceID,
-		&i.CreatingOperationID,
-		&i.RetireBy,
-		&i.LastOperationID,
 	)
 	return i, err
 }

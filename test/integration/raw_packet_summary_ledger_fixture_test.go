@@ -58,13 +58,6 @@ func syntheticRawPacketSummaryRecording(t *testing.T, started, end time.Time) []
 	return append([]byte(nil), out...)
 }
 
-func refuseRetainedRawPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
-	t.Helper()
-	// The shared metadata fixture checks the same minimized-audit conservative
-	// rollback fence and all retained query/key/allocation snapshots at138.
-	refuseRetainedPacketSummaryDowngrade(t, f)
-}
-
 func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	t.Helper()
 	snapshot := func() string {

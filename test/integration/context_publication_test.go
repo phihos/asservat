@@ -37,12 +37,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	auditPool := poolFor("context_verification_audit_runtime", "synthetic-context-audit")
 	publishPool := poolFor("context_publish_runtime", "synthetic-context-publish")
 	readerPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
-	intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
 	defer verifierPool.Close()
 	defer auditPool.Close()
 	defer publishPool.Close()
 	defer readerPool.Close()
-	defer intentPool.Close()
 	for _, role := range []struct {
 		pool  *pgxpool.Pool
 		query string
@@ -112,7 +110,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		f.e = accepted.Expectation
 		var processing *processingTestFixture
 		if initialize {
-			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e, shareCohort...)
+			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
 			defer processing.Close()
 		}
 		for _, pair := range []struct {
@@ -124,25 +122,8 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 		}
-		// Sharing admissions acknowledge their own pair immediately. Other
-		// fixtures still exercise the initial unaudited publication refusal.
-		_, shareQualified := shareCaptures[s.a.RootID]
-		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize && !shareQualified {
-			t.Fatal("unaudited capture accepted for publication")
-		}
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
 			t.Fatal("reservation became evidence")
-		}
-		intents, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if qualified, ok := shareCaptures[s.a.RootID]; ok {
-			if _, err = qualified.publication.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
-				t.Fatal("actual share-qualified capture pair", shareFixtureFailureStage(err), err)
-			}
-		} else if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-			t.Fatal(err)
 		}
 		bound, err := store.ForCustody(f.e.Registration.StoreID)
 		if err != nil {
@@ -287,7 +268,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal("acknowledged native length mutable")
 			}
 			if !legacy {
-				qualifyNativeLengthRollbackRefusal(t, ctx, admin)
 			}
 		})
 	}
@@ -313,7 +293,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 
 	// Each version case starts with a new genuine published fixture and keeps the
 	// original short authority throughout corruption, denial and exact restore.
-	for _, kind := range []string{"capture", "verification"} {
+	for _, kind := range []string{"verification"} {
 		for _, version := range []string{"", "null"} {
 			label := version
 			if label == "" {
@@ -354,11 +334,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				}
 				positive()
 				withPublicationAuditVersion(t, ctx, admin, kind, f.e.CaptureUID, version, func() {
-					if kind == "capture" {
-						if _, err := f.verify.AcceptedContextForPublication(ctx, f.e.CaptureUID); err == nil {
-							t.Fatal("historical capture receipt became current acceptance")
-						}
-					}
 					if _, err := f.publish.PublishContext(ctx, f.e, f.copies, authority); err == nil {
 						t.Fatal("historical audit authorized publication replay")
 					}
@@ -609,7 +584,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		// Join the eight-way publication burst before the processing and native
 		// download fixtures need the same bounded server connections.
 		releasePermissionBurst()
-		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool, intentPool} {
+		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool} {
 			pool.Reset()
 		}
 	})
@@ -739,7 +714,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		// Release those idle connections through that owner; keep the server
 		// budget, per-pool ceiling and later eight-way race unchanged.
 		releasePermissionBurst()
-		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool, intentPool} {
+		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool} {
 			pool.Reset()
 		}
 	}
@@ -776,15 +751,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	releaseBurstConnections()
 	qualifyDownloadStop(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
-		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f.scenario, p
-	})
-	releaseBurstConnections()
-	qualifyDownloadStopLifecycle(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
 		f := setup(t)
 		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
 		if err != nil {

@@ -10,11 +10,11 @@ import (
 
 func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	const installation = "10000000-0000-4000-8000-000000000001"
-	wantHub := []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
-	want := append(slices.Clone(wantHub), "capture-cleanup", "capture-verifier", "capture-finalizer", "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
+	wantHub := []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
+	want := append(slices.Clone(wantHub), "connector-delivery", "connector-owner-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-verify", "key-acquisition")
 	// ADR-204 takes the next unused ordinals 86-88, ADR-205 89-91 and ADR-210
 	// 92; metadata uses 93 and execution 94; old facet ordinals remain retired.
-	ordinals := []int{95, 16, 20, 34, 40, 41, 42, 43, 44, 45, 52, 56, 24, 25, 26, 27, 65, 70, 71, 72, 73, 78, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
+	ordinals := []int{95, 20, 34, 40, 52, 56, 24, 25, 26, 27, 65, 70, 71, 72, 73, 78, 81, 86, 87, 89, 90, 91, 82, 83, 84, 88}
 	for n, purpose := range want {
 		ordinal, known := contracts.PublicRuntimeRoleOrdinal(purpose)
 		name, valid := PublicRuntimeRoleName(installation, purpose)
@@ -45,20 +45,6 @@ func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 		}
 		if _, known := publicRuntimeRoleGrants(unknown); known {
 			t.Fatalf("unimplemented purpose acquired grants: %s", unknown)
-		}
-	}
-}
-
-func TestShareEffectUsesOnlyCompiledHubCredential(t *testing.T) {
-	function := publicRuntimeGrant{"function", "begin_share_effect(uuid,uuid,text,text,text,text,uuid)", "", "EXECUTE"}
-	column := publicRuntimeGrant{"table", "evidence_share", "last_operation_id", "UPDATE"}
-	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
-		grants, ok := publicRuntimeRoleGrants(purpose)
-		if !ok {
-			t.Fatal("missing compiled role", purpose)
-		}
-		if slices.Contains(grants, function) != (purpose == "hub-runtime") || slices.Contains(grants, column) != (purpose == "hub-runtime") {
-			t.Fatal("share effects escaped the exact compiled hub grant", purpose)
 		}
 	}
 }
@@ -107,7 +93,6 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		publicRuntimeGrant{"table", "workload_name", "", "INSERT"})
 	resolution := append(slices.Clone(common),
 		publicRuntimeGrant{"table", "recording_save_group", "", "SELECT"},
-		publicRuntimeGrant{"function", "capture_preview_reason_copied(context_preview)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "recording_selection_set", "", "SELECT"},
 		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"},

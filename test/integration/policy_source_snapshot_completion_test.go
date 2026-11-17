@@ -13,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
@@ -104,13 +103,13 @@ type sourceSnapshotCompletionState struct {
 	Retention         *privacyapp.RetentionResolver
 }
 
-func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation)) {
+func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents captureapp.ContextAcceptedIntents, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation)) {
 	stage := startSourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents)
 	defer stage.Close()
 	completeSourceSnapshotCompletion(t, ctx, f, policy, snapshot, stage, beforeStored...)
 }
 
-func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication) *sourceSnapshotCompletionState {
+func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents captureapp.ContextAcceptedIntents) *sourceSnapshotCompletionState {
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
@@ -128,7 +127,7 @@ func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacit
 	if e.Snapshot == nil || e.Recording != nil {
 		t.Fatal("not an admitted existing-source snapshot")
 	}
-	if _, err := intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
+	if _, err := intents.AcceptedCaptureIntent(ctx, accepted.CaptureID); err != nil {
 		t.Fatal("audited exact snapshot intent", err)
 	}
 	hub := f.roles["hub-runtime"]
