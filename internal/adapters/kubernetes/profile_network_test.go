@@ -110,7 +110,11 @@ func TestProfileNetworkExactWholePodObservation(t *testing.T) {
 				if !got.Target.ObservedAt.Equal(start) || !got.Target.FreshUntil.Equal(start.Add(5*time.Second)) {
 					t.Fatal("nested resolver renewed original outer interval")
 				}
-				b, _ := json.Marshal(got)
+				// Target labels feed label-scoped retention by design; the
+				// shared namespace fixture's label is not container configuration.
+				unlabeled := got
+				unlabeled.Target.Labels = nil
+				b, _ := json.Marshal(unlabeled)
 				if strings.Contains(string(b), "MUST-NOT-LEAK") || strings.Contains(string(b), "sidecar") {
 					t.Fatal("container configuration leaked")
 				}

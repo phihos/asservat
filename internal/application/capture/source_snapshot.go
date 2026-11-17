@@ -172,7 +172,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		if selected.SourceTarget == nil || !observed.Valid(s.Now()) || observed.Original != *selected.SourceTarget {
 			return zero, planning.ContextPlan{}, value.ErrChanged
 		}
-		target = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+		target = observed.Original.Routing()
 	}
 	step = "target"
 	if target.Request != selection.Target {
@@ -321,7 +321,7 @@ func (s ContextInvestigation) resolveSourceSnapshot(ctx context.Context, selecte
 	if !observed.Valid(s.Now()) || observed.Original != *selected.SourceTarget {
 		return targets.PodResolution{}, nil, previewFailure("snapshot/source-observation", value.ErrChanged)
 	}
-	routing := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+	routing := observed.Original.Routing()
 	return routing, &observed, nil
 }
 func snapshotFactsTargetValid(f contextFacts, now time.Time) bool {

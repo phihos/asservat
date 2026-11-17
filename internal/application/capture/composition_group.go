@@ -49,7 +49,7 @@ func (s ContextInvestigation) childRetention(ctx context.Context, f contextFacts
 	if err != nil {
 		return f, previewFailure("facts/composition", err)
 	}
-	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: f.target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: requested, AnchorAt: anchor})
+	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: f.target.Target(), Labels: f.target.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: requested, AnchorAt: anchor})
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}

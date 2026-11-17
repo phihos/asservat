@@ -29,23 +29,39 @@ func TestMatchPoliciesClusterScopeLabelsAndBaseline(t *testing.T) {
 	base := scoped("base", PolicyScope{}, 86400)
 	here := scoped("here", PolicyScope{ClusterIDs: []string{matchCluster}}, 3600)
 	there := scoped("there", PolicyScope{ClusterIDs: []string{otherCluster}}, 600)
-	set, err := MatchPolicies([]ScopedPolicy{there, here, base}, target, stubRevision)
+	set, err := MatchPolicies([]ScopedPolicy{there, here, base}, target, nil, stubRevision)
 	if err != nil || len(set.Policies) != 2 || set.Policies[0].Revision.UID != "base" || set.Policies[1].Revision.UID != "here" || set.Revision.UID != "set" {
 		t.Fatal("cluster scope", set, err)
 	}
-	labeled := scoped("labeled", PolicyScope{NamespaceLabels: map[string]string{"team": "a"}}, 600)
-	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
-		t.Fatal("covering labeled policy admitted", err)
+	labeled := scoped("labeled", PolicyScope{NamespaceLabels: map[string]string{"team": "a"}, WorkloadLabels: map[string]string{"tier": "web"}}, 600)
+	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, nil, stubRevision); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("covering labeled policy admitted without observed labels", err)
+	}
+	for _, c := range []struct {
+		name   string
+		labels TargetLabels
+		match  bool
+	}{
+		{"all present", TargetLabels{Namespace: map[string]string{"team": "a", "env": "prod"}, Workload: map[string]string{"tier": "web"}}, true},
+		{"namespace value differs", TargetLabels{Namespace: map[string]string{"team": "b"}, Workload: map[string]string{"tier": "web"}}, false},
+		{"workload key missing", TargetLabels{Namespace: map[string]string{"team": "a"}}, false},
+		{"labels on the wrong object", TargetLabels{Namespace: map[string]string{"tier": "web"}, Workload: map[string]string{"team": "a"}}, false},
+		{"no labels", TargetLabels{}, false},
+	} {
+		set, err := MatchPolicies([]ScopedPolicy{base, labeled}, target, &c.labels, stubRevision)
+		if err != nil || (len(set.Policies) == 2) != c.match {
+			t.Fatal(c.name, set, err)
+		}
 	}
 	labeled.Scope.ClusterIDs = []string{otherCluster}
-	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, stubRevision); err != nil {
+	if _, err = MatchPolicies([]ScopedPolicy{base, labeled}, target, nil, stubRevision); err != nil {
 		t.Fatal("non-covering labeled policy refused", err)
 	}
-	if _, err = MatchPolicies([]ScopedPolicy{here}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+	if _, err = MatchPolicies([]ScopedPolicy{here}, target, nil, stubRevision); !errors.Is(err, ErrUnavailable) {
 		t.Fatal("no baseline admitted", err)
 	}
 	second := scoped("base2", PolicyScope{}, 86400)
-	if _, err = MatchPolicies([]ScopedPolicy{base, second}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+	if _, err = MatchPolicies([]ScopedPolicy{base, second}, target, nil, stubRevision); !errors.Is(err, ErrUnavailable) {
 		t.Fatal("two baselines admitted", err)
 	}
 }
@@ -70,6 +86,9 @@ func TestEvidenceMaximumAndEffect(t *testing.T) {
 	}
 	if e = Effect(scoped("b", PolicyScope{}, 86400)); e.Clusters == nil || len(e.Clusters) != 0 {
 		t.Fatal("baseline effect must cover all clusters", e)
+	}
+	if e = Effect(scoped("l", PolicyScope{WorkloadLabels: map[string]string{"tier": "web"}}, 600)); e.WorkloadLabels["tier"] != "web" || e.NamespaceLabels != nil {
+		t.Fatal("effect must carry the label selectors", e)
 	}
 }
 
@@ -110,11 +129,28 @@ func TestMatchPoliciesRefusesCoveringRejectedPolicy(t *testing.T) {
 	if !rejected.Valid() {
 		t.Fatal("rejected policy invalid")
 	}
-	if set, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); err != nil || len(set.Policies) != 1 {
+	if set, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, nil, stubRevision); err != nil || len(set.Policies) != 1 {
 		t.Fatal("rejected policy outside the scope blocked collection", err)
 	}
 	rejected.Scope = PolicyScope{}
-	if _, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, stubRevision); !errors.Is(err, ErrUnavailable) {
+	if _, err := MatchPolicies([]ScopedPolicy{base, rejected}, target, nil, stubRevision); !errors.Is(err, ErrUnavailable) {
 		t.Fatal("covering rejected policy admitted", err)
+	}
+}
+
+func TestLabelsTextRoundTrip(t *testing.T) {
+	l := &TargetLabels{Namespace: map[string]string{"team": "shop", "example.com/env": ""}, Workload: map[string]string{"tier": "web"}}
+	text := EncodeLabels(l)
+	got := DecodeLabels(text)
+	if got == nil || got.Namespace["team"] != "shop" || got.Namespace["example.com/env"] != "" || len(got.Namespace) != 2 || got.Workload["tier"] != "web" || len(got.Workload) != 1 || EncodeLabels(got) != text {
+		t.Fatal("round trip", text, got)
+	}
+	if e := DecodeLabels(EncodeLabels(&TargetLabels{})); e == nil || len(e.Namespace)+len(e.Workload) != 0 {
+		t.Fatal("observed empty labels must stay observed", e)
+	}
+	for _, bad := range []string{"", "n:team=shop", "labels,x:team=shop", "labels,n:=v", "labels,n:team"} {
+		if DecodeLabels(bad) != nil {
+			t.Fatal("decoded", bad)
+		}
 	}
 }

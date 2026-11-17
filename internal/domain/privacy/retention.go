@@ -47,8 +47,10 @@ type PolicySet struct {
 // Input classifications are derived by the qualified producer, never supplied
 // as a user claim that arbitrary data is nonpersonal or innocuous context.
 type Input struct {
-	ControlKind                string `json:",omitempty"` // "case-metadata" only for protected parameter/control records
-	Target                     authorization.Target
+	ControlKind string `json:",omitempty"` // "case-metadata" only for protected parameter/control records
+	Target      authorization.Target
+	// Labels select label-scoped policies; nil when not observed.
+	Labels                     *TargetLabels `json:",omitempty"`
 	PrivacyClass, EvidenceType string
 	RequestedSeconds           int64 // zero selects the lowest applicable default
 	AnchorAt                   time.Time

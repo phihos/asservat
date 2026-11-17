@@ -58,6 +58,77 @@ func (s PolicyScope) Valid() bool {
 	return true
 }
 
+// TargetLabels are the namespace and workload labels read with a target's
+// resolution. The workload is the Deployment or StatefulSet, or the Pod
+// itself for a bare Pod. nil means the labels were not observed.
+type TargetLabels struct {
+	Namespace map[string]string `json:"namespace,omitempty"`
+	Workload  map[string]string `json:"workload,omitempty"`
+}
+
+// EncodeLabels is the canonical text of l ("" for nil): sorted
+// "n:key=value" and "w:key=value" entries joined by ",". Kubernetes label
+// keys and values cannot contain "=" or ",", so the text is unambiguous.
+func EncodeLabels(l *TargetLabels) string {
+	if l == nil {
+		return ""
+	}
+	entries := []string{"labels"}
+	for prefix, labels := range map[string]map[string]string{"n:": l.Namespace, "w:": l.Workload} {
+		for k, v := range labels {
+			entries = append(entries, prefix+k+"="+v)
+		}
+	}
+	slices.Sort(entries)
+	return strings.Join(entries, ",")
+}
+
+// DecodeLabels reverses EncodeLabels; text it cannot read is nil (labels
+// not observed), which refuses collection under a covering labeled policy.
+func DecodeLabels(text string) *TargetLabels {
+	entries := strings.Split(text, ",")
+	if !slices.Contains(entries, "labels") {
+		return nil
+	}
+	out := &TargetLabels{}
+	for _, e := range entries {
+		if e == "labels" {
+			continue
+		}
+		k, v, ok := strings.Cut(e[min(2, len(e)):], "=")
+		var into *map[string]string
+		switch {
+		case strings.HasPrefix(e, "n:"):
+			into = &out.Namespace
+		case strings.HasPrefix(e, "w:"):
+			into = &out.Workload
+		}
+		if !ok || into == nil || k == "" {
+			return nil
+		}
+		if *into == nil {
+			*into = map[string]string{}
+		}
+		(*into)[k] = v
+	}
+	return out
+}
+
+// Selects applies matchLabels semantics: every selector key must be present
+// with its value. An unlabeled scope selects every target.
+func (s PolicyScope) Selects(l TargetLabels) bool {
+	return subset(s.NamespaceLabels, l.Namespace) && subset(s.WorkloadLabels, l.Workload)
+}
+
+func subset(selector, labels map[string]string) bool {
+	for k, v := range selector {
+		if got, ok := labels[k]; !ok || got != v {
+			return false
+		}
+	}
+	return true
+}
+
 // Covers reports whether the policy's cluster scope includes cluster.
 func (s PolicyScope) Covers(cluster string) bool {
 	return len(s.ClusterIDs) == 0 || slices.Contains(s.ClusterIDs, cluster)
@@ -71,12 +142,12 @@ func (p ScopedPolicy) Valid() bool {
 }
 
 // MatchPolicies selects the policies of the current set that apply to the
-// target: every policy whose cluster scope covers it. Label selectors need
-// namespace and workload labels that no reader supplies yet, so a covering
-// labeled policy refuses new collection, as does a covering rejected policy
-// (it may be stricter than the others). Exactly one baseline is required.
+// target: every policy whose cluster scope covers it and whose label
+// selectors match labels. A covering labeled policy refuses new collection
+// when labels is nil (not observed), as does a covering rejected policy (it
+// may be stricter than the others). Exactly one baseline is required.
 // revision identifies the matched set; the caller digests it.
-func MatchPolicies(policies []ScopedPolicy, t authorization.Target, revision func([]Policy) identity.Revision) (PolicySet, error) {
+func MatchPolicies(policies []ScopedPolicy, t authorization.Target, labels *TargetLabels, revision func([]Policy) identity.Revision) (PolicySet, error) {
 	out := PolicySet{Target: t}
 	if !t.Valid() {
 		return out, ErrInvalid
@@ -91,8 +162,11 @@ func MatchPolicies(policies []ScopedPolicy, t authorization.Target, revision fun
 		if !p.Scope.Covers(t.ClusterID) {
 			continue
 		}
-		if p.Scope.Labeled() || p.Rejected != "" {
+		if p.Rejected != "" || p.Scope.Labeled() && labels == nil {
 			return out, ErrUnavailable
+		}
+		if p.Scope.Labeled() && !p.Scope.Selects(*labels) {
+			continue
 		}
 		if p.Policy.Baseline {
 			baselines++

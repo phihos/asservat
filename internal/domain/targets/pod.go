@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
 var (
@@ -48,6 +49,10 @@ type PodResolution struct {
 	// EvidenceDisabled marks a namespace that capacity does not cover; new
 	// collection there is refused (ErrEvidenceDisabled), reads are not.
 	EvidenceDisabled bool `json:",omitempty"`
+	// Labels are the namespace and workload labels read with this
+	// resolution; label-scoped retention policies match them. nil from a
+	// resolver that reads none.
+	Labels *privacy.TargetLabels `json:",omitempty"`
 }
 
 func (p PodResolution) Target() authorization.Target {

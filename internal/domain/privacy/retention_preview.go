@@ -18,20 +18,24 @@ import (
 // affects nothing.
 
 // PolicyEffect is the parameter of the SQL function retention_policy_effect:
-// the cluster scope (empty for all clusters), the evidence maximum per native
-// type, the case-metadata maximum and the deletion budget.
+// the cluster scope (empty for all clusters), the label selectors, the
+// evidence maximum per native type, the case-metadata maximum and the
+// deletion budget.
 type PolicyEffect struct {
-	Clusters    []string         `json:"clusters"`
-	Maxima      map[string]int64 `json:"maxima"`
-	CaseMaximum int64            `json:"caseMaximum"`
-	Budget      int64            `json:"budget"`
+	Clusters        []string          `json:"clusters"`
+	NamespaceLabels map[string]string `json:"namespaceLabels,omitempty"`
+	WorkloadLabels  map[string]string `json:"workloadLabels,omitempty"`
+	Maxima          map[string]int64  `json:"maxima"`
+	CaseMaximum     int64             `json:"caseMaximum"`
+	Budget          int64             `json:"budget"`
 }
 
-// Effect returns the stored-deadline effect of one policy. A labeled policy
-// applies to its whole cluster scope: no artifact records namespace or
-// workload labels, and a privacy maximum may only err towards earlier.
+// Effect returns the stored-deadline effect of one policy. SQL matches its
+// label selectors against the labels recorded at admission; an artifact
+// without recorded labels takes every policy of its cluster scope, since a
+// privacy maximum may only err towards earlier deletion.
 func Effect(p ScopedPolicy) PolicyEffect {
-	out := PolicyEffect{Clusters: slices.Clone(p.Scope.ClusterIDs), Maxima: map[string]int64{}, CaseMaximum: CaseMetadataPolicy(p).EvidenceMaximum("other"), Budget: p.Policy.DeletionBudgetSeconds}
+	out := PolicyEffect{Clusters: slices.Clone(p.Scope.ClusterIDs), NamespaceLabels: p.Scope.NamespaceLabels, WorkloadLabels: p.Scope.WorkloadLabels, Maxima: map[string]int64{}, CaseMaximum: CaseMetadataPolicy(p).EvidenceMaximum("other"), Budget: p.Policy.DeletionBudgetSeconds}
 	if out.Clusters == nil {
 		out.Clusters = []string{}
 	}

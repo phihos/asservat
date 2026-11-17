@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	value "asservat.local/asservat/internal/domain/targets"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +58,7 @@ type targetObject struct {
 	ref            cfg.Resource
 	owner          *meta.OwnerReference
 	node, bootID   string
+	labels         map[string]string
 	packetEligible bool
 }
 
@@ -128,6 +130,9 @@ func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, ui
 			out.owner = &copy
 		}
 	}
+	if v := metadata["labels"]; v != nil && json.Unmarshal(v, &out.labels) != nil {
+		return out, value.ErrUnavailable
+	}
 	out.ref = ref
 	if kind == "Pod" {
 		var spec map[string]json.RawMessage
@@ -162,15 +167,16 @@ func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, ui
 // deleted and reports whether capacity covers it: kube-* system namespaces,
 // the release namespace and namespaces labelled asservat.io/evidence:
 // disabled take no new evidence. Reads of existing evidence still resolve.
-func (c *PodTargets) targetNamespace(ctx context.Context, ref cfg.NamespaceRef) (bool, error) {
+// It also returns the namespace labels for label-scoped retention.
+func (c *PodTargets) targetNamespace(ctx context.Context, ref cfg.NamespaceRef) (bool, map[string]string, error) {
 	ns, err := c.client.namespace(ctx, ref)
 	if err != nil {
-		return false, targetReadError(err)
+		return false, nil, targetReadError(err)
 	}
 	if ns.Deleting {
-		return false, value.ErrChanged
+		return false, nil, value.ErrChanged
 	}
-	return strings.HasPrefix(ns.Name, "kube-") || ns.Name == c.client.control.Name || ns.Labels["asservat.io/evidence"] == "disabled", nil
+	return strings.HasPrefix(ns.Name, "kube-") || ns.Name == c.client.control.Name || ns.Labels["asservat.io/evidence"] == "disabled", ns.Labels, nil
 }
 
 func targetReadError(err error) error {
@@ -186,7 +192,11 @@ func targetReadError(err error) error {
 func ownerMatches(owner *meta.OwnerReference, kind, name, uid string) bool {
 	return owner != nil && owner.APIVersion == "apps/v1" && owner.Kind == kind && owner.Name == name && string(owner.UID) == uid
 }
-func (c *PodTargets) chain(ctx context.Context, r value.Request, pod targetObject) (string, error) {
+
+// chain checks the Pod's owner chain up to the requested workload and
+// returns the workload's resourceVersion and labels (the Pod's own for a
+// bare Pod), which label-scoped retention policies match.
+func (c *PodTargets) chain(ctx context.Context, r value.Request, pod targetObject) (string, map[string]string, error) {
 	base := "/apis/apps/v1/namespaces/" + r.Namespace.Name + "/"
 	root := r.Workload
 	switch root.Kind {
@@ -194,31 +204,31 @@ func (c *PodTargets) chain(ctx context.Context, r value.Request, pod targetObjec
 		// Do not assign an owned pod its own workload budget or silently bypass a
 		// Deployment/StatefulSet grant. Resolve it under its actual supported root.
 		if pod.owner != nil {
-			return "", value.ErrUnsupported
+			return "", nil, value.ErrUnsupported
 		}
-		return pod.ref.ResourceVersion, nil
+		return pod.ref.ResourceVersion, pod.labels, nil
 	case "StatefulSet":
 		if !ownerMatches(pod.owner, root.Kind, root.Name, root.UID) {
-			return "", value.ErrChanged
+			return "", nil, value.ErrChanged
 		}
 		object, err := c.object(ctx, base+"statefulsets/"+root.Name, root.Kind, r.Namespace.Name, root.Name, root.UID)
-		return object.ref.ResourceVersion, err
+		return object.ref.ResourceVersion, object.labels, err
 	case "Deployment":
 		owner := pod.owner
 		if owner == nil || owner.Kind != "ReplicaSet" || owner.APIVersion != "apps/v1" {
-			return "", value.ErrChanged
+			return "", nil, value.ErrChanged
 		}
 		rs, err := c.object(ctx, base+"replicasets/"+owner.Name, "ReplicaSet", r.Namespace.Name, owner.Name, string(owner.UID))
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		if !ownerMatches(rs.owner, root.Kind, root.Name, root.UID) {
-			return "", value.ErrChanged
+			return "", nil, value.ErrChanged
 		}
 		object, err := c.object(ctx, base+"deployments/"+root.Name, root.Kind, r.Namespace.Name, root.Name, root.UID)
-		return object.ref.ResourceVersion, err
+		return object.ref.ResourceVersion, object.labels, err
 	}
-	return "", value.ErrInvalid
+	return "", nil, value.ErrInvalid
 }
 func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.PodResolution, error) {
 	var out value.PodResolution
@@ -234,7 +244,7 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	if _, err := c.targetNamespace(ctx, r.Namespace); err != nil {
+	if _, _, err := c.targetNamespace(ctx, r.Namespace); err != nil {
 		return out, err
 	}
 	path := "/api/v1/namespaces/" + r.Namespace.Name + "/pods/" + r.PodName
@@ -248,7 +258,7 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	if len(validation.IsDNS1123Subdomain(first.node)) != 0 {
 		return out, value.ErrChanged
 	}
-	if _, err = c.chain(ctx, r, first); err != nil {
+	if _, _, err = c.chain(ctx, r, first); err != nil {
 		return out, err
 	}
 	node, err := c.object(ctx, "/api/v1/nodes/"+first.node, "Node", "", first.node, "")
@@ -262,7 +272,7 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	if last.node != first.node || (last.owner == nil) != (first.owner == nil) || (last.owner != nil && *last.owner.Controller && !ownerMatches(last.owner, first.owner.Kind, first.owner.Name, string(first.owner.UID))) {
 		return out, value.ErrChanged
 	}
-	workloadRV, err := c.chain(ctx, r, last)
+	workloadRV, workloadLabels, err := c.chain(ctx, r, last)
 	if err != nil {
 		return out, err
 	}
@@ -273,12 +283,13 @@ func (c *PodTargets) ResolvePod(ctx context.Context, r value.Request) (value.Pod
 	if nodeAgain.bootID != node.bootID {
 		return out, value.ErrChanged
 	}
-	disabled, err := c.targetNamespace(ctx, r.Namespace)
+	disabled, namespaceLabels, err := c.targetNamespace(ctx, r.Namespace)
 	if err != nil {
 		return out, err
 	}
 	out = value.PodResolution{Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID, NodeName: last.node}, NodeUID: node.ref.UID, NodeBootID: node.bootID, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: workloadRV, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
 	out.EvidenceDisabled = disabled
+	out.Labels = &privacy.TargetLabels{Namespace: namespaceLabels, Workload: workloadLabels}
 	if last.owner != nil {
 		out.Pin.ControllerUID = string(last.owner.UID)
 	}

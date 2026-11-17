@@ -190,7 +190,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if err != nil {
 		return zero, previewFailure("composition", err)
 	}
-	r, err := s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: created})
+	r, err := s.Retention.Resolve(ctx, privacy.Input{Target: t, Labels: target.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: created})
 	if err != nil {
 		return zero, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}

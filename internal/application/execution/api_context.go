@@ -167,7 +167,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 			return out, nil, apiCheckStep{resolveStep, value.ErrDenied}
 		}
 		snapshotObserved = &observed
-		t = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+		t = observed.Original.Routing()
 	} else if argumentRecording(w) {
 		resolveStep = "ResolveArgumentSource"
 		resolver, ok := s.Targets.(interface {
@@ -298,7 +298,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if snapshot != nil {
 		evidenceType = e.Type().EvidenceType
 	}
-	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
+	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), Labels: t.Labels, PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
 		return out, nil, apiCheckStep{"Retention", err}
 	}

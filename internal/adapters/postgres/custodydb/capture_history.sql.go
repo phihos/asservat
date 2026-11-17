@@ -12,7 +12,7 @@ import (
 )
 
 const listCaptureHistory = `-- name: ListCaptureHistory :many
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason FROM context_capture c
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason, c.target_labels FROM context_capture c
 WHERE c.root_id=$1 AND c.history_cluster_id=$2 AND c.history_namespace_uid=$3::text AND c.history_workload_uid=$4::text
  AND c.history_origin=ANY($5::text[])
  AND c.created_at<=$6::timestamptz
@@ -99,6 +99,7 @@ func (q *Queries) ListCaptureHistory(ctx context.Context, arg ListCaptureHistory
 			&i.GroupID,
 			&i.GroupOrdinal,
 			&i.Reason,
+			&i.TargetLabels,
 		); err != nil {
 			return nil, err
 		}
@@ -158,7 +159,7 @@ func (q *Queries) ReadAPIExecutions(ctx context.Context, arg ReadAPIExecutionsPa
 }
 
 const readCaptureHistoryFacts = `-- name: ReadCaptureHistoryFacts :many
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason,a.state AS custody_state,a.request_digest,
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason, c.target_labels,a.state AS custody_state,a.request_digest,
  a.copies_digest,a.effective_expires_at,a.effective_delete_by,
  v.capture_id AS verified_capture_id,v.root_id AS verified_root_id,v.verified_at,
  v.expectation_digest,v.copies_digest AS verified_copies_digest,v.intent_digest AS verified_intent_digest,
@@ -261,6 +262,7 @@ func (q *Queries) ReadCaptureHistoryFacts(ctx context.Context, arg ReadCaptureHi
 			&i.ContextCapture.GroupID,
 			&i.ContextCapture.GroupOrdinal,
 			&i.ContextCapture.Reason,
+			&i.ContextCapture.TargetLabels,
 			&i.CustodyState,
 			&i.RequestDigest,
 			&i.CopiesDigest,
@@ -299,7 +301,7 @@ func (q *Queries) ReadCaptureHistoryFacts(ctx context.Context, arg ReadCaptureHi
 }
 
 const readHistoryCapture = `-- name: ReadHistoryCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason FROM context_capture WHERE root_id=$1 AND id=$2 AND history_workload_uid IS NOT NULL
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason, target_labels FROM context_capture WHERE root_id=$1 AND id=$2 AND history_workload_uid IS NOT NULL
 `
 
 type ReadHistoryCaptureParams struct {
@@ -351,6 +353,7 @@ func (q *Queries) ReadHistoryCapture(ctx context.Context, arg ReadHistoryCapture
 		&i.GroupID,
 		&i.GroupOrdinal,
 		&i.Reason,
+		&i.TargetLabels,
 	)
 	return i, err
 }

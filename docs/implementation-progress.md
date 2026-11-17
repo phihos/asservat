@@ -45,10 +45,14 @@ the key-service/publisher catalog polling loops are gone. Verified: focused cust
 (`^d`, retention, deletion, publication, history: 98 subtests pass), goose
 up/down-to 125/up on PostgreSQL 17, `make go-check pcap-check` and the CI
 gate set.
+Label selectors (migration 00198): target resolution reads the namespace and
+workload labels, `MatchPolicies` applies matchLabels, and admission records the
+labels on `context_capture.target_labels` so policy events and the admission
+trigger shorten only matching artifacts. Policy recorders and saved windows
+use the labels resolved at arming. Rows without recorded labels (older rows)
+take a labeled policy cluster-wide.
 Open: policy status writes (no RBAC or status code yet; the log line is the
-signal), label selectors (no label reader; a labeled policy refuses collection in
-its clusters and applies cluster-wide to existing evidence), connector-pushed
-local policies, one-step publication.
+signal), connector-pushed local policies, one-step publication.
 
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
 

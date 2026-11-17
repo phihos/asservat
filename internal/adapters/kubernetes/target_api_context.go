@@ -6,6 +6,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	value "asservat.local/asservat/internal/domain/targets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -31,7 +32,7 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
-	if _, err := c.targetNamespace(ctx, r.Namespace); err != nil {
+	if _, _, err := c.targetNamespace(ctx, r.Namespace); err != nil {
 		return value.PodResolution{}, "", err
 	}
 	path := "/api/v1/namespaces/" + r.Namespace.Name + "/pods/" + r.PodName
@@ -39,7 +40,7 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	if err != nil {
 		return value.PodResolution{}, "", err
 	}
-	if _, err = c.chain(ctx, r, first); err != nil {
+	if _, _, err = c.chain(ctx, r, first); err != nil {
 		return value.PodResolution{}, "", err
 	}
 	last, err := c.object(ctx, path, "Pod", r.Namespace.Name, r.PodName, r.PodUID)
@@ -49,16 +50,17 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	if (last.owner == nil) != (first.owner == nil) || (last.owner != nil && !ownerMatches(last.owner, first.owner.Kind, first.owner.Name, string(first.owner.UID))) {
 		return value.PodResolution{}, "", value.ErrChanged
 	}
-	rv, err := c.chain(ctx, r, last)
+	rv, workloadLabels, err := c.chain(ctx, r, last)
 	if err != nil {
 		return value.PodResolution{}, "", err
 	}
-	disabled, err := c.targetNamespace(ctx, r.Namespace)
+	disabled, namespaceLabels, err := c.targetNamespace(ctx, r.Namespace)
 	if err != nil {
 		return value.PodResolution{}, "", err
 	}
 	out := value.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID}, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(identity.AuthorityRecheckInterval)}
 	out.EvidenceDisabled = disabled
+	out.Labels = &privacy.TargetLabels{Namespace: namespaceLabels, Workload: workloadLabels}
 	if last.owner != nil {
 		out.Pin.ControllerUID = string(last.owner.UID)
 	}
