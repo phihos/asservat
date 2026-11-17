@@ -114,10 +114,15 @@ func TestPlanAndSummarizePreview(t *testing.T) {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	out := SummarizePreview([]PreviewRow{
 		{ClusterID: matchCluster, NativeType: artifact.PodStatusArtifact, Scanned: 3, Affected: 2, ReadClosed: 1, DeletionDue: 1, EarliestExpiresAt: now, EarliestDeleteBy: now.Add(time.Minute)},
-		{ClusterID: matchCluster, CaseMetadata: true, Scanned: 1},
+		{ClusterID: matchCluster, CaseMetadata: true, Scanned: 1, Unknown: 1},
 	}, skipped, true, now)
-	if out.Scanned != 4 || out.Affected != 2 || out.ReadClosed != 1 || out.DeletionDue != 1 || !out.EarliestExpiresAt.Equal(now) || len(out.Groups) != 2 || out.Groups[0].EvidenceType != "context" || out.Groups[1].EvidenceType != "other" || !out.BaselineChanged || out.Complete() {
+	if out.Scanned != 4 || out.Affected != 2 || out.Unknown != 1 || out.Groups[1].Unknown != 1 || out.ReadClosed != 1 || out.DeletionDue != 1 || !out.EarliestExpiresAt.Equal(now) || len(out.Groups) != 2 || out.Groups[0].EvidenceType != "context" || out.Groups[1].EvidenceType != "other" || !out.BaselineChanged || out.Complete() {
 		t.Fatal("summary", out)
+	}
+	// Unknown rows alone leave the preview incomplete (ADR-240 §5).
+	onlyUnknown := SummarizePreview([]PreviewRow{{ClusterID: matchCluster, NativeType: artifact.PodStatusArtifact, Scanned: 2, Unknown: 2}}, nil, false, now)
+	if onlyUnknown.Unknown != 2 || onlyUnknown.Complete() {
+		t.Fatal("unknown rows reported complete", onlyUnknown)
 	}
 }
 
