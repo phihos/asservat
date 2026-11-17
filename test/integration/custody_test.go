@@ -615,6 +615,7 @@ func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *
 	}
 	accepted(true, "current")
 	// A newer database after an expand migration still serves this binary.
+	floor(head)
 	exec("INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1)
 	accepted(true, "newer expand-only database (image-only rollback)")
 	floor(head + 1)
