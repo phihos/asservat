@@ -106,7 +106,7 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 		}
 		return response
 	}
-	for _, query := range []string{"", "?capture_id=x", "?grant_id=00000000-0000-4000-8000-000000000030", "?capture_id=00000000-0000-4000-8000-000000000030&capture_id=00000000-0000-4000-8000-000000000030"} {
+	for _, query := range []string{"", "?capture_id=x", "?other_id=00000000-0000-4000-8000-000000000030", "?capture_id=00000000-0000-4000-8000-000000000030&capture_id=00000000-0000-4000-8000-000000000030"} {
 		if response := get(query); response.StatusCode != 400 {
 			t.Fatal("accepted invalid query", query, response.StatusCode)
 		}
@@ -164,5 +164,14 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	changes.Publish("00000000-0000-4000-8000-000000000030")
 	if e := next(); e.Type != "accessLost" {
 		t.Fatal("decision without a capture", e)
+	}
+}
+
+func TestEventReadNamesTheStatusOperation(t *testing.T) {
+	id := "00000000-0000-4000-8000-000000000030"
+	for kind, want := range map[string]string{"capture": `get_capture {"capture_id":"` + id + `"}`, "grant": `get_grant {"grant_id":"` + id + `"}`, "download": `download_artifact {"action":"status","download_id":"` + id + `"}`} {
+		if name, input := eventRead(kind, id); name+" "+string(input) != want {
+			t.Errorf("%s: %s %s", kind, name, input)
+		}
 	}
 }

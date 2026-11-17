@@ -15,8 +15,9 @@ import (
 // EventsPath is the console's one status stream (REQ-INT-003).
 const EventsPath = "/api/v1/events"
 
-// EventsHandler serves GET /api/v1/events as Server-Sent Events. Each event
-// is the unchanged get_capture result, read through the same audited
+// EventsHandler serves GET /api/v1/events as Server-Sent Events for the
+// listed captures, grants and downloads. Each event is the unchanged
+// get_capture, get_grant or download_artifact status result, read through the same audited
 // operation as a POST, so every event is authorized and audited like one
 // status read. A denied read after a change ends the stream with
 // accessLost.
@@ -59,18 +60,24 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query, err := url.ParseQuery(r.URL.RawQuery)
-	ids := query["capture_id"]
-	if err != nil || len(query) != 1 || len(ids) == 0 {
+	var ids []string
+	kinds := map[string]string{}
+	for key, values := range query {
+		kind, known := eventKinds[key]
+		if !known {
+			err = url.EscapeError(key)
+		}
+		for _, id := range values {
+			if _, seen := kinds[id]; seen || !authorization.UUID(id) {
+				err = url.EscapeError(id)
+			}
+			kinds[id] = kind
+			ids = append(ids, id)
+		}
+	}
+	if err != nil || len(ids) == 0 {
 		sessionProblem(w, 400)
 		return
-	}
-	seen := map[string]bool{}
-	for _, id := range ids {
-		if !authorization.UUID(id) || seen[id] {
-			sessionProblem(w, 400)
-			return
-		}
-		seen[id] = true
 	}
 	_, view, err := h.sessions.AuthenticateCurrentWithin(w, r, 5*time.Second)
 	if err != nil {
@@ -88,7 +95,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// A capture that is not visible yet is waited for: an approval may still
 	// start it. Its grant decision notifies the same ID (migration 00201).
 	for _, id := range ids {
-		if !h.send(w, r, control, id, true) {
+		if !h.send(w, r, control, kinds[id], id, true) {
 			return
 		}
 	}
@@ -121,23 +128,41 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		changed := subscription.Take()
 		_, all := changed[""]
 		for _, id := range ids {
-			if _, ok := changed[id]; (all || ok) && !h.send(w, r, control, id, false) {
+			if _, ok := changed[id]; (all || ok) && !h.send(w, r, control, kinds[id], id, false) {
 				return
 			}
 		}
 	}
 }
 
-// send writes the current state of one capture; false ends the stream.
-func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *http.ResponseController, id string, initial bool) bool {
-	ctx, cancel := context.WithTimeout(r.Context(), audit.OperationRequestWindow("get_capture"))
+// eventKinds maps each query parameter to its StatusEvent type.
+var eventKinds = map[string]string{"capture_id": "capture", "grant_id": "grant", "download_id": "download"}
+
+// eventRead is the status operation and input that read one ID.
+func eventRead(kind, id string) (string, []byte) {
+	var input []byte
+	switch kind {
+	case "grant":
+		input, _ = json.Marshal(map[string]string{"grant_id": id})
+		return "get_grant", input
+	case "download":
+		input, _ = json.Marshal(map[string]string{"action": "status", "download_id": id})
+		return "download_artifact", input
+	}
+	input, _ = json.Marshal(map[string]string{"capture_id": id})
+	return "get_capture", input
+}
+
+// send writes the current state of one ID; false ends the stream.
+func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *http.ResponseController, kind, id string, initial bool) bool {
+	name, input := eventRead(kind, id)
+	ctx, cancel := context.WithTimeout(r.Context(), audit.OperationRequestWindow(name))
 	defer cancel()
 	request := r.WithContext(ctx)
 	event := statusEvent{Type: "accessLost", ID: id}
-	current, _, err := h.sessions.AuthenticateCurrentWithin(w, request, audit.OperationRequestWindow("get_capture"))
+	current, _, err := h.sessions.AuthenticateCurrentWithin(w, request, audit.OperationRequestWindow(name))
 	if err == nil {
-		input, _ := json.Marshal(map[string]string{"capture_id": id})
-		out, callErr := h.operations.Call(ctx, current, "get_capture", input)
+		out, callErr := h.operations.Call(ctx, current, name, input)
 		defer func() { _ = out.Close(ctx); clear(out.Body) }()
 		if callErr != nil || out.CheckDisclosure(ctx) != nil || !time.Now().Before(out.ValidUntil) {
 			h.report("call")
@@ -154,7 +179,7 @@ func (h *EventsHandler) send(w http.ResponseWriter, r *http.Request, control *ht
 			return false
 		}
 		if envelope.Status == "ok" {
-			event = statusEvent{Type: "capture", ID: id, Revision: envelope.Data.Revision, Result: out.Body}
+			event = statusEvent{Type: kind, ID: id, Revision: envelope.Data.Revision, Result: out.Body}
 		} else if initial {
 			return true
 		}
