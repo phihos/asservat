@@ -8,12 +8,12 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "default": true
         }
       },
-      "required": [
-        "enabled"
-      ]
+      "required": [],
+      "description": "Defaults to true for a policy with ongoing actions (invalid without one). Shown on the policy grant review; not part of the collection execution digest (REQ-SAV-001)."
     },
     "policyRef": {
       "type": "object",

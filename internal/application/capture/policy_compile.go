@@ -325,12 +325,20 @@ func compilePolicy(ctx context.Context, catalogTarget targets.Request, spec []by
 			}
 		}
 	}
+	// Saves default on for a policy with an ongoing recording.
+	ongoing := out.Recorder != nil && out.Recorder.Action.ExecutionMode == "ongoing"
+	out.RecordingSaves = ongoing
 	if raw, present := s["recordingSaves"]; present {
-		var saves struct{ Enabled bool }
-		if json.Unmarshal(raw, &saves) != nil || saves.Enabled && (out.Recorder == nil || out.Recorder.Action.ExecutionMode != "ongoing") {
+		saves := struct{ Enabled *bool }{}
+		if json.Unmarshal(raw, &saves) != nil {
+			return reject(".recordingSaves", "invalid recording save setting")
+		}
+		if saves.Enabled != nil {
+			out.RecordingSaves = *saves.Enabled
+		}
+		if !ongoing && (saves.Enabled == nil || *saves.Enabled) {
 			return reject(".recordingSaves", "no ongoing recording exists for a context diagnostic")
 		}
-		out.RecordingSaves = saves.Enabled
 	}
 	if out.IncidentPods > 1 && !out.RecordingSaves {
 		return reject(".target.maxPods", "multiple incident Pods require an enabled existing-recording Save")
