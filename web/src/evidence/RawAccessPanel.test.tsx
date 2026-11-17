@@ -25,7 +25,7 @@ it('requests selected whole files with exact sizes and reuses an uncertain reque
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   await screen.findByRole('alert');
   const input = call.mock.calls[0][1];
-  expect(input).toEqual({ case_id: id(2), artifact_digests: [artifact(3).digest, artifact(4).digest], operations: ['download_artifact'], reason: 'Inspect incident', max_bytes: 1536, expires_in_seconds: 3600, idempotency_key: 'same-key' });
+  expect(input).toEqual({ case_id: id(2), artifact_digests: [artifact(3).digest, artifact(4).digest], operations: ['download_artifact'], reason: 'Inspect incident', max_bytes: 1536, idempotency_key: 'same-key' });
   expect(validInput_request_raw_access(input)).toBe(true);
   expect(screen.getByRole('group')).toHaveProperty('disabled', true);
   fireEvent.click(screen.getByRole('button', { name: 'Retry same approval request' }));
@@ -78,13 +78,14 @@ it('unlocks a definitive validated refusal and submits edited values with a new 
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   expect((await screen.findByRole('alert')).textContent).toBe('Choose a shorter approval period.');
   expect(screen.getByRole('group')).toHaveProperty('disabled', false);
-  fireEvent.change(screen.getByLabelText('Approval period in seconds'), { target: { value: '300' } });
+  fireEvent.change(screen.getByLabelText('Approval period in seconds (empty: until the evidence access ends)'), { target: { value: '300' } });
   fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect selected incident' } });
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   await screen.findByRole('link', { name: 'Review download approval' });
   const first = JSON.parse(fetch.mock.calls[0][1].body);
   const second = JSON.parse(fetch.mock.calls[1][1].body);
-  expect(first).toMatchObject({ idempotency_key: 'first-key', expires_in_seconds: 3600, reason: 'Inspect incident' });
+  expect(first).toMatchObject({ idempotency_key: 'first-key', reason: 'Inspect incident' });
+  expect(first).not.toHaveProperty('expires_in_seconds');
   expect(second).toEqual({ ...first, idempotency_key: 'edited-key', expires_in_seconds: 300, reason: 'Inspect selected incident' });
   expect(fetch.mock.calls[1][1].headers['Idempotency-Key']).toBe('edited-key');
   expect(newID).toHaveBeenCalledTimes(2);

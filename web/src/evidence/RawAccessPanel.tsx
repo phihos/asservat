@@ -5,7 +5,6 @@ import { operations, type Operations, type Input, type Data } from '../approvals
 import { operationMessage } from '../capture/http';
 import type { Artifact } from './http';
 
-const maximumBytes = 1099511627776;
 const count = (value: number) => new Intl.NumberFormat().format(value);
 
 // This form retains only metadata and one immutable request after submission.
@@ -19,7 +18,8 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
   const [selected, setSelected] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [maxBytes, setMaxBytes] = useState(1);
-  const [seconds, setSeconds] = useState(3600);
+  // No period means the server default: the selected artifacts' access end.
+  const [seconds, setSeconds] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [reply, setReply] = useState<{ grant_id: string; phase: Data<'request_raw_access'>['phase'] | 'Exhausted' }>();
@@ -48,8 +48,7 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
   const queryEligible = chosenKind !== undefined && chosen.every(a => queryKind(a) === chosenKind);
   const queryLabel = chosenKind === 'log' || purpose === 'log-query' ? 'log' : chosenKind === 'syscall' || purpose === 'syscall-query' ? 'syscall argument' : 'packet';
   const minimum = downloads ? Math.max(1, total) : 24576;
-  const maximum = downloads ? maximumBytes : 1073741824;
-  const invalid = !chosen.length || chosen.some(a => !eligible(a)) || query && !queryEligible || !reason.trim() || !Number.isSafeInteger(maxBytes) || maxBytes < minimum || maxBytes > maximum || !Number.isInteger(seconds) || seconds < 1 || seconds > 28800;
+  const invalid = !chosen.length || chosen.some(a => !eligible(a)) || query && !queryEligible || !reason.trim() || !Number.isSafeInteger(maxBytes) || maxBytes < minimum || seconds !== undefined && (!Number.isSafeInteger(seconds) || seconds < 1);
   const locked = busy || request.current !== undefined;
   const select = (artifact: Artifact, checked: boolean) => {
     const next = checked ? [...selected, artifact.artifact_id] : selected.filter(id => id !== artifact.artifact_id);
@@ -63,7 +62,7 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     if (busy || scope.aborted) return;
     if (!request.current) {
       if (invalid) return;
-      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? [chosenKind === 'log' ? 'get_logs' as const : chosenKind === 'syscall' ? 'syscall_query' as const : 'pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, expires_in_seconds: seconds, idempotency_key: newID() };
+      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? [chosenKind === 'log' ? 'get_logs' as const : chosenKind === 'syscall' ? 'syscall_query' as const : 'pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, ...(seconds === undefined ? {} : { expires_in_seconds: seconds }), idempotency_key: newID() };
     }
     const controller = new AbortController(); active.current = controller;
     const abort = () => controller.abort(); scope.addEventListener('abort', abort, { once: true });
@@ -104,8 +103,8 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
       <p>Selected native size: {count(total)} bytes.</p>
       {queryEligible && <label>Allowed operations<select value={allowed} onChange={e => { const next = e.target.value as typeof allowed; setAllowed(next); setMaxBytes(defaultBudget(chosen, next)); }}>{purpose === 'download' && <option value="download">Whole-file downloads</option>}<option value="query">Saved {queryLabel} queries</option><option value="both">Downloads and saved {queryLabel} queries</option></select></label>}
       <label>{query ? 'Reason for raw access' : 'Reason for raw download'}<textarea maxLength={512} value={reason} onChange={e => setReason(e.target.value)}/></label>
-      <label>{query ? 'Total disclosure byte budget' : 'Total download byte budget'}<input type="number" min={minimum} max={maximum} step={1} value={maxBytes} onChange={e => setMaxBytes(Number(e.target.value))}/></label>
-      <label>Approval period in seconds<input type="number" min={1} max={28800} step={1} value={seconds} onChange={e => setSeconds(Number(e.target.value))}/></label>
+      <label>{query ? 'Total disclosure byte budget' : 'Total download byte budget'}<input type="number" min={minimum} step={1} value={maxBytes} onChange={e => setMaxBytes(Number(e.target.value))}/></label>
+      <label>Approval period in seconds (empty: until the evidence access ends)<input type="number" min={1} step={1} value={seconds ?? ''} onChange={e => setSeconds(e.target.value === '' ? undefined : Number(e.target.value))}/></label>
     </fieldset>
     {query ? <p>At most 10000 selected operations, bound to this requesting client. Each paid query page reserves 24 KiB and one operation, including a reply lost in transit. A query permits at most two paid pages. Downloads and queries consume the same budget when both are selected. Downloaded copies are outside Asservat's automatic deletion.</p> : <p>At most 10000 download operations, bound to this requesting client. Retransmissions consume the byte budget. Downloaded copies are outside Asservat's automatic deletion.</p>}
     {error && <p role="alert">{error}</p>}
