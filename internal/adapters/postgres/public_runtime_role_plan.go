@@ -389,7 +389,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
 			"download_worker_configuration", "download_worker_configuration_revision")
 		// ReadPublishedContext reads only these catalog and attempt columns.
-		add("context_catalog", "SELECT", "artifact_id", "root_id", "capture_id", "published_at")
+		add("context_catalog", "SELECT", "artifact_id", "root_id", "capture_id", "published_at", "copies_digest", "native_bytes", "acquisition_started_at", "acquisition_completed_at")
 		add("custody_attempt", "SELECT", "id", "artifact_id", "state", "copies_digest", "effective_expires_at", "effective_delete_by")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		for _, table := range []string{"permission_stream", "artifact_download", "download_response", "download_window", "download_worker"} {
