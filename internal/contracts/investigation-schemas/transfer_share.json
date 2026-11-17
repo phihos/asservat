@@ -1,6 +1,6 @@
 {
   "name": "transfer_share",
-  "description": "Replace the owner teams managing a share you currently manage (an audited transfer). Name owner teams you belong to now (mode teams), or, as the share's creator, only yourself (mode creator). Installation administrators may assign any owner teams that currently hold evidence-owner for the artifact (mode teams), also to recover a Suspended share. Creator, recipients, artifact and expiry stay unchanged; the share is suspended when no new manager keeps the evidence-owner role. Managing grants no read. Repeating with the same idempotency key is harmless.",
+  "description": "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). A current manager may name teams they currently hold; an installation administrator (scoped management delegation) may name any current owner teams covering the target. Creator, recipients, artifacts, counts and expiry are unchanged.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -17,25 +17,42 @@
       "expected_revision": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 1000000000
+        "maximum": 9007199254740991
       },
       "idempotency_key": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 128
+        "minLength": 1
+      },
+      "sharing_intent_id": {
+        "$ref": "#/$defs/d0"
       },
       "management": {
-        "$ref": "#/$defs/d0"
+        "$ref": "#/$defs/d1"
       }
     },
     "required": [
-      "share_id",
       "expected_revision",
       "idempotency_key",
       "management"
     ],
+    "oneOf": [
+      {
+        "required": [
+          "share_id"
+        ]
+      },
+      {
+        "required": [
+          "sharing_intent_id"
+        ]
+      }
+    ],
     "$defs": {
       "d0": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "d1": {
         "oneOf": [
           {
             "type": "object",
@@ -71,8 +88,7 @@
                     },
                     "id": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
+                      "minLength": 1
                     }
                   },
                   "required": [
@@ -82,7 +98,6 @@
                   ]
                 },
                 "minItems": 1,
-                "maxItems": 8,
                 "uniqueItems": true
               }
             },
@@ -96,69 +111,10 @@
     }
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -176,28 +132,73 @@
                     "format": "uuid"
                   },
                   "phase": {
+                    "type": "string",
                     "const": "Active"
                   },
                   "revision": {
                     "type": "integer",
                     "minimum": 2,
-                    "maximum": 1000000000
+                    "maximum": 9007199254740991
+                  },
+                  "sharing_intent_id": {
+                    "$ref": "#/$defs/d2"
                   },
                   "managed_by": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/$defs/d0"
+                      "$ref": "#/$defs/d3"
                     },
                     "minItems": 1,
-                    "maxItems": 8,
                     "uniqueItems": true
                   }
                 },
                 "required": [
-                  "share_id",
                   "phase",
                   "revision",
                   "managed_by"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "share_id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sharing_intent_id"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
                 ]
               }
             },
@@ -218,21 +219,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -244,8 +242,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -264,7 +261,138 @@
       }
     ],
     "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
       "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d2": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "d3": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -281,8 +409,7 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [

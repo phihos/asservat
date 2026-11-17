@@ -126,7 +126,7 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 		return zero, false, err
 	}
 	now := s.Now()
-	if !value.UUID(in.CaseID) || !value.UUID(in.ArtifactID) || in.Version == (artifact.Digest{}) || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || len(in.Recipients) < 1 || !in.Management.Valid() {
+	if !value.UUID(in.CaseID) || !value.UUID(in.ArtifactID) || in.Version == (artifact.Digest{}) || !identity.Text(in.IdempotencyKey, 128) || len(in.Recipients) < 1 || !in.Management.Valid() {
 		return zero, false, capture.ErrInvalid
 	}
 	recipients := slices.Clone(in.Recipients)

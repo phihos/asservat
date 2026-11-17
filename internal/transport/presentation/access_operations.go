@@ -28,10 +28,11 @@ type AccessOperations struct {
 	now       func() time.Time
 	newID     func() string
 	explain   AccessExplanationUseCase
+	clusters  ClusterNames
 	contracts *contracts.InvestigationContracts
 }
 
-func NewAccessOperations(origin string, now func() time.Time, newID func() string, explain AccessExplanationUseCase) (*AccessOperations, error) {
+func NewAccessOperations(origin string, now func() time.Time, newID func() string, clusters ClusterNames, explain AccessExplanationUseCase) (*AccessOperations, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || explain == nil || now == nil || newID == nil {
 		return nil, ErrOperationsConfiguration
@@ -40,7 +41,7 @@ func NewAccessOperations(origin string, now func() time.Time, newID func() strin
 	if err != nil {
 		return nil, err
 	}
-	return &AccessOperations{origin: origin, now: now, newID: newID, explain: explain, contracts: wire}, nil
+	return &AccessOperations{origin: origin, now: now, newID: newID, explain: explain, clusters: clusters, contracts: wire}, nil
 }
 
 func (s *AccessOperations) PublicOrigin() string {
@@ -60,7 +61,7 @@ func (s *AccessOperations) Tool(name string) (contracts.InvestigationTool, bool)
 // AccessOperationInput is the closed explain_access input.
 type AccessOperationInput struct {
 	TargetRef struct {
-		ClusterID string `json:"cluster_id"`
+		Cluster   string `json:"cluster"`
 		Namespace string `json:"namespace"`
 		Kind      string `json:"kind"`
 		Name      string `json:"name"`
@@ -95,7 +96,6 @@ type accessExplanationData struct {
 	Target           *accessTargetData      `json:"target,omitempty"`
 	Assignments      []accessAssignmentData `json:"assignments"`
 	AssignmentsTotal int                    `json:"assignments_total"`
-	ValidUntil       *time.Time             `json:"valid_until,omitempty"`
 }
 
 // accessMessage is fixed reviewed text per condition; it never includes a
@@ -108,12 +108,10 @@ func accessMessage(e authorization.Explanation) string {
 		return "A deny assignment that names you (directly or through one of your groups) blocks this operation. Ask a permission administrator to review the listed deny."
 	case authorization.UnmetClientScope:
 		return "Your client was not granted the listed scope. Sign in again with a client that requests it, or ask an administrator to allow it for this client."
-	case authorization.UnmetPermissionStale:
-		return "Permission data for this workload is not current, so the result cannot be decided now. Retry shortly; if it persists, ask an administrator to check permission observation."
+	case authorization.UnmetClusterNotObserved:
+		return "The permission state of this workload's cluster has not reached the hub, so the result cannot be decided now. It is decided once the cluster's connector reconnects; if it persists, ask an administrator to check the cluster's connector."
 	case authorization.UnmetIdentity:
 		return "Your identity could not be confirmed as current. Sign in again and retry."
-	case authorization.UnmetAudienceOverflow:
-		return "More than 32 assignments would form the audience for this operation. Ask a permission administrator to narrow the bindings for this workload."
 	case authorization.UnmetServiceUnavailable:
 		return "The service cannot evaluate access right now. Retry shortly."
 	}
@@ -154,7 +152,13 @@ func (s *AccessOperations) CallWithContext(ctx context.Context, current identiti
 	if err != nil || !i.Valid(s.now()) {
 		return OperationReply{}, identity.ErrDenied
 	}
-	ref := targets.WorkloadRequest{ClusterID: in.TargetRef.ClusterID, Namespace: in.TargetRef.Namespace, Kind: in.TargetRef.Kind, Name: in.TargetRef.Name}
+	out := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
+	clusterID, known := s.clusters.ID(in.TargetRef.Cluster)
+	if !known {
+		out.Status, out.Data = "error", OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}
+		return s.reply(ctx, current, i, name, out, i.ValidUntil, operationAuditInvalid)
+	}
+	ref := targets.WorkloadRequest{ClusterID: clusterID, Namespace: in.TargetRef.Namespace, Kind: in.TargetRef.Kind, Name: in.TargetRef.Name}
 	e, until, err := s.explain.Explain(ctx, current, ref, op)
 	if errors.Is(err, authorization.ErrExplainInvalid) {
 		return OperationReply{}, contracts.ErrInvestigationWire
@@ -167,18 +171,17 @@ func (s *AccessOperations) CallWithContext(ctx context.Context, current identiti
 		data.Target = &accessTargetData{ClusterID: e.Target.ClusterID, NamespaceUID: e.Target.NamespaceUID, WorkloadUID: e.Target.WorkloadUID, PodUID: e.Target.PodUID}
 	}
 	for _, a := range e.Assignments {
-		if len(data.Assignments) == 32 {
-			break
-		}
 		x := a.Assignment
 		data.Assignments = append(data.Assignments, accessAssignmentData{Effect: a.Effect, AssignmentID: x.AssignmentID, Role: x.Role, SubjectKind: x.Kind, BasisKind: x.BasisKind, BasisUID: x.BasisUID, Revision: hex.EncodeToString(x.BasisDigest[:])})
 	}
 	if e.Decision == authorization.Allow {
-		v := e.ValidUntil.UTC()
-		data.ValidUntil = &v
 		until = identity.Earlier(until, e.ValidUntil)
 	}
-	out := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "ok", Data: data, Warnings: []string{}, Provenance: []any{}}
+	out.Data = data
+	return s.reply(ctx, current, i, name, out, until, captureAuditDecision(nil))
+}
+
+func (s *AccessOperations) reply(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, name string, out OperationEnvelope, until time.Time, decision operationAuditDecision) (OperationReply, error) {
 	final, err := current.ResolveIdentity(ctx)
 	if err != nil || ctx.Err() != nil || !final.Valid(s.now()) || final.Principal != i.Principal {
 		return OperationReply{}, identity.ErrDenied
@@ -192,5 +195,5 @@ func (s *AccessOperations) CallWithContext(ctx context.Context, current identiti
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(nil)}, nil
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: decision}, nil
 }

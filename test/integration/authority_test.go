@@ -339,13 +339,13 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		started := time.Now()
 		snap, err := s.p.PreviewProjections(ctx, read)
 		readTime := time.Since(started)
-		if err != nil || len(snap.Cells) != cfg.MaxPreviewTargets {
+		if err != nil || len(snap.Cells) != 1000 {
 			t.Fatalf("%v cells=%d", err, len(snap.Cells))
 		}
 		policy := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
 		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, policy, time.Now())
 		total := time.Since(started)
-		if err != nil || !got.Complete() || got.Targets != cfg.MaxPreviewTargets || got.DeltasTotal == 0 {
+		if err != nil || !got.Complete() || got.Targets != 1000 || got.DeltasTotal == 0 {
 			t.Fatalf("%v %+v", err, got.Targets)
 		}
 		t.Logf("ADR-237 worst case: %d cells read in %v, read+evaluate %v, %d decision changes", len(snap.Cells), readTime, total, got.DeltasTotal)

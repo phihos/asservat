@@ -117,7 +117,7 @@ func TestPreviewUpdateNarrowsScope(t *testing.T) {
 func TestPreviewUnavailableClusterIsIndeterminate(t *testing.T) {
 	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 	stale := previewCell(now, "wl-1")
-	stale.Unavailable = authorization.UnmetPermissionStale
+	stale.Unavailable = authorization.UnmetClusterNotObserved
 	foreign := previewCell(now, "wl-2")
 	foreign.Target.ClusterID = "99999999-9999-9999-9999-999999999999"
 	got := runPreview(t, []AccessChange{{Action: "create", Kind: "AccessBinding", Binding: previewBinding("Allow", "team-c")}}, stale, foreign)
@@ -141,23 +141,9 @@ func TestPreviewStaleProjectionNeverAllows(t *testing.T) {
 	}
 }
 
-func TestPreviewBounds(t *testing.T) {
-	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
-	change := AccessChange{Action: "create", Kind: "AccessBinding", Binding: previewBinding("Allow", "team-c")}
-	many := make([]AccessChange, MaxPreviewChanges+1)
-	for n := range many {
-		many[n] = change
-	}
-	if _, _, err := PreviewChanges(many); !errors.Is(err, ErrLimit) {
-		t.Fatalf("17 changes: %v", err)
-	}
-	cells := make([]PreviewCell, MaxPreviewTargets+1)
-	for n := range cells {
-		cells[n] = previewCell(now, "wl")
-	}
-	changes, _, _ := PreviewChanges([]AccessChange{change})
-	if _, err := PreviewAccess(changes, PreviewSnapshot{Cells: cells}, []string{previewCluster}, previewPolicy, now); !errors.Is(err, ErrLimit) {
-		t.Fatalf("1,001 targets: %v", err)
+func TestPreviewInvalidChanges(t *testing.T) {
+	if _, _, err := PreviewChanges(nil); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("no changes: %v", err)
 	}
 	for _, bad := range [][]AccessChange{
 		{{Action: "create", Kind: "PermissionSource", Binding: previewBinding("Allow", "x")}},

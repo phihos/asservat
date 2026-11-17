@@ -11,14 +11,9 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ADR-237 permission impact preview bounds. They are constants, not tuning
-// knobs: REQ-PER-002 bounds a preview to 1,000 target objects and a 256 KiB
-// result. MaxPreviewDeltas only bounds memory; the listed result is bounded
-// by its serialized size in the presentation layer.
+// ADR-237 permission impact preview. The result is paged (REQ-PER-002); it
+// has no object, target or row cap.
 const (
-	MaxPreviewChanges = 16
-	MaxPreviewTargets = 1000
-	MaxPreviewDeltas  = 4096
 	// OtherWorkloads is the preview cell that stands for every workload of a
 	// namespace that no current or proposed binding names explicitly. A
 	// namespace-wide assignment matches it; a workload-narrowed one does not.
@@ -149,8 +144,8 @@ func validChangeBinding(b Binding) bool {
 // PreviewChanges validates the proposal, names each proposed binding's object
 // and returns the projection read it needs.
 func PreviewChanges(changes []AccessChange) ([]AccessChange, PreviewRead, error) {
-	if len(changes) < 1 || len(changes) > MaxPreviewChanges {
-		return nil, PreviewRead{}, ErrLimit
+	if len(changes) < 1 {
+		return nil, PreviewRead{}, ErrInvalid
 	}
 	out := slices.Clone(changes)
 	read := PreviewRead{Workloads: map[PreviewNamespace][]string{}}
@@ -219,9 +214,6 @@ var previewOperations = []authorization.Operation{authorization.CollectContext, 
 // never enumerated. Cells outside the administered clusters or without a
 // current projection are reported Indeterminate and never evaluated.
 func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []string, policy identity.Revision, now time.Time) (AccessPreview, error) {
-	if len(snap.Cells) > MaxPreviewTargets {
-		return AccessPreview{}, ErrLimit
-	}
 	out := AccessPreview{Revision: snap.Revision}
 	// Attach each proposed source's grants from the accepted namespace
 	// observation, in change order.
@@ -293,10 +285,8 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 					continue
 				}
 				out.DeltasTotal++
-				if len(out.Deltas) < MaxPreviewDeltas {
-					out.Deltas = append(out.Deltas, AccessDelta{Target: cell.Target, Subject: s, Operation: op, Before: authorization.Indeterminate, After: decided.Decision,
-						BeforeUnmet: DecisionTimeSource, BeforeBasis: []PreviewAssignment{{Effect: "Allow", Assignment: a}}, AfterUnmet: decided.Unmet, AfterBasis: basis(decided), AfterValidUntil: decided.ValidUntil})
-				}
+				out.Deltas = append(out.Deltas, AccessDelta{Target: cell.Target, Subject: s, Operation: op, Before: authorization.Indeterminate, After: decided.Decision,
+					BeforeUnmet: DecisionTimeSource, BeforeBasis: []PreviewAssignment{{Effect: "Allow", Assignment: a}}, AfterUnmet: decided.Unmet, AfterBasis: basis(decided), AfterValidUntil: decided.ValidUntil})
 			}
 		}
 		for _, s := range subjects {
@@ -308,10 +298,8 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 					continue
 				}
 				out.DeltasTotal++
-				if len(out.Deltas) < MaxPreviewDeltas {
-					out.Deltas = append(out.Deltas, AccessDelta{Target: cell.Target, Subject: s, Operation: op, Before: before.Decision, After: decided.Decision,
-						BeforeUnmet: before.Unmet, AfterUnmet: decided.Unmet, BeforeBasis: basis(before), AfterBasis: basis(decided), AfterValidUntil: decided.ValidUntil})
-				}
+				out.Deltas = append(out.Deltas, AccessDelta{Target: cell.Target, Subject: s, Operation: op, Before: before.Decision, After: decided.Decision,
+					BeforeUnmet: before.Unmet, AfterUnmet: decided.Unmet, BeforeBasis: basis(before), AfterBasis: basis(decided), AfterValidUntil: decided.ValidUntil})
 			}
 		}
 	}

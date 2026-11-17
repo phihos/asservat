@@ -289,7 +289,7 @@ func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperati
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Reviews: pc.reviews, Now: c.Now}
-	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, service)
+	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, c.Clusters, service)
 }
 
 // composePublicAccessPreview composes the ADR-237 browser-only
