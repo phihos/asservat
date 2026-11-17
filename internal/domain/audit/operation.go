@@ -22,54 +22,107 @@ const OperationCaptureSettingsOutputLimit = 160 << 10
 
 const OperationGrantReviewOutputLimit = 256 << 10
 
-func operationOutputLimit(name string) int64 {
-	if name == "get_grant" {
-		return OperationGrantReviewOutputLimit
-	}
-	if name == "preview_recording_save" {
-		return OperationRecordingSavePreviewOutputLimit
-	}
-	if name == "get_capture_settings" {
-		return OperationCaptureSettingsOutputLimit
-	}
-	return OperationOutputLimit
+// operationKind classifies one public or internal operation for audit.
+type operationKind struct {
+	format string        // accepted audit input format
+	window time.Duration // maximum request interval
+	effect bool          // may record an accepted or unknown effect
+	output int64         // prepared output byte maximum
 }
 
-// Lane is server-selected from the fixed operation, never supplied by a caller.
+const (
+	contextInput    = "context-input/v1"
+	queryInput      = "context-query-input/v1"
+	nativeInput     = "native-content-input/v1"
+	processingInput = "processing-input/v1"
+	ordinaryWindow  = 5 * time.Second
+)
+
+// operations lists every audited operation, one per line. Evidence reads use
+// the twenty-second evidence window, capture preview/submission their own;
+// every contained authority retains its own bound. A live read holds two
+// authority checks around a bounded node wait; measured installed reads take
+// four to six seconds.
+var operations = map[string]operationKind{
+	"cancel_capture":             {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"close_live_watch":           {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"compare_profiles":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"create_share":               {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"deactivate_policy":          {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"decide_review":              {contextInput, identity.RecordingSaveRequestWindow, true, OperationOutputLimit},
+	"download_artifact":          {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"download_artifact_content":  {nativeInput, ordinaryWindow, false, OperationOutputLimit},
+	"explain_access":             {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_artifact_download":      {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
+	"get_capture":                {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_capture_profile":        {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_capture_settings":       {contextInput, ordinaryWindow, false, OperationCaptureSettingsOutputLimit},
+	"get_case":                   {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_extract":                {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_file_excerpt":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_grant":                  {contextInput, ordinaryWindow, false, OperationGrantReviewOutputLimit},
+	"get_http_headers":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_logs":                   {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_pcap_summary":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_policy_status":          {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_processing_erasure":     {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_processing_report":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"get_profile_summary":        {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_query_result":           {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_syscall_events":         {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"get_syscall_summary":        {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"initialize_processing":      {processingInput, ordinaryWindow, false, OperationOutputLimit},
+	"invalid_operation":          {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"list_capture_history":       {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"list_capture_profiles":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"list_diagnostics":           {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"list_live_sources":          {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
+	"list_recordings":            {contextInput, identity.EvidenceReadRequestWindow, false, OperationOutputLimit},
+	"list_reviews":               {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"list_shares":                {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"open_live_watch":            {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"pcap_query":                 {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"prepare_artifact_download":  {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"preview_access_change":      {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"preview_capture":            {contextInput, identity.CapturePreviewRequestWindow, false, OperationOutputLimit},
+	"preview_recording_save":     {contextInput, ordinaryWindow, false, OperationRecordingSavePreviewOutputLimit},
+	"preview_retention_change":   {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"query_artifact":             {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"read_live_watch":            {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"release_processing":         {processingInput, ordinaryWindow, true, OperationOutputLimit},
+	"request_capture":            {contextInput, identity.RecordingSaveRequestWindow, true, OperationOutputLimit},
+	"request_early_erasure":      {processingInput, ordinaryWindow, true, OperationOutputLimit},
+	"request_policy_grant":       {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"request_raw_access":         {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"restrict_processing":        {processingInput, ordinaryWindow, true, OperationOutputLimit},
+	"revoke_grant":               {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"revoke_share":               {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"search_processing_evidence": {contextInput, ordinaryWindow, false, OperationOutputLimit},
+	"stop_future_sharing":        {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"syscall_query":              {queryInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"transfer_share":             {contextInput, ordinaryWindow, true, OperationOutputLimit},
+	"update_live_watch":          {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+	"watch_live":                 {contextInput, identity.EvidenceReadRequestWindow, true, OperationOutputLimit},
+}
+
+// OperationLane is server-selected from the fixed operation, never supplied
+// by a caller. release_processing has its own lane.
 func OperationLane(name string) string {
-	switch name {
-	case "initialize_processing", "restrict_processing", "request_early_erasure":
-		return "normal"
-	case "release_processing":
-		return "processing"
-	case "resolve_capture_request":
-		return "resolution"
-	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "search_processing_evidence", "get_processing_erasure", "get_processing_report", "prepare_artifact_download", "get_artifact_download", "download_artifact_content", "invalid_operation", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
-		return "normal"
-	default:
+	if _, ok := operations[name]; !ok {
 		return ""
 	}
+	if name == "release_processing" {
+		return "processing"
+	}
+	return "normal"
 }
 
-// OperationRequestWindow is the maximum request interval of an operation:
-// twenty seconds for evidence reads, fifteen for capture preview/submission composition,
-// five seconds otherwise. Every contained authority retains its own bound.
+// OperationRequestWindow is the maximum request interval of an operation.
 func OperationRequestWindow(name string) time.Duration {
-	switch name {
-	case "request_capture", "decide_review":
-		// An approval submits the reviewed request (ADR-335 D5).
-		return identity.RecordingSaveRequestWindow
-	case "preview_capture":
-		return identity.CapturePreviewRequestWindow
-	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_query_result", "prepare_artifact_download", "get_artifact_download":
-		return identity.EvidenceReadRequestWindow
-	case "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
-		// A live read holds two authority checks around a bounded node wait;
-		// measured installed reads take four to six seconds.
-		return identity.EvidenceReadRequestWindow
-	default:
-		return 5 * time.Second
+	if k, ok := operations[name]; ok {
+		return k.window
 	}
+	return ordinaryWindow
 }
 
 // OperationIntent contains only bounded audit facts. It is not a permit, and
@@ -108,12 +161,12 @@ type OperationOutcome struct {
 func (r OperationOutcome) Valid() bool {
 	if !r.Intent.Valid() || !slices.Contains([]string{"success", "denied", "invalid", "unavailable", "interrupted"}, r.Status) ||
 		!slices.Contains([]string{"prepared", "not_available", "invalid_input", "authority_unavailable", "interrupted"}, r.Reason) ||
-		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > operationOutputLimit(r.Intent.Name) ||
+		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > operations[r.Intent.Name].output ||
 		r.OutputDigest == (artifact.Digest{}) || r.RecordedAt.Before(r.Intent.CreatedAt) || !r.RecordedAt.Before(r.Intent.WriteUntil) ||
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false
 	}
-	if r.Effect != "none" && r.Intent.Name != "restrict_processing" && r.Intent.Name != "release_processing" && r.Intent.Name != "request_early_erasure" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "pcap_query" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_logs" && r.Intent.Name != "syscall_query" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" && r.Intent.Name != "open_live_watch" && r.Intent.Name != "read_live_watch" && r.Intent.Name != "update_live_watch" && r.Intent.Name != "close_live_watch" {
+	if r.Effect != "none" && !operations[r.Intent.Name].effect {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {
@@ -137,18 +190,8 @@ func (r OperationOutcome) Valid() bool {
 // Closed internal classification, separate from public tool discovery. Keeping
 // this branch explicit prevents a private peer operation accepting human data.
 func humanOperationInputValid(name, format string) bool {
-	switch name {
-	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_query_result":
-		return format == "context-query-input/v1"
-	case "search_processing_evidence", "get_processing_erasure", "get_processing_report":
-		return format == "context-input/v1"
-	case "download_artifact_content":
-		return format == "native-content-input/v1"
-	case "initialize_processing", "restrict_processing", "release_processing", "request_early_erasure":
-		return format == "processing-input/v1"
-	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
-		return format == "context-input/v1" || format == "invalid-input/v1"
-	default:
-		return false
-	}
+	k, ok := operations[name]
+	// The processing reads accept no invalid-input form.
+	strict := name == "search_processing_evidence" || name == "get_processing_erasure" || name == "get_processing_report"
+	return ok && (format == k.format || k.format == contextInput && !strict && format == "invalid-input/v1")
 }
