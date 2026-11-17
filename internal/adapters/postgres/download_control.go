@@ -180,6 +180,11 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		}
 		return ctx.Err()
 	})
+	if errors.Is(err, artifact.ErrIntegrity) {
+		// A catalog row without its read facts; the caller reports this class
+		// to operator diagnostics and the client still sees Unavailable.
+		return evidence.ContextDownloadSource{}, artifact.ErrIntegrity
+	}
 	if err != nil || ctx.Err() != nil {
 		return evidence.ContextDownloadSource{}, artifact.ErrDownloadUnavailable
 	}
