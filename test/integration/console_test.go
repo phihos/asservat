@@ -61,7 +61,7 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	// reply. Production HTTP, current-identity, CSRF and canonical projection are
 	// exercised without claiming SQL/admission/execution qualification.
 	captureService := &consoleSyntheticCaptures{state: "ready"}
-	operations, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, captureService, captureService, &consoleSyntheticHistory{captures: captureService})
+	operations, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }, Clusters: presentation.NewClusterNames(map[string]string{"local": consoleCaptureID(1)})}, captureService, captureService, &consoleSyntheticHistory{captures: captureService})
 	if err != nil {
 		t.Fatal(err)
 	}

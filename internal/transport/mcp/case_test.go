@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,7 +57,7 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 		var captures *presentation.ContextOperations
 		if withCaptures {
 			stub := &mcpCaptureFixture{}
-			captures, e = presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, stub, stub)
+			captures, e = presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, stub, stub)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -77,19 +76,16 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 			t.Fatal(e)
 		}
 		for _, version := range []string{"2025-11-25", "2026-07-28"} {
-			response, b := send(t, server, rpcRequest(t, server, version, "tools/list", nil))
-			var listed struct {
-				Result sdk.ListToolsResult `json:"result"`
-			}
 			expected := 1
 			if withCaptures {
 				expected = 4
 			}
-			if response.StatusCode != 200 || json.Unmarshal(b, &listed) != nil || len(listed.Result.Tools) != expected {
-				t.Fatalf("discovery: %d %s", response.StatusCode, b)
+			names := discoveredTools(t, server, version)
+			if len(names) != expected {
+				t.Fatal("discovery", names)
 			}
 			for _, unavailable := range []string{"prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "request_capture"} {
-				if strings.Contains(string(b), `"name":"`+unavailable+`"`) {
+				if names[unavailable] {
 					t.Fatal("unavailable service advertised", unavailable)
 				}
 			}
@@ -97,7 +93,7 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 				return send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "get_case", "arguments": arguments}))
 			}
 			before := f.calls.Load()
-			response, b = call(map[string]any{"case_id": mcpCaseID, "include_raw": true})
+			response, b := call(map[string]any{"case_id": mcpCaseID, "include_raw": true})
 			if f.calls.Load() != before || strings.Contains(string(b), `"kind":"pod-status"`) {
 				t.Fatal("unsupported input reached metadata service")
 			}

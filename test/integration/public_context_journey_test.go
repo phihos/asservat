@@ -145,7 +145,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	server.EnableHTTP2 = true
 	t.Cleanup(server.Close)
 	origin := "https://" + server.Listener.Addr().String()
-	operations, e := bootstrap.NewPublicContextOperations(bootstrap.PublicContextOperationsConfig{RootID: s.a.RootID, InstallationID: s.recovery.installation, PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: custodyID}, bootstrap.PublicContextOperationServices{Investigation: investigation, Intents: intents, Regional: bridge, Progress: captureapp.ContextProgressService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Reader: progress}, Cases: cases, Downloads: native.coordinator, Native: native.services})
+	operations, e := bootstrap.NewPublicContextOperations(bootstrap.PublicContextOperationsConfig{RootID: s.a.RootID, InstallationID: s.recovery.installation, PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: custodyID, Clusters: presentation.NewClusterNames(map[string]string{"local": n.target.ClusterID})}, bootstrap.PublicContextOperationServices{Investigation: investigation, Intents: intents, Regional: bridge, Progress: captureapp.ContextProgressService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Reader: progress}, Cases: cases, Downloads: native.coordinator, Native: native.services})
 	publicJourneyRequire(t, "one complete public operation assembly", e)
 	// Fund the finite whole journey up front, preserving processing revision and
 	// spend. No replenishment is performed once the first public operation begins.
@@ -160,7 +160,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	call := func(name string, input any, browserIdentity bool) (presentation.OperationReply, error) {
 		return shared.Call(ctx, current(ctx, browserIdentity), name, publicJourneyInput(t, input))
 	}
-	previewInput := map[string]any{"target_ref": presentation.WorkloadReference{ClusterID: n.target.ClusterID, Namespace: n.target.Namespace, Kind: n.target.Kind, Name: n.target.Name}, "preset_ref": presentation.PresetReference{Name: "pod-status", Version: "v1"}, "requested_retention_seconds": 3600}
+	previewInput := map[string]any{"target_ref": presentation.TargetRef{Cluster: "local", Namespace: n.target.Namespace, Kind: n.target.Kind, Name: n.target.Name}, "preset_ref": presentation.PresetReference{Name: "pod-status", Version: "v1"}, "requested_retention_seconds": 3600}
 	reply, e := call("preview_capture", previewInput, true)
 	diagnostic.Report(t)
 	preview := publicJourneyData[presentation.ContextPreviewData](t, "browser preview", reply, e)

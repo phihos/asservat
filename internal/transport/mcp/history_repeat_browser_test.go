@@ -138,7 +138,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	investigation.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
 	service := recordedPreviews{investigation, facts}
 	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Now: time.Now}
-	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)
+	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{Clusters: presentation.NewClusterNames(map[string]string{"local": reserveID(4)}), PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 		}
 		return out
 	}
-	target := map[string]string{"cluster_id": reserveID(4), "namespace": "payments", "kind": "Deployment", "name": "api"}
+	target := map[string]string{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"}
 	composition := map[string]any{"components": []any{map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{map[string]any{"actionID": "sample", "field": "packetFilter", "value": "tcp port 8080"}, map[string]any{"actionID": "sample", "field": "packetAfter", "value": "2s"}, map[string]any{"actionID": "sample", "field": "actionTimeout", "value": "10s"}}}}, "maxTotalBytes": 16 << 20, "maxDuration": "10s"}
 	if out := call("preview_capture", map[string]any{"target_ref": target, "profile_composition": composition, "requested_retention_seconds": 600}); out["status"] != "ok" || out["data"].(map[string]any)["approval_required"] != false {
 		t.Fatal("original preview", out["data"])
@@ -218,7 +218,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	facts.settings = value.CaptureSettings{CaptureID: p.CaptureID, Origin: value.HistoryManual, ClusterID: reserveID(4), NamespaceUID: "ns", WorkloadUID: "deployment", Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", AcceptedAt: p.CreatedAt, ExpiresAt: sourceExpiry, ValidUntil: time.Now().Add(5 * time.Second), SettingsKey: artifact.Digest{8}, ExecutionDigest: p.ScopeDigest, Composition: p.Intent.Composition.Clone(), CompositionJSON: scope.ProfileComposition, RecipeJSON: scope.Recipe, FrozenFilters: scope.Filters, DependencyJSON: pins, RequestedSeconds: 600}
 	facts.settings.TargetJSON = []byte(`{"namespace":"payments","workloadRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"api","uid":"deployment"},"maxPods":1,"selection":"allWithinLimit","adoption":"pinUID"}`)
 	facts.mu.Unlock()
-	if out := call("get_capture_settings", map[string]any{"capture_id": p.CaptureID}); out["status"] != "ok" {
+	if out := call("get_capture", map[string]any{"capture_id": p.CaptureID, "view": "settings"}); out["status"] != "ok" {
 		t.Fatal("settings route", out["data"])
 	}
 	edits := composition["components"].([]any)[0].(map[string]any)["overrides"].([]any)

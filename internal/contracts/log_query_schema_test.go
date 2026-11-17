@@ -10,7 +10,7 @@ func TestRawLogCaptureTypedWindowAndCombinedStreamInput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := []byte(`{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"saved","profileRef":{"catalog":"builtin","name":"finite-logs","version":"v1"},"overrides":[{"actionID":"logs","field":"logBefore","value":"1h"},{"actionID":"logs","field":"logAfter","value":"30s"},{"actionID":"logs","field":"logStream","value":"both"}]}],"maxTotalBytes":1048576,"maxDuration":"40s"}}`)
+	input := []byte(`{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"saved","profileRef":{"catalog":"builtin","name":"finite-logs","version":"v1"},"overrides":[{"actionID":"logs","field":"logBefore","value":"1h"},{"actionID":"logs","field":"logAfter","value":"30s"},{"actionID":"logs","field":"logStream","value":"both"}]}],"maxTotalBytes":1048576,"maxDuration":"40s"}}`)
 	if wire.ValidateInput("preview_capture", input) != nil {
 		t.Fatal("declared log edits refused")
 	}

@@ -26,8 +26,19 @@ type peersWire struct {
 	Protocol     string          `json:"protocol"`
 	Ports        []int           `json:"ports,omitempty"`
 	Resolution   string          `json:"resolution"`
-	MaxEndpoints int             `json:"maxEndpoints"`
-	MaxStaleness string          `json:"maxStaleness"`
+	MaxEndpoints int             `json:"maxEndpoints,omitempty"`
+	MaxStaleness string          `json:"maxStaleness,omitempty"`
+}
+
+// peerStaleness is the freshness bound of frozen Kubernetes peers. The
+// canonical peers object has no maxStaleness (peers follow watch events);
+// stored plans that carry one keep it, others take the five-second bound
+// of REQ-NET-003.
+func peerStaleness(s string) (time.Duration, bool) {
+	if s == "" {
+		return 5 * time.Second, true
+	}
+	return durationValue(s, false)
 }
 
 type peerEntryWire struct {
@@ -213,7 +224,7 @@ func packetPeers(path string, raw json.RawMessage, pc *peerContext) (*peerSet, e
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if len(raw) == 0 || d.Decode(&p) != nil {
-		return nil, refuse(value.CompositionInvalid, path, "peers take entries, protocol, resolution, maxEndpoints and maxStaleness")
+		return nil, refuse(value.CompositionInvalid, path, "peers take entries, protocol, ports and resolution")
 	}
 	var kubernetes []targets.PeerEntry
 	for i, entry := range p.Entries {
@@ -253,15 +264,18 @@ func packetPeers(path string, raw json.RawMessage, pc *peerContext) (*peerSet, e
 	if len(kubernetes) > 0 && p.Resolution != "frozen" {
 		return nil, refuse(value.CompositionRecorderUnavailable, path+".resolution", "Kubernetes peers resolve frozen in this release; follow is not available yet")
 	}
-	if staleness, ok := durationValue(p.MaxStaleness, false); ok && len(kubernetes) > 0 && (staleness < time.Second || staleness > 5*time.Second) {
+	if staleness, ok := peerStaleness(p.MaxStaleness); ok && len(kubernetes) > 0 && (staleness < time.Second || staleness > 5*time.Second) {
 		// ADR-283 part 3: the verifier re-resolves once per second; the
 		// freshness bound is at most five seconds (REQ-NET-003).
 		return nil, refuse(value.CompositionInvalid, path+".maxStaleness", "maxStaleness of Kubernetes peers is 1s to 5s")
 	}
+	if p.MaxEndpoints == 0 {
+		p.MaxEndpoints = targets.MaxPeerEndpoints // the region's member bound
+	}
 	if p.MaxEndpoints < 1 || p.MaxEndpoints > targets.MaxPeerEndpoints {
 		return nil, refuse(value.CompositionInvalid, path+".maxEndpoints", "maxEndpoints is 1 to 4,096")
 	}
-	if _, ok := durationValue(p.MaxStaleness, false); !ok {
+	if _, ok := peerStaleness(p.MaxStaleness); !ok {
 		return nil, refuse(value.CompositionInvalid, path+".maxStaleness", "maxStaleness is a positive duration")
 	}
 	set := &peerSet{Protocol: p.Protocol}
@@ -453,7 +467,7 @@ func frozenPeerResolution(recipe recipeSpec, f compiledFilterRecord) (targets.Pe
 	if json.Unmarshal(params.Peers, &maxStaleness) != nil {
 		return bad()
 	}
-	staleness, ok := durationValue(maxStaleness.MaxStaleness, false)
+	staleness, ok := peerStaleness(maxStaleness.MaxStaleness)
 	resolvedAt, err := time.Parse(time.RFC3339Nano, k.ResolvedAt)
 	if !ok || err != nil {
 		return bad()

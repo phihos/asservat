@@ -33,9 +33,9 @@ func (f *profileOperationFixture) CaptureProfile(_ context.Context, _ identities
 	return compiler.ProfileDescription{}, time.Time{}, value.ErrProfileNotFound
 }
 
-// REQ-CPR-001: both profile tools pass the runtime contract for browser and
-// MCP: the list is metadata, the definition read is an extract, and an
-// unpublished version is a closed ProfileNotFound error.
+// REQ-CPR-001: list_diagnostics lists the preset and the catalog profiles
+// (metadata, paginated), get_capture_profile reads a definition (extract) and
+// an unpublished version is a closed ProfileNotFound error.
 func TestCaptureProfileToolsProjectContract(t *testing.T) {
 	base, inner := operationFixture(t, false)
 	f := &profileOperationFixture{contextOperationFixture: inner}
@@ -43,33 +43,50 @@ func TestCaptureProfileToolsProjectContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reply, err := s.Call(context.Background(), f, "list_capture_profiles", []byte(`{`+wireTarget+`,"catalog":"builtin"}`))
-	var out struct {
-		DataClass string `json:"data_class"`
-		Data      struct {
-			Profiles []ProfileRow `json:"profiles"`
+	type page struct {
+		DataClass  string  `json:"data_class"`
+		NextCursor *string `json:"next_cursor"`
+		Data       struct {
+			Diagnostics []DiagnosticRow `json:"diagnostics"`
 		} `json:"data"`
 	}
-	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Profiles) != 4 || f.catalog != "builtin" || out.Data.Profiles[0].ExecutionModes[0] != "onTrigger" {
+	reply, err := s.Call(t.Context(), f, "list_diagnostics", []byte(`{`+wireTarget+`,"catalog":"builtin","limit":3}`))
+	var out page
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Diagnostics) != 3 || f.catalog != "builtin" || out.NextCursor == nil || out.Data.Diagnostics[0].ExecutionModes[0] != "onTrigger" {
 		t.Fatalf("list = %s, %v", reply.Body, err)
 	}
 	var names []string
-	for _, profile := range out.Data.Profiles {
-		names = append(names, profile.Ref.Name)
+	for _, row := range out.Data.Diagnostics {
+		names = append(names, row.Profile.Name)
 	}
+	reply, err = s.Call(t.Context(), f, "list_diagnostics", []byte(`{`+wireTarget+`,"catalog":"builtin","cursor":"`+*out.NextCursor+`"}`))
+	out = page{}
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.NextCursor != nil || len(out.Data.Diagnostics) != 1 {
+		t.Fatalf("second page = %s, %v", reply.Body, err)
+	}
+	names = append(names, out.Data.Diagnostics[0].Profile.Name)
 	if !slices.Equal(names, []string{"network-connections", "syscall-activity", "go-cpu", "finite-logs"}) {
 		t.Fatal("actual closed builtin catalog", names)
 	}
-	reply, err = s.Call(context.Background(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`))
+	reply, err = s.Call(t.Context(), f, "list_diagnostics", []byte(`{`+wireTarget+`}`))
+	out = page{}
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Diagnostics) != 5 || out.Data.Diagnostics[0].Kind != "preset" || out.Data.Diagnostics[1].Kind != "captureProfile" {
+		t.Fatalf("all = %s, %v", reply.Body, err)
+	}
+	reply, err = s.Call(t.Context(), f, "list_diagnostics", []byte(`{`+wireTarget+`,"goal":"crash"}`))
+	if err != nil || !bytes.Contains(reply.Body, []byte(`"CapabilityUnavailable"`)) {
+		t.Fatalf("goal = %s, %v", reply.Body, err)
+	}
+	reply, err = s.Call(t.Context(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`))
 	if err != nil || !bytes.Contains(reply.Body, []byte(`"data_class":"extract"`)) || !bytes.Contains(reply.Body, []byte(`"definition_digest"`)) {
 		t.Fatalf("get = %s, %v", reply.Body, err)
 	}
-	reply, err = s.Call(context.Background(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"organization","name":"absent","version":"v1"}}`))
+	reply, err = s.Call(t.Context(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"organization","name":"absent","version":"v1"}}`))
 	if err != nil || !bytes.Contains(reply.Body, []byte(`"ProfileNotFound"`)) {
 		t.Fatalf("absent = %s, %v", reply.Body, err)
 	}
-	if _, ok := base.Tool("list_capture_profiles"); ok {
-		t.Fatal("a service without catalog reads served the profile tools")
+	if _, ok := base.Tool("get_capture_profile"); ok {
+		t.Fatal("a service without catalog reads served get_capture_profile")
 	}
 }
 

@@ -31,7 +31,7 @@ func (h recordingHistoryFixture) PreviewRepeat(ctx context.Context, i identities
 func TestRecordingSaveHistorySettingsNeverBecomeRecipeOrOldSourceReplay(t *testing.T) {
 	ops, current, h := historyOperations(t)
 	ops.history = recordingHistoryFixture{h}
-	reply, err := ops.Call(t.Context(), current, "get_capture_settings", json.RawMessage(`{"capture_id":"`+historyCapture+`"}`))
+	reply, err := ops.Call(t.Context(), current, "get_capture", json.RawMessage(`{"capture_id":"`+historyCapture+`","view":"settings"}`))
 	if err != nil {
 		t.Fatal(err)
 	}

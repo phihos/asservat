@@ -192,7 +192,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatalf("installed %s: %v", name, failure)
 		}
-		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
+		target := map[string]string{"cluster": "local", "namespace": namespace, "kind": "Deployment", "name": workload}
 		previewArguments := map[string]any{"target_ref": target,
 			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetentionSeconds()}
 		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" && !short {
@@ -496,12 +496,12 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 				Effect string `json:"effect"`
 			} `json:"assignments"`
 		}
-		call(ctx, "explain_access", map[string]any{"target_ref": target, "operation": "read"}, &explained)
+		call(ctx, "explain_access", map[string]any{"target_ref": map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}, "operation": "read"}, &explained)
 		if explained.Decision != "Allow" || len(explained.Assignments) == 0 || explained.Assignments[0].Effect != "allow" {
 			diagnose()
 			t.Fatal("installed explain_access for the developer", explained)
 		}
-		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
+		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, cluster, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
 		// the case no longer offers it and a new preparation is refused.

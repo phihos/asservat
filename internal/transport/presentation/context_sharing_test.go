@@ -66,7 +66,7 @@ func TestContextOperationsCaptureSharingStatus(t *testing.T) {
 				}
 			}
 		}
-		if json.Unmarshal(b.Body, &out) != nil || out.Data.Phase != "Finalizing" || (status == nil) != (out.Data.Sharing == nil) ||
+		if json.Unmarshal(b.Body, &out) != nil || out.Data.Phase != "Running" || (status == nil) != (out.Data.Sharing == nil) ||
 			status != nil && (out.Data.Sharing.State != status.State || out.Data.Sharing.ShareID != status.ShareID) {
 			t.Fatal("sharing status not projected separately", string(b.Body))
 		}

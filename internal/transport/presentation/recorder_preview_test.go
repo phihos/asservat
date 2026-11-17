@@ -241,7 +241,7 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	}
 	// ADR-283: a CIDR peer edit compiles into the hub filter and the preview
 	// names its prefix count. Kubernetes peers are outside the runtime subset.
-	cidrs := strings.Replace(wireComposition, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"}`, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8","2001:db8::/32"]}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}}`, 1)
+	cidrs := strings.Replace(wireComposition, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"}`, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8","2001:db8::/32"]}],"protocol":"tcp","resolution":"frozen"}}`, 1)
 	reply, err = s.Call(t.Context(), f, "preview_capture", []byte(cidrs))
 	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 CIDR prefixes") || !strings.Contains(string(reply.Body), "((net 10.0.0.0/8 or net 2001:db8::/32) and tcp) and (tcp port 8080)") {
 		t.Fatalf("cidr peers: %v %s", err, reply.Body)
@@ -252,7 +252,7 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	// ADR-283 PR 2: Kubernetes peers are previewed with their resolved
 	// endpoint count and members digest; a plan-only preview has the generic
 	// RecorderUnavailable blocker (part 3 lifted the peer-specific gate).
-	k8s := strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":8,"maxStaleness":"5s"}`, 1)
+	k8s := strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen"}`, 1)
 	reply, err = s.Call(t.Context(), f, "preview_capture", []byte(k8s))
 	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 Kubernetes endpoints resolved at preview") || !strings.Contains(string(reply.Body), "(net 10.0.0.11/32 or net 10.0.0.12/32) and tcp") || !strings.Contains(string(reply.Body), `"code":"RecorderUnavailable"`) || strings.Contains(string(reply.Body), "Kubernetes peers in this release") || !strings.Contains(string(reply.Body), `"capture_enabled":false`) {
 		t.Fatalf("kubernetes peers: %v %s", err, reply.Body)
@@ -260,14 +260,17 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if k := f.composition.Components[0].Edits[0].Peers; k == nil || len(k.Kubernetes) != 1 || k.Kubernetes[0].Resource.Kind != "Deployment" || k.Kubernetes[0].Resource.Namespace != "payments" {
 		t.Fatal("typed Kubernetes peers edit not decoded")
 	}
-	// Schema subset: sharing, presets and malformed peer edits are not accepted; more than
-	// eight components exceed the canonical bound (ADR-276 groups are below it).
+	// Recorder plans take no capture-time sharing yet.
+	shared := strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1)
+	if reply, err = s.Call(t.Context(), f, "preview_capture", []byte(shared)); err != nil || !strings.Contains(string(reply.Body), "CapabilityUnavailable") {
+		t.Fatalf("sharing: %v %s", err, reply.Body)
+	}
+	// Presets beside a composition and malformed peer edits are not accepted.
 	for name, bad := range map[string]string{
-		"sharing":              strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1),
 		"preset":               strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"preset_ref":{"name":"pod-status","version":"v1"},`, 1),
-		"service without mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Service","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"deployment with mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db","readyOnly":true}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"bad peer":             strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"service without mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Service","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen"}`, 1),
+		"deployment with mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db","readyOnly":true}}],"protocol":"tcp","resolution":"frozen"}`, 1),
+		"bad peer":             strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen"}`, 1),
 		"no field":             strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "preview_capture", []byte(bad)); err == nil {
@@ -293,12 +296,14 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	}
 	// result_access travels only to the reviewed-plan request.
 	f.err = nil
-	withAccess := `{"preview":` + wireComposition + `,"expected_plan_digest":"` + wirePlanDigest + `","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
+	withAccess := `{"preview":` + strings.TrimSuffix(wireComposition, "}") + `,"result_access":{"actionIds":["a1"],"operations":["download_artifact"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}},"expected_plan_digest":"` + wirePlanDigest + `","idempotency_key":"same-key"}`
 	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 {
 		t.Fatalf("result access not passed: %v %+v", err, f.access)
 	}
+	if reply, err = s.Call(t.Context(), f, "request_capture", []byte(strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1))); err != nil || !strings.Contains(string(reply.Body), "CapabilityUnavailable") {
+		t.Fatalf("read_memory: %v %s", err, reply.Body)
+	}
 	for name, bad := range map[string]string{
-		"read_memory": strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1),
 		"client list": strings.Replace(withAccess, `"maxArtifacts"`, `"clientIDs":["console"],"maxArtifacts"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "request_capture", []byte(bad)); err == nil {

@@ -123,7 +123,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			server.StartTLS()
 			defer server.Close()
 			service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
-			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{})
+			ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: presentation.NewClusterNames(map[string]string{"local": reserveID(4)}), PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +148,7 @@ func TestStorageReadinessReserveDeliversAuditedHTTP2Preview(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			request := rpcRequest(t, server, "2026-07-28", "tools/call", map[string]any{"name": "preview_capture", "arguments": map[string]any{"target_ref": map[string]any{"cluster_id": reserveID(4), "namespace": "payments", "kind": "Deployment", "name": "api"}, "preset_ref": map[string]any{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": 60}})
+			request := rpcRequest(t, server, "2026-07-28", "tools/call", map[string]any{"name": "preview_capture", "arguments": map[string]any{"target_ref": map[string]any{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"}, "preset_ref": map[string]any{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": 60}})
 			started := time.Now()
 			response, err := server.Client().Do(request)
 			if err != nil {

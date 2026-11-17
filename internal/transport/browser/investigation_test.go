@@ -86,7 +86,7 @@ func TestInvestigationBrowserUsesCurrentSessionAndExactIdempotency(t *testing.T)
 	defer server.Close()
 	sessions := &investigationSession{}
 	calls := &investigationCalls{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestInvestigationBrowserUsesCurrentSessionAndExactIdempotency(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const request = `{"preview":{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"stable-key"`
+	const request = `{"preview":{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"stable-key"`
 	body := request + "}"
 	makeRequest := func() *http.Request {
 		r, e := http.NewRequest("POST", server.URL+"/api/v1/operations/"+op, strings.NewReader(body))
@@ -201,7 +201,7 @@ func TestInvestigationFinalIdentityShorteningReachesSocket(t *testing.T) {
 		handler.ServeHTTP(investigationDeadlineWriter{w, observed}, r)
 	}))
 	defer server.Close()
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if err != nil {
 		t.Fatal(err)
 	}

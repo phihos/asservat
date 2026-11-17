@@ -64,14 +64,17 @@ func operationFixture(t *testing.T, enabled bool) (*ContextOperations, *contextO
 	now := assessmentFixture().GeneratedAt
 	f := &contextOperationFixture{i: identity.Identity{Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}}
 	f.metadataUntil = f.i.ValidUntil
-	s, err := NewContextOperations(ContextOperationsConfig{PublicOrigin: "https://console.invalid", CollectionEnabled: enabled, Now: func() time.Time { return now }, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+	s, err := NewContextOperations(ContextOperationsConfig{Clusters: NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000001"}), PublicOrigin: "https://console.invalid", CollectionEnabled: enabled, Now: func() time.Time { return now }, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return s, f
 }
 
-const wireTarget = `"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"}`
+const wireTarget = `"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}`
+
+// wireLegacyTarget is the target_ref of tools still on the old contract.
+const wireLegacyTarget = `"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"}`
 const wirePreview = `{` + wireTarget + `,"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`
 const wirePlanDigest = "1111111111111111111111111111111111111111111111111111111111111111"
 const wireRequest = `{"preview":` + wirePreview + `,"expected_plan_digest":"` + wirePlanDigest + `","idempotency_key":"same-key"}`
@@ -146,9 +149,18 @@ func TestContextOperationsDisabledScopesUnknownRepliesAndNoSilentFeatures(t *tes
 	if _, err = s.Call(context.Background(), f, "request_capture", []byte(wireRequest)); err != nil || f.requests != 0 {
 		t.Fatal("capture scope bypass")
 	}
-	for _, extra := range []string{`,"reason":"private-value"`, `,"sharing":{}`, `,"history_capture_id":"00000000-0000-4000-8000-000000000030"`} {
+	for _, extra := range []string{`,"sharing":{}`, `,"history_capture_id":"00000000-0000-4000-8000-000000000030"`} {
 		if _, err = s.Call(context.Background(), f, "preview_capture", []byte(strings.TrimSuffix(wirePreview, "}")+extra+"}")); err == nil {
-			t.Fatal("unsupported feature silently discarded")
+			t.Fatal("invalid input accepted", extra)
+		}
+	}
+	for _, extra := range []string{`,"reason":"private-value"`, `,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"r"}],"management":{"mode":"creator"}}`, `,"target_handle":"t"`} {
+		in := strings.TrimSuffix(wirePreview, "}") + extra + "}"
+		if extra == `,"target_handle":"t"` {
+			in = `{"target_handle":"t","preset_ref":{"name":"pod-status","version":"v1"}}`
+		}
+		if b, err = s.Call(context.Background(), f, "preview_capture", []byte(in)); err != nil || !strings.Contains(string(b.Body), "CapabilityUnavailable") || f.input.Target.Name != "" {
+			t.Fatal("unsupported feature silently discarded", extra, err, string(b.Body))
 		}
 	}
 	f.i.Scopes = append(f.i.Scopes, "evidence:capture")

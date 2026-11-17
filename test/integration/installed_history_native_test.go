@@ -95,7 +95,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	if status, code := call(outsider, "list_capture_history", list, nil); status != "error" || code != "NotAvailable" {
 		t.Fatal("installed unrelated principal listed history", status, code)
 	}
-	if status, code := call(outsider, "get_capture_settings", map[string]string{"capture_id": captureID}, nil); status != "error" || code != "NotAvailable" {
+	if status, code := call(outsider, "get_capture", map[string]string{"capture_id": captureID, "view": "settings"}, nil); status != "error" || code != "NotAvailable" {
 		t.Fatal("installed unrelated principal read settings", status, code)
 	}
 	if status, code := call(outsider, "preview_capture", map[string]string{"history_capture_id": captureID}, nil); status != "error" || code != "NotAvailable" {
@@ -115,7 +115,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 			RequestedRetention string `json:"requested_retention"`
 		} `json:"settings"`
 	}
-	if status, code := call(developer, "get_capture_settings", map[string]string{"capture_id": captureID}, &settings); status != "ok" || settings.CaptureID != captureID || settings.Settings.Target.Namespace != target["namespace"] || settings.Settings.Target.Workload.Name != target["name"] || settings.Settings.RequestedRetention == "" {
+	if status, code := call(developer, "get_capture", map[string]string{"capture_id": captureID, "view": "settings"}, &settings); status != "ok" || settings.CaptureID != captureID || settings.Settings.Target.Namespace != target["namespace"] || settings.Settings.Target.Workload.Name != target["name"] || settings.Settings.RequestedRetention == "" {
 		t.Fatal("installed capture settings", status, code, settings)
 	}
 	// 4. Collect again: the ordinary preview of the same target, then submit.

@@ -56,7 +56,7 @@ func TestCompositionPreviewThroughMCP(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	f := &mcpRecorderFixture{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestCompositionPreviewThroughMCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	arguments := map[string]any{}
-	if err := json.Unmarshal([]byte(`{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"calls","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"},"overrides":[{"actionID":"syscalls","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"syscalls","field":"syscallBefore","value":"0s"},{"actionID":"syscalls","field":"syscallFilter","value":{"mode":"include","names":["openat","connect"]}}]}],"maxTotalBytes":16777216,"maxDuration":"30s"}}`), &arguments); err != nil {
+	if err := json.Unmarshal([]byte(`{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"calls","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"},"overrides":[{"actionID":"syscalls","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"syscalls","field":"syscallBefore","value":"0s"},{"actionID":"syscalls","field":"syscallFilter","value":{"mode":"include","names":["openat","connect"]}}]}],"maxTotalBytes":16777216,"maxDuration":"30s"}}`), &arguments); err != nil {
 		t.Fatal(err)
 	}
 	client := sdk.NewClient(&sdk.Implementation{Name: "recorder-test-agent", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
