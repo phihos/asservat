@@ -91,12 +91,12 @@ func artifactScope(installation string) authorization.KeyScope {
 	return authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: artifactKeyID(installation)}
 }
 
-// keyServiceAuthorities is the artifact scope's authority map: wraps,
-// verifier unwraps and, only with downloads, acquisition unwraps through the
-// native download key authority (ADR-204 decision 8). A role without an
-// entry is denied; there is no bare "unwrap" entry to fall back to.
-func keyServiceAuthorities(wraps, verifier authapp.KeyOperationAuthorizer, acquisition *postgres.NativeKeyAuthority) authapp.KeyOperationAuthorizers {
-	out := authapp.KeyOperationAuthorizers{"wrap": wraps, "unwrap/verifier": verifier}
+// keyServiceAuthorities is the artifact scope's authority map: wraps and,
+// only with downloads, acquisition unwraps through the native download key
+// authority (ADR-204 decision 8). A role without an entry is denied; there is
+// no bare "unwrap" entry to fall back to.
+func keyServiceAuthorities(wraps authapp.KeyOperationAuthorizer, acquisition *postgres.NativeKeyAuthority) authapp.KeyOperationAuthorizers {
+	out := authapp.KeyOperationAuthorizers{"wrap": wraps}
 	if acquisition != nil {
 		out["unwrap/acquisition"] = acquisition
 	}
@@ -175,7 +175,7 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	in := &providerInputs{files: files, postgresEndpoint: endpoint}
 	pools := map[string]*pgxpool.Pool{}
 	users := map[string]bool{}
-	purposes := []string{"key-configuration", "key-wrap", "key-verify"}
+	purposes := []string{"key-configuration", "key-wrap"}
 	if c.Downloads != nil {
 		// ADR-204: the acquisition login exists only with downloads.
 		purposes = append(purposes, "key-acquisition")
@@ -236,11 +236,6 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	if err != nil {
 		return k, err
 	}
-	unwraps, err := postgres.NewContextKeyUnwraps(startup, pools["key-verify"], c.PermissionRootID, c.IssuerEpoch, scope)
-	if err != nil {
-		return k, mounts.ErrUnavailable
-	}
-	// ADR-181: verification unwraps for the publisher's verifier role.
 	// ADR-204: acquisition unwraps through the native download key authority,
 	// only with a Downloads section.
 	var acquisition *postgres.NativeKeyAuthority
@@ -249,7 +244,7 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 			return k, err
 		}
 	}
-	authority := keyServiceAuthorities(wraps, unwraps, acquisition)
+	authority := keyServiceAuthorities(wraps, acquisition)
 	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors, Now: time.Now}, time.Now, c.Concurrency); err != nil {
 		return k, mounts.ErrUnavailable
 	}

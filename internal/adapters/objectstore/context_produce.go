@@ -167,6 +167,6 @@ func (p *preparedContext) StoreContext(ctx context.Context, native []byte, start
 	if ctx.Err() != nil || !stored.Before(e.Registration.WriteUntil) {
 		return artifact.Copies{}, privacy.ErrExpired
 	}
-	p.completion = artifact.ContextWriterCompletion{RegistrationDigest: privacy.RegistrationDigest(e.Registration), ExpectationDigest: evidence.ContextExpectationDigest(e), Copies: out, StoredAt: stored}
+	p.completion = artifact.ContextWriterCompletion{RegistrationDigest: privacy.RegistrationDigest(e.Registration), ExpectationDigest: evidence.ContextExpectationDigest(e), Copies: out, StoredAt: stored, NativeBytes: int64(len(native))}
 	return out, nil
 }

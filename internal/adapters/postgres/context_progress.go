@@ -41,7 +41,7 @@ func NewContextProgressReads(ctx context.Context, pool *pgxpool.Pool, root strin
 }
 
 // progressFacts projects a single MVCC snapshot of immutable admission, custody,
-// verified outcome, durable encrypted audit acknowledgement and publication.
+// stored outcome and publication.
 // It deliberately makes no claim that admission implies collector execution.
 func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...executionvalue.APIExecution) (value.ContextProgressObservation, error) {
 	var out value.ContextProgressObservation
@@ -87,19 +87,8 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		return out, nil
 	}
 	out.CanCancel = (accepted.Expectation.Snapshot != nil || accepted.Expectation.Profile != nil || accepted.Expectation.Logs != nil || recordingCancellationExpected(accepted.Expectation)) && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
-	verified := f.VerifiedCaptureID.Valid
-	if verified {
-		v := custodydb.ContextVerification{AcquisitionStartedAt: f.AcquisitionStartedAt, AcquisitionCompletedAt: f.AcquisitionCompletedAt, NativeBytes: f.NativeBytes, CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64}
-		record, err := verificationRecord(c, v, executions...)
-		if err != nil || !f.PermissionSequence.Valid || !bytes.Equal(f.CopiesDigest, f.VerifiedCopiesDigest) {
-			return value.ContextProgressObservation{}, value.ErrUnavailable
-		}
-		if f.AuditAcknowledgedAt.Valid && (!bytes.Equal(f.AuditDigest, digest(record)) || f.AuditAcknowledgedAt.Time.Before(f.VerifiedAt.Time)) {
-			return value.ContextProgressObservation{}, value.ErrUnavailable
-		}
-	}
 	if f.CatalogArtifactID.Valid || f.PublishedAt.Valid {
-		if !verified || !f.AuditAcknowledgedAt.Valid || uid(f.CatalogArtifactID) != out.CandidateArtifactID || !f.PublishedAt.Valid || f.PublishedAt.Time.Before(f.AuditAcknowledgedAt.Time) || !f.PublishedAt.Time.Before(accepted.Expectation.Registration.WriteUntil) {
+		if uid(f.CatalogArtifactID) != out.CandidateArtifactID || !f.PublishedAt.Valid || !bytes.Equal(f.CatalogCopiesDigest, f.CopiesDigest) || !f.PublishedAt.Time.Before(accepted.Expectation.Registration.WriteUntil) {
 			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
 		out.Phase = "Succeeded"
@@ -162,7 +151,7 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		case "stored":
 			out.Phase = "Finalizing"
 			out.ActionPhase = "Finalizing"
-			out.ReasonCode = "VerificationPending"
+			out.ReasonCode = "PublicationPending"
 		default:
 			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
@@ -174,19 +163,11 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		out.Phase = "Indeterminate"
 		out.ActionPhase = "Indeterminate"
 		out.ReasonCode = "DeadlineOutcomeUnconfirmed"
-	} else if verified || f.CustodyState == artifact.StoredUnpublished {
+	} else if f.CustodyState == artifact.StoredUnpublished {
 		if len(f.CopiesDigest) != 32 {
 			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
-		out.Phase = "Finalizing"
-		out.ActionPhase = "Finalizing"
-		out.ReasonCode = "VerificationPending"
-		if verified {
-			out.ReasonCode = "VerificationAuditPending"
-			if f.AuditAcknowledgedAt.Valid {
-				out.ReasonCode = "PublicationPending"
-			}
-		}
+		out.Phase, out.ActionPhase, out.ReasonCode = "Finalizing", "Finalizing", "PublicationPending"
 	}
 	return out, nil
 }

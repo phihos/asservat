@@ -6,12 +6,11 @@ Scope: C-14 evidence, C-15 privacy and C-21 adapters under I-05/I-09; part of RE
 
 Integrity is checked where it is cheapest:
 
-1. **Producer, before encryption.** The producer runs the structural check of its native type: pod-status schema, PCAPNG block structure, syscall events against `syscall-results.schema.json#/$defs/event` for the expected Pod and interval, one strict JSON object for the HTTP header projection. Output that fails is not uploaded.
+1. **Producer, before encryption.** The producer runs the check of its native type: pod-status schema, PCAPNG block structure with headers-only packets or the accepted raw prefix caps, syscall events against `syscall-results.schema.json#/$defs/event` for the expected Pod and interval, the HTTP header projection with only approved header values, a gzip/trace header for Go profiles. Output that fails is not uploaded.
 2. **Writer, during upload.** Each object's SHA-256 is computed while streaming and sent as `x-amz-checksum-sha256`; the store rejects a mismatch ([custody](custody-transactions.md)).
-3. **Regional reader, before publication.** `ContextVerifier` runs in A-READ, which holds the `download-reader` unwrap role, and reads and checks only the small objects: envelope, manifest and index.
-4. **Reader.** Each data frame is authenticated by its AEAD tag when read. A failed tag ends the read with an error.
+3. **Reader.** Every read checks the envelope, manifest and index against the catalog row, and each data frame by its AEAD tag. A failure ends the read with `Integrity`.
 
-Publication never rereads or redecrypts data frames.
+Publication reads nothing; it records the producer's completion ([context publication](context-publication.md)).
 
 ## Expected facts
 
@@ -19,17 +18,15 @@ Publication never rereads or redecrypts data frames.
 
 ## Reader checks
 
-The hub assigns verification of a stored outcome to the regional reader over its connection. `evidence.ContextCustodian` checks the registration and write deadline; the reader runs `ContextVerifier` outside transaction locks; each object read has the five-second I/O timeout (ADR-330 D5):
+`objectstore.ContextVerifier` opens a published artifact for every read (projection, query, native download); each object read has the five-second I/O timeout (ADR-330 D5):
 
 1. Read the envelope object/version, compare its recorded checksum and length, validate `artifact-commit/v1` and bind its IDs and manifest checksum to the registration.
 2. Decrypt the manifest with the fixed manifest AAD and validate it against the canonical schema.
-3. Compare every control field with the expectation: target, audience, origin, classification, retention arithmetic, source times, projection provenance, type, and data/index identities, sizes and checksums. Reject unsupported fields, substituted targets or audiences, later expiry and false completeness.
+3. Compare every control field with the catalog row's admitted expectation and copy receipts: target, audience, origin, classification, retention arithmetic, source times, projection provenance, type, and data/index identities, sizes and checksums. Reject unsupported fields, substituted targets or audiences, later expiry and false completeness.
 4. Decrypt the index and check that its frame count, sizes and data checksum agree with the manifest.
 5. For the pod-status profile only, the whole data object is one frame: decrypt it and check identity, observation time and counts against the expectation.
 
-A failure publishes nothing; the stored objects stay charged until deletion removes them.
-
-Limits, each bounding reader memory per verification: the envelope is at most the size implied by the fixed-shape `artifact-commit/v1` schema maxima; the decoded manifest is at most the reader memory limit divided by its concurrent verifications (chart default 1 MiB), and its ciphertext adds the 64 KiB framing overhead; the pod-status document is within the 2 MiB Kubernetes API response cap. Strict JSON parsing rejects duplicate keys, invalid Unicode, trailing documents, nesting deeper than the deepest canonical schema plus a margin, and non-integer numbers; the byte bound also bounds the token count. Errors carry allowlisted codes, never content.
+Limits, each bounding reader memory per read: the envelope is at most the size implied by the fixed-shape `artifact-commit/v1` schema maxima; the decoded manifest is at most the reader memory limit divided by its concurrent reads (chart default 1 MiB), and its ciphertext adds the 64 KiB framing overhead; the pod-status document is within the 2 MiB Kubernetes API response cap. Strict JSON parsing rejects duplicate keys, invalid Unicode, trailing documents, nesting deeper than the deepest canonical schema plus a margin, and non-integer numbers; the byte bound also bounds the token count. Errors carry allowlisted codes, never content.
 
 ## Profiles
 
@@ -44,4 +41,4 @@ Nine canonical schemas are embedded with remote loading denied and format assert
 
 ## Result
 
-The reader returns pass or an allowlisted failure code. [Context publication](context-publication.md) records the catalog association, the settled charge and the `audit_event` row in one transaction.
+The reader returns the authenticated stream or an allowlisted failure code.

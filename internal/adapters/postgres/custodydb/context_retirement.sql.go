@@ -13,7 +13,6 @@ import (
 
 const observeContextRetirementDependencies = `-- name: ObserveContextRetirementDependencies :one
 SELECT c.id,c.root_id,a.state AS custody_state,
- NOT EXISTS(SELECT 1 FROM context_verification v WHERE v.capture_id=c.id AND v.audit_acknowledged_at IS NOT NULL) AS verification_audit_pending,
  NOT EXISTS(SELECT 1 FROM context_execution e WHERE e.capture_id=c.id AND e.phase='stored') AS execution_unresolved,
  EXISTS(SELECT 1 FROM custody_copy p WHERE p.attempt_id=a.id AND p.ciphertext_sha256 IS NOT NULL) AS retained_copy_receipts,
  EXISTS(SELECT 1 FROM artifact_download d WHERE d.artifact_id=a.artifact_id) AS download_dependents,
@@ -28,14 +27,13 @@ type ObserveContextRetirementDependenciesParams struct {
 }
 
 type ObserveContextRetirementDependenciesRow struct {
-	ID                       pgtype.UUID
-	RootID                   pgtype.UUID
-	CustodyState             string
-	VerificationAuditPending bool
-	ExecutionUnresolved      bool
-	RetainedCopyReceipts     bool
-	DownloadDependents       bool
-	RetentionAuditPending    bool
+	ID                    pgtype.UUID
+	RootID                pgtype.UUID
+	CustodyState          string
+	ExecutionUnresolved   bool
+	RetainedCopyReceipts  bool
+	DownloadDependents    bool
+	RetentionAuditPending bool
 }
 
 func (q *Queries) ObserveContextRetirementDependencies(ctx context.Context, arg ObserveContextRetirementDependenciesParams) (ObserveContextRetirementDependenciesRow, error) {
@@ -45,7 +43,6 @@ func (q *Queries) ObserveContextRetirementDependencies(ctx context.Context, arg 
 		&i.ID,
 		&i.RootID,
 		&i.CustodyState,
-		&i.VerificationAuditPending,
 		&i.ExecutionUnresolved,
 		&i.RetainedCopyReceipts,
 		&i.DownloadDependents,

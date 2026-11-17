@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## One-step publication (REQ-EVD-001, ADR-330, 2026-11-17)
+
+Branch `clean/publication`. hub-api publishes in the transaction that records
+the collector's stored outcome (`RecordAPIStoredCompletion`): copy receipts,
+the catalog row (admitted facts plus the reported copy digest, native size and
+Go-profile acquisition window) and the custody event; the catalog INSERT
+triggers add the case association, capture-time shares and the progress
+`NOTIFY`. Migration 00199 drops `context_verification` and
+`context_key_unwrap`. Removed: the `asservat publisher` Deployment, its
+verifier key unwrap, verifier PKI, OpenBao audit key, SeaweedFS principals,
+SQL purposes and Helm values; `ContextPublisher`, `ContextPublicationGate`,
+verification audit objects and receipts. The producer now runs the
+headers-only, raw-cap and approved-HTTP-header checks before encryption.
+Verified: see the PR. Gaps: the publication `audit_event` row waits for the
+`audit_event` table (#283); reads compare the manifest with the admitted facts
+and copy digests but not yet with the stored native size.
+
 ## Custody fixes after #279 and #283 (2026-11-17)
 
 Branch `clean/main-fixes-downgrade`. The integration hub pool fixture opens the
@@ -63,6 +80,10 @@ trigger shorten only matching artifacts. Policy recorders and saved windows
 use the labels resolved at arming. Rows without recorded labels (older rows)
 take a labeled policy cluster-wide.
 Open: policy status writes (no RBAC or status code yet; the log line is the
+signal), label selectors (no label reader; a labeled policy refuses collection in
+its clusters and applies cluster-wide to existing evidence), connector-pushed
+local policies.
+
 signal), connector-pushed local policies, one-step publication.
 
 ## Joined clusters without copied Secrets (REQ-FED-001/002, ADR-334/335 D4, 2026-11-16)
@@ -249,7 +270,7 @@ function body; its Down restores the 00167 view for downgrade probes.
 `RecoveryTransactionGuard` and `EffectTransactionGuards` are gone from domain,
 application, adapters, bootstrap and transport; effect transactions no longer
 lock or check the trust row for recovery. Open: the setup recovery step of REQ-DB-005;
-one-step publication; the unused `identity-read` pools that only served recovery reads.
+the unused `identity-read` pools that only served recovery reads.
 
 ## Standing connector identity (ADR-332, 2026-11-14)
 

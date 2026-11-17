@@ -99,9 +99,9 @@ for package in packages:
             raise ValueError(f"Invalid dependency {source} -> {target}")
         if source == "bootstrap":
             continue
-        # Publication reuses canonical data-only logs and approved HTTP native
-        # codecs/checkers. This exact package allowlist does not admit collectors.
-        if source == "C-21" and target == "C-23" and relative(imported) not in {"internal/adapters/logs", "internal/adapters/httpheaders"}:
+        # The producer's native checks reuse canonical data-only logs, approved
+        # HTTP header and packet checkers. This exact allowlist admits no collector.
+        if source == "C-21" and target == "C-23" and relative(imported) not in {"internal/adapters/logs", "internal/adapters/httpheaders", "internal/adapters/packets"}:
             raise ValueError(f"Persistence may only reuse canonical native codecs from C-23: {imported}")
         if source != target and target not in components[source]["allowed_dependencies"]:
             raise ValueError(f"Undeclared dependency {source} -> {target}: {imported}")

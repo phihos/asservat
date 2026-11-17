@@ -118,12 +118,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if table, ok := publicRuntimeHubExtensionGrantTable[purpose]; ok {
 		return ownerIdentityGrantSet(append(slices.Clone(table), publicRuntimeProjectionGrants(purpose)...)), true
 	}
-	// The publisher retains its own narrow identity and retention credentials.
-	// Consolidating hub metadata never expands this separate process's grants.
-	switch purpose {
-	case "publisher-identity-read":
-		purpose = "identity-read"
-	}
 	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}}
 	add := func(table, privilege string, columns ...string) {
 		if len(columns) == 0 {
@@ -146,7 +140,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("recording_save_group", "UPDATE", "id")
 		// The hub's seven metadata facets share only their existing read and
 		// row-lock privileges. No evidence-object locators, credentials or effect writes.
-		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_decision", "retention_policy")
+		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_execution", "context_processing", "context_storage_binding", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_decision", "retention_policy")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		for _, signature := range []string{"capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "capacity_expensive_admits(uuid)"} {
@@ -347,7 +341,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// ADR-329: joined clusters' AccessBinding deliveries.
 		read("remote_access_binding_delivery")
 	case "permission-audit":
-		// The publisher's pending read and acknowledgement only; the stream
+		// The audit publisher's pending read and acknowledgement only; the stream
 		// column grant permits its existing FOR UPDATE lock.
 		read("permission_stream", "authority_audit")
 		add("permission_stream", "UPDATE", "id")
@@ -381,16 +375,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_capture", "SELECT", "id", "root_id", "expectation_json")
 		add("context_key_wrap", "INSERT", "attempt_id", "root_id", "certificate_sha256", "used_roles")
 		add("context_key_wrap", "UPDATE", "used_roles")
-	case "key-verify":
-		// ContextKeyUnwrapGrantSQL (ADR-181).
-		read("fleet_current_trust", "context_key_unwrap")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("context_execution", "SELECT", "capture_id", "root_id", "attempt_id", "expectation_digest", "phase")
-		add("context_execution", "UPDATE", "capture_id")
-		add("context_capture", "SELECT", "id", "root_id", "expectation_json", "snapshot_coverage", "snapshot_coverage_digest", "snapshot_expectation_digest")
-		add("context_catalog", "SELECT", "capture_id")
-		add("context_key_unwrap", "INSERT", "attempt_id", "root_id", "last_certificate_sha256", "unwraps")
-		add("context_key_unwrap", "UPDATE", "unwraps", "last_certificate_sha256")
 	case "key-acquisition":
 		// ADR-204: NativeKeyAuthority's two resolvers, DownloadKeys for the
 		// prepaid metadata batch and NativeKeys for a response window. These
@@ -401,7 +385,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("fleet_current_trust", "permission_stream", "authority_audit", "artifact_download", "download_batch",
 			"processing_root", "context_processing", "processing_rule",
 			"retention_policy", "retention_decision",
-			"context_capture", "context_verification", "download_key_binding", "download_native_key", "download_native_owner",
+			"context_capture", "download_key_binding", "download_native_key", "download_native_owner",
 			"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
 			"download_worker_configuration", "download_worker_configuration_revision")
 		// ReadPublishedContext reads only these catalog and attempt columns.
@@ -480,7 +464,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "download-source":
 		// Exact ciphertext receipts and minimized routing only. In particular,
 		// there is no allocation/session/audit/key/native-operation mutation.
-		read("fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "context_verification", "custody_attempt", "custody_copy", "context_case_locator", "retention_policy", "retention_decision", "processing_root", "context_processing", "processing_rule")
+		read("fleet_current_trust", "permission_stream", "authority_audit", "context_catalog", "context_capture", "custody_attempt", "custody_copy", "context_case_locator", "retention_policy", "retention_decision", "processing_root", "context_processing", "processing_rule")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 	case "download-plan":

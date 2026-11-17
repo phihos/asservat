@@ -304,16 +304,6 @@ hub:
       # Native downloads need the key service to unwrap for the hub-local
       # download workers (hub.download-worker, enabled by default).
       enabled: true
-  # Asynchronous publication verifier (no listener).
-  publisher:
-    replicas: 1
-    pollSeconds: 2
-    batch: 8
-    resources:
-      requests: {cpu: 50m, memory: 128Mi}
-      limits: {cpu: "1", memory: 512Mi}
-    nodeSelector: {}
-    tolerations: []
   # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
   # dedicated `<name>-downloads` namespace; Helm renders the namespace,
   # account, PriorityClass, the worker configuration and the dispatch Roles.

@@ -349,10 +349,14 @@ type ContextCaseLocator struct {
 }
 
 type ContextCatalog struct {
-	ArtifactID  pgtype.UUID
-	CaptureID   pgtype.UUID
-	RootID      pgtype.UUID
-	PublishedAt pgtype.Timestamptz
+	ArtifactID             pgtype.UUID
+	CaptureID              pgtype.UUID
+	RootID                 pgtype.UUID
+	PublishedAt            pgtype.Timestamptz
+	CopiesDigest           []byte
+	NativeBytes            pgtype.Int8
+	AcquisitionStartedAt   pgtype.Timestamptz
+	AcquisitionCompletedAt pgtype.Timestamptz
 }
 
 type ContextDeletionCheckpoint struct {
@@ -394,14 +398,6 @@ type ContextExecution struct {
 	CopiesJson        []byte
 	CopiesDigest      []byte
 	WriterProtocol    pgtype.Text
-}
-
-type ContextKeyUnwrap struct {
-	AttemptID             pgtype.UUID
-	RootID                pgtype.UUID
-	LastCertificateSha256 []byte
-	Unwraps               int16
-	CreatedAt             pgtype.Timestamptz
 }
 
 type ContextKeyWrap struct {
@@ -594,28 +590,6 @@ type ContextStorageBinding struct {
 	SourceDigest     []byte
 	ObservedAt       pgtype.Timestamptz
 	FreshUntil       pgtype.Timestamptz
-}
-
-type ContextVerification struct {
-	CaptureID              pgtype.UUID
-	RootID                 pgtype.UUID
-	ExpectationDigest      []byte
-	CopiesDigest           []byte
-	IntentDigest           []byte
-	AuthorityDigest        []byte
-	PermissionEpoch        pgtype.UUID
-	PermissionSequence     int64
-	VerifiedAt             pgtype.Timestamptz
-	AuditAcknowledgedAt    pgtype.Timestamptz
-	AuditDigest            []byte
-	AuditObjectKey         pgtype.Text
-	AuditObjectVersion     pgtype.Text
-	AuditObjectEtag        pgtype.Text
-	AuditObjectBytes       pgtype.Int8
-	AuditObjectSha256      []byte
-	NativeBytes            pgtype.Int8
-	AcquisitionStartedAt   pgtype.Timestamptz
-	AcquisitionCompletedAt pgtype.Timestamptz
 }
 
 type ContextWriterCompletion struct {

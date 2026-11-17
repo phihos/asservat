@@ -47,10 +47,9 @@ SELECT s.artifact_id,s.capture_id,s.attempt_id,s.case_id,s.cluster_id,s.namespac
        COALESCE(e.doc->>'ActionID','')::text AS action_id,
        COALESCE(e.doc->>'NativeType','')::text AS native_type,
        COALESCE(e.doc->>'DataClass','')::text AS data_class,
-       COALESCE(v.audit_acknowledged_at IS NOT NULL AND s.copies_digest=v.copies_digest,false)::boolean AS verified
+       COALESCE(s.copies_digest=cat.copies_digest,false)::boolean AS verified
 FROM scanned s
 LEFT JOIN context_catalog cat ON cat.root_id=s.root_id AND cat.artifact_id=s.artifact_id AND cat.capture_id=s.capture_id
-LEFT JOIN context_verification v ON v.root_id=cat.root_id AND v.capture_id=cat.capture_id
 LEFT JOIN context_capture c ON c.root_id=cat.root_id AND c.id=cat.capture_id AND c.attempt_id=s.attempt_id
 LEFT JOIN LATERAL (SELECT convert_from(c.expectation_json,'UTF8')::jsonb AS doc) e ON true
 ORDER BY CASE WHEN $1::uuid IS NULL THEN s.anchor_at END,s.artifact_id

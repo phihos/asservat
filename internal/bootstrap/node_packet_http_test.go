@@ -202,7 +202,7 @@ func TestNodeRefusesInvalidHTTPProjectionWork(t *testing.T) {
 }
 
 // A projection that does not fit the recording's output cap drops its
-// latest records and still passes the publisher's recheck.
+// latest records and still passes the native check.
 func TestHTTPRecorderBoundsOutputByMaxBytes(t *testing.T) {
 	w, _ := httpWork(time.Now())
 	started := time.Now().UTC()
@@ -231,9 +231,9 @@ func TestHTTPRecorderBoundsOutputByMaxBytes(t *testing.T) {
 	}
 }
 
-// The publisher's HTTP check uses the expectation's accepted limits and
+// The native HTTP check uses the expectation's accepted limits and
 // output cap; any other recording yields a check that refuses everything.
-func TestPublisherHTTPCheckUsesAcceptedRecording(t *testing.T) {
+func TestNativeHTTPCheckUsesAcceptedRecording(t *testing.T) {
 	w, _ := httpWork(time.Now())
 	started := time.Now().UTC()
 	rec, err := newHTTPRecorder(w.Packet.Program, w.Packet.MaxBytes, started, testHTTPProjection)

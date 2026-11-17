@@ -38,7 +38,7 @@ func (p KeyPeer) Valid(now time.Time) bool {
 		return false
 	}
 	switch p.Role {
-	case "collector", "publisher", "acquisition", "verifier", "audit-writer", "audit-reader", "hub-session", "policy-submitter":
+	case "collector", "acquisition", "audit-writer", "audit-reader", "hub-session", "policy-submitter":
 		return true
 	}
 	return false
@@ -52,8 +52,7 @@ func (p KeyPeer) CanRequest(scope KeyScope, operation string) bool {
 	}
 	switch scope.Purpose {
 	case "artifact":
-		// ADR-181: the publication verifier unwraps only under its own authority.
-		return operation == "wrap" && (p.Role == "collector" || p.Role == "publisher") || operation == "unwrap" && (p.Role == "acquisition" || p.Role == "verifier")
+		return operation == "wrap" && p.Role == "collector" || operation == "unwrap" && p.Role == "acquisition"
 	case "audit":
 		return operation == "wrap" && p.Role == "audit-writer" || operation == "unwrap" && p.Role == "audit-reader"
 	case "browser-credentials":

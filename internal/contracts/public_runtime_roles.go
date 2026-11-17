@@ -29,7 +29,6 @@ const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 func PublicRuntimeRolePurposes() []string {
 	out := PublicRuntimeHubRolePurposes()
 	out = append(out, PublicRuntimeFederationPurposes()...)
-	out = append(out, PublicRuntimePublisherPurposes()...)
 	out = append(out, "capacity", "capacity-capture")
 	out = append(out, PublicRuntimePermissionPurposes()...)
 	out = append(out, PublicRuntimeRetentionPurposes()...)
@@ -116,16 +115,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 52, true
 	case "connector-owner-read":
 		return 56, true
-	case "publication-gate":
-		return 24, true
-	case "context-verify":
-		return 25, true
-	case "context-verification-audit":
-		return 26, true
-	case "context-publish":
-		return 27, true
-	case "publisher-identity-read":
-		return 65, true
 	case "capacity":
 		return 70, true
 	case "capacity-capture":
@@ -143,8 +132,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 82, true
 	case "key-wrap":
 		return 83, true
-	case "key-verify":
-		return 84, true
 	// ADR-204: the hub-worker's worker configuration acceptance and the key
 	// service's acquisition unwraps.
 	case "worker-config-observe":
@@ -207,9 +194,7 @@ type PublicRuntimeRoleState struct {
 	FederationProjection *PublicRuntimeProjectionClaim `json:"federationProjection,omitempty"`
 	// ADR-198: the key service's immutable SQL projection.
 	KeyServiceProjection *PublicRuntimeProjectionClaim `json:"keyServiceProjection,omitempty"`
-	// ADR-203: the publisher's immutable SQL projection.
-	PublisherProjection *PublicRuntimeProjectionClaim `json:"publisherProjection,omitempty"`
-	CapacitySetup       *CapacityRootSetupClaim       `json:"capacitySetup,omitempty"`
+	CapacitySetup        *CapacityRootSetupClaim       `json:"capacitySetup,omitempty"`
 }
 
 // One original create claim for the separate immutable runtime projection.

@@ -21,10 +21,10 @@ func HubDeploymentNamesList(installation string) []string {
 
 // ReleaseFollowerNames are the hub-namespace Deployments that follow the
 // release image without any runtime check of their own image (ADR-227 phase
-// 3): the key service, publisher and federation, in rollout order. Each exists
+// 3): the key service and federation, in rollout order. Each exists
 // only when the installation enabled it.
 func ReleaseFollowerNames(installation string) []string {
-	return []string{contracts.KeyServiceName(installation), contracts.PublisherName(installation), FederationWorkloadName(installation)}
+	return []string{contracts.KeyServiceName(installation), FederationWorkloadName(installation)}
 }
 
 // HubDeploymentSettled reports whether the Deployment's controller has

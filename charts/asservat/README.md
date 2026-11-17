@@ -57,7 +57,7 @@ Apply configuration changes with `helm upgrade` and the same values file.
 | `workloadKeys` | omitted | Workload label/annotation keys only administrators may set (workloadMetadata PermissionSources) |
 | `retention` | omitted | Baseline retention policy |
 | `region` | see values.yaml | Connector settings for `cluster` and `combined` |
-| `hub.<component>` | see values.yaml | `replicas`, `resources`, `nodeSelector`, `tolerations` of hub-api, hub-worker, federation, key-service, publisher |
+| `hub.<component>` | see values.yaml | `replicas`, `resources`, `nodeSelector`, `tolerations` of hub-api, hub-worker, federation, key-service |
 | `secrets.<key>.existingSecret` | none | Use an existing Secret instead of generating it (see below) |
 | `services.*` | external | Provider selection, external coordinates and bundled workloads |
 | `collector.*` | disabled | Node collector (test hosts only) |
@@ -77,7 +77,7 @@ Its Role can only create Secrets and get or patch the named ones.
 | Secret | Keys |
 | --- | --- |
 | `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `roleSetupID`, `peerID` |
-| `<name>-sql-<component>` | `sql-<purpose>.json` (`{"username","password"}`) per runtime SQL role of hub-api, hub-worker, federation, publisher, key-service |
+| `<name>-sql-<component>` | `sql-<purpose>.json` (`{"username","password"}`) per runtime SQL role of hub-api, hub-worker, federation, key-service |
 | `<name>-audit-mac` | `inputVersion`, `inputKey`, `accountVersion`, `accountKey` |
 | `<name>-artifact-key` | `keys.json`, the local artifact root keyset |
 | `<name>-s3-<principal>` | `credentials.json`, bundled SeaweedFS only |

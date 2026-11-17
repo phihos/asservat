@@ -46,36 +46,3 @@ func TestProfileAcquisitionWindowCanonicalDisplayMetadata(t *testing.T) {
 		t.Fatal("unknown window invented")
 	}
 }
-
-func TestProfileVerificationResultRequiresTimingOnlyForProfiles(t *testing.T) {
-	now := time.Date(2026, 11, 4, 9, 0, 0, 0, time.UTC)
-	w := &AcquisitionWindow{StartedAt: now, CompletedAt: now.Add(time.Second)}
-	for _, native := range []string{PprofArtifact, GoTraceArtifact} {
-		e := ContextExpectation{NativeType: native, Profile: &GoProfileAcquisition{}, Registration: Registration{NativeLimit: 1024}}
-		r := ContextVerificationResult{NativeBytes: 512, Acquisition: w}
-		if !r.Valid(e) {
-			t.Fatal("profile result rejected", native)
-		}
-		clone := r.Clone()
-		clone.Acquisition.CompletedAt = now
-		if clone.Acquisition.Equal(*r.Acquisition) {
-			t.Fatal("result clone aliases window")
-		}
-		r.Acquisition = nil
-		if r.Valid(e) {
-			t.Fatal("new profile verification accepted unknown timing")
-		}
-	}
-	e := ContextExpectation{Registration: Registration{NativeLimit: 1024}}
-	if (ContextVerificationResult{NativeBytes: 512, Acquisition: w}).Valid(e) {
-		t.Fatal("non-profile received profile timing")
-	}
-	for _, length := range []int64{-1, 1025} {
-		if (ContextVerificationResult{NativeBytes: length}).Valid(e) {
-			t.Fatal("invalid length accepted")
-		}
-	}
-	if !(ContextVerificationResult{NativeBytes: 512}).Valid(e) {
-		t.Fatal("legacy non-profile result changed")
-	}
-}

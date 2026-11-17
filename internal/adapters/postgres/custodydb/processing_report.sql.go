@@ -26,13 +26,12 @@ JOIN context_case_locator r ON r.root_id=p.root_id AND r.artifact_id=p.artifact_
  AND r.cluster_id=p.cluster_id AND r.namespace_uid=p.namespace_uid AND r.workload_uid=p.workload_uid AND r.pod_uid=p.pod_uid
 JOIN context_catalog cat ON cat.root_id=p.root_id AND cat.artifact_id=p.artifact_id AND cat.capture_id=p.capture_id
 JOIN context_capture c ON c.root_id=p.root_id AND c.id=p.capture_id AND c.attempt_id=p.attempt_id
-JOIN context_verification v ON v.root_id=p.root_id AND v.capture_id=p.capture_id
 JOIN custody_attempt a ON a.id=p.attempt_id AND a.artifact_id=p.artifact_id AND a.cluster_id=p.cluster_id
 CROSS JOIN LATERAL (SELECT convert_from(c.expectation_json,'UTF8')::jsonb AS doc) e
 WHERE p.root_id=$1::uuid AND p.retire_by>$2::timestamptz
  AND c.created_at<=$3::timestamptz
  AND (p.cluster_id,p.artifact_id,p.attempt_id)>($4::uuid,$5::uuid,$6::uuid)
- AND v.audit_acknowledged_at IS NOT NULL AND v.copies_digest=a.copies_digest
+ AND cat.copies_digest=a.copies_digest
 ORDER BY p.cluster_id,p.artifact_id,p.attempt_id LIMIT $7::integer
 `
 

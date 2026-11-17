@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Offline render checks for the federation, key service and publisher
-templates; no Kubernetes API calls. CHART overrides the chart directory."""
+"""Offline render checks for the federation and key service templates; no
+Kubernetes API calls. CHART overrides the chart directory."""
 import json
 import os
 from pathlib import Path
@@ -30,7 +30,7 @@ BASE = {
         "identity": {"provider": "keycloak", "keycloak": {"image": IMAGE, "hostname": "https://id.example", "tlsSecretName": "id-tls"}},
     },
 }
-COMPONENTS = {"federation": "FederationConfig", "key-service": "KeyServiceConfig", "publisher": "PublisherConfig"}
+COMPONENTS = {"federation": "FederationConfig", "key-service": "KeyServiceConfig"}
 TEMPLATES = [f"templates/{c}-workload.yaml" for c in COMPONENTS]
 
 
@@ -110,17 +110,11 @@ def main():
     # The federation holds no audit, object-store or OpenBao credential.
     assert not {"audit-storage.json", "inputKey", "provider-auth.token"} & set(fed), sorted(fed)
     assert fed["tls.key"] == ("secret", "asservat-federation-tls", "tls.key")
-    pub = files(by[("Deployment", "asservat-publisher")]["spec"]["template"])
-    assert pub["audit-storage.json"][1] == "asservat-s3-publisher-audit" and pub["evidence-read.json"][1] == "asservat-s3-publisher-read"
-    assert pub["provider-auth.token"] == ("serviceAccountToken", "asservat-publisher-provider", None)
-    # Only the key service's CA, never its key, reaches the publisher.
-    assert pub["key-service-ca.crt"] == ("secret", "asservat-key-service-tls", "ca.crt") and "tls.key" not in pub
     # Without cert-manager or an existing Secret the secrets hook creates the
     # CA and certificate once; Helm renders no key material.
     assert not any(d["kind"] == "Secret" for d in docs)
     assert by[("Service", "asservat-federation")]["spec"]["ports"][0]["port"] == 9446
     assert by[("Service", "asservat-key-service")]["spec"]["ports"][0]["port"] == 9447
-    assert ("Service", "asservat-publisher") not in by
     # Downloads are on by default (the hub-local download workers).
     assert ("Role", "asservat-key-service") in by
     off = {(d["kind"], d["metadata"]["name"]): d for d in render(merge(BASE, {"hub": {"key-service": {"downloads": {"enabled": False}}}}))}
@@ -137,7 +131,6 @@ def main():
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}
     assert by[("Certificate", "asservat-federation")]["spec"]["secretName"] == "asservat-federation-tls"
     assert not any(d["kind"] == "Secret" for d in docs) and ("Certificate", "asservat-key-service") not in by
-    assert files(by[("Deployment", "asservat-publisher")]["spec"]["template"])["key-service-ca.crt"][1] == "keys-tls"
     # Remote regions: NodePort and LoadBalancer listeners.
     docs = render(merge(BASE, {"hub": {"federation": {"service": {"type": "NodePort", "nodePort": 31446}}, "key-service": {"service": {"type": "LoadBalancer"}}}}))
     by = {(d["kind"], d["metadata"]["name"]): d for d in docs}

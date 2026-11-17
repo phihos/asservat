@@ -148,7 +148,7 @@ func (f *downloadWorkerFixture) Send(ctx context.Context, m DownloadMetadata, s 
 	return int64(len(b)), nil
 }
 func downloadWorkerTest(t *testing.T) (*downloadWorkerFixture, ContextDownloadWorker, ContextDownloadRequest) {
-	p, _ := publicationTest(t)
+	p := newContextFixture(t)
 	id := p.e.CaptureUID
 	scope := artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: p.e.NamespaceUID, WorkloadUID: p.e.WorkloadUID, PodUID: p.e.PodUID, Version: ContextCopiesDigest(p.copies), Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}}
 	f := &downloadWorkerFixture{now: p.now, body: []byte("synthetic approved native context")}

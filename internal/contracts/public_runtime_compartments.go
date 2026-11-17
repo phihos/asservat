@@ -18,15 +18,6 @@ func PublicRuntimeFederationPurposes() []string {
 	return []string{"connector-delivery", "connector-owner-read"}
 }
 
-// ADR-181: the asynchronous publication verifier is its own process kind
-// with its own recovery and retention read logins.
-const PublicRuntimeRetainedPublisherProcesses = 2
-const PublicRuntimePublisherRoleConnections = PublicRuntimeRetainedPublisherProcesses + 1
-
-func PublicRuntimePublisherPurposes() []string {
-	return []string{"publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read"}
-}
-
 // ConnectionLimit describes a fixed purpose, not permission to provision it.
 // The compiled inventory and independently protected workload compartment must
 // also support that purpose before any credential effect or runtime mount.
@@ -40,9 +31,6 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {
 		return PublicRuntimeFederationRoleConnections, true
-	}
-	if slices.Contains(PublicRuntimePublisherPurposes(), purpose) {
-		return PublicRuntimePublisherRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeKeyServicePurposes(), purpose) {
 		return PublicRuntimeKeyServiceRoleConnections, true

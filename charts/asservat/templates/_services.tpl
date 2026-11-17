@@ -1,5 +1,5 @@
 {{/*
-Federation, key service and publisher helpers. Everything shared (names,
+Federation and key service helpers. Everything shared (names,
 labels, image, Secrets, providers, CAs, schema wait, security contexts) is in
 _helpers.tpl.
 */}}

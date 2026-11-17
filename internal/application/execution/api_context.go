@@ -113,7 +113,7 @@ type ContextCollector interface {
 }
 
 type ContextResult struct {
-	State  string // AlreadyStarted, Indeterminate, Recording or StoredPendingVerification.
+	State  string // AlreadyStarted, Indeterminate, Recording or Published.
 	Copies artifact.Copies
 }
 
@@ -667,7 +667,7 @@ func (s APIContextRunner) finishAcquisition(ctx context.Context, w APIContextWor
 	if err != nil {
 		return ContextResult{State: "Indeterminate"}, executeStep{"acquire/" + result.Phase, err}
 	}
-	return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
+	return ContextResult{State: "Published", Copies: result.Copies}, nil
 }
 
 // executeStep names the call before a failed execution, for operator

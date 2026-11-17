@@ -12,7 +12,6 @@ func TestContextEffectReceiptsRequireImmutableVersions(t *testing.T) {
 		name, key string
 		valid     func(Receipt) bool
 	}{
-		{"verification", ContextVerificationKey(root, id), func(r Receipt) bool { return r.ValidContextVerification(root, id) }},
 	} {
 		for _, tc := range []struct {
 			name, version string

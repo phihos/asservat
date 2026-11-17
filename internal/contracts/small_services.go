@@ -116,8 +116,6 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 		return append(out, PublicRuntimeContextDeletionPurposes()...), true
 	case "federation":
 		return PublicRuntimeFederationPurposes(), true
-	case "publisher":
-		return PublicRuntimePublisherPurposes(), true
 	case "key-service":
 		return PublicRuntimeKeyServicePurposes(), true
 	}
@@ -127,7 +125,7 @@ func SQLComponentPurposes(component string) ([]string, bool) {
 // ObjectStorePrincipals are the bundled SeaweedFS principals with a
 // `<name>-s3-<principal>` Secret; combined mode adds the local region's.
 func ObjectStorePrincipals(mode string) []string {
-	out := []string{"configuration-audit", "owner-audit", "federation-audit", "publisher-audit", "publisher-read", "download-read", "evidence-delete"}
+	out := []string{"configuration-audit", "owner-audit", "federation-audit", "download-read", "evidence-delete", "operation-cleanup", "operation-verify"}
 	if mode == "combined" {
 		out = append(out, "regional-write", "regional-history")
 	}
@@ -156,5 +154,5 @@ func DecodeSmallKeycloakSettings(r io.Reader) (SmallKeycloakSettings, error) {
 
 // SQLComponents are the hub components with their own SQL credential Secret.
 func SQLComponents() []string {
-	return []string{"hub-api", "hub-worker", "federation", "publisher", "key-service"}
+	return []string{"hub-api", "hub-worker", "federation", "key-service"}
 }

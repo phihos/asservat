@@ -41,7 +41,7 @@ type HubWorkerCapacity struct {
 	// (ADR-192); empty when no regional download path is configured.
 	Paths []DownloadEnvironmentPath `json:"paths"`
 	// SharedQueries reserves shared context query capacity; true when
-	// downloads (the publisher) are enabled.
+	// downloads are enabled.
 	SharedQueries bool `json:"sharedQueries"`
 	// RemoteClusters are the joined mode=cluster clusters (values clusters):
 	// each is qualified once and observed from its connector's deliveries

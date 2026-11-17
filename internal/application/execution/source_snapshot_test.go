@@ -138,7 +138,7 @@ func snapshotCollectionKeepsAcceptedDigest(t *testing.T, nativeType string) {
 	runner.Record = recorder
 	execution := value.APIExecution{Phase: "started", ExpectationDigest: accepted}
 	result, err := runner.CollectRecording(t.Context(), f.work, execution, snapshotCollectionFixture{c})
-	if err != nil || result.State != "StoredPendingVerification" || recorder.snapshotCompletions != 1 || execution.ExpectationDigest != accepted {
+	if err != nil || result.State != "Published" || recorder.snapshotCompletions != 1 || execution.ExpectationDigest != accepted {
 		t.Fatal("snapshot bypassed typed coverage completion or changed accepted digest", result.State, err, recorder.snapshotCompletions)
 	}
 	changed := coverage

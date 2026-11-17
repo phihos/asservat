@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-// This literal retains the three original execution logins plus schema-102
+// This literal retains the three original execution logins, one-step
+// publication (REQ-EVD-001) and schema-102
 // original policy reservation/grant reads and a grant row lock. An unrelated
 // privilege, table-wide write or lost column fails.
 func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
@@ -80,7 +81,23 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "custody_allocation", "", "SELECT"},
 		{"table", "custody_allocation", "id", "UPDATE"},
 		{"table", "custody_attempt", "", "SELECT"},
+		{"table", "custody_attempt", "copies_digest", "UPDATE"},
 		{"table", "custody_attempt", "id", "UPDATE"},
+		{"table", "custody_attempt", "state", "UPDATE"},
+		// One-step publication: stored copies, custody event and catalog row.
+		{"table", "custody_copy", "", "SELECT"},
+		{"table", "custody_copy", "ciphertext_bytes", "UPDATE"},
+		{"table", "custody_copy", "ciphertext_sha256", "UPDATE"},
+		{"table", "custody_copy", "etag", "UPDATE"},
+		{"table", "custody_copy", "version_id", "UPDATE"},
+		{"table", "custody_event", "", "INSERT"},
+		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_catalog", "artifact_id", "INSERT"},
+		{"table", "context_catalog", "capture_id", "INSERT"},
+		{"table", "context_catalog", "root_id", "INSERT"},
+		{"table", "context_catalog", "native_bytes", "INSERT"},
+		{"table", "context_catalog", "acquisition_started_at", "INSERT"},
+		{"table", "context_catalog", "acquisition_completed_at", "INSERT"},
 		{"table", "custody_pool", "", "SELECT"},
 		{"table", "custody_pool", "id", "UPDATE"},
 		{"table", "fleet_current_trust", "", "SELECT"},
@@ -110,8 +127,8 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		}
 	}
 	for _, grant := range got {
-		if grant.privilege == "DELETE" || grant.kind == "function" && grant.object != "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)" && grant.object != "spend_adhoc_observed_bytes(uuid,uuid,bigint)" && grant.object != "spend_adhoc_observation(uuid,uuid,bigint,bigint)" || grant.object == "custody_copy" || grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
-			t.Fatal("execution gained excluded deletion, publication, evidence-copy or download privilege", grant)
+		if grant.privilege == "DELETE" || grant.kind == "function" && grant.object != "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)" && grant.object != "spend_adhoc_observed_bytes(uuid,uuid,bigint)" && grant.object != "spend_adhoc_observation(uuid,uuid,bigint,bigint)" || grant.privilege == "UPDATE" && grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
+			t.Fatal("execution gained excluded deletion, catalog rewrite or download privilege", grant)
 		}
 	}
 }

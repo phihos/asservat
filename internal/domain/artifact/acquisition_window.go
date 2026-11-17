@@ -24,27 +24,3 @@ func (w *AcquisitionWindow) Clone() *AcquisitionWindow {
 	out := *w
 	return &out
 }
-
-// ContextVerificationResult exists only after the complete native, manifest,
-// framing/index/hash and semantic checks have succeeded. An error returns zero.
-// Only currently supported Go profiles carry acquisition timing (ADR-297).
-type ContextVerificationResult struct {
-	NativeBytes int64
-	Acquisition *AcquisitionWindow
-}
-
-func (r ContextVerificationResult) Valid(e ContextExpectation) bool {
-	if r.NativeBytes < 0 || r.NativeBytes > e.Registration.NativeLimit {
-		return false
-	}
-	profile := e.Profile != nil && (e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact)
-	if !profile {
-		return r.Acquisition == nil
-	}
-	return r.Acquisition != nil && r.Acquisition.Valid()
-}
-
-func (r ContextVerificationResult) Clone() ContextVerificationResult {
-	r.Acquisition = r.Acquisition.Clone()
-	return r
-}

@@ -61,14 +61,7 @@ func scanSavedPCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 	limit := Snaplen
 	var rawLimits RawLimits
 	if raw {
-		if e.Recording == nil || e.Recording.Profile != "rawPackets" {
-			return zero, query.ErrUnavailable
-		}
-		rawLimits.Snaplen = e.Recording.Snaplen
-		if caps := e.Recording.ProtocolSnaplen; caps != nil {
-			rawLimits.TCP, rawLimits.UDP, rawLimits.ICMP = caps.TCP, caps.UDP, caps.ICMP
-		}
-		if !rawLimits.valid() {
+		if rawLimits = RawLimitsFor(e.Recording); !rawLimits.valid() {
 			return zero, query.ErrUnavailable
 		}
 		limit = rawLimits.Max()

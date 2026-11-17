@@ -52,7 +52,7 @@ installation ID in Go, object UIDs are read by name.
 {{- $_ := set $c "revision" $.Release.Revision -}}
 {{- $_ := set $c "processingSource" (printf "%s-processing-source" $n) -}}
 {{- $_ := set $c "paths" list -}}
-{{- $_ := set $c "sharedQueries" (gt (int (default 0 $.Values.hub.publisher.replicas)) 0) -}}
+{{- $_ := set $c "sharedQueries" (and (index $.Values.hub "download-worker").enabled true) -}}
 {{- with include "asservat.hubApi.clusters" $ | fromJsonArray }}{{ $_ := set $c "remoteClusters" . }}{{ end -}}
 {{- $_ := set $v "capacity" $c -}}
 {{- $_ := set $permission "contextDeletion" (dict "evidenceStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.evidenceBucket)) -}}

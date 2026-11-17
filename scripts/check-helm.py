@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CHART = ROOT / "charts/asservat"
 HELM = os.environ.get("HELM", "helm")
 DIGEST = "sha256:" + "a" * 64
-COMPONENTS = ["hub-api", "hub-worker", "federation", "publisher", "key-service"]
+COMPONENTS = ["hub-api", "hub-worker", "federation", "key-service"]
 
 
 def run(args, ok=True):
@@ -163,7 +163,7 @@ def check_setup(render):
     config = json.loads(named(docs, "ConfigMap", "asservat-setup-config")["data"]["config.json"])
     assert config == {"format": "asservat-setup/v1", "name": "asservat", "namespace": "asservat-system",
                       "postgres": {"host": "asservat-postgres.asservat-system.svc", "port": 5432, "database": "asservat"},
-                      "openBao": {"endpoint": "https://asservat-openbao.asservat-system.svc:8200", "bundled": True, "accounts": {c: f"asservat-{c}" for c in ["hub-api", "hub-worker", "federation", "publisher"]}},
+                      "openBao": {"endpoint": "https://asservat-openbao.asservat-system.svc:8200", "bundled": True, "accounts": {c: f"asservat-{c}" for c in ["hub-api", "hub-worker", "federation"]}},
                       "objectStore": {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bundled": True, "auditBucket": "asservat-audit", "evidenceBucket": "asservat-evidence"}}, config
     # SeaweedFS restarts when the hook recompiles its IAM Secret.
     store = named(docs, "StatefulSet", "asservat-objectstore")
@@ -354,8 +354,6 @@ def check_cluster_join(render):
     assert {"asservat-s3-regional-write-eu", "asservat-s3-regional-history-eu"} <= hook and "asservat-s3-regional-write" not in hook
     key = json.loads(named(docs, "ConfigMap", "asservat-key-service-config")["data"]["config.json"])
     assert key["downloads"] == {}, key
-    publisher = json.loads(named(docs, "ConfigMap", "asservat-publisher-config")["data"]["config.json"])
-    assert "remoteClusters" not in publisher, publisher
     worker = json.loads(named(docs, "ConfigMap", "asservat-hub-worker-config")["data"]["config.json"])
     assert worker["capacity"]["remoteClusters"] == config["clusters"], worker["capacity"].get("remoteClusters")
     # combined plus one cluster.

@@ -18,7 +18,6 @@ type publicRoleRootFixture struct {
 	object                *core.Secret
 	projection            *core.Secret
 	federation            *core.Secret
-	publisher             *core.Secret
 	projectionWrites      atomic.Int32
 	lostProjection        atomic.Bool
 	lostProjectionClaim   atomic.Bool
