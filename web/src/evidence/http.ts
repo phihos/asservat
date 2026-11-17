@@ -30,7 +30,11 @@ export const operations: Operations = {
     const abort = () => request.abort();
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
-    const timer = setTimeout(abort, 10_000);
+    // A status read with after_revision may wait server-side for its whole
+    // transport window (40 s, identity.StatusWaitRequestWindow); allow 5 s
+    // more for the reply so the client never abandons a running wait.
+    const waits = name === 'download_artifact' && (input as { after_revision?: number }).after_revision !== undefined;
+    const timer = setTimeout(abort, waits ? 45_000 : 10_000);
     try {
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
       const download = input as { action?: string; idempotency_key?: string };

@@ -35,3 +35,19 @@ it.each([
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => response()));
   await expect(operations.call('get_case', { case_id: id(2) }, 'csrf', new AbortController().signal)).rejects.toThrow();
 });
+
+it('lets a status read with after_revision outlast the server wait while other reads stop at 10 s', async () => {
+  vi.useFakeTimers();
+  try {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal('fetch', vi.fn((_url: RequestInfo | URL, init?: RequestInit) => { signals.push(init!.signal!); return new Promise(() => {}); }));
+    void operations.call('download_artifact', { action: 'status', download_id: id(4), after_revision: 2 }, 'csrf', new AbortController().signal).catch(() => undefined);
+    void operations.call('download_artifact', { action: 'status', download_id: id(4) }, 'csrf', new AbortController().signal).catch(() => undefined);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(signals[0].aborted).toBe(false); expect(signals[1].aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(31_000);
+    expect(signals[0].aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(signals[0].aborted).toBe(true);
+  } finally { vi.useRealTimers(); }
+});
