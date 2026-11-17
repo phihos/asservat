@@ -88,8 +88,7 @@ func (s *WorkerRouting) ReadAcquisitionEnrollment(ctx context.Context, parent va
 	}
 	profile := state.Worker.Intent.Profile
 	configuration := &WorkerConfigurations{s.ledger, s.installation, profile.ClusterID, profile.NamespaceUID, profile.Configuration.UID}
-	until, err := configuration.CurrentWorkerConfiguration(ctx, profile)
-	if err != nil {
+	if err = configuration.CurrentWorkerConfiguration(ctx, profile); err != nil {
 		return out, err
 	}
 	// As with the native-download observation, no outer transaction is held
@@ -115,9 +114,10 @@ func (s *WorkerRouting) ReadAcquisitionEnrollment(ctx context.Context, parent va
 	if err != nil {
 		return out, err
 	}
-	deadline, _ := ctx.Deadline()
-	until = identity.Earlier(until, deadline)
-	until = identity.Earlier(until, identity.Earlier(query.Deadline, identity.Earlier(query.CredentialUntil, state.Worker.Intent.RunUntil)))
+	until := identity.Earlier(query.Deadline, identity.Earlier(query.CredentialUntil, state.Worker.Intent.RunUntil))
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
 	out = value.AcquisitionWorkerIdentity{Worker: state.Worker, ObservedAt: started, FreshUntil: until}
 	if ctx.Err() != nil || !out.Valid(now.Time) || !out.Valid(time.Now()) {
 		return value.AcquisitionWorkerIdentity{}, artifact.ErrDownloadExpired
@@ -181,8 +181,7 @@ func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation strin
 		return out, artifact.ErrDownloadUnavailable
 	}
 	configuration := &WorkerConfigurations{l, installation, p.ClusterID, p.NamespaceUID, p.Configuration.UID}
-	until, err := configuration.CurrentWorkerConfiguration(ctx, p)
-	if err != nil {
+	if err = configuration.CurrentWorkerConfiguration(ctx, p); err != nil {
 		return out, err
 	}
 	// Configuration/recovery checks can wait on locks. Recheck the original
@@ -211,9 +210,10 @@ func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation strin
 	if current.ID != r.ID || current.TerminationJson != nil || current.RetiredProofJson != nil || !now.Time.Before(w.Intent.RunUntil) || !now.Time.Before(parent.Deadline.Time) || artifact.DownloadState(parent.State).Terminal() || !identity.Fresh(start.Time, start.Time.Add(5*time.Second), now.Time, 5*time.Second) {
 		return out, artifact.ErrDownloadExpired
 	}
-	deadline, _ := ctx.Deadline()
-	until = identity.Earlier(until, identity.Earlier(start.Time.Add(5*time.Second), w.Intent.RunUntil))
-	until = identity.Earlier(until, identity.Earlier(parent.Deadline.Time, deadline))
+	until := identity.Earlier(start.Time.Add(5*time.Second), identity.Earlier(w.Intent.RunUntil, parent.Deadline.Time))
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
 	out = value.DownloadWorkerIdentity{Worker: w, ObservedAt: start.Time, FreshUntil: until}
 	if ctx.Err() != nil || !out.Valid(time.Now()) {
 		return value.DownloadWorkerIdentity{}, artifact.ErrDownloadExpired

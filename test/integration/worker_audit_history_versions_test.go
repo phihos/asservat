@@ -195,7 +195,7 @@ func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f native
 				}
 				withHistoricalAuditReceipt(t, ctx, f.admin, read, update, args, func(r *audit.Receipt) { r.Version = version }, func() {
 					if kind == "configuration" {
-						if _, err := configuration.CurrentWorkerConfiguration(ctx, w.Intent.Profile); err == nil {
+						if err := configuration.CurrentWorkerConfiguration(ctx, w.Intent.Profile); err == nil {
 							t.Fatal("historical configuration became current")
 						}
 					}

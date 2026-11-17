@@ -129,7 +129,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, &fixedStepError{"downloads/workerSource", mounts.ErrUnavailable}
 	}
 	observed, err := workerSource.ReadWorkerConfiguration(ctx)
-	if err != nil || !observed.Valid(time.Now()) {
+	if err != nil || !observed.Valid() {
 		return nil, &fixedStepError{"downloads/observed", mounts.ErrUnavailable}
 	}
 	profile := observed.Configuration.Profile
@@ -139,7 +139,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, &fixedStepError{"downloads/configuration", mounts.ErrUnavailable}
 	}
-	if _, err = configuration.CurrentWorkerConfiguration(ctx, profile); err != nil {
+	if err = configuration.CurrentWorkerConfiguration(ctx, profile); err != nil {
 		return nil, &fixedStepError{"downloads/configuration", mounts.ErrUnavailable}
 	}
 	jobsClient := d.shared.workers[ownerNativeAPIKey{profile.ClusterID, profile.NamespaceUID}]

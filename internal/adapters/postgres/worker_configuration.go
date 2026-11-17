@@ -14,7 +14,6 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"time"
 )
 
 type WorkerConfigurations struct {
@@ -39,14 +38,15 @@ func NewWorkerConfigurations(ctx context.Context, pool *pgxpool.Pool, installati
 func (s *WorkerConfigurations) matches(p value.DownloadWorkerProfile) bool {
 	return p.Valid() && p.InstallationID == s.installation && p.ClusterID == s.cluster && p.NamespaceUID == s.namespace && p.Configuration.UID == s.source
 }
+
+// ObserveWorkerConfiguration records one read of the worker profile. An
+// accepted revision stays current until a later observation replaces it.
 func (s *WorkerConfigurations) ObserveWorkerConfiguration(ctx context.Context, o value.DownloadWorkerObservation) (audit.Receipt, bool, error) {
 	var receipt audit.Receipt
 	var ack bool
-	if s == nil || ctx == nil || !o.Valid(o.ObservedAt) || !s.matches(o.Configuration.Profile) {
+	if s == nil || ctx == nil || !o.Valid() || !s.matches(o.Configuration.Profile) {
 		return receipt, false, artifact.ErrInvalid
 	}
-	ctx, end := context.WithDeadline(ctx, o.FreshUntil)
-	defer end()
 	c := o.Configuration
 	p := c.Profile
 	b, e := json.Marshal(c)
@@ -54,27 +54,11 @@ func (s *WorkerConfigurations) ObserveWorkerConfiguration(ctx context.Context, o
 		return receipt, false, artifact.ErrInvalid
 	}
 	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		check := func() error {
-			n, e := q.CurrentTime(ctx)
-			if e != nil {
-				return e
-			}
-			if !o.Valid(n.Time) {
-				return artifact.ErrDownloadExpired
-			}
-			return nil
-		}
-		if e := check(); e != nil {
-			return e
-		}
-		if e := q.InsertWorkerConfiguration(ctx, custodydb.InsertWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt), FreshUntil: ts(o.FreshUntil)}); e != nil {
+		if e := q.InsertWorkerConfiguration(ctx, custodydb.InsertWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt)}); e != nil {
 			return e
 		}
 		head, e := q.LockWorkerConfiguration(ctx, custodydb.LockWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source)})
 		if e != nil {
-			return e
-		}
-		if e = check(); e != nil {
 			return e
 		}
 		if head.Generation > p.Configuration.Generation || o.ObservedAt.Before(head.ObservedAt.Time) {
@@ -105,10 +89,7 @@ func (s *WorkerConfigurations) ObserveWorkerConfiguration(ctx context.Context, o
 		} else {
 			return e
 		}
-		if e = q.ObserveWorkerConfiguration(ctx, custodydb.ObserveWorkerConfigurationParams{InstallationID: head.InstallationID, ClusterID: head.ClusterID, SourceUid: head.SourceUid, Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt), FreshUntil: ts(o.FreshUntil)}); e != nil {
-			return e
-		}
-		return check()
+		return q.ObserveWorkerConfiguration(ctx, custodydb.ObserveWorkerConfigurationParams{InstallationID: head.InstallationID, ClusterID: head.ClusterID, SourceUid: head.SourceUid, Generation: p.Configuration.Generation, ObservedAt: ts(o.ObservedAt)})
 	})
 	if e != nil {
 		return audit.Receipt{}, false, e
@@ -149,76 +130,34 @@ func (s *WorkerConfigurations) AcknowledgeWorkerConfiguration(ctx context.Contex
 		return nil
 	})
 }
-func (s *WorkerConfigurations) FenceWorkerConfiguration(ctx context.Context, started time.Time) error {
-	if s == nil || ctx == nil || started.IsZero() {
-		return artifact.ErrInvalid
-	}
-	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		n, e := q.CurrentTime(ctx)
-		if e != nil {
-			return e
-		}
-		if started.After(n.Time) {
-			return artifact.ErrInvalid
-		}
-		return q.FenceWorkerConfiguration(ctx, custodydb.FenceWorkerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster), SourceUid: id(s.source), ObservedAt: ts(started)})
-	})
-}
 
-// The shared head lock prevents
-// configuration changes until the enclosing effect completes. Check time again
-// after every blocking lock and before commit; no old lease is renewed here.
-func currentWorkerConfiguration(ctx context.Context, q *custodydb.Queries, p value.DownloadWorkerProfile) (time.Time, error) {
-	var zero time.Time
+// currentWorkerConfiguration checks that p is the current accepted, audited
+// and unsuspended revision. The shared head lock prevents configuration
+// changes until the enclosing effect completes.
+func currentWorkerConfiguration(ctx context.Context, q *custodydb.Queries, p value.DownloadWorkerProfile) error {
 	if !p.Valid() {
-		return zero, artifact.ErrInvalid
+		return artifact.ErrInvalid
 	}
 	head, e := q.ShareWorkerConfiguration(ctx, custodydb.ShareWorkerConfigurationParams{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID)})
 	if e != nil {
-		return zero, artifact.ErrDownloadUnavailable
+		return artifact.ErrDownloadUnavailable
 	}
 	r, e := q.ReadWorkerConfigurationRevision(ctx, custodydb.ReadWorkerConfigurationRevisionParams{InstallationID: head.InstallationID, ClusterID: head.ClusterID, SourceUid: head.SourceUid, Generation: head.Generation})
 	if e != nil {
-		return zero, e
+		return e
 	}
 	var c value.DownloadWorkerConfiguration
 	var receipt audit.Receipt
 	if json.Unmarshal(r.SnapshotJson, &c) != nil || !c.Valid() || c.Suspended || c.Profile != p || json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerConfiguration(c) {
-		return zero, artifact.ErrDownloadUnavailable
+		return artifact.ErrDownloadUnavailable
 	}
-	n, e := q.CurrentTime(ctx)
-	if e != nil {
-		return zero, e
-	}
-	if !identity.Fresh(head.ObservedAt.Time, head.FreshUntil.Time, n.Time, 5*time.Second) {
-		return zero, artifact.ErrDownloadExpired
-	}
-	return head.FreshUntil.Time, nil
+	return nil
 }
-func (s *WorkerConfigurations) CurrentWorkerConfiguration(ctx context.Context, p value.DownloadWorkerProfile) (time.Time, error) {
-	var until time.Time
+func (s *WorkerConfigurations) CurrentWorkerConfiguration(ctx context.Context, p value.DownloadWorkerProfile) error {
 	if s == nil || ctx == nil || !s.matches(p) {
-		return until, artifact.ErrInvalid
+		return artifact.ErrInvalid
 	}
-	ctx, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	e := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var e error
-		until, e = currentWorkerConfiguration(ctx, q, p)
-		if e != nil {
-			return e
-		}
-		n, e := q.CurrentTime(ctx)
-		if e != nil {
-			return e
-		}
-		if !n.Time.Before(until) {
-			return artifact.ErrDownloadExpired
-		}
-		return nil
+	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		return currentWorkerConfiguration(ctx, q, p)
 	})
-	if e != nil {
-		return time.Time{}, e
-	}
-	return until, nil
 }

@@ -412,7 +412,9 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			}
 		}
 		stopObserved()
-		if err = f.workerConfig.FenceWorkerConfiguration(ctx, time.Now()); err != nil {
+		// Replace the accepted revision with one that has no audited snapshot
+		// while the admission waits; the post-lock recheck must refuse it.
+		if _, err = blocker.Exec(ctx, "UPDATE download_worker_configuration SET generation=generation+1 WHERE installation_id=$1", plan.InstallationID); err != nil {
 			t.Fatal(err)
 		}
 		if err = blocker.Commit(ctx); err != nil {
@@ -421,13 +423,28 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		select {
 		case err = <-result:
 			if err == nil {
-				t.Fatal("post-lock expired accepted worker configuration authorized query")
+				t.Fatal("post-lock replaced worker configuration authorized query")
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("blocked query did not join original deadline")
 		}
 		backing.beforeSQL = nil
-		// Restore only through a fresh observation of the same accepted configuration.
+		// Restore the accepted revision. The head guard forbids a rollback, so
+		// this fixture-only reset bypasses triggers for its own transaction.
+		restore, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = restore.Exec(ctx, "SET LOCAL session_replication_role=replica"); err == nil {
+			_, err = restore.Exec(ctx, "UPDATE download_worker_configuration SET generation=generation-1 WHERE installation_id=$1", plan.InstallationID)
+		}
+		if err != nil {
+			_ = restore.Rollback(ctx)
+			t.Fatal(err)
+		}
+		if err = restore.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
 		f.refresh(t)
 		charged(units)
 		// A lost guard/commit response returns no Fresh result, while private lookup

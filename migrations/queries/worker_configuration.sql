@@ -1,6 +1,6 @@
 -- name: InsertWorkerConfiguration :exec
-INSERT INTO download_worker_configuration(installation_id,cluster_id,source_uid,generation,observed_at,fresh_until)
-VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING;
+INSERT INTO download_worker_configuration(installation_id,cluster_id,source_uid,generation,observed_at)
+VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;
 
 -- name: LockWorkerConfiguration :one
 SELECT * FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR UPDATE;
@@ -19,11 +19,7 @@ VALUES($1,$2,$3,$4,$5);
 SELECT count(*) FROM download_worker_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3;
 
 -- name: ObserveWorkerConfiguration :exec
-UPDATE download_worker_configuration SET generation=$4,observed_at=$5,fresh_until=$6 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3;
-
--- name: FenceWorkerConfiguration :exec
-UPDATE download_worker_configuration SET fresh_until=least(fresh_until,clock_timestamp())
-WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND observed_at<=$4;
+UPDATE download_worker_configuration SET generation=$4,observed_at=$5 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3;
 
 -- name: AcknowledgeWorkerConfiguration :execrows
 UPDATE download_worker_configuration_revision SET audit_receipt_json=$5

@@ -32,16 +32,16 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// The test explicitly refreshes the real source/projection before driver use.
-// Runtime supervision will do this independently; no fixture grace period exists.
+// The test observes the real source before driver use, as the hub-worker
+// does once per process.
 type refreshedWorkerConfiguration struct {
 	observer *evidence.WorkerConfigurationObserver
 	current  *postgres.WorkerConfigurations
 }
 
-func (f refreshedWorkerConfiguration) CurrentWorkerConfiguration(c context.Context, p value.DownloadWorkerProfile) (time.Time, error) {
+func (f refreshedWorkerConfiguration) CurrentWorkerConfiguration(c context.Context, p value.DownloadWorkerProfile) error {
 	if e := f.observer.Observe(c); e != nil {
-		return time.Time{}, e
+		return e
 	}
 	return f.current.CurrentWorkerConfiguration(c, p)
 }
@@ -182,14 +182,14 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 		t.Fatal(e)
 	}
 	keys := authorityTestKeys{a: aead}
-	observer := &evidence.WorkerConfigurationObserver{Reader: source, Ledger: l, Audit: &objectstore.WorkerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: ack, Now: time.Now}
-	if _, e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
+	observer := &evidence.WorkerConfigurationObserver{Reader: source, Ledger: l, Audit: &objectstore.WorkerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: ack}
+	if e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
 		t.Fatal("missing profile accepted")
 	}
 	if _, _, e = l.ObserveWorkerConfiguration(ctx, observation); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
+	if e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
 		t.Fatal("unaudited profile accepted")
 	}
 	if e = observer.Observe(ctx); e != nil {
@@ -216,7 +216,7 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
+	if e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
 		t.Fatal("old profile survived rollout")
 	}
 	p = observation.Configuration.Profile

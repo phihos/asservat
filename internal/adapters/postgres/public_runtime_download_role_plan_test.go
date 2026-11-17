@@ -30,8 +30,8 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	}
 	observe := with(read("fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision")...)
 	observe = append(observe, publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"})
-	observe = append(observe, columns("download_worker_configuration", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "observed_at", "fresh_until")...)
-	observe = append(observe, columns("download_worker_configuration", "UPDATE", "generation", "observed_at", "fresh_until")...)
+	observe = append(observe, columns("download_worker_configuration", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "observed_at")...)
+	observe = append(observe, columns("download_worker_configuration", "UPDATE", "generation", "observed_at")...)
 	observe = append(observe, columns("download_worker_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")...)
 	acknowledge := with(read("download_worker_configuration", "download_worker_configuration_revision")...)
 	acknowledge = append(acknowledge, publicRuntimeGrant{"table", "download_worker_configuration", "source_uid", "UPDATE"}, publicRuntimeGrant{"table", "download_worker_configuration_revision", "audit_receipt_json", "UPDATE"})

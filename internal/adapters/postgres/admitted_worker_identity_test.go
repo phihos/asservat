@@ -133,7 +133,7 @@ func admittedIdentityFixture(t *testing.T) (*admittedWorkerIdentity, *admittedId
 	r := &admittedIdentityRows{
 		trust:  custodydb.FleetCurrentTrust{InstallationID: id(p.InstallationID), IssuerEpoch: id(cfg.RecoveryEpoch), ObservedAt: ts(started.Add(-time.Second)), FreshUntil: ts(started.Add(4 * time.Second))},
 		parent: parent, worker: worker, latest: worker, now: started,
-		head:     custodydb.DownloadWorkerConfiguration{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID), Generation: p.Configuration.Generation, ObservedAt: ts(started), FreshUntil: ts(started.Add(3 * time.Second))},
+		head:     custodydb.DownloadWorkerConfiguration{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID), Generation: p.Configuration.Generation, ObservedAt: ts(started)},
 		revision: custodydb.DownloadWorkerConfigurationRevision{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), SourceUid: id(p.Configuration.UID), Generation: p.Configuration.Generation, SnapshotJson: encode(cfg), AuditReceiptJson: encode(receipt)},
 	}
 	return &admittedWorkerIdentity{root: scope.RootID, profile: p}, r, w, started
@@ -145,12 +145,12 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 	var effects int
 	err := s.current(context.Background(), custodydb.New(rows), w.Intent.Acquisition().Parent, w.Intent.ID, started, func(_ context.Context, _ *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
 		effects++
-		if checked.download != w || checked.worker != w.Acquisition() || checked.recoveryEpoch != w.Intent.Authority.Environment.RecoveryEpoch || !checked.observedAt.Equal(started) || !checked.freshUntil.Equal(rows.head.FreshUntil.Time) || !now.Equal(started) {
+		if checked.download != w || checked.worker != w.Acquisition() || checked.recoveryEpoch != w.Intent.Authority.Environment.RecoveryEpoch || !checked.observedAt.Equal(started) || !checked.freshUntil.Equal(started.Add(5*time.Second)) || !now.Equal(started) {
 			t.Fatal("admitted identity or original bound changed")
 		}
 		return nil
 	})
-	want := []string{"ReadFleetTrust", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
+	want := []string{"ReadFleetTrust", "LockDownloadSession", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "LockDownloadWorker", "LatestDownloadWorker", "CurrentTime", "CurrentTime"}
 	if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 		t.Fatalf("identity enrollment: err=%v effects=%d calls=%v", err, effects, rows.calls)
 	}
@@ -160,7 +160,7 @@ func TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority(t *tes
 }
 
 func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.T) {
-	for _, mode := range []string{"stopped-parent", "expired-parent", "configuration-suspended", "configuration-replaced", "configuration-expired-after-worker-lock", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
+	for _, mode := range []string{"stopped-parent", "expired-parent", "configuration-suspended", "configuration-replaced", "terminated-worker", "retired-worker", "replacement-worker", "missing-worker-audit", "caller-cancelled-after-worker-lock", "original-operation-expired-after-worker-lock", "cutoff-after-effect"} {
 		t.Run(mode, func(t *testing.T) {
 			s, rows, w, started := admittedIdentityFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -195,8 +195,6 @@ func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.
 					return
 				}
 				switch mode {
-				case "configuration-expired-after-worker-lock":
-					rows.now = rows.head.FreshUntil.Time
 				case "original-operation-expired-after-worker-lock":
 					rows.now = started.Add(5 * time.Second)
 				case "caller-cancelled-after-worker-lock":
@@ -207,7 +205,7 @@ func TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork(t *testing.
 			err := s.current(ctx, custodydb.New(rows), w.Intent.Acquisition().Parent, w.Intent.ID, started, func(context.Context, *custodydb.Queries, admittedWorkerCheck, time.Time) error {
 				effects++
 				if mode == "cutoff-after-effect" {
-					rows.now = rows.head.FreshUntil.Time
+					rows.now = started.Add(5 * time.Second)
 				}
 				return nil
 			})
@@ -310,7 +308,6 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 			case "retired":
 				rows.worker.RetiredProofJson = []byte(`{}`)
 			case "expired-after-worker-lock":
-				rows.head.FreshUntil = ts(started.Add(5 * time.Second))
 				rows.hook = func(name string) {
 					if name == "LockDownloadWorker" {
 						rows.now = q.Deadline
@@ -333,7 +330,7 @@ func TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall(t *testing.
 				return nil
 			})
 			if mode == "valid" {
-				want := []string{"ReadFleetTrust", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "CurrentTime", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
+				want := []string{"ReadFleetTrust", "LockContextQuery", "ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "LockDownloadWorker", "CurrentTime", "CurrentTime"}
 				if err != nil || effects != 1 || !slices.Equal(rows.calls, want) {
 					t.Fatal("query identity failed or requested public authority", err, effects, rows.calls)
 				}

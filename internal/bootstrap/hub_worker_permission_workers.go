@@ -98,13 +98,17 @@ func (w *hubWorker) openWorkerConfiguration(ctx context.Context, v contracts.Hub
 	}
 	out.closers = append(out.closers, seal.Close, open.Close)
 	objects := &installedWorkerConfigurationAudit{installation: w.ids.InstallationID, authority: w.authority, audit: w.audit, seal: seal, open: open}
-	out.observer = &evidence.WorkerConfigurationObserver{Reader: stagedWorkerConfigurationSource{source, &out.read}, Ledger: ledger, Audit: objects, Acknowledgements: acknowledgements, Now: time.Now}
+	out.observer = &evidence.WorkerConfigurationObserver{Reader: stagedWorkerConfigurationSource{source, &out.read}, Ledger: ledger, Audit: objects, Acknowledgements: acknowledgements}
 	return out, nil
 }
 
-// run observes the source once a second until the Lease ends, so an accepted
-// revision stays within its five-second freshness. A failed read fences the
-// SQL head inside the observer.
+// run observes the worker profile once per process. An accepted revision
+// stays current until a later observation replaces it, so nothing refreshes
+// it on a timer. A profile change is a Helm upgrade, and the hub-worker
+// Deployment's checksum/config annotation covers the profile ConfigMap, so
+// the upgrade restarts this process and the new revision is observed here.
+// A failed observation (audit admission busy, API error) retries after a
+// second until one succeeds.
 func (w *workerConfigurationWorker) run(ctx context.Context) {
 	last := "ok"
 	for ctx.Err() == nil {
@@ -119,7 +123,7 @@ func (w *workerConfigurationWorker) run(ctx context.Context) {
 			last = outcome
 			fmt.Fprintln(os.Stderr, "hub-worker worker configuration: "+outcome)
 		}
-		if !sleepContext(ctx, time.Second) {
+		if outcome == "ok" || !sleepContext(ctx, time.Second) {
 			return
 		}
 	}
@@ -136,7 +140,7 @@ func (s stagedWorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Con
 	out, err := s.WorkerConfigurationSource.ReadWorkerConfiguration(ctx)
 	if err != nil {
 		*s.read = regionalOutcome(&fixedStepError{"source", err})
-	} else if !out.Valid(time.Now()) {
+	} else if !out.Valid() {
 		*s.read = "source/invalid-observation"
 	} else {
 		// A later failure is the SQL ledger, audit or acknowledgement.

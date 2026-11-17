@@ -55,9 +55,8 @@ func acceptedWorkerConfiguration(t *testing.T, ctx context.Context, poolFor func
 	r := makeLedger("worker_configuration_read_runtime", "synthetic-worker-configuration-read")
 	c := &value.DownloadWorkerConfiguration{Profile: profile, RecoveryEpoch: epoch, ProtectionDigest: artifact.Digest{17}}
 	observer := &evidence.WorkerConfigurationObserver{Reader: workerObservationFunc(func(context.Context) (value.DownloadWorkerObservation, error) {
-		now := time.Now().UTC()
-		return value.DownloadWorkerObservation{Configuration: *c, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
-	}), Ledger: l, Audit: &objectstore.WorkerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: a, Now: time.Now}
+		return value.DownloadWorkerObservation{Configuration: *c, ObservedAt: time.Now().UTC()}, nil
+	}), Ledger: l, Audit: &objectstore.WorkerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: a}
 	if e := observer.Observe(ctx); e != nil {
 		t.Fatal("worker configuration acceptance", e)
 	}

@@ -104,17 +104,15 @@ func (s *WorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Context)
 	if s == nil || ctx == nil {
 		return out, artifact.ErrInvalid
 	}
-	ctx, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
 	started := s.client.now()
 	c, e := s.snapshot(ctx)
 	if e != nil {
 		return out, e
 	}
 	c.ProtectionDigest = s.protection.digest
-	out = value.DownloadWorkerObservation{Configuration: c, ObservedAt: started, FreshUntil: started.Add(5 * time.Second)}
-	if !out.Valid(s.client.now()) || ctx.Err() != nil {
-		return value.DownloadWorkerObservation{}, artifact.ErrDownloadExpired
+	out = value.DownloadWorkerObservation{Configuration: c, ObservedAt: started}
+	if !out.Valid() {
+		return value.DownloadWorkerObservation{}, artifact.ErrInvalid
 	}
 	return out, nil
 }

@@ -145,9 +145,6 @@ func (f *preparationPhaseBudget) ContextDownloadPlan(ctx context.Context, source
 func (f *preparationPhaseBudget) ContextNativeReady(ctx context.Context) (time.Time, error) {
 	return f.until, f.step(ctx, "runtime-ready")
 }
-func (f *preparationPhaseBudget) CurrentWorkerConfiguration(ctx context.Context, _ value.DownloadWorkerProfile) (time.Time, error) {
-	return f.until, f.step(ctx, "configuration")
-}
 func (f *preparationPhaseBudget) ReadContextDownloadSource(ctx context.Context, _ artifact.DownloadAuthority) (evidence.ContextDownloadSource, error) {
 	return f.source, f.step(ctx, "source")
 }

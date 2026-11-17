@@ -21,7 +21,9 @@ spec:
     metadata:
       labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 8 }}
       annotations:
-        {{- include "asservat.checksum" (list . "hub-worker-configmap.yaml") | nindent 8 }}
+        {{- /* download-worker.yaml holds the worker profile: a change restarts the
+          hub-worker, which observes the new revision once at start. */}}
+        {{- include "asservat.checksum" (list . "hub-worker-configmap.yaml" "download-worker.yaml") | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
       automountServiceAccountToken: false

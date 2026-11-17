@@ -98,7 +98,7 @@ func projectionNativeWorker(ctx context.Context, tx *custodydb.Queries, q query.
 	if e != nil || !state.Audited || !state.Worker.Valid() {
 		return value.AcquisitionEnrollment{}, query.ErrUnavailable
 	}
-	if _, e = currentWorkerConfiguration(ctx, tx, state.Worker.Intent.Profile); e != nil {
+	if e = currentWorkerConfiguration(ctx, tx, state.Worker.Intent.Profile); e != nil {
 		return value.AcquisitionEnrollment{}, e
 	}
 	en, e := currentAuditedAcquisitionEnrollment(ctx, tx, state.Worker)

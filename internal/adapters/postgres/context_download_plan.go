@@ -55,13 +55,6 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 	original := identity.Earlier(time.Now().Add(artifact.DownloadLease), source.ValidUntil)
 	call, end := context.WithDeadline(ctx, original)
 	defer end()
-	configured, e := s.configuration.CurrentWorkerConfiguration(call, s.profile)
-	if e != nil {
-		return out, artifact.ErrDownloadUnavailable
-	}
-	original = identity.Earlier(original, configured)
-	call, narrow := context.WithDeadline(call, original)
-	defer narrow()
 	e = s.ledger.transaction(call, func(q *custodydb.Queries) error {
 		start, e := q.CurrentTime(call)
 		if e != nil {
@@ -83,8 +76,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		until, e := s.configuration.CurrentWorkerConfiguration(call, s.profile)
-		if e != nil {
+		if e := s.configuration.CurrentWorkerConfiguration(call, s.profile); e != nil {
 			return e
 		}
 		now, e := q.CurrentTime(call)
@@ -97,7 +89,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		// Every contributing original deadline survives the configuration and SQL
 		// waits. This snapshot grants no effect; reservation rechecks current backing.
 		hard := identity.Earlier(allocation.ValidUntil, identity.Earlier(control.ValidUntil.Time, native.ValidUntil.Time))
-		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, until, hard)}
+		out = evidence.ContextDownloadPlan{HardUntil: hard, Allocation: allocation, OutputLimit: limits.OutputLimit, ReadLimit: limits.ReadLimit, ObservedAt: start.Time, ValidUntil: downloadObservationDeadline(call, start.Time, original, hard)}
 		if !out.Valid(scope, now.Time) || call.Err() != nil {
 			return artifact.ErrDownloadUnavailable
 		}

@@ -16,9 +16,9 @@ func (f preflightServing) ContextNativeReady(ctx context.Context) (time.Time, er
 	return f(ctx)
 }
 
-type preflightConfiguration func(context.Context, value.DownloadWorkerProfile) (time.Time, error)
+type preflightConfiguration func(context.Context, value.DownloadWorkerProfile) error
 
-func (f preflightConfiguration) CurrentWorkerConfiguration(ctx context.Context, p value.DownloadWorkerProfile) (time.Time, error) {
+func (f preflightConfiguration) CurrentWorkerConfiguration(ctx context.Context, p value.DownloadWorkerProfile) error {
 	return f(ctx, p)
 }
 
@@ -69,12 +69,7 @@ func newPreflightPreparation(t *testing.T, which string) (boundWorkerFixture, *d
 		}
 		return c.a.ValidUntil, nil
 	})
-	f.r.config.Configuration = preflightConfiguration(func(context.Context, value.DownloadWorkerProfile) (time.Time, error) {
-		if which == "configuration-readiness" {
-			return short, nil
-		}
-		return c.a.ValidUntil, nil
-	})
+	f.r.config.Configuration = preflightConfiguration(func(context.Context, value.DownloadWorkerProfile) error { return nil })
 	if which == "plan" {
 		// A previously observed configuration may cap the finite plan read,
 		// independently of the current runtime readiness observation.
@@ -91,7 +86,7 @@ func newPreflightPreparation(t *testing.T, which string) (boundWorkerFixture, *d
 }
 
 func TestContextDownloadConsumedPreflightDoesNotExpirePreparation(t *testing.T) {
-	for _, which := range []string{"readiness", "configuration-readiness", "plan"} {
+	for _, which := range []string{"readiness", "plan"} {
 		t.Run(which, func(t *testing.T) {
 			f, c, coordinator, short := newPreflightPreparation(t, which)
 			original := c.a
