@@ -208,6 +208,12 @@ Choose how the logins are created:
   README lists, and reference their Secrets under
   `services.postgres.external.logins`. No administrator credential is stored.
 
+When you manage PostgreSQL logins yourself, budget one query connection per
+federation replica for each of its two purposes. The owner-read login also
+needs one persistent notification connection per replica. Include Pods running
+during a rolling update. Setup-managed federation logins use the server's
+connection limit and the application's per-process pools.
+
 Bundled Keycloak on external PostgreSQL also needs
 `services.identity.keycloak.database.host` and `credentialsSecretName`.
 
