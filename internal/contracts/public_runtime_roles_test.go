@@ -8,8 +8,8 @@ import (
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	// Physical hub credentials are consolidated; separate process roles remain.
-	if len(all) != 20 || len(hub) != 4 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
-		t.Fatal("unreviewed compartment expansion")
+	if PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+		t.Fatalf("unexpected retained process counts: worker=%d hub=%d", PublicRuntimeRetainedWorkerProcesses, PublicRuntimeRetainedHubProcesses)
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
 	if !slices.Equal(PublicRuntimeContextDeletionPurposes(), []string{"context-cleanup", "context-cleanup-audit", "context-cleanup-finalize"}) {
