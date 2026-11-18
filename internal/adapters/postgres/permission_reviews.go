@@ -141,7 +141,7 @@ func NewAccessReviews(ctx context.Context, pool *pgxpool.Pool, root string) (*Ac
 }
 
 // currentReviewStream is the stream under a share lock, current for reviews.
-func currentReviewStream(ctx context.Context, q *custodydb.Queries, root string) (custodydb.PermissionStream, error) {
+func currentReviewStream(ctx context.Context, q *custodydb.Queries, root, cluster string) (custodydb.PermissionStream, error) {
 	s, err := q.SharePermissionStream(ctx, id(root))
 	if err != nil {
 		return s, err
@@ -150,7 +150,7 @@ func currentReviewStream(ctx context.Context, q *custodydb.Queries, root string)
 	if err != nil {
 		return s, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+	if slices.Contains(s.UnavailableClusters, cluster) || !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return s, cfg.ErrUnavailable
 	}
 	return s, nil
@@ -162,7 +162,7 @@ func (r *AccessReviews) ReviewSources(ctx context.Context, cluster string) ([]cf
 		return nil, cfg.ErrInvalid
 	}
 	err := permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := currentReviewStream(ctx, q, r.root)
+		s, err := currentReviewStream(ctx, q, r.root, cluster)
 		if err != nil {
 			return err
 		}
@@ -234,7 +234,7 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		return cfg.ErrInvalid
 	}
 	return permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := currentReviewStream(ctx, q, r.root)
+		s, err := currentReviewStream(ctx, q, r.root, t.ClusterID)
 		if err != nil {
 			return err
 		}
