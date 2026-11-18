@@ -303,6 +303,78 @@ func TestForeignDemandBeforeRegistrationReleasesAfterOriginalQuery(t *testing.T)
 	})
 }
 
+// A delayed registration for the first hub must not strand the only connector
+// slot when that hub cannot use it. The second caller keeps its original wait.
+func TestForeignDemandSurvivesUnclaimedRegistration(t *testing.T) {
+	for _, scenario := range []string{"canceled before claim", "replacement process"} {
+		t.Run(scenario, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				w := workFixture().Work
+				cluster := w.Channel.Connector.Binding.ClusterID
+				first, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+				second, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+				defer first.Close()
+				defer second.Close()
+				// Hold the local query inside demand publication until after the
+				// connector has registered, before the caller can claim it.
+				published := make(chan struct{})
+				first.RequestExchange = func(call context.Context, _ string) error { <-published; return call.Err() }
+				second.RequestExchange = func(context.Context, string) error { first.YieldIdle(cluster); return nil }
+				ctx, stop := context.WithTimeout(t.Context(), 5*time.Second)
+				defer stop()
+				local, cancel := context.WithCancel(ctx)
+				defer cancel()
+				a := make(chan error, 1)
+				go func() {
+					_, err := first.QueryProcess(local, cluster, queryResolvePod, nil, nil, w.Channel.Executor.PodUID, w.Channel.Executor.ProcessEpoch)
+					a <- err
+				}()
+				synctest.Wait()
+				b := make(chan error, 1)
+				go func() { _, err := second.Query(ctx, cluster, queryResolvePod, nil, nil); b <- err }()
+				synctest.Wait()
+				if scenario == "replacement process" {
+					w.Channel.Executor.ProcessEpoch = "00000000-0000-4000-8000-000000000098"
+				}
+				receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(time.Now(), identity.Recheck)}
+				check := func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil }
+				s, err := first.RegisterStandby(t.Context(), receiver, check)
+				if scenario == "canceled before claim" {
+					if err != nil {
+						t.Fatal(err)
+					}
+					cancel()
+				} else if err != nil && !errors.Is(err, fleet.ErrUnavailable) {
+					t.Fatal(err)
+				}
+				close(published)
+				synctest.Wait()
+				if s != nil {
+					defer s.Finish()
+					if s.Context().Err() == nil {
+						t.Fatal("unclaimed socket still occupies the single connector slot")
+					}
+					s.Finish()
+				}
+				next, err := second.RegisterStandby(t.Context(), receiver, check)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer next.Finish()
+				job := <-next.query
+				job.result <- queryResult{until: time.Now().Add(time.Second)}
+				if err := <-b; err != nil {
+					t.Fatal("second owner query", err)
+				}
+				cancel()
+				if err := <-a; !errors.Is(err, fleet.ErrUnavailable) {
+					t.Fatal("canceled or process-pinned local query", err)
+				}
+			})
+		})
+	}
+}
+
 func TestColdAttachSharesCallerDeadlineWithPublishedDemand(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := workFixture().Work
@@ -383,7 +455,7 @@ func TestRouterCloseEndsWaitsAndDemand(t *testing.T) {
 				default:
 					t.Fatal("router closure left a pending request")
 				}
-				if stop, err := r.request(ctx, cluster); err == nil || stop != nil {
+				if stop, err := r.request(ctx, cluster, nil); err == nil || stop != nil {
 					t.Fatal("demand accepted after closure")
 				}
 				if notifications != 1 {

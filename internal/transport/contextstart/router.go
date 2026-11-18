@@ -17,15 +17,30 @@ import (
 // An outstanding caller is the source of truth for demand. PostgreSQL
 // notifications wake connected clients; reconnects reannounce only live waits.
 type exchangeWait struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	cluster string
-	yield   bool // Another replica needs this slot after the local query.
+	ctx      context.Context
+	cancel   context.CancelFunc
+	cluster  string
+	executor *fleet.APIContextExecutor // Non-nil when the query pins a connector process.
+	yield    bool                      // Another replica needs this slot after the local query.
 }
 
-func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
+func matchesExecutor(actual, expected *fleet.APIContextExecutor) bool {
+	return expected == nil || actual.PodUID == expected.PodUID && actual.ProcessEpoch == expected.ProcessEpoch
+}
+
+func (r *Router) demandLocked(channel *fleet.APIContextChannel) (requested, yield bool) {
+	for w := range r.waiting[channel.Connector.Binding.ClusterID] {
+		if w.ctx.Err() == nil {
+			requested = requested || matchesExecutor(&channel.Executor, w.executor)
+			yield = yield || w.yield
+		}
+	}
+	return requested, yield
+}
+
+func (r *Router) request(ctx context.Context, cluster string, executor *fleet.APIContextExecutor) (func(), error) {
 	call, cancel := context.WithCancel(ctx)
-	w := &exchangeWait{ctx: call, cancel: cancel, cluster: cluster}
+	w := &exchangeWait{ctx: call, cancel: cancel, cluster: cluster, executor: executor}
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -47,6 +62,11 @@ func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
 		delete(r.waiting[cluster], w)
 		if len(r.waiting[cluster]) == 0 {
 			delete(r.waiting, cluster)
+		}
+		for _, s := range r.standby {
+			if s.yield && s.channel.Connector.Binding.ClusterID == cluster {
+				s.yieldIdleLocked()
+			}
 		}
 	}
 	if err := r.RequestExchange(call, cluster); err != nil {
@@ -165,9 +185,16 @@ func (r *Router) YieldIdle(cluster string) {
 		if s.channel.Connector.Binding.ClusterID != cluster || s.attached {
 			continue
 		}
-		if s.queryBusy || len(r.waiting[cluster]) != 0 {
-			s.yield = true
-		} else {
+		s.yield = true
+		s.yieldIdleLocked()
+	}
+}
+
+// While a different replica waits, only running work and a live caller that
+// can claim this particular process justify retaining the connector slot.
+func (s *Standby) yieldIdleLocked() {
+	if !s.attached && !s.queryBusy {
+		if requested, _ := s.router.demandLocked(&s.channel); !requested {
 			s.cancel()
 		}
 	}
@@ -260,13 +287,7 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	}
 	// A connector can finish opening after its requesting caller has left.
 	// A demand-driven router retains the socket only for a live waiter.
-	var requested, yield bool
-	for w := range r.waiting[cluster.limit.ClusterID] {
-		if w.ctx.Err() == nil {
-			requested = true
-			yield = yield || w.yield
-		}
-	}
+	requested, yield := r.demandLocked(&receiver.Channel)
 	if r.RequestExchange != nil && !requested {
 		return nil, fleet.ErrUnavailable
 	}
@@ -446,7 +467,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		r.mu.Lock()
 		r.pruneLocked(cluster)
 		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool {
-			return executor == nil || s.channel.Executor.PodUID == executor.PodUID && s.channel.Executor.ProcessEpoch == executor.ProcessEpoch
+			return matchesExecutor(&s.channel.Executor, executor)
 		})
 		if r.closed || r.clusters[cluster] == nil {
 			r.mu.Unlock()
@@ -468,7 +489,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		}
 		if done == nil && r.RequestExchange != nil {
 			var err error
-			done, err = r.request(ctx, cluster)
+			done, err = r.request(ctx, cluster, executor)
 			if err != nil {
 				return time.Time{}, fleet.ErrUnavailable
 			}
@@ -583,7 +604,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, history bo
 		r.mu.Unlock()
 		if !busy && done == nil && r.RequestExchange != nil {
 			var err error
-			done, err = r.request(ctx, cluster)
+			done, err = r.request(ctx, cluster, nil)
 			if err != nil {
 				return nil, fleet.ErrUnavailable
 			}
