@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -124,10 +125,11 @@ func insertAuthority(ctx context.Context, q *custodydb.Queries, r audit.Authorit
 	}
 	// Each outbox event must fit the authority audit format's plaintext budget.
 	data, err := json.Marshal(r)
-	if err != nil || len(data) > 8<<20 {
+	if err != nil || len(data) > audit.AuthorityPlaintextBytes {
 		return cfg.ErrLimit
 	}
-	return q.InsertAuthorityAudit(ctx, custodydb.InsertAuthorityAuditParams{ID: id(r.ID), StreamID: id(r.RootID), Epoch: id(r.Epoch), Sequence: r.Sequence, EventKind: r.Kind, EventDigest: digest(r), Record: data})
+	sum := sha256.Sum256(data)
+	return q.InsertAuthorityAudit(ctx, custodydb.InsertAuthorityAuditParams{ID: id(r.ID), StreamID: id(r.RootID), Epoch: id(r.Epoch), Sequence: r.Sequence, EventKind: r.Kind, EventDigest: sum[:], Record: data})
 }
 
 func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, trust artifact.Digest) (cfg.PermissionFence, error) {
@@ -211,7 +213,7 @@ func (p *Permissions) RenewPermissions(ctx context.Context, f cfg.PermissionFenc
 		if err = liveStream(ctx, q, s, f); err != nil {
 			return err
 		}
-		until, err := q.RenewPermissionStream(ctx, custodydb.RenewPermissionStreamParams{ID: s.ID, Epoch: s.Epoch})
+		until, err := q.RenewPermissionStream(ctx, custodydb.RenewPermissionStreamParams{ID: s.ID, Epoch: s.Epoch, Observing: f.Initialized, Sequence: f.Sequence})
 		if err != nil {
 			return err
 		}

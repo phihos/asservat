@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -13,12 +14,22 @@ import (
 
 func decodeAuthority(row custodydb.AuthorityAudit) (audit.AuthorityRecord, error) {
 	var r audit.AuthorityRecord
-	if len(row.Record) > 8<<20 {
+	// The SQL CHECK bounds PostgreSQL's expanded JSONB rendering separately
+	// from the canonical plaintext that is encrypted and authenticated.
+	if len(row.Record) > 12<<20 {
 		return r, cfg.ErrLimit
 	}
 	decoder := json.NewDecoder(bytes.NewReader(row.Record))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&r) != nil || !r.Valid() || r.ID != uid(row.ID) || r.RootID != uid(row.StreamID) || r.Epoch != uid(row.Epoch) || r.Sequence != row.Sequence || r.Kind != row.EventKind || !bytes.Equal(digest(r), row.EventDigest) {
+	if decoder.Decode(&r) != nil || !r.Valid() || r.ID != uid(row.ID) || r.RootID != uid(row.StreamID) || r.Epoch != uid(row.Epoch) || r.Sequence != row.Sequence || r.Kind != row.EventKind {
+		return audit.AuthorityRecord{}, cfg.ErrUnavailable
+	}
+	plain, err := json.Marshal(r)
+	if err != nil || len(plain) > audit.AuthorityPlaintextBytes {
+		return audit.AuthorityRecord{}, cfg.ErrLimit
+	}
+	sum := sha256.Sum256(plain)
+	if !bytes.Equal(sum[:], row.EventDigest) {
 		return audit.AuthorityRecord{}, cfg.ErrUnavailable
 	}
 	return r, nil
@@ -49,6 +60,7 @@ func (p *Permissions) AcknowledgeAuthorityAudit(ctx context.Context, r audit.Aut
 	if !r.Valid() || r.RootID != p.root || !receipt.Valid(r.RootID, r.ID) {
 		return cfg.ErrInvalid
 	}
+	expected := digest(r)
 	return p.transaction(ctx, func(q *custodydb.Queries) error {
 		// Same root-first order as acceptance; no object-store I/O under these locks.
 		if _, err := q.LockPermissionStream(ctx, id(p.root)); err != nil {
@@ -58,11 +70,10 @@ func (p *Permissions) AcknowledgeAuthorityAudit(ctx context.Context, r audit.Aut
 		if err != nil {
 			return err
 		}
-		frozen, err := decodeAuthority(row)
-		if err != nil {
+		if _, err = decodeAuthority(row); err != nil {
 			return err
 		}
-		if !bytes.Equal(digest(frozen), digest(r)) {
+		if !bytes.Equal(row.EventDigest, expected) {
 			return cfg.ErrChanged
 		}
 		if row.AcknowledgedAt.Valid {

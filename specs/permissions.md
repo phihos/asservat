@@ -113,8 +113,12 @@ The evaluator reads one snapshot: the hub cluster's informer caches and each rem
 
 The hub computes the input digest incrementally across all delivered bindings.
 It accepts assignment additions and retirements together under one permission
-epoch in PostgreSQL. The 8 MiB plaintext budget applies to one authority audit
-event, which the audit format encrypts and verifies as a whole. Previously
+epoch in PostgreSQL. A committed replacement at the same observation timestamp
+takes effect when its delivery digest changes. A binding change or its original
+expiry updates the projection. The live writer renews its database lease
+independently, without rebuilding the bindings. The 8 MiB plaintext budget applies to one authority audit
+event, which the audit format encrypts and verifies as a whole. PostgreSQL may
+expand its JSON representation up to the separate 12 MiB row limit. Previously
 accepted bindings do not count as assignment changes.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.

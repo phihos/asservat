@@ -48,6 +48,7 @@ type BindingReconciler struct {
 	// RemoteBindingChanges signals a changed stored delivery (PostgreSQL
 	// LISTEN/NOTIFY); deliveries are reread only on a signal and at start.
 	RemoteBindingChanges <-chan struct{}
+	ConfigurationChanges <-chan struct{} // hub ClusterAccessBinding and PermissionSource events
 	Now                  func() time.Time
 	NewID                func() string
 }
@@ -99,6 +100,7 @@ type bindingRun struct {
 	fence      value.PermissionFence
 	journal    *BindingJournal
 	trustUntil time.Time
+	nextExpiry time.Time
 	// Inheritance state (ADR-242). continuity counts namespace journals and
 	// dropped transitions; a source's bases are continuous only while
 	// included holds the counter value of its last accepted inclusion.
@@ -146,7 +148,9 @@ func (s *bindingRun) refreshWorkloads(ctx context.Context) {
 	for _, key := range keys {
 		old := s.workloads[key]
 		if old != nil {
+			mu.Lock()
 			next[key] = old
+			mu.Unlock()
 			if now.Sub(old.fetchedAt) < RemoteNamespaceRefresh {
 				continue
 			}
@@ -214,11 +218,15 @@ func (s *bindingRun) refreshRemote(ctx context.Context) {
 			old = nil
 		}
 		if old != nil && now.Sub(old.fetchedAt) < RemoteNamespaceRefresh {
+			mu.Lock()
 			next[cluster] = old
+			mu.Unlock()
 			continue
 		}
 		if old != nil {
+			mu.Lock()
 			next[cluster] = old
+			mu.Unlock()
 		}
 		if len(keys.Labels)+len(keys.Annotations) == 0 || !keys.Valid() {
 			continue
@@ -263,6 +271,17 @@ func (r BindingReconciler) trust(ctx context.Context) (PermissionTrust, error) {
 	}
 	return t, nil
 }
+func (s *bindingRun) checkTrust(ctx context.Context) (PermissionTrust, error) {
+	t, err := s.r.trust(ctx)
+	if err != nil {
+		return PermissionTrust{}, err
+	}
+	if t.Digest != s.fence.TrustDigest {
+		return PermissionTrust{}, value.ErrChanged
+	}
+	return t, nil
+}
+
 func (s *bindingRun) guardedSnapshot(ctx context.Context, first PermissionTrust) (value.Snapshot, error) {
 	snapshot, err := s.r.Reader.PermissionSnapshot(ctx)
 	if err != nil {
@@ -279,38 +298,28 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context, first PermissionTrust)
 	snapshot.FreshUntil = identity.Earlier(snapshot.FreshUntil, s.trustUntil)
 	return snapshot, nil
 }
-func (s *bindingRun) accept(ctx context.Context, refresh bool) error {
-	if !s.r.Now().Before(s.trustUntil) {
-		return reconcileStep("trust-expired", value.ErrUnavailable)
+func (s *bindingRun) accept(ctx context.Context, onlyChangedInheritance bool) error {
+	if !s.r.Now().Before(s.journal.until) || !s.r.Now().Before(s.trustUntil) {
+		// The ordered watch supplies binding continuity. Obtain a new trust
+		// observation when a later event needs an acceptance window.
+		t, err := s.checkTrust(ctx)
+		if err != nil {
+			return err
+		}
+		s.journal.observed, s.journal.until, s.trustUntil = t.ObservedAt, t.FreshUntil, t.FreshUntil
 	}
 	if err := s.journal.Constrain(s.trustUntil); err != nil {
 		return reconcileStep("constrain", err)
 	}
 	now := s.r.Now()
 	inherited := s.inheritance(now)
+	derived := inheritanceDigest(inherited)
+	if onlyChangedInheritance && derived == s.lastInheritance {
+		return nil
+	}
 	b, err := s.journal.Prepare(s.fence, s.r.NewID(), now, inherited.Inheritance)
 	if err != nil {
 		return reconcileStep("prepare", err)
-	}
-	commit := func() {
-		s.included, s.lastInheritance = inherited.included, inheritanceDigest(inherited)
-	}
-	if refresh {
-		err = s.r.Store.RefreshPermissions(ctx, b)
-		if err == nil {
-			if err = s.journal.Refreshed(b.RequestID); err != nil {
-				return reconcileStep("refreshed", err)
-			}
-			// The identical accepted projection holds exactly these
-			// namespace versions, so the current journal continues it.
-			commit()
-			return nil
-		}
-		// Identical input may have an expired member. Accept that removal as a
-		// new transition; an epoch/sequence conflict still fails in the store.
-		if !errors.Is(err, value.ErrChanged) {
-			return reconcileStep("store-refresh", err)
-		}
 	}
 	accepted, err := s.r.Store.AcceptPermissions(ctx, b)
 	if err != nil {
@@ -320,7 +329,23 @@ func (s *bindingRun) accept(ctx context.Context, refresh bool) error {
 		return reconcileStep("accepted", err)
 	}
 	s.fence = accepted.PermissionFence
-	commit()
+	s.included, s.lastInheritance = inherited.included, derived
+	s.nextExpiry = time.Time{}
+	consider := func(at time.Time) {
+		if at.After(now) && (s.nextExpiry.IsZero() || at.Before(s.nextExpiry)) {
+			s.nextExpiry = at
+		}
+	}
+	for _, basis := range b.Bases {
+		consider(basis.NotAfter)
+	}
+	for _, r := range s.remote {
+		consider(r.observedAt.Add(authorization.PermissionObservationInterval))
+	}
+	for _, w := range s.workloads {
+		consider(w.observedAt.Add(authorization.PermissionObservationInterval))
+	}
+
 	return nil
 }
 func (s *bindingRun) start(ctx context.Context) error {
@@ -337,6 +362,8 @@ func (s *bindingRun) start(ctx context.Context) error {
 		return reconcileStep("snapshot", err)
 	}
 	s.syncSources(ctx, snapshot)
+	s.refreshRemote(ctx)
+	s.refreshWorkloads(ctx)
 	s.journal, err = NewBindingJournal(snapshot, s.r.Now())
 	if err != nil {
 		return reconcileStep("journal", err)
@@ -344,7 +371,7 @@ func (s *bindingRun) start(ctx context.Context) error {
 	s.journal.Issuer = s.r.Issuer
 	// The joined clusters' stored deliveries, before the first acceptance
 	// (ADR-329): later changes arrive as RemoteBindingChanges.
-	if err := s.refreshRemoteBindings(ctx); err != nil {
+	if _, err := s.refreshRemoteBindings(ctx); err != nil {
 		return err
 	}
 	if err = s.accept(ctx, false); err != nil {
@@ -356,9 +383,6 @@ func (s *bindingRun) start(ctx context.Context) error {
 var errWatchBehind = errors.New("permission watch has not reached current complete list")
 
 func (s *bindingRun) refresh(ctx context.Context) error {
-	// Before the trust window opens: a slow connector cannot consume it.
-	s.refreshRemote(ctx)
-	s.refreshWorkloads(ctx)
 	first, err := s.r.trust(ctx)
 	if err != nil {
 		return reconcileStep("trust", err)
@@ -368,6 +392,8 @@ func (s *bindingRun) refresh(ctx context.Context) error {
 		return reconcileStep("snapshot", err)
 	}
 	s.syncSources(ctx, snapshot)
+	s.refreshRemote(ctx)
+	s.refreshWorkloads(ctx)
 	if err = s.journal.Confirm(snapshot, s.r.Now()); err != nil {
 		// Do not replace a journal with a newer LIST and thereby skip an
 		// intermediate owner. Process queued events, then retry the full LIST.
@@ -376,22 +402,15 @@ func (s *bindingRun) refresh(ctx context.Context) error {
 		}
 		return errWatchBehind
 	}
-	if s.fence.LeaseUntil.Sub(s.r.Now()) < 10*time.Second {
-		s.fence, err = s.r.Store.RenewPermissions(ctx, s.fence)
-		if err != nil {
-			return reconcileStep("renew", err)
-		}
-	}
 	if err = s.accept(ctx, true); err != nil {
 		return reconcileStep("accept", err)
 	}
 	return nil
 }
 
-// Run keeps event delivery bounded to one queued transition and processes each
-// through SQL before reading the next. Full LISTs renew deny completeness;
-// bookmarks and watch traffic do not. Audit publication is an independent role:
-// the store keeps new allows unavailable until its exact record is acknowledged.
+// Run processes ordered watch transitions, database notifications and original
+// binding expirations. The live epoch renews its lease separately from changes.
+// New allows become available after their audit record is acknowledged.
 // PermissionEpochResult is a completed run's scheduling result, never current
 // permission authority. Suspended is true only after exact owned-epoch
 // suspension was acknowledged and all original watch/feed children joined.
@@ -430,7 +449,9 @@ func (r BindingReconciler) runEpoch(ctx context.Context) (err error, suspended b
 	if err := s.start(ctx); err != nil {
 		return reconcileStep("start", err), false
 	}
-	ticker := time.NewTicker(time.Second)
+	// The live writer renews its 30-second database lease with ten seconds
+	// left. Idle renewal never enumerates or hashes the accepted projection.
+	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 	for {
 		watch, err := r.Watcher.WatchBindings(ctx, s.journal.Cursor())
@@ -466,19 +487,51 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 		}
 	}()
 	defer func() { cancel(); watch.Close(); <-done }()
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
 	for {
+		var expires <-chan time.Time
+		if !s.nextExpiry.IsZero() {
+			wait := s.nextExpiry.Sub(s.r.Now())
+			if timer == nil {
+				timer = time.NewTimer(wait)
+			} else {
+				timer.Reset(wait)
+			}
+			expires = timer.C
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticks:
+			fence, err := s.r.Store.RenewPermissions(ctx, s.fence)
+			if err != nil {
+				return reconcileStep("renew", err)
+			}
+			s.fence = fence
+		case <-expires:
+			s.refreshRemote(ctx)
+			s.refreshWorkloads(ctx)
+			if err := s.accept(ctx, false); err != nil {
+				return reconcileStep("expiry", err)
+			}
+		case <-s.r.ConfigurationChanges:
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
 				return reconcileStep("refresh", err)
 			}
 		case <-s.r.RemoteBindingChanges:
 			// ADR-329: a stored delivery changed (or the notification
 			// connection was re-established): reread and accept.
-			if err := s.refreshRemoteBindings(ctx); err != nil {
+			changed, err := s.refreshRemoteBindings(ctx)
+			if err != nil {
 				return err
+			}
+			if !changed {
+				continue
 			}
 			if err := s.accept(ctx, false); err != nil {
 				return reconcileStep("accept", err)
@@ -497,7 +550,7 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 			if err := s.journal.Apply(item.event); err != nil {
 				return reconcileStep("apply", err)
 			}
-			if item.event.Type != "BOOKMARK" {
+			if item.event.Type != "BOOKMARK" && !s.journal.accepted {
 				if err := s.accept(ctx, false); err != nil {
 					return reconcileStep("accept", err)
 				}

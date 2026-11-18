@@ -34,12 +34,16 @@ type resourceWatch struct {
 	informers []cache.SharedIndexInformer
 }
 
-func startResourceWatch(ctx context.Context, config *rest.Config, resources []schema.GroupVersionResource) (*resourceWatch, error) {
+type watchedResource struct {
+	resource  schema.GroupVersionResource
+	namespace string
+}
+
+func startResourceWatch(ctx context.Context, config *rest.Config, resources ...watchedResource) (*resourceWatch, error) {
 	client, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	factory := metadatainformer.NewSharedInformerFactory(client, 0)
 	w := &resourceWatch{trigger: make(chan struct{}, 1)}
 	signal := func() {
 		select {
@@ -49,13 +53,15 @@ func startResourceWatch(ctx context.Context, config *rest.Config, resources []sc
 	}
 	handler := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { signal() }, UpdateFunc: func(any, any) { signal() }, DeleteFunc: func(any) { signal() }}
 	for _, r := range resources {
-		informer := factory.ForResource(r).Informer()
+		informer := metadatainformer.NewFilteredMetadataInformer(client, r.resource, r.namespace, 0, nil, nil).Informer()
 		if _, err = informer.AddEventHandler(handler); err != nil {
 			return nil, err
 		}
 		w.informers = append(w.informers, informer)
 	}
-	factory.Start(ctx.Done())
+	for _, informer := range w.informers {
+		go informer.RunWithContext(ctx)
+	}
 	return w, nil
 }
 
@@ -140,7 +146,7 @@ func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.
 func (r *Regional) runDeliveries(ctx context.Context, enrolled <-chan struct{}) {
 	var joins []func()
 	if r.bindings != nil {
-		bindings, err := startResourceWatch(ctx, r.watchConfig, []schema.GroupVersionResource{accessBindingsResource})
+		bindings, err := startResourceWatch(ctx, r.watchConfig, watchedResource{resource: accessBindingsResource})
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "connector access binding watch unavailable")
 		} else {

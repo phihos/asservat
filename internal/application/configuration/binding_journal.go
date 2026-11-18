@@ -176,12 +176,6 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 	return b
 }
 
-// Ready reports whether a batch can be prepared at now without failing: the
-// last transition is accepted and the complete binding list is still current.
-func (j *BindingJournal) Ready(now time.Time) bool {
-	return !j.poisoned && j.pending == nil && j.accepted && identity.Fresh(j.observed, j.until, now, 5*time.Second)
-}
-
 // Prepare builds the next batch from the processed bindings and the
 // separately derived inheritance (ADR-242).
 func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now time.Time, inherited Inheritance) (value.PermissionBatch, error) {
@@ -247,16 +241,6 @@ func (j *BindingJournal) Accepted(r value.PermissionAcceptance) error {
 	j.acceptedFence = r.PermissionFence
 	j.pending = nil
 	j.accepted = true
-	return nil
-}
-
-// Refreshed follows only a successful identical-projection refresh. It cannot
-// acknowledge a changed watch transition or initialize an unaccepted baseline.
-func (j *BindingJournal) Refreshed(request string) error {
-	if j.pending == nil || !j.accepted || j.sequence == 0 || j.pending.RequestID != request || j.pending.ExpectedSequence != j.sequence {
-		return value.ErrChanged
-	}
-	j.pending = nil
 	return nil
 }
 

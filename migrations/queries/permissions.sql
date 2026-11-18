@@ -15,7 +15,12 @@ UPDATE permission_stream SET epoch=$2,sequence=0,initial_audit_id=CASE WHEN trus
 UPDATE permission_stream SET initial_audit_id=$2 WHERE id=$1 AND initial_audit_id IS NULL;
 
 -- name: RenewPermissionStream :one
-UPDATE permission_stream SET lease_until=clock_timestamp()+interval '30 seconds' WHERE id=$1 AND epoch=$2 AND lease_until>clock_timestamp() RETURNING lease_until;
+UPDATE permission_stream SET lease_until=statement_timestamp()+interval '30 seconds',
+ observed_at=CASE WHEN sqlc.arg(observing)::boolean THEN statement_timestamp() ELSE observed_at END,
+ fresh_until=CASE WHEN sqlc.arg(observing)::boolean THEN statement_timestamp()+interval '30 seconds' ELSE fresh_until END
+WHERE id=sqlc.arg(id) AND epoch=sqlc.arg(epoch) AND lease_until>clock_timestamp()
+ AND (NOT sqlc.arg(observing)::boolean OR (NOT suspended AND sequence=sqlc.arg(sequence)))
+RETURNING lease_until;
 
 -- name: SuspendPermissionStream :exec
 UPDATE permission_stream SET suspended=true,lease_until=clock_timestamp(),fresh_until=NULL,observed_at=NULL WHERE id=$1;

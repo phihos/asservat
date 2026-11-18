@@ -58,16 +58,13 @@ type hubWorker struct {
 	owners  sync.WaitGroup
 
 	// Shared between children: the capacity child publishes the evidence
-	// store ID of its stored qualification for context deletion (ADR-205)
-	// and lends its namespace guard readers to the permission reconciler
-	// (ADR-247).
+	// store ID of its stored qualification for context deletion (ADR-205).
 	deletionMu      sync.Mutex
 	evidenceStoreID string
 	// capacityStarted closes when the capacity child published the store ID:
 	// the permission stream is current and setup's SQL rows exist, so the
 	// children that need them start after it instead of failing noisily.
 	capacityStarted chan struct{}
-	guards          sharedNamespaceGuards
 }
 
 // RunHubWorker is the `hub-worker` command.

@@ -55,14 +55,18 @@ func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.B
 	if !identity.Text(rv, 128) || rv == "0" {
 		return nil, value.ErrInvalid
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithCancel(ctx)
+	// Bound establishing the watch; its healthy stream stays open until an
+	// API watch restart or caller cancellation.
+	opening := time.AfterFunc(5*time.Second, cancel)
+	defer opening.Stop()
 	start := c.now()
 	ns, err := c.namespace(ctx, c.control)
 	if err != nil || ns.Deleting {
 		cancel()
 		return nil, value.ErrChanged
 	}
-	r := c.api.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true").Param("timeoutSeconds", "4")
+	r := c.api.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
 	body, err := r.Stream(ctx)
 	if err != nil {
 		mapped := permissionError(ctx, err)

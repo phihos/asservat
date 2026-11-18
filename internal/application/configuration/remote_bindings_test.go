@@ -54,7 +54,7 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	foreign := value.RemoteBindings{ClusterID: "33333333-3333-4333-8333-333333333333", ObservedAt: now, Bindings: []value.Binding{remoteBinding(remoteCluster, "mislabelled", "uid-x", "Allow")}}
 	reader := &remoteBindingFixture{deliveries: []value.RemoteBindings{delivery, own, foreign}}
 	s.r.RemoteBindings = reader
-	if err := s.refreshRemoteBindings(ctx); err != nil {
+	if _, err := s.refreshRemoteBindings(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.accept(ctx, false); err != nil {
@@ -72,7 +72,7 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	// A failed read leaves the cache intact but stops the epoch. An old
 	// valid delivery still grants until the connector replaces it.
 	reader.err = errors.New("sql unavailable")
-	if err := s.refreshRemoteBindings(ctx); !errors.Is(err, reader.err) {
+	if _, err := s.refreshRemoteBindings(ctx); !errors.Is(err, reader.err) {
 		t.Fatal("missing remote binding read error", err)
 	}
 	reader.err = nil
@@ -89,14 +89,14 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	// deny removes it.
 	reader.err = nil
 	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: d.ObservedAt.Add(-time.Second)}}
-	if err := s.refreshRemoteBindings(ctx); err != nil {
+	if _, err := s.refreshRemoteBindings(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.remoteBindings[remoteCluster].Bindings) != 3 {
 		t.Fatal("older delivery replaced the newer one")
 	}
 	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: s.r.Now()}}
-	if err := s.refreshRemoteBindings(ctx); err != nil {
+	if _, err := s.refreshRemoteBindings(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.accept(ctx, false); err != nil {
@@ -134,6 +134,28 @@ func TestReconcilerRereadsRemoteBindingsOnSignal(t *testing.T) {
 	}
 	if reader.reads != 0 {
 		t.Fatal("the reconciler tick reread the deliveries", reader.reads)
+	}
+}
+
+func TestRemoteBindingReplacementAtSameTimeAndExplicitWithdrawal(t *testing.T) {
+	_, _, s, ctx := inheritanceRun(t)
+	d := value.RemoteBindings{ClusterID: remoteCluster, ObservedAt: s.r.Now(), Digest: [32]byte{1}, Bindings: []value.Binding{remoteBinding(remoteCluster, "before", "uid-allow", "Allow")}}
+	reader := &remoteBindingFixture{deliveries: []value.RemoteBindings{d}}
+	s.r.RemoteBindings = reader
+	for _, expected := range []bool{true, false} {
+		if changed, err := s.refreshRemoteBindings(ctx); err != nil || changed != expected {
+			t.Fatal("initial/unchanged delivery", changed, err)
+		}
+	}
+	d.Digest[0]++
+	d.Bindings = nil
+	reader.deliveries = []value.RemoteBindings{d}
+	if changed, err := s.refreshRemoteBindings(ctx); err != nil || !changed || len(s.remoteBindings[remoteCluster].Bindings) != 0 {
+		t.Fatal("changed digest at same observation time", changed, err)
+	}
+	reader.deliveries = nil
+	if changed, err := s.refreshRemoteBindings(ctx); err != nil || !changed || len(s.remoteBindings) != 0 {
+		t.Fatal("withdrawn delivery retained", changed, err)
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 type RemoteBindings struct {
 	ClusterID  string
 	ObservedAt time.Time
+	Digest     artifact.Digest // stored delivery digest returned by the hub reader
 	Bindings   []Binding
 }
 

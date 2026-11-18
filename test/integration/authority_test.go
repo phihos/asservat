@@ -69,6 +69,7 @@ func (c delayedPermissionConn) Write(b []byte) (int, error) {
 type remoteBindingHubFixture struct {
 	cluster  string
 	bindings []cfg.Binding
+	watch    configapp.BindingWatch
 }
 
 func (f remoteBindingHubFixture) PermissionSnapshot(context.Context) (cfg.Snapshot, error) {
@@ -83,8 +84,48 @@ func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.Permi
 
 var errBaselineAccepted = errors.New("test stops at watch after initial acceptance")
 
-func (remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
+func (f remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
+	if f.watch != nil {
+		return f.watch, nil
+	}
 	return nil, errBaselineAccepted
+}
+
+type quietBindingWatch struct{}
+
+func (quietBindingWatch) Close() {}
+func (quietBindingWatch) Next(ctx context.Context) (cfg.BindingEvent, error) {
+	<-ctx.Done()
+	return cfg.BindingEvent{}, ctx.Err()
+}
+
+type observedPermissionWriter struct {
+	*postgres.Permissions
+	accepted  chan cfg.PermissionAcceptance
+	renewed   chan cfg.PermissionFence
+	refreshed chan struct{}
+}
+
+func (w *observedPermissionWriter) AcceptPermissions(ctx context.Context, b cfg.PermissionBatch) (cfg.PermissionAcceptance, error) {
+	a, err := w.Permissions.AcceptPermissions(ctx, b)
+	if err == nil {
+		w.accepted <- a
+	}
+	return a, err
+}
+func (w *observedPermissionWriter) RenewPermissions(ctx context.Context, f cfg.PermissionFence) (cfg.PermissionFence, error) {
+	next, err := w.Permissions.RenewPermissions(ctx, f)
+	if err == nil {
+		w.renewed <- next
+	}
+	return next, err
+}
+func (w *observedPermissionWriter) RefreshPermissions(ctx context.Context, b cfg.PermissionBatch) error {
+	select {
+	case w.refreshed <- struct{}{}:
+	default:
+	}
+	return w.Permissions.RefreshPermissions(ctx, b)
 }
 
 func TestPermissionAuthorityWithRealServices(t *testing.T) {
@@ -283,6 +324,68 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			})
 		}
 	}
+	t.Run("fleet-automation-audit-readback", func(t *testing.T) {
+		s := create(t)
+		template := s.b.Bases[0]
+		template.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{"logs"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 1024}
+		s.b.Bases = nil
+		for i := 0; i < 1025; i++ {
+			b := template
+			b.Resource.UID = custodyID()
+			s.b.Bases = append(s.b.Bases, b)
+		}
+		s.b = fresh(s.b)
+		accept(t, &s)
+		rows, err := s.p.PendingAuthorityAudits(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var initial audit.AuthorityRecord
+		for _, r := range rows {
+			if r.ID == s.b.RequestID {
+				initial = r
+			}
+		}
+		if len(initial.Automation) != 1025 || len(initial.Changes) != 1025 {
+			t.Fatal("incomplete automatic delegations", len(initial.Automation), len(initial.Changes))
+		}
+		flush(t, s.p)
+		// Derive the issuer length from the real compact record so its SQL
+		// representation crosses 8 MiB while its canonical plaintext fits.
+		initial.Changes = slices.Repeat(initial.Changes, 4)
+		body, err := json.Marshal(initial)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issuer := template.Subjects[0].Issuer + strings.Repeat("a", (audit.AuthorityPlaintextBytes-8192-len(body))/len(initial.Changes))
+		for i := range s.b.Bases {
+			b := &s.b.Bases[i]
+			b.Subjects = slices.Clone(template.Subjects)
+			for j := 0; j < 4; j++ {
+				b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: issuer, ID: fmt.Sprintf("team-%d", j)})
+			}
+			b.Resource.Generation++
+			b.Resource.ResourceVersion = "v2"
+			b.Resource.SpecDigest[0]++
+			b.Continuous = true
+		}
+		s.b = fresh(s.b)
+		accept(t, &s)
+		var stored int
+		if err := admin.QueryRow(ctx, `SELECT octet_length(record::text) FROM authority_audit WHERE id=$1`, s.b.RequestID).Scan(&stored); err != nil || stored <= audit.AuthorityPlaintextBytes {
+			t.Fatal("expected expanded SQL JSON above plaintext budget", stored, err)
+		}
+		rows, err = s.p.PendingAuthorityAudits(ctx)
+		if err != nil || len(rows) != 1 || len(rows[0].Changes) != 4100 || len(rows[0].Automation) != 1025 {
+			t.Fatal("unreadable near-limit audit", len(rows), err)
+		}
+		body, err = json.Marshal(rows[0])
+		if err != nil || len(body) > audit.AuthorityPlaintextBytes {
+			t.Fatal("audit exceeded canonical budget", len(body), err)
+		}
+		flush(t, s.p)
+		t.Logf("acknowledged %d-byte canonical event (%d-byte PostgreSQL rendering)", len(body), stored)
+	})
 	t.Run("remote-bindings-after-fleet-grows", func(t *testing.T) {
 		root := custodyID()
 		slow := pool.Config()
@@ -417,6 +520,61 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			reconcile()
 			checkFleet(201)
 		}
+		// Keep the real production watch active through a database renewal.
+		// The quiet fleet must not build, hash or write a new projection.
+		live, stop := context.WithTimeout(ctx, 45*time.Second)
+		defer stop()
+		writer := &observedPermissionWriter{reconciler.Store.(*postgres.Permissions), make(chan cfg.PermissionAcceptance, 4), make(chan cfg.PermissionFence, 2), make(chan struct{}, 1)}
+		hub.watch = quietBindingWatch{}
+		reconciler.Watcher = hub
+		reconciler.Store = writer
+		reconciler.RemoteBindingChanges = postgres.Listen(live, pool, postgres.RemoteBindingsChannel)
+		done := make(chan configapp.PermissionEpochResult, 1)
+		go func() { done <- reconciler.RunEpoch(live) }()
+		defer func() {
+			stop()
+			select {
+			case <-done:
+			case <-time.After(6 * time.Second):
+				t.Error("epoch did not stop")
+			}
+		}()
+		nextAcceptance := func() cfg.PermissionAcceptance {
+			t.Helper()
+			select {
+			case accepted := <-writer.accepted:
+				return accepted
+			case result := <-done:
+				done <- result
+				t.Fatalf("epoch stopped: %v", result.Err)
+			case <-live.Done():
+				t.Fatal(live.Err())
+			}
+			return cfg.PermissionAcceptance{}
+		}
+		baseline := nextAcceptance()
+		select {
+		case f := <-writer.renewed:
+			if f.Sequence != baseline.Sequence || len(writer.refreshed) != 0 || len(writer.accepted) != 0 {
+				t.Fatal("idle fleet recomputed its projection")
+			}
+		case result := <-done:
+			done <- result
+			t.Fatalf("epoch stopped before renewal: %v", result.Err)
+		case <-live.Done():
+			t.Fatal(live.Err())
+		}
+		// Leave observed_at untouched: the changed digest at PostgreSQL's
+		// original timestamp is the committed replacement.
+		if _, err := admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET bindings='[]'::bytea,digest=sha256('[]'::bytea) WHERE root_id=$1 AND cluster_id=$2`, root, newlyJoined); err != nil {
+			t.Fatal(err)
+		}
+		changed := nextAcceptance()
+		if changed.Sequence != baseline.Sequence+1 || changed.Retired != 1 {
+			t.Fatal("equal-timestamp replacement did not retire the original assignment", changed)
+		}
+		checkAssignments(newlyJoined, 0)
+		checkFleet(200)
 	})
 	// ADR-237: the impact preview reads every workload cell of the affected
 	// namespace from the same accepted projection, and the real evaluator

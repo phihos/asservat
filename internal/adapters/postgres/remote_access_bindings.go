@@ -111,7 +111,7 @@ func (s *RemoteAccessBindings) RemoteBindings(ctx context.Context) ([]cfg.Remote
 				cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest}
 			}
 			next[cluster] = cached
-			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Bindings: cached.bindings})
+			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Digest: [32]byte(row.Digest), Bindings: cached.bindings})
 		}
 		return nil
 	})

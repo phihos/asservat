@@ -373,16 +373,28 @@ func (q *Queries) RememberWorkloadName(ctx context.Context, arg RememberWorkload
 }
 
 const renewPermissionStream = `-- name: RenewPermissionStream :one
-UPDATE permission_stream SET lease_until=clock_timestamp()+interval '30 seconds' WHERE id=$1 AND epoch=$2 AND lease_until>clock_timestamp() RETURNING lease_until
+UPDATE permission_stream SET lease_until=statement_timestamp()+interval '30 seconds',
+ observed_at=CASE WHEN $1::boolean THEN statement_timestamp() ELSE observed_at END,
+ fresh_until=CASE WHEN $1::boolean THEN statement_timestamp()+interval '30 seconds' ELSE fresh_until END
+WHERE id=$2 AND epoch=$3 AND lease_until>clock_timestamp()
+ AND (NOT $1::boolean OR (NOT suspended AND sequence=$4))
+RETURNING lease_until
 `
 
 type RenewPermissionStreamParams struct {
-	ID    pgtype.UUID
-	Epoch pgtype.UUID
+	Observing bool
+	ID        pgtype.UUID
+	Epoch     pgtype.UUID
+	Sequence  int64
 }
 
 func (q *Queries) RenewPermissionStream(ctx context.Context, arg RenewPermissionStreamParams) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, renewPermissionStream, arg.ID, arg.Epoch)
+	row := q.db.QueryRow(ctx, renewPermissionStream,
+		arg.Observing,
+		arg.ID,
+		arg.Epoch,
+		arg.Sequence,
+	)
 	var lease_until pgtype.Timestamptz
 	err := row.Scan(&lease_until)
 	return lease_until, err

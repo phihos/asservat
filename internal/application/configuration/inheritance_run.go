@@ -164,9 +164,8 @@ func (s *bindingRun) feedItems() <-chan namespaceItem {
 }
 
 // namespaceItem applies one feed delivery. A transition that changes the
-// derived inheritance is accepted before the next one is read; when that is
-// impossible now, continuity is dropped instead, so that the next acceptance
-// compares exact namespace resourceVersions and retires what changed.
+// derived inheritance is accepted before the next one is read. A trust or
+// storage error ends the epoch before any later transition is accepted.
 func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error {
 	switch {
 	case it.list != nil:
@@ -184,21 +183,16 @@ func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error 
 			s.restartFeed(ctx, s.feed.keys)
 			return nil
 		}
+		if it.event.Type == "BOOKMARK" {
+			return nil
+		}
 	default:
 		if s.namespaces != nil {
 			s.namespaces.Fresh(it.fresh)
 		}
 		return nil
 	}
-	now := s.r.Now()
-	if inheritanceDigest(s.inheritance(now)) == s.lastInheritance {
-		return nil
-	}
-	if !s.journal.Ready(now) || !now.Before(s.trustUntil) {
-		s.continuity++
-		return nil
-	}
-	return s.accept(ctx, false)
+	return s.accept(ctx, true)
 }
 
 type inheritanceState struct {

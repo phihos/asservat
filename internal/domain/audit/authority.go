@@ -16,6 +16,10 @@ type AssignmentChange struct {
 	Audience    artifact.AudienceAssignment
 	ScopeDigest artifact.Digest
 }
+
+// AuthorityPlaintextBytes is the maximum plaintext of one encrypted audit event.
+const AuthorityPlaintextBytes = 8 << 20
+
 type AuthorityRecord struct {
 	ID, RootID, Epoch, Kind string
 	Sequence                int64
@@ -111,7 +115,7 @@ func (r AuthorityRecord) Valid() bool {
 	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.Changes) > 0 || len(r.ReviewRetirements) > 0) {
 		return false
 	}
-	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
+	if (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
 		return false
 	}
 	if len(r.ReviewSources) > 64 || len(r.ReviewRetirements) > 128 {

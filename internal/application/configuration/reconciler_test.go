@@ -217,3 +217,44 @@ func TestBindingReconcilerNamesTheStoppingPhase(t *testing.T) {
 		})
 	}
 }
+
+type expiryPermissionStore struct {
+	*reconciliationFixture
+	transitions chan value.PermissionBatch
+}
+
+func (s expiryPermissionStore) AcceptPermissions(ctx context.Context, b value.PermissionBatch) (value.PermissionAcceptance, error) {
+	a, err := s.reconciliationFixture.AcceptPermissions(ctx, b)
+	if err == nil {
+		s.transitions <- b
+	}
+	return a, err
+}
+
+func TestBindingExpiresDuringQuietWatch(t *testing.T) {
+	f, r := reconciliationTest(t)
+	start := time.Now()
+	base := r.Now()
+	r.Now = func() time.Time { return base.Add(time.Since(start)) }
+	f.snapshot.Bindings[0].NotAfter = base.Add(150 * time.Millisecond)
+	store := expiryPermissionStore{f, make(chan value.PermissionBatch, 2)}
+	r.Store = store
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- r.Run(ctx) }()
+	for _, want := range []int{1, 0} {
+		select {
+		case b := <-store.transitions:
+			if len(b.Bases) != want {
+				t.Fatal("accepted bases", len(b.Bases), "want", want)
+			}
+		case <-ctx.Done():
+			t.Fatal("missing expiry transition", ctx.Err())
+		}
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}

@@ -33,7 +33,7 @@ func SealAuthority(ctx context.Context, keys evidence.KeySealer, r audit.Authori
 	if keys == nil || !r.Valid() {
 		return nil, artifact.ErrInvalid
 	}
-	return sealControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, 8<<20)
+	return sealControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, audit.AuthorityPlaintextBytes)
 }
 
 func sealControlAudit(ctx context.Context, keys evidence.KeySealer, format, root, event string, record any, maxPlain int) ([]byte, error) {
@@ -63,7 +63,7 @@ func VerifyAuthority(ctx context.Context, keys evidence.KeyOpener, r audit.Autho
 	if keys == nil || !r.Valid() || len(encoded) == 0 || len(encoded) > 16<<20 {
 		return artifact.ErrInvalid
 	}
-	return verifyControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, encoded, 8<<20)
+	return verifyControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, encoded, audit.AuthorityPlaintextBytes)
 }
 
 func verifyControlAudit(ctx context.Context, keys evidence.KeyOpener, format, root, event string, record any, encoded []byte, maxPlain int) error {
