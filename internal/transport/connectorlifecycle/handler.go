@@ -34,7 +34,8 @@ type SettingsService interface {
 // presented cluster (ADR-329). The Region reads the delivery; the service
 // must attribute it to region.Presented().ClusterID only.
 type AccessBindingsService interface {
-	AccessBindings(context.Context, *Region) error
+	AccessBindings(context.Context, *Region, string) (string, error)
+	AccessBindingRevision(context.Context, value.ConnectorCluster) (string, error)
 }
 
 type Handler struct {
@@ -129,8 +130,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		settings.Protocol = contracts.ConnectorProtocolMajor
 		result.Settings = &settings
 	case PurposeAccessBindings:
+		if sink, ok := h.services.(AccessBindingsService); ok && authorization.UUID(opening.BindingRevision) {
+			result.BindingRevision, err = sink.AccessBindings(ctx, region, opening.BindingRevision)
+		} else {
+			err = ErrChannel
+		}
+	case PurposeBindingRevision:
 		if sink, ok := h.services.(AccessBindingsService); ok {
-			err = sink.AccessBindings(ctx, region)
+			result.BindingRevision, err = sink.AccessBindingRevision(ctx, presented)
 		} else {
 			err = ErrChannel
 		}
@@ -156,7 +163,7 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 		return false
 	}
 	switch o.Purpose {
-	case PurposeAccessBindings:
+	case PurposeAccessBindings, PurposeBindingRevision:
 		if o.Owner != nil {
 			return false
 		}

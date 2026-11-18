@@ -239,50 +239,60 @@ type federationServices struct {
 type federationBindings struct {
 	decoder *kube.AccessBindingSpecDecoder
 	store   interface {
-		StoreRemoteBindings(context.Context, string, time.Time, string, []configuration.Binding, bool) error
-		RemoteBindingsDigest(context.Context, string) (string, time.Time, error)
+		StoreRemoteBindings(context.Context, string, string, string, []configuration.Binding, bool) (string, error)
+		BeginRemoteBindings(context.Context, string) (string, error)
+		RemoteBindingsDigest(context.Context, string) (string, string, error)
 	}
 }
 
-// AccessBindings stores the presenting connector's delivery under its
-// authenticated cluster, ordered by the database at the digest exchange (ADR-329).
-// The payload names no cluster; a binding the schema refuses grants nothing.
-func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region) error {
-	if s.bindings == nil || region == nil {
-		return mounts.ErrUnavailable
+func (s federationServices) acceptsBindingsFrom(p value.ConnectorCluster) bool {
+	return s.bindings != nil && p.RootID == s.ids.PermissionRootID && p.InstallationID == s.ids.InstallationID && p.ClusterID != s.ids.ClusterID
+}
+
+// A connector's first LIST starts from this predecessor. Every successful
+// transfer returns the predecessor for its next LIST on the same watch.
+func (s federationServices) AccessBindingRevision(ctx context.Context, p value.ConnectorCluster) (string, error) {
+	if !s.acceptsBindingsFrom(p) {
+		return "", mounts.ErrUnavailable
 	}
-	p := region.Presented()
-	if p.RootID != s.ids.PermissionRootID || p.InstallationID != s.ids.InstallationID || p.ClusterID == s.ids.ClusterID {
-		return mounts.ErrUnavailable
+	return s.bindings.store.BeginRemoteBindings(ctx, p.ClusterID)
+}
+
+func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region, previous string) (string, error) {
+	if region == nil || previous == "" || !s.acceptsBindingsFrom(region.Presented()) {
+		return "", mounts.ErrUnavailable
 	}
-	// The connector answers "unchanged" when its current LIST has the
-	// stored digest; the stored delivery then stays in effect.
-	stored, observedAt, err := s.bindings.store.RemoteBindingsDigest(ctx, p.ClusterID)
+	cluster := region.Presented().ClusterID
+	stored, current, err := s.bindings.store.RemoteBindingsDigest(ctx, cluster)
 	if err != nil {
-		return err
+		return "", err
+	}
+	if current != previous {
+		return "", configuration.ErrChanged
 	}
 	delivery, unchanged, err := region.ReadAccessBindings(ctx, stored)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if unchanged {
-		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, stored, nil, false)
+		return s.bindings.store.StoreRemoteBindings(ctx, cluster, previous, stored, nil, false)
 	}
-	if delivery.Unavailable {
-		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), nil, true)
+	var bindings []configuration.Binding
+	unavailable := delivery.Unavailable
+	if !unavailable {
+		bindings, err = s.bindings.decoder.DeliveredBindings(cluster, delivery)
+		if err != nil {
+			// The previous Allow may have been removed in this replacement.
+			// An unrepresentable observation suspends this cluster.
+			unavailable, bindings = true, nil
+			fmt.Fprintln(os.Stderr, "federation access bindings unavailable: incomplete observation")
+		}
 	}
-	bindings, err := s.bindings.decoder.DeliveredBindings(p.ClusterID, delivery)
-	if errors.Is(err, configuration.ErrLimit) {
-		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), nil, true)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
-		return err
-	}
-	if err = s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), bindings, false); err != nil {
+	revision, err := s.bindings.store.StoreRemoteBindings(ctx, cluster, previous, delivery.Digest(), bindings, unavailable)
+	if err != nil && !errors.Is(err, configuration.ErrChanged) {
 		fmt.Fprintln(os.Stderr, "federation access bindings store failed: "+federationCause(err))
 	}
-	return err
+	return revision, err
 }
 
 // AuthenticateOwner logs the fixed refusal step of a failed owner

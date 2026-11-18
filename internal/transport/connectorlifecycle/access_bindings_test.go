@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	value "asservat.local/asservat/internal/domain/fleet"
+
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -22,30 +24,23 @@ type deliveryServices struct {
 	unavailable bool
 }
 
-func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) error {
+func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region, _ string) (string, error) {
 	d, unchanged, err := region.ReadAccessBindings(ctx, s.stored)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, _, err = region.ReadAccessBindings(ctx, s.stored); err == nil {
-		return ErrChannel // one delivery per conversation
+		return "", ErrChannel // one delivery per conversation
 	}
 	s.unavailable = d.Unavailable
 	s.cluster, s.items, s.unchanged = region.Presented().ClusterID, len(d.Items), unchanged
-	return nil
+	return "10000000-0000-4000-8000-000000000009", nil
 }
 
-type deliveringReader struct {
-	delivery contracts.AccessBindingDelivery
+func (s *deliveryServices) AccessBindingRevision(context.Context, value.ConnectorCluster) (string, error) {
+	return "", nil
 }
 
-func (d deliveringReader) ReadAccessBindings(context.Context) (contracts.AccessBindingDelivery, error) {
-	return d.delivery, nil
-}
-
-// ADR-329: the hub asks for the delivery only after the presentation, may
-// read more than an ordinary conversation for it, and attributes it to the
-// presented cluster.
 func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	services := &deliveryServices{}
 	h, err := NewHandler(&acceptTokens{}, services, 2)
@@ -64,7 +59,7 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 		t.Fatal(err)
 	}
 	process := testProcess()
-	open := Opening{Purpose: PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
+	open := Opening{BindingRevision: "10000000-0000-4000-8000-000000000009", Purpose: PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
 	// A connector running across the upgrade keeps its process and bearer
 	// token. Its old opening omits Protocol, whether it would send a new
 	// namespaced list or confirm the stored digest.
@@ -72,7 +67,7 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 		services.stored = stored
 		legacy := open
 		legacy.Protocol = 0
-		_, err := client.Run(context.Background(), legacy, deliveringReader{})
+		_, err := client.Run(context.Background(), legacy, nil)
 		var unsupported *ProtocolMismatch
 		if !errors.As(err, &unsupported) || unsupported.Required != contracts.ConnectorProtocolMajor || unsupported.Announced != 0 || services.cluster != "" {
 			t.Fatalf("legacy process reached permission delivery after upgrade: %v", err)
@@ -85,22 +80,22 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	for range 1000 {
 		delivery.Items = append(delivery.Items, contracts.DeliveredAccessBinding{Namespace: "payments", NamespaceUID: "ns", Name: "b", UID: "u", ResourceVersion: "1", Generation: 1, Spec: spec})
 	}
-	result, err := client.Run(context.Background(), open, deliveringReader{delivery: delivery})
+	result, err := client.Run(context.Background(), open, &delivery)
 	if err != nil || result.Kind != "result" || services.items != 1000 || services.cluster != process.Binding.ClusterID {
 		t.Fatal("delivery", result.Kind, err, services.items, services.cluster)
 	}
 	// With the hub's stored digest equal to the connector's, nothing is sent.
 	services.stored, services.items = delivery.Digest(), 0
-	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || result.Kind != "result" || !services.unchanged || services.items != 0 {
+	if result, err = client.Run(context.Background(), open, &delivery); err != nil || result.Kind != "result" || !services.unchanged || services.items != 0 {
 		t.Fatal("unchanged delivery", result.Kind, err, services.unchanged, services.items)
 	}
 	services.stored = "0000"
-	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || services.unchanged || services.items != 1000 {
+	if result, err = client.Run(context.Background(), open, &delivery); err != nil || services.unchanged || services.items != 1000 {
 		t.Fatal("changed delivery", err, services.unchanged, services.items)
 	}
 	oversized := delivery
 	oversized.Items = append(append([]contracts.DeliveredAccessBinding(nil), delivery.Items...), delivery.Items...)
-	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: oversized}); err != nil || result.Kind != "result" || !services.unavailable || services.items != 0 || services.unchanged {
+	if result, err = client.Run(context.Background(), open, &oversized); err != nil || result.Kind != "result" || !services.unavailable || services.items != 0 || services.unchanged {
 		t.Fatal("over-budget replacement left the previous observation current", err)
 	}
 	services.stored = ""
@@ -115,7 +110,7 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 		t.Fatal(err)
 	}
 	server.Config.Handler = plain
-	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || result.Kind != "failure" {
+	if result, err = client.Run(context.Background(), open, &delivery); err != nil || result.Kind != "failure" {
 		t.Fatal("hub without the service", result.Kind, err)
 	}
 }

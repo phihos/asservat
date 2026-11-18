@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 // Client is the connector's side of its hub connection: one HTTP/2
@@ -84,9 +86,8 @@ func (c *Client) open(ctx context.Context, path string, header http.Header, body
 	return resp, nil
 }
 
-// Run returns the hub's final frame; local answers a delivery request and
-// may be nil for a read-only purpose.
-func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame, error) {
+// Run returns the final frame. A binding transfer carries its source observation.
+func (c *Client) Run(ctx context.Context, opening Opening, observation *contracts.AccessBindingDelivery) (HubFrame, error) {
 	var zero HubFrame
 	if c == nil || ctx == nil {
 		return zero, ErrChannel
@@ -117,17 +118,11 @@ func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame,
 		var reply RegionFrame
 		switch {
 		case frame.Kind == "access-bindings":
-			reader, ok := local.(AccessBindingsLocal)
-			if !ok {
+			if observation == nil || opening.Purpose != PurposeAccessBindings {
 				_ = out.Send(RegionFrame{Kind: "error"})
 				return zero, ErrChannel
 			}
-			delivery, err := reader.ReadAccessBindings(ctx)
-			if err != nil {
-				_ = out.Send(RegionFrame{Kind: "error"})
-				return zero, ErrChannel
-			}
-			delivery = delivery.Bounded()
+			delivery := observation.Bounded()
 			reply = RegionFrame{Kind: "access-bindings", AccessBindings: &delivery}
 			if frame.Digest != "" && frame.Digest == delivery.Digest() {
 				reply = RegionFrame{Kind: "access-bindings", Unchanged: true}

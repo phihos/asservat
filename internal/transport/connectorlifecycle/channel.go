@@ -30,7 +30,8 @@ const (
 	// PurposeAccessBindings delivers the connector's complete AccessBinding
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
-	PurposeAccessBindings Purpose = "access-bindings"
+	PurposeAccessBindings  Purpose = "access-bindings"
+	PurposeBindingRevision Purpose = "binding-revision"
 	// PurposeSettings returns the settings the connector needs from the hub
 	// (REQ-FED-001): its cluster and peer IDs, the hub's offer and its
 	// cluster's object-store capabilities. It is the first conversation of
@@ -60,11 +61,12 @@ var ErrChannel = errors.New("connector lifecycle channel unavailable")
 // Opening is the connector's first frame. Process names the connector
 // process; its binding must name the token's cluster and peer.
 type Opening struct {
-	Protocol    int `json:",omitempty"` // advertised on every opening
-	Purpose     Purpose
-	OperationID string
-	Process     value.ConnectorProcessIdentity
-	Owner       *value.OwnerCertificate `json:",omitempty"` // owner authentication only
+	Protocol        int `json:",omitempty"` // advertised on every opening
+	Purpose         Purpose
+	OperationID     string
+	Process         value.ConnectorProcessIdentity
+	BindingRevision string                  `json:",omitempty"` // Predecessor sampled before the workload LIST.
+	Owner           *value.OwnerCertificate `json:",omitempty"` // owner authentication only
 }
 
 // ProtocolMismatch is the lifecycle endpoint's HTTP 426 response.
@@ -81,10 +83,11 @@ func (m *ProtocolMismatch) FixedStep() string { return m.Error() }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind     string               // access-bindings, result, failure
-	Owner    *OwnerAuthentication `json:",omitempty"`
-	Settings *Settings            `json:",omitempty"`
-	Failure  string               `json:",omitempty"`
+	Kind            string               // access-bindings, result, failure
+	BindingRevision string               `json:",omitempty"`
+	Owner           *OwnerAuthentication `json:",omitempty"`
+	Settings        *Settings            `json:",omitempty"`
+	Failure         string               `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings"
 	// request; the connector answers Unchanged when its current delivery has
 	// the same digest (ADR-329).
@@ -98,12 +101,6 @@ type RegionFrame struct {
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
 	// Unchanged answers a delivery request whose digest matches.
 	Unchanged bool `json:",omitempty"`
-}
-
-// AccessBindingsLocal is the regional reader of the connector's own
-// AccessBinding LIST (ADR-329), offered only by a delivering conversation.
-type AccessBindingsLocal interface {
-	ReadAccessBindings(context.Context) (contracts.AccessBindingDelivery, error)
 }
 
 // Conn is one decoded/encoded frame stream with a per-read deadline control.

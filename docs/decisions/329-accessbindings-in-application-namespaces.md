@@ -117,13 +117,18 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
 - The connector watches both binding collections. A change triggers a
   paginated LIST through the same reader as the hub. The connector skips
   bindings from an earlier namespace incarnation and enforces its 8 MiB wire
-  budget as each page arrives. Bursts coalesce to at most one delivery per
-  second, and a set
-  whose digest equals the last delivered one is not sent. A failed delivery is
-  retried after five seconds; nothing is resent periodically.
-- Every delivery conversation carries the hub's stored digest; the connector
-  answers "unchanged" when its set has it. The first conversation after a
-  connector (re)start is therefore a digest comparison.
+  budget as each page arrives. Bursts coalesce to at most one observation per
+  second. Failed reads or deliveries retry after five seconds.
+- Before its first LIST, the authenticated connector reads its cluster's
+  delivery revision from the hub. Each acknowledged transfer returns the
+  revision for the next LIST. The connector submits against the revision it
+  held before that source read. Another
+  publication or confirmation makes a delayed submission retry from a new LIST.
+  The hub compares digests so an unchanged set only needs a confirmation.
+  Kubernetes pagination holds no federation slot or database connection.
+  An idle watch needs no hub requests.
+  Both binding kinds share the documented wire budget in
+  [the permission contract](../../specs/permissions.md).
 - The connector presents its cluster credential on that channel (ADR-168,
   exporter-bound signature, checked under the SQL lineage lock). The
   federation asks for the delivery only after that check and stores it under

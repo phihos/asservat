@@ -19,6 +19,10 @@ from the complete replacement, so independent revocations still reach the hub.
 The connector counts the encoded envelope and both collections against the
 8 MiB transfer budget as it reads. Crossing it stops the read and reports the
 cluster unavailable. The hub applies the complete binding set within that budget.
+A connector starts with its cluster's delivery revision from the authenticated
+hub and uses each acknowledgement as the predecessor for its next read. Publication and digest confirmation
+require that exact predecessor. This applies to unavailable observations as well as complete snapshots. A competing update forces a fresh source read.
+The Kubernetes LIST holds neither a database connection nor a federation slot.
 Persisted assignments and recorded artifact audiences represent a subject
 ID in up to 256 UTF-8 bytes and its optional issuer in up to 2,048. Both fields
 exclude control characters. All proposed binding subjects must fit these fields,
