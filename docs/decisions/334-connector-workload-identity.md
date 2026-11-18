@@ -53,7 +53,11 @@ per owner every 30 seconds. With 65 active connectors, that would mean 65 owner
 lookups per second before any user started work. Protocol major 2 keeps one
 outbound HTTP/2 work subscription per connector. A waiting owner sends a
 PostgreSQL notification when it needs an exchange. The connector opens that
-exchange through its existing connection and authenticates the actual owner.
+exchange through its existing connection. Federation resolves the requesting
+owner's binding to a ready Pod address in the installed Service's EndpointSlice
+and uses the configured native port. The connector verifies the TLS identity
+of that exact owner process. Ordinary Service load balancing could select a
+different replica with no waiting request.
 An available exchange can serve further work within its original lifetime.
 
 One database listener per federation replica receives work notifications. One

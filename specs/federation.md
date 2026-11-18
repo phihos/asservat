@@ -30,7 +30,8 @@ The hub and workload clusters can upgrade in either order. The hub checks the co
 
 An idle connector subscribes for work over its outbound HTTP/2 connection.
 When a hub request needs a regional exchange, the connector opens one to the
-requesting hub replica. Reconnection announces only work whose caller is still
+requesting hub replica. Federation resolves the registered owner to its ready
+endpoint, and the connector authenticates that owner. Reconnection announces only work whose caller is still
 waiting. Notifications carry routing information. Each operation retains its
 original identity, authorization and deadline.
 
