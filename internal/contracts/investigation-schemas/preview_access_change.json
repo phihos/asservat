@@ -181,11 +181,13 @@
           },
           "issuer": {
             "type": "string",
-            "format": "uri"
+            "minLength": 1,
+            "description": "Compared literally with the verified issuer. PostgreSQL permission assignments store up to 2048 UTF-8 bytes."
           },
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "PostgreSQL permission assignments store up to 256 UTF-8 bytes."
           }
         },
         "required": [
