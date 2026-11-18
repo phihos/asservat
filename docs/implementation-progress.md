@@ -53,6 +53,19 @@ for the selected remote Pod (352 and 353 bytes). The installed test passed
 in 21.42 seconds and cleanup exited 0. Both federation replicas held SQL
 listeners while a third connection with the same role read owner records.
 
+The follow-up router tests passed 24 consecutive queries through one exchange.
+A request from a second owner arriving during the initial opening obtained the
+slot after the first query finished. The registration wait uses the caller's
+deadline, and closing the router wakes its waiters. The exchange still obeys
+its wire-byte budget.
+
+With 1,025 automation bindings, the PostgreSQL regression wrote and
+acknowledged an 8,377,659-byte audit event (8,812,305 bytes in PostgreSQL's
+JSON representation). The 201-cluster fixture stayed idle through a permission
+lease renewal, then applied a replacement delivery with the same timestamp
+and a different digest. A withdrawal drops the saved delivery before federation
+accepts traffic. The connector loads its current storage keys on reconnect.
+
 ## Processing cleanup (2026-11-17)
 
 Branch `codex/processing-cleanup`. Removed the dead manual processing
