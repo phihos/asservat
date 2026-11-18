@@ -65,7 +65,7 @@ func (r *Router) request(ctx context.Context, cluster string, executor *fleet.AP
 		}
 		for _, s := range r.standby {
 			if s.yield && s.channel.Connector.Binding.ClusterID == cluster {
-				s.yieldIdleLocked()
+				s.yieldToPeerLocked()
 			}
 		}
 	}
@@ -85,9 +85,20 @@ func (r *Router) ResendDemand(cluster string) {
 		r.mu.Unlock()
 		return
 	}
+	// LISTEN cannot replay notifications from a disconnected session. A peer
+	// may already be waiting for one of our connector slots. Release idle
+	// slots and let work that was running or opening finish its turn.
+	if cluster == "" {
+		for _, s := range r.standby {
+			s.yieldToPeerLocked()
+		}
+	}
 	for k, set := range r.waiting {
 		if cluster == "" || k == cluster {
 			for w := range set {
+				if cluster == "" {
+					w.yield = true
+				}
 				waiting = append(waiting, w)
 			}
 		}
@@ -182,17 +193,16 @@ func (r *Router) YieldIdle(cluster string) {
 		w.yield = true
 	}
 	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID != cluster || s.attached {
-			continue
+		if s.channel.Connector.Binding.ClusterID == cluster {
+			s.yieldToPeerLocked()
 		}
-		s.yield = true
-		s.yieldIdleLocked()
 	}
 }
 
 // While a different replica waits, only running work and a live caller that
 // can claim this particular process justify retaining the connector slot.
-func (s *Standby) yieldIdleLocked() {
+func (s *Standby) yieldToPeerLocked() {
+	s.yield = true
 	if !s.attached && !s.queryBusy {
 		if requested, _ := s.router.demandLocked(&s.channel); !requested {
 			s.cancel()
@@ -273,10 +283,25 @@ func NewRouter(reservations []ClusterLimit) (*Router, error) {
 // StandbyCapacity sizes the shared listener for all registered connectors.
 func (r *Router) StandbyCapacity() int { return r.standbyCapacity }
 
-// RegisterStandby runs only after actual TLS authentication, before any human
-// request attaches. The handler must call Finish only after its stream joins.
+// RegisterStandby registers an already initialized exchange. HTTP handlers
+// reserve the same capacity before they flush the handshake.
 func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextReceiver, check ReceiverCheck) (*Standby, error) {
-	if r == nil || ctx == nil || ctx.Err() != nil || check == nil || !receiver.Valid(time.Now()) {
+	if check == nil {
+		return nil, fleet.ErrInvalid
+	}
+	s, err := r.reserveStandby(ctx, receiver)
+	if err != nil {
+		return nil, err
+	}
+	if !s.publish(check) {
+		s.Finish()
+		return nil, fleet.ErrUnavailable
+	}
+	return s, nil
+}
+
+func (r *Router) reserveStandby(ctx context.Context, receiver fleet.APIContextReceiver) (*Standby, error) {
+	if r == nil || ctx == nil || ctx.Err() != nil || !receiver.Valid(time.Now()) {
 		return nil, fleet.ErrInvalid
 	}
 	r.mu.Lock()
@@ -295,7 +320,7 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	// below always independently rechecks current peer/route/process facts.
 	call, cancel := context.WithTimeout(ctx, 30*time.Second)
 	r.serial++
-	s := &Standby{router: r, yield: yield, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
+	s := &Standby{router: r, yield: yield, channel: receiver.Channel, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
 	if end, ok := call.Deadline(); ok {
 		if usable := time.Until(end.Add(-(standbyWork + standbyMargin))); usable > 0 {
 			s.retire = time.AfterFunc(usable, func() {
@@ -307,9 +332,26 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	}
 	r.standby[s.channel.ExchangeID] = s
 	cluster.standby++
+	return s, nil
+}
+
+// The caller owns both Finish and publication. A reservation without a
+// receiver check consumes capacity but cannot be selected for work.
+func (s *Standby) publish(check ReceiverCheck) bool {
+	r := s.router
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || s.ctx.Err() != nil {
+		return false
+	}
+	// The caller may have left while the handshake flushed.
+	if requested, _ := r.demandLocked(&s.channel); r.RequestExchange != nil && !requested {
+		return false
+	}
+	s.check = check
 	close(r.registered)
 	r.registered = make(chan struct{})
-	return s, nil
+	return true
 }
 func (s *Standby) Context() context.Context { return s.ctx }
 
@@ -323,7 +365,7 @@ func (s *Standby) retireIdleLocked() {
 	}
 }
 func (s *Standby) liveLocked() bool {
-	if s.ctx.Err() != nil {
+	if s.check == nil || s.ctx.Err() != nil {
 		return false
 	}
 	select {

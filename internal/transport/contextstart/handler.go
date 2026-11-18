@@ -158,21 +158,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.refuse(w, "authenticate")
 		return
 	}
-	var current atomic.Pointer[frameStream]
-	attach := func(c context.Context) (fleet.APIContextReceiver, error) {
-		s := current.Load()
-		if s == nil {
-			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
-		}
-		// Failures are recorded for a caller's diagnostic context only, as
-		// for queries; they change neither the result nor the stream.
-		receiver, e := check(c)
-		if e != nil {
-			recordStreamDiagnostic(c, s, e, streamHubQueryCheck)
-		}
-		return receiver, e
-	}
-	standby, e := h.router.RegisterStandby(residence, receiver, attach)
+	standby, e := h.router.reserveStandby(residence, receiver)
 	stop()
 	release()
 	if e != nil {
@@ -197,7 +183,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Hello was read before the stream was constructed.
 	stream.frames = 1
 	stream.bytes = contracts.APIContextWorkBytes + 5 // Same ceiling as the connector.
-	current.Store(stream)
 	if controller.SetWriteDeadline(receiver.Window.Until()) != nil || !time.Now().Before(receiver.Window.Until()) {
 		return
 	}
@@ -214,6 +199,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// final results recheck the exact peer without extending that work lease.
 	idleUntil, _ := standby.Context().Deadline()
 	if controller.SetReadDeadline(idleUntil) != nil || controller.SetWriteDeadline(idleUntil) != nil {
+		return
+	}
+	if !standby.publish(func(c context.Context) (fleet.APIContextReceiver, error) {
+		observed, err := check(c)
+		if err != nil {
+			recordStreamDiagnostic(c, stream, err, streamHubQueryCheck)
+		}
+		return observed, err
+	}) {
 		return
 	}
 	_ = standby.Serve(stream, time.Now)

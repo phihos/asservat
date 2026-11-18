@@ -188,8 +188,16 @@ func TestHistoryWaitsForOneDemandThroughReconnect(t *testing.T) {
 }
 
 func TestForeignOwnerDemandReleasesSingleConnectorSlot(t *testing.T) {
-	for _, situation := range []string{"completed query", "in-flight query"} {
-		t.Run(situation, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name                   string
+		inFlight, disconnected bool
+	}{
+		{"completed query", false, false},
+		{"in-flight query", true, false},
+		{"missed notification while idle", false, true},
+		{"missed notification during query", true, true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				w := workFixture().Work
 				cluster := w.Channel.Connector.Binding.ClusterID
@@ -216,8 +224,13 @@ func TestForeignOwnerDemandReleasesSingleConnectorSlot(t *testing.T) {
 				}
 				a := query(first)
 				job := <-only.query
-				second.RequestExchange = func(context.Context, string) error { first.YieldIdle(cluster); return nil }
-				if situation == "completed query" {
+				second.RequestExchange = func(context.Context, string) error {
+					if !scenario.disconnected {
+						first.YieldIdle(cluster)
+					}
+					return nil
+				}
+				if !scenario.inFlight {
 					job.result <- queryResult{until: time.Now().Add(time.Second)}
 					if err := <-a; err != nil {
 						t.Fatal(err)
@@ -225,7 +238,12 @@ func TestForeignOwnerDemandReleasesSingleConnectorSlot(t *testing.T) {
 				}
 				b := query(second)
 				synctest.Wait()
-				if situation == "in-flight query" {
+				// The connector received B's demand while A alone was
+				// disconnected. Reconnecting A must make that slot available.
+				if scenario.disconnected {
+					first.ResendDemand("")
+				}
+				if scenario.inFlight {
 					if only.Context().Err() != nil {
 						t.Fatal("yield interrupted query")
 					}
