@@ -62,12 +62,13 @@ callers after reconnect. Neither notification persists a request, carries
 credentials or grants collection authority. This uses the existing database
 credentials and service endpoints. An idle fleet sends no owner lookups or
 exchange renewals. Upgrade a development installation's hub and connectors
-together when crossing from the old standby protocol to major 2.
+together when crossing from the old standby protocol to major 2. Registering before resynchronization
+follows PostgreSQL’s documented startup ordering. [PostgreSQL LISTEN](https://www.postgresql.org/docs/18/sql-listen.html#SQL-LISTEN-NOTES).
 
 ## Compatibility
 
-The hub checks the protocol major before handing out settings or storage credentials. The connector checks the major in the reply. For
-a missing or different major it returns HTTP 426 with both values. Within a
+The hub checks the protocol major before handing out settings or storage credentials. The hub returns HTTP 426 with both values for a missing or incompatible major.
+The connector also checks the major in a successful reply. Within a
 major the hub sends only advertised operations and queries. A missing
 capability refuses that request while other supported work remains available.
 The Hello frame's byte limit bounds its capability announcement. A newer

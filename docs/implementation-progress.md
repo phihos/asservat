@@ -21,7 +21,15 @@ on each identity. The pinned SeaweedFS 4.53 integration passed versioned reads,
 regional writes, multipart completion and cleanup, and cross-region denials
 against existing objects. The installed capture driver submits the reviewed
 stateless preview and verifies that retrying its idempotency key returns the
-same capture.
+same capture. Bundled SeaweedFS refused both withdrawn keys after a restart
+on the existing data volume and continued serving the remaining region.
+
+A fresh two-cluster Kind installation at `ebd5b16d8` accepted 65 registrations
+with one real remote connector and one hub-api replica. During 36 seconds idle,
+the native listener had zero established sockets at both observations. The
+first remote capture then published and downloaded the expected 353-byte
+pod-status file. Exact replay returned the original capture and altered input
+returned Conflict. The installed test took 15.82 seconds and cleanup exited 0.
 
 ## Processing cleanup (2026-11-17)
 
