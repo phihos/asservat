@@ -298,7 +298,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// those of reset/renew/suspend/update; assignments only retire.
 		read("permission_stream", "permission_basis", "permission_assignment", "permission_acceptance", "authority_audit")
 		add("permission_stream", "INSERT")
-		add("permission_stream", "UPDATE", "epoch", "sequence", "initial_audit_id", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended")
+		add("permission_stream", "UPDATE", "epoch", "sequence", "initial_audit_id", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended", "unavailable_clusters")
 		// The joined protected-settings observer uses this existing credential.
 		// Grant updates can only shorten effective periods; its trigger forbids
 		// changing scope, decisions, revision or spend in the same statement.
