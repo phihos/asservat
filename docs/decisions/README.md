@@ -628,13 +628,9 @@ all start operations until its original deadline, never renewed; capacity, guard
 CAS checks stay current. The connector-Deployment executor's local start now passes
 natively in 2.57 s of 5 s.
 
-[ADR-172 — Delegated owner discovery](172-delegated-owner-discovery.md) lets the
-regional process discover and authenticate hub owners without hub SQL. The federation
-channel answers owner candidates and the hub's own authentication facts; the region
-verifies its actual TLS session against them and dials one pinned endpoint with exact
-owner names. The federation process composes the hub-api's owner reads under a
-read-only role (ordinal 56) and the identical guard plan. Component-tested;
-installer projection, regional composition and native qualification pending.
+[ADR-172 — Authenticate the hub owner reached by a regional connector](172-delegated-owner-discovery.md)
+binds the connector's actual TLS session to the owner's current registration
+and route. Work notifications identify the owner that requested the exchange.
 
 [ADR-171 — Hub-run context execution](171-hub-run-context-execution.md) moves the
 API context runner and all its SQL/authority ports to the hub. The region answers

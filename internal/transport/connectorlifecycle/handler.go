@@ -14,10 +14,9 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
-// Services answers the presenting connector's read-only owner questions.
+// Services verifies the owner certificate the connector observed.
 type Services interface {
-	OwnerCandidates(context.Context, *Region) (value.APIContextOwnerCandidates, error)
-	AuthenticateOwner(context.Context, *Region, value.OwnerCertificate) (OwnerAuthentication, error)
+	AuthenticateOwner(context.Context, value.OwnerCertificate) (OwnerAuthentication, error)
 }
 
 // TokenVerifier attributes a connector's projected ServiceAccount token to
@@ -114,13 +113,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer region.closeChannel()
 	result := HubFrame{Kind: "result"}
 	switch opening.Purpose {
-	case PurposeOwnerCandidates:
-		var owners value.APIContextOwnerCandidates
-		owners, err = h.services.OwnerCandidates(ctx, region)
-		result.Owners = &owners
 	case PurposeOwnerAuthentication:
 		var owner OwnerAuthentication
-		owner, err = h.services.AuthenticateOwner(ctx, region, *opening.Owner)
+		owner, err = h.services.AuthenticateOwner(ctx, *opening.Owner)
 		if err == nil && owner.Owner.Certificate != *opening.Owner {
 			err = ErrChannel // only the observed certificate, never another owner
 		}
@@ -162,7 +157,7 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 		return false
 	}
 	switch o.Purpose {
-	case PurposeOwnerCandidates, PurposeAccessBindings:
+	case PurposeAccessBindings:
 		if o.Owner != nil {
 			return false
 		}
@@ -251,13 +246,6 @@ func (r *Region) closeChannel() {
 	r.closed = true
 }
 
-// OwnerReads are the hub's shared read-only owner facts for regional
-// exchanges (ADR-172): the candidate set and the unchanged authenticator.
-type OwnerReads struct {
-	Candidates    app.APIContextOwnerCandidatesReader
-	Authenticator *app.OwnerAuthenticator
-}
-
 // presentedOwner lets the hub's authenticator check a certificate the region
 // observed. It cannot see that TLS session, so its verify step only requires
 // the identical certificate and records the configuration for the region.
@@ -278,24 +266,11 @@ func (p presentedOwner) VerifyCurrentOwner(c value.OwnerConfigurationObservation
 	return p.certificate, nil
 }
 
-// Duties are the hub's read-only answers for every presenting connector.
-type Duties struct {
-	Owners OwnerReads
-}
-
-func (d Duties) OwnerCandidates(ctx context.Context, _ *Region) (value.APIContextOwnerCandidates, error) {
-	if d.Owners.Candidates == nil {
-		return value.APIContextOwnerCandidates{}, ErrChannel
-	}
-	return d.Owners.Candidates.ReadContextStartOwners(ctx)
-}
-
-func (d Duties) AuthenticateOwner(ctx context.Context, _ *Region, c value.OwnerCertificate) (OwnerAuthentication, error) {
-	if d.Owners.Authenticator == nil {
-		return OwnerAuthentication{}, ErrChannel
-	}
+// AuthenticateOwner checks the presented certificate against the hub registry
+// and returns the configuration the connector must verify on its actual TLS session.
+func AuthenticateOwner(ctx context.Context, authenticator *app.OwnerAuthenticator, c value.OwnerCertificate) (OwnerAuthentication, error) {
 	var configuration value.OwnerConfigurationObservation
-	owner, err := d.Owners.Authenticator.AuthenticateOwner(ctx, presentedOwner{c, &configuration})
+	owner, err := authenticator.AuthenticateOwner(ctx, presentedOwner{c, &configuration})
 	if err != nil {
 		return OwnerAuthentication{}, err
 	}

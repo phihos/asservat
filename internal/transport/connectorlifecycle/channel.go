@@ -24,11 +24,8 @@ const (
 	Path        = "/v1/connector-lifecycle"
 	ContentType = "application/x-ndjson"
 	// MaxRegionFrame bounds the connector's frames in one conversation.
-	MaxFrameBytes  = 256 << 10
-	MaxRegionFrame = 2
-	// ADR-172 read-only owner purposes: the current context-start owner set,
-	// and the hub's authentication facts for one observed owner certificate.
-	PurposeOwnerCandidates     Purpose = "owner-candidates"
+	MaxFrameBytes                      = 256 << 10
+	MaxRegionFrame                     = 2
 	PurposeOwnerAuthentication Purpose = "owner-authentication"
 	// PurposeAccessBindings delivers the connector's complete AccessBinding
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
@@ -84,11 +81,10 @@ func (m *ProtocolMismatch) FixedStep() string { return m.Error() }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind     string                           // access-bindings, result, failure
-	Owners   *value.APIContextOwnerCandidates `json:",omitempty"`
-	Owner    *OwnerAuthentication             `json:",omitempty"`
-	Settings *Settings                        `json:",omitempty"`
-	Failure  string                           `json:",omitempty"`
+	Kind     string               // access-bindings, result, failure
+	Owner    *OwnerAuthentication `json:",omitempty"`
+	Settings *Settings            `json:",omitempty"`
+	Failure  string               `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings"
 	// request; the connector answers Unchanged when its current delivery has
 	// the same digest (ADR-329).

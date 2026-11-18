@@ -43,11 +43,7 @@ func unavailable(cause error) error {
 	return errors.Join(value.ErrUnavailable, cause)
 }
 
-func (r *RegionalLifecycle) run(ctx context.Context, purpose connectorlifecycle.Purpose, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
-	return r.runLocal(ctx, purpose, nil, owner...)
-}
-
-func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifecycle.Purpose, local any, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+func (r *RegionalLifecycle) run(ctx context.Context, purpose connectorlifecycle.Purpose, owner *value.OwnerCertificate, local any) (connectorlifecycle.HubFrame, error) {
 	var zero connectorlifecycle.HubFrame
 	if r.Client == nil || r.Now == nil || ctx == nil || !r.Process.Valid() {
 		return zero, value.ErrInvalid
@@ -56,10 +52,7 @@ func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifec
 	if r.Timing != nil {
 		finished = r.Timing(purpose)
 	}
-	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: uuid.NewString(), Process: r.Process}
-	if len(owner) == 1 {
-		o.Owner = &owner[0]
-	}
+	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: uuid.NewString(), Process: r.Process, Owner: owner}
 	frame, err := r.Client.Run(ctx, o, local)
 	if err != nil {
 		return zero, errRegionalChannel
@@ -69,16 +62,6 @@ func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifec
 	}
 	finished()
 	return frame, nil
-}
-
-// ReadContextStartOwners asks the hub for its current context-start owner set
-// (ADR-172), presented by this process.
-func (r *RegionalLifecycle) ReadContextStartOwners(ctx context.Context) (value.APIContextOwnerCandidates, error) {
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates)
-	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
-		return value.APIContextOwnerCandidates{}, unavailable(err)
-	}
-	return *frame.Owners, nil
 }
 
 // AuthenticateOwner authenticates the owner of an actual TLS session: the hub
@@ -94,7 +77,7 @@ func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fl
 	if err != nil || certificate.Usage != "server" || !certificate.Valid(r.Now()) {
 		return zero, value.ErrDenied
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, certificate)
+	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, &certificate, nil)
 	if err != nil || frame.Owner == nil {
 		return zero, unavailable(err)
 	}
@@ -138,7 +121,7 @@ func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings 
 	if bindings == nil || ctx == nil {
 		return value.ErrUnavailable
 	}
-	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, deliveringLocal{bindings})
+	_, err := r.run(ctx, connectorlifecycle.PurposeAccessBindings, nil, deliveringLocal{bindings})
 	if err != nil {
 		return unavailable(err)
 	}

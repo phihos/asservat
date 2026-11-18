@@ -12,8 +12,8 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			out = append(out, publicRuntimeGrant{"table", "remote_access_binding_delivery", "", privilege})
 		}
 	case "connector-owner-read":
-		// ADR-172: the hub-api owner registry reads, for owner discovery and
-		// authentication on behalf of regions. No owner write is granted.
+		// The federation authenticates a regional connection's exact owner
+		// against the hub registry.
 		return ownerIdentityDutyGrants("registry")
 	default:
 		return nil, false

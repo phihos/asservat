@@ -26,8 +26,8 @@ import (
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It
-// answers the connectors' ADR-172 owner discovery and authentication
-// reads and stores their AccessBinding and capacity deliveries. It
+// authenticates the owner certificates observed by connectors, delivers work
+// hints and stores their AccessBindings. It
 // holds no browser, MCP, evidence, signing, audit or recovery-activation
 // authority.
 type Federation struct {
@@ -135,7 +135,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 		pools[purpose] = pool
 		f.closers = append(f.closers, pool.Close)
 	}
-	owners, err := federationOwnerReads(startup, c, pools["connector-owner-read"])
+	owners, err := federationOwnerAuthenticator(startup, c, pools["connector-owner-read"])
 	if err != nil {
 		return f, err
 	}
@@ -155,8 +155,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, err
 	}
-	duties := connectorlifecycle.Duties{Owners: owners}
-	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{duties, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
+	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{owners, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
@@ -164,7 +163,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	f.work = &connectorlifecycle.WorkHandler{Tokens: tokens, Concurrency: c.Concurrency, Ready: func(ctx context.Context, cluster string) error {
 		return postgres.NotifyConnectorReady(ctx, f.workPool, cluster)
 	}}
-	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
+	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Owners: owners.Routes, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
 	// The serving identity is deployment-provided server authentication only;
 	// connectors authenticate with their ServiceAccount tokens.
 	pair, err := readServingPair(startup, files)
@@ -219,7 +218,7 @@ func federationClass(err error) string {
 }
 
 type federationServices struct {
-	connectorlifecycle.Duties
+	owners   *fleetapp.OwnerAuthenticator
 	ids      contracts.ServiceIDs
 	bindings *federationBindings
 	*federationSettings
@@ -274,9 +273,9 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 
 // AuthenticateOwner logs the fixed refusal step of a failed owner
 // authentication (fleet.WithRefusalSteps); the result is unchanged.
-func (s federationServices) AuthenticateOwner(ctx context.Context, region *connectorlifecycle.Region, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
+func (s federationServices) AuthenticateOwner(ctx context.Context, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
 	var steps []string
-	out, err := s.Duties.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), region, c)
+	out, err := connectorlifecycle.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), s.owners, c)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation owner authentication refused: "+strings.Join(steps, ",")+" "+federationCause(err))
 	}
@@ -324,49 +323,48 @@ func (f *Federation) Close() {
 	f.closers = nil
 }
 
-// federationOwnerReads composes the hub-api's unchanged owner registry and
+// federationOwnerAuthenticator composes the hub-api's unchanged owner registry and
 // route reads (ADR-172). The owner configuration and namespace UIDs key the
 // SQL rows and are read by name; the owner protection is the platform's
 // deterministic workload digest. Nothing here can sign, audit or activate an
 // owner.
-func federationOwnerReads(ctx context.Context, c federationInputs, pool *pgxpool.Pool) (connectorlifecycle.OwnerReads, error) {
-	var zero connectorlifecycle.OwnerReads
+func federationOwnerAuthenticator(ctx context.Context, c federationInputs, pool *pgxpool.Pool) (*fleetapp.OwnerAuthenticator, error) {
 	api, err := serviceKubernetes()
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
 	}
 	namespaceUID, err := kube.NamespaceUID(ctx, api, c.Namespace)
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
 	}
 	configurationUID, err := kube.ConfigMapUID(ctx, api, c.Namespace, c.Name+"-owner-source")
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
 	}
 	configurations, err := postgres.NewOwnerConfigurations(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	registry, err := postgres.NewOwnerEnrollments(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID, ownerRandomID)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	observer, err := kube.NewPermissionClient(api, c.ClusterID, configuration.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	// The hub-api accepts its owner configuration; until then the federation
 	// restarts rather than serving owner reads without a pool.
 	current, err := configurations.ReadOwnerConfiguration(ctx)
 	if err != nil || !current.Valid(time.Now()) || current.Configuration.Pool.Namespace != c.Namespace {
-		return zero, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
 	}
 	endpoints, err := kube.NewOwnerEndpoints(observer, current.Configuration.Pool)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	routes := &fleetapp.OwnerRoutes{Configurations: configurations, Endpoints: endpoints, Now: time.Now}
-	return connectorlifecycle.OwnerReads{Candidates: registry, Authenticator: &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: platformOwnerProtection{time.Now}, Now: time.Now}}, nil
+	return &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: platformOwnerProtection{time.Now}, Now: time.Now}, nil
 }
 
 // platformOwnerProtection replaces the removed owner workload guard proof:

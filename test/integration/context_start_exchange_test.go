@@ -58,7 +58,6 @@ func (s contextStartTestRoutes) ReadOwnerProtection(ctx context.Context, p fleet
 type regionalAPIStartFixture struct {
 	bridge       bootstrap.RegionalAPIContextStart
 	client       *mtls.ContextStartClient
-	candidates   *postgres.OwnerEnrollments
 	owner        fleet.OwnerBinding
 	local        contextstart.RegionalLocal
 	calls        int
@@ -79,16 +78,12 @@ func (s *regionalAPIStartFixture) standby(t *testing.T, ctx context.Context) {
 		t.Fatal("fixture attempted to replace an unjoined conversation")
 	}
 	n := time.Now()
-	candidates, e := s.candidates.ReadContextStartOwners(ctx)
-	if e != nil || len(candidates.Owners) != 1 || candidates.Owners[0] != s.owner {
-		t.Fatal("actual SQL exact owner discovery", e)
-	}
 	var streamDiagnostic *contextstart.StreamDiagnostics
 	if s.diagnostic != nil {
 		ctx, streamDiagnostic = contextstart.NewStreamDiagnosticContext(ctx)
 	}
 	standby, stop := context.WithTimeout(ctx, 30*time.Second)
-	exchange, e := s.client.OpenRequested(standby, s.owner, candidates.ValidUntil)
+	exchange, e := s.client.OpenRequested(standby, s.owner, n.Add(5*time.Second))
 	if e != nil {
 		stop()
 		t.Fatalf("actual shared NativePort standby elapsed=%s error=%v", time.Since(n), e)
@@ -105,7 +100,7 @@ func (s *regionalAPIStartFixture) standby(t *testing.T, ctx context.Context) {
 		}
 		s.regional <- err
 	}()
-	t.Logf("actual SQL discovery and original H2 standby setup elapsed=%s", time.Since(n))
+	t.Logf("requested owner H2 exchange setup elapsed=%s", time.Since(n))
 }
 func (s *regionalAPIStartFixture) joined(t *testing.T, ctx context.Context) {
 	t.Helper()
@@ -251,7 +246,9 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		}
 	})
 	token := func() ([]byte, error) { return []byte(contextStartTestToken), nil }
-	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, net.JoinHostPort(localIP, strconv.Itoa(port)), (&net.Dialer{}).DialContext, owners, connector, token, runner.Process, 1, time.Now)
+	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, func(call context.Context, owner fleet.OwnerBinding) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(call, "tcp", net.JoinHostPort(localIP, strconv.Itoa(port)))
+	}, owners, connector, token, runner.Process, 1, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -260,7 +257,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	// answers only its cluster-local ports over the exchange.
 	hub := executionapp.APIContextRunner{Read: runner.Read, Prepare: runner.Prepare, Record: runner.Record, Eligibility: runner.Eligibility, Capabilities: runner.Capabilities, Retention: runner.Retention, Now: runner.Now}
 	local := contextstart.RegionalLocal{Process: runner.Process, Targets: regionalQueryTargets(runner.Targets), Output: runner.Output, Collector: runner.Collector, Now: runner.Now}
-	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, local: local}
+	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Runner: hub, Router: router, Now: time.Now}, client: client, owner: owner, local: local}
 	t.Cleanup(func() {
 		client.Close()
 		if out.regional != nil {

@@ -64,10 +64,6 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 		enrolled = append(enrolled, reg.Enrollment)
 		if len(enrolled) == 17 {
 			refresh()
-			// A larger opted value bound must not silently bless old LIMIT17 output.
-			if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
-				t.Fatal("old LIMIT17 reader returned truncated successful opted set")
-			}
 			got, e := s.reader.ReadOwnerObservationCandidates(ctx)
 			if e != nil || !got.Valid(time.Now()) || len(got.Owners) != 17 {
 				t.Fatal("complete configured candidate set", e, len(got.Owners))
@@ -89,9 +85,7 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("configured limit-plus-one overflow returned success")
 	}
-	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
-		t.Fatal("old LIMIT17 reader returned truncated18-process population")
-	}
+
 	for _, v := range enrolled[16:] {
 		refresh()
 		if e = s.cleanup.RetireOwnerEnrollment(ctx, v); e != nil {
@@ -99,10 +93,6 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 		}
 	}
 	refresh()
-	old, e := s.reader.ReadContextStartOwners(ctx)
-	if e != nil || len(old.Owners) != 16 {
-		t.Fatal("old complete sixteen-entry behavior changed", e)
-	}
 	current, e := s.reader.ReadOwnerObservationCandidates(ctx)
 	if e != nil || len(current.Owners) != 16 {
 		t.Fatal("current set included retired process", e)
@@ -130,5 +120,5 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("configuration fence returned complete candidates")
 	}
-	t.Log("separate configured observation reader and old fixed16 overflow; exact17 same-Pod processes retained,18 denied, retired leaves excluded; synthetic initial source/recovery/native proof")
+	t.Log("configured observation candidate limit; exact17 same-Pod processes retained,18 denied, retired leaves excluded; synthetic initial source/recovery/native proof")
 }
