@@ -60,14 +60,14 @@ var ErrChannel = errors.New("connector lifecycle channel unavailable")
 // Opening is the connector's first frame. Process names the connector
 // process; its binding must name the token's cluster and peer.
 type Opening struct {
-	Protocol    int `json:",omitempty"` // advertised on the initial settings request
+	Protocol    int `json:",omitempty"` // advertised on every opening
 	Purpose     Purpose
 	OperationID string
 	Process     value.ConnectorProcessIdentity
 	Owner       *value.OwnerCertificate `json:",omitempty"` // owner authentication only
 }
 
-// ProtocolMismatch is the settings endpoint's HTTP 426 response.
+// ProtocolMismatch is the lifecycle endpoint's HTTP 426 response.
 type ProtocolMismatch struct {
 	Required  int
 	Announced int

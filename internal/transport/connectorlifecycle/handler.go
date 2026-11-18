@@ -97,7 +97,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusForbidden)
 		return
 	}
-	if opening.Purpose == PurposeSettings && opening.Protocol != contracts.ConnectorProtocolMajor {
+	if opening.Protocol != contracts.ConnectorProtocolMajor {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUpgradeRequired)
 		_ = json.NewEncoder(w).Encode(ProtocolMismatch{Required: contracts.ConnectorProtocolMajor, Announced: opening.Protocol})

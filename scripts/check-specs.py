@@ -1165,6 +1165,9 @@ def main() -> None:
         "purpose": "artifact", "keyID": "synthetic-only", "activeVersion": 1,
         "keys": [{"version": 1, "material": base64.b64encode(bytes(range(32))).decode("ascii")}],
     }
+    largest_version = dict(local_key, activeVersion=2**31 - 1,
+                           keys=[dict(local_key["keys"][0], version=2**31 - 1)])
+    validate(largest_version, schemas[BASE + "local-key-secret.schema.json"])
     for purpose in ("artifact", "browser-credentials"):
         local_key["purpose"] = purpose
         validate(local_key, schemas[BASE + "local-key-secret.schema.json"])
@@ -1176,7 +1179,8 @@ def main() -> None:
         lambda d: d.update(purpose="audit"),
         lambda d: d.update(keyID="../key"),
         lambda d: d.update(activeVersion=0),
-        lambda d: d.update(activeVersion=2**53),
+        lambda d: d.update(activeVersion=2**31),
+        lambda d: d["keys"][0].update(version=2**31),
         lambda d: d.update(keys=[]),
         lambda d: d.update(password="default"),
         lambda d: d.pop("activeVersion"),

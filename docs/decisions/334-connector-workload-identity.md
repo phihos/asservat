@@ -85,7 +85,7 @@ follows PostgreSQL’s documented startup ordering. [PostgreSQL LISTEN](https://
 
 ## Compatibility
 
-The hub checks the protocol major before handing out settings or storage credentials. The hub returns HTTP 426 with both values for a missing or incompatible major.
+The hub checks the protocol major on every lifecycle opening, before handing out settings, accepting a binding observation or confirming an unchanged digest. The hub returns HTTP 426 with both values for a missing or incompatible major.
 The connector also checks the major in a successful reply. Within a
 major the hub sends only advertised operations and queries. A missing
 capability refuses that request while other supported work remains available.

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -63,7 +64,21 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 		t.Fatal(err)
 	}
 	process := testProcess()
-	open := Opening{Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
+	open := Opening{Purpose: PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
+	// A connector running across the upgrade keeps its process and bearer
+	// token. Its old opening omits Protocol, whether it would send a new
+	// namespaced list or confirm the stored digest.
+	for _, stored := range []string{"", (contracts.AccessBindingDelivery{}).Digest()} {
+		services.stored = stored
+		legacy := open
+		legacy.Protocol = 0
+		_, err := client.Run(context.Background(), legacy, deliveringReader{})
+		var unsupported *ProtocolMismatch
+		if !errors.As(err, &unsupported) || unsupported.Required != contracts.ConnectorProtocolMajor || unsupported.Announced != 0 || services.cluster != "" {
+			t.Fatalf("legacy process reached permission delivery after upgrade: %v", err)
+		}
+	}
+	services.stored = ""
 	// About 4 MiB: above an ordinary conversation's read bound.
 	spec, _ := json.Marshal(map[string]string{"pad": strings.Repeat("x", 4<<10)})
 	delivery := contracts.AccessBindingDelivery{ResourceVersion: "7"}

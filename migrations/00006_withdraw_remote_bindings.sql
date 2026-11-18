@@ -1,5 +1,4 @@
 -- +goose Up
-ALTER TABLE remote_access_binding_delivery ADD COLUMN unavailable boolean NOT NULL DEFAULT false;
 -- Committed with the permission projection so decisions never use superseded
 -- grants when a replacement observation cannot be represented in full.
 ALTER TABLE permission_stream ADD COLUMN unavailable_clusters text[] NOT NULL DEFAULT '{}';
@@ -8,6 +7,9 @@ ALTER TABLE permission_stream ADD COLUMN unavailable_clusters text[] NOT NULL DE
 -- until its worker establishes a new baseline, even on a hub with no rows yet.
 UPDATE permission_stream SET suspended=true, lease_until=statement_timestamp(), observed_at=NULL, fresh_until=NULL;
 DELETE FROM remote_access_binding_delivery;
+-- Require writers to specify whether the two-kind observation is available.
+-- A still-running v5 hub omits this column in its upsert.
+ALTER TABLE remote_access_binding_delivery ADD COLUMN unavailable boolean NOT NULL;
 -- +goose StatementBegin
 CREATE FUNCTION public.withdraw_remote_bindings(target_root uuid, active_clusters uuid[]) RETURNS void
 LANGUAGE plpgsql STRICT SECURITY DEFINER SET search_path TO pg_catalog, pg_temp AS $$

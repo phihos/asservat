@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -46,7 +47,7 @@ func backend(t testing.TB, scope LocalKeyScope, raw []byte) *LocalKeyBackend {
 
 func TestLocalKeyRestartRotationAndBinding(t *testing.T) {
 	ctx := context.Background()
-	raw := localSecret(t, localScope, 1, 1, 2)
+	raw := localSecret(t, localScope, 1, 1, math.MaxInt32)
 	first := backend(t, localScope, raw)
 	plain, ad := []byte("synthetic keyset"), []byte("exact artifact binding")
 	sealed, err := first.Seal(ctx, plain, ad)
@@ -70,12 +71,12 @@ func TestLocalKeyRestartRotationAndBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer doc.clear()
-	doc.ActiveVersion = 2
+	doc.ActiveVersion = math.MaxInt32
 	rotatedSecret, _ := json.Marshal(doc)
 	defer clear(rotatedSecret)
 	rotated := backend(t, localScope, rotatedSecret)
 	newKey, err := rotated.Seal(ctx, plain, ad)
-	if err != nil || !strings.HasSuffix(newKey.Reference, "/2") {
+	if err != nil || !strings.HasSuffix(newKey.Reference, "/2147483647") {
 		t.Fatal("new wrapping ignored active version", err)
 	}
 	got, err = rotated.Open(ctx, sealed, ad)
@@ -95,7 +96,7 @@ func TestLocalKeyRestartRotationAndBinding(t *testing.T) {
 		func(k *artifact.SealedKey) {
 			k.Reference = strings.Replace(k.Reference, localScope.InstallationID, "00000000-0000-4000-8000-000000000002", 1)
 		},
-		func(k *artifact.SealedKey) { k.Reference = strings.TrimSuffix(k.Reference, "/1") + "/2" },
+		func(k *artifact.SealedKey) { k.Reference = newKey.Reference },
 		func(k *artifact.SealedKey) { k.Reference = strings.TrimSuffix(k.Reference, "/1") + "/01" },
 		func(k *artifact.SealedKey) { k.Ciphertext += "\n" },
 		func(k *artifact.SealedKey) {

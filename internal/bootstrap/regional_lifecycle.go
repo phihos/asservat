@@ -52,7 +52,7 @@ func (r *RegionalLifecycle) run(ctx context.Context, purpose connectorlifecycle.
 	if r.Timing != nil {
 		finished = r.Timing(purpose)
 	}
-	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: uuid.NewString(), Process: r.Process, Owner: owner}
+	o := connectorlifecycle.Opening{Purpose: purpose, Protocol: contracts.ConnectorProtocolMajor, OperationID: uuid.NewString(), Process: r.Process, Owner: owner}
 	frame, err := r.Client.Run(ctx, o, local)
 	if err != nil {
 		return zero, errRegionalChannel

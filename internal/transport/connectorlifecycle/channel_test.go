@@ -84,7 +84,7 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 		}
 	}
 	process := testProcess()
-	base := Opening{Purpose: PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
+	base := Opening{Purpose: PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
 	// A token of another cluster never reaches the services.
 	if _, err = stranger.Run(context.Background(), base, nil); err == nil {
 		t.Fatal("foreign token accepted")

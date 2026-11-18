@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -495,9 +496,18 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)`, root, cluster, body); err != nil {
+		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3,false)`, root, cluster, body); err != nil {
 			t.Fatal(err)
+		}
+		// A v5 federation replica omits availability. Its upsert must fail
+		// even if a current replica already wrote an observation for this peer.
+		_, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
+			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)
+			ON CONFLICT(root_id,cluster_id) DO UPDATE SET digest=excluded.digest,bindings=excluded.bindings`, root, cluster, []byte("[]"))
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23502" || pgErr.ColumnName != "unavailable" {
+			t.Fatalf("accepted legacy delivery or wrong refusal: %v", err)
 		}
 		reconcile()
 		checkAssignments := func(cluster string, want int) {
@@ -519,8 +529,8 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-				VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)`, root, regional, body); err != nil {
+			if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+				VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3,false)`, root, regional, body); err != nil {
 				t.Fatal(err)
 			}
 		}

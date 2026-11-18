@@ -305,6 +305,8 @@ For artifact keys, update `keys.json` in the generated
 `secrets.artifact-key.existingSecret`. Keep the installation, purpose, key ID
 and all existing versions and bytes. Append a higher, previously unused version
 with a fresh 32-byte random key and set `activeVersion` to its number.
+Version numbers range from 1 to 2,147,483,647, the largest positive
+PostgreSQL `integer`. [PostgreSQL integer types](https://www.postgresql.org/docs/18/datatype-numeric.html#DATATYPE-INT)
 The running key service picks up the new version after Kubernetes updates its
 volume. New captures wrap with that version. Earlier captures remain readable.
 [Key format](../../specs/contracts/local-key-secret.schema.json).
@@ -469,7 +471,7 @@ protocol majors match. Use a cluster release that advertises the capabilities
 your workflows need. Each cluster's node collectors use that cluster's
 connector release. The hub records image digests as provenance.
 
-A missing or different protocol major returns HTTP 426. The settings request checks compatibility before returning credentials.
+A missing or different protocol major returns HTTP 426. Every lifecycle request checks compatibility, including an existing connector delivering bindings after a hub upgrade.
 The startup log includes both majors. Choose releases that speak the same major. With a matching
 major, `connector too old for <capability>` identifies one unsupported request.
 Upgrade the cluster to use that feature. Adjacent minor releases in both
