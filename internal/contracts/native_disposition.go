@@ -1,6 +1,32 @@
 package contracts
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
+
+// NativeOwnerRoute directs an unclaimed worker Hello to the current operation
+// owner's Pod. Only the TCP destination changes. The worker keeps the installed
+// authority, port, TLS roots, client identity and original opening deadline.
+type NativeOwnerRoute struct {
+	Addresses []string
+}
+
+func (*NativeOwnerRoute) Error() string { return "native operation on another hub replica" }
+
+func (r *NativeOwnerRoute) Valid() bool {
+	// A Pod has one address per IP family.
+	if r == nil || len(r.Addresses) < 1 || len(r.Addresses) > 2 {
+		return false
+	}
+	for i, s := range r.Addresses {
+		a, err := netip.ParseAddr(s)
+		if err != nil || a.String() != s || a.Zone() != "" || a.Is4In6() || !a.IsGlobalUnicast() || i > 0 && r.Addresses[i-1] >= s {
+			return false
+		}
+	}
+	return true
+}
 
 // NativeNoCommand is a positively checked transport response, not a generic
 // availability error. It permits only another bounded idle lookup, never replay
