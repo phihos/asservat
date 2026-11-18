@@ -46,8 +46,9 @@ no IAM API service or additional credential. [SeaweedFS policy size](https://git
 The connector watches AccessBindings in its cluster's application namespaces.
 On a change or reconnect it compares the current digest with the hub and
 delivers the bindings if they differ. The hub attributes the delivery to the
-authenticated cluster. All federation replicas use the database clock to order
-overlapping deliveries. An idle disconnect preserves the last accepted binding
+authenticated cluster. Each change and confirmation commits against its original
+database revision. An overlapping writer with a stale revision retries from
+a new cluster observation. An idle disconnect preserves the last accepted binding
 set, and an explicit withdrawal invalidates it. The hub worker applies capture
 capacity from the installation's Helm values.
 [Permission contract](../../specs/permissions.md).

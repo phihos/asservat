@@ -1,12 +1,17 @@
--- name: StoreRemoteAccessBindings :execrows
--- An older delivery never replaces a newer one; unchanged bindings keep
--- their stored bytes.
+-- name: InsertRemoteAccessBindings :execrows
 INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,digest=excluded.digest,
- bindings=CASE WHEN remote_access_binding_delivery.digest=excluded.digest THEN remote_access_binding_delivery.bindings ELSE excluded.bindings END
-WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
- OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest);
+VALUES ($1,$2,statement_timestamp(),$3,$4)
+ON CONFLICT(root_id,cluster_id) DO NOTHING;
+
+-- name: ReplaceRemoteAccessBindings :execrows
+-- Every completed exchange, including confirmation, advances the same token.
+-- The existing timestamp column stays increasing even across clock corrections.
+UPDATE remote_access_binding_delivery SET
+ observed_at=GREATEST(statement_timestamp(), observed_at + interval '1 microsecond'),
+ bindings=CASE WHEN digest=sqlc.arg(digest) THEN bindings ELSE sqlc.arg(bindings) END,
+ digest=sqlc.arg(digest)
+WHERE root_id=sqlc.arg(root_id) AND cluster_id=sqlc.arg(cluster_id)
+ AND observed_at=sqlc.arg(previous);
 
 -- name: ListRemoteAccessBindings :many
 -- Compare the reader's cached digests within the same database snapshot.
@@ -21,7 +26,5 @@ FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
 WHERE d.root_id=sqlc.arg(root_id) ORDER BY d.cluster_id;
 
 -- name: ReadRemoteAccessBindingDigest :one
--- Use the same database clock on all federation replicas. Order overlapping
--- deliveries by the start of their digest exchange, not by completion time.
-SELECT statement_timestamp()::timestamptz AS observed_at,
- (SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2)::bytea AS digest;
+SELECT digest, observed_at FROM remote_access_binding_delivery
+WHERE root_id=$1 AND cluster_id=$2;

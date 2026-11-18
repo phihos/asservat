@@ -85,17 +85,9 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	if got := remoteBases(f.accepted[len(f.accepted)-1], remoteCluster); len(got) != 2 || got["readers"] != "Allow" || got["blocked"] != "Deny" {
 		t.Fatalf("old delivery: want both bindings, got %v", got)
 	}
-	// An older delivery never replaces a newer one; a newer one without the
-	// deny removes it.
-	reader.err = nil
+	// The reader supplies committed database state. Even a restored row
+	// whose observation time is older than the cache replaces that cache.
 	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: d.ObservedAt.Add(-time.Second)}}
-	if _, err := s.refreshRemoteBindings(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(s.remoteBindings[remoteCluster].Bindings) != 3 {
-		t.Fatal("older delivery replaced the newer one")
-	}
-	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: s.r.Now()}}
 	if _, err := s.refreshRemoteBindings(ctx); err != nil {
 		t.Fatal(err)
 	}

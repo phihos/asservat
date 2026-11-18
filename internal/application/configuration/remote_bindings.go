@@ -36,10 +36,6 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 			continue
 		}
 		if old, ok := s.remoteBindings[d.ClusterID]; ok {
-			if d.ObservedAt.Before(old.ObservedAt) {
-				next[d.ClusterID] = old
-				continue
-			}
 			if old.Digest == d.Digest && (d.Digest != ([32]byte{}) || d.ObservedAt.Equal(old.ObservedAt)) {
 				old.ObservedAt = d.ObservedAt
 				next[d.ClusterID] = old

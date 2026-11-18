@@ -14,3 +14,12 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 REVOKE ALL ON FUNCTION public.withdraw_remote_bindings(uuid,uuid[]) FROM PUBLIC;
+
+-- Confirming an unchanged digest advances its concurrency token without
+-- waking every permission reader to reload an identical fleet snapshot.
+DROP TRIGGER remote_access_binding_delivery_notify ON public.remote_access_binding_delivery;
+CREATE TRIGGER remote_access_binding_delivery_insert AFTER INSERT ON public.remote_access_binding_delivery
+FOR EACH ROW EXECUTE FUNCTION public.notify_remote_delivery('asservat_remote_bindings');
+CREATE TRIGGER remote_access_binding_delivery_update AFTER UPDATE ON public.remote_access_binding_delivery
+FOR EACH ROW WHEN (OLD.digest IS DISTINCT FROM NEW.digest)
+EXECUTE FUNCTION public.notify_remote_delivery('asservat_remote_bindings');

@@ -11,7 +11,7 @@ import (
 // RemoteBindings is the latest complete AccessBinding list of one workload
 // cluster joined with mode: cluster, delivered by its connector (ADR-329).
 // The hub sets ClusterID from the connector's authenticated cluster
-// credential and ObservedAt from the database clock at the digest exchange.
+// credential. ObservedAt identifies the database's committed observation.
 type RemoteBindings struct {
 	ClusterID  string
 	ObservedAt time.Time
@@ -30,13 +30,18 @@ func BindingInCluster(b Binding, cluster string) bool {
 // Valid checks the identity of a delivery: bindings with unique UIDs and
 // names, each in its own namespace of the cluster.
 func (d RemoteBindings) Valid() bool {
-	if !authorization.UUID(d.ClusterID) || d.ObservedAt.IsZero() {
+	return !d.ObservedAt.IsZero() && ValidClusterBindings(d.ClusterID, d.Bindings)
+}
+
+// ValidClusterBindings checks the contents before the database records an observation.
+func ValidClusterBindings(cluster string, bindings []Binding) bool {
+	if !authorization.UUID(cluster) {
 		return false
 	}
 	uids, names := map[string]bool{}, map[string]bool{}
-	for _, b := range d.Bindings {
+	for _, b := range bindings {
 		key := b.Resource.Namespace + "/" + b.Resource.Name
-		if !BindingInCluster(b, d.ClusterID) || uids[b.Resource.UID] || names[key] {
+		if !BindingInCluster(b, cluster) || uids[b.Resource.UID] || names[key] {
 			return false
 		}
 		uids[b.Resource.UID], names[key] = true, true

@@ -25,11 +25,20 @@ func (p clusterTokens) VerifyConnector(context.Context, string) (value.Connector
 }
 
 type recordedBindings struct {
-	stored []configuration.RemoteBindings
-	digest string
+	stored        []configuration.RemoteBindings
+	digest        string
+	confirmations int
 }
 
-func (r *recordedBindings) StoreRemoteBindings(_ context.Context, d configuration.RemoteBindings, digest string) error {
+func (r *recordedBindings) StoreRemoteBindings(_ context.Context, cluster string, previous time.Time, digest string, bindings []configuration.Binding) error {
+	if previous != time.Unix(1700000000, 0) {
+		return configuration.ErrChanged
+	}
+	if digest == r.digest {
+		r.confirmations++
+		return nil
+	}
+	d := configuration.RemoteBindings{ClusterID: cluster, ObservedAt: previous, Bindings: bindings}
 	r.stored, r.digest = append(r.stored, d), digest
 	return nil
 }
@@ -95,6 +104,9 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 	// An unchanged LIST matches the stored digest: nothing is stored again.
 	if result, err = run(remote); err != nil || result.Kind != "result" || len(store.stored) != 1 {
 		t.Fatal("unchanged delivery stored again", result.Kind, err, len(store.stored))
+	}
+	if store.confirmations != 1 {
+		t.Fatal("unchanged delivery was not confirmed")
 	}
 	store.digest = ""
 	// The hub cluster's own connector is observed directly, never delivered.

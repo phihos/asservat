@@ -239,7 +239,7 @@ type federationServices struct {
 type federationBindings struct {
 	decoder *kube.AccessBindingSpecDecoder
 	store   interface {
-		StoreRemoteBindings(context.Context, configuration.RemoteBindings, string) error
+		StoreRemoteBindings(context.Context, string, time.Time, string, []configuration.Binding) error
 		RemoteBindingsDigest(context.Context, string) (string, time.Time, error)
 	}
 }
@@ -262,20 +262,18 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 		return err
 	}
 	delivery, unchanged, err := region.ReadAccessBindings(ctx, stored)
-	if err != nil || unchanged {
+	if err != nil {
 		return err
+	}
+	if unchanged {
+		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, stored, nil)
 	}
 	bindings, err := s.bindings.decoder.DeliveredBindings(p.ClusterID, delivery)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
 		return err
 	}
-	d := configuration.RemoteBindings{ClusterID: p.ClusterID, ObservedAt: observedAt, Bindings: bindings}
-	if !d.Valid() {
-		fmt.Fprintln(os.Stderr, "federation access bindings refused: over the per-cluster bounds")
-		return configuration.ErrLimit
-	}
-	if err = s.bindings.store.StoreRemoteBindings(ctx, d, delivery.Digest()); err != nil {
+	if err = s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), bindings); err != nil {
 		fmt.Fprintln(os.Stderr, "federation access bindings store failed: "+federationCause(err))
 	}
 	return err

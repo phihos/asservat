@@ -115,10 +115,11 @@ When Kubernetes reports lost namespace watch history, namespace-derived access i
 
 The hub follows the local AccessBinding list with a sustained Kubernetes watch.
 Each watch event has its own byte budget. Idle time, total stream bytes, and
-the number of local bindings do not end an otherwise valid watch. On a
-connector digest exchange, federation reads the current digest and the database
-time together. Concurrent deliveries are ordered on this shared clock. The hub
-applies the committed bindings independently of its own wall clock.
+the number of local bindings do not end an otherwise valid watch. Each connector
+exchange compares against the digest and revision it read from the database.
+A concurrent replacement or confirmation invalidates that revision. A losing
+exchange rereads the cluster before retrying. The hub applies the committed
+bindings independently of wall-clock differences between replicas.
 
 The hub computes the input digest incrementally across all delivered bindings.
 It accepts assignment additions and retirements together under one permission

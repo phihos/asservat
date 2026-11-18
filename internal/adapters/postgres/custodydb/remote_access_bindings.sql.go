@@ -11,6 +11,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const insertRemoteAccessBindings = `-- name: InsertRemoteAccessBindings :execrows
+INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
+VALUES ($1,$2,statement_timestamp(),$3,$4)
+ON CONFLICT(root_id,cluster_id) DO NOTHING
+`
+
+type InsertRemoteAccessBindingsParams struct {
+	RootID    pgtype.UUID
+	ClusterID pgtype.UUID
+	Digest    []byte
+	Bindings  []byte
+}
+
+func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemoteAccessBindingsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertRemoteAccessBindings,
+		arg.RootID,
+		arg.ClusterID,
+		arg.Digest,
+		arg.Bindings,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listRemoteAccessBindings = `-- name: ListRemoteAccessBindings :many
 WITH cached AS (
  SELECT unnest($2::uuid[]) AS cluster_id,
@@ -63,8 +89,8 @@ func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAc
 }
 
 const readRemoteAccessBindingDigest = `-- name: ReadRemoteAccessBindingDigest :one
-SELECT statement_timestamp()::timestamptz AS observed_at,
- (SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2)::bytea AS digest
+SELECT digest, observed_at FROM remote_access_binding_delivery
+WHERE root_id=$1 AND cluster_id=$2
 `
 
 type ReadRemoteAccessBindingDigestParams struct {
@@ -73,45 +99,43 @@ type ReadRemoteAccessBindingDigestParams struct {
 }
 
 type ReadRemoteAccessBindingDigestRow struct {
-	ObservedAt pgtype.Timestamptz
 	Digest     []byte
+	ObservedAt pgtype.Timestamptz
 }
 
-// Use the same database clock on all federation replicas. Order overlapping
-// deliveries by the start of their digest exchange, not by completion time.
 func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) (ReadRemoteAccessBindingDigestRow, error) {
 	row := q.db.QueryRow(ctx, readRemoteAccessBindingDigest, arg.RootID, arg.ClusterID)
 	var i ReadRemoteAccessBindingDigestRow
-	err := row.Scan(&i.ObservedAt, &i.Digest)
+	err := row.Scan(&i.Digest, &i.ObservedAt)
 	return i, err
 }
 
-const storeRemoteAccessBindings = `-- name: StoreRemoteAccessBindings :execrows
-INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,digest=excluded.digest,
- bindings=CASE WHEN remote_access_binding_delivery.digest=excluded.digest THEN remote_access_binding_delivery.bindings ELSE excluded.bindings END
-WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
- OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest)
+const replaceRemoteAccessBindings = `-- name: ReplaceRemoteAccessBindings :execrows
+UPDATE remote_access_binding_delivery SET
+ observed_at=GREATEST(statement_timestamp(), observed_at + interval '1 microsecond'),
+ bindings=CASE WHEN digest=$1 THEN bindings ELSE $2 END,
+ digest=$1
+WHERE root_id=$3 AND cluster_id=$4
+ AND observed_at=$5
 `
 
-type StoreRemoteAccessBindingsParams struct {
-	RootID     pgtype.UUID
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
+type ReplaceRemoteAccessBindingsParams struct {
+	Digest    []byte
+	Bindings  []byte
+	RootID    pgtype.UUID
+	ClusterID pgtype.UUID
+	Previous  pgtype.Timestamptz
 }
 
-// An older delivery never replaces a newer one; unchanged bindings keep
-// their stored bytes.
-func (q *Queries) StoreRemoteAccessBindings(ctx context.Context, arg StoreRemoteAccessBindingsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storeRemoteAccessBindings,
-		arg.RootID,
-		arg.ClusterID,
-		arg.ObservedAt,
+// Every completed exchange, including confirmation, advances the same token.
+// The existing timestamp column stays increasing even across clock corrections.
+func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRemoteAccessBindingsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, replaceRemoteAccessBindings,
 		arg.Digest,
 		arg.Bindings,
+		arg.RootID,
+		arg.ClusterID,
+		arg.Previous,
 	)
 	if err != nil {
 		return 0, err
