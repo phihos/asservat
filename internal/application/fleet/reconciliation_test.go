@@ -14,13 +14,13 @@ import (
 
 type ownerWatchSource struct {
 	list  func() (value.OwnerConfigurationObservation, string, error)
-	watch func(context.Context, string) error
+	watch func(context.Context, string) (string, error)
 }
 
 func (s ownerWatchSource) OwnerSourceSnapshot(context.Context) (value.OwnerConfigurationObservation, string, error) {
 	return s.list()
 }
-func (s ownerWatchSource) WaitOwnerChange(ctx context.Context, rv string) error {
+func (s ownerWatchSource) WaitOwnerChange(ctx context.Context, rv string) (string, error) {
 	return s.watch(ctx, rv)
 }
 
@@ -43,17 +43,29 @@ func TestOwnerConfigurationReconcilerWatchesIdleBaselineAndFencesRemoval(t *test
 		}
 		c := value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "hub", ServiceUID: id, Deployment: "hub", DeploymentUID: id, ServiceAccount: "hub", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: int64(n), Digest: [32]byte{1}}, ProtectionDigest: [32]byte{2}, IssuerRoots: [][]byte{{3}}}
 		return value.OwnerConfigurationObservation{Configuration: c, ObservedAt: now, FreshUntil: now.Add(time.Hour)}, rv, nil
-	}, watch: func(ctx context.Context, rv string) error {
+	}, watch: func(ctx context.Context, rv string) (string, error) {
 		waiting <- rv
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return "", ctx.Err()
 		case <-change:
-			return nil
+			if rv == "3" {
+				return "4", nil
+			}
+			return "", nil
 		}
 	}}
-	ledger := ownerLedgerFake{observe: func(_ context.Context, o value.OwnerConfigurationObservation) error { observed.Add(1); return nil }, fence: func(context.Context, time.Time) error { fenced.Add(1); return nil }}
-	r := ConfigurationReconciler{Source: source, Ledger: ledger, Now: time.Now}
+	ledger := ownerApplyFunc(func(ctx context.Context, rv string, o value.OwnerConfigurationObservation) error {
+		if o.ObservedAt.IsZero() {
+			if fenced.Add(1) == 1 {
+				return value.ErrUnavailable
+			}
+		} else {
+			observed.Add(1)
+		}
+		return nil
+	})
+	r := ConfigurationReconciler{Source: source, Ledger: ledger}
 	done := make(chan error, 1)
 	go func() { done <- r.Run(ctx) }()
 	wait := func(want string) {
@@ -81,11 +93,17 @@ func TestOwnerConfigurationReconcilerWatchesIdleBaselineAndFencesRemoval(t *test
 	}
 	change <- struct{}{}
 	wait("4")
-	if fenced.Load() != 1 || reads.Load() != 4 {
+	if fenced.Load() != 2 || reads.Load() != 3 {
 		t.Fatal("deletion not fenced", fenced.Load(), reads.Load())
 	}
 	cancel()
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
+}
+
+type ownerApplyFunc func(context.Context, string, value.OwnerConfigurationObservation) error
+
+func (f ownerApplyFunc) ApplyOwnerConfiguration(ctx context.Context, rv string, o value.OwnerConfigurationObservation) error {
+	return f(ctx, rv, o)
 }

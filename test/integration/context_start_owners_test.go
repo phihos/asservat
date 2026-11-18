@@ -137,7 +137,7 @@ func (s *contextStartOwnerSQL) closeEffects() {
 func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
-	if e := s.lab.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
+	if e := s.lab.observe(ctx, o); e != nil {
 		return o, e
 	}
 	return s.lab.reader.ReadOwnerConfiguration(ctx)
@@ -331,7 +331,7 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		}
 		read(0)
 	})
-	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
+	if e = l.fence(ctx, time.Now()); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {

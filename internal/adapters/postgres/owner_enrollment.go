@@ -563,6 +563,7 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 			return value.ErrDenied
 		}
 		out = value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: certificate, Configuration: c, ObservedAt: c.ObservedAt, FreshUntil: identity.Earlier(c.FreshUntil, certificate.NotAfter)}
+		localStart := time.Now()
 		n, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
@@ -570,6 +571,9 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 		if !out.Valid(n.Time) {
 			return value.ErrUnavailable
 		}
+		offset := clockOffsetAt(localStart, n.Time)
+		out.ObservedAt, out.FreshUntil = offset.at(out.ObservedAt), offset.at(out.FreshUntil)
+		out.Configuration.ObservedAt, out.Configuration.FreshUntil = offset.at(out.Configuration.ObservedAt), offset.at(out.Configuration.FreshUntil)
 		return nil
 	})
 	if err != nil {

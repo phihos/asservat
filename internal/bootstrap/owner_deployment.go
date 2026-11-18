@@ -625,12 +625,12 @@ func legacyOwnerIdentity(startup context.Context, d *OwnerDeployment, in *ownerI
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	current, err := configs.ReadOwnerConfiguration(startup)
-	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
+	current, err := app.StartupOwnerConfiguration(startup, configs, c.Namespace.Name)
+	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	pool := current.Configuration.Pool
-	roots, _, err := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+	pool := current.Pool
+	roots, _, err := mtls.OwnerTrustRoots(current.IssuerRoots, time.Now())
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

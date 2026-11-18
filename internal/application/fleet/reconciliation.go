@@ -12,39 +12,48 @@ import (
 // An empty observation at a known cursor represents an absent or invalid source.
 type OwnerConfigurationSource interface {
 	OwnerSourceSnapshot(context.Context) (value.OwnerConfigurationObservation, string, error)
-	WaitOwnerChange(context.Context, string) error
+	// WaitOwnerChange returns a confirmed deletion cursor, or an empty cursor for a relist.
+	WaitOwnerChange(context.Context, string) (string, error)
+}
+
+type OwnerConfigurationLedger interface {
+	ApplyOwnerConfiguration(context.Context, string, value.OwnerConfigurationObservation) error
 }
 
 type ConfigurationReconciler struct {
 	Source OwnerConfigurationSource
 	Ledger OwnerConfigurationLedger
-	Now    func() time.Time
 }
 
 // The worker lease selects one reconciler. Read at startup, on a source change,
 // and after a watch interruption. A transient failure preserves accepted state.
 func (r *ConfigurationReconciler) Run(ctx context.Context) error {
-	if r == nil || r.Source == nil || r.Ledger == nil || r.Now == nil || ctx == nil {
+	if r == nil || r.Source == nil || r.Ledger == nil || ctx == nil {
 		return value.ErrInvalid
 	}
+	var deletion string
 	for ctx.Err() == nil {
 		call, end := context.WithTimeout(ctx, 5*time.Second)
-		start := r.Now()
-		observed, rv, err := r.Source.OwnerSourceSnapshot(call)
+		var observed value.OwnerConfigurationObservation
+		rv := deletion
+		var err error
+		if rv == "" {
+			observed, rv, err = r.Source.OwnerSourceSnapshot(call)
+		}
 		if err == nil {
-			if observed.CurrentSource(r.Now()) {
-				err = r.Ledger.ObserveOwnerConfiguration(call, observed)
-				// The ledger already committed the negative fence for a conflicting generation.
-				if errors.Is(err, value.ErrConflict) {
-					err = nil
-				}
-			} else {
-				err = r.Ledger.FenceOwnerConfiguration(call, start)
+			if observed.ObservedAt.IsZero() {
+				deletion = rv
+			}
+			err = r.Ledger.ApplyOwnerConfiguration(call, rv, observed)
+			// A conflicting Helm generation was durably fenced at this cursor.
+			if errors.Is(err, value.ErrConflict) {
+				err = nil
 			}
 		}
 		end()
 		if err == nil {
-			err = r.Source.WaitOwnerChange(ctx, rv)
+			// An applied deletion stands even if the watch or the next LIST fails.
+			deletion, err = r.Source.WaitOwnerChange(ctx, rv)
 		}
 		if err != nil && ctx.Err() == nil {
 			// Back off only after failed I/O; a healthy idle watch needs no timer.

@@ -18,6 +18,7 @@ import (
 	settings "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -148,25 +149,32 @@ func (s *OwnerSourceReader) OwnerSourceSnapshot(ctx context.Context) (value.Owne
 	return o, list.ResourceVersion, err
 }
 
-func (s *OwnerSourceReader) WaitOwnerChange(ctx context.Context, rv string) error {
+func (s *OwnerSourceReader) WaitOwnerChange(ctx context.Context, rv string) (string, error) {
 	stream, cancel, err := s.client.openSelectedWatch(ctx, s.path(), rv, true, "metadata.name="+s.name)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer cancel()
 	defer stream.Close()
 	for {
 		event, err := stream.next()
 		if err != nil {
-			return err
+			return "", err
 		}
 		switch event.Type {
 		case "BOOKMARK":
 			continue
 		case "ADDED", "MODIFIED", "DELETED":
-			return nil
+			var obj metav1.PartialObjectMetadata
+			if json.Unmarshal(event.Object.Raw, &obj) != nil || obj.ResourceVersion == "" {
+				return "", value.ErrInvalid
+			}
+			if event.Type == "DELETED" || obj.DeletionTimestamp != nil {
+				return obj.ResourceVersion, nil
+			}
+			return "", nil
 		default:
-			return value.ErrUnavailable
+			return "", value.ErrUnavailable
 		}
 	}
 }

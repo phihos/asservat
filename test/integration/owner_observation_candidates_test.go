@@ -114,7 +114,7 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 		}
 	})
 	refresh()
-	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
+	if e = l.fence(ctx, time.Now()); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {

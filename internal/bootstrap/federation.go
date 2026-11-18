@@ -369,11 +369,11 @@ func federationOwnerAuthenticator(ctx context.Context, c federationInputs, pool 
 	}
 	// The hub-api accepts its owner configuration; until then the federation
 	// restarts rather than serving owner reads without a pool.
-	current, err := configurations.ReadOwnerConfiguration(ctx)
-	if err != nil || !current.Valid(time.Now()) || current.Configuration.Pool.Namespace != c.Namespace {
+	current, err := fleetapp.StartupOwnerConfiguration(ctx, configurations, c.Namespace)
+	if err != nil {
 		return nil, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
 	}
-	endpoints, err := kube.NewOwnerEndpoints(observer, current.Configuration.Pool)
+	endpoints, err := kube.NewOwnerEndpoints(observer, current.Pool)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

@@ -88,7 +88,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	refresh := func(ctx context.Context) (value.OwnerConfigurationObservation, error) {
 		n := time.Now().UTC().Truncate(time.Microsecond)
 		o := value.OwnerConfigurationObservation{Configuration: c.Clone(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
-		if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
+		if e := l.observe(ctx, o); e != nil {
 			return o, e
 		}
 		return l.reader.ReadOwnerConfiguration(ctx)
@@ -338,7 +338,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 		t.Fatal("retirement crossed purposes", err)
 	}
 	// Existing API observations remain mandatory after activation.
-	if err = l.writer.FenceOwnerConfiguration(ctx, time.Now()); err != nil {
+	if err = l.fence(ctx, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = registry.ReadOwnerRegistration(ctx, clientCert.Certificate); err == nil {

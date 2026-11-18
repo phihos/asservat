@@ -199,7 +199,7 @@ GRANT SELECT ON goose_db_version,fleet_trust,hub_owner_configuration,hub_owner_c
 GRANT UPDATE(installation_id) ON fleet_trust TO owner_configuration_runtime,owner_configuration_read_runtime;
 GRANT INSERT ON hub_owner_configuration TO owner_configuration_runtime;
 GRANT INSERT(installation_id,cluster_id,source_uid,generation,snapshot_json) ON hub_owner_configuration_revision TO owner_configuration_runtime;
-GRANT UPDATE(generation,observed_at,fresh_until) ON hub_owner_configuration TO owner_configuration_runtime;
+GRANT UPDATE(generation,observed_at,fresh_until,source_version) ON hub_owner_configuration TO owner_configuration_runtime;
 GRANT UPDATE(source_uid) ON hub_owner_configuration TO owner_configuration_runtime,owner_configuration_read_runtime;
 
 -- Hub process ownership: independent enrollment, audit, activation/read and cleanup.

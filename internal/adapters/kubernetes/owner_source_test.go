@@ -58,7 +58,7 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 				if r.URL.Query().Get("resourceVersion") != "12" {
 					t.Error("wrong watch cursor")
 				}
-				permissionReply(w, map[string]any{"type": "MODIFIED", "object": map[string]string{"kind": "PartialObjectMetadata"}})
+				permissionReply(w, map[string]any{"type": "MODIFIED", "object": map[string]any{"kind": "PartialObjectMetadata", "metadata": map[string]string{"resourceVersion": "13"}}})
 				return true
 			}
 			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMapList", "metadata": map[string]string{"resourceVersion": "12"}, "items": []any{map[string]any{"metadata": map[string]any{"name": "asservat-owner-source", "namespace": ns, "uid": cmUID, "resourceVersion": "1"}, "data": map[string]string{"owner-pool.json": source}}}})
@@ -90,7 +90,7 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		if err != nil || rv != "12" || !o.FreshUntil.Equal(f.client.now().Add(24*time.Hour).Truncate(time.Second)) {
 			t.Fatal("original CA cutoff or cursor lost", o.FreshUntil, rv, err)
 		}
-		if err = reader.WaitOwnerChange(t.Context(), rv); err != nil {
+		if _, err = reader.WaitOwnerChange(t.Context(), rv); err != nil {
 			t.Fatal(err)
 		}
 		p := o.Configuration.Pool

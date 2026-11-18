@@ -39,7 +39,7 @@ func configurationRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool)
 	if purpose == "configuration-source" {
 		add("hub_owner_configuration", "SELECT")
 		add("hub_owner_configuration_revision", "SELECT")
-		add("hub_owner_configuration", "UPDATE", "source_uid", "generation", "observed_at", "fresh_until")
+		add("hub_owner_configuration", "UPDATE", "source_uid", "generation", "observed_at", "fresh_until", "source_version")
 		add("hub_owner_configuration", "INSERT")
 		add("hub_owner_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
 	}

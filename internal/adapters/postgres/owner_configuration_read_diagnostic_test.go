@@ -64,7 +64,7 @@ func (q *ownerReadDiagnosticQuery) QueryRow(_ context.Context, sql string, args 
 	switch name {
 	case "ShareOwnerConfiguration":
 		v := q.head
-		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.ObservedAt, v.FreshUntil}
+		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.ObservedAt, v.FreshUntil, v.SourceVersion}
 		wantArgs = []any{q.head.InstallationID, q.head.ClusterID}
 	case "ReadOwnerConfigurationRevision":
 		v := q.revision

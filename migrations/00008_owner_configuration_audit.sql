@@ -7,6 +7,10 @@ ALTER TABLE public.hub_owner_configuration_revision RENAME COLUMN audit_receipt_
 -- The source stays accepted until replaced, fenced, or its issuer certificate expires.
 ALTER TABLE public.hub_owner_configuration DROP CONSTRAINT hub_owner_configuration_check;
 
+-- The numeric-string cursor orders events from the same built-in ConfigMap collection,
+-- including a DELETE received before the API becomes unavailable.
+ALTER TABLE public.hub_owner_configuration ADD COLUMN source_version text NOT NULL DEFAULT '';
+
 -- Append one digest-only audit row per revision, including revisions retained
 -- across a development upgrade. Backfilled events record their migration time.
 -- The source UID groups the immutable generation numbers for this source.

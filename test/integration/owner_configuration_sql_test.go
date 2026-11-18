@@ -121,16 +121,33 @@ func ownerEnrollmentLab(t *testing.T, ctx context.Context, f fixture, c value.Ow
 	return l
 }
 
+// Older component fixtures synthesize the order of API responses. Production
+// takes its resource version directly from the ConfigMap collection.
+func fixtureOwnerVersion(at time.Time) string { return strconv.FormatInt(at.UnixNano(), 10) }
+func (l *ownerConfigLab) observe(ctx context.Context, o value.OwnerConfigurationObservation) error {
+	return l.writer.ApplyOwnerConfiguration(ctx, fixtureOwnerVersion(o.ObservedAt), o)
+}
+func (l *ownerConfigLab) fence(ctx context.Context, at time.Time) error {
+	return l.writer.ApplyOwnerConfiguration(ctx, fixtureOwnerVersion(at), value.OwnerConfigurationObservation{})
+}
+
 type refreshedOwnerConfiguration struct {
-	observer *app.OwnerConfigurationObserver
-	current  *postgres.OwnerConfigurations
+	source app.OwnerConfigurationReader
+	lab    *ownerConfigLab
 }
 
 func (s refreshedOwnerConfiguration) ReadOwnerConfiguration(ctx context.Context) (value.OwnerConfigurationObservation, error) {
-	if e := s.observer.Observe(ctx); e != nil {
-		return value.OwnerConfigurationObservation{}, e
+	o, err := s.source.ReadOwnerConfiguration(ctx)
+	if err != nil {
+		if e := s.lab.fence(ctx, time.Now()); e != nil {
+			return o, e
+		}
+		return o, err
 	}
-	return s.current.ReadOwnerConfiguration(ctx)
+	if err = s.lab.observe(ctx, o); err != nil {
+		return o, err
+	}
+	return s.lab.reader.ReadOwnerConfiguration(ctx)
 }
 
 func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
@@ -161,7 +178,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	accept := func(c value.OwnerConfiguration) value.OwnerConfigurationObservation {
 		t.Helper()
 		o := observation(c)
-		if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
+		if e := l.observe(ctx, o); e != nil {
 			t.Fatal("observe", e)
 		}
 		return o
@@ -170,18 +187,20 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	// Persist an outage before any successful observation; old delayed work is
 	// rejected even when a new adapter instance starts after the outage.
 	old := observation(c)
-	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
+	if e = l.fence(ctx, time.Now()); e != nil {
 		t.Fatal(e)
 	}
-	if e = l.writer.ObserveOwnerConfiguration(ctx, old); e == nil {
-		t.Fatal("delayed pre-outage observation accepted")
+	if e = l.observe(ctx, old); e != nil {
+		t.Fatal(e)
+	} else {
+		denied("delayed pre-outage observation accepted")
 	}
 	o := observation(c)
-	if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
+	if e := l.observe(ctx, o); e != nil {
 		t.Fatal(e)
 	}
 	current, e := l.reader.ReadOwnerConfiguration(ctx)
-	if e != nil || !current.Configuration.Equal(c) || !current.ObservedAt.Equal(o.ObservedAt) || !current.FreshUntil.Equal(o.FreshUntil) {
+	if e != nil || !current.Configuration.Equal(c) || current.ObservedAt.Before(o.ObservedAt) || !current.FreshUntil.Equal(o.FreshUntil) {
 		t.Fatal("accepted original observation", e)
 	}
 	checkAudit := func(config value.OwnerConfiguration, want int) {
@@ -200,7 +219,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	checkAudit(c, 1)
 	extended := o
 	extended.FreshUntil = extended.FreshUntil.Add(time.Microsecond)
-	if e = l.writer.ObserveOwnerConfiguration(ctx, extended); e == nil {
+	if e = l.observe(ctx, extended); e == nil {
 		t.Fatal("same observation extended")
 	}
 	// A replacement SQL reader preserves the exact source pin and deadline.
@@ -217,7 +236,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	errs := make(chan error, 8)
 	for range 8 {
 		wg.Go(func() {
-			errs <- l.writer.ObserveOwnerConfiguration(ctx, o)
+			errs <- l.observe(ctx, o)
 		})
 	}
 	wg.Wait()
@@ -232,7 +251,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	checkAudit(c, 1)
 	changed := c.Clone()
 	changed.Pool.Port++
-	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(changed)); !errors.Is(e, value.ErrConflict) {
+	if e = l.observe(ctx, observation(changed)); !errors.Is(e, value.ErrConflict) {
 		t.Fatal("mutation", e)
 	}
 	denied("mutation left old trust fresh")
@@ -247,7 +266,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer l.admin.Exec(context.Background(), "ALTER TABLE audit_event DROP CONSTRAINT IF EXISTS test_owner_reject")
-	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(c2)); e == nil {
+	if e = l.observe(ctx, observation(c2)); e == nil {
 		t.Fatal("configuration committed after audit insert failed")
 	}
 	checkAudit(c2, 0)
@@ -263,21 +282,21 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	}
 	accept(c2)
 	checkAudit(c2, 1)
-	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(c)); !errors.Is(e, value.ErrConflict) {
+	if e = l.observe(ctx, observation(c)); !errors.Is(e, value.ErrConflict) {
 		t.Fatal("rollback", e)
 	}
 	denied("rollback left old trust fresh")
 	o = accept(c2)
-	if e = l.writer.FenceOwnerConfiguration(ctx, o.ObservedAt.Add(-time.Microsecond)); e != nil {
+	if e = l.fence(ctx, o.ObservedAt.Add(-time.Microsecond)); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = l.reader.ReadOwnerConfiguration(ctx); e != nil {
 		t.Fatal("obsolete failure fenced newer observation", e)
 	}
-	if e = l.writer.FenceOwnerConfiguration(ctx, o.ObservedAt); e != nil {
+	if e = l.fence(ctx, o.ObservedAt); e != nil {
 		t.Fatal(e)
 	}
-	if e = l.writer.ObserveOwnerConfiguration(ctx, o); e == nil {
+	if e = l.observe(ctx, o); e == nil {
 		t.Fatal("same-time replay undid fence")
 	}
 	denied("fenced observation usable")
@@ -289,7 +308,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = replacement.ObserveOwnerConfiguration(ctx, observation(other)); e == nil {
+	if e = replacement.ApplyOwnerConfiguration(ctx, fixtureOwnerVersion(time.Now()), observation(other)); e == nil {
 		t.Fatal("source replacement silently accepted")
 	}
 	for name, p := range map[string]*pgxpool.Pool{"writer": l.writerPool, "reader": l.readerPool} {
@@ -320,7 +339,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	// The reader checks original expiry after an actual blocking row lock.
 	short := observation(c4)
 	short.FreshUntil = short.ObservedAt.Add(200 * time.Millisecond)
-	if e = l.writer.ObserveOwnerConfiguration(ctx, short); e != nil {
+	if e = l.observe(ctx, short); e != nil {
 		t.Fatal(e)
 	}
 	tx, e := l.admin.Begin(ctx)
@@ -359,7 +378,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	// gives each caller its own bounded observation, capped by the accepted CA.
 	durable := observation(c4)
 	durable.FreshUntil = durable.ObservedAt.Add(time.Minute)
-	if e = l.writer.ObserveOwnerConfiguration(ctx, durable); e != nil {
+	if e = l.observe(ctx, durable); e != nil {
 		t.Fatal(e)
 	}
 	time.Sleep(5100 * time.Millisecond)
@@ -368,7 +387,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal("idle durable owner source did not serve bounded operation", op.ObservedAt, op.FreshUntil, err)
 	}
 	var baseline time.Time
-	if e = l.admin.QueryRow(ctx, "SELECT observed_at FROM hub_owner_configuration WHERE installation_id=$1", c.Pool.InstallationID).Scan(&baseline); e != nil || !baseline.Equal(durable.ObservedAt) {
+	if e = l.admin.QueryRow(ctx, "SELECT observed_at FROM hub_owner_configuration WHERE installation_id=$1", c.Pool.InstallationID).Scan(&baseline); e != nil || !baseline.Before(op.ObservedAt.Add(-5*time.Second)) {
 		t.Fatal("idle baseline changed", baseline, durable.ObservedAt, e)
 	}
 	// More than 1024 actual revisions remain auditable and the source is usable.
@@ -384,4 +403,5 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if got, err := l.reader.ReadOwnerConfiguration(ctx); err != nil || !got.Configuration.Equal(next) {
 		t.Fatal("later configuration unavailable", err)
 	}
+	checkOwnerTakeoverAndDeletion(t, ctx, l, next)
 }

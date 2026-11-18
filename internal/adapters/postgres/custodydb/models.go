@@ -942,6 +942,7 @@ type HubOwnerConfiguration struct {
 	Generation     int64
 	ObservedAt     pgtype.Timestamptz
 	FreshUntil     pgtype.Timestamptz
+	SourceVersion  string
 }
 
 type HubOwnerConfigurationRevision struct {
