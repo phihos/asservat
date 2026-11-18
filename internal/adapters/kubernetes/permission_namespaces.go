@@ -13,9 +13,6 @@ import (
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -140,7 +137,7 @@ func (c *PermissionClient) ListNamespaces(ctx context.Context, keys value.Namesp
 type namespaceWatch struct {
 	client  *PermissionClient
 	keys    value.NamespaceKeys
-	decoder streaming.Decoder
+	decoder *permissionWatchEvents
 	cancel  context.CancelFunc
 	mu      sync.Mutex
 }
@@ -169,7 +166,7 @@ func (c *PermissionClient) WatchNamespaces(ctx context.Context, rv string, keys 
 		cancel()
 		return nil, mapped
 	}
-	return &namespaceWatch{client: c, keys: keys, decoder: streaming.NewDecoder(serializer.Framer.NewFrameReader(body), permissionEventDecoder{}), cancel: cancel}, nil
+	return &namespaceWatch{client: c, keys: keys, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
 }
 
 func (w *namespaceWatch) Next(ctx context.Context) (value.NamespaceEvent, error) {
@@ -180,8 +177,7 @@ func (w *namespaceWatch) Next(ctx context.Context) (value.NamespaceEvent, error)
 	}
 	stop := context.AfterFunc(ctx, w.Close)
 	defer stop()
-	var event metav1.WatchEvent
-	_, _, err := w.decoder.Decode(nil, &event)
+	event, err := w.decoder.next()
 	if err != nil || ctx.Err() != nil {
 		w.Close()
 		if ctx.Err() == nil && errors.Is(err, io.EOF) {

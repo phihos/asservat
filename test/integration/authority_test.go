@@ -69,12 +69,11 @@ func (c delayedPermissionConn) Write(b []byte) (int, error) {
 type remoteBindingHubFixture struct {
 	cluster  string
 	bindings []cfg.Binding
-	watch    configapp.BindingWatch
 }
 
 func (f remoteBindingHubFixture) PermissionSnapshot(context.Context) (cfg.Snapshot, error) {
 	now := time.Now()
-	return cfg.Snapshot{ClusterID: f.cluster, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: f.cluster}, BindingResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bindings: f.bindings}, nil
+	return cfg.Snapshot{ClusterID: f.cluster, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: f.cluster}, BindingResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second), SourcesComplete: true, Bindings: f.bindings}, nil
 }
 
 func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.PermissionTrust, error) {
@@ -85,18 +84,7 @@ func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.Permi
 var errBaselineAccepted = errors.New("test stops at watch after initial acceptance")
 
 func (f remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
-	if f.watch != nil {
-		return f.watch, nil
-	}
 	return nil, errBaselineAccepted
-}
-
-type quietBindingWatch struct{}
-
-func (quietBindingWatch) Close() {}
-func (quietBindingWatch) Next(ctx context.Context) (cfg.BindingEvent, error) {
-	<-ctx.Done()
-	return cfg.BindingEvent{}, ctx.Err()
 }
 
 type observedPermissionWriter struct {
@@ -525,8 +513,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		live, stop := context.WithTimeout(ctx, 45*time.Second)
 		defer stop()
 		writer := &observedPermissionWriter{reconciler.Store.(*postgres.Permissions), make(chan cfg.PermissionAcceptance, 4), make(chan cfg.PermissionFence, 2), make(chan struct{}, 1)}
-		hub.watch = quietBindingWatch{}
-		reconciler.Watcher = hub
+		reconciler.Watcher = idleKubernetesBindingWatch(t, hub.cluster)
 		reconciler.Store = writer
 		reconciler.RemoteBindingChanges = postgres.Listen(live, pool, postgres.RemoteBindingsChannel)
 		done := make(chan configapp.PermissionEpochResult, 1)

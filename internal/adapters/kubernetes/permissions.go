@@ -35,6 +35,7 @@ const (
 // namespace GET. Successful reads attest no RBAC/admission qualification.
 type PermissionClient struct {
 	api         rest.Interface
+	watchAPI    rest.Interface
 	clusterID   string
 	control     value.NamespaceRef
 	now         func() time.Time
@@ -63,7 +64,8 @@ type permissionTransport struct{ http.RoundTripper }
 
 func (t permissionTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	v, err := t.RoundTripper.RoundTrip(r)
-	if v != nil && v.Body != nil {
+	// Successful watches apply the same byte budget independently to each event.
+	if v != nil && v.Body != nil && (v.StatusCode != http.StatusOK || r.URL.Query().Get("watch") != "true") {
 		v.Body = &boundedBody{v.Body, permissionPageBytes + 1}
 	}
 	return v, err
@@ -73,7 +75,7 @@ func NewPermissionClient(config *rest.Config, clusterID string, control value.Na
 	if config == nil || config.Insecure || now == nil || !authorization.UUID(clusterID) || !namespaceRefValid(control) {
 		return nil, value.ErrInvalid
 	}
-	api, err := newBoundedAPI(config)
+	api, watch, err := boundedRESTClients(config, true)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +84,7 @@ func NewPermissionClient(config *rest.Config, clusterID string, control value.Na
 		return nil, err
 	}
 	v.clusters = map[string]string{LocalClusterName: clusterID}
-	return &PermissionClient{api: api, clusterID: clusterID, control: control, now: now, validator: v, bindings: &bindingNamespaces{byBinding: map[string]value.NamespaceRef{}}}, nil
+	return &PermissionClient{api: api, watchAPI: watch, clusterID: clusterID, control: control, now: now, validator: v, bindings: &bindingNamespaces{byBinding: map[string]value.NamespaceRef{}}}, nil
 }
 
 // WithClusterNames returns c resolving the joined clusters' names (values
@@ -103,13 +105,18 @@ func (c *PermissionClient) WithClusterNames(names map[string]string) *Permission
 
 // newBoundedAPI supplies transport restrictions shared by the narrow adapters.
 // Each adapter retains its own response/domain validation and resource paths.
-func newBoundedAPI(config *rest.Config) (rest.Interface, error) {
+func newBoundedAPI(config *rest.Config) (*rest.RESTClient, error) {
+	api, _, err := boundedRESTClients(config, false)
+	return api, err
+}
+
+func boundedRESTClients(config *rest.Config, watch bool) (*rest.RESTClient, *rest.RESTClient, error) {
 	if config == nil || config.Insecure {
-		return nil, value.ErrInvalid
+		return nil, nil, value.ErrInvalid
 	}
 	u, err := url.Parse(config.Host)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || (u.Path != "" && u.Path != "/") {
-		return nil, value.ErrInvalid
+		return nil, nil, value.ErrInvalid
 	}
 	c := rest.CopyConfig(config)
 	// Fixed 20/20, except the one explicit ADR-208 opening budget that the
@@ -129,14 +136,26 @@ func newBoundedAPI(config *rest.Config) (rest.Interface, error) {
 	c.Wrap(func(t http.RoundTripper) http.RoundTripper { return permissionTransport{t} })
 	httpClient, err := rest.HTTPClientFor(c)
 	if err != nil {
-		return nil, value.ErrUnavailable
+		return nil, nil, value.ErrUnavailable
 	}
 	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error { return value.ErrUnavailable }
 	api, err := rest.UnversionedRESTClientForConfigAndClient(c, httpClient)
 	if err != nil {
-		return nil, value.ErrUnavailable
+		return nil, nil, value.ErrUnavailable
 	}
-	return api, nil
+	if !watch {
+		return api, nil, nil
+	}
+	// An ordinary request is bounded from start to finish. A watch shares
+	// its transport, credentials, redirect policy and rate limiter, while
+	// the watch opener bounds time to the response headers.
+	c.RateLimiter = api.GetRateLimiter()
+	streamHTTP := &http.Client{Transport: httpClient.Transport, CheckRedirect: httpClient.CheckRedirect, Jar: httpClient.Jar}
+	stream, err := rest.UnversionedRESTClientForConfigAndClient(c, streamHTTP)
+	if err != nil {
+		return nil, nil, value.ErrUnavailable
+	}
+	return api, stream, nil
 }
 
 func permissionError(ctx context.Context, err error) error {

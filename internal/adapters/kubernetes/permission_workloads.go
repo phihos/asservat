@@ -17,8 +17,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -112,7 +110,7 @@ func (c *PermissionClient) ListWorkloads(ctx context.Context, kind string, sel v
 type workloadWatch struct {
 	kind    string
 	keys    value.NamespaceKeys
-	decoder streaming.Decoder
+	decoder *permissionWatchEvents
 	cancel  context.CancelFunc
 	mu      sync.Mutex
 }
@@ -141,7 +139,7 @@ func (c *PermissionClient) WatchWorkloads(ctx context.Context, kind, rv string, 
 		cancel()
 		return nil, mapped
 	}
-	return &workloadWatch{kind: kind, keys: sel.Keys, decoder: streaming.NewDecoder(serializer.Framer.NewFrameReader(body), permissionEventDecoder{}), cancel: cancel}, nil
+	return &workloadWatch{kind: kind, keys: sel.Keys, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
 }
 
 func (w *workloadWatch) Next(ctx context.Context) (port.WorkloadEvent, error) {
@@ -152,8 +150,7 @@ func (w *workloadWatch) Next(ctx context.Context) (port.WorkloadEvent, error) {
 	}
 	stop := context.AfterFunc(ctx, w.Close)
 	defer stop()
-	var event metav1.WatchEvent
-	_, _, err := w.decoder.Decode(nil, &event)
+	event, err := w.decoder.next()
 	if err != nil || ctx.Err() != nil {
 		w.Close()
 		if ctx.Err() == nil && errors.Is(err, io.EOF) {

@@ -12,40 +12,48 @@ import (
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 )
 
 var _ port.BindingWatcher = (*PermissionClient)(nil)
 
-// This decoder uses the Kubernetes streaming framer, then applies the same
-// bounded strict JSON checks as the LIST reader before accepting any event.
-type permissionEventDecoder struct{}
+// JSON values on a watch can span HTTP chunks or arrive together. Limit
+// reads to one event, replenishing only the bytes the decoder consumed.
+// Bytes buffered ahead for the next event remain charged to that event.
+type permissionWatchEvents struct {
+	io.Closer
+	limit *io.LimitedReader
+	json  *json.Decoder
+}
 
-func (permissionEventDecoder) Decode(data []byte, _ *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	if err := permissionJSON(data, permissionPageBytes, 131072); err != nil {
-		return nil, nil, err
+func newPermissionWatchEvents(body io.ReadCloser) *permissionWatchEvents {
+	r := &io.LimitedReader{R: body, N: permissionPageBytes + 1}
+	return &permissionWatchEvents{body, r, json.NewDecoder(r)}
+}
+
+func (d *permissionWatchEvents) next() (event metav1.WatchEvent, err error) {
+	start := d.json.InputOffset()
+	var data json.RawMessage
+	if err = d.json.Decode(&data); err != nil {
+		if d.limit.N == 0 {
+			return event, value.ErrLimit
+		}
+		return event, err
+	}
+	d.limit.N += d.json.InputOffset() - start
+	if err = permissionJSON(data, permissionPageBytes, 131072); err != nil {
+		return event, err
 	}
 	var fields map[string]json.RawMessage
-	if json.Unmarshal(data, &fields) != nil || len(fields) != 2 || fields["type"] == nil || fields["object"] == nil {
-		return nil, nil, value.ErrUnavailable
+	if json.Unmarshal(data, &fields) != nil || len(fields) != 2 || fields["type"] == nil || fields["object"] == nil || json.Unmarshal(fields["type"], &event.Type) != nil {
+		return event, value.ErrUnavailable
 	}
-	event, ok := into.(*metav1.WatchEvent)
-	if !ok {
-		return nil, nil, value.ErrInvalid
-	}
-	if json.Unmarshal(fields["type"], &event.Type) != nil {
-		return nil, nil, value.ErrUnavailable
-	}
-	event.Object.Raw = append([]byte{}, fields["object"]...)
-	return event, nil, nil
+	event.Object.Raw = fields["object"]
+	return event, nil
 }
 
 type permissionBindingWatch struct {
 	client  *PermissionClient
-	decoder streaming.Decoder
+	decoder *permissionWatchEvents
 	cancel  context.CancelFunc
 	mu      sync.Mutex
 }
@@ -66,7 +74,7 @@ func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.B
 		cancel()
 		return nil, value.ErrChanged
 	}
-	r := c.api.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
+	r := c.watchAPI.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
 	body, err := r.Stream(ctx)
 	if err != nil {
 		mapped := permissionError(ctx, err)
@@ -78,7 +86,7 @@ func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.B
 		cancel()
 		return nil, err
 	}
-	return &permissionBindingWatch{client: c, decoder: streaming.NewDecoder(serializer.Framer.NewFrameReader(body), permissionEventDecoder{}), cancel: cancel}, nil
+	return &permissionBindingWatch{client: c, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
 }
 func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, error) {
 	w.mu.Lock()
@@ -88,8 +96,7 @@ func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, 
 	}
 	stop := context.AfterFunc(ctx, w.Close)
 	defer stop()
-	var event metav1.WatchEvent
-	_, _, err := w.decoder.Decode(nil, &event)
+	event, err := w.decoder.next()
 	if err != nil || ctx.Err() != nil {
 		w.Close()
 		if ctx.Err() == nil && errors.Is(err, io.EOF) {
