@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"maps"
 	"math/big"
 	"net"
 	"os"
@@ -416,7 +415,7 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		if !same {
 			return secretsFailure("ObjectStoreIAMChanged")
 		}
-	} else if !maps.EqualFunc(current.Data, want, bytes.Equal) {
+	} else if !bytes.Equal(current.Data[providerconfig.SeaweedConfigKey], compiled.Config) || !bytes.Equal(previousPolicies, want[SeaweedBucketPoliciesKey]) {
 		// Refuse a stale hook's update if another run already published new membership.
 		body, err := json.Marshal(map[string]any{"metadata": map[string]string{"resourceVersion": current.ResourceVersion}, "data": want})
 		if err != nil {
