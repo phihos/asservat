@@ -61,7 +61,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		if d.cluster == target.ClusterID {
 			b.Bindings = []cfg.Binding{original}
 		}
-		if err := d.s.StoreRemoteBindings(ctx, b.ClusterID, time.Time{}, sum, b.Bindings); err != nil {
+		if err := d.s.StoreRemoteBindings(ctx, b.ClusterID, time.Time{}, sum, b.Bindings, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -75,28 +75,28 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	if err != nil || !initial.After(time.Now()) {
 		t.Fatal("future predecessor", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, initial, sum, nil); err != nil {
+	if err := store.StoreRemoteBindings(ctx, active, initial, sum, nil, false); err != nil {
 		t.Fatal("confirm", err)
 	}
 	replacementDigest := strings.Repeat("ca", 32)
-	if err := store.StoreRemoteBindings(ctx, active, initial, replacementDigest, nil); !errors.Is(err, cfg.ErrChanged) {
+	if err := store.StoreRemoteBindings(ctx, active, initial, replacementDigest, nil, false); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("stale replacement acknowledged")
 	}
 	_, confirmed, err := store.RemoteBindingsDigest(ctx, active)
 	if err != nil || !confirmed.After(initial) {
 		t.Fatal("confirmation did not advance revision", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, confirmed, replacementDigest, nil); err != nil {
+	if err := store.StoreRemoteBindings(ctx, active, confirmed, replacementDigest, nil, false); err != nil {
 		t.Fatal("replace", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, confirmed, sum, nil); !errors.Is(err, cfg.ErrChanged) {
+	if err := store.StoreRemoteBindings(ctx, active, confirmed, sum, nil, false); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("stale confirmation acknowledged")
 	}
 	_, current, err := store.RemoteBindingsDigest(ctx, target.ClusterID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.StoreRemoteBindings(ctx, target.ClusterID, current, sum, nil); err != nil {
+	if err := store.StoreRemoteBindings(ctx, target.ClusterID, current, sum, nil, false); err != nil {
 		t.Fatal("confirm populated delivery", err)
 	}
 	rows, err := store.RemoteBindings(ctx)
@@ -166,7 +166,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	ended := make(chan struct{})
 	go func() { defer close(ended); reconciler.RunEpoch(live) }()
 	defer func() { stop(); <-ended }()
-	projection := func() authorization.Projection {
+	awaitAcceptance := func() {
 		t.Helper()
 		select {
 		case <-writer.accepted:
@@ -176,6 +176,10 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 			t.Fatal("permission acceptance timed out")
 		}
 		flush(t, permissions)
+	}
+	projection := func() authorization.Projection {
+		t.Helper()
+		awaitAcceptance()
 		got, err := permissions.Permissions(ctx, target)
 		if err != nil || !got.DeniesComplete {
 			t.Fatal("replacement projection unavailable", err)
@@ -189,10 +193,41 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	replacement.Resource.UID = custodyID()
 	replacement.Subjects = []cfg.Subject{{Kind: "Group", Issuer: original.Subjects[0].Issuer, ID: "replacement-team"}}
 	d := cfg.RemoteBindings{ClusterID: target.ClusterID, ObservedAt: time.Now().UTC(), Bindings: []cfg.Binding{replacement}}
-	if err := store.StoreRemoteBindings(ctx, d.ClusterID, time.Time{}, strings.Repeat("bd", 32), d.Bindings); err != nil {
+	if err := store.StoreRemoteBindings(ctx, d.ClusterID, time.Time{}, strings.Repeat("bd", 32), d.Bindings, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := projection(); len(got.Allows) != 1 || got.Allows[0].Audience.SubjectID != "replacement-team" || got.Allows[0].Audience.BasisUID != replacement.Resource.UID {
 		t.Fatal("same-name replacement did not receive only its own grant")
+	}
+
+	// The old Allow must stop working if the replacement will not fit. A
+	// scoped unavailable observation leaves the rest of the fleet usable.
+	replace := func(bindings []cfg.Binding, digest string, unavailable bool) {
+		t.Helper()
+		_, previous, err := store.RemoteBindingsDigest(ctx, target.ClusterID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.StoreRemoteBindings(ctx, target.ClusterID, previous, digest, bindings, unavailable); err != nil {
+			t.Fatal(err)
+		}
+	}
+	replace(nil, strings.Repeat("cb", 32), true)
+	awaitAcceptance()
+	if got, err := permissions.Permissions(ctx, target); !errors.Is(err, cfg.ErrUnavailable) || len(got.Allows) != 0 {
+		t.Fatal("old access survived an unavailable replacement", err)
+	}
+	peerTarget := target
+	peerTarget.ClusterID = active
+	if got, err := permissions.Permissions(ctx, peerTarget); err != nil || !got.DeniesComplete {
+		t.Fatal("unavailable delivery disabled the other cluster", err)
+	}
+	deny := replacement
+	deny.Resource.Kind, deny.Resource.Name, deny.Resource.UID = cfg.ClusterAccessBindingKind, "blocked", custodyID()
+	deny.Resource.Namespace, deny.Resource.NamespaceUID = "", ""
+	deny.Scope.Namespace, deny.Effect = cfg.AllNamespaces, "Deny"
+	replace([]cfg.Binding{replacement, deny}, strings.Repeat("db", 32), false)
+	if got := projection(); len(got.Denies) != 1 || len(got.Allows) != 1 || got.Denies[0].Audience.SubjectID != got.Allows[0].Audience.SubjectID {
+		t.Fatal("restored cluster-wide Deny missing alongside the overlapping Allow")
 	}
 }

@@ -26,7 +26,7 @@ func TestAccessBindingDeliveryRoundTrip(t *testing.T) {
 		return true
 	})
 	d, err := f.client.AccessBindingDelivery(context.Background())
-	if err != nil || len(d.Items) != 2 || d.ResourceVersion != "opaque:bindings" {
+	if err != nil || len(d.Items) != 3 || d.ResourceVersion != "opaque:bindings" {
 		t.Fatal(err, d)
 	}
 	if i := d.Items[0]; i.Namespace != "payments" || i.NamespaceUID != "payments-uid" || i.UID != "uid-1" || i.Generation != 1 || len(i.Spec) == 0 {
@@ -44,8 +44,12 @@ func TestAccessBindingDeliveryRoundTrip(t *testing.T) {
 	}
 	const remote = "22222222-2222-4222-8222-222222222222"
 	bindings, err := decoder.DeliveredBindings(remote, wire)
-	if err != nil || len(bindings) != 2 {
+	if err != nil || len(bindings) != 3 {
 		t.Fatal(err, bindings)
+	}
+	cab := bindings[2]
+	if cab.Resource.Kind != value.ClusterAccessBindingKind || cab.Scope.ClusterID != remote || cab.Scope.Namespace != value.AllNamespaces || cab.NamespaceSelector["example.invalid/managed"] != "true" {
+		t.Fatalf("cluster-scoped binding lost its authenticated scope or selector: %+v", cab)
 	}
 	ok, refused := bindings[0], bindings[1]
 	if ok.Invalid || ok.Scope.ClusterID != remote || ok.Scope.Namespace != (value.NamespaceRef{Name: "payments", UID: "payments-uid"}) || ok.Effect != "Allow" || len(ok.Subjects) != 1 {

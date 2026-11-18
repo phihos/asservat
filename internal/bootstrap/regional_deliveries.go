@@ -27,12 +27,12 @@ const (
 )
 
 // The regional informer coalesces AccessBinding changes into delivery signals.
-func watchRegionalBindings(ctx context.Context, config *rest.Config) (cache.SharedIndexInformer, <-chan struct{}, error) {
+func watchRegionalBindings(ctx context.Context, config *rest.Config) ([]cache.InformerSynced, <-chan struct{}, error) {
 	client, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, nil, err
 	}
-	informer := metadatainformer.NewFilteredMetadataInformer(client, accessBindingsResource, "", 0, nil, nil).Informer()
+	factory := metadatainformer.NewSharedInformerFactory(client, 0)
 	changes := make(chan struct{}, 1)
 	signal := func() {
 		select {
@@ -41,11 +41,16 @@ func watchRegionalBindings(ctx context.Context, config *rest.Config) (cache.Shar
 		}
 	}
 	handler := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { signal() }, UpdateFunc: func(any, any) { signal() }, DeleteFunc: func(any) { signal() }}
-	if _, err = informer.AddEventHandler(handler); err != nil {
-		return nil, nil, err
+	var synced []cache.InformerSynced
+	for _, resource := range []string{"accessbindings", "clusteraccessbindings"} {
+		informer := factory.ForResource(accessBindingsResource.GroupVersion().WithResource(resource)).Informer()
+		if _, err = informer.AddEventHandler(handler); err != nil {
+			return nil, nil, err
+		}
+		synced = append(synced, informer.HasSynced)
 	}
-	go informer.RunWithContext(ctx)
-	return informer, changes, nil
+	factory.Start(ctx.Done())
+	return synced, changes, nil
 }
 
 // deliverOnChange sends a delivery when the watched state changed, at most
@@ -114,14 +119,21 @@ func (r *Regional) runDeliveries(ctx context.Context, resync <-chan struct{}) {
 			fmt.Fprintln(os.Stderr, "connector access binding watch unavailable")
 		} else {
 			joins = append(joins, goJoined(func() {
-				if !cache.WaitForCacheSync(ctx.Done(), bindings.HasSynced) {
+				if !cache.WaitForCacheSync(ctx.Done(), bindings...) {
 					return
 				}
 				deliverOnChange(ctx, resync, changes, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
 					d, err := r.bindings.AccessBindingDelivery(ctx)
+					if err != nil {
+						d = contracts.AccessBindingDelivery{Unavailable: true}
+					}
+					d = d.Bounded()
 					return d.Digest(), func(ctx context.Context) error {
-						return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))
-					}, err
+						if sendErr := r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d)); sendErr != nil {
+							return sendErr
+						}
+						return err // Retry a failed Kubernetes read from a new complete list.
+					}, nil
 				})
 			}))
 		}

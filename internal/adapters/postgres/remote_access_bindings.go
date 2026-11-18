@@ -28,8 +28,9 @@ type RemoteAccessBindings struct {
 }
 
 type cachedRemoteBindings struct {
-	bindings []cfg.Binding
-	digest   []byte
+	unavailable bool
+	bindings    []cfg.Binding
+	digest      []byte
 }
 
 func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root string) (*RemoteAccessBindings, error) {
@@ -45,12 +46,20 @@ func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root strin
 
 // StoreRemoteBindings confirms the exact predecessor the connector compared.
 // A concurrent commit makes this exchange retry from a fresh workload LIST.
-func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster string, previous time.Time, digest string, bindings []cfg.Binding) error {
+func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster string, previous time.Time, digest string, bindings []cfg.Binding, unavailable bool) error {
 	sum, err := hex.DecodeString(digest)
 	if s == nil || ctx == nil || !cfg.ValidClusterBindings(cluster, bindings) || err != nil || len(sum) != sha256.Size {
 		return cfg.ErrInvalid
 	}
 	body, err := json.Marshal(bindings)
+	// The normalized SQL representation is independently bounded at 32 MiB
+	// by remote_access_binding_delivery_bindings_check.
+	if len(body) > 32<<20 {
+		unavailable = true
+	}
+	if unavailable {
+		body = []byte("[]")
+	}
 	if err != nil {
 		return cfg.ErrInvalid
 	}
@@ -58,9 +67,9 @@ func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster 
 		var rows int64
 		var err error
 		if previous.IsZero() {
-			rows, err = q.InsertRemoteAccessBindings(ctx, custodydb.InsertRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Digest: sum, Bindings: body})
+			rows, err = q.InsertRemoteAccessBindings(ctx, custodydb.InsertRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Digest: sum, Bindings: body, Unavailable: unavailable})
 		} else {
-			rows, err = q.ReplaceRemoteAccessBindings(ctx, custodydb.ReplaceRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Previous: ts(previous), Digest: sum, Bindings: body})
+			rows, err = q.ReplaceRemoteAccessBindings(ctx, custodydb.ReplaceRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Previous: ts(previous), Digest: sum, Bindings: body, Unavailable: unavailable})
 		}
 		if err == nil && rows == 0 {
 			return cfg.ErrChanged
@@ -116,10 +125,10 @@ func (s *RemoteAccessBindings) RemoteBindings(ctx context.Context) ([]cfg.Remote
 				if err := json.Unmarshal(row.Bindings, &bindings); err != nil {
 					return cfg.ErrInvalid
 				}
-				cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest}
+				cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest, unavailable: row.Unavailable}
 			}
 			next[cluster] = cached
-			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Digest: [32]byte(row.Digest), Bindings: cached.bindings})
+			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Digest: [32]byte(row.Digest), Bindings: cached.bindings, Unavailable: cached.unavailable})
 		}
 		return nil
 	})

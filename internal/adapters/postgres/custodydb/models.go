@@ -1110,16 +1110,17 @@ type PermissionReviewSource struct {
 }
 
 type PermissionStream struct {
-	ID               pgtype.UUID
-	Epoch            pgtype.UUID
-	Sequence         int64
-	TrustDigest      []byte
-	ProjectionDigest []byte
-	LeaseUntil       pgtype.Timestamptz
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-	Suspended        bool
-	InitialAuditID   pgtype.UUID
+	ID                  pgtype.UUID
+	Epoch               pgtype.UUID
+	Sequence            int64
+	TrustDigest         []byte
+	ProjectionDigest    []byte
+	LeaseUntil          pgtype.Timestamptz
+	ObservedAt          pgtype.Timestamptz
+	FreshUntil          pgtype.Timestamptz
+	Suspended           bool
+	InitialAuditID      pgtype.UUID
+	UnavailableClusters []string
 }
 
 type PolicyAcceptance struct {
@@ -1422,11 +1423,12 @@ type RecordingSelectionSet struct {
 }
 
 type RemoteAccessBindingDelivery struct {
-	RootID     pgtype.UUID
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	ObservedAt  pgtype.Timestamptz
+	Digest      []byte
+	Bindings    []byte
+	Unavailable bool
 }
 
 type RetentionDecision struct {

@@ -243,6 +243,7 @@ func (p *Permissions) SuspendPermissions(ctx context.Context, f cfg.PermissionFe
 func normalizedBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
 	b.ObservedAt = b.ObservedAt.UTC()
 	b.FreshUntil = b.FreshUntil.UTC()
+	b.UnavailableClusters = slices.Sorted(slices.Values(b.UnavailableClusters))
 	b.UnavailableSources = slices.Sorted(slices.Values(b.UnavailableSources))
 	b.ReviewSources = slices.Clone(b.ReviewSources)
 	slices.SortFunc(b.ReviewSources, func(x, y cfg.ReviewSource) int { return cmp.Compare(x.Resource.UID, y.Resource.UID) })
@@ -497,7 +498,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired))}); err != nil {
 			return err
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
+		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
 			return err
 		}
 		if err = liveStream(ctx, q, s, requested); err != nil {
@@ -544,7 +545,7 @@ func (p *Permissions) RefreshPermissions(ctx context.Context, b cfg.PermissionBa
 		if !b.Current(n.Time) {
 			return cfg.ErrInvalid
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
+		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
 			return err
 		}
 		n, err = q.CurrentTime(ctx)
@@ -610,7 +611,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	if err != nil {
 		return authorization.Projection{}, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
+	if slices.Contains(s.UnavailableClusters, target.ClusterID) || !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
 		return authorization.Projection{}, cfg.ErrUnavailable
 	}
 	reset, err := q.ReadAuthorityAudit(ctx, s.Epoch)

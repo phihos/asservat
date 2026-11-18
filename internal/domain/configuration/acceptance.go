@@ -101,6 +101,11 @@ func (b PermissionBatch) Validate(now time.Time) error {
 	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, len(b.UnavailableSources), 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
 		return ErrInvalid
 	}
+	for i, cluster := range b.UnavailableClusters {
+		if !authorization.UUID(cluster) || (i > 0 && b.UnavailableClusters[i-1] >= cluster) {
+			return ErrInvalid
+		}
+	}
 	if b.SourcesUnavailable && len(b.ReviewSources) > 0 {
 		return ErrInvalid
 	}

@@ -268,7 +268,7 @@ def check_collector(directory):
 
     docs = render(base)
     # ADR-329: the mode=cluster connector lists this cluster's AccessBindings.
-    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
+    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings", "clusteraccessbindings"], "verbs": ["list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
     collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"]
     assert sorted(r["kind"] for r in collector) == ["ConfigMap", "ConfigMap", "DaemonSet", "Namespace", "Role", "RoleBinding", "ServiceAccount"], [r["kind"] for r in collector]
     namespace = next(r for r in collector if r["kind"] == "Namespace")

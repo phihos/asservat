@@ -12,16 +12,17 @@ import (
 )
 
 const insertRemoteAccessBindings = `-- name: InsertRemoteAccessBindings :execrows
-INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-VALUES ($1,$2,statement_timestamp(),$3,$4)
+INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+VALUES ($1,$2,statement_timestamp(),$3,$4,$5)
 ON CONFLICT(root_id,cluster_id) DO NOTHING
 `
 
 type InsertRemoteAccessBindingsParams struct {
-	RootID    pgtype.UUID
-	ClusterID pgtype.UUID
-	Digest    []byte
-	Bindings  []byte
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	Digest      []byte
+	Bindings    []byte
+	Unavailable bool
 }
 
 func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemoteAccessBindingsParams) (int64, error) {
@@ -30,6 +31,7 @@ func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemo
 		arg.ClusterID,
 		arg.Digest,
 		arg.Bindings,
+		arg.Unavailable,
 	)
 	if err != nil {
 		return 0, err
@@ -42,7 +44,7 @@ WITH cached AS (
  SELECT unnest($2::uuid[]) AS cluster_id,
         unnest($3::bytea[]) AS digest
 )
-SELECT d.cluster_id, d.observed_at, d.digest,
+SELECT d.cluster_id, d.observed_at, d.digest, d.unavailable,
        (CASE WHEN d.digest IS DISTINCT FROM c.digest THEN d.bindings END)::bytea AS bindings
 FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
 WHERE d.root_id=$1 ORDER BY d.cluster_id
@@ -55,10 +57,11 @@ type ListRemoteAccessBindingsParams struct {
 }
 
 type ListRemoteAccessBindingsRow struct {
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
+	ClusterID   pgtype.UUID
+	ObservedAt  pgtype.Timestamptz
+	Digest      []byte
+	Unavailable bool
+	Bindings    []byte
 }
 
 // Compare the reader's cached digests within the same database snapshot.
@@ -76,6 +79,7 @@ func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAc
 			&i.ClusterID,
 			&i.ObservedAt,
 			&i.Digest,
+			&i.Unavailable,
 			&i.Bindings,
 		); err != nil {
 			return nil, err
@@ -113,18 +117,20 @@ func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRem
 const replaceRemoteAccessBindings = `-- name: ReplaceRemoteAccessBindings :execrows
 UPDATE remote_access_binding_delivery SET
  observed_at=GREATEST(statement_timestamp(), observed_at + interval '1 microsecond'),
- bindings=CASE WHEN digest=$1 THEN bindings ELSE $2 END,
+ unavailable=CASE WHEN digest=$1 THEN unavailable ELSE $2 END,
+ bindings=CASE WHEN digest=$1 THEN bindings ELSE $3 END,
  digest=$1
-WHERE root_id=$3 AND cluster_id=$4
- AND observed_at=$5
+WHERE root_id=$4 AND cluster_id=$5
+ AND observed_at=$6
 `
 
 type ReplaceRemoteAccessBindingsParams struct {
-	Digest    []byte
-	Bindings  []byte
-	RootID    pgtype.UUID
-	ClusterID pgtype.UUID
-	Previous  pgtype.Timestamptz
+	Digest      []byte
+	Unavailable bool
+	Bindings    []byte
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	Previous    pgtype.Timestamptz
 }
 
 // Every completed exchange, including confirmation, advances the same token.
@@ -132,6 +138,7 @@ type ReplaceRemoteAccessBindingsParams struct {
 func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRemoteAccessBindingsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, replaceRemoteAccessBindings,
 		arg.Digest,
+		arg.Unavailable,
 		arg.Bindings,
 		arg.RootID,
 		arg.ClusterID,

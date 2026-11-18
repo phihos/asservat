@@ -14,10 +14,11 @@ import (
 
 type deliveryServices struct {
 	scriptedServices
-	cluster   string
-	items     int
-	stored    string
-	unchanged bool
+	cluster     string
+	items       int
+	stored      string
+	unchanged   bool
+	unavailable bool
 }
 
 func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) error {
@@ -28,6 +29,7 @@ func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) e
 	if _, _, err = region.ReadAccessBindings(ctx, s.stored); err == nil {
 		return ErrChannel // one delivery per conversation
 	}
+	s.unavailable = d.Unavailable
 	s.cluster, s.items, s.unchanged = region.Presented().ClusterID, len(d.Items), unchanged
 	return nil
 }
@@ -80,6 +82,11 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	services.stored = "0000"
 	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || services.unchanged || services.items != 1000 {
 		t.Fatal("changed delivery", err, services.unchanged, services.items)
+	}
+	oversized := delivery
+	oversized.Items = append(append([]contracts.DeliveredAccessBinding(nil), delivery.Items...), delivery.Items...)
+	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: oversized}); err != nil || result.Kind != "result" || !services.unavailable || services.items != 0 || services.unchanged {
+		t.Fatal("over-budget replacement left the previous observation current", err)
 	}
 	services.stored = ""
 	// A connector without the reader answers with an error.

@@ -15,10 +15,11 @@ import (
 
 // Inheritance is the source-derived part of one prepared permission batch.
 type Inheritance struct {
-	Bases              []value.PermissionBasis
-	UnavailableSources []string
-	SourcesUnavailable bool
-	Namespaces         *value.NamespaceObservation
+	UnavailableClusters []string `json:",omitempty"`
+	Bases               []value.PermissionBasis
+	UnavailableSources  []string
+	SourcesUnavailable  bool
+	Namespaces          *value.NamespaceObservation
 	// RemoteNamespaces are the minimized current observations of joined
 	// clusters other than the hub's (ADR-247), sorted by cluster.
 	RemoteNamespaces []value.NamespaceObservation `json:",omitempty"`
@@ -223,27 +224,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	s.remoteBindingBases(now, &out)
 	// ClusterAccessBindings are read with every LIST (ADR-335 D14).
 	for _, b := range s.clusterBindings {
-		p, ok := bindingBasis(b, now)
-		if !ok {
-			continue
-		}
-		if len(b.NamespaceSelector) == 0 {
-			out.Bases = append(out.Bases, p)
-			continue
-		}
-		// A selector-narrowed binding has one basis per selected namespace.
-		// While its cluster's labels are unknown an allow grants nothing
-		// and a deny covers every namespace.
-		namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID, now))
-		if !known && p.Effect == "Deny" {
-			out.Bases = append(out.Bases, p)
-		}
-		for _, ns := range namespaces {
-			q := p
-			q.Scope.Namespace = ns
-			q.ScopeDigest = PermissionScopeDigest(q)
-			out.Bases = append(out.Bases, q)
-		}
+		s.appendBindingBasis(&out, b, now)
 	}
 	if !s.sourcesComplete {
 		out.SourcesUnavailable = true
@@ -378,5 +359,30 @@ func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source) {
 	}
 	for _, g := range grants {
 		out.Bases = append(out.Bases, WorkloadBasis(src, g))
+	}
+}
+
+// appendBindingBasis applies the same namespace selector to local and delivered bindings.
+func (s *bindingRun) appendBindingBasis(out *inheritanceState, b value.Binding, now time.Time) {
+	p, ok := bindingBasis(b, now)
+	if !ok {
+		return
+	}
+	if len(b.NamespaceSelector) == 0 {
+		out.Bases = append(out.Bases, p)
+		return
+	}
+	// A selector-narrowed binding has one basis per selected namespace.
+	// While its cluster's labels are unknown an allow grants nothing
+	// and a deny covers every namespace.
+	namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID, now))
+	if !known && p.Effect == "Deny" {
+		out.Bases = append(out.Bases, p)
+	}
+	for _, ns := range namespaces {
+		q := p
+		q.Scope.Namespace = ns
+		q.ScopeDigest = PermissionScopeDigest(q)
+		out.Bases = append(out.Bases, q)
 	}
 }

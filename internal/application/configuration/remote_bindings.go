@@ -59,10 +59,13 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 // connector anyway.
 func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState) {
 	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
-		for _, b := range s.remoteBindings[cluster].Bindings {
-			if p, ok := bindingBasis(b, now); ok {
-				out.Bases = append(out.Bases, p)
-			}
+		delivery := s.remoteBindings[cluster]
+		if delivery.Unavailable {
+			out.UnavailableClusters = append(out.UnavailableClusters, cluster)
+			continue
+		}
+		for _, b := range delivery.Bindings {
+			s.appendBindingBasis(out, b, now)
 		}
 	}
 }

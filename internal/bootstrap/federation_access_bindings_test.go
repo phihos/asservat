@@ -30,7 +30,7 @@ type recordedBindings struct {
 	confirmations int
 }
 
-func (r *recordedBindings) StoreRemoteBindings(_ context.Context, cluster string, previous time.Time, digest string, bindings []configuration.Binding) error {
+func (r *recordedBindings) StoreRemoteBindings(_ context.Context, cluster string, previous time.Time, digest string, bindings []configuration.Binding, unavailable bool) error {
 	if previous != time.Unix(1700000000, 0) {
 		return configuration.ErrChanged
 	}
@@ -38,7 +38,7 @@ func (r *recordedBindings) StoreRemoteBindings(_ context.Context, cluster string
 		r.confirmations++
 		return nil
 	}
-	d := configuration.RemoteBindings{ClusterID: cluster, ObservedAt: previous, Bindings: bindings}
+	d := configuration.RemoteBindings{ClusterID: cluster, ObservedAt: previous, Bindings: bindings, Unavailable: unavailable}
 	r.stored, r.digest = append(r.stored, d), digest
 	return nil
 }

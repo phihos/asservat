@@ -171,17 +171,21 @@ Complexity gate:
 3. Typical deployments with more than one cluster.
 4. OCM and Karmada agents report per-cluster state under their own identity
    (above).
-5. Privilege: `get/list/watch accessbindings` on the workload-cluster
+5. Privilege: `list/watch accessbindings,clusteraccessbindings` on the workload-cluster
    connector; the federation's existing `cluster-credential` login gets
    SELECT/INSERT/UPDATE on one table, the hub-worker's `permission-accept`
    login SELECT. No new credential, endpoint, listener or exposure.
 6. Degraded states: one, an unreachable connector (its last delivered set
-   stays in effect until it delivers again); an over-budget cluster grants
-   nothing.
+   stays in effect until it delivers again). A connected reporter unable to send
+   a complete set names that condition in the same authenticated exchange.
+   The projection records just the unavailable cluster IDs beside its existing
+   revision. Fresh decisions for those clusters fail until a complete delivery
+   is accepted. This requires no additional credential, decision-time SQL
+   round trip or background reconciliation.
 7. No configuration.
 8. Depends on the connector reaching the federation, which every
    `mode: cluster` function already needs.
-9. Per cluster: one AccessBinding watch on the member's API server; one
+9. Per cluster: one watch per binding kind on the member's API server; one
    LIST and one lifecycle conversation per change (at most one per second,
    bounded by 8 MiB; typical deliveries are kilobytes), plus one digest
    comparison per connector start; one upsert and one notification per

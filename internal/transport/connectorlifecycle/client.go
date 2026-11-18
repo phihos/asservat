@@ -127,6 +127,7 @@ func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame,
 				_ = out.Send(RegionFrame{Kind: "error"})
 				return zero, ErrChannel
 			}
+			delivery = delivery.Bounded()
 			reply = RegionFrame{Kind: "access-bindings", AccessBindings: &delivery}
 			if frame.Digest != "" && frame.Digest == delivery.Digest() {
 				reply = RegionFrame{Kind: "access-bindings", Unchanged: true}

@@ -159,6 +159,7 @@ func (j *BindingJournal) Confirm(s value.Snapshot, now time.Time) error {
 	return nil
 }
 func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
+	b.UnavailableClusters = slices.Clone(b.UnavailableClusters)
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)
 	b.ReviewSources = slices.Clone(b.ReviewSources)
 	b.Bases = slices.Clone(b.Bases)
@@ -217,6 +218,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	}
 	batch.Bases = append(batch.Bases, inherited.Bases...)
 	batch.Bases = withIssuer(batch.Bases, j.Issuer)
+	batch.UnavailableClusters = slices.Clone(inherited.UnavailableClusters)
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces

@@ -270,7 +270,7 @@ func (q *Queries) LockAuthorityAudit(ctx context.Context, id pgtype.UUID) (Autho
 }
 
 const lockPermissionStream = `-- name: LockPermissionStream :one
-SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id FROM permission_stream WHERE id=$1 FOR UPDATE
+SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id, unavailable_clusters FROM permission_stream WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (PermissionStream, error) {
@@ -287,6 +287,7 @@ func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (Per
 		&i.FreshUntil,
 		&i.Suspended,
 		&i.InitialAuditID,
+		&i.UnavailableClusters,
 	)
 	return i, err
 }
@@ -621,7 +622,7 @@ func (q *Queries) SelectPermissionAssignments(ctx context.Context, arg SelectPer
 }
 
 const sharePermissionStream = `-- name: SharePermissionStream :one
-SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id FROM permission_stream WHERE id=$1 FOR SHARE
+SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id, unavailable_clusters FROM permission_stream WHERE id=$1 FOR SHARE
 `
 
 func (q *Queries) SharePermissionStream(ctx context.Context, id pgtype.UUID) (PermissionStream, error) {
@@ -638,6 +639,7 @@ func (q *Queries) SharePermissionStream(ctx context.Context, id pgtype.UUID) (Pe
 		&i.FreshUntil,
 		&i.Suspended,
 		&i.InitialAuditID,
+		&i.UnavailableClusters,
 	)
 	return i, err
 }
@@ -652,15 +654,16 @@ func (q *Queries) SuspendPermissionStream(ctx context.Context, id pgtype.UUID) e
 }
 
 const updatePermissionStream = `-- name: UpdatePermissionStream :exec
-UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1
+UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,unavailable_clusters=COALESCE($6::text[], '{}'),lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1
 `
 
 type UpdatePermissionStreamParams struct {
-	ID               pgtype.UUID
-	Sequence         int64
-	ProjectionDigest []byte
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Sequence            int64
+	ProjectionDigest    []byte
+	ObservedAt          pgtype.Timestamptz
+	FreshUntil          pgtype.Timestamptz
+	UnavailableClusters []string
 }
 
 // ADR-200 revision (2026-10-23): the live lease holder's accepted observation
@@ -672,6 +675,7 @@ func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissi
 		arg.ProjectionDigest,
 		arg.ObservedAt,
 		arg.FreshUntil,
+		arg.UnavailableClusters,
 	)
 	return err
 }

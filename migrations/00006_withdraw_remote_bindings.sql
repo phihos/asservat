@@ -1,4 +1,8 @@
 -- +goose Up
+ALTER TABLE remote_access_binding_delivery ADD COLUMN unavailable boolean NOT NULL DEFAULT false;
+-- Committed with the permission projection so decisions never use superseded
+-- grants when a replacement observation cannot be represented in full.
+ALTER TABLE permission_stream ADD COLUMN unavailable_clusters text[] NOT NULL DEFAULT '{}';
 -- +goose StatementBegin
 CREATE FUNCTION public.withdraw_remote_bindings(target_root uuid, active_clusters uuid[]) RETURNS void
 LANGUAGE plpgsql STRICT SECURITY DEFINER SET search_path TO pg_catalog, pg_temp AS $$
