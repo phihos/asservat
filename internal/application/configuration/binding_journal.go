@@ -233,12 +233,14 @@ func bindingBasis(b value.Binding, now time.Time) (value.PermissionBasis, bool) 
 func withIssuer(bases []value.PermissionBasis, issuer string) []value.PermissionBasis {
 	out := bases[:0]
 	for _, p := range bases {
-		var subjects []value.Subject
+		seen := make(map[value.Subject]bool, len(p.Subjects))
+		subjects := make([]value.Subject, 0, len(p.Subjects))
 		for _, s := range p.Subjects {
 			if s.Issuer == "" {
 				s.Issuer = issuer
 			}
-			if s.Issuer != "" && !slices.Contains(subjects, s) {
+			if s.Issuer != "" && !seen[s] {
+				seen[s] = true
 				subjects = append(subjects, s)
 			}
 		}
