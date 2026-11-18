@@ -31,7 +31,7 @@ func TestRuntimeRolesCoverAllCompiledPlansWithUniqueNames(t *testing.T) {
 			owner++
 		}
 	}
-	if pub == 0 || configuration != 3 || owner != 1 {
+	if pub == 0 || configuration != len(contracts.ConfigurationRuntimeRolePurposes()) || owner != 1 {
 		t.Fatal("inventory", pub, configuration, owner)
 	}
 	if _, err = RuntimeRoles("not-a-uuid"); err == nil {
