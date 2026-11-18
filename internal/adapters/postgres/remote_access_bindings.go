@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,8 +23,12 @@ type RemoteAccessBindings struct {
 	ledger *Ledger
 	root   string
 	mu     sync.Mutex
-	cache  map[string]cfg.RemoteBindings // by cluster, for the stored digest
-	digest map[string][]byte
+	cache  map[string]cachedRemoteBindings
+}
+
+type cachedRemoteBindings struct {
+	bindings []cfg.Binding
+	digest   []byte
 }
 
 func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root string) (*RemoteAccessBindings, error) {
@@ -36,7 +39,7 @@ func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root strin
 	if err != nil {
 		return nil, err
 	}
-	return &RemoteAccessBindings{ledger: l, root: root, cache: map[string]cfg.RemoteBindings{}, digest: map[string][]byte{}}, nil
+	return &RemoteAccessBindings{ledger: l, root: root}, nil
 }
 
 // StoreRemoteBindings records d with its delivery digest (hex,
@@ -83,38 +86,38 @@ func (s *RemoteAccessBindings) RemoteBindings(ctx context.Context) ([]cfg.Remote
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	params := custodydb.ListRemoteAccessBindingsParams{RootID: id(s.root)}
+	for cluster, cached := range s.cache {
+		params.ClusterIds = append(params.ClusterIds, id(cluster))
+		params.Digests = append(params.Digests, cached.digest)
+	}
 	var out []cfg.RemoteBindings
-	var next map[string]cfg.RemoteBindings
-	var digests map[string][]byte
+	var next map[string]cachedRemoteBindings
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		out, next, digests = nil, map[string]cfg.RemoteBindings{}, map[string][]byte{}
-		rows, err := q.ListRemoteAccessBindingDigests(ctx, id(s.root))
+		rows, err := q.ListRemoteAccessBindings(ctx, params)
 		if err != nil {
 			return err
 		}
+		out = make([]cfg.RemoteBindings, 0, len(rows))
+		next = make(map[string]cachedRemoteBindings, len(rows))
 		for _, row := range rows {
 			cluster := uid(row.ClusterID)
-			d, known := s.cache[cluster]
-			d.ObservedAt = row.ObservedAt.Time
-			if !known || !bytes.Equal(s.digest[cluster], row.Digest) {
-				full, err := q.ReadRemoteAccessBindings(ctx, custodydb.ReadRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: row.ClusterID})
-				if err != nil {
-					return err
+			cached := s.cache[cluster]
+			if row.Bindings != nil {
+				var bindings []cfg.Binding
+				if err := json.Unmarshal(row.Bindings, &bindings); err != nil {
+					return cfg.ErrInvalid
 				}
-				d = cfg.RemoteBindings{ClusterID: cluster, ObservedAt: full.ObservedAt.Time}
-				if json.Unmarshal(full.Bindings, &d.Bindings) != nil {
-					continue // an unreadable row grants and denies nothing
-				}
-				row.Digest = full.Digest
+				cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest}
 			}
-			next[cluster], digests[cluster] = d, row.Digest
-			out = append(out, d)
+			next[cluster] = cached
+			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Bindings: cached.bindings})
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, permissionError(err)
 	}
-	s.cache, s.digest = next, digests
+	s.cache = next
 	return out, nil
 }

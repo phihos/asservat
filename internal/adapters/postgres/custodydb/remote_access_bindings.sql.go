@@ -11,26 +11,47 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const listRemoteAccessBindingDigests = `-- name: ListRemoteAccessBindingDigests :many
-SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id
+const listRemoteAccessBindings = `-- name: ListRemoteAccessBindings :many
+WITH cached AS (
+ SELECT unnest($2::uuid[]) AS cluster_id,
+        unnest($3::bytea[]) AS digest
+)
+SELECT d.cluster_id, d.observed_at, d.digest,
+       (CASE WHEN d.digest IS DISTINCT FROM c.digest THEN d.bindings END)::bytea AS bindings
+FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
+WHERE d.root_id=$1 ORDER BY d.cluster_id
 `
 
-type ListRemoteAccessBindingDigestsRow struct {
+type ListRemoteAccessBindingsParams struct {
+	RootID     pgtype.UUID
+	ClusterIds []pgtype.UUID
+	Digests    [][]byte
+}
+
+type ListRemoteAccessBindingsRow struct {
 	ClusterID  pgtype.UUID
 	ObservedAt pgtype.Timestamptz
 	Digest     []byte
+	Bindings   []byte
 }
 
-func (q *Queries) ListRemoteAccessBindingDigests(ctx context.Context, rootID pgtype.UUID) ([]ListRemoteAccessBindingDigestsRow, error) {
-	rows, err := q.db.Query(ctx, listRemoteAccessBindingDigests, rootID)
+// Compare the reader's cached digests within the same database snapshot.
+// Only a missing or changed delivery returns its potentially large document.
+func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAccessBindingsParams) ([]ListRemoteAccessBindingsRow, error) {
+	rows, err := q.db.Query(ctx, listRemoteAccessBindings, arg.RootID, arg.ClusterIds, arg.Digests)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRemoteAccessBindingDigestsRow{}
+	items := []ListRemoteAccessBindingsRow{}
 	for rows.Next() {
-		var i ListRemoteAccessBindingDigestsRow
-		if err := rows.Scan(&i.ClusterID, &i.ObservedAt, &i.Digest); err != nil {
+		var i ListRemoteAccessBindingsRow
+		if err := rows.Scan(
+			&i.ClusterID,
+			&i.ObservedAt,
+			&i.Digest,
+			&i.Bindings,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -55,28 +76,6 @@ func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRem
 	var digest []byte
 	err := row.Scan(&digest)
 	return digest, err
-}
-
-const readRemoteAccessBindings = `-- name: ReadRemoteAccessBindings :one
-SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
-`
-
-type ReadRemoteAccessBindingsParams struct {
-	RootID    pgtype.UUID
-	ClusterID pgtype.UUID
-}
-
-type ReadRemoteAccessBindingsRow struct {
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
-}
-
-func (q *Queries) ReadRemoteAccessBindings(ctx context.Context, arg ReadRemoteAccessBindingsParams) (ReadRemoteAccessBindingsRow, error) {
-	row := q.db.QueryRow(ctx, readRemoteAccessBindings, arg.RootID, arg.ClusterID)
-	var i ReadRemoteAccessBindingsRow
-	err := row.Scan(&i.ObservedAt, &i.Digest, &i.Bindings)
-	return i, err
 }
 
 const storeRemoteAccessBindings = `-- name: StoreRemoteAccessBindings :execrows

@@ -54,7 +54,9 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	foreign := value.RemoteBindings{ClusterID: "33333333-3333-4333-8333-333333333333", ObservedAt: now, Bindings: []value.Binding{remoteBinding(remoteCluster, "mislabelled", "uid-x", "Allow")}}
 	reader := &remoteBindingFixture{deliveries: []value.RemoteBindings{delivery, own, foreign}}
 	s.r.RemoteBindings = reader
-	s.refreshRemoteBindings(ctx)
+	if err := s.refreshRemoteBindings(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.accept(ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -67,10 +69,13 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 			t.Fatalf("hub-cluster row or mislabelled delivery accepted: %+v", p.Resource)
 		}
 	}
-	// A failed read keeps the last delivery, and an old delivery keeps its
-	// allows: no expiry.
+	// A failed read leaves the cache intact but stops the epoch. An old
+	// valid delivery still grants until the connector replaces it.
 	reader.err = errors.New("sql unavailable")
-	s.refreshRemoteBindings(ctx)
+	if err := s.refreshRemoteBindings(ctx); !errors.Is(err, reader.err) {
+		t.Fatal("missing remote binding read error", err)
+	}
+	reader.err = nil
 	d := s.remoteBindings[remoteCluster]
 	d.ObservedAt = s.r.Now().Add(-time.Hour)
 	s.remoteBindings[remoteCluster] = d
@@ -84,12 +89,16 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	// deny removes it.
 	reader.err = nil
 	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: d.ObservedAt.Add(-time.Second)}}
-	s.refreshRemoteBindings(ctx)
+	if err := s.refreshRemoteBindings(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if len(s.remoteBindings[remoteCluster].Bindings) != 3 {
 		t.Fatal("older delivery replaced the newer one")
 	}
 	reader.deliveries = []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: s.r.Now()}}
-	s.refreshRemoteBindings(ctx)
+	if err := s.refreshRemoteBindings(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.accept(ctx, false); err != nil {
 		t.Fatal(err)
 	}
@@ -136,4 +145,39 @@ type countingRemoteBindings struct {
 func (r *countingRemoteBindings) RemoteBindings(ctx context.Context) ([]value.RemoteBindings, error) {
 	r.reads++
 	return r.remoteBindingFixture.RemoteBindings(ctx)
+}
+
+type remoteBindingReadFunc func(context.Context) ([]value.RemoteBindings, error)
+
+func (f remoteBindingReadFunc) RemoteBindings(ctx context.Context) ([]value.RemoteBindings, error) {
+	return f(ctx)
+}
+
+func TestRemoteBindingReadFailureSuspendsBeforeAcceptance(t *testing.T) {
+	for _, fail := range []string{"startup", "notification"} {
+		t.Run(fail, func(t *testing.T) {
+			f, r := reconciliationTest(t)
+			changes := make(chan struct{}, 1)
+			changes <- struct{}{}
+			r.RemoteBindingChanges = changes
+			cause := errors.New("remote database unavailable")
+			reads := 0
+			r.RemoteBindings = remoteBindingReadFunc(func(ctx context.Context) ([]value.RemoteBindings, error) {
+				reads++
+				if fail == "startup" || reads > 1 {
+					return nil, cause
+				}
+				return []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: r.Now(), Bindings: []value.Binding{remoteBinding(remoteCluster, "readers", "uid-reader", "Allow")}}}, nil
+			})
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			result := r.RunEpoch(ctx)
+			if !errors.Is(result.Err, cause) || !result.Suspended || len(f.accepted) != reads-1 {
+				t.Fatalf("failed read: %v, suspended %t, %d reads, %d snapshots accepted", result.Err, result.Suspended, reads, len(f.accepted))
+			}
+			if fail == "notification" && (reads != 2 || remoteBases(f.accepted[0], remoteCluster)["readers"] != "Allow") {
+				t.Fatal("expected an allow only in the initial snapshot")
+			}
+		})
+	}
 }

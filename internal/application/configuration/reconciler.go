@@ -344,7 +344,9 @@ func (s *bindingRun) start(ctx context.Context) error {
 	s.journal.Issuer = s.r.Issuer
 	// The joined clusters' stored deliveries, before the first acceptance
 	// (ADR-329): later changes arrive as RemoteBindingChanges.
-	s.refreshRemoteBindings(ctx)
+	if err := s.refreshRemoteBindings(ctx); err != nil {
+		return err
+	}
 	if err = s.accept(ctx, false); err != nil {
 		return reconcileStep("accept", err)
 	}
@@ -475,7 +477,9 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 		case <-s.r.RemoteBindingChanges:
 			// ADR-329: a stored delivery changed (or the notification
 			// connection was re-established): reread and accept.
-			s.refreshRemoteBindings(ctx)
+			if err := s.refreshRemoteBindings(ctx); err != nil {
+				return err
+			}
 			if err := s.accept(ctx, false); err != nil {
 				return reconcileStep("accept", err)
 			}

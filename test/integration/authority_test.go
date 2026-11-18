@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"slices"
@@ -53,6 +54,34 @@ func (k authorityTestKeys) Open(ctx context.Context, key artifact.SealedKey, ad 
 	}
 	return k.a.Open(nil, b[:k.a.NonceSize()], b[k.a.NonceSize():], ad)
 }
+
+// Delay each client write so a serial document query per cluster exceeds the
+// production reconciler's three-second refresh window.
+type delayedPermissionConn struct{ net.Conn }
+
+func (c delayedPermissionConn) Write(b []byte) (int, error) {
+	time.Sleep(20 * time.Millisecond)
+	return c.Conn.Write(b)
+}
+
+type remoteBindingHubFixture struct{ cluster string }
+
+func (f remoteBindingHubFixture) PermissionSnapshot(context.Context) (cfg.Snapshot, error) {
+	now := time.Now()
+	return cfg.Snapshot{ClusterID: f.cluster, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: f.cluster}, BindingResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
+}
+
+func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.PermissionTrust, error) {
+	now := time.Now()
+	return configapp.PermissionTrust{Digest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
+}
+
+var errBaselineAccepted = errors.New("test stops at watch after initial acceptance")
+
+func (remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
+	return nil, errBaselineAccepted
+}
+
 func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -251,9 +280,36 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	}
 	t.Run("remote-bindings-after-fleet-grows", func(t *testing.T) {
 		root := custodyID()
-		reader, err := postgres.NewRemoteAccessBindings(ctx, pool, root)
+		slow := pool.Config()
+		dial := slow.ConnConfig.DialFunc
+		slow.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := dial(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			return delayedPermissionConn{conn}, nil
+		}
+		slowPool, err := pgxpool.NewWithConfig(ctx, slow)
 		if err != nil {
 			t.Fatal(err)
+		}
+		defer slowPool.Close()
+		reader, err := postgres.NewRemoteAccessBindings(ctx, slowPool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store, err := postgres.NewPermissions(ctx, pool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hub := remoteBindingHubFixture{cluster: custodyID()}
+		reconciler := configapp.BindingReconciler{RootID: root, NamespaceClusterID: hub.cluster, Reader: hub, Watcher: hub, Trust: hub, RemoteBindings: reader, Store: store, NewID: custodyID, Now: time.Now}
+		reconcile := func() {
+			t.Helper()
+			result := reconciler.RunEpoch(ctx)
+			if !errors.Is(result.Err, errBaselineAccepted) || !result.Suspended {
+				t.Fatalf("reconcile remote deliveries: %v (suspended %t)", result.Err, result.Suspended)
+			}
 		}
 		const cluster = "ffffffff-ffff-4fff-8fff-ffffffffffff"
 		ns := cfg.NamespaceRef{Name: "payments", UID: custodyID()}
@@ -270,28 +326,42 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)`, root, cluster, body); err != nil {
 			t.Fatal(err)
 		}
-		rows, err := reader.RemoteBindings(ctx)
-		if err != nil || len(rows) != 1 || !rows[0].Valid() || len(rows[0].Bindings) != 1 || rows[0].Bindings[0].Resource.UID != binding.Resource.UID {
-			t.Fatal("initial binding delivery", rows, err)
+		reconcile()
+		checkAssignments := func(cluster string, want int) {
+			t.Helper()
+			var count int
+			err := admin.QueryRow(ctx, `SELECT count(*) FROM permission_assignment a JOIN permission_basis b
+				ON b.stream_id=a.stream_id AND b.basis_key=a.basis_key WHERE a.stream_id=$1 AND b.cluster_id=$2 AND a.retired_at IS NULL`, root, cluster).Scan(&count)
+			if err != nil || count != want {
+				t.Fatalf("active assignments for %s: got %d, want %d: %v", cluster, count, want, err)
+			}
 		}
+		checkAssignments(cluster, 1)
 		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-			SELECT $1, ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, clock_timestamp(), sha256('[]'::bytea), '[]'::bytea FROM generate_series(1,64) AS i`, root); err != nil {
+			SELECT $1, ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, clock_timestamp(), sha256('[]'::bytea), '[]'::bytea FROM generate_series(1,200) AS i`, root); err != nil {
 			t.Fatal(err)
 		}
 		if _, err = admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET observed_at=clock_timestamp(), digest=sha256('[]'::bytea), bindings='[]'::bytea
 			WHERE root_id=$1 AND cluster_id=$2`, root, cluster); err != nil {
 			t.Fatal(err)
 		}
-		rows, err = reader.RemoteBindings(ctx)
-		if err != nil || len(rows) != 65 {
-			t.Fatalf("expected all 65 deliveries after removal, got %d: %v", len(rows), err)
+		const newlyJoined = "00000000-0000-4000-8000-000000000200"
+		binding.Scope.ClusterID, binding.Resource.ClusterID = newlyJoined, newlyJoined
+		binding.Resource.UID = custodyID()
+		body, err = json.Marshal([]cfg.Binding{binding})
+		if err != nil {
+			t.Fatal(err)
 		}
-		for _, row := range rows {
-			if row.ClusterID == cluster && row.Valid() && len(row.Bindings) == 0 {
-				return
-			}
+		if _, err = admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET observed_at=clock_timestamp(),digest=sha256($3::bytea),bindings=$3
+			WHERE root_id=$1 AND cluster_id=$2`, root, newlyJoined, body); err != nil {
+			t.Fatal(err)
 		}
-		t.Fatal("missing replacement of the previously populated binding set")
+		// The second read is unchanged and must reuse the decoded documents.
+		for range 2 {
+			reconcile()
+			checkAssignments(cluster, 0)
+			checkAssignments(newlyJoined, 1)
+		}
 	})
 	// ADR-237: the impact preview reads every workload cell of the affected
 	// namespace from the same accepted projection, and the real evaluator

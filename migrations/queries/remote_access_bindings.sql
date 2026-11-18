@@ -8,11 +8,17 @@ ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,d
 WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
  OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest);
 
--- name: ListRemoteAccessBindingDigests :many
-SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id;
-
--- name: ReadRemoteAccessBindings :one
-SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;
+-- name: ListRemoteAccessBindings :many
+-- Compare the reader's cached digests within the same database snapshot.
+-- Only a missing or changed delivery returns its potentially large document.
+WITH cached AS (
+ SELECT unnest(sqlc.arg(cluster_ids)::uuid[]) AS cluster_id,
+        unnest(sqlc.arg(digests)::bytea[]) AS digest
+)
+SELECT d.cluster_id, d.observed_at, d.digest,
+       (CASE WHEN d.digest IS DISTINCT FROM c.digest THEN d.bindings END)::bytea AS bindings
+FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
+WHERE d.root_id=sqlc.arg(root_id) ORDER BY d.cluster_id;
 
 -- name: ReadRemoteAccessBindingDigest :one
 SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;
