@@ -53,7 +53,7 @@ func (p DownloadPolicy) DownloadValid(now time.Time) bool {
 func (p DownloadPolicy) WellFormed() bool {
 	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.RecoveryEpoch) || !p.Revision.Valid() ||
 		!ProcessingOrganizationsValid(p.Processors) || p.PermittedRegions == nil || !identity.Strings(p.PermittedRegions, 64, 63) ||
-		p.Paths == nil || len(p.Paths) > 32 || p.Clients == nil || len(p.Clients) > 64 {
+		p.Paths == nil || p.Clients == nil || len(p.Clients) > 64 {
 		return false
 	}
 	paths := map[string]bool{}
@@ -72,7 +72,7 @@ func (p DownloadPolicy) WellFormed() bool {
 		if !identity.Text(c.Issuer, 2048) || !identity.Text(c.ID, 256) || !identity.ValidKind(c.Kind) || clients[key] ||
 			c.DataClasses == nil || !identity.Strings(c.DataClasses, 3, 32) || c.PrivacyClasses == nil || !identity.Strings(c.PrivacyClasses, 1, 32) ||
 			c.EvidenceTypes == nil || !identity.Strings(c.EvidenceTypes, 5, 32) || c.Purposes == nil || !identity.Strings(c.Purposes, 32, 128) ||
-			c.PathIDs == nil || !identity.Strings(c.PathIDs, 32, 36) {
+			!validClientPaths(c.PathIDs, paths) {
 			return false
 		}
 		clients[key] = true
@@ -93,11 +93,6 @@ func (p DownloadPolicy) WellFormed() bool {
 				return false
 			}
 		}
-		for _, v := range c.PathIDs {
-			if !paths[v] {
-				return false
-			}
-		}
 	}
 	operators := map[ProcessingOperator]bool{}
 	for _, o := range p.Operators {
@@ -105,6 +100,20 @@ func (p DownloadPolicy) WellFormed() bool {
 			return false
 		}
 		operators[o] = true
+	}
+	return true
+}
+
+func validClientPaths(ids []string, installed map[string]bool) bool {
+	if ids == nil || len(ids) > len(installed) {
+		return false
+	}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if !installed[id] || seen[id] {
+			return false
+		}
+		seen[id] = true
 	}
 	return true
 }

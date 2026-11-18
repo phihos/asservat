@@ -50,7 +50,7 @@ func downloadEnvironmentPaths(installation, hub string, pinned []contracts.Downl
 	if template == nil || pinned == nil {
 		return capacityRuntimeProcessingPaths(pinned)
 	}
-	if !authorization.UUID(installation) || !downloadPathTemplate(*template, hub) || len(targets) > 32 {
+	if !authorization.UUID(installation) || !downloadPathTemplate(*template, hub) {
 		return nil, mounts.ErrUnavailable
 	}
 	all := slices.Clone(pinned)
@@ -77,7 +77,7 @@ func catalogTargets(c contracts.OwnerClusterCatalog) []string {
 
 func capacityRuntimeProcessingPaths(in []contracts.DownloadEnvironmentPath) ([]privacy.DownloadPath, error) {
 	// ADR-192: an empty set is valid; pinned paths only narrow a source.
-	if in == nil || len(in) > 32 {
+	if in == nil {
 		return nil, mounts.ErrUnavailable
 	}
 	seen := map[string]bool{}
