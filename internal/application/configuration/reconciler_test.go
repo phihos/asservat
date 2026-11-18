@@ -258,3 +258,70 @@ func TestBindingExpiresDuringQuietWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type permissionSnapshotFunc func(context.Context) (value.Snapshot, error)
+
+func (read permissionSnapshotFunc) PermissionSnapshot(ctx context.Context) (value.Snapshot, error) {
+	return read(ctx)
+}
+
+func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
+	f, r := reconciliationTest(t)
+	store := expiryPermissionStore{f, make(chan value.PermissionBatch, 4)}
+	r.Store = store
+	var reads int
+	r.Reader = permissionSnapshotFunc(func(context.Context) (value.Snapshot, error) {
+		reads++
+		snapshot := f.snapshot
+		snapshot.ObservedAt = r.Now()
+		snapshot.FreshUntil = snapshot.ObservedAt.Add(5 * time.Second)
+		snapshot.SourcesComplete = reads != 2
+		if snapshot.SourcesComplete {
+			snapshot.Sources = []value.Source{inheritanceSource()}
+		}
+		return snapshot, nil
+	})
+	changes := make(chan struct{}, 1)
+	r.ConfigurationChanges = changes
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	s := &bindingRun{r: r}
+	if err := s.start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	assertBatch := func(incomplete bool) {
+		t.Helper()
+		select {
+		case b := <-store.transitions:
+			if b.SourcesUnavailable != incomplete || len(b.Bases) != 1 {
+				t.Fatal("unexpected source or explicit binding state", b.SourcesUnavailable, len(b.Bases))
+			}
+		case <-ctx.Done():
+			t.Fatal("no source transition")
+		}
+	}
+	assertBatch(false)
+	ticks := make(chan time.Time)
+	done := make(chan error, 1)
+	go func() { done <- s.consume(ctx, &fixtureWatch{}, ticks) }()
+	defer func() { cancel(); <-done }()
+	changes <- struct{}{}
+	assertBatch(true)
+	select {
+	case ticks <- time.Now():
+	case <-ctx.Done():
+		t.Fatal("renewal not read")
+	}
+	assertBatch(false)
+	// After the source LIST succeeds, another renewal performs no LIST.
+	for range 2 {
+		select {
+		case ticks <- time.Now():
+		case <-ctx.Done():
+			t.Fatal("renewal not read")
+		}
+	}
+	if reads != 3 {
+		t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads)
+	}
+}

@@ -513,6 +513,13 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 				return reconcileStep("renew", err)
 			}
 			s.fence = fence
+			// A failed PermissionSource LIST carries no change event when
+			// Kubernetes recovers. Retry it at the next lease renewal.
+			if !s.sourcesComplete {
+				if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
+					return reconcileStep("retry-sources", err)
+				}
+			}
 		case <-expires:
 			s.refreshRemote(ctx)
 			s.refreshWorkloads(ctx)

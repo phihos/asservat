@@ -111,6 +111,8 @@ An operation requires an eligible identity, a current allow, no deny, local ceil
 
 The evaluator reads one snapshot: the hub cluster's informer caches and each remote cluster's last delivered state. It stays valid until an event replaces it. State that is not yet available (during a hub relist, or before a connector's first delivery) grants nothing and fails closed for that cluster. An operation reuses its snapshot for at most 30 s ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
 
+When Kubernetes reports lost namespace watch history, namespace-derived access is unavailable until the relist completes. Explicit AccessBindings and observations from other clusters remain usable. The hub retries an incomplete PermissionSource list at its next permission lease renewal, even when the objects have stayed unchanged.
+
 The hub follows the local AccessBinding list with a sustained Kubernetes watch.
 Each watch event has its own byte budget. Idle time, total stream bytes, and
 the number of local bindings do not end an otherwise valid watch. On a

@@ -925,6 +925,9 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("missed history preserved")
 		}
 	})
+	t.Run("namespace-relist-withdraws-only-derived-access", func(t *testing.T) {
+		qualifyBlockedNamespaceRelist(t, pool, flush)
+	})
 	t.Run("namespace-observation-is-separate-from-source-version", func(t *testing.T) {
 		s := create(t)
 		s.b.Bases[0].Resource.Kind = "PermissionSource"

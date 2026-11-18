@@ -33,9 +33,10 @@ type Inheritance struct {
 // namespaceItem is one ordered delivery of the namespace feed: a complete
 // LIST, a watch transition or the start time of a cleanly ended session.
 type namespaceItem struct {
-	list  *value.NamespaceList
-	event *value.NamespaceEvent
-	fresh time.Time
+	historyLost bool
+	list        *value.NamespaceList
+	event       *value.NamespaceEvent
+	fresh       time.Time
 }
 
 // runNamespaceFeed lists the namespaces once, then follows them with finite
@@ -97,8 +98,14 @@ func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.Names
 					continue
 				}
 			}
-			if errors.Is(err, value.ErrChanged) || !pause() {
+			if errors.Is(err, value.ErrChanged) {
+				if !send(namespaceItem{historyLost: true}) {
+					return
+				}
 				break
+			}
+			if !pause() {
+				return
 			}
 		}
 	}
@@ -168,22 +175,22 @@ func (s *bindingRun) feedItems() <-chan namespaceItem {
 // storage error ends the epoch before any later transition is accepted.
 func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error {
 	switch {
+	case it.historyLost:
+		s.namespaces = nil
 	case it.list != nil:
 		j, err := NewNamespaceJournal(*it.list)
 		if err != nil {
 			s.restartFeed(ctx, s.feed.keys)
-			return nil
+		} else {
+			s.namespaces, s.continuity = j, s.continuity+1
 		}
-		s.namespaces, s.continuity = j, s.continuity+1
 	case it.event != nil:
 		if s.namespaces == nil {
 			return nil
 		}
 		if err := s.namespaces.Apply(*it.event); err != nil {
 			s.restartFeed(ctx, s.feed.keys)
-			return nil
-		}
-		if it.event.Type == "BOOKMARK" {
+		} else if it.event.Type == "BOOKMARK" {
 			return nil
 		}
 	default:
