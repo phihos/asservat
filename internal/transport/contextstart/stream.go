@@ -139,7 +139,7 @@ func (s *frameStream) beginFrame(ctx context.Context, read bool, mode framePeerM
 		reason = streamClosed
 	} else if err := s.ctx.Err(); err != nil {
 		reason = streamErrorReason(err)
-	} else if !read && s.frames >= contracts.APIContextMaximumFrames {
+	} else if !read && s.frames >= (contracts.APIContextMaximumWorkFrames+contracts.APIContextFramesPerQuery*s.querySeq) {
 		reason = streamBudget
 	} else if read && s.reads != 0 || !read && s.writes != 0 {
 		reason = streamBusy
@@ -240,7 +240,7 @@ func (s *frameStream) beginFrame(ctx context.Context, read bool, mode framePeerM
 func (s *frameStream) count(n int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || n < 0 || s.frames >= contracts.APIContextMaximumFrames || s.bytes > contracts.APIContextMaximumExchangeBytes-n {
+	if s.closed || n < 0 || s.frames >= (contracts.APIContextMaximumWorkFrames+contracts.APIContextFramesPerQuery*s.querySeq) || s.bytes > contracts.APIContextMaximumExchangeBytes-n {
 		return false
 	}
 	s.frames++

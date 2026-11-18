@@ -37,14 +37,12 @@ Source delivery is already a single exchange: one signed work, one
    Native run 41180024841 showed previews and recorder resolution refused
    while the exhausted standby idled.
 5. The dedicated source-work frame (kind 40), its attachment path and its
-   receipt are removed. Source work counts against the existing eight queries
-   per standby.
+   receipt are removed. Source work counts against the exchange's byte budget.
 
 ## Consequences
 
 Saves and other context starts no longer race source traffic for the
 standby; ADR-209 is unchanged. No state, configuration, privilege or
-fallback is added. Source traffic stays one round trip per source per tick
-and retires one standby per eight queries instead of one per delivery. The region no longer
+fallback is added. A source query takes one round trip and leaves the exchange available for later work. The region no longer
 receives a receipt for its reply; it never acted on one. Hub and region must
 run the same version, as for any frame change before the first release.

@@ -121,14 +121,6 @@ func TestRouterRefusesIneligibleDemandBeforeSignallingConnector(t *testing.T) {
 		t.Error("refused request signalled the connector")
 		return nil
 	}
-	short, end := context.WithTimeout(t.Context(), time.Second)
-	defer end()
-	if _, err := router.Query(short, cluster, queryResolvePod, nil, nil); !errors.Is(err, fleet.ErrUnavailable) {
-		t.Fatal("query without room for an exchange", err)
-	}
-	if _, err := router.Attach(short, cluster, work.CaptureID); !errors.Is(err, fleet.ErrUnavailable) {
-		t.Fatal("capture without room for an exchange", err)
-	}
 	long, stop := context.WithTimeout(t.Context(), 6*time.Second)
 	defer stop()
 	if _, err := router.Query(long, cluster, queryResolvePod, nil, nil); !errors.Is(err, fleet.ErrInvalid) {
@@ -256,4 +248,104 @@ func TestForeignOwnerDemandReleasesSingleConnectorSlot(t *testing.T) {
 			})
 		})
 	}
+}
+
+// The sole connector slot may already be opening for A when B requests it.
+func TestForeignDemandBeforeRegistrationReleasesAfterOriginalQuery(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := workFixture().Work
+		cluster := w.Channel.Connector.Binding.ClusterID
+		first, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		second, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		defer first.Close()
+		defer second.Close()
+		first.RequestExchange = func(context.Context, string) error { return nil }
+		second.RequestExchange = func(context.Context, string) error { first.YieldIdle(cluster); return nil }
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		query := func(r *Router) <-chan error {
+			done := make(chan error, 1)
+			go func() { _, err := r.Query(ctx, cluster, queryResolvePod, nil, nil); done <- err }()
+			synctest.Wait()
+			return done
+		}
+		register := func(r *Router) *Standby {
+			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(time.Now(), identity.Recheck)}
+			s, err := r.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s
+		}
+		a := query(first)
+		b := query(second)
+		s := register(first)
+		defer s.Finish()
+		job := <-s.query
+		if s.ctx.Err() != nil {
+			t.Fatal("cancelled local demand before delivery")
+		}
+		job.result <- queryResult{until: time.Now().Add(time.Second)}
+		if err := <-a; err != nil {
+			t.Fatal(err)
+		}
+		if s.ctx.Err() == nil {
+			t.Fatal("first replica kept the one connector slot after its query")
+		}
+		s.Finish()
+		next := register(second)
+		defer next.Finish()
+		job = <-next.query
+		job.result <- queryResult{until: time.Now().Add(time.Second)}
+		if err := <-b; err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestColdAttachSharesCallerDeadlineWithPublishedDemand(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := workFixture().Work
+		cluster := w.Channel.Connector.Binding.ClusterID
+		router, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		defer router.Close()
+		deadline := time.Now().Add(9 * time.Second)
+		ctx, cancel := context.WithDeadline(t.Context(), deadline)
+		defer cancel()
+		var demand context.Context
+		router.RequestExchange = func(c context.Context, _ string) error { demand = c; return nil }
+		result := make(chan *Attachment, 1)
+		go func() { a, _ := router.Attach(ctx, cluster, w.CaptureID); result <- a }()
+		synctest.Wait()
+		if until, ok := demand.Deadline(); !ok || !until.Equal(deadline) {
+			t.Fatal("hint has another lifetime", until)
+		}
+		time.Sleep(6 * time.Second)
+		select {
+		case <-result:
+			t.Fatal("gave up while original demand remained live")
+		default:
+		}
+		r := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(time.Now(), identity.Recheck)}
+		s, err := router.RegisterStandby(t.Context(), r, func(context.Context) (fleet.APIContextReceiver, error) { return r, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := <-result
+		if a == nil {
+			t.Fatal("lost live attachment")
+		}
+		s.Finish()
+		defer a.Close()
+		r.Channel.ExchangeID = "00000000-0000-4000-8000-000000000098"
+		if late, err := router.RegisterStandby(t.Context(), r, func(context.Context) (fleet.APIContextReceiver, error) { return r, nil }); late != nil || !errors.Is(err, fleet.ErrUnavailable) {
+			if late != nil {
+				late.Finish()
+			}
+			t.Fatal("orphan opening occupied connector capacity", err)
+		}
+		if until, _ := a.ctx.Deadline(); !until.Equal(deadline) || demand.Err() == nil {
+			t.Fatal("attachment changed its original bound or left demand pending", until)
+		}
+	})
 }

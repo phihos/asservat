@@ -176,7 +176,7 @@ func TestLiveManualRegionalCompactReplyRebindsSixteenOriginals(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || len(got) != 16 || standby.queries != 1 {
+			if err != nil || len(got) != 16 {
 				t.Fatal("compact original batch refused", len(got), err)
 			}
 			for n, p := range got {

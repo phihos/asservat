@@ -177,7 +177,7 @@ func (s *frameStream) nextQuery() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next := s.querySeq + 1
-	if s.closed || next > contracts.APIContextMaximumQueries {
+	if s.closed {
 		return 0, contracts.ErrAPIContextProtocol
 	}
 	s.querySeq = next

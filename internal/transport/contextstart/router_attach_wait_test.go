@@ -156,9 +156,6 @@ func TestRouterAttachmentWaitPreservesRefusals(t *testing.T) {
 			t.Fatalf("expected immediate %v, got %v in %s", want, e, time.Since(began))
 		}
 	}
-	short, end := context.WithTimeout(t.Context(), time.Second)
-	defer end()
-	immediate(short, w.Authority.Expectation.CaptureID, fleet.ErrUnavailable)
 	immediate(t.Context(), w.Authority.Expectation.CaptureID, fleet.ErrInvalid)
 	ctx, cancel := context.WithTimeout(t.Context(), 4500*time.Millisecond)
 	defer cancel()
@@ -188,16 +185,14 @@ func TestRouterAttachmentWaitPreservesRefusals(t *testing.T) {
 	a.Close()
 	second.Finish()
 	other.Close()
-	// A missing replacement exhausts only the original wait allowance, leaving
-	// the full query reserve and no capture reservation behind.
-	tail, endTail := context.WithTimeout(t.Context(), queryReserve+150*time.Millisecond)
+	// A missing replacement consumes no capture reservation and cannot outlast its caller.
+	tail, endTail := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	began := time.Now()
 	_, e = router.Attach(tail, cluster, w.Authority.Expectation.CaptureID)
 	elapsed := time.Since(began)
-	deadline, _ := tail.Deadline()
 	endTail()
-	if !errors.Is(e, fleet.ErrUnavailable) || elapsed < 100*time.Millisecond || elapsed > 500*time.Millisecond || time.Until(deadline) < 2*time.Second {
-		t.Fatal("wait consumed query reserve", e, elapsed)
+	if !errors.Is(e, fleet.ErrUnavailable) || elapsed < 100*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatal("wait exceeded caller deadline", e, elapsed)
 	}
 	waitCtx, stop := context.WithTimeout(t.Context(), 4500*time.Millisecond)
 	done := make(chan error, 1)

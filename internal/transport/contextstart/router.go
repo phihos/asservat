@@ -9,7 +9,6 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -20,11 +19,12 @@ import (
 type exchangeWait struct {
 	ctx     context.Context
 	cluster string
+	yield   bool // Another replica needs this slot after the local query.
 }
 
 func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
 	call, cancel := context.WithCancel(ctx)
-	w := &exchangeWait{call, cluster}
+	w := &exchangeWait{ctx: call, cluster: cluster}
 	r.mu.Lock()
 	if r.waiting == nil {
 		r.waiting = make(map[string]map[*exchangeWait]bool)
@@ -94,16 +94,12 @@ type Router struct {
 	captures        map[string]*Attachment
 	serial          uint64
 	// registered is closed and replaced when a standby registers or a query
-	// releases it, so a waiting query can retry within its original reserve.
+	// releases it, so a waiting query can retry within its original deadline.
 	registered chan struct{}
 	// lastAttach is when each cluster's latest attachment took a standby;
 	// diagnostic only (AttachState).
 	lastAttach map[string]time.Time
 }
-
-// queryReserve is the part of a query's original deadline kept for the query
-// itself and the caller's later checks when waiting for a standby to register.
-const queryReserve = 2500 * time.Millisecond
 
 // standbyMargin is the residency a selected standby must keep beyond the work's
 // own deadline. The region's exchange began, and ends, its opening's setup
@@ -152,18 +148,17 @@ func (r *Router) pruneLocked(cluster string) {
 func (r *Router) YieldIdle(cluster string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for w := range r.waiting[cluster] {
+		w.yield = true
+	}
 	for _, s := range r.standby {
 		if s.channel.Connector.Binding.ClusterID != cluster || s.attached {
 			continue
 		}
-		if s.queryBusy {
+		if s.queryBusy || len(r.waiting[cluster]) != 0 {
 			s.yield = true
-			continue
-		}
-		if len(r.waiting[cluster]) == 0 {
-			s.cancel()
 		} else {
-			s.yield = true
+			s.cancel()
 		}
 	}
 }
@@ -185,7 +180,6 @@ type Standby struct {
 	attached  bool
 	queryBusy bool
 	yield     bool
-	queries   int
 	retire    *time.Timer
 	once      sync.Once
 	// Protected by router.mu. Selection observes stream cancellation directly,
@@ -254,11 +248,23 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	if r.closed || cluster == nil || cluster.standby >= cluster.limit.Standby || r.standby[receiver.Channel.ExchangeID] != nil {
 		return nil, fleet.ErrCapacity
 	}
+	// A connector can finish opening after its requesting caller has left.
+	// A demand-driven router retains the socket only for a live waiter.
+	var requested, yield bool
+	for w := range r.waiting[cluster.limit.ClusterID] {
+		if w.ctx.Err() == nil {
+			requested = true
+			yield = yield || w.yield
+		}
+	}
+	if r.RequestExchange != nil && !requested {
+		return nil, fleet.ErrUnavailable
+	}
 	// This bounds passive socket residency, not an authority interval. Attachment
 	// below always independently rechecks current peer/route/process facts.
 	call, cancel := context.WithTimeout(ctx, 30*time.Second)
 	r.serial++
-	s := &Standby{router: r, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
+	s := &Standby{router: r, yield: yield, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
 	if end, ok := call.Deadline(); ok {
 		if usable := time.Until(end.Add(-(standbyWork + standbyMargin))); usable > 0 {
 			s.retire = time.AfterFunc(usable, func() {
@@ -275,16 +281,6 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	return s, nil
 }
 func (s *Standby) Context() context.Context { return s.ctx }
-
-// otherLiveLocked reports another live standby of s's cluster.
-func (r *Router) otherLiveLocked(s *Standby) bool {
-	for _, o := range r.standby {
-		if o != s && o.channel.Connector.Binding.ClusterID == s.channel.Connector.Binding.ClusterID && o.liveLocked() {
-			return true
-		}
-	}
-	return false
-}
 
 // retireIdleLocked ends an idle standby that can no longer cover any work, so
 // its handler returns and the region opens a replacement. Attached or querying
@@ -428,8 +424,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		return time.Time{}, fleet.ErrInvalid
 	}
 	// Between a standby's bounded residency and the region's next opening no
-	// standby may be idle. Wait for a registration within this query's original
-	// deadline, keeping queryReserve for the query and the caller (native 66).
+	// standby may be idle. Registration and execution share the caller's deadline.
 	var done func()
 	defer func() {
 		if done != nil {
@@ -441,14 +436,13 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		r.mu.Lock()
 		r.pruneLocked(cluster)
 		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool {
-			return s.queries < contracts.APIContextMaximumQueries && (executor == nil || s.channel.Executor.PodUID == executor.PodUID && s.channel.Executor.ProcessEpoch == executor.ProcessEpoch)
+			return executor == nil || s.channel.Executor.PodUID == executor.PodUID && s.channel.Executor.ProcessEpoch == executor.ProcessEpoch
 		})
 		if r.closed || r.clusters[cluster] == nil {
 			r.mu.Unlock()
 			return time.Time{}, fleet.ErrUnavailable
 		}
 		if selected != nil {
-			selected.queries++
 			selected.queryBusy = true
 			r.mu.Unlock()
 			if done != nil {
@@ -459,7 +453,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		}
 		registered := r.registered
 		r.mu.Unlock()
-		if !time.Now().Before(deadline.Add(-queryReserve)) {
+		if ctx.Err() != nil {
 			return time.Time{}, fleet.ErrUnavailable
 		}
 		if done == nil && r.RequestExchange != nil {
@@ -469,25 +463,16 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 				return time.Time{}, fleet.ErrUnavailable
 			}
 		}
-		timer := time.NewTimer(time.Until(deadline.Add(-queryReserve)))
 		select {
 		case <-registered:
-			timer.Stop()
 		case <-ctx.Done():
-			timer.Stop()
-			return time.Time{}, fleet.ErrUnavailable
-		case <-timer.C:
 			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
-		if selected.yield || selected.queries >= contracts.APIContextMaximumQueries && r.otherLiveLocked(selected) {
-			// An exhausted standby can answer no further query (ADR-270
-			// source work spends them every tick). While the cluster has
-			// another standby, retire it so the region opens a queryable
-			// replacement; a lone one stays for an attach (ADR-179).
+		if selected.yield {
 			selected.cancel()
 		} else {
 			selected.retireIdleLocked()
@@ -537,24 +522,10 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, history bo
 	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(limit)) {
 		return nil, fleet.ErrInvalid
 	}
-	// A completed history exchange consumes its standby. Its next empty
-	// conversation may still be opening. Wait only before selecting any work,
-	// within ordinary work of this caller's original bound and the existing
-	// query reserve: a longer start bound does not lengthen the wait.
-	waitUntil := deadline
-	if !history {
-		waitUntil = identity.Earlier(deadline, time.Now().Add(standbyWork))
-	}
 	var done func()
 	defer func() {
 		if done != nil {
 			done()
-		}
-	}()
-	var timer *time.Timer
-	defer func() {
-		if timer != nil {
-			timer.Stop()
 		}
 	}()
 	for {
@@ -565,7 +536,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, history bo
 			r.mu.Unlock()
 			return nil, fleet.ErrCapacity
 		}
-		if ctx.Err() != nil || !time.Now().Before(deadline) || timer != nil && !time.Now().Before(waitUntil.Add(-queryReserve)) {
+		if ctx.Err() != nil || !time.Now().Before(deadline) {
 			r.mu.Unlock()
 			return nil, fleet.ErrUnavailable
 		}
@@ -600,9 +571,6 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, history bo
 		}
 		registered := r.registered
 		r.mu.Unlock()
-		if !time.Now().Before(waitUntil.Add(-queryReserve)) {
-			return nil, fleet.ErrUnavailable
-		}
 		if !busy && done == nil && r.RequestExchange != nil {
 			var err error
 			done, err = r.request(ctx, cluster)
@@ -610,18 +578,9 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, history bo
 				return nil, fleet.ErrUnavailable
 			}
 		}
-		if timer == nil {
-			wait := time.Until(waitUntil.Add(-queryReserve))
-			if wait <= 0 {
-				return nil, fleet.ErrUnavailable
-			}
-			timer = time.NewTimer(wait)
-		}
 		select {
 		case <-registered:
 		case <-ctx.Done():
-			return nil, fleet.ErrUnavailable
-		case <-timer.C:
 			return nil, fleet.ErrUnavailable
 		}
 	}

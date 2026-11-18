@@ -32,7 +32,7 @@ An idle connector subscribes for work over its outbound HTTP/2 connection.
 When a hub request needs a regional exchange, the connector opens one to the
 requesting hub replica. Federation resolves the registered owner to its ready
 endpoint addresses within the original deadline, and the connector authenticates
-that owner. A replica releases idle exchange capacity when another replica needs it. Reconnection announces only work whose caller is still
+that owner. Waiting for an exchange and using it share the original caller deadline. A replica that sees demand from another replica releases its exchange after its current query, including when the exchange is still opening. Sequential queries share the exchange's existing time and byte bounds. Reconnection announces only work whose caller is still
 waiting. Notifications carry routing information. Each operation retains its
 original identity, authorization and deadline.
 

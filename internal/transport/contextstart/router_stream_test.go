@@ -89,12 +89,8 @@ func TestRouterWithdrawsCancelledStreamBeforeSocketCleanup(t *testing.T) {
 	if _, err := f.router.Query(ctx, cluster, queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(err, fleet.ErrUnavailable) {
 		t.Errorf("dead standby query returned %v", err)
 	}
-	f.router.mu.Lock()
-	queries := f.standby.queries
-	f.router.mu.Unlock()
-	if queries != 0 {
-		t.Error("query selected the cancelled stream")
-	}
+	ctx, endAttach := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer endAttach()
 	attachment, err := f.router.Attach(ctx, cluster, workFixture().Work.CaptureID)
 	if err == nil {
 		t.Error("capture selected the cancelled stream")

@@ -24,7 +24,6 @@ func TestAPIContextClosedOperationEncoding(t *testing.T) {
 		"null":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":null`), 1),
 		"absent":    bytes.Replace(b, []byte(`,"sequence":1`), nil, 1),
 		"zero":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":0`), 1),
-		"over":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":17`), 1),
 		"trailing":  append(append([]byte{}, b...), []byte(`{}`)...),
 		"oversize":  bytes.Repeat([]byte(" "), APIContextOperationBytes+1),
 	} {

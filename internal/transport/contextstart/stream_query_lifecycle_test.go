@@ -110,7 +110,7 @@ func queryAnswerFrame(t *testing.T, reply contracts.APIContextOperationReply) co
 	return contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: payload}
 }
 
-func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
+func TestContextQueryRepeatedAnswersRetainOriginalProof(t *testing.T) {
 	for _, denied := range []bool{false, true} {
 		t.Run(map[bool]string{false: "success", true: "closed-denial"}[denied], func(t *testing.T) {
 			parent, end := context.WithTimeout(context.Background(), 2*time.Second)
@@ -121,7 +121,8 @@ func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
 				}
 				return queryAnswerFrame(t, reply)
 			})
-			for i := 0; i < contracts.APIContextMaximumQueries; i++ {
+			const count = 24 // crosses both the old eight-query and sixteen-operation counts
+			for i := 0; i < count; i++ {
 				ctx, cancel := context.WithTimeout(parent, time.Second)
 				until, err := f.stream.query(ctx, queryResolvePod, struct{}{}, &struct{}{})
 				cancel()
@@ -137,15 +138,12 @@ func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
 					t.Fatal("completed caller cancellation closed standby")
 				}
 			}
-			n := int32(contracts.APIContextMaximumQueries)
+			n := int32(count)
 			if f.readRestores.Load() != n || f.writeRestores.Load() != n {
 				t.Fatal("both original passive deadlines were not restored", f.readRestores.Load(), f.writeRestores.Load())
 			}
 			if f.stream.querySeq != int(n) || f.stream.frames != 2*int(n) {
 				t.Fatal("finite sequence/frame accounting changed", f.stream.querySeq, f.stream.frames)
-			}
-			if _, err := f.stream.query(parent, queryResolvePod, struct{}{}, &struct{}{}); err == nil {
-				t.Fatal("query beyond the budget accepted")
 			}
 		})
 	}

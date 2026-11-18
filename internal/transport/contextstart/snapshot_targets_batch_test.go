@@ -134,7 +134,7 @@ func TestSnapshotBatchSixteenUsesTwoRealFramedRouterQueries(t *testing.T) {
 	hub := Targets{Router: router, Now: func() time.Time { return replies[0].ObservedAt }}
 	got, err := hub.ResolveSourceSnapshots(ctx, requests)
 	<-joined
-	if err != nil || len(got) != 16 || count != 2 || standby.queries != 2 || standby.queries >= contracts.APIContextMaximumQueries {
+	if err != nil || len(got) != 16 || count != 2 {
 		t.Fatal("sixteen-member selection did not use two queries", len(got), count, err)
 	}
 	for index, value := range got {

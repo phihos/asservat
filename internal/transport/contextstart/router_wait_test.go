@@ -11,8 +11,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
-// A query that finds no idle standby waits, within its original deadline less
-// queryReserve, for the next registration; without that room it fails at once.
+// A query can use its original deadline to wait for the next registration.
 func TestRouterQueryWaitsForNextStandbyWithinDeadline(t *testing.T) {
 	work := workFixture()
 	cluster := work.Work.Channel.Connector.Binding.ClusterID
@@ -20,10 +19,9 @@ func TestRouterQueryWaitsForNextStandbyWithinDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	short, end := context.WithTimeout(context.Background(), 2*time.Second)
-	started := time.Now()
-	if _, err := router.Query(short, cluster, queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(err, fleet.ErrUnavailable) || time.Since(started) > 100*time.Millisecond {
-		t.Fatalf("no room to wait must fail at once: %v after %s", err, time.Since(started))
+	short, end := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	if _, err := router.Query(short, cluster, queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(err, fleet.ErrUnavailable) || short.Err() != context.DeadlineExceeded {
+		t.Fatal("registration exceeded query deadline", err)
 	}
 	end()
 	ctx, cancel := context.WithTimeout(context.Background(), 4500*time.Millisecond)

@@ -8,7 +8,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/identity"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -56,18 +55,11 @@ func TestRouterQueryExcludesAttachmentUntilJoinedResult(t *testing.T) {
 	if !errors.Is(err, fleet.ErrUnavailable) {
 		t.Error("attachment selected an in-flight query", err)
 	}
-	short, stop := context.WithTimeout(context.Background(), time.Second)
-	started := time.Now()
-	if _, e := router.Query(short, cluster, queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(e, fleet.ErrUnavailable) || time.Since(started) > 100*time.Millisecond {
-		t.Error("busy query did not preserve execution reserve", e, time.Since(started))
+	short, stop := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	if _, e := router.Query(short, cluster, queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(e, fleet.ErrUnavailable) || short.Err() != context.DeadlineExceeded {
+		t.Error("busy query did not respect its own deadline", e)
 	}
 	stop()
-	router.mu.Lock()
-	queries := standby.queries
-	router.mu.Unlock()
-	if queries != 1 {
-		t.Error("another query reserved the busy standby", queries)
-	}
 	job.result <- queryResult{until: receiver.Window.Until()}
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -111,12 +103,6 @@ func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 		t.Fatal("second query did not wait for availability", err)
 	case <-time.After(30 * time.Millisecond):
 	}
-	router.mu.Lock()
-	spent := standby.queries
-	router.mu.Unlock()
-	if spent != 1 {
-		t.Error("busy standby consumed another query count", spent)
-	}
 	first.result <- queryResult{until: receiver.Window.Until()}
 	if err := <-firstDone; err != nil {
 		t.Fatal(err)
@@ -132,8 +118,8 @@ func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 	}
 	router.mu.Lock()
 	defer router.mu.Unlock()
-	if standby.queryBusy || standby.queries != 2 {
-		t.Fatal("joined queries retained busy or refunded count", standby.queryBusy, standby.queries)
+	if standby.queryBusy {
+		t.Fatal("joined queries retained busy")
 	}
 }
 
@@ -158,10 +144,10 @@ func TestRouterCancellationBeforeHandoffReleasesBusyWithoutRefund(t *testing.T) 
 		t.Fatal(err)
 	}
 	router.mu.Lock()
-	busy, spent := standby.queryBusy, standby.queries
+	busy := standby.queryBusy
 	router.mu.Unlock()
-	if busy || spent != 1 {
-		t.Fatal("cancelled handoff retained busy or refunded count", busy, spent)
+	if busy {
+		t.Fatal("cancelled handoff retained busy")
 	}
 	attachCtx, end := context.WithTimeout(context.Background(), time.Second)
 	defer end()
@@ -184,10 +170,10 @@ func TestRouterTerminalQueryWithdrawnBeforeJoinedResult(t *testing.T) {
 		t.Fatal("invalid query unexpectedly succeeded")
 	}
 	f.router.mu.Lock()
-	live, busy, spent := f.standby.liveLocked(), f.standby.queryBusy, f.standby.queries
+	live, busy := f.standby.liveLocked(), f.standby.queryBusy
 	f.router.mu.Unlock()
-	if live || busy || spent != 1 {
-		t.Fatal("terminal query published a reusable standby", live, busy, spent)
+	if live || busy {
+		t.Fatal("terminal query published a reusable standby", live, busy)
 	}
 	select {
 	case <-f.handled:
@@ -196,64 +182,38 @@ func TestRouterTerminalQueryWithdrawnBeforeJoinedResult(t *testing.T) {
 	}
 }
 
-// ADR-270 source work spends queries every tick. A standby whose last query
-// completed is retired while its cluster has another standby, so the region
-// opens a queryable replacement; a lone one stays for an attach (ADR-179).
-func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
-	for _, c := range []struct{ last, other bool }{{false, true}, {true, false}, {true, true}} {
-		w := workFixture()
-		cluster := w.Work.Target.ClusterID
-		router, err := NewRouter([]ClusterLimit{{cluster, 2, 1}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		now := time.Now()
-		register := func(exchange string) *Standby {
-			channel := w.Work.Channel
-			channel.ExchangeID = exchange
-			receiver := fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
-			s, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
-			if err != nil {
-				t.Fatal(err)
+func TestRouterReusesSingleConnectorSlotForSequentialQueries(t *testing.T) {
+	w := workFixture().Work
+	cluster := w.Channel.Connector.Binding.ClusterID
+	router, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+	defer router.Close()
+	receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(time.Now(), identity.Recheck)}
+	s, err := router.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Finish()
+	ctx, stop := context.WithTimeout(t.Context(), 3*time.Second)
+	defer stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case j := <-s.query:
+				j.result <- queryResult{until: time.Now().Add(time.Second)}
 			}
-			return s
 		}
-		var other *Standby
-		if c.other {
-			other = register("00000000-0000-4000-8000-000000000099")
+	}()
+	for n := 1; n <= 24; n++ {
+		if _, err := router.Query(ctx, cluster, queryResolvePod, nil, nil); err != nil {
+			t.Fatalf("query %d on original exchange: %v", n, err)
 		}
-		// Registered last, so the query selects it.
-		standby := register(w.Work.Channel.ExchangeID)
-		if c.last {
-			router.mu.Lock()
-			standby.queries = contracts.APIContextMaximumQueries - 1
-			router.mu.Unlock()
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		done := make(chan error, 1)
-		go func() {
-			_, e := router.Query(ctx, cluster, queryResolvePod, struct{}{}, &struct{}{})
-			done <- e
-		}()
-		(<-standby.query).result <- queryResult{until: now.Add(5 * time.Second)}
-		if err := <-done; err != nil {
-			t.Fatal(err)
-		}
-		cancel()
-		if retired := standby.ctx.Err() != nil; retired != (c.last && c.other) {
-			t.Fatal("exhausted standby retirement", c, retired)
-		}
-		standby.Finish()
-		other.Finish()
-		router.Close()
 	}
 }
 
-// A history AttachHistory (up to HistoryAttachLimit) takes an idle standby that can
-// still cover ordinary work but not the whole ten seconds, and narrows its
-// attachment to that standby's residency instead of refusing: such a standby
-// is not retired, so refusing left history without any standby until it
-// aged out (installed native 41525755470: 25 refused attaches over 6 s).
+// History attaches to an exchange that covers ordinary work and narrows to
+// its remaining residency (installed run 41525755470).
 func TestRouterAttachHistoryNarrowsToAnAgedStandby(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID

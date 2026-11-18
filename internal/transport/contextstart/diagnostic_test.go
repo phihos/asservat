@@ -592,7 +592,7 @@ func TestContextStreamDiagnosticAdmissionAndPassiveBranches(t *testing.T) {
 				s.closed = true
 				want = streamClosed
 			case "frame-limit":
-				s.frames = contracts.APIContextMaximumFrames
+				s.frames = contracts.APIContextMaximumWorkFrames
 				want = streamBudget
 			case "busy-read":
 				read = true
