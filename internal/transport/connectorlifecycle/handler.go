@@ -2,6 +2,7 @@ package connectorlifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -96,6 +97,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !admit(opening, presented) {
 		fail(http.StatusForbidden)
+		return
+	}
+	if opening.Purpose == PurposeSettings && opening.Protocol != contracts.ConnectorProtocolMajor {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_ = json.NewEncoder(w).Encode(ProtocolMismatch{Required: contracts.ConnectorProtocolMajor, Announced: opening.Protocol})
 		return
 	}
 	w.Header().Set("Content-Type", ContentType)

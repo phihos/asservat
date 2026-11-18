@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -61,11 +62,24 @@ var ErrChannel = errors.New("connector lifecycle channel unavailable")
 // Opening is the connector's first frame. Process names the connector
 // process; its binding must name the token's cluster and peer.
 type Opening struct {
+	Protocol    int `json:",omitempty"` // advertised on the initial settings request
 	Purpose     Purpose
 	OperationID string
 	Process     value.ConnectorProcessIdentity
 	Owner       *value.OwnerCertificate `json:",omitempty"` // owner authentication only
 }
+
+// ProtocolMismatch is the settings endpoint's HTTP 426 response.
+type ProtocolMismatch struct {
+	Required  int
+	Announced int
+}
+
+func (m *ProtocolMismatch) Error() string {
+	return fmt.Sprintf("hub requires connector protocol major %d, connector announced %d (0 means unspecified)", m.Required, m.Announced)
+}
+
+func (m *ProtocolMismatch) FixedStep() string { return m.Error() }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {

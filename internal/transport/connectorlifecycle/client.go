@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -68,6 +69,14 @@ func (c *Client) open(ctx context.Context, path string, header http.Header, body
 	if err != nil {
 		return nil, ErrChannel
 	}
+	if resp.StatusCode == http.StatusUpgradeRequired && resp.ProtoMajor == 2 {
+		defer resp.Body.Close()
+		var mismatch ProtocolMismatch
+		if json.NewDecoder(io.LimitReader(resp.Body, MaxFrameBytes)).Decode(&mismatch) == nil && mismatch.Required > 0 {
+			return nil, &mismatch
+		}
+		return nil, ErrChannel
+	}
 	if resp.StatusCode != http.StatusOK || resp.ProtoMajor != 2 {
 		resp.Body.Close()
 		return nil, ErrChannel
@@ -93,7 +102,7 @@ func (c *Client) Run(ctx context.Context, opening Opening, local any) (HubFrame,
 	if err != nil {
 		writer.CloseWithError(err)
 		<-sent
-		return zero, ErrChannel
+		return zero, err
 	}
 	defer resp.Body.Close()
 	if <-sent != nil || resp.Header.Get("Content-Type") != ContentType {

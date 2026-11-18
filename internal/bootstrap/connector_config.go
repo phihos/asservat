@@ -137,7 +137,11 @@ func hubRoots(ctx context.Context, in *providerInputs) (*x509.CertPool, error) {
 // completes c with them.
 func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c contracts.ConnectorConfig) (regionalConfig, error) {
 	out := regionalConfig{ConnectorConfig: c}
-	frame, err := channel.Run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeSettings, OperationID: uuid.NewString()}, nil)
+	frame, err := channel.Run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeSettings, Protocol: contracts.ConnectorProtocolMajor, OperationID: uuid.NewString()}, nil)
+	var mismatch *connectorlifecycle.ProtocolMismatch
+	if errors.As(err, &mismatch) {
+		return out, &fixedStepError{"hub-settings", mismatch}
+	}
 	if err != nil || frame.Kind != "result" || frame.Settings == nil {
 		return out, &fixedStepError{"hub-settings", errors.Join(mounts.ErrUnavailable, errRegionalChannel)}
 	}

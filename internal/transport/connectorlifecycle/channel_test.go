@@ -1,9 +1,11 @@
 package connectorlifecycle
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -77,6 +79,14 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	stranger, err := NewClient(server.URL, roots, func() ([]byte, error) { return []byte("other-token"), nil })
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, major := range []int{0, contracts.ConnectorProtocolMajor + 1} {
+		opening := Opening{Purpose: PurposeSettings, Protocol: major, OperationID: "10000000-0000-4000-8000-000000000008"}
+		frame, err := client.Run(t.Context(), opening, nil)
+		var mismatch *ProtocolMismatch
+		if !errors.As(err, &mismatch) || mismatch.Announced != major || mismatch.Required != contracts.ConnectorProtocolMajor || frame.Settings != nil {
+			t.Fatalf("settings negotiation for major %d: frame=%+v error=%v", major, frame, err)
+		}
 	}
 	process := testProcess()
 	base := Opening{Purpose: PurposeOwnerCandidates, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
