@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -188,5 +189,79 @@ func TestHubListsLegacyDeniesAtTheirActualClusters(t *testing.T) {
 	s, err := f.client.WithClusterNames(map[string]string{"peer": peer}).PermissionSnapshot(t.Context())
 	if err != nil || len(s.Bindings) != 1 || len(s.ClusterBindings) != 1 || !s.Bindings[0].UnavailableDeny || !s.ClusterBindings[0].UnavailableDeny || s.Bindings[0].Scope.ClusterID != permissionCluster || s.ClusterBindings[0].Scope.ClusterID != peer {
 		t.Fatal("unrelated cluster lost when the hub observed a legacy Deny", err)
+	}
+}
+
+func TestBindingDeliveryCompletesDelayedPagesWithinCallerDeadline(t *testing.T) {
+	t.Parallel()
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/apis/asservat.io/v1alpha1/accessbindings" {
+			permissionReply(w, permissionList("AccessBinding", "1", ""))
+			return true
+		}
+		if r.URL.Path != "/apis/asservat.io/v1alpha1/clusteraccessbindings" {
+			return false
+		}
+		// Each page is within the REST request deadline. Together they
+		// exceed five seconds, including when the wire data is tiny.
+		select {
+		case <-time.After(2600 * time.Millisecond):
+		case <-r.Context().Done():
+			return true
+		}
+		o := permissionClusterBinding()
+		cursor := r.URL.Query().Get("continue")
+		next := ""
+		switch cursor {
+		case "":
+			next = "second"
+		case "second":
+			m := o["metadata"].(map[string]any)
+			m["name"], m["uid"] = "second", "second-uid"
+		default:
+			t.Errorf("unexpected cursor %q", cursor)
+		}
+		permissionReply(w, permissionList(value.ClusterAccessBindingKind, "consistent", next, o))
+		return true
+	})
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if err != nil || len(d.Items) != 2 || d.ClusterResourceVersion != "consistent" || d.Items[1].UID != "second-uid" {
+		t.Fatalf("complete paginated observation lost: %d items, %v", len(d.Items), err)
+	}
+	early, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	d, err = f.client.AccessBindingDelivery(early)
+	if !errors.Is(err, context.DeadlineExceeded) || len(d.Items) != 0 {
+		t.Fatal("caller deadline ignored", err)
+	}
+}
+
+func TestBindingDeliveryReadsEachUnplacedNamespaceOnce(t *testing.T) {
+	var gets atomic.Int64
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Path {
+		case "/api/v1/namespaces/payments":
+			gets.Add(1)
+			return false
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			var items []map[string]any
+			for i := range permissionPageSize {
+				items = append(items, permissionBinding(i))
+			}
+			// The current namespace is newer than just this binding.
+			items[0]["metadata"].(map[string]any)["creationTimestamp"] = "2026-09-01T00:00:00Z"
+			permissionReply(w, permissionList("AccessBinding", "1", "", items...))
+			return true
+		}
+		return false
+	})
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if err != nil || len(d.Items) != permissionPageSize+1 || gets.Load() != 1 {
+		t.Fatal("namespace placement", len(d.Items), gets.Load(), err)
+	}
+	for i, item := range d.Items[:permissionPageSize] {
+		if (i == 0) != (item.NamespaceUID == "") {
+			t.Fatal("binding placed in different incarnation", i, item.NamespaceUID)
+		}
 	}
 }

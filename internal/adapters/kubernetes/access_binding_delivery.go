@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -17,12 +16,8 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 	if err != nil || len(unplaced) == 0 {
 		return d, err
 	}
-	place, cancel := context.WithTimeout(ctx, bindingNamespaceResolve)
-	defer cancel()
-	for _, m := range unplaced {
-		if _, err = c.placeBinding(place, m); err != nil {
-			return contracts.AccessBindingDelivery{}, err
-		}
+	if err = c.placeBindings(ctx, unplaced); err != nil {
+		return contracts.AccessBindingDelivery{}, err
 	}
 	if d, unplaced, err = c.bindingDelivery(ctx); err == nil && len(unplaced) != 0 {
 		return contracts.AccessBindingDelivery{}, value.ErrUnavailable
@@ -31,9 +26,7 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 }
 
 func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.AccessBindingDelivery, []permissionMetadata, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", c.now())
+	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings")
 	if err != nil || len(unplaced) != 0 {
 		return contracts.AccessBindingDelivery{}, unplaced, err
 	}
@@ -42,7 +35,7 @@ func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.Acces
 		r := refs[i]
 		out.Items = append(out.Items, contracts.DeliveredAccessBinding{Namespace: r.Namespace, NamespaceUID: r.NamespaceUID, Name: r.Name, UID: r.UID, ResourceVersion: r.ResourceVersion, Generation: r.Generation, Deleting: r.Deleting, Spec: o.Spec})
 	}
-	out.ClusterResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", c.now())
+	out.ClusterResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings")
 	if err != nil {
 		return contracts.AccessBindingDelivery{}, nil, err
 	}

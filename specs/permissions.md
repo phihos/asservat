@@ -10,10 +10,15 @@ and ClusterAccessBindings scoped to that cluster. Only the hub can target other
 clusters. Before its first complete observation, including after re-registration,
 a remote cluster cannot authorize fresh access even from an overlapping hub Allow.
 The connector reduces its Kubernetes LIST page size when a page exceeds its
-response budget. The hub applies the complete binding set within the transfer
+response budget. Each page has its own request timeout. The connector follows
+continuation tokens at the same list revision until completion or caller cancellation.
+It reads each newly encountered namespace once per list to place its bindings.
+The hub applies the complete binding set within the transfer
 budget. Persisted assignments and recorded artifact audiences represent a subject
 ID in up to 256 UTF-8 bytes and its optional issuer in up to 2,048. Both fields
-exclude control characters. An Allow retains every representable subject. A Deny
+exclude control characters. All proposed binding subjects must fit these fields,
+including during change preview. When reading previously stored bindings, an
+Allow retains every representable subject. A Deny
 with an unrepresentable subject makes its target clusters unavailable until
 correction or removal. A namespaced binding affects only its own cluster. A hub
 ClusterAccessBinding affects the registered clusters it names. Other clusters

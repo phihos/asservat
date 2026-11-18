@@ -62,6 +62,10 @@ func (d *permissionWatchEvents) next() (event metav1.WatchEvent, err error) {
 // openWatch bounds the opening request. Once opened, the caller owns the
 // sustained stream; each event is framed separately.
 func (c *PermissionClient) openWatch(ctx context.Context, path, rv string, metadataOnly bool) (*permissionWatchEvents, context.CancelFunc, error) {
+	return c.openSelectedWatch(ctx, path, rv, metadataOnly, "")
+}
+
+func (c *PermissionClient) openSelectedWatch(ctx context.Context, path, rv string, metadataOnly bool, selector string) (*permissionWatchEvents, context.CancelFunc, error) {
 	if !identity.Text(rv, 128) || rv == "0" {
 		return nil, nil, value.ErrInvalid
 	}
@@ -69,6 +73,9 @@ func (c *PermissionClient) openWatch(ctx context.Context, path, rv string, metad
 	opening := time.AfterFunc(5*time.Second, cancel)
 	defer opening.Stop()
 	r := c.watchAPI.Get().AbsPath(path).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
+	if selector != "" {
+		r.Param("fieldSelector", selector)
+	}
 	if metadataOnly {
 		r.SetHeader("Accept", "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1")
 	}
@@ -196,7 +203,7 @@ func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, 
 		return fail()
 	}
 	// ADR-329: a binding first seen here is placed in its namespace.
-	namespace, err := w.client.placeBinding(ctx, m)
+	namespace, err := w.client.placeBinding(ctx, m, nil)
 	if err != nil {
 		return fail()
 	}

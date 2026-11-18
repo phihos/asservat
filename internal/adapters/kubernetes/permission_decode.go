@@ -257,8 +257,10 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
-	b.Subjects, err = subjects(spec.Subjects, spec.Effect)
-	b.UnavailableDeny = err == value.ErrLimit
+	// Proposed specs have no Kubernetes UID. Admission requires all of their
+	// subjects to fit, including subjects of an Allow.
+	b.Subjects, err = subjects(spec.Subjects, spec.Effect == "Allow" && ref.UID != "")
+	b.UnavailableDeny = spec.Effect == "Deny" && err == value.ErrLimit
 	if err != nil && !b.UnavailableDeny {
 		return value.Binding{}, err
 	}
@@ -286,15 +288,14 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 
 // subjects decodes authored subjects; an omitted issuer stays empty and is
 // the installation's issuer (ADR-335 D4).
-func subjects(in []wire.Subject, effect string) ([]value.Subject, error) {
+func subjects(in []wire.Subject, skipUnrepresentable bool) ([]value.Subject, error) {
 	var out []value.Subject
 	for _, s := range in {
 		// A binding compares its issuer literally with a verified identity.
 		// Only the identity provider uses the issuer as a network endpoint.
 		if (s.Issuer != "" && !identity.Text(s.Issuer, 2048)) || !identity.Text(s.ID, 256) {
-			// A previously admitted Deny may exceed the SQL subject representation.
-			// Dropping the binding here would also discard its other subjects.
-			if effect == "Deny" {
+			// Only an already-stored Allow may retain its representable siblings.
+			if !skipUnrepresentable {
 				return nil, value.ErrLimit
 			}
 			// Other subjects of an Allow keep their independent grant.
@@ -336,7 +337,7 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 		return invalid()
 	}
 	ref.SpecDigest = digest
-	subjects, err := subjects(spec.Subjects, spec.Effect)
+	subjects, err := subjects(spec.Subjects, spec.Effect == "Allow")
 	unavailableDeny := err == value.ErrLimit
 	if err != nil && !unavailableDeny {
 		return invalid()

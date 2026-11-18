@@ -93,7 +93,7 @@ func retentionPolicy(v *permissionValidator, hub bool, o permissionObject, ref c
 func (c *RetentionClient) ListRetentionPolicies(ctx context.Context) ([]value.ScopedPolicy, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", c.client.now())
+	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies")
 	if err != nil {
 		return nil, "", value.ErrUnavailable
 	}
