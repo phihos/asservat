@@ -84,7 +84,8 @@ grant any role there. It adds no runtime component, request or state.
   namespace's UID.
 - The hub-worker LISTs and watches AccessBindings in every namespace of the
   hub cluster (ClusterRole `get/list/watch accessbindings`). It reads a
-  binding's namespace once per binding UID. A binding whose namespace is
+  new binding's namespace once for all bindings in that namespace in a LIST,
+  then remembers the placement for its UID. A binding whose namespace is
   gone, lacks timestamps or was created after the binding (a later
   incarnation) grants and denies nothing; it does not stop the stream.
   PermissionSources stay in the release namespace.
@@ -93,9 +94,8 @@ grant any role there. It adds no runtime component, request or state.
   RoleBindings, whose roleRef is immutable.
 - Any namespace writer can store a binding the embedded schema refuses; it
   is kept as an invalid entry that grants and denies nothing instead of
-  stopping the whole stream. The shared bounds (1,024 bindings, 4,096 rows,
-  8 MiB) are a cluster-wide limitation; `count/accessbindings.asservat.io`
-  ResourceQuotas bound a namespace.
+  stopping the whole stream. Administrators can use Kubernetes
+  `count/accessbindings.asservat.io` ResourceQuotas in individual namespaces.
 - Removed: the delegation envelope (`identity.permissionDelegations`,
   hub-worker `delegations`, hub-api `permissionDelegations`), the permission
   admission policy builder and the delegated previewers. The permission
@@ -114,10 +114,11 @@ LIST to the hub over the existing connector lifecycle channel (ADR-169), as a
 new purpose `access-bindings`, whenever it changes (maintainer correction
 2026-11-14: no polling where an event source exists):
 
-- The connector watches AccessBindings (a metadata informer). An event
-  triggers a LIST with the hub cluster's LIST code (paginated, 1,024 objects,
-  8 MiB, each binding's namespace UID read once, a younger namespace
-  refused); bursts coalesce to at most one delivery per second, and a set
+- The connector watches both binding collections. A change triggers a
+  paginated LIST through the same reader as the hub. The connector skips
+  bindings from an earlier namespace incarnation and enforces its 8 MiB wire
+  budget as each page arrives. Bursts coalesce to at most one delivery per
+  second, and a set
   whose digest equals the last delivered one is not sent. A failed delivery is
   retried after five seconds; nothing is resent periodically.
 - Every delivery conversation carries the hub's stored digest; the connector
@@ -131,8 +132,9 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
   grants `get/list/watch accessbindings` to the connector's ClusterRole in
   `mode: cluster` only.
 - The federation validates every spec with the same embedded schema: a
-  refused spec becomes an invalid entry that grants and denies nothing. A
-  delivery over 1,024 bindings or 4,096 subject-role rows is refused.
+  schema-invalid spec becomes an inert entry. A stored Deny with an
+  unrepresentable subject makes its scope unavailable as specified in
+  [permission management](../../specs/permissions.md).
 - It is stored in `remote_access_binding_delivery` (migration 00162), one row
   per cluster; an older delivery never replaces a newer one. A trigger
   (migration 00163) notifies `asservat_remote_bindings` in the writing
@@ -145,9 +147,8 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
   stays in effect, allows included, until a newer delivery replaces it:
   connector liveness is a health signal, not authority; every new remote
   action needs the connector anyway, and expiring allows broke stored-evidence
-  reads during connector outages. A cluster whose bindings do not fit the
-  stream's remaining 1,024 bases and 4,096 rows contributes nothing rather
-  than a partial set.
+  reads during connector outages. A cluster reporting an incomplete or oversized
+  observation becomes unavailable until its next complete delivery.
 - The escalation ValidatingAdmissionPolicy and the aggregated ClusterRoles
   render in every mode.
 

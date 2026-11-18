@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -12,38 +13,54 @@ import (
 // AccessBindingDelivery lists both binding kinds in the connector's cluster.
 // Namespaced bindings retain the UID of their application namespace.
 func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts.AccessBindingDelivery, error) {
-	d, unplaced, err := c.bindingDelivery(ctx)
-	if err != nil || len(unplaced) == 0 {
-		return d, err
+	out := contracts.AccessBindingDelivery{Items: []contracts.DeliveredAccessBinding{}}
+	size := 0
+	appendItem := func(o permissionObject, r value.Resource) error {
+		item := contracts.DeliveredAccessBinding{Name: r.Name, UID: r.UID, ResourceVersion: r.ResourceVersion, Generation: r.Generation, Deleting: r.Deleting}
+		if r.Kind == value.ClusterAccessBindingKind {
+			item.Kind = r.Kind
+		} else {
+			// A binding from an earlier namespace incarnation has no effect.
+			if r.NamespaceUID == "" {
+				return nil
+			}
+			item.Namespace, item.NamespaceUID = r.Namespace, r.NamespaceUID
+		}
+		// Account for the actual JSON on the wire, including escaped text,
+		// separators and the envelope. Retain only the compact spec.
+		if size == 0 {
+			envelope, err := json.Marshal(out)
+			if err != nil {
+				return err
+			}
+			size = len(envelope)
+		}
+		spec, err := json.Marshal(o.Spec)
+		if err != nil {
+			return err
+		}
+		item.Spec = spec
+		encoded, err := json.Marshal(item)
+		if err != nil {
+			return err
+		}
+		size += len(encoded)
+		if len(out.Items) > 0 {
+			size++
+		}
+		if size > contracts.AccessBindingDeliveryMaxBytes {
+			return value.ErrLimit
+		}
+		out.Items = append(out.Items, item)
+		return nil
 	}
-	if err = c.placeBindings(ctx, unplaced); err != nil {
+	if err := c.list(ctx, "AccessBinding", "accessbindings", &out.ResourceVersion, appendItem); err != nil {
 		return contracts.AccessBindingDelivery{}, err
 	}
-	if d, unplaced, err = c.bindingDelivery(ctx); err == nil && len(unplaced) != 0 {
-		return contracts.AccessBindingDelivery{}, value.ErrUnavailable
+	if err := c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterResourceVersion, appendItem); err != nil {
+		return contracts.AccessBindingDelivery{}, err
 	}
-	return d, err
-}
-
-func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.AccessBindingDelivery, []permissionMetadata, error) {
-	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings")
-	if err != nil || len(unplaced) != 0 {
-		return contracts.AccessBindingDelivery{}, unplaced, err
-	}
-	out := contracts.AccessBindingDelivery{ResourceVersion: rv, Items: make([]contracts.DeliveredAccessBinding, 0, len(objects))}
-	for i, o := range objects {
-		r := refs[i]
-		out.Items = append(out.Items, contracts.DeliveredAccessBinding{Namespace: r.Namespace, NamespaceUID: r.NamespaceUID, Name: r.Name, UID: r.UID, ResourceVersion: r.ResourceVersion, Generation: r.Generation, Deleting: r.Deleting, Spec: o.Spec})
-	}
-	out.ClusterResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings")
-	if err != nil {
-		return contracts.AccessBindingDelivery{}, nil, err
-	}
-	for i, o := range objects {
-		r := refs[i]
-		out.Items = append(out.Items, contracts.DeliveredAccessBinding{Kind: value.ClusterAccessBindingKind, Name: r.Name, UID: r.UID, ResourceVersion: r.ResourceVersion, Generation: r.Generation, Deleting: r.Deleting, Spec: o.Spec})
-	}
-	return out, nil, nil
+	return out, nil
 }
 
 // DeliveredBindings validates a connector's delivery for cluster, the

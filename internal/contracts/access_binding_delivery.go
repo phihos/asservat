@@ -7,8 +7,7 @@ import (
 )
 
 // AccessBindingDeliveryMaxBytes bounds one connector's AccessBinding delivery
-// on the lifecycle channel, the same byte budget as the hub cluster's LIST
-// (ADR-329).
+// on the lifecycle channel across both collections (ADR-329).
 const AccessBindingDeliveryMaxBytes = 8 << 20
 
 // AccessBindingDelivery is a connector's complete AccessBinding LIST of its

@@ -296,8 +296,20 @@ func (s *bindingRun) checkTrust(ctx context.Context) (PermissionTrust, error) {
 	return t, nil
 }
 
+// Bound a blocking baseline or refresh by its actual authority. Watch streams
+// opened at the returned cursors belong to the epoch's longer-lived context.
+func (s *bindingRun) listContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	until := value.PermissionDeadline(s.fence.LeaseUntil, s.trust.FreshUntil)
+	if until.IsZero() {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, until.Sub(s.r.Now()))
+}
+
 func (s *bindingRun) guardedSnapshot(ctx context.Context) (value.Snapshot, error) {
-	snapshot, err := s.r.Reader.PermissionSnapshot(ctx)
+	read, cancel := s.listContext(ctx)
+	snapshot, err := s.r.Reader.PermissionSnapshot(read)
+	cancel()
 	if err != nil {
 		return value.Snapshot{}, err
 	}
@@ -426,7 +438,9 @@ func (s *bindingRun) start(ctx context.Context) error {
 }
 
 func (s *bindingRun) refreshClusterBindings(ctx context.Context) error {
-	snapshot, err := s.r.Reader.ClusterAccessBindings(ctx)
+	read, cancel := s.listContext(ctx)
+	snapshot, err := s.r.Reader.ClusterAccessBindings(read)
+	cancel()
 	if err != nil {
 		return err
 	}
@@ -513,8 +527,10 @@ func (s *bindingRun) readSources(ctx context.Context) {
 	result := make(chan sourceRead, 1)
 	s.readingSources = result
 	watch := s.sourceSettings
+	read, cancel := s.listContext(ctx)
 	go func() {
-		snapshot, err := s.r.ReadSources(ctx)
+		snapshot, err := s.r.ReadSources(read)
+		cancel()
 		if err == nil && watch.Changed == nil {
 			watch, err = s.r.WatchConfiguration(ctx, "permissionsources", snapshot.SourceResourceVersion)
 		}

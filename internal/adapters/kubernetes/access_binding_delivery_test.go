@@ -228,6 +228,10 @@ func TestBindingDeliveryCompletesDelayedPagesWithinCallerDeadline(t *testing.T) 
 	if err != nil || len(d.Items) != 2 || d.ClusterResourceVersion != "consistent" || d.Items[1].UID != "second-uid" {
 		t.Fatalf("complete paginated observation lost: %d items, %v", len(d.Items), err)
 	}
+	hub, err := f.client.PermissionSnapshot(t.Context())
+	if err != nil || len(hub.ClusterBindings) != 2 || hub.ClusterBindingResourceVersion != "consistent" {
+		t.Errorf("hub baseline lost delayed continuation: %d items, %v", len(hub.ClusterBindings), err)
+	}
 	early, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 	d, err = f.client.AccessBindingDelivery(early)
@@ -256,12 +260,51 @@ func TestBindingDeliveryReadsEachUnplacedNamespaceOnce(t *testing.T) {
 		return false
 	})
 	d, err := f.client.AccessBindingDelivery(t.Context())
-	if err != nil || len(d.Items) != permissionPageSize+1 || gets.Load() != 1 {
+	if err != nil || len(d.Items) != permissionPageSize || gets.Load() != 1 {
 		t.Fatal("namespace placement", len(d.Items), gets.Load(), err)
 	}
-	for i, item := range d.Items[:permissionPageSize] {
-		if (i == 0) != (item.NamespaceUID == "") {
+	decoder, err := NewAccessBindingSpecDecoder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindings, err := decoder.DeliveredBindings(permissionCluster, d)
+	if err != nil || !value.ValidClusterBindings(permissionCluster, bindings) {
+		t.Fatal("hub refused complete replacement", err)
+	}
+	for i, item := range d.Items[:permissionPageSize-1] {
+		if item.NamespaceUID != "payments-uid" || item.UID == "uid-0" {
 			t.Fatal("binding placed in different incarnation", i, item.NamespaceUID)
 		}
+	}
+}
+
+func TestConnectorStopsReadingWhenBothCollectionsExceedTransferBudget(t *testing.T) {
+	var clusterPages atomic.Int64
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		var kind string
+		var obj map[string]any
+		switch r.URL.Path {
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			kind, obj = "AccessBinding", permissionBinding(1)
+		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
+			kind, obj = value.ClusterAccessBindingKind, permissionClusterBinding()
+			clusterPages.Add(1)
+		default:
+			return false
+		}
+		page, _ := strconv.Atoi(r.URL.Query().Get("continue"))
+		m := obj["metadata"].(map[string]any)
+		m["name"], m["uid"] = fmt.Sprintf("binding-%d", page), fmt.Sprintf("%s-%d", kind, page)
+		obj["spec"].(map[string]any)["reason"] = strings.Repeat("x", 1<<20)
+		next := strconv.Itoa(page + 1)
+		if page == 4 {
+			next = ""
+		}
+		permissionReply(w, permissionList(kind, "rv", next, obj))
+		return true
+	})
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if !errors.Is(err, value.ErrLimit) || len(d.Items) != 0 || clusterPages.Load() != 3 {
+		t.Fatalf("oversized observation: %d items, %d cluster pages, %v", len(d.Items), clusterPages.Load(), err)
 	}
 }

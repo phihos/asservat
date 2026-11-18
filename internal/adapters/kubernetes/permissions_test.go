@@ -176,7 +176,6 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 				if !strings.HasSuffix(r.URL.Path, "/accessbindings") {
 					return false
 				}
-				// A first LIST places the bindings, a second is the snapshot.
 				if r.URL.Query().Get("continue") == "" {
 					calls.Store(0)
 				}
@@ -239,7 +238,14 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 				permissionReply(w, permissionList("AccessBinding", rv, next, item))
 				return true
 			})
-			s, err := f.client.PermissionSnapshot(context.Background())
+			ctx := t.Context()
+			if mode == "overflow" {
+				// This API never ends its LIST. Only the caller's deadline ends it.
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+			}
+			s, err := f.client.PermissionSnapshot(ctx)
 			if mode == "complete" || mode == "emptyMiddle" {
 				if err != nil || len(s.Bindings) != 2 {
 					t.Fatalf("complete list: %v", err)
@@ -442,8 +448,9 @@ func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 				cancel()
 			}
 			if mode == "advance" || mode == "rollback" {
-				if _, err := f.client.PermissionSources(ctx); err == nil {
-					t.Fatal("invalid source observation clock accepted")
+				_, err := f.client.PermissionSources(ctx)
+				if (err != nil) != (mode == "rollback") {
+					t.Fatal("source list with clock change", mode, err)
 				}
 				return
 			}

@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
+
 	"testing"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/postgres"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -74,7 +77,20 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 					}
 				}
 			}
-			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBindingList", "metadata": map[string]string{"resourceVersion": "1"}, "items": []map[string]any{object("AccessBinding", "local-grant", "Allow", "team", 1), object("AccessBinding", "legacy", "Deny", legacyID, 1)}})
+			// The hub startup LIST spans five seconds but fits its actual controller lease.
+			select {
+			case <-time.After(2600 * time.Millisecond):
+			case <-r.Context().Done():
+				return
+			}
+			metadata := map[string]string{"resourceVersion": "1"}
+			item := object("AccessBinding", "local-grant", "Allow", "team", 1)
+			if r.URL.Query().Get("continue") == "" {
+				metadata["continue"] = "remaining"
+			} else {
+				item = object("AccessBinding", "legacy", "Deny", legacyID, 1)
+			}
+			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBindingList", "metadata": metadata, "items": []map[string]any{item}})
 		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
 			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBindingList", "metadata": map[string]string{"resourceVersion": "1"}, "items": []map[string]any{object(cfg.ClusterAccessBindingKind, "other-cluster", "Deny", legacyID, 1)}})
 		default:
@@ -122,4 +138,68 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 	check("Unavailable")
 	edits <- map[string]any{"type": "DELETED", "object": object("AccessBinding", "legacy", "Deny", legacyID, 4)}
 	check("Allow")
+
+	t.Run("inert-binding-does-not-keep-removed-allow", func(t *testing.T) {
+		ctx := t.Context()
+		cluster := custodyID()
+		var removed atomic.Bool
+		client := idleKubernetesBindingWatch(t, cluster, func(w http.ResponseWriter, r *http.Request) {
+			reply := json.NewEncoder(w)
+			switch r.URL.Path {
+			case "/api/v1/namespaces/app":
+				_ = reply.Encode(map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]string{"name": ns.Name, "uid": ns.UID, "resourceVersion": "1", "creationTimestamp": "2026-01-01T00:00:00Z"}})
+			case "/apis/asservat.io/v1alpha1/accessbindings":
+				item := object("AccessBinding", "removed", "Allow", "team", 1)
+				rv := "1"
+				if removed.Load() {
+					rv = "2"
+					item = object("AccessBinding", "previous-incarnation", "Allow", "team", 1)
+					item["metadata"].(map[string]any)["creationTimestamp"] = "2025-12-31T00:00:00Z"
+				}
+				_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBindingList", "metadata": map[string]string{"resourceVersion": rv}, "items": []map[string]any{item}})
+			case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
+				_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBindingList", "metadata": map[string]string{"resourceVersion": "1"}, "items": []any{}})
+			default:
+				http.NotFound(w, r)
+			}
+		})
+		decoder, err := kube.NewAccessBindingSpecDecoder()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []int{1, 0} {
+			_, previous, err := deliveries.RemoteBindingsDigest(ctx, cluster)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wire, err := client.AccessBindingDelivery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bindings, err := decoder.DeliveredBindings(cluster, wire)
+			if err != nil {
+				t.Fatal("replacement refused", err)
+			}
+			if err = deliveries.StoreRemoteBindings(ctx, cluster, previous, wire.Digest(), bindings, false); err != nil {
+				t.Fatal(err)
+			}
+			rows, err := deliveries.RemoteBindings(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, row := range rows {
+				if row.ClusterID == cluster {
+					found = true
+					if row.Unavailable || len(row.Bindings) != want || (want == 1 && row.Bindings[0].Resource.Name != "removed") {
+						t.Fatal("unexpected published replacement", want, row)
+					}
+				}
+			}
+			if !found {
+				t.Fatal("missing SQL delivery")
+			}
+			removed.Store(true)
+		}
+	})
 }
