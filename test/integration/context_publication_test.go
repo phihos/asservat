@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -160,9 +159,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil || record.NativeBytes == nil || record.ExecutionDigest != f.e.PlanDigest {
 			t.Fatal("verified raw-review metadata", err)
 		}
-		qualifyRawQueryGrants(t, ctx, admin, poolFor, f.scenario, f.e, record.Version, *record.NativeBytes, func() error {
-			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
-		}, releasePermissionBurst)
+		qualifyRawQueryGrants(t, ctx, admin, poolFor, f.scenario, f.e, record.Version, *record.NativeBytes, releasePermissionBurst)
 	})
 
 	t.Run("processing-restrictions-before-publication-and-prepaid-release", func(t *testing.T) {
@@ -233,10 +230,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
-		publishAuthority := func() error {
-			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
-		}
-		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority, store, keys)
+		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, store, keys)
 	})
 
 	t.Run("access-grant-approval-children-pool-revocation-and-expiry", func(t *testing.T) {
@@ -244,10 +238,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if _, err := f.publish(ctx); err != nil {
 			t.Fatal(err)
 		}
-		publishAuthority := func() error {
-			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
-		}
-		qualifyAccessGrants(t, ctx, admin, poolFor, f.scenario, f.e, publishAuthority, releasePermissionBurst)
+		qualifyAccessGrants(t, ctx, admin, poolFor, f.scenario, f.e, releasePermissionBurst)
 	})
 
 	t.Run("capture-time-share-once-at-publication-and-owner-checked-at-admission", func(t *testing.T) {

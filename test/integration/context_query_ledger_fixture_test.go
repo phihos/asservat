@@ -40,7 +40,7 @@ func TestContextQueryLedgerWithRealPostgres(t *testing.T) {
 }
 
 func TestProfileSummaryQueryLedgerWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("profile-summary-source-and-ledger", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyContextQueries, true)
 		})
@@ -108,11 +108,11 @@ func queryLedgerQualification(t *testing.T, f *capacitySQLFixture) {
 	}
 }
 
-func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 	withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyContextQueries)
 }
 
-func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
+func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
 	isProfile := len(profileSource) > 0 && profileSource[0]
 	isComparison := len(profileSource) > 1 && profileSource[1]
 	legacyTiming := len(profileSource) > 2 && profileSource[2]

@@ -109,7 +109,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := authorityTestKeys{aead}
-	objects := &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}
 	policyObjects := &objectstore.PolicyAcceptanceObjects{Store: store, Seal: keys, Open: keys}
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	type setup struct {
@@ -120,12 +119,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		observation                 capture.PolicySource
 		input                       capture.PolicyAdmission
 		issuerEpoch                 string
-	}
-	flushPermissions := func(t *testing.T, p *postgres.Permissions) {
-		t.Helper()
-		if err := (auditapp.AuthorityPublisher{Ledger: p, Objects: objects}).PublishAuthority(ctx); err != nil {
-			t.Fatal(err)
-		}
 	}
 	newSetup := func(t *testing.T, outputCeiling ...int64) setup {
 		t.Helper()
@@ -151,7 +144,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		batch.ExpectedSequence = accepted.Sequence
-		flushPermissions(t, p)
+
 		target := authorization.Target{ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, PodUID: custodyID()}
 		projection, err := p.Permissions(ctx, target)
 		if err != nil || len(projection.Allows) != 1 {
@@ -322,71 +315,50 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("plaintext identity in object audit")
 		}
 	})
-	for _, kind := range []string{"automation-envelope", "policy-acceptance"} {
-		for _, version := range []string{"", "null"} {
-			label := version
-			if label == "" {
-				label = "empty"
-			}
-			t.Run("retained-"+kind+"-"+label, func(t *testing.T) {
-				s := newSetup(t)
-				// Give the current automation envelope its own acknowledgement:
-				// the original ordinary assignment and initial/reset receipts stay
-				// valid, so their checks cannot mask a missing envelope check.
-				rebind(t, &s)
-				s.input.Authority.Delegation = identity.Revision{UID: s.batch.Bases[0].Resource.UID, Generation: s.batch.Bases[0].Resource.Generation, Digest: s.batch.Bases[0].Resource.SpecDigest}
-				flushPermissions(t, s.p)
-				s.input.Verification = syntheticSubmissionCheck(s.input, clock())
-				accepted := accept(t, s)
-				flush(t, s)
-				baseline := eligible(s)
-				if !baseline.Eligible {
-					t.Fatal("original versioned policy unavailable", baseline)
-				}
-				deny := func() {
-					if kind == "automation-envelope" {
-						ordinary, err := s.p.Permissions(ctx, s.input.Target)
-						if err != nil || len(ordinary.Allows) != 1 || !ordinary.DeniesComplete {
-							t.Fatal("old envelope receipt affected separate ordinary assignment", err)
-						}
-						if _, err := s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target); err == nil {
-							t.Fatal("historical automation envelope became current")
-						}
-					} else if _, err := s.read.AcceptedPolicyAuthority(ctx, s.input.Authority.PolicyUID); err == nil {
-						t.Fatal("historical policy acceptance became current")
-					}
-					if eligible(s).Eligible {
-						t.Fatal("historical audit authorized policy execution")
-					}
-					// Nonce replay is historical provenance, not re-acceptance.
-					replayed, err := s.accept.AcceptPolicy(ctx, s.input)
-					if err != nil || !replayed.Replay || replayed.Record.ID != accepted.Record.ID || !replayed.Record.AcceptedAt.Equal(accepted.Record.AcceptedAt) {
-						t.Fatal("exact historical nonce replay changed", err)
-					}
-					if eligible(s).Eligible {
-						t.Fatal("historical nonce replay repaired audit authority")
-					}
-					if !clock().Before(baseline.ValidUntil) {
-						t.Fatal("historical policy denial crossed original authority deadline")
-					}
-				}
-				if kind == "automation-envelope" {
-					var event string
-					if err := admin.QueryRow(ctx, "SELECT automation_audit_id FROM permission_basis WHERE stream_id=$1 AND uid=$2", s.input.RootID, s.batch.Bases[0].Resource.UID).Scan(&event); err != nil {
-						t.Fatal(err)
-					}
-					withHistoricalAuthorityVersion(t, ctx, admin, s.input.RootID, event, version, deny)
-				} else {
-					withHistoricalAuditReceipt(t, ctx, admin,
-						"SELECT receipt_json FROM policy_acceptance WHERE root_id=$1 AND id=$2",
-						"UPDATE policy_acceptance SET receipt_json=$3 WHERE root_id=$1 AND id=$2",
-						[]any{s.input.RootID, accepted.Record.ID}, func(r *audit.Receipt) { r.Version = version }, deny)
-				}
-				if restored := eligible(s); !restored.Eligible {
-					t.Fatal("exact original policy history did not restore baseline", restored)
-				}
-			})
+	for _, version := range []string{"", "null"} {
+		label := version
+		if label == "" {
+			label = "empty"
 		}
+		t.Run("retained-policy-acceptance-"+label, func(t *testing.T) {
+			s := newSetup(t)
+			rebind(t, &s)
+			s.input.Authority.Delegation = identity.Revision{UID: s.batch.Bases[0].Resource.UID, Generation: s.batch.Bases[0].Resource.Generation, Digest: s.batch.Bases[0].Resource.SpecDigest}
+
+			s.input.Verification = syntheticSubmissionCheck(s.input, clock())
+			accepted := accept(t, s)
+			flush(t, s)
+			baseline := eligible(s)
+			if !baseline.Eligible {
+				t.Fatal("original versioned policy unavailable", baseline)
+			}
+			deny := func() {
+				if _, err := s.read.AcceptedPolicyAuthority(ctx, s.input.Authority.PolicyUID); err == nil {
+					t.Fatal("historical policy acceptance became current")
+				}
+				if eligible(s).Eligible {
+					t.Fatal("historical audit authorized policy execution")
+				}
+				// Nonce replay is historical provenance, not re-acceptance.
+				replayed, err := s.accept.AcceptPolicy(ctx, s.input)
+				if err != nil || !replayed.Replay || replayed.Record.ID != accepted.Record.ID || !replayed.Record.AcceptedAt.Equal(accepted.Record.AcceptedAt) {
+					t.Fatal("exact historical nonce replay changed", err)
+				}
+				if eligible(s).Eligible {
+					t.Fatal("historical nonce replay repaired audit authority")
+				}
+				if !clock().Before(baseline.ValidUntil) {
+					t.Fatal("historical policy denial crossed original authority deadline")
+				}
+			}
+			withHistoricalAuditReceipt(t, ctx, admin,
+				"SELECT receipt_json FROM policy_acceptance WHERE root_id=$1 AND id=$2",
+				"UPDATE policy_acceptance SET receipt_json=$3 WHERE root_id=$1 AND id=$2",
+				[]any{s.input.RootID, accepted.Record.ID}, func(r *audit.Receipt) { r.Version = version }, deny)
+			if restored := eligible(s); !restored.Eligible {
+				t.Fatal("exact original policy history did not restore baseline", restored)
+			}
+		})
 	}
 	t.Run("concurrent-nonce-replay-is-one-immutable-acceptance", func(t *testing.T) {
 		s := newSetup(t)
@@ -451,7 +423,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if _, err := s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target); err == nil {
 			t.Fatal("unaudited current envelope accepted")
 		}
-		flushPermissions(t, s.p)
+
 		current, err := s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target)
 		if err != nil {
 			t.Fatal(err)

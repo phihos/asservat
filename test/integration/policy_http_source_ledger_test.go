@@ -69,7 +69,7 @@ func httpSourceCompiler(t *testing.T, cluster, namespace string) captureapp.Poli
 // privileges. Native target/collector/fleet origins and independent human review
 // are fixture inputs; no collector, HTTP reassembly or installed proof here.
 func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects)
 		root, enrollment := f.setup(t)
 		seed, _, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)

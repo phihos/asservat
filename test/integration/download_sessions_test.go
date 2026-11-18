@@ -176,11 +176,6 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		return evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: f.allocation.ID, Scope: a.Scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20}, IdempotencyDigest: artifact.Digest{9}, Authority: a}
 	}
 
-	qualifyPermissionDownloadAuditHistory(t, ctx, admin, func(t *testing.T) permissionDownloadAuditFixture {
-		f := setup(t)
-		a := f.authority()
-		return permissionDownloadAuditFixture{runtime: f.runtime, request: request(f, a)}
-	})
 	t.Run("download-worker-installed-original-authority", func(t *testing.T) {
 		f := setupWithKeys(t, func(string) (evidence.KeySealer, evidence.KeyOpener) { return keys, keys })
 		defer f.s.nativeSources.Close()

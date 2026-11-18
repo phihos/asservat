@@ -148,11 +148,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if len(protected) > 0 && protected[0].PermissionsAccepted != nil {
 				protected[0].PermissionsAccepted(policyRecorderCloneBatch(s.batch))
 			}
-			for range 2 {
-				if err = (auditapp.AuthorityPublisher{Ledger: s.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx); err != nil {
-					t.Fatal(err)
-				}
-			}
+
 			projection, err := s.p.Permissions(ctx, target)
 			if err != nil {
 				t.Fatal(err)

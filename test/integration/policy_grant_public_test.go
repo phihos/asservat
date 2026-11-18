@@ -158,11 +158,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		t.Fatal("public reviewer acceptance", e)
 	}
 	batch.ExpectedSequence = accepted.Sequence
-	for range 2 {
-		if e = (auditapp.AuthorityPublisher{Ledger: permissions, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx); e != nil {
-			t.Fatal(e)
-		}
-	}
+
 	hubRole := narrowRole(t, ctx, admin, "policy_public_hub_", "synthetic-public-policy", func(role string) []string {
 		g, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {

@@ -32,7 +32,7 @@ import (
 // its share, revocation concurrent with reads stops every later read,
 // expiry ends a share, and a current Deny (or the loss of the pinned owner
 // assignment) wins over every share.
-func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, reader *postgres.ContextPublications, publishAuthority func() error, objects *objectstore.Store, keys authorityTestKeys) {
+func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, reader *postgres.ContextPublications, objects *objectstore.Store, keys authorityTestKeys) {
 	t.Helper()
 	role := narrowRole(t, ctx, admin, "share_hub_", "synthetic-share-hub", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)

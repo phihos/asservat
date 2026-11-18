@@ -23,7 +23,7 @@ import (
 // admission/permit/stored graph samples; no publication/native/physical-bloat/
 // backup result is inferred, nor is the synthetic guard a native installer.
 func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		profile := installedMetadataProfile
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			policyMetadataProfile(&f.qualification, &f.values)

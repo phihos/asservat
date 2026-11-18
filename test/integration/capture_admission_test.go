@@ -16,7 +16,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -71,7 +70,7 @@ func installedSQLPoolProfile(pc *pgxpool.Config) *pgxpool.Config {
 	return pc
 }
 
-// This composes real SQL admission/capacity and encrypted authority audit. IdP,
+// This composes real SQL admission, capacity and transaction-local permission audit. IdP,
 // retained policy qualification and target observations are synthetic fixtures;
 // it does not enable the public collection path or qualify fleet execution.
 func TestContextAdmissionWithRealServices(t *testing.T) {
@@ -184,7 +183,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := authorityTestKeys{aead}
-	objects := &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}
 	ledger, err := postgres.New(ctx, custodyPool)
 	if err != nil {
 		t.Fatal(err)
@@ -233,11 +231,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		batch.ExpectedSequence = accepted.Sequence
-		for j := 0; j < 2; j++ {
-			if err = (auditapp.AuthorityPublisher{Ledger: p, Objects: objects}).PublishAuthority(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
 		now = time.Now().UTC().Truncate(time.Microsecond)
 		target := targets.PodResolution{Request: targets.Request{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: namespaceName, UID: namespace}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: workload}, PodName: "api-123", PodUID: pod}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: namespace, Name: "api-123", UID: pod, NodeName: "worker", ControllerUID: "replicaset"}, NodeUID: "node", NodeBootID: custodyID(), PodResourceVersion: "10", WorkloadResourceVersion: "11", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		if source != nil {

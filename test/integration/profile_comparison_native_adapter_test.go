@@ -20,7 +20,7 @@ import (
 // supplies controlled Pod/token/issuer facts, but audit, enrollment, certificate
 // activation, native claim/binding and all six key consumptions use real SQL.
 func TestSharedProfileComparisonLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("profile-comparison-native-key-authority", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifySharedProjectionLifecycle, true, true)
 		})

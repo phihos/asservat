@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -28,7 +27,7 @@ func TestCapacityAccountsWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyCapacityAccountsSQL)
 }
 
-type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, *objectstore.AuthorityObjects)
+type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, *objectstore.Store)
 
 func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	var f fixture
@@ -59,23 +58,6 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 		t.Fatal(e)
 	}
 	address, tlsConfig := pgTLSBridge(t, u.Host)
-	request(t, f.KMS, "synthetic-root", "sys/mounts/initial-transit", map[string]any{"type": "transit"}, 204)
-	request(t, f.KMS, "synthetic-root", "initial-transit/keys/audit", map[string]any{"type": "aes256-gcm96"}, 200)
-	tokens := map[string]string{}
-	for _, op := range []string{"encrypt", "decrypt"} {
-		name := "initial-" + op
-		request(t, f.KMS, "synthetic-root", "sys/policies/acl/"+name, map[string]any{"policy": `path "initial-transit/` + op + `/audit" { capabilities=["update"] }`}, 204)
-		tokens[op] = request(t, f.KMS, "synthetic-root", "auth/token/create", map[string]any{"policies": []string{name}, "no_default_policy": true, "ttl": "15m"}, 200)["auth"].(map[string]any)["client_token"].(string)
-	}
-	keyBridge := tlsBridge(t, f.KMS)
-	seal, e := kms.NewSealer(keyBridge.URL, tokens["encrypt"], "initial-transit", "audit", keyBridge.Client())
-	if e != nil {
-		t.Fatal(e)
-	}
-	open, e := kms.NewOpener(keyBridge.URL, tokens["decrypt"], "initial-transit", "audit", keyBridge.Client())
-	if e != nil {
-		t.Fatal(e)
-	}
 	bridge := tlsBridge(t, f.S3)
 	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
 	bucket := "initial-installation"
@@ -106,6 +88,6 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	if e = postgres.SeedInstallation(ctx, seed, scope.InstallationID, scope.IssuerEpoch); e != nil {
 		t.Fatal("capacity prerequisite trust seed unavailable", e)
 	}
-	qualify(t, ctx, admin, address, tlsConfig, scope, custodyID(), &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
+	qualify(t, ctx, admin, address, tlsConfig, scope, custodyID(), store)
 	t.Log("setup trust seed and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer")
 }
