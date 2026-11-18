@@ -95,7 +95,7 @@ func (c *RetentionClient) ListRetentionPolicies(ctx context.Context) ([]value.Sc
 	defer cancel()
 	var rv string
 	out := []value.ScopedPolicy{}
-	err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", &rv, func(o permissionObject, ref configvalue.Resource) error {
+	err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", &rv, false, func(o permissionObject, ref configvalue.Resource) error {
 		out = append(out, c.policy(o, ref))
 		return nil
 	})

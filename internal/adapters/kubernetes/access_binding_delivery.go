@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -51,9 +50,9 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 		out.Items = append(out.Items, item)
 		return nil
 	}
-	err := c.list(ctx, "AccessBinding", "accessbindings", &out.ResourceVersion, appendItem)
+	err := c.list(ctx, "AccessBinding", "accessbindings", &out.ResourceVersion, false, appendItem)
 	if err == nil {
-		err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterResourceVersion, appendItem)
+		err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterResourceVersion, false, appendItem)
 	}
 	if size > contracts.AccessBindingDeliveryMaxBytes {
 		out.Items = nil
@@ -81,13 +80,8 @@ func (c *PermissionClient) clusterBindingCursor(ctx context.Context) (string, er
 	if err != nil {
 		return "", permissionError(ctx, err)
 	}
-	// Kubernetes can encode an empty metadata list with null items. Only
-	// the collection's resource version is needed to open the watch.
-	var list metav1.PartialObjectMetadataList
-	if json.Unmarshal(b, &list) != nil || list.Kind != "PartialObjectMetadataList" || list.APIVersion != "meta.k8s.io/v1" || !identity.Text(list.ResourceVersion, 128) {
-		return "", value.ErrUnavailable
-	}
-	return list.ResourceVersion, nil
+	metadata, _, err := listEnvelopeOf(b, "meta.k8s.io/v1", "PartialObjectMetadata")
+	return metadata.ResourceVersion, err
 }
 
 // DeliveredBindings validates a connector's delivery for cluster, the

@@ -84,7 +84,11 @@ grant any role there. It adds no runtime component, request or state.
   namespace's UID.
 - The hub-worker LISTs and watches AccessBindings in every namespace of the
   hub cluster (ClusterRole `get/list/watch accessbindings`). It reads a
-  namespace once per LIST of its bindings. Each ordered watch change checks
+  namespace once per LIST of its bindings. For multiple new names on a page
+  it selects just those namespaces using the control plane's immutable
+  `kubernetes.io/metadata.name` label.
+  [Kubernetes namespace labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#automatic-labelling).
+  Each ordered watch change checks
   the current incarnation before retaining the binding. A binding whose namespace is
   gone, lacks timestamps or was created after the binding (a later
   incarnation) grants and denies nothing; it does not stop the stream.

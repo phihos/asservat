@@ -12,9 +12,11 @@ a remote cluster cannot authorize fresh access even from an overlapping hub Allo
 The connector reduces its Kubernetes LIST page size when a page exceeds its
 response budget. Each page has its own request timeout. The connector follows
 continuation tokens at the same list revision until completion or caller cancellation.
-Both hub and connector process each page as it arrives. Within a list, bindings
-in a newly encountered namespace share one lookup of its identity and creation
-time. Both readers omit bindings from an earlier incarnation. An ordered hub
+Both hub and connector process each page as it arrives. Each reader looks up a
+namespace's identity and creation time once within the binding list. The hub
+batches new names on each page using Kubernetes' immutable namespace-name
+label. Connectors can use named GETs with their existing permissions. Both
+readers omit bindings from an earlier incarnation. An ordered hub
 watch event for such a binding retires its prior grant and advances the cursor.
 The connector counts the encoded envelope and both collections against the
 8 MiB transfer budget as it reads. Crossing it stops the read and reports the

@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	corev1 "k8s.io/api/core/v1"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	port "asservat.local/asservat/internal/application/configuration"
@@ -170,6 +174,9 @@ func (c *PermissionClient) raw(ctx context.Context, path string, params map[stri
 	for k, v := range params {
 		r.Param(k, v)
 	}
+	return c.rawRequest(ctx, r)
+}
+func (c *PermissionClient) rawRequest(ctx context.Context, r *rest.Request) ([]byte, error) {
 	b, err := r.DoRaw(ctx)
 	if err != nil {
 		if errors.Is(err, ErrContextUnavailable) {
@@ -231,7 +238,8 @@ func listEnvelopeOf(b []byte, apiVersion, kind string) (permissionListMetadata, 
 			return out, nil, value.ErrUnavailable
 		}
 	}
-	if json.Unmarshal(fields["items"], &items) != nil || items == nil {
+	// Kubernetes may encode an empty metadata-only collection as null.
+	if json.Unmarshal(fields["items"], &items) != nil || (items == nil && kind != "PartialObjectMetadata") {
 		return out, nil, value.ErrUnavailable
 	}
 	return out, items, nil
@@ -284,24 +292,22 @@ func (c *PermissionClient) listPath(plural string) string {
 	return "/apis/asservat.io/v1alpha1/namespaces/" + c.control.Name + "/" + plural
 }
 
-// list consumes one consistent Kubernetes collection page by page. The caller
-// uses the cursor and its accumulated observation only after successful completion.
-func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor *string, accept func(permissionObject, value.Resource) error) error {
+// listPages applies the response budget to each page and requires a consistent
+// resource version throughout. Selectors are used only for Namespace identity;
+// the binding collections must be complete.
+func (c *PermissionClient) listPages(ctx context.Context, path, version, kind, selector string, cursor *string, consume func([]json.RawMessage) error) error {
 	start := c.now()
-	continuation := ""
-	namespaces := make(map[string]permissionMetadata)
-	pageSize := permissionPageSize
-	seenUID, seenName, seenContinue := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	pageSize, continuation := permissionPageSize, ""
+	seenContinue := map[string]bool{}
 	for {
-		// Each REST request has an I/O timeout. Kubernetes binds continuation
-		// pages to the initial LIST revision, however long the whole LIST takes.
-		params := map[string]string{"limit": strconv.Itoa(pageSize)}
+		request := c.api.Get().AbsPath(path).MaxRetries(0).Param("limit", strconv.Itoa(pageSize))
 		if continuation != "" {
-			params["continue"] = continuation
+			request.Param("continue", continuation)
 		}
-		// No selectors and no resourceVersion=0: authoritative denies require
-		// a complete, most-recent list with consistent pagination.
-		b, err := c.raw(ctx, c.listPath(plural), params)
+		if selector != "" {
+			request.Param("labelSelector", selector).SetHeader("Accept", "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1")
+		}
+		b, err := c.rawRequest(ctx, request)
 		if errors.Is(err, value.ErrLimit) && pageSize > 1 {
 			pageSize /= 2
 			continue
@@ -309,7 +315,7 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor
 		if err != nil {
 			return err
 		}
-		meta, items, err := listEnvelope(b, kind)
+		meta, items, err := listEnvelopeOf(b, version, kind)
 		if err != nil {
 			return err
 		}
@@ -320,6 +326,79 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor
 		if len(items) > pageSize {
 			return value.ErrLimit
 		}
+		if err := consume(items); err != nil {
+			return err
+		}
+		if meta.Continue == "" {
+			if c.now().Before(start) {
+				return value.ErrUnavailable
+			}
+			return ctx.Err()
+		}
+		if seenContinue[meta.Continue] {
+			return value.ErrUnavailable
+		}
+		seenContinue[meta.Continue] = true
+		continuation = meta.Continue
+	}
+}
+
+type listedPermission struct {
+	object   permissionObject
+	metadata permissionMetadata
+}
+
+// Only the hub needs a whole baseline under the writer lease. Its existing
+// namespace LIST permission can place the distinct names in each binding page
+// together. One unseen name is cheaper to GET directly; get-only connectors
+// and ordered watches retain their named reads.
+func (c *PermissionClient) prefetchNamespaces(ctx context.Context, page []listedPermission, known map[string]permissionMetadata) error {
+	wanted := make(map[string]bool)
+	for _, entry := range page {
+		name := entry.metadata.Namespace
+		if _, ok := known[name]; !ok {
+			wanted[name] = true
+		}
+	}
+	if len(wanted) < 2 {
+		return nil
+	}
+	names := slices.Sorted(maps.Keys(wanted))
+	// Namespace names were validated as DNS labels. Kubernetes automatically
+	// sets this immutable label to each Namespace's own name.
+	selector := corev1.LabelMetadataName + " in (" + strings.Join(names, ",") + ")"
+	var cursor string
+	err := c.listPages(ctx, "/api/v1/namespaces", "meta.k8s.io/v1", "PartialObjectMetadata", selector, &cursor, func(items []json.RawMessage) error {
+		for _, item := range items {
+			var fields map[string]json.RawMessage
+			if json.Unmarshal(item, &fields) != nil {
+				return value.ErrUnavailable
+			}
+			ns, err := decodeMetadata(fields["metadata"], true)
+			if err != nil || !wanted[ns.Name] {
+				return value.ErrUnavailable
+			}
+			known[ns.Name] = permissionMetadata{Name: ns.Name, UID: ns.UID, Created: ns.Created}
+			delete(wanted, ns.Name)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for name := range wanted {
+		known[name] = permissionMetadata{}
+	}
+	return nil
+}
+
+// list consumes one consistent custom-resource collection page by page. The
+// caller uses its projection only after the complete LIST succeeds.
+func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor *string, batchNamespaces bool, accept func(permissionObject, value.Resource) error) error {
+	namespaces := make(map[string]permissionMetadata)
+	seenUID, seenName := map[string]bool{}, map[string]bool{}
+	return c.listPages(ctx, c.listPath(plural), "asservat.io/v1alpha1", kind, "", cursor, func(items []json.RawMessage) error {
+		page := make([]listedPermission, 0, len(items))
 		for _, item := range items {
 			o, err := objectEnvelope(item)
 			if err != nil || o.APIVersion != "asservat.io/v1alpha1" || o.Kind != kind {
@@ -331,6 +410,15 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor
 				return value.ErrUnavailable
 			}
 			seenUID[m.UID], seenName[key] = true, true
+			page = append(page, listedPermission{o, m})
+		}
+		if batchNamespaces {
+			if err := c.prefetchNamespaces(ctx, page, namespaces); err != nil {
+				return err
+			}
+		}
+		for _, entry := range page {
+			o, m := entry.object, entry.metadata
 			namespace := c.control
 			if kind == "AccessBinding" {
 				ref, err := c.placeBinding(ctx, m, namespaces)
@@ -347,25 +435,15 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor
 				return err
 			}
 		}
-		if meta.Continue == "" {
-			if c.now().Before(start) {
-				return value.ErrUnavailable
-			}
-			return ctx.Err()
-		}
-		if seenContinue[meta.Continue] {
-			return value.ErrUnavailable
-		}
-		seenContinue[meta.Continue] = true
-		continuation = meta.Continue
-	}
+		return nil
+	})
 }
 
 // PermissionSnapshot reads a baseline for the watches opened at the two LIST
 // cursors. Namespace creation times bind each object to its incarnation.
 func (c *PermissionClient) PermissionSnapshot(ctx context.Context) (value.Snapshot, error) {
 	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, ObservedAt: c.now()}
-	err := c.list(ctx, "AccessBinding", "accessbindings", &out.BindingResourceVersion, func(o permissionObject, ref value.Resource) error {
+	err := c.list(ctx, "AccessBinding", "accessbindings", &out.BindingResourceVersion, true, func(o permissionObject, ref value.Resource) error {
 		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, ref))
 		return nil
 	})
@@ -391,7 +469,7 @@ func (c *PermissionClient) PermissionSnapshot(ctx context.Context) (value.Snapsh
 // of the ordered namespaced watch.
 func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Snapshot, error) {
 	out := value.Snapshot{ClusterID: c.clusterID, ObservedAt: c.now()}
-	err := c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterBindingResourceVersion, func(o permissionObject, ref value.Resource) error {
+	err := c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterBindingResourceVersion, false, func(o permissionObject, ref value.Resource) error {
 		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, ref)...)
 		return nil
 	})
@@ -404,7 +482,7 @@ func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Sna
 // PermissionSources independently reads the optional allow-only configuration.
 func (c *PermissionClient) PermissionSources(ctx context.Context) (value.Snapshot, error) {
 	out := value.Snapshot{SourcesComplete: true}
-	err := c.list(ctx, "PermissionSource", "permissionsources", &out.SourceResourceVersion, func(o permissionObject, ref value.Resource) error {
+	err := c.list(ctx, "PermissionSource", "permissionsources", &out.SourceResourceVersion, false, func(o permissionObject, ref value.Resource) error {
 		source, err := c.validator.source(o, ref)
 		if err != nil {
 			out.InvalidSources = append(out.InvalidSources, ref)
