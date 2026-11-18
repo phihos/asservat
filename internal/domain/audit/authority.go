@@ -20,12 +20,23 @@ type AssignmentChange struct {
 // AuthorityPlaintextBytes is the maximum plaintext of one encrypted audit event.
 const AuthorityPlaintextBytes = 8 << 20
 
+// BasisChange counts assignments linked to this event by their activation or
+// retirement audit ID. The original scope remains available after replacement.
+type BasisChange struct {
+	Kind           string
+	Revision       identity.Revision
+	BasisKey       string
+	ScopeDigest    artifact.Digest
+	Added, Retired int
+}
+
 type AuthorityRecord struct {
 	ID, RootID, Epoch, Kind string
 	Sequence                int64
 	InputDigest             artifact.Digest
 	CreatedAt               time.Time
-	Changes                 []AssignmentChange
+	Changes                 []AssignmentChange     // Historical full-member records.
+	BasisChanges            []BasisChange          `json:",omitempty"`
 	Automation              []AutomationDelegation `json:",omitempty"`
 	// Namespaces is the minimized namespace observation that the accepted
 	// PermissionSource assignments were derived from (ADR-242): keys, names,
@@ -134,6 +145,14 @@ func (r AuthorityRecord) Valid() bool {
 			return false
 		}
 		delegations[a.BasisKey] = true
+	}
+	if len(r.BasisChanges) > 0 && ((r.Kind != "permission-change" && r.Kind != "permission-reset") || len(r.Changes) > 0) {
+		return false
+	}
+	for _, change := range r.BasisChanges {
+		if !identity.Text(change.BasisKey, 256) || !authorization.ValidPermissionBasisKind(change.Kind) || !change.Revision.Valid() || change.ScopeDigest == (artifact.Digest{}) || change.Added < 0 || change.Retired < 0 || change.Added+change.Retired == 0 {
+			return false
+		}
 	}
 	seen := map[string]bool{}
 	for _, c := range r.Changes {

@@ -11,10 +11,15 @@ consolidates the registration, identity, dispatch and compatibility decisions.
 - The former router, permission reader and download policy lost clusters at 17,
   65 and 33 entries respectively. Tests cover 65 registrations, a 129-cluster
   policy, and 201 populated deliveries with 20 ms injected SQL read and write
-  latency. PostgreSQL accepted and acknowledged an 8,377,659-byte canonical
-  audit event for 1,025 automation bindings. A separate real-services test
-  accepted 65 decision-time sources and retained the provenance of cluster-wide
-  Allow and Deny assignments through retirement.
+  latency. PostgreSQL accepted 32,768 assignment additions and their subsequent
+  retirement, keeping a peer’s existing grant usable throughout. One audit row
+  per transaction records the basis revisions, scope digests and counts. A
+  1,025-binding automation change produced a 1,025,354-byte canonical event.
+  The decision-time source fixture accepted 65 sources. A real permission
+  read immediately after renewal authorized the caller with the database
+  clock 500 ms ahead of the API. The existing permission publisher still
+  requires an encrypted object receipt. Its transition to database-only audit
+  under ADR-330 D6 remains open.
 - At `7f775c274`, a fresh two-cluster Kind installation ran two hub API and
   two federation replicas, with one connected remote cluster and 64 offline
   registrations. Two Helm upgrades withdrew and restored unchanged bindings on

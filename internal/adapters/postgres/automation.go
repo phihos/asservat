@@ -39,17 +39,23 @@ func NewAutomationAuthorities(ctx context.Context, pool *pgxpool.Pool, root, ins
 func (r *AutomationAuthorities) PolicyAutomationAuthority(ctx context.Context, a authorization.AcceptedPolicyAuthority, target authorization.Target) (authorization.AutomationProjection, error) {
 	var out authorization.AutomationProjection
 	err := r.permissions.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := q.SharePermissionStream(ctx, id(r.permissions.root))
+		s, offset, err := readPermissionStreamClock(ctx, q, r.permissions.root)
 		if err != nil {
 			return err
 		}
 		out, err = automationProjection(ctx, q, s, r.installation, a, target)
+		offset.automation(&out)
 		return err
 	})
 	if err != nil {
 		return authorization.AutomationProjection{}, err
 	}
 	return out, nil
+}
+
+func (offset permissionClockOffset) automation(p *authorization.AutomationProjection) {
+	p.ObservedAt, p.FreshUntil, p.NotAfter = offset.at(p.ObservedAt), offset.at(p.FreshUntil), offset.at(p.NotAfter)
+	offset.projection(&p.Permissions)
 }
 
 // Caller holds the permission stream lock for the entire transaction. Audited
@@ -178,11 +184,12 @@ func (r *AutomationAuthorities) PolicyWorkloadAutomation(ctx context.Context, ta
 	}
 	var projection authorization.AutomationProjection
 	err := r.permissions.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, err := q.SharePermissionStream(ctx, id(r.permissions.root))
+		stream, offset, err := readPermissionStreamClock(ctx, q, r.permissions.root)
 		if err != nil {
 			return err
 		}
 		projection, err = automationProjectionFor(ctx, q, stream, r.installation, basis, authorization.Target{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID}, nil)
+		offset.automation(&projection)
 		return err
 	})
 	if err != nil {

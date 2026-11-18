@@ -8,6 +8,10 @@ SELECT * FROM permission_stream WHERE id=$1 FOR UPDATE;
 -- name: SharePermissionStream :one
 SELECT * FROM permission_stream WHERE id=$1 FOR SHARE;
 
+-- name: ReadPermissionStreamClock :one
+SELECT sqlc.embed(permission_stream),clock_timestamp()::timestamptz AS read_at
+FROM permission_stream WHERE id=$1 FOR SHARE;
+
 -- name: ResetPermissionStream :exec
 UPDATE permission_stream SET epoch=$2,sequence=0,initial_audit_id=CASE WHEN trust_digest=$3 THEN initial_audit_id ELSE NULL END,trust_digest=$3,projection_digest=NULL,lease_until=clock_timestamp()+interval '30 seconds',observed_at=NULL,fresh_until=NULL,suspended=true WHERE id=$1;
 
@@ -55,9 +59,11 @@ ORDER BY b.basis_key LIMIT 2;
 -- name: ListCurrentPermissionAssignments :many
 SELECT * FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id;
 
--- name: InsertPermissionAssignments :batchone
+-- name: InsertPermissionAssignments :batchexec
+-- One insert per changed basis. The assignment and immutable activation event
+-- commit together; PostgreSQL owns the generated assignment IDs.
 INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
-VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
+SELECT gen_random_uuid(),sqlc.arg(stream_id),sqlc.arg(basis_key),unnest(sqlc.arg(kinds)::text[]),unnest(sqlc.arg(issuers)::text[]),unnest(sqlc.arg(subjects)::text[]),unnest(sqlc.arg(roles)::text[]),sqlc.arg(basis_digest),sqlc.arg(activation_audit_id);
 
 -- name: RetirePermissionAssignments :exec
 UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=sqlc.arg(audit_id) WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND retired_at IS NULL;

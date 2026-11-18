@@ -17,9 +17,9 @@ var (
 	ErrBatchAlreadyClosed = errors.New("batch already closed")
 )
 
-const insertPermissionAssignments = `-- name: InsertPermissionAssignments :batchone
+const insertPermissionAssignments = `-- name: InsertPermissionAssignments :batchexec
 INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
-VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, stream_id, basis_key, subject_kind, issuer, subject_id, role, basis_digest, created_at, retired_at, activation_audit_id, retirement_audit_id
+SELECT gen_random_uuid(),$1,$2,unnest($3::text[]),unnest($4::text[]),unnest($5::text[]),unnest($6::text[]),$7,$8
 `
 
 type InsertPermissionAssignmentsBatchResults struct {
@@ -31,24 +31,26 @@ type InsertPermissionAssignmentsBatchResults struct {
 type InsertPermissionAssignmentsParams struct {
 	StreamID          pgtype.UUID
 	BasisKey          string
-	SubjectKind       string
-	Issuer            string
-	SubjectID         string
-	Role              string
+	Kinds             []string
+	Issuers           []string
+	Subjects          []string
+	Roles             []string
 	BasisDigest       []byte
 	ActivationAuditID pgtype.UUID
 }
 
+// One insert per changed basis. The assignment and immutable activation event
+// commit together; PostgreSQL owns the generated assignment IDs.
 func (q *Queries) InsertPermissionAssignments(ctx context.Context, arg []InsertPermissionAssignmentsParams) *InsertPermissionAssignmentsBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
 			a.StreamID,
 			a.BasisKey,
-			a.SubjectKind,
-			a.Issuer,
-			a.SubjectID,
-			a.Role,
+			a.Kinds,
+			a.Issuers,
+			a.Subjects,
+			a.Roles,
 			a.BasisDigest,
 			a.ActivationAuditID,
 		}
@@ -58,33 +60,18 @@ func (q *Queries) InsertPermissionAssignments(ctx context.Context, arg []InsertP
 	return &InsertPermissionAssignmentsBatchResults{br, len(arg), false}
 }
 
-func (b *InsertPermissionAssignmentsBatchResults) QueryRow(f func(int, PermissionAssignment, error)) {
+func (b *InsertPermissionAssignmentsBatchResults) Exec(f func(int, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var i PermissionAssignment
 		if b.closed {
 			if f != nil {
-				f(t, i, ErrBatchAlreadyClosed)
+				f(t, ErrBatchAlreadyClosed)
 			}
 			continue
 		}
-		row := b.br.QueryRow()
-		err := row.Scan(
-			&i.ID,
-			&i.StreamID,
-			&i.BasisKey,
-			&i.SubjectKind,
-			&i.Issuer,
-			&i.SubjectID,
-			&i.Role,
-			&i.BasisDigest,
-			&i.CreatedAt,
-			&i.RetiredAt,
-			&i.ActivationAuditID,
-			&i.RetirementAuditID,
-		)
+		_, err := b.br.Exec()
 		if f != nil {
-			f(t, i, err)
+			f(t, err)
 		}
 	}
 }

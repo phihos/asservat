@@ -409,18 +409,12 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 				initial = r
 			}
 		}
-		if len(initial.Automation) != 1025 || len(initial.Changes) != 1025 {
-			t.Fatal("incomplete automatic delegations", len(initial.Automation), len(initial.Changes))
+		if len(initial.Automation) != 1025 || len(initial.BasisChanges) != 1025 {
+			t.Fatal("incomplete automatic delegations", len(initial.Automation), len(initial.BasisChanges))
 		}
 		flush(t, s.p)
-		// Derive the issuer length from the real compact record so its SQL
-		// representation crosses 8 MiB while its canonical plaintext fits.
-		initial.Changes = slices.Repeat(initial.Changes, 4)
-		body, err := json.Marshal(initial)
-		if err != nil {
-			t.Fatal(err)
-		}
-		issuer := template.Subjects[0].Issuer + strings.Repeat("a", (audit.AuthorityPlaintextBytes-8192-len(body))/len(initial.Changes))
+		// Long issuers remain on their own immutable assignment rows.
+		issuer := template.Subjects[0].Issuer + strings.Repeat("a", 1536)
 		for i := range s.b.Bases {
 			b := &s.b.Bases[i]
 			b.Subjects = slices.Clone(template.Subjects)
@@ -434,20 +428,21 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		}
 		s.b = fresh(s.b)
 		accept(t, &s)
-		var stored int
-		if err := admin.QueryRow(ctx, `SELECT octet_length(record::text) FROM authority_audit WHERE id=$1`, s.b.RequestID).Scan(&stored); err != nil || stored <= audit.AuthorityPlaintextBytes {
-			t.Fatal("expected expanded SQL JSON above plaintext budget", stored, err)
-		}
 		rows, err = s.p.PendingAuthorityAudits(ctx)
-		if err != nil || len(rows) != 1 || len(rows[0].Changes) != 4100 || len(rows[0].Automation) != 1025 {
-			t.Fatal("unreadable near-limit audit", len(rows), err)
+		if err != nil || len(rows) != 1 || len(rows[0].BasisChanges) != 1025 || len(rows[0].Automation) != 1025 {
+			t.Fatal("missing per-basis audit details", len(rows), err)
 		}
-		body, err = json.Marshal(rows[0])
-		if err != nil || len(body) > audit.AuthorityPlaintextBytes {
-			t.Fatal("audit exceeded canonical budget", len(body), err)
+		for _, c := range rows[0].BasisChanges {
+			if c.Added != 4 || c.Retired != 0 {
+				t.Fatal("wrong assignment delta", c)
+			}
+		}
+		body, err := json.Marshal(rows[0])
+		if err != nil || len(body) > audit.AuthorityPlaintextBytes || bytes.Contains(body, []byte(issuer)) {
+			t.Fatal("audit repeated a per-assignment issuer", len(body), err)
 		}
 		flush(t, s.p)
-		t.Logf("acknowledged %d-byte canonical event (%d-byte PostgreSQL rendering)", len(body), stored)
+		t.Logf("acknowledged %d-byte canonical event", len(body))
 	})
 	t.Run("remote-bindings-after-fleet-grows", func(t *testing.T) {
 		root := custodyID()
@@ -916,6 +911,162 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		var count int
 		if err = admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1", s.b.RootID).Scan(&count); err != nil || count != 2 {
 			t.Fatal("heartbeat appended audit")
+		}
+	})
+	t.Run("expanded-remote-change-retains-healthy-peer", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		old := projection(t, s).Allows[0].Audience
+		remote := custodyID()
+		bases := s.b.Bases[:1:1]
+		for i := 0; i < 32; i++ {
+			b := s.b.Bases[0]
+			b.Resource.Kind = cfg.ClusterAccessBindingKind
+			b.Resource.UID = custodyID()
+			b.Scope = cfg.Scope{ClusterID: remote, Namespace: cfg.AllNamespaces}
+			b.ScopeDigest = configapp.PermissionScopeDigest(b)
+			b.Roles = cfg.Roles
+			b.Subjects = nil
+			for j := 0; j < 256; j++ {
+				b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: old.Issuer, ID: fmt.Sprintf("team-%d-%d", i, j)})
+			}
+			bases = append(bases, b)
+		}
+		s.b = fresh(s.b)
+		s.b.Bases = bases
+		s.b.Bases[0].Continuous = true
+		accept(t, &s)
+		healthy := func() {
+			t.Helper()
+			p := projection(t, s)
+			now := time.Now()
+			who := identity.Identity{Principal: identity.Principal{Issuer: old.Issuer, Subject: "alice", ClientID: "console", Kind: identity.Human}, Groups: []string{old.SubjectID}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			if got := authorization.ContextEligibility(who, p, s.target, now); !got.Eligible || len(got.DefaultAudience) != 1 || got.DefaultAudience[0] != old {
+				t.Fatal("healthy peer lost its existing assignment", got)
+			}
+		}
+		healthy()
+		activation := s.b.RequestID
+		var cnt int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM permission_assignment WHERE stream_id=$1 AND activation_audit_id=$2", s.b.RootID, activation).Scan(&cnt); err != nil || cnt != 32768 {
+			t.Fatal("incomplete atomic write", cnt, err)
+		}
+		rows, err := s.p.PendingAuthorityAudits(ctx)
+		if err != nil || len(rows) != 1 || rows[0].ID != activation || len(rows[0].BasisChanges) != 32 {
+			t.Fatal("missing single large-delta audit", len(rows), err)
+		}
+		for _, c := range rows[0].BasisChanges {
+			if c.Added != 1024 || c.Retired != 0 {
+				t.Fatal("incorrect addition count", c)
+			}
+		}
+		remoteTarget := s.target
+		remoteTarget.ClusterID = remote
+		unacknowledged, err := s.p.Permissions(ctx, remoteTarget)
+		if err != nil || len(unacknowledged.Allows) != 0 {
+			t.Fatal("unaudited additions conferred access", len(unacknowledged.Allows), err)
+		}
+		flush(t, s.p)
+		audited, err := s.p.Permissions(ctx, remoteTarget)
+		if err != nil || len(audited.Allows) != 32768 {
+			t.Fatal("audited assignments missing", len(audited.Allows), err)
+		}
+		var assignment string
+		first := bases[1]
+		if err := admin.QueryRow(ctx, `SELECT id FROM permission_assignment WHERE stream_id=$1 AND activation_audit_id=$2 AND basis_key=$3 AND subject_kind='Group' AND issuer=$4 AND subject_id='team-0-0' AND role='evidence-reader' AND basis_digest=$5`, s.b.RootID, activation, first.Key(), old.Issuer, first.Resource.SpecDigest[:]).Scan(&assignment); err != nil {
+			t.Fatal("cannot resolve original member from activation", err)
+		}
+		// Remove the whole remote set. No current basis is needed to recover
+		// the retired assignment's identity, source and original scope.
+		s.b = fresh(s.b)
+		s.b.Bases = s.b.Bases[:1]
+		accept(t, &s)
+		healthy()
+		rows, err = s.p.PendingAuthorityAudits(ctx)
+		if err != nil || len(rows) != 1 || rows[0].ID != s.b.RequestID || len(rows[0].BasisChanges) != 32 {
+			t.Fatal("missing single retirement audit", len(rows), err)
+		}
+		if !slices.Contains(rows[0].BasisChanges, audit.BasisChange{BasisKey: first.Key(), Kind: first.Resource.Kind, Revision: identity.Revision{UID: first.Resource.UID, Generation: first.Resource.Generation, Digest: first.Resource.SpecDigest}, ScopeDigest: first.ScopeDigest, Retired: 1024}) {
+			t.Fatal("original scope lost on retirement")
+		}
+		var provenance bool
+		if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM permission_assignment WHERE id=$1 AND stream_id=$2 AND activation_audit_id=$3 AND retirement_audit_id=$4 AND basis_key=$5 AND basis_digest=$6 AND role='evidence-reader' AND subject_id='team-0-0' AND retired_at IS NOT NULL)`, assignment, s.b.RootID, activation, s.b.RequestID, first.Key(), first.Resource.SpecDigest[:]).Scan(&provenance); err != nil || !provenance {
+			t.Fatal("lost event-linked original member after removal", err)
+		}
+
+		replacement := first
+		replacement.Resource.Generation++
+		replacement.Resource.ResourceVersion = "new"
+		replacement.Resource.SpecDigest[0]++
+		replacement.NotAfter = time.Now().UTC().Add(time.Hour)
+		replacement.ScopeDigest = configapp.PermissionScopeDigest(replacement)
+		replacement.Subjects = first.Subjects[:1]
+		s.b = fresh(s.b)
+		s.b.Bases = append(s.b.Bases, replacement)
+		accept(t, &s)
+		var current []byte
+		if err = admin.QueryRow(ctx, "SELECT scope_digest FROM permission_basis WHERE stream_id=$1 AND basis_key=$2", s.b.RootID, first.Key()).Scan(&current); err != nil || !bytes.Equal(current, replacement.ScopeDigest[:]) || bytes.Equal(current, first.ScopeDigest[:]) {
+			t.Fatal("scope replacement failed", err)
+		}
+		var historical audit.AuthorityRecord
+		var historicalBytes []byte
+		if err = admin.QueryRow(ctx, "SELECT record FROM authority_audit WHERE id=$1", activation).Scan(&historicalBytes); err != nil || json.Unmarshal(historicalBytes, &historical) != nil || !slices.Contains(historical.BasisChanges, audit.BasisChange{BasisKey: first.Key(), Kind: first.Resource.Kind, Revision: identity.Revision{UID: first.Resource.UID, Generation: first.Resource.Generation, Digest: first.Resource.SpecDigest}, ScopeDigest: first.ScopeDigest, Added: 1024}) {
+			t.Fatal("scope replacement lost activation provenance", err)
+		}
+
+	})
+	t.Run("post-renewal-api-clock-behind", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		// This pool alone sees PostgreSQL half a second ahead of the API.
+		// Neither the host clock nor concurrent database sessions are changed.
+		_, err := admin.Exec(ctx, `CREATE SCHEMA permission_test_clock;
+CREATE FUNCTION permission_test_clock.clock_timestamp() RETURNS timestamptz LANGUAGE sql VOLATILE AS $$SELECT pg_catalog.clock_timestamp()+interval '500 milliseconds'$$;
+CREATE FUNCTION permission_test_clock.statement_timestamp() RETURNS timestamptz LANGUAGE sql STABLE AS $$SELECT pg_catalog.statement_timestamp()+interval '500 milliseconds'$$;
+GRANT USAGE ON SCHEMA permission_test_clock TO authority_runtime`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := admin.Exec(ctx, "DROP SCHEMA permission_test_clock CASCADE"); err != nil {
+				t.Error(err)
+			}
+		}()
+		config := pool.Config()
+		config.ConnConfig.RuntimeParams["search_path"] = "permission_test_clock, pg_catalog, public"
+		shifted, err := pgxpool.NewWithConfig(ctx, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer shifted.Close()
+		s.p, err = postgres.NewPermissions(ctx, shifted, s.b.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, TrustDigest: s.b.TrustDigest, Sequence: s.b.ExpectedSequence, Initialized: true}
+		if _, err = s.p.RenewPermissions(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		var stamp, until time.Time
+		if err = admin.QueryRow(ctx, "SELECT observed_at,fresh_until FROM permission_stream WHERE id=$1", s.b.RootID).Scan(&stamp, &until); err != nil {
+			t.Fatal(err)
+		}
+		p := projection(t, s)
+		now := time.Now()
+		if !stamp.After(now) {
+			t.Fatal("fixture did not exercise clock skew", stamp, now)
+		}
+		who := identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "alice", ClientID: "console", Kind: identity.Human}, Groups: []string{"team-a"}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(time.Minute)}
+		workload := authorization.WorkloadTarget{ClusterID: s.target.ClusterID, NamespaceUID: s.target.NamespaceUID, WorkloadUID: s.target.WorkloadUID}
+		wp, err := s.p.WorkloadPermissions(ctx, workload)
+		if err != nil || !authorization.WorkloadScopeEligibility(who, wp, authorization.CollectContext, workload, time.Now()).Eligible {
+			t.Fatal("renewal disabled workload permissions", wp.ObservedAt, err)
+		}
+		got := authorization.ContextEligibility(who, p, s.target, now)
+		if !got.Eligible || p.FreshUntil.After(until.Add(-500*time.Millisecond)) || authorization.ContextEligibility(who, p, s.target, p.FreshUntil).Eligible {
+			t.Fatal("SQL-clock renewal changed the API decision or extended its deadline", got.Reason, p.ObservedAt, p.FreshUntil, until)
 		}
 	})
 	t.Run("post-renewal-worker-clock-behind", func(t *testing.T) {

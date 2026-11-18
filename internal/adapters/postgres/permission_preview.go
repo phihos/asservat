@@ -26,7 +26,7 @@ import (
 func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
 	var out cfg.PreviewSnapshot
 	err := p.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := q.SharePermissionStream(ctx, id(p.root))
+		s, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
 		}
@@ -166,6 +166,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 					if err = previewReviews(ctx, q, &cell, reviewRows, reviewSource); err != nil {
 						return err
 					}
+					offset.projection(&cell.Projection)
 				case errors.Is(err, cfg.ErrUnavailable):
 					cell.Unavailable = authorization.UnmetPermissionStale
 				case errors.Is(err, cfg.ErrLimit):

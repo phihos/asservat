@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"time"
 
@@ -94,15 +95,13 @@ func liveStream(ctx context.Context, q *custodydb.Queries, s custodydb.Permissio
 	}
 	return nil
 }
-func assignmentAudience(a custodydb.PermissionAssignment, b custodydb.PermissionBasis) artifact.AudienceAssignment {
-	out := artifact.AudienceAssignment{Kind: a.SubjectKind, Issuer: a.Issuer, SubjectID: a.SubjectID, Role: a.Role, BasisKind: b.Kind, BasisUID: b.Uid, AssignmentID: uid(a.ID)}
-	copy(out.BasisDigest[:], a.BasisDigest)
-	return out
-}
-func change(a custodydb.PermissionAssignment, b custodydb.PermissionBasis, kind string) audit.AssignmentChange {
-	c := audit.AssignmentChange{ID: uid(a.ID), Change: kind, Audience: assignmentAudience(a, b)}
-	copy(c.ScopeDigest[:], b.ScopeDigest)
-	return c
+func retiredBases(counts map[string]int, bases map[string]custodydb.PermissionBasis) []audit.BasisChange {
+	var changes []audit.BasisChange
+	for _, key := range slices.Sorted(maps.Keys(counts)) {
+		basis := bases[key]
+		changes = append(changes, audit.BasisChange{BasisKey: key, Kind: basis.Kind, Revision: identity.Revision{UID: basis.Uid, Generation: basis.Generation, Digest: artifact.Digest(basis.SpecDigest)}, ScopeDigest: artifact.Digest(basis.ScopeDigest), Retired: counts[key]})
+	}
+	return changes
 }
 func currentPermissionRows(ctx context.Context, q *custodydb.Queries, root string) (map[string]custodydb.PermissionBasis, []custodydb.PermissionAssignment, error) {
 	bases, err := q.ListPermissionBases(ctx, id(root))
@@ -181,9 +180,11 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 		// reconciliation against exact observed versions. Trust replacement retires
 		// everything; equal final values alone never establish continuity.
 		if !bytes.Equal(s.TrustDigest, trust[:]) {
+			counts := map[string]int{}
 			for _, a := range rows {
-				record.Changes = append(record.Changes, change(a, bases[a.BasisKey], "retired"))
+				counts[a.BasisKey]++
 			}
+			record.BasisChanges = retiredBases(counts, bases)
 			if _, err = q.RetirePermissionStream(ctx, custodydb.RetirePermissionStreamParams{StreamID: id(root), RetirementAuditID: id(epoch)}); err != nil {
 				return err
 			}
@@ -405,6 +406,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		record.Namespaces = b.Namespaces
 		record.RemoteNamespaces = b.RemoteNamespaces
 		record.Workloads = b.Workloads
+		retiredCounts := map[string]int{}
 		var retired []pgtype.UUID
 		for _, a := range rows {
 			basis, exists := next[a.BasisKey]
@@ -421,9 +423,10 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 				continue
 			}
 			retired = append(retired, a.ID)
-			record.Changes = append(record.Changes, change(a, old, "retired"))
+			retiredCounts[a.BasisKey]++
 		}
 		if len(retired) > 0 {
+			record.BasisChanges = retiredBases(retiredCounts, bases)
 			if err := q.RetirePermissionAssignments(ctx, custodydb.RetirePermissionAssignmentsParams{Ids: retired, AuditID: id(record.ID)}); err != nil {
 				return err
 			}
@@ -455,14 +458,21 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 				record.Automation = append(record.Automation, audit.AutomationDelegation{BasisKey: basis.Key(), Revision: identity.Revision{UID: basis.Resource.UID, Generation: basis.Resource.Generation, Digest: basis.Resource.SpecDigest}, ScopeDigest: basis.ScopeDigest, Envelope: *basis.Automation})
 			}
 			basisWrites = append(basisWrites, params)
+			add := custodydb.InsertPermissionAssignmentsParams{StreamID: s.ID, BasisKey: basis.Key(), BasisDigest: basis.Resource.SpecDigest[:], ActivationAuditID: id(record.ID)}
 			for _, subject := range basis.Subjects {
 				for _, role := range basis.Roles {
-					key := memberKey{basis.Key(), subject.Kind, subject.Issuer, subject.ID, role}
-					if wanted[key] {
+					if wanted[memberKey{add.BasisKey, subject.Kind, subject.Issuer, subject.ID, role}] {
 						continue
 					}
-					additions = append(additions, custodydb.InsertPermissionAssignmentsParams{StreamID: s.ID, BasisKey: basis.Key(), SubjectKind: subject.Kind, Issuer: subject.Issuer, SubjectID: subject.ID, Role: role, BasisDigest: basis.Resource.SpecDigest[:], ActivationAuditID: id(record.ID)})
+					add.Kinds = append(add.Kinds, subject.Kind)
+					add.Issuers = append(add.Issuers, subject.Issuer)
+					add.Subjects = append(add.Subjects, subject.ID)
+					add.Roles = append(add.Roles, role)
 				}
+			}
+			if len(add.Roles) > 0 {
+				additions = append(additions, add)
+				record.BasisChanges = append(record.BasisChanges, audit.BasisChange{BasisKey: add.BasisKey, Kind: basis.Resource.Kind, Revision: identity.Revision{UID: basis.Resource.UID, Generation: basis.Resource.Generation, Digest: basis.Resource.SpecDigest}, ScopeDigest: basis.ScopeDigest, Added: len(add.Roles)})
 			}
 		}
 		if len(basisWrites) > 0 {
@@ -471,16 +481,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 			}
 		}
 		if len(additions) > 0 {
-			added := q.InsertPermissionAssignments(ctx, additions)
-			added.QueryRow(func(_ int, a custodydb.PermissionAssignment, readErr error) {
-				if readErr != nil {
-					err = readErr
-					return
-				}
-				basis := next[a.BasisKey]
-				record.Changes = append(record.Changes, change(a, custodydb.PermissionBasis{Kind: basis.Resource.Kind, Uid: basis.Resource.UID, ScopeDigest: basis.ScopeDigest[:]}, "added"))
-			})
-			if err := errors.Join(err, added.Close()); err != nil {
+			if err := q.InsertPermissionAssignments(ctx, additions).Close(); err != nil {
 				return err
 			}
 		}
@@ -562,17 +563,43 @@ func (p *Permissions) RefreshPermissions(ctx context.Context, b cfg.PermissionBa
 	})
 }
 
+// SQL validates observations on the database clock. Application decisions
+// use their local clock. Sampling both during the existing stream read keeps
+// the remaining lifetime and can only narrow the original absolute deadline.
+type permissionClockOffset time.Duration
+
+func readPermissionStreamClock(ctx context.Context, q *custodydb.Queries, root string) (custodydb.PermissionStream, permissionClockOffset, error) {
+	start := time.Now()
+	row, err := q.ReadPermissionStreamClock(ctx, id(root))
+	return row.PermissionStream, permissionClockOffset(min(time.Duration(0), start.Sub(row.ReadAt.Time))), err
+}
+func (offset permissionClockOffset) at(t time.Time) time.Time {
+	if t.IsZero() {
+		return t
+	}
+	return t.Add(time.Duration(offset))
+}
+func (offset permissionClockOffset) projection(p *authorization.Projection) {
+	p.ObservedAt, p.FreshUntil = offset.at(p.ObservedAt), offset.at(p.FreshUntil)
+	p.DeniesObservedAt, p.DeniesFreshUntil = offset.at(p.DeniesObservedAt), offset.at(p.DeniesFreshUntil)
+	for _, rows := range [][]authorization.CurrentAssignment{p.Allows, p.Denies} {
+		for i := range rows {
+			rows[i].ObservedAt, rows[i].FreshUntil = offset.at(rows[i].ObservedAt), offset.at(rows[i].FreshUntil)
+		}
+	}
+}
 func (p *Permissions) Permissions(ctx context.Context, target authorization.Target) (authorization.Projection, error) {
 	var out authorization.Projection
 	if !target.Valid() {
 		return out, cfg.ErrInvalid
 	}
 	err := p.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := q.SharePermissionStream(ctx, id(p.root))
+		s, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
 		}
 		out, err = permissionProjection(ctx, q, s, target)
+		offset.projection(&out)
 		return err
 	})
 	if err != nil {
@@ -590,11 +617,12 @@ func (p *Permissions) WorkloadPermissions(ctx context.Context, target authorizat
 	}
 	var concrete authorization.Projection
 	err := p.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, err := q.SharePermissionStream(ctx, id(p.root))
+		stream, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
 		}
 		concrete, err = permissionProjection(ctx, q, stream, authorization.Target{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID})
+		offset.projection(&concrete)
 		return err
 	})
 	if err != nil {

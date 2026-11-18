@@ -357,6 +357,36 @@ func (q *Queries) ReadPermissionChangeRecord(ctx context.Context, arg ReadPermis
 	return record, err
 }
 
+const readPermissionStreamClock = `-- name: ReadPermissionStreamClock :one
+SELECT permission_stream.id, permission_stream.epoch, permission_stream.sequence, permission_stream.trust_digest, permission_stream.projection_digest, permission_stream.lease_until, permission_stream.observed_at, permission_stream.fresh_until, permission_stream.suspended, permission_stream.initial_audit_id, permission_stream.unavailable_clusters,clock_timestamp()::timestamptz AS read_at
+FROM permission_stream WHERE id=$1 FOR SHARE
+`
+
+type ReadPermissionStreamClockRow struct {
+	PermissionStream PermissionStream
+	ReadAt           pgtype.Timestamptz
+}
+
+func (q *Queries) ReadPermissionStreamClock(ctx context.Context, id pgtype.UUID) (ReadPermissionStreamClockRow, error) {
+	row := q.db.QueryRow(ctx, readPermissionStreamClock, id)
+	var i ReadPermissionStreamClockRow
+	err := row.Scan(
+		&i.PermissionStream.ID,
+		&i.PermissionStream.Epoch,
+		&i.PermissionStream.Sequence,
+		&i.PermissionStream.TrustDigest,
+		&i.PermissionStream.ProjectionDigest,
+		&i.PermissionStream.LeaseUntil,
+		&i.PermissionStream.ObservedAt,
+		&i.PermissionStream.FreshUntil,
+		&i.PermissionStream.Suspended,
+		&i.PermissionStream.InitialAuditID,
+		&i.PermissionStream.UnavailableClusters,
+		&i.ReadAt,
+	)
+	return i, err
+}
+
 const rememberWorkloadName = `-- name: RememberWorkloadName :exec
 INSERT INTO workload_name(cluster_id,workload_uid,ref) VALUES($1,$2,$3) ON CONFLICT DO NOTHING
 `
