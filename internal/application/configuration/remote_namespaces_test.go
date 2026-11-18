@@ -118,7 +118,7 @@ func TestConfigurationChangeReadsNewRemoteMetadataSource(t *testing.T) {
 	f.snapshot.ObservedAt = s.r.Now()
 	r := &remoteFixture{list: value.NamespaceList{ResourceVersion: "joined", ObservedAt: f.snapshot.ObservedAt, Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "joined:0", "payments")}}}
 	s.r.Remote = r
-	if err := s.refresh(ctx); err != nil {
+	if err := s.sourceSnapshot(ctx, f.snapshot); err != nil {
 		t.Fatal(err)
 	}
 	latest := f.accepted[len(f.accepted)-1]

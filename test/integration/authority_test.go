@@ -76,6 +76,9 @@ func (f remoteBindingHubFixture) PermissionSnapshot(context.Context) (cfg.Snapsh
 	return cfg.Snapshot{ClusterID: f.cluster, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: f.cluster}, BindingResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second), SourcesComplete: true, Bindings: f.bindings}, nil
 }
 
+func (f remoteBindingHubFixture) ClusterAccessBindings(ctx context.Context) (cfg.Snapshot, error) {
+	return f.PermissionSnapshot(ctx)
+}
 func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.PermissionTrust, error) {
 	now := time.Now()
 	return configapp.PermissionTrust{Digest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
@@ -904,6 +907,43 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err = admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1", s.b.RootID).Scan(&count); err != nil || count != 2 {
 			t.Fatal("heartbeat appended audit")
 		}
+	})
+	t.Run("post-renewal-worker-clock-behind", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		initial := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, Sequence: s.b.ExpectedSequence, TrustDigest: s.b.TrustDigest, Initialized: true}
+		if _, err := s.p.RenewPermissions(ctx, initial); err != nil {
+			t.Fatal(err)
+		}
+		var renewed time.Time
+		if err := admin.QueryRow(ctx, "SELECT observed_at FROM permission_stream WHERE id=$1", s.b.RootID).Scan(&renewed); err != nil {
+			t.Fatal(err)
+		}
+		next(&s)
+		s.b.Bases[0].Subjects[0].ID = "new-owner"
+		s.b.ObservedAt = renewed.Add(-500 * time.Millisecond)
+		s.b.FreshUntil = s.b.ObservedAt.Add(5 * time.Second)
+		accept(t, &s)
+		if s.b.ExpectedSequence != initial.Sequence+1 {
+			t.Fatal("change lost its sequence", s.b.ExpectedSequence)
+		}
+		flush(t, s.p)
+		got := projection(t, s)
+		if got.Revision.UID != initial.Epoch || got.Revision.Generation != s.b.ExpectedSequence || len(got.Allows) != 1 || got.Allows[0].Audience.SubjectID != "new-owner" {
+			t.Fatal("renewal disrupted the ordered edit", got)
+		}
+		stale := fresh(s.b)
+		stale.ExpectedSequence = initial.Sequence
+		if _, err := s.p.AcceptPermissions(ctx, stale); !errors.Is(err, cfg.ErrChanged) {
+			t.Fatal("stale sequence", err)
+		}
+		expired := fresh(s.b)
+		expired.ObservedAt = renewed.Add(-6 * time.Second)
+		expired.FreshUntil = expired.ObservedAt.Add(5 * time.Second)
+		if _, err := s.p.AcceptPermissions(ctx, expired); !errors.Is(err, cfg.ErrInvalid) {
+			t.Fatal("expired original deadline", err)
+		}
+
 	})
 	t.Run("ownership-A-B-A-does-not-resurrect", func(t *testing.T) {
 		s := create(t)

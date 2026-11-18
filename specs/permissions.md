@@ -142,7 +142,10 @@ Concurrent deliveries from one connector must preserve the latest accepted
 observation. A connector whose original comparison has become stale rereads
 the cluster before retrying. Wall-clock differences between replicas cannot
 discard a committed change. Readers see assignment additions and retirements
-together. Idle lease renewal does not rebuild the fleet.
+together. The hub processes namespaced AccessBinding events in order and reads
+the ClusterAccessBinding collection independently when it changes. The writer
+epoch and sequence order accepted changes. Idle lease renewal maintains
+freshness without rebuilding the fleet or advancing its sequence.
 
 The 8 MiB plaintext budget applies to one authority audit event, which the audit
 format encrypts and verifies as a whole. PostgreSQL's expanded representation

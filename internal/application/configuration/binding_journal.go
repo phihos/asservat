@@ -16,7 +16,6 @@ import (
 // PermissionStore acceptance are still required. Use one serial coordinator.
 type BindingJournal struct {
 	cluster         string
-	control         value.NamespaceRef
 	byUID           map[string]value.Binding
 	names           map[string]string
 	cursor          string
@@ -54,7 +53,7 @@ func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error)
 	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) {
 		return nil, value.ErrInvalid
 	}
-	j := &BindingJournal{cluster: s.ClusterID, control: s.ControlNamespace, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
+	j := &BindingJournal{cluster: s.ClusterID, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
 	for _, b := range s.Bindings {
 		if !journalIdentity(b, j.cluster) || j.names[bindingName(b.Resource)] != "" {
 			return nil, value.ErrInvalid
@@ -70,15 +69,6 @@ func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error)
 
 func (j *BindingJournal) Cursor() string { return j.cursor }
 
-// Constrain preserves the original list deadline while also bounding it by the
-// guard/review observation. It never makes an old source observation fresh.
-func (j *BindingJournal) Constrain(until time.Time) error {
-	if j.pending != nil || !until.After(j.observed) {
-		return value.ErrChanged
-	}
-	j.until = identity.Earlier(j.until, until)
-	return nil
-}
 func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	if j.poisoned || !j.accepted || j.pending != nil {
 		return value.ErrChanged
@@ -138,26 +128,6 @@ func equalBinding(a, b value.Binding) bool {
 	return string(x) == string(y)
 }
 
-// Confirm refreshes completeness only when a current full LIST exactly agrees
-// with the processed watch state. A bookmark or a successful unrelated GET is
-// not evidence that the complete deny set is fresh. Mismatch means catch up or
-// start a new baseline; never replace the journal and claim continuity.
-func (j *BindingJournal) Confirm(s value.Snapshot, now time.Time) error {
-	if j.poisoned || j.pending != nil || !j.accepted || s.ClusterID != j.cluster || s.ControlNamespace != j.control || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || !s.ObservedAt.After(j.observed) || len(s.Bindings) != len(j.byUID) {
-		return value.ErrChanged
-	}
-	seen := map[string]bool{}
-	for _, b := range s.Bindings {
-		old, exists := j.byUID[b.Resource.UID]
-		if !exists || seen[b.Resource.UID] || !equalBinding(old, b) {
-			return value.ErrChanged
-		}
-		seen[b.Resource.UID] = true
-	}
-	j.observed = s.ObservedAt
-	j.until = s.FreshUntil
-	return nil
-}
 func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 	b.UnavailableClusters = slices.Clone(b.UnavailableClusters)
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)

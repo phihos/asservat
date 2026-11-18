@@ -139,7 +139,7 @@ func TestReconcilerRereadsRemoteBindingsOnSignal(t *testing.T) {
 	now := s.r.Now()
 	reader := &countingRemoteBindings{remoteBindingFixture: remoteBindingFixture{deliveries: []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: now, Bindings: []value.Binding{remoteBinding(remoteCluster, "readers", "uid-allow", "Allow")}}}}}
 	s.r.RemoteBindings = reader
-	if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
+	if err := s.refreshClusterBindings(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if reader.reads != 0 {

@@ -33,6 +33,9 @@ type reconciliationFixture struct {
 func (f *reconciliationFixture) PermissionSnapshot(context.Context) (value.Snapshot, error) {
 	return f.snapshot, nil
 }
+func (f *reconciliationFixture) ClusterAccessBindings(context.Context) (value.Snapshot, error) {
+	return value.Snapshot{ClusterID: f.snapshot.ClusterID, ClusterBindings: f.snapshot.ClusterBindings, ObservedAt: f.snapshot.ObservedAt, FreshUntil: f.snapshot.FreshUntil}, nil
+}
 func (f *reconciliationFixture) PermissionTrust(context.Context) (PermissionTrust, error) {
 	f.trustCalls++
 	t := f.trust
@@ -181,19 +184,56 @@ func TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner(t *testing.T) {
 		}
 	}
 }
-func TestBindingReconcilerListCannotSkipPendingOwner(t *testing.T) {
-	f, r := reconciliationTest(t)
-	s := &bindingRun{r: r}
-	if err := s.start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	f.snapshot.Bindings[0].Resource.ResourceVersion = "future-rv"
-	f.snapshot.ObservedAt = f.snapshot.ObservedAt.Add(time.Microsecond)
-	if err := s.refresh(context.Background()); !errors.Is(err, errWatchBehind) {
-		t.Fatal(err)
-	}
-	if len(f.accepted) != 1 || s.journal.Cursor() != f.snapshot.BindingResourceVersion {
-		t.Fatal("full list skipped watch history")
+func TestBindingReconcilerIndependentBindingChangesAfterIdle(t *testing.T) {
+	for _, clusterFirst := range []bool{true, false} {
+		t.Run(fmt.Sprintf("cluster-first-%t", clusterFirst), func(t *testing.T) {
+			f, r := reconciliationTest(t)
+			clock := f.snapshot.ObservedAt
+			r.Now = func() time.Time { return clock }
+			s := &bindingRun{r: r}
+			if err := s.start(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			clock = clock.Add(time.Minute)
+			f.snapshot.ObservedAt, f.snapshot.FreshUntil = clock, clock.Add(5*time.Second)
+			f.trust.ObservedAt, f.trust.FreshUntil = clock, clock.Add(5*time.Second)
+			direct := cloneBinding(f.snapshot.Bindings[0])
+			direct.Resource.ResourceVersion = "changed-direct"
+			direct.Resource.Generation++
+			direct.Resource.SpecDigest[0]++
+			direct.Subjects[0].ID = "new-direct-owner"
+			f.snapshot.Bindings = []value.Binding{direct}
+			cluster := value.Binding{Resource: value.Resource{ClusterID: f.snapshot.ClusterID, Kind: value.ClusterAccessBindingKind, Name: "fleet-deny", UID: "cluster-deny", Generation: 1, ResourceVersion: "1", SpecDigest: artifact.Digest{7}}, Effect: "Deny", Subjects: []value.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "group"}}, Roles: []string{"evidence-reader"}, Scope: value.Scope{ClusterID: f.snapshot.ClusterID, Namespace: value.AllNamespaces}}
+			f.snapshot.ClusterBindings = []value.Binding{cluster}
+			changeDirect := func() {
+				t.Helper()
+				if err := s.journal.Apply(value.BindingEvent{Type: "MODIFIED", ResourceVersion: direct.Resource.ResourceVersion, Binding: &direct}); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.accept(t.Context(), false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			changeCluster := func() {
+				t.Helper()
+				if err := s.refreshClusterBindings(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if clusterFirst {
+				changeCluster()
+				changeDirect()
+			} else {
+				changeDirect()
+				changeCluster()
+			}
+			if len(f.accepted) != 3 || f.accepted[2].ExpectedSequence != 2 || len(f.accepted[2].Bases) != 2 || f.accepted[2].Epoch != f.accepted[0].Epoch {
+				t.Fatal("independent changes lost or fenced", f.accepted)
+			}
+			if clusterFirst && (f.accepted[1].Bases[0].Subjects[0].ID == "new-direct-owner" || len(f.accepted[1].Bases) != 2) {
+				t.Fatal("cluster LIST skipped a direct watch transition")
+			}
+		})
 	}
 }
 

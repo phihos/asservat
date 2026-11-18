@@ -189,7 +189,7 @@ func (c *PermissionClient) raw(ctx context.Context, path string, params map[stri
 	if err != nil {
 		return nil, permissionError(ctx, err)
 	}
-	if err = permissionJSON(b, permissionPageBytes, 131072); err != nil {
+	if err = permissionJSON(b, permissionPageBytes, 0); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -410,13 +410,6 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.now()
-	ns, err := c.namespace(ctx, c.control)
-	if err != nil {
-		return value.Snapshot{}, nil, err
-	}
-	if ns.Deleting {
-		return value.Snapshot{}, nil, value.ErrChanged
-	}
 	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", start)
 	if err != nil {
 		return value.Snapshot{}, nil, err
@@ -430,14 +423,12 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	}
 	// ClusterAccessBindings deny as well, so an incomplete LIST fails the
 	// snapshot like AccessBindings.
-	out.ClusterBindingResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", start)
+	cluster, err := c.ClusterAccessBindings(ctx)
 	if err != nil {
 		return value.Snapshot{}, nil, err
 	}
-	for i, o := range objects {
-		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
-	}
-	ns, err = c.namespace(ctx, c.control)
+	out.ClusterBindings, out.ClusterBindingResourceVersion = cluster.ClusterBindings, cluster.ClusterBindingResourceVersion
+	ns, err := c.namespace(ctx, c.control)
 	if err != nil {
 		return value.Snapshot{}, nil, err
 	}
@@ -448,6 +439,26 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 		return value.Snapshot{}, nil, err
 	}
 	return out, nil, nil
+}
+
+// ClusterAccessBindings follows the cluster-scoped collection independently
+// of the ordered namespaced watch.
+func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	start := c.now()
+	rv, objects, refs, _, err := c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", start)
+	if err != nil {
+		return value.Snapshot{}, err
+	}
+	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	for i, o := range objects {
+		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
+	}
+	if err = c.current(ctx, start, 5*time.Second); err != nil {
+		return value.Snapshot{}, err
+	}
+	return out, nil
 }
 
 // PermissionSources independently reads the optional allow-only configuration.

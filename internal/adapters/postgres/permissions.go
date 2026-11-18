@@ -376,7 +376,9 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = liveStream(ctx, q, s, requested); err != nil {
 			return err
 		}
-		if s.Sequence != b.ExpectedSequence || (s.ObservedAt.Valid && !b.ObservedAt.After(s.ObservedAt.Time)) {
+		// The epoch and expected sequence order changes. Idle renewal and
+		// the worker can observe different wall clocks.
+		if s.Sequence != b.ExpectedSequence {
 			return cfg.ErrChanged
 		}
 		n, err := q.CurrentTime(ctx)
@@ -535,7 +537,7 @@ func (p *Permissions) RefreshPermissions(ctx context.Context, b cfg.PermissionBa
 		if err = liveStream(ctx, q, s, cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, TrustDigest: b.TrustDigest}); err != nil {
 			return err
 		}
-		if s.Suspended || s.Sequence != b.ExpectedSequence || !bytes.Equal(s.ProjectionDigest, projected) || !b.ObservedAt.After(s.ObservedAt.Time) {
+		if s.Suspended || s.Sequence != b.ExpectedSequence || !bytes.Equal(s.ProjectionDigest, projected) {
 			return cfg.ErrChanged
 		}
 		n, err := q.CurrentTime(ctx)
@@ -658,17 +660,13 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		}
 	}
 	// ADR-245: fresh decision-time allows of this exact Pod, each one
-	// principal's own recorded review by a current, acknowledged source. They
-	// are allow-only, so the row bound drops the oldest rather than failing.
+	// principal's own recorded review by a current, acknowledged source.
 	if target.PodUID != "" {
 		reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
 		if err != nil {
 			return authorization.Projection{}, err
 		}
 		for _, r := range reviews {
-			if len(out.Allows)+len(out.Denies) >= 256 {
-				break
-			}
 			deadline := identity.Earlier(until, r.FreshUntil.Time)
 			if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
 				continue

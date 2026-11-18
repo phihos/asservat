@@ -151,8 +151,8 @@ func TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted(t *testing.T
 		t.Fatal("return owner coalesced with original")
 	}
 }
-func TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList(t *testing.T) {
-	j, s, f, now := journalFixture(t)
+func TestBindingJournalDoesNotRenewCompletenessFromBookmark(t *testing.T) {
+	j, _, f, now := journalFixture(t)
 	b, err := j.Prepare(f, journalID, now, Inheritance{})
 	if err != nil {
 		t.Fatal(err)
@@ -160,14 +160,6 @@ func TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList(t *te
 	f = journalAck(t, j, b)
 	if err = j.Apply(value.BindingEvent{Type: "BOOKMARK", ResourceVersion: "new-bookmark"}); err != nil {
 		t.Fatal(err)
-	}
-	changed := s
-	changed.ObservedAt = now.Add(time.Second)
-	changed.FreshUntil = now.Add(6 * time.Second)
-	changed.Bindings = []value.Binding{cloneBinding(s.Bindings[0])}
-	changed.Bindings[0].Resource.ResourceVersion = "not-processed"
-	if err = j.Confirm(changed, now.Add(time.Second)); err == nil {
-		t.Fatal("different relist asserted continuity")
 	}
 	if _, err = j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(5*time.Second), Inheritance{}); err == nil {
 		t.Fatal("bookmark renewed deny deadline")

@@ -92,6 +92,21 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 	return permissionFixture{c, cfg, clock}
 }
 
+func TestClusterBindingChangeReadsOnlyItsOwnCollection(t *testing.T) {
+	var calls atomic.Int64
+	f := newPermissionFixture(t, func(_ http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path != "/apis/asservat.io/v1alpha1/clusteraccessbindings" {
+			t.Errorf("cluster change read %s", r.URL.Path)
+		}
+		calls.Add(1)
+		return false
+	})
+	got, err := f.client.ClusterAccessBindings(t.Context())
+	if err != nil || calls.Load() != 1 || got.ClusterBindingResourceVersion != "opaque:cabs" || len(got.ClusterBindings) != 1 || len(got.Bindings) != 0 {
+		t.Fatal("cluster collection", got, err, calls.Load())
+	}
+}
+
 func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	f := newPermissionFixture(t, nil)
 	s, err := f.client.PermissionSnapshot(context.Background())
@@ -390,7 +405,6 @@ func TestUnplaceableBindingGrantsNothing(t *testing.T) {
 func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 	for _, mode := range []string{"advance", "rollback", "replaceControl", "deletingControl", "replaceTarget", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
-			var count atomic.Int64
 			var f permissionFixture
 			f = newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				if strings.HasSuffix(r.URL.Path, "/permissionsources") {
@@ -401,7 +415,7 @@ func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 						f.clock.Add(-int64(time.Second))
 					}
 				}
-				if r.URL.Path == "/api/v1/namespaces/asservat-system" && count.Add(1) == 2 {
+				if r.URL.Path == "/api/v1/namespaces/asservat-system" {
 					if mode == "replaceControl" {
 						permissionReply(w, permissionNamespace(permissionControl.Name, "replacement"))
 						return true

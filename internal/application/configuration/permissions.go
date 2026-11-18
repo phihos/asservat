@@ -9,6 +9,7 @@ import (
 
 type PermissionReader interface {
 	PermissionSnapshot(context.Context) (value.Snapshot, error)
+	ClusterAccessBindings(context.Context) (value.Snapshot, error)
 }
 type NamespaceReader interface {
 	NamespaceMetadata(context.Context, value.NamespaceQuery) (value.NamespaceMetadata, error)
