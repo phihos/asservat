@@ -16,83 +16,97 @@ const (
 )
 
 type regionalBindingSource interface {
-	AccessBindingReader
+	AccessBindingDelivery(context.Context) (contracts.AccessBindingDelivery, error)
 	WatchConfiguration(context.Context, string, string) (app.SettingsWatch, error)
 }
 
-type staticAccessBindings contracts.AccessBindingDelivery
-
-func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.AccessBindingDelivery, error) {
-	return contracts.AccessBindingDelivery(s), nil
+type regionalBindingHub interface {
+	bindingRevision(context.Context) (string, error)
+	deliverAccessBindings(context.Context, string, contracts.AccessBindingDelivery) (string, error)
 }
 
 func (r *Regional) runDeliveries(ctx context.Context, resync <-chan struct{}) {
-	deliverRegionalBindings(ctx, resync, r.bindings, func(ctx context.Context, d contracts.AccessBindingDelivery) error {
-		return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))
-	})
+	deliverRegionalBindings(ctx, resync, r.bindings, r.lifecycle)
 }
 
-func deliverRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, send func(context.Context, contracts.AccessBindingDelivery) error) {
-	last := ""
+func deliverRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, hub regionalBindingHub) {
 	report := eventLog(os.Stderr, "connector access binding delivery")
-	publish := func(ctx context.Context, d contracts.AccessBindingDelivery, force bool) bool {
-		digest := d.Digest()
-		if !force && digest == last && last != "" {
-			return true
-		}
-		if err := send(ctx, d); err != nil {
-			last = ""
-			report(regionalOutcome(err))
-			return false
-		}
-		last = digest
-		return true
-	}
+	var revision string
 	for ctx.Err() == nil {
-		err := followRegionalBindings(ctx, resync, source, publish)
+		var err error
+		if revision == "" {
+			revision, err = hub.bindingRevision(ctx)
+			if err != nil || revision == "" {
+				revision = ""
+				if err == nil {
+					err = value.ErrUnavailable
+				}
+				report(regionalOutcome(err))
+				waitForDeliveryRetry(ctx, resync)
+				continue
+			}
+		}
+		var lost bool
+		revision, lost, err = followRegionalBindings(ctx, resync, source, hub, revision)
 		if ctx.Err() != nil {
 			return
 		}
+		if err == nil { // A reconnect starts with the current hub revision.
+			revision = ""
+			continue
+		}
 		report(regionalOutcome(err))
-		// Withdraw the previous observation before starting any replacement
-		// LIST. If the hub cannot acknowledge it, retry the withdrawal first.
-		for {
-			acknowledged := publish(ctx, contracts.AccessBindingDelivery{Unavailable: true}, false)
-			select {
-			case <-ctx.Done():
-				return
-			case <-resync:
-				last = ""
-				continue
-			case <-time.After(deliveryRetry):
-			}
-			if acknowledged {
+		if !lost { // A failed transfer says nothing about the source.
+			revision = ""
+			waitForDeliveryRetry(ctx, resync)
+			continue
+		}
+
+		// A failed LIST or lost watch belongs to the same predecessor as the
+		// observation. Never withdraw a newer successful report on its behalf.
+		for ctx.Err() == nil {
+			ack, err := hub.deliverAccessBindings(ctx, revision, contracts.AccessBindingDelivery{Unavailable: true})
+			if err == nil {
+				revision = ack
+				waitForDeliveryRetry(ctx, resync)
 				break
 			}
+			current, err := hub.bindingRevision(ctx)
+			if err == nil && current != "" && current != revision {
+				revision = current
+				break // Reread Kubernetes before using the new predecessor.
+			}
+			waitForDeliveryRetry(ctx, resync)
 		}
 	}
 }
 
-// Each collection has its own LIST cursor. Both histories must be observable
-// before a complete snapshot is sent. Their loss interrupts even a blocked
-// refresh, so a stale read cannot restore an old allow or hide a removed deny.
-func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, publish func(context.Context, contracts.AccessBindingDelivery, bool) bool) error {
+func waitForDeliveryRetry(ctx context.Context, resync <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+	case <-resync:
+	case <-time.After(deliveryRetry):
+	}
+}
+
+// Each successful transfer returns the predecessor for the next observation.
+// The two watches share that observation: losing either invalidates it even
+// while the next LIST or hub transfer is blocked.
+func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, hub regionalBindingHub, revision string) (string, bool, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	d, err := source.AccessBindingDelivery(ctx)
 	if err != nil {
-		return err
+		return revision, true, err
 	}
 	local, err := source.WatchConfiguration(ctx, "accessbindings", d.ResourceVersion)
 	if err != nil {
-		return err
+		return revision, true, err
 	}
 	cluster, err := source.WatchConfiguration(ctx, "clusteraccessbindings", d.ClusterResourceVersion)
 	if err != nil {
-		return err
+		return revision, true, err
 	}
-
-	// Loss interrupts both an in-flight LIST and an in-flight hub conversation.
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -102,31 +116,36 @@ func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source 
 			cancel(value.ErrChanged)
 		}
 	}()
-	force := false
-	for {
+	lost := func() bool {
 		select {
-		case <-ctx.Done():
-			return context.Cause(ctx)
 		case <-local.Lost:
-			return value.ErrChanged
+			return true
 		case <-cluster.Lost:
-			return value.ErrChanged
+			return true
 		default:
+			return false
 		}
+	}
+	for {
+		if lost() {
+			return revision, true, value.ErrChanged
+		}
+		ack, err := hub.deliverAccessBindings(ctx, revision, d)
+		if err != nil {
+			// A watch can also interrupt this transfer. Its outcome is unknown.
+			return revision, lost(), err
+		}
+		revision = ack
 		var next <-chan time.Time
-		if !publish(ctx, d, force) {
-			next = time.After(deliveryRetry)
-		}
-		force = false
 	waitForChange:
 		for {
 			select {
 			case <-ctx.Done():
-				return context.Cause(ctx)
+				return revision, true, context.Cause(ctx)
+			case <-resync:
+				return revision, false, nil
 			case <-local.Changed:
 			case <-cluster.Changed:
-			case <-resync:
-				force = true
 			case <-next:
 				break waitForChange
 			}
@@ -134,8 +153,9 @@ func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source 
 				next = time.After(deliverySpacing)
 			}
 		}
-		if d, err = source.AccessBindingDelivery(ctx); err != nil {
-			return err
+		d, err = source.AccessBindingDelivery(ctx)
+		if err != nil {
+			return revision, true, err
 		}
 	}
 }
