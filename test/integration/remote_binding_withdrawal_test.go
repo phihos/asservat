@@ -2,16 +2,21 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/postgres"
 	configapp "asservat.local/asservat/internal/application/configuration"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -234,13 +239,42 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	if got, err := permissions.Permissions(ctx, peerTarget); err != nil || !got.DeniesComplete {
 		t.Fatal("unavailable delivery disabled the other cluster", err)
 	}
-	deny := replacement
-	deny.Resource.Kind, deny.Resource.Name, deny.Resource.UID = cfg.ClusterAccessBindingKind, "blocked", custodyID()
-	deny.Resource.Namespace, deny.Resource.NamespaceUID = "", ""
-	deny.Scope.Namespace, deny.Effect = cfg.AllNamespaces, "Deny"
-	replace([]cfg.Binding{replacement, deny}, strings.Repeat("db", 32), false)
-	if got := projection(); len(got.Denies) != 1 || len(got.Allows) != 1 || got.Denies[0].Audience.SubjectID != got.Allows[0].Audience.SubjectID {
-		t.Fatal("restored cluster-wide Deny missing alongside the overlapping Allow")
+	decoder, err := kube.NewAccessBindingSpecDecoder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer := replacement.Subjects[0].Issuer
+	clusterBinding := func(effect, role, reason string, subjects []map[string]string) cfg.Binding {
+		t.Helper()
+		raw, err := json.Marshal(map[string]any{"effect": effect, "roles": []string{role}, "subjects": subjects, "reason": reason})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d := contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{{Kind: cfg.ClusterAccessBindingKind, Name: strings.ToLower(effect), UID: custodyID(), Generation: 1, ResourceVersion: "1", Spec: raw}}}
+		bindings, err := decoder.DeliveredBindings(target.ClusterID, d.Bounded())
+		if err != nil || len(bindings) != 1 {
+			t.Fatal("cluster-wide delivery", err)
+		}
+		return bindings[0]
+	}
+	// Unrelated approvers do not expand this user's capture evidence audience.
+	subjects := make([]map[string]string, 257)
+	for i := range subjects {
+		subjects[i] = map[string]string{"kind": "User", "issuer": issuer, "id": fmt.Sprintf("approver-%d", i)}
+	}
+	wide := clusterBinding("Allow", "action-approver", "cluster approvers", subjects)
+	replace([]cfg.Binding{replacement, wide}, strings.Repeat("ab", 32), false)
+	p := projection()
+	now := time.Now()
+	who := identity.Identity{Principal: identity.Principal{Issuer: issuer, Subject: "developer", ClientID: "console", Kind: identity.Human}, Groups: []string{replacement.Subjects[0].ID}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+	if got := authorization.ContextEligibility(who, p, target, now); len(p.Allows) != 259 || !got.Eligible || len(got.DefaultAudience) != 2 {
+		t.Fatal("unrelated subjects obscured independent grant", len(p.Allows), got.Reason)
+	}
+	deny := clusterBinding("Deny", "workload-maintainer", strings.Repeat("x", 70<<10), []map[string]string{{"kind": "Group", "issuer": issuer, "id": replacement.Subjects[0].ID}})
+	replace([]cfg.Binding{replacement, wide, deny}, strings.Repeat("db", 32), false)
+	p = projection()
+	if got := authorization.ContextEligibility(who, p, target, time.Now()); len(p.Denies) != 1 || got.Eligible || got.Reason != "ExplicitDeny" {
+		t.Fatal("large cluster-wide Deny missing alongside overlapping Allow", len(p.Denies), got.Reason)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	wire "asservat.local/asservat/api/v1alpha1"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -104,7 +105,7 @@ func permissionJSON(b []byte, maxBytes, maxTokens int) error {
 		if err != nil {
 			return value.ErrUnavailable
 		}
-		if tokens >= maxTokens || d.StackDepth() > 32 {
+		if (maxTokens > 0 && tokens >= maxTokens) || d.StackDepth() > 32 {
 			return value.ErrLimit
 		}
 		if token.Kind() == '0' {
@@ -123,7 +124,9 @@ func permissionJSON(b []byte, maxBytes, maxTokens int) error {
 }
 
 func decodePermissionSpec(b []byte, s *jsonschema.Schema, out any) (artifact.Digest, error) {
-	if err := permissionJSON(b, 64<<10, 16384); err != nil {
+	// The Kubernetes read or authenticated delivery already bounds input bytes.
+	// A smaller per-spec limit could silently discard a valid Deny.
+	if err := permissionJSON(b, contracts.AccessBindingDeliveryMaxBytes, 0); err != nil {
 		return artifact.Digest{}, err
 	}
 	v, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))

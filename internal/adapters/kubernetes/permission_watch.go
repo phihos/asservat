@@ -45,7 +45,7 @@ func (d *permissionWatchEvents) next() (event metav1.WatchEvent, err error) {
 		return event, err
 	}
 	d.limit.N += d.json.InputOffset() - start
-	if err = permissionJSON(data, permissionPageBytes, 131072); err != nil {
+	if err = permissionJSON(data, permissionPageBytes, 0); err != nil {
 		if errors.Is(err, value.ErrLimit) {
 			return event, err
 		}

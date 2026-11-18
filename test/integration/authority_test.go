@@ -1362,6 +1362,18 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if removed["alice"] != 3 || removed["bob"] != 3 {
 			t.Fatalf("deleting the source did not show the removed access: %+v", preview2.Deltas)
 		}
+		// Other principals' direct assignments do not displace this Pod's review.
+		approvers := binding
+		approvers.Resource.UID, approvers.Roles = custodyID(), []string{"action-approver"}
+		approvers.Subjects = make([]cfg.Subject, 257)
+		for i := range approvers.Subjects {
+			approvers.Subjects[i] = cfg.Subject{Kind: "User", Issuer: issuer, ID: fmt.Sprintf("approver-%d", i)}
+		}
+		approvers.ScopeDigest = configapp.PermissionScopeDigest(approvers)
+		step(t, []cfg.PermissionBasis{binding, approvers}, []cfg.ReviewSource{source}, false)
+		if got := eligible(t, alice); !got.Eligible || reviewed(t, alice) != first {
+			t.Fatal("unrelated direct assignments obscured decision-time grant", got.Reason)
+		}
 		// An explicit deny of the user wins over the fresh review.
 		deny := binding
 		deny.Resource.UID, deny.Effect = custodyID(), "Deny"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,5 +74,19 @@ func TestAccessBindingDeliveryRoundTrip(t *testing.T) {
 		if _, err = decoder.DeliveredBindings(remote, bad); err == nil {
 			t.Fatal(name)
 		}
+	}
+}
+
+func TestDeliveredClusterDenyRetainsSchemaValidLongReason(t *testing.T) {
+	decoder, err := NewAccessBindingSpecDecoder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const cluster = "22222222-2222-4222-8222-222222222222"
+	spec := json.RawMessage(`{"effect":"Deny","subjects":[{"kind":"Group","id":"developers"}],"roles":["workload-maintainer"],"reason":"` + strings.Repeat("x", 70<<10) + `"}`)
+	item := contracts.DeliveredAccessBinding{Kind: value.ClusterAccessBindingKind, Name: "blocked", UID: "binding", Generation: 1, ResourceVersion: "1", Spec: spec}
+	got, err := decoder.DeliveredBindings(cluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
+	if err != nil || len(got) != 1 || got[0].Invalid || got[0].Effect != "Deny" {
+		t.Fatal("valid cluster-wide Deny lost in delivery", err)
 	}
 }

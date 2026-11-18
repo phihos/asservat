@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -100,6 +101,22 @@ func TestExplainAccessOperationContract(t *testing.T) {
 	}
 	if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "explain_access", json.RawMessage(accessRequest("delete"))); !errors.Is(err, contracts.ErrInvestigationWire) {
 		t.Fatalf("unknown operation accepted: %v", err)
+	}
+}
+
+func TestExplainAccessCountsAllMatchingAssignments(t *testing.T) {
+	f, s := newAccessFixture()
+	mine := f.allows[0]
+	f.allows = nil
+	for i := range 257 {
+		assignment := mine
+		assignment.Audience.AssignmentID = fmt.Sprintf("44444444-5555-4666-8777-%012x", i)
+		f.allows = append(f.allows, assignment)
+	}
+	got := accessCall(t, s, f, accessRequest("read"))
+	rows := got["assignments"].([]any)
+	if got["decision"] != "Allow" || got["assignments_total"] != float64(257) || len(rows) != 32 {
+		t.Fatal("incomplete explanation", got["decision"], got["assignments_total"], len(rows))
 	}
 }
 

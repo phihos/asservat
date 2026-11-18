@@ -148,9 +148,6 @@ func matches(a artifact.AudienceAssignment, i identity.Identity) bool {
 	return false
 }
 func rowsValid(rows []CurrentAssignment) bool {
-	if len(rows) > 256 {
-		return false
-	}
 	seen := map[string]bool{}
 	for _, a := range rows {
 		if !ValidAudienceAssignment(a.Audience) || seen[a.Audience.AssignmentID] {

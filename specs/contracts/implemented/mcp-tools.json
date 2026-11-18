@@ -16448,7 +16448,7 @@
                       "assignments_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 256
+                        "maximum": 9007199254740991
                       },
                       "valid_until": {
                         "type": "string",
