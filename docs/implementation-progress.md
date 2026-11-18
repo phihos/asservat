@@ -8,38 +8,32 @@ standby settings. Remove `clusters[].standby` and `hub.hub-api.public.standby`
 on development upgrades. Upgrade both ends to protocol major 2. ADR-334
 consolidates the registration, identity, dispatch and compatibility decisions.
 
-- The former router, permission reader and download policy lost clusters at
-  17, 65 and 33 entries respectively. Tests now cover 65 registrations, a
-  129-cluster policy, and 201 populated remote permission deliveries with 20 ms
-  injected SQL read and write latency. The permission reconciler applies
-  same-timestamp replacements and renews its lease without rebuilding the fleet.
-  PostgreSQL read and acknowledged an 8,377,659-byte canonical audit event for
-  1,025 automation bindings, which occupies 8,812,305 bytes in its JSON format.
-- A fresh two-cluster Kind installation at `106f3d636` ran two hub API and two
-  federation replicas. One remote cluster connected and 64 registrations used
-  offline issuers. Neither owner held a native socket at either end of a
-  36-second idle interval. Both public listeners accepted and replayed a
-  capture, refused changed input and downloaded the selected Pod's native file.
-  One connector slot also served 24 consecutive framed queries in focused tests.
-- Pinned SeaweedFS 4.53 rejected the former 210,581-byte evidence policy at 65
-  registrations. Per-identity permissions keep the combined bucket policies at
-  5,626 bytes in that installation. Withdrawal and re-registration on the same
-  volume preserved the original bytes, invalidated both old keys, and left the
-  continuously registered cluster's keys active.
-- At `3ee9aafd4`, real Helm upgrades withdrew the old bindings and restored an
-  unchanged workload binding from the same connector process. Evidence and
-  history writes succeeded with refreshed keys. Native download exposed a
-  five-second HTTP client timeout on the permission watch. The corrected
-  client bounds individual events and connection setup separately. Focused
-  HTTP tests cross the old time and cumulative-byte cutoffs for both permission
-  and retention watches. At `e52b4bd35`, both Helm upgrades passed and the
-  permission epoch stayed stable. The first replica completed the download.
-  The second received a key-service refusal before capture. Two fresh requests
-  on those same replicas later completed through native download. The original
-  refusal had no stage detail. A separate regression showed that a previous
-  request's nearly expired key-cache entry could interrupt a valid wrap.
-  Each operation now reads the mounted keys within its own permit and reports
-  which check failed. Final installed results are recorded in
+- The former router, permission reader and download policy lost clusters at 17,
+  65 and 33 entries respectively. Tests cover 65 registrations, a 129-cluster
+  policy, and 201 populated deliveries with 20 ms injected SQL read and write
+  latency. PostgreSQL accepted and acknowledged an 8,377,659-byte canonical
+  audit event for 1,025 automation bindings. A separate real-services test
+  accepted 65 decision-time sources and retained the provenance of cluster-wide
+  Allow and Deny assignments through retirement.
+- At `d4049fdfa`, a fresh two-cluster Kind installation ran two hub API and
+  two federation replicas, with one connected remote cluster and 64 offline
+  registrations. Two Helm upgrades withdrew and restored unchanged bindings on
+  the same running connector. Across 36 idle seconds neither owner opened a
+  native exchange. The permission epoch and sequence stayed constant while
+  its lease advanced. Each public endpoint independently accepted a capture,
+  replayed the duplicate, refused changed input, committed history and
+  downloaded the selected Pod's 354-byte native file. Cleanup succeeded.
+- SeaweedFS 4.53 rejected the former 210,581-byte evidence bucket policy.
+  With permissions on the regional identities, the combined bucket-policy
+  file measured 5,626 bytes for 65 registrations. On re-registration both
+  withdrawn keys stayed unusable and the original evidence remained readable.
+- The remote binding exchange now includes ClusterAccessBindings authored
+  in the workload cluster. An unavailable binding observation blocks fresh
+  decisions in that cluster. Namespace and workload metadata delivery from
+  installed connectors is still pending. The key service accepts additive
+  changes to mounted material. Original operation deadlines and the protection
+  against mixing generations within one cryptographic operation still apply.
+  Exact-source qualification for these changes is tracked in
   [PR #304](https://github.com/phihos/asservat/pull/304).
 
 ## Processing cleanup (2026-11-17)
