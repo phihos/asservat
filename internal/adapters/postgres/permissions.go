@@ -390,12 +390,13 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		Continuous           []bool
 	}{projected, b.RootID, b.Epoch, b.RequestID, b.ExpectedSequence, b.ObservedAt, b.FreshUntil, continuity})
 	// An expired request may still resolve the outcome of its original commit.
-	until := b.FreshUntil
-	expired := !time.Now().Before(until)
+	expired := !time.Now().Before(b.FreshUntil)
+	var cancel context.CancelFunc
 	if expired {
-		until = time.Now().Add(5 * time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+	} else {
+		ctx, cancel = context.WithDeadline(ctx, b.FreshUntil)
 	}
-	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	err := permissionError(p.ledger.runTransaction(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(q *custodydb.Queries) error {
 		s, err := q.LockPermissionStream(ctx, id(p.root))
