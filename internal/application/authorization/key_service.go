@@ -79,25 +79,25 @@ func (s KeyService) Execute(ctx context.Context, peer value.KeyPeer, request val
 	observation.Binding = bytes.Clone(info.Binding)
 	permit, err := s.Authority.Resolve(ctx, peer, observation)
 	if err != nil || ctx.Err() != nil || !permit.Valid(peer, info, s.Now()) {
-		return value.KeyResult{}, ErrKeyDenied
+		return value.KeyResult{}, &authorityCheckStep{step: "permit", err: ErrKeyDenied, cause: err}
 	}
 	effect, end := context.WithDeadline(ctx, permit.ValidUntil)
 	defer end()
 	keyUntil, err := configuration.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
 	if err != nil || effect.Err() != nil || !s.Now().Before(keyUntil) || keyUntil.After(s.Now().Add(5*time.Second)) || !permit.Valid(peer, info, s.Now()) {
-		return value.KeyResult{}, ErrKeyUnavailable
+		return value.KeyResult{}, &authorityCheckStep{step: "configuration-before", err: ErrKeyUnavailable, cause: err}
 	}
 	effect, stopKeys := context.WithDeadline(effect, keyUntil)
 	defer stopKeys()
 	result, err := s.Backend.Execute(effect, request)
 	if err != nil || effect.Err() != nil || !permit.Valid(peer, info, s.Now()) || !result.Valid(request.Operation) {
 		clear(result.Output)
-		return value.KeyResult{}, ErrKeyUnavailable
+		return value.KeyResult{}, &authorityCheckStep{step: "crypto", err: ErrKeyUnavailable, cause: err}
 	}
 	currentUntil, err := configuration.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
 	if err != nil || effect.Err() != nil || !s.Now().Before(currentUntil) || currentUntil.After(s.Now().Add(5*time.Second)) || !s.Now().Before(keyUntil) || !permit.Valid(peer, info, s.Now()) {
 		clear(result.Output)
-		return value.KeyResult{}, ErrKeyUnavailable
+		return value.KeyResult{}, &authorityCheckStep{step: "configuration-after", err: ErrKeyUnavailable, cause: err}
 	}
 	result.RequestDigest = info.RequestDigest
 	result.ValidUntil, _ = effect.Deadline()
