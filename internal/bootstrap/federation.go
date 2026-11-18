@@ -31,11 +31,13 @@ import (
 // holds no browser, MCP, evidence, signing, audit or recovery-activation
 // authority.
 type Federation struct {
-	handler *connectorlifecycle.Handler
-	tunnel  *connectorlifecycle.TunnelHandler
-	tls     *tls.Config
-	port    int
-	closers []func()
+	handler  *connectorlifecycle.Handler
+	tunnel   *connectorlifecycle.TunnelHandler
+	work     *connectorlifecycle.WorkHandler
+	workPool *pgxpool.Pool
+	tls      *tls.Config
+	port     int
+	closers  []func()
 }
 
 // federationInputs are the Helm-rendered configuration plus the generated
@@ -158,6 +160,10 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
+	f.workPool = pools["connector-owner-read"]
+	f.work = &connectorlifecycle.WorkHandler{Tokens: tokens, Concurrency: c.Concurrency, Ready: func(ctx context.Context, cluster string) error {
+		return postgres.NotifyConnectorReady(ctx, f.workPool, cluster)
+	}}
 	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
 	// The serving identity is deployment-provided server authentication only;
 	// connectors authenticate with their ServiceAccount tokens.
@@ -283,9 +289,13 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 		return mounts.ErrUnavailable
 	}
 	mux := http.NewServeMux()
+	if f.work != nil {
+		postgres.ListenPayloads(ctx, f.workPool, postgres.ConnectorWorkChannel, f.work.Publish)
+		mux.Handle(connectorlifecycle.WorkPath, f.work)
+	}
 	mux.Handle(connectorlifecycle.Path, f.handler)
 	mux.Handle(connectorlifecycle.TunnelPath, f.tunnel)
-	server := &http.Server{Handler: mux, TLSConfig: f.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
+	server := &http.Server{BaseContext: func(net.Listener) context.Context { return ctx }, Handler: mux, TLSConfig: f.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
 	select {
@@ -295,9 +305,11 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 	}
 	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 35*time.Second)
 	defer cancel()
-	// Conversations are bounded at thirty seconds; tunnels end with the
-	// shutdown's deadline.
-	_ = server.Shutdown(stop)
+	// A peer blocked on an HTTP/2 flow-control window may still hold an
+	// active write after its request context ends. Close it at shutdown's bound.
+	if err := server.Shutdown(stop); err != nil {
+		_ = server.Close()
+	}
 	<-done
 	return nil
 }
