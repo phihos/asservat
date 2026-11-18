@@ -133,7 +133,7 @@ func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source 
 		ack, err := hub.deliverAccessBindings(ctx, revision, d)
 		if err != nil {
 			// A watch can also interrupt this transfer. Its outcome is unknown.
-			return revision, lost(), err
+			return revision, d.Unavailable || lost(), err
 		}
 		revision = ack
 		var next <-chan time.Time

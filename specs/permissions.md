@@ -14,11 +14,13 @@ response budget. Each page has its own request timeout. The connector follows
 continuation tokens at the same list revision until completion or caller cancellation.
 Both hub and connector process each page as it arrives. Within a list, bindings
 in a newly encountered namespace share one lookup of its identity and creation
-time. A binding from an earlier incarnation is inert. The connector omits it
-from the complete replacement, so independent revocations still reach the hub.
+time. Both readers omit bindings from an earlier incarnation. An ordered hub
+watch event for such a binding retires its prior grant and advances the cursor.
 The connector counts the encoded envelope and both collections against the
 8 MiB transfer budget as it reads. Crossing it stops the read and reports the
-cluster unavailable. The hub applies the complete binding set within that budget.
+cluster unavailable. The connector waits on both metadata watches for changes
+before reading the oversized collection again. The hub applies the complete
+binding set within that budget.
 A connector starts with its cluster's delivery revision from the authenticated
 hub and uses each acknowledgement as the predecessor for its next read. Publication and digest confirmation
 require that exact predecessor. This applies to unavailable observations as well as complete snapshots. A competing update forces a fresh source read.

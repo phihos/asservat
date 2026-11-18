@@ -77,6 +77,18 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	if !identity.Text(e.ResourceVersion, 128) {
 		return fail()
 	}
+	if e.UnplacedUID != "" {
+		if e.Binding != nil || !identity.Text(e.UnplacedUID, 64) || (e.Type != "ADDED" && e.Type != "MODIFIED" && e.Type != "DELETED") {
+			return fail()
+		}
+		if old, ok := j.byUID[e.UnplacedUID]; ok {
+			delete(j.byUID, e.UnplacedUID)
+			delete(j.names, bindingName(old.Resource))
+			j.accepted = false
+		}
+		j.cursor = e.ResourceVersion
+		return nil
+	}
 	if e.Type == "BOOKMARK" {
 		if e.Binding != nil {
 			return fail()

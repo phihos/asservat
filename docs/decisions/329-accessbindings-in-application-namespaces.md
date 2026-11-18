@@ -84,8 +84,8 @@ grant any role there. It adds no runtime component, request or state.
   namespace's UID.
 - The hub-worker LISTs and watches AccessBindings in every namespace of the
   hub cluster (ClusterRole `get/list/watch accessbindings`). It reads a
-  new binding's namespace once for all bindings in that namespace in a LIST,
-  then remembers the placement for its UID. A binding whose namespace is
+  namespace once per LIST of its bindings. Each ordered watch change checks
+  the current incarnation before retaining the binding. A binding whose namespace is
   gone, lacks timestamps or was created after the binding (a later
   incarnation) grants and denies nothing; it does not stop the stream.
   PermissionSources stay in the release namespace.
@@ -117,7 +117,8 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
 - The connector watches both binding collections. A change triggers a
   paginated LIST through the same reader as the hub. The connector skips
   bindings from an earlier namespace incarnation and enforces its 8 MiB wire
-  budget as each page arrives. Bursts coalesce to at most one observation per
+  budget as each page arrives. An oversized set contributes no bindings.
+  Changes to either watched collection trigger its next complete read. Bursts coalesce to at most one observation per
   second. Failed reads or deliveries retry after five seconds.
 - Before its first LIST, the authenticated connector reads its cluster's
   delivery revision from the hub. Each acknowledged transfer returns the

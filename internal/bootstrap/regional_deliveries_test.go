@@ -215,6 +215,30 @@ func TestRegionalDeliveryOlderFailedReadCannotWithdrawNewerSuccess(t *testing.T)
 	})
 }
 
+func TestRegionalUnavailableBindingSetWaitsForEitherCollection(t *testing.T) {
+	for _, kind := range []string{"accessbindings", "clusteraccessbindings"} {
+		t.Run(kind, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				f := &regionalDeliveryFixture{revision: "initial", resync: make(chan struct{}, 1), watches: make(map[string]regionalTestWatch), current: contracts.AccessBindingDelivery{Unavailable: true, ResourceVersion: "local-1", ClusterResourceVersion: "cluster-1"}}
+				go deliverRegionalBindings(t.Context(), f.resync, f, f)
+				synctest.Wait()
+				f.Lock()
+				defer f.Unlock()
+				f.advance(time.Hour)
+				if len(f.watches) != 2 || len(f.sent) != 1 || f.reads != 1 || !f.actual.Unavailable || len(f.actual.Items) != 0 || f.preflights != 1 {
+					t.Fatal("unavailable observation polled or exposed data", f.order, f.actual)
+				}
+				f.current = contracts.AccessBindingDelivery{ResourceVersion: "local-2", ClusterResourceVersion: "cluster-2", Items: []contracts.DeliveredAccessBinding{{Name: "survivor"}}}
+				f.watches[kind].changed <- struct{}{}
+				f.advance(deliverySpacing)
+				if f.actual.Unavailable || len(f.actual.Items) != 1 || f.reads != 2 || len(f.sent) != 2 || f.preflights != 1 {
+					t.Fatal("deletion did not restore the complete replacement", f.order, f.actual)
+				}
+			})
+		})
+	}
+}
+
 func TestRegionalDeliveryUnavailableHubDoesNotWithdrawSource(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := startRegionalDeliveryFixture(t)

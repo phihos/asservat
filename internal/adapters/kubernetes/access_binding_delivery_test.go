@@ -304,7 +304,37 @@ func TestConnectorStopsReadingWhenBothCollectionsExceedTransferBudget(t *testing
 		return true
 	})
 	d, err := f.client.AccessBindingDelivery(t.Context())
-	if !errors.Is(err, value.ErrLimit) || len(d.Items) != 0 || clusterPages.Load() != 3 {
+	if err != nil || !d.Unavailable || d.ResourceVersion != "rv" || d.ClusterResourceVersion != "rv" || len(d.Items) != 0 || clusterPages.Load() != 3 {
 		t.Fatalf("oversized observation: %d items, %d cluster pages, %v", len(d.Items), clusterPages.Load(), err)
+	}
+}
+
+func TestNamespacedBindingsAloneExceedBudget(t *testing.T) {
+	var pages, metadataReads atomic.Int64
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Path {
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			n := int(pages.Add(1))
+			o := permissionBinding(n)
+			o["spec"].(map[string]any)["reason"] = strings.Repeat("x", 1<<20)
+			next := strconv.Itoa(n)
+			if n == 10 {
+				next = ""
+			}
+			permissionReply(w, permissionList("AccessBinding", "oversized-local", next, o))
+		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
+			metadataReads.Add(1)
+			if r.URL.Query().Get("limit") != "1" || !strings.Contains(r.Header.Get("Accept"), "as=PartialObjectMetadataList") {
+				t.Error("read full cluster binding data after budget was exhausted")
+			}
+			permissionReply(w, map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadataList", "metadata": map[string]string{"resourceVersion": "cluster-metadata", "continue": "unneeded"}, "items": []any{}})
+		default:
+			return false
+		}
+		return true
+	})
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if err != nil || !d.Unavailable || len(d.Items) != 0 || d.ResourceVersion != "oversized-local" || d.ClusterResourceVersion != "cluster-metadata" || metadataReads.Load() != 1 || pages.Load() != 8 {
+		t.Fatal("cannot watch oversized replacement", d.ResourceVersion, d.ClusterResourceVersion, pages.Load(), metadataReads.Load(), err)
 	}
 }

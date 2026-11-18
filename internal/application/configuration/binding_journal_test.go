@@ -245,3 +245,28 @@ func TestPermissionInputDigestAcrossPopulatedFleet(t *testing.T) {
 		t.Fatal("incomplete or unstable fleet digest", len(batch.Bases), err)
 	}
 }
+
+func TestUnplacedBindingRetiresOnlyItsPriorContribution(t *testing.T) {
+	j, s, f, now := journalFixture(t)
+	initial, err := j.Prepare(f, journalID, now, Inheritance{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f = journalAck(t, j, initial)
+	uid := s.Bindings[0].Resource.UID
+	for _, event := range []value.BindingEvent{
+		{Type: "ADDED", ResourceVersion: "rv-foreign", UnplacedUID: "previous-namespace-binding"},
+		{Type: "DELETED", ResourceVersion: "rv-foreign-deleted", UnplacedUID: "previous-namespace-binding"},
+	} {
+		if err = j.Apply(event); err != nil || !j.accepted || j.Cursor() != event.ResourceVersion {
+			t.Fatal("inert event stopped the cursor or requested publication", event, err)
+		}
+	}
+	if err = j.Apply(value.BindingEvent{Type: "MODIFIED", ResourceVersion: "rv-recreated", UnplacedUID: uid}); err != nil || j.accepted || j.Cursor() != "rv-recreated" {
+		t.Fatal("previously placed binding was not retired", err)
+	}
+	b, err := j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(time.Second), Inheritance{})
+	if err != nil || len(b.Bases) != 0 {
+		t.Fatal("old entitlement survived", err, b.Bases)
+	}
+}

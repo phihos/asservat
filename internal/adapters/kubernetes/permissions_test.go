@@ -331,7 +331,7 @@ func TestPermissionInvalidSpecGrantsNothing(t *testing.T) {
 }
 
 // ADR-329: bindings in other namespaces are listed cluster-wide; each
-// namespace UID is read once per binding and remembered.
+// namespace UID is read once per namespace per LIST.
 func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
 	var reads atomic.Int64
 	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
@@ -360,7 +360,7 @@ func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
 			}
 		}
 	}
-	if reads.Load() != 1 {
+	if reads.Load() != 2 {
 		t.Fatalf("namespace read %d times", reads.Load())
 	}
 }
@@ -396,13 +396,8 @@ func TestUnplaceableBindingGrantsNothing(t *testing.T) {
 				return false
 			})
 			s, err := f.client.PermissionSnapshot(context.Background())
-			if err != nil || len(s.Bindings) != 2 {
-				t.Fatal(err, len(s.Bindings))
-			}
-			for _, b := range s.Bindings {
-				if (b.Resource.Namespace == "orders") != b.Invalid {
-					t.Fatalf("%s invalid=%v", b.Resource.Namespace, b.Invalid)
-				}
+			if err != nil || len(s.Bindings) != 1 || s.Bindings[0].Resource.Namespace != "payments" || s.Bindings[0].Invalid {
+				t.Fatal("old incarnation entered hub baseline", err, len(s.Bindings))
 			}
 		})
 	}

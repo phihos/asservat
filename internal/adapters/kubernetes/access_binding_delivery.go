@@ -20,10 +20,6 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 		if r.Kind == value.ClusterAccessBindingKind {
 			item.Kind = r.Kind
 		} else {
-			// A binding from an earlier namespace incarnation has no effect.
-			if r.NamespaceUID == "" {
-				return nil
-			}
 			item.Namespace, item.NamespaceUID = r.Namespace, r.NamespaceUID
 		}
 		// Account for the actual JSON on the wire, including escaped text,
@@ -54,13 +50,38 @@ func (c *PermissionClient) AccessBindingDelivery(ctx context.Context) (contracts
 		out.Items = append(out.Items, item)
 		return nil
 	}
-	if err := c.list(ctx, "AccessBinding", "accessbindings", &out.ResourceVersion, appendItem); err != nil {
-		return contracts.AccessBindingDelivery{}, err
+	err := c.list(ctx, "AccessBinding", "accessbindings", &out.ResourceVersion, appendItem)
+	if err == nil {
+		err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterResourceVersion, appendItem)
 	}
-	if err := c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", &out.ClusterResourceVersion, appendItem); err != nil {
+	if size > contracts.AccessBindingDeliveryMaxBytes {
+		out.Items = nil
+		out.Unavailable = true
+		// The namespaced collection can exceed the budget on its own.
+		// Its original cursor observes any edit that could make it fit. Take
+		// only a metadata cursor for the as-yet unread collection.
+		if out.ClusterResourceVersion == "" {
+			out.ClusterResourceVersion, err = c.clusterBindingCursor(ctx)
+			if err != nil {
+				return contracts.AccessBindingDelivery{}, err
+			}
+		}
+		return out, nil
+	}
+	if err != nil {
 		return contracts.AccessBindingDelivery{}, err
 	}
 	return out, nil
+}
+
+func (c *PermissionClient) clusterBindingCursor(ctx context.Context) (string, error) {
+	b, err := c.api.Get().AbsPath(c.listPath("clusteraccessbindings")).MaxRetries(0).Param("limit", "1").
+		SetHeader("Accept", "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1").DoRaw(ctx)
+	if err != nil {
+		return "", permissionError(ctx, err)
+	}
+	m, _, err := listEnvelopeOf(b, "meta.k8s.io/v1", "PartialObjectMetadata")
+	return m.ResourceVersion, err
 }
 
 // DeliveredBindings validates a connector's delivery for cluster, the

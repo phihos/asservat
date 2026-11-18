@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 	"time"
 
 	port "asservat.local/asservat/internal/application/configuration"
@@ -41,16 +40,6 @@ type PermissionClient struct {
 	now         func() time.Time
 	validator   *permissionValidator
 	workerToken *configurationWorkerTokenTransport
-	bindings    *bindingNamespaces
-}
-
-// bindingNamespaces remembers each observed AccessBinding's namespace UID by
-// binding UID (ADR-329). A binding exists only in the namespace incarnation
-// it was created in, so the mapping never changes; a namespace created after
-// the binding is a later incarnation and is refused.
-type bindingNamespaces struct {
-	mu        sync.Mutex
-	byBinding map[string]value.NamespaceRef
 }
 
 var _ port.PermissionReader = (*PermissionClient)(nil)
@@ -80,7 +69,7 @@ func NewPermissionClient(config *rest.Config, clusterID string, control value.Na
 		return nil, err
 	}
 	v.clusters = map[string]string{LocalClusterName: clusterID}
-	return &PermissionClient{api: api, watchAPI: watch, clusterID: clusterID, control: control, now: now, validator: v, bindings: &bindingNamespaces{byBinding: map[string]value.NamespaceRef{}}}, nil
+	return &PermissionClient{api: api, watchAPI: watch, clusterID: clusterID, control: control, now: now, validator: v}, nil
 }
 
 // WithClusterNames returns c resolving the joined clusters' names (values
@@ -248,26 +237,9 @@ func listEnvelopeOf(b []byte, apiVersion, kind string) (permissionListMetadata, 
 	return out, items, nil
 }
 
-// cached returns a binding's remembered namespace.
-func (c *PermissionClient) cached(m permissionMetadata) (value.NamespaceRef, bool) {
-	if c.bindings == nil {
-		return value.NamespaceRef{}, false
-	}
-	c.bindings.mu.Lock()
-	defer c.bindings.mu.Unlock()
-	ref, ok := c.bindings.byBinding[m.UID]
-	return ref, ok && ref.Name == m.Namespace
-}
-
-// placeBinding pins the namespace UID to the binding's own incarnation. A
-// missing or younger namespace, or missing creation time, leaves the UID empty.
+// placeBinding compares each binding to the current namespace incarnation.
+// A LIST shares its namespace reads; a watch event observes the namespace anew.
 func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadata, namespaces map[string]permissionMetadata) (value.NamespaceRef, error) {
-	if ref, ok := c.cached(m); ok {
-		return ref, nil
-	}
-	if c.bindings == nil {
-		return value.NamespaceRef{}, value.ErrUnavailable
-	}
 	ns, known := namespaces[m.Namespace]
 	if !known {
 		var err error
@@ -283,12 +255,6 @@ func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadat
 	if ns.Name == m.Namespace && !ns.Created.IsZero() && !m.Created.IsZero() && !ns.Created.After(m.Created) {
 		ref.UID = ns.UID
 	}
-	c.bindings.mu.Lock()
-	defer c.bindings.mu.Unlock()
-	if known, ok := c.bindings.byBinding[m.UID]; ok {
-		return known, nil
-	}
-	c.bindings.byBinding[m.UID] = ref
 	return ref, nil
 }
 
@@ -370,6 +336,9 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, cursor
 				ref, err := c.placeBinding(ctx, m, namespaces)
 				if err != nil {
 					return err
+				}
+				if ref.UID == "" {
+					continue
 				}
 				namespace = ref
 			}

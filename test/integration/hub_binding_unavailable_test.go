@@ -61,12 +61,18 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 		}
 		return map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": kind, "metadata": meta, "spec": spec}
 	}
+	var recreated atomic.Bool
+	newNamespace := custodyID()
 	edits := make(chan map[string]any, 1)
 	client := idleKubernetesBindingWatch(t, hub, func(w http.ResponseWriter, r *http.Request) {
 		reply := json.NewEncoder(w)
 		switch r.URL.Path {
 		case "/api/v1/namespaces/app":
-			_ = reply.Encode(map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]string{"name": ns.Name, "uid": ns.UID, "resourceVersion": "1", "creationTimestamp": "2026-01-01T00:00:00Z"}})
+			uid, created := ns.UID, "2026-01-01T00:00:00Z"
+			if recreated.Load() {
+				uid, created = newNamespace, "2026-02-01T00:00:00Z"
+			}
+			_ = reply.Encode(map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]string{"name": ns.Name, "uid": uid, "resourceVersion": "1", "creationTimestamp": created}})
 		case "/apis/asservat.io/v1alpha1/accessbindings":
 			if r.URL.Query().Get("watch") == "true" {
 				w.(http.Flusher).Flush()
@@ -95,7 +101,13 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 			} else {
 				item = object("AccessBinding", "legacy", "Deny", legacyID, 1)
 			}
-			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBindingList", "metadata": metadata, "items": []map[string]any{item}})
+			items := []map[string]any{item}
+			if metadata["continue"] != "" {
+				inert := object("AccessBinding", "previous-incarnation", "Deny", "team", 1)
+				inert["metadata"].(map[string]any)["creationTimestamp"] = "2025-12-01T00:00:00Z"
+				items = append(items, inert)
+			}
+			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBindingList", "metadata": metadata, "items": items})
 		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
 			_ = reply.Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "ClusterAccessBindingList", "metadata": map[string]string{"resourceVersion": "1"}, "items": []map[string]any{object(cfg.ClusterAccessBindingKind, "other-cluster", "Deny", legacyID, 1)}})
 		default:
@@ -135,7 +147,7 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 			now := time.Now()
 			who := identity.Identity{Principal: identity.Principal{Kind: identity.Human, Issuer: issuer, Subject: "developer", ClientID: "console"}, Groups: []string{"team"}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 			result := authorization.ContextEligibility(who, projection, target, now)
-			if (want == "Allow" && !result.Eligible) || (want == "ExplicitDeny" && result.Reason != want) {
+			if (want == "Allow" && !result.Eligible) || (want != "Allow" && result.Reason != want) {
 				t.Fatal("unexpected cluster decision", cluster, want, result.Reason)
 			}
 		}
@@ -147,6 +159,11 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 	check("Unavailable")
 	edits <- map[string]any{"type": "DELETED", "object": object("AccessBinding", "legacy", "Deny", legacyID, 4)}
 	check("Allow")
+	// The exact same binding UID now predates the replacement namespace.
+	// The watch retires its former grant and the healthy remote stays usable.
+	recreated.Store(true)
+	edits <- map[string]any{"type": "MODIFIED", "object": object("AccessBinding", "local-grant", "Allow", "team", 2)}
+	check("NoEntitlement")
 
 	t.Run("inert-binding-does-not-keep-removed-allow", func(t *testing.T) {
 		ctx := t.Context()

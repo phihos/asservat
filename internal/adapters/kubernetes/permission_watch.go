@@ -202,10 +202,13 @@ func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, 
 	if err != nil {
 		return fail()
 	}
-	// ADR-329: a binding first seen here is placed in its namespace.
+	// A recreated namespace cannot inherit this binding.
 	namespace, err := w.client.placeBinding(ctx, m, nil)
 	if err != nil {
 		return fail()
+	}
+	if namespace.UID == "" {
+		return value.BindingEvent{Type: event.Type, ResourceVersion: m.RV, UnplacedUID: m.UID}, nil
 	}
 	ref := value.Resource{ClusterID: w.client.clusterID, Namespace: m.Namespace, NamespaceUID: namespace.UID, Kind: "AccessBinding", Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting}
 	binding := w.client.validator.observedBinding(o, ref)
