@@ -214,7 +214,7 @@ func statusWait(name string, raw json.RawMessage) (string, int64) {
 	case name == "download_artifact" && in.Action == "status":
 		id = in.DownloadID
 	case name == "get_query_result":
-		// A query worker's readiness notifies the query ID (migration 00007).
+		// A query worker's readiness notifies the query ID (migration 00008).
 		id = in.QueryHandle
 	}
 	if !authorization.UUID(id) {
