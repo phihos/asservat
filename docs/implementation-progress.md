@@ -35,7 +35,7 @@ to protocol major 2. ADR-334 consolidates the federation contract.
   policies to 5,626 bytes at 65 registrations. Withdrawal invalidated the
   old credentials and retained evidence remained readable.
 - Migrations 00006–00008 cover delivery, permission projection and owner
-  audit. A schema-5 connector received HTTP 426 on delivery and confirmation.
+  audit. The previous connector received HTTP 426 on delivery and confirmation.
   Already-prepared schema-5 SQL statements could neither read nor renew the
   new permission projection. Installed connectors still lack remote namespace
   and workload ownership metadata. Key rotation requires a mounted Secret
