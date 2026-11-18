@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"slices"
+	"sync"
 	"time"
 
 	app "asservat.local/asservat/internal/application/authorization"
@@ -12,18 +13,19 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
-// ProtectedLocalOperations never changes the loaded crypto maps. Loading a new
-// accepted snapshot creates a new instance; an old instance fails its guard.
+// ProtectedLocalOperations selects an immutable backend for each operation.
+// Rotation replaces the generation after the ledger accepts the mounted keys.
 type ProtectedLocalOperations struct {
 	source   app.KeyMaterialReader
 	ledger   app.KeyConfigurationLedger
 	scope    value.KeyScope
+	epoch    string
+	mu       sync.Mutex
 	snapshot value.LocalKeyConfiguration
-	backend  *LocalOperations
+	keys     *app.KeyGeneration
 	now      func() time.Time
 }
 
-var _ app.KeyOperationBackend = (*ProtectedLocalOperations)(nil)
 var _ app.KeyConfigurationGuard = (*ProtectedLocalOperations)(nil)
 
 func describeLocalMaterial(m app.KeyMaterial, scope value.KeyScope, now time.Time) (value.LocalKeyConfiguration, error) {
@@ -47,64 +49,59 @@ func describeLocalMaterial(m app.KeyMaterial, scope value.KeyScope, now time.Tim
 	}
 	return c, nil
 }
-func LoadProtectedLocalOperations(ctx context.Context, scope value.KeyScope, source app.KeyMaterialReader, ledger app.KeyConfigurationLedger, now func() time.Time) (*ProtectedLocalOperations, error) {
-	if ctx == nil || !scope.Valid() || source == nil || ledger == nil || now == nil {
+func LoadProtectedLocalOperations(ctx context.Context, scope value.KeyScope, epoch string, source app.KeyMaterialReader, ledger app.KeyConfigurationLedger, now func() time.Time) (*ProtectedLocalOperations, error) {
+	if !scope.Valid() || !value.UUID(epoch) {
 		return nil, ErrKeyService
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	m, err := source.ReadKeyMaterial(ctx)
-	defer clear(m.Payload)
-	if err != nil {
-		return nil, ErrKeyService
-	}
-	c, err := describeLocalMaterial(m, scope, now())
-	if err != nil {
+	s := &ProtectedLocalOperations{source: source, ledger: ledger, scope: scope, epoch: epoch, now: now}
+	if _, _, err := s.CurrentKeyConfiguration(ctx, scope, epoch); err != nil {
 		return nil, err
 	}
-	until, err := ledger.ObserveLocalKeys(ctx, c)
-	if err != nil || ctx.Err() != nil || c.Suspended || !c.Valid(now()) || !now().Before(until) || until.After(c.FreshUntil) {
-		return nil, ErrKeyService
-	}
-	backend, err := NewLocalOperations(scope, bytes.NewReader(m.Payload))
-	if err != nil {
-		return nil, err
-	}
-	return &ProtectedLocalOperations{source: source, ledger: ledger, scope: scope, snapshot: c, backend: backend, now: now}, nil
+	return s, nil
 }
-func (s *ProtectedLocalOperations) CurrentKeyConfiguration(ctx context.Context, scope value.KeyScope, epoch string) (time.Time, error) {
-	if s == nil || s.source == nil || s.ledger == nil || s.now == nil || ctx == nil || ctx.Err() != nil || scope != s.scope || epoch != s.snapshot.RecoveryEpoch {
-		return time.Time{}, providerStep("scope", ErrKeyService)
+
+func (s *ProtectedLocalOperations) CurrentKeyConfiguration(ctx context.Context, scope value.KeyScope, epoch string) (*app.KeyGeneration, time.Time, error) {
+	if s == nil || s.source == nil || s.ledger == nil || s.now == nil || ctx == nil || ctx.Err() != nil || scope != s.scope || epoch != s.epoch {
+		return nil, time.Time{}, providerStep("scope", ErrKeyService)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	m, err := s.source.ReadKeyMaterial(ctx)
 	defer clear(m.Payload)
 	if err != nil {
-		return time.Time{}, providerStep("source", ErrKeyService)
+		return nil, time.Time{}, providerStep("source", ErrKeyService)
 	}
 	c, err := describeLocalMaterial(m, scope, s.now())
 	if err != nil {
-		return time.Time{}, providerStep("material", ErrKeyService)
+		return nil, time.Time{}, providerStep("material", ErrKeyService)
+	}
+	if c.RecoveryEpoch != epoch {
+		return nil, time.Time{}, providerStep("scope", ErrKeyService)
 	}
 	until, err := s.ledger.ObserveLocalKeys(ctx, c)
 	if err != nil {
-		return time.Time{}, providerStep("ledger", ErrKeyService)
+		return nil, time.Time{}, providerStep("ledger", ErrKeyService)
 	}
-	if c.Suspended || !c.SameSnapshot(s.snapshot) {
-		return time.Time{}, providerStep("rotation", ErrKeyService)
+	if c.Suspended {
+		return nil, time.Time{}, providerStep("rotation", ErrKeyService)
 	}
 	now := s.now()
 	if ctx.Err() != nil || !c.Valid(now) || !now.Before(until) || until.After(c.FreshUntil) {
-		return time.Time{}, providerStep("deadline", ErrKeyService)
+		return nil, time.Time{}, providerStep("deadline", ErrKeyService)
 	}
-	return until, nil
-}
-func (s *ProtectedLocalOperations) Execute(ctx context.Context, r value.KeyRequest) (value.KeyResult, error) {
-	if s == nil || s.backend == nil {
-		return value.KeyResult{}, ErrKeyService
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !c.SameSnapshot(s.snapshot) {
+		// Another operation may already have installed a later ledger observation.
+		if c.Revision.Generation <= s.snapshot.Revision.Generation {
+			return nil, time.Time{}, providerStep("rotation", ErrKeyService)
+		}
+		backend, err := NewLocalOperations(scope, bytes.NewReader(m.Payload))
+		if err != nil {
+			return nil, time.Time{}, providerStep("material", ErrKeyService)
+		}
+		s.keys = &app.KeyGeneration{Operations: backend}
+		s.snapshot = c
 	}
-	// KeyService is responsible for invoking this instance's mandatory guard
-	// before and after crypto, with the operation permit's recovery epoch.
-	return s.backend.Execute(ctx, r)
+	return s.keys, until, nil
 }

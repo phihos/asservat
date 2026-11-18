@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,9 +39,13 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 	payload := localSecret(t, localScope, 1, 1)
 	snapshot := value.LocalKeyConfiguration{Scope: scope, ClusterID: "00000000-0000-4000-8000-000000000002", NamespaceUID: "synthetic", RecoveryEpoch: "00000000-0000-4000-8000-000000000003", Revision: identity.Revision{UID: "configuration", Generation: 1, Digest: artifact.Digest(sha256.Sum256(payload))}, SecretUID: "fixture-key", SecretDigest: artifact.Digest(sha256.Sum256(payload))}
 	sourceUnavailable := false
+	var onRead func()
 	source := materialSourceFunc(func(context.Context) (app.KeyMaterial, error) {
 		if sourceUnavailable {
 			return app.KeyMaterial{}, ErrKeyService
+		}
+		if onRead != nil {
+			onRead()
 		}
 		c := snapshot
 		c.SecretDigest = artifact.Digest(sha256.Sum256(payload))
@@ -58,7 +63,7 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 		}
 		return c.FreshUntil, nil
 	})
-	backend, err := LoadProtectedLocalOperations(t.Context(), scope, source, ledger, func() time.Time { return now })
+	backend, err := LoadProtectedLocalOperations(t.Context(), scope, snapshot.RecoveryEpoch, source, ledger, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,17 +98,44 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 	defer rotated.clear()
 	rotated.ActiveVersion = 2
 	rotated.Keys = append(rotated.Keys, localKeyVersion{Version: 2, Material: bytes.Repeat([]byte{0x42}, 32)})
-	payload, err = json.Marshal(rotated)
+	updated, err := json.Marshal(rotated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clear(payload)
-	snapshot.Revision.Digest = artifact.Digest(sha256.Sum256(payload))
-	snapshot.Revision.Generation = 2
+	defer clear(updated)
+	before := result.Sealed
+	originalPayload, originalSnapshot := payload, snapshot
+	// Replace the mount between the before and after reads of one operation.
+	reads := 0
+	onRead = func() {
+		reads++
+		if reads == 2 {
+			payload = updated
+			snapshot.Revision.Digest = artifact.Digest(sha256.Sum256(payload))
+			snapshot.Revision.Generation = 2
+		}
+	}
+	if crossed, err := service.Execute(t.Context(), peer, r); !errors.Is(err, app.ErrKeyUnavailable) || crossed.Sealed != (artifact.SealedKey{}) {
+		t.Fatal("operation crossing active key rotation returned a result", err)
+	}
+	onRead = nil
+	after, err := service.Execute(t.Context(), peer, r)
+	if err != nil || !strings.HasSuffix(after.Sealed.Reference, "/2") {
+		t.Fatal("next operation did not wrap with v2", err)
+	}
+	reader := peer
+	reader.Role = "acquisition"
+	unwrap := value.KeyRequest{Scope: r.Scope, Operation: "unwrap", AuthorityID: r.AuthorityID, Binding: r.Binding, Sealed: before}
+	plain, err := service.Execute(t.Context(), reader, unwrap)
+	if err != nil || !bytes.Equal(plain.Output, r.Input) || !strings.HasSuffix(before.Reference, "/1") {
+		t.Fatal("retained v1 key could not unwrap after rotation", err)
+	}
+	// A delayed v1 observation cannot reinstall v1 after the v2 operation.
+	payload, snapshot = originalPayload, originalSnapshot
 	requireRefusal("configuration-before/rotation")
 	sourceUnavailable = true
 	requireRefusal("configuration-before/source")
-	if _, err := backend.CurrentKeyConfiguration(t.Context(), scope, "00000000-0000-4000-8000-000000000099"); err == nil {
+	if _, _, err := backend.CurrentKeyConfiguration(t.Context(), scope, "00000000-0000-4000-8000-000000000099"); err == nil {
 		t.Fatal("wrong recovery epoch accepted")
 	}
 }

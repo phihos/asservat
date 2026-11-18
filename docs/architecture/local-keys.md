@@ -6,7 +6,9 @@ Implements the local provider of REQ-DEP-003 and REQ-EVD-001 under [ADR-064](../
 
 The Helm `secrets` Job creates the key Secret once if it is missing. The Secret contains only `keys.json`, closed by the [private Secret schema](../../specs/contracts/local-key-secret.schema.json); the Kubernetes Secret size limit (1 MiB) bounds it. The key service mounts it read-only; no other workload mounts it. The service rejects a key file readable by group or world ([security evidence review](../reviews/security-evidence-2026-11-13.md), item 9f).
 
-The service watches the mounted file (kubelet replaces it with an atomic symlink swap) and builds a new immutable backend on change. A reload is accepted only if every version loaded before is still present with identical bytes and the active version did not decrease. A rejected reload is logged and the current backend stays in use. Concurrent calls keep the backend they started with. Nothing in SQL or Kubernetes acts as a second ledger for key versions (ADR-330 D1).
+The artifact key service reads the projected Secret at each operation boundary. When the mounted version increases, the service installs an immutable backend for the accepted keyset. Each operation uses one backend through cryptography. If the final check observes a different generation, the caller receives no result. Subsequent operations use the new active version for wrapping and can unwrap keys from retained versions. Idle Pods do no refresh work. Kubernetes propagates a Secret update to each volume asynchronously. [Kubernetes Secret volumes](https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod).
+
+The current implementation checks per-version fingerprints in PostgreSQL before accepting the keyset. It refuses rollback, removal and changed bytes for an existing version. The intended key-service contract removes that second ledger (ADR-330 D1).
 
 ## Format
 

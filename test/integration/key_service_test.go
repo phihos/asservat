@@ -166,10 +166,7 @@ func newKeyTLSFor(t *testing.T, installation, purpose string, authority app.KeyO
 	if operationBackend == nil {
 		operationBackend = backend
 	}
-	if _, ok := operationBackend.(app.KeyConfigurationGuard); !ok {
-		operationBackend = fixtureConfiguredKeyBackend{operationBackend}
-	}
-	handler, err := keyservice.NewHandler([]app.KeyService{{Scope: f.scope, Authority: authority, Backend: operationBackend, Now: time.Now}}, peers, time.Now, 2)
+	handler, err := keyservice.NewHandler([]app.KeyService{{Scope: f.scope, Authority: authority, Backend: configuredFixtureKeys(operationBackend), Now: time.Now}}, peers, time.Now, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,11 +448,15 @@ func TestLocalKeyServiceBoundsAndCurrentTLS(t *testing.T) {
 }
 
 // Existing TLS/authority fixtures do not attest protected configuration.
-type fixtureConfiguredKeyBackend struct{ app.KeyOperationBackend }
+type fixtureConfiguredKeyBackend struct{ keys *app.KeyGeneration }
 
-func (fixtureConfiguredKeyBackend) CurrentKeyConfiguration(ctx context.Context, scope value.KeyScope, epoch string) (time.Time, error) {
+func configuredFixtureKeys(operations app.KeyOperationBackend) fixtureConfiguredKeyBackend {
+	return fixtureConfiguredKeyBackend{keys: &app.KeyGeneration{Operations: operations}}
+}
+
+func (f fixtureConfiguredKeyBackend) CurrentKeyConfiguration(ctx context.Context, scope value.KeyScope, epoch string) (*app.KeyGeneration, time.Time, error) {
 	if ctx.Err() != nil || !scope.Valid() || !value.UUID(epoch) {
-		return time.Time{}, app.ErrKeyUnavailable
+		return nil, time.Time{}, app.ErrKeyUnavailable
 	}
-	return time.Now().Add(5 * time.Second), nil
+	return f.keys, time.Now().Add(5 * time.Second), nil
 }

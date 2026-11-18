@@ -30,7 +30,7 @@ type KeyOperationBackend interface {
 type KeyService struct {
 	Scope     value.KeyScope
 	Authority KeyOperationAuthorizer
-	Backend   KeyOperationBackend
+	Backend   KeyConfigurationGuard
 	Now       func() time.Time
 }
 
@@ -57,10 +57,6 @@ func (s KeyService) Execute(ctx context.Context, peer value.KeyPeer, request val
 	if ctx == nil || s.Now == nil || s.Authority == nil || s.Backend == nil || !s.Scope.Valid() {
 		return value.KeyResult{}, ErrKeyUnavailable
 	}
-	configuration, ok := s.Backend.(KeyConfigurationGuard)
-	if !ok {
-		return value.KeyResult{}, ErrKeyUnavailable
-	}
 	if ctx.Err() != nil || request.Scope != s.Scope || !peer.Valid(s.Now()) || !peer.CanRequest(request.Scope, request.Operation) {
 		return value.KeyResult{}, ErrKeyDenied
 	}
@@ -83,19 +79,19 @@ func (s KeyService) Execute(ctx context.Context, peer value.KeyPeer, request val
 	}
 	effect, end := context.WithDeadline(ctx, permit.ValidUntil)
 	defer end()
-	keyUntil, err := configuration.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
-	if err != nil || effect.Err() != nil || !s.Now().Before(keyUntil) || keyUntil.After(s.Now().Add(5*time.Second)) || !permit.Valid(peer, info, s.Now()) {
+	keys, keyUntil, err := s.Backend.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
+	if err != nil || keys == nil || keys.Operations == nil || effect.Err() != nil || !s.Now().Before(keyUntil) || keyUntil.After(s.Now().Add(5*time.Second)) || !permit.Valid(peer, info, s.Now()) {
 		return value.KeyResult{}, &authorityCheckStep{step: "configuration-before", err: ErrKeyUnavailable, cause: err}
 	}
 	effect, stopKeys := context.WithDeadline(effect, keyUntil)
 	defer stopKeys()
-	result, err := s.Backend.Execute(effect, request)
+	result, err := keys.Operations.Execute(effect, request)
 	if err != nil || effect.Err() != nil || !permit.Valid(peer, info, s.Now()) || !result.Valid(request.Operation) {
 		clear(result.Output)
 		return value.KeyResult{}, &authorityCheckStep{step: "crypto", err: ErrKeyUnavailable, cause: err}
 	}
-	currentUntil, err := configuration.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
-	if err != nil || effect.Err() != nil || !s.Now().Before(currentUntil) || currentUntil.After(s.Now().Add(5*time.Second)) || !s.Now().Before(keyUntil) || !permit.Valid(peer, info, s.Now()) {
+	current, currentUntil, err := s.Backend.CurrentKeyConfiguration(effect, s.Scope, permit.RecoveryEpoch)
+	if err != nil || current != keys || effect.Err() != nil || !s.Now().Before(currentUntil) || currentUntil.After(s.Now().Add(5*time.Second)) || !s.Now().Before(keyUntil) || !permit.Valid(peer, info, s.Now()) {
 		clear(result.Output)
 		return value.KeyResult{}, &authorityCheckStep{step: "configuration-after", err: ErrKeyUnavailable, cause: err}
 	}

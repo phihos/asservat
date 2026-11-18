@@ -210,7 +210,7 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	backend, err := kms.LoadProtectedLocalOperations(startup, scope, source, ledger, time.Now)
+	backend, err := kms.LoadProtectedLocalOperations(startup, scope, c.IssuerEpoch, source, ledger, time.Now)
 	if err != nil {
 		return k, &fixedStepError{"artifact-key", mounts.ErrUnavailable}
 	}
