@@ -417,7 +417,7 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	if len(unplaced) != 0 {
 		return value.Snapshot{}, unplaced, nil
 	}
-	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
 		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
 	}
@@ -451,7 +451,7 @@ func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Sna
 	if err != nil {
 		return value.Snapshot{}, err
 	}
-	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
 		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
 	}
@@ -505,7 +505,7 @@ func (c *PermissionClient) NamespaceMetadata(ctx context.Context, q value.Namesp
 	if err != nil {
 		return value.NamespaceMetadata{}, err
 	}
-	out := value.NamespaceMetadata{ClusterID: c.clusterID, Namespace: q.Namespace, ResourceVersion: ns.RV, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), Deleting: ns.Deleting, Labels: map[string]string{}, Annotations: map[string]string{}}
+	out := value.NamespaceMetadata{ClusterID: c.clusterID, Namespace: q.Namespace, ResourceVersion: ns.RV, ObservedAt: start, FreshUntil: identity.Check(start, identity.Recheck).Until(), Deleting: ns.Deleting, Labels: map[string]string{}, Annotations: map[string]string{}}
 	for _, copy := range []struct {
 		keys     []string
 		src, dst map[string]string
