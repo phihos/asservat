@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -65,7 +66,7 @@ func startWorkWatch(t *testing.T, client *Client) (<-chan WorkHint, <-chan error
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	t.Cleanup(cancel)
 	hints, done := make(chan WorkHint, 8), make(chan error, 1)
-	go func() { done <- client.WatchWork(ctx, func(h WorkHint) { hints <- h }) }()
+	go func() { _, err := client.WatchWork(ctx, func(h WorkHint) { hints <- h }); done <- err }()
 	return hints, done, cancel
 }
 
@@ -209,5 +210,22 @@ func TestWorkWatchFailedReadyClosesStreamForRetry(t *testing.T) {
 	_, done, _ := startWorkWatch(t, client("A"))
 	if !errors.Is(workEvent(t, done), ErrChannel) || workEvent(t, ended) != "A" {
 		t.Fatal("subscription accepted despite failed readiness notification")
+	}
+}
+
+func TestWorkHintsBoundEachControlFrame(t *testing.T) {
+	raw, err := json.Marshal(testWorkHint(workClusterA, time.Now().Add(time.Minute)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := string(raw) + "\n"
+	count := MaxFrameBytes/len(record) + 2
+	got := 0
+	if err := readWorkHints(strings.NewReader(strings.Repeat(record, count)), func(WorkHint) { got++ }); !errors.Is(err, io.EOF) || got != count {
+		t.Fatalf("long subscription: %d/%d %v", got, count, err)
+	}
+	oversized := strings.Repeat(" ", MaxFrameBytes) + record
+	if err := readWorkHints(strings.NewReader(oversized), func(WorkHint) { t.Fatal("oversized hint dispatched") }); err == nil || errors.Is(err, io.EOF) {
+		t.Fatal("oversized record accepted")
 	}
 }

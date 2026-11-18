@@ -1,8 +1,10 @@
 package connectorlifecycle
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -153,26 +155,36 @@ func (h *WorkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *Client) WatchWork(ctx context.Context, receive func(WorkHint)) error {
+func (c *Client) WatchWork(ctx context.Context, receive func(WorkHint)) (connected bool, err error) {
 	if c == nil || ctx == nil || receive == nil {
-		return ErrChannel
+		return false, ErrChannel
 	}
 	resp, err := c.open(ctx, WorkPath, nil, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 	if resp.Header.Get("Content-Type") != ContentType {
-		return ErrChannel
+		return false, ErrChannel
 	}
-	dec := json.NewDecoder(resp.Body)
-	for {
+	return true, readWorkHints(resp.Body, receive)
+}
+
+func readWorkHints(body io.Reader, receive func(WorkHint)) error {
+	scanner := bufio.NewScanner(body)
+	// One NDJSON control frame at a time, independent of subscription lifetime.
+	scanner.Buffer(make([]byte, 4096), MaxFrameBytes+1)
+	for scanner.Scan() {
 		var hint WorkHint
-		if err := dec.Decode(&hint); err != nil {
+		if err := json.Unmarshal(scanner.Bytes(), &hint); err != nil {
 			return err
 		}
 		if hint.valid() {
 			receive(hint)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return io.EOF
 }

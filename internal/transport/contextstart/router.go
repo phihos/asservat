@@ -146,6 +146,28 @@ func (r *Router) pruneLocked(cluster string) {
 	}
 }
 
+// YieldIdle releases a connector slot for a different hub replica with active
+// demand. An in-flight query completes before its exchange yields. Attached
+// captures keep the exchange until their normal completion.
+func (r *Router) YieldIdle(cluster string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, s := range r.standby {
+		if s.channel.Connector.Binding.ClusterID != cluster || s.attached {
+			continue
+		}
+		if s.queryBusy {
+			s.yield = true
+			continue
+		}
+		if len(r.waiting[cluster]) == 0 {
+			s.cancel()
+		} else {
+			s.yield = true
+		}
+	}
+}
+
 // ReceiverCheck rechecks the same actual TLS peer and accepted local process.
 // A successful fresh check may authorize attachment, never restore a lost human
 // owner. The channel identity must remain exactly the original registered one.
@@ -162,6 +184,7 @@ type Standby struct {
 	done      chan struct{}
 	attached  bool
 	queryBusy bool
+	yield     bool
 	queries   int
 	retire    *time.Timer
 	once      sync.Once
@@ -460,7 +483,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
-		if selected.queries >= contracts.APIContextMaximumQueries && r.otherLiveLocked(selected) {
+		if selected.yield || selected.queries >= contracts.APIContextMaximumQueries && r.otherLiveLocked(selected) {
 			// An exhausted standby can answer no further query (ADR-270
 			// source work spends them every tick). While the cluster has
 			// another standby, retire it so the region opens a queryable
@@ -489,28 +512,23 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 	return result.until, result.err
 }
 
-// Attach accepts a start bounded by the ADR-311 recheck interval. Like
-// TryAttach it needs a standby covering only ordinary work; the attachment is
-// narrowed to the selected standby's residency, a transport lifetime that the
-// start's own receiver bound then carries.
+// Attach waits for the requested connector within the start's own bounds.
+// A full capture reservation is refused at admission.
 func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachment, error) {
-	return r.attach(ctx, cluster, capture, true, identity.AuthorityRecheckInterval)
+	return r.attach(ctx, cluster, capture, false, identity.AuthorityRecheckInterval)
 }
 
-// TryAttach is Attach without waiting for a standby: it fails at once when
-// none is idle, so the caller's whole bound remains for its exchange. A
-// caller with its own retry loop uses it (ADR-272 advisory history); its
-// attachment may last up to TryAttachLimit.
-func (r *Router) TryAttach(ctx context.Context, cluster, capture string) (*Attachment, error) {
-	return r.attach(ctx, cluster, capture, false, TryAttachLimit)
+// HistoryAttachLimit covers a history write's receiver check, SQL claim and
+// three-copy exchange, which exceeded five seconds on CI (run 41215337179).
+const HistoryAttachLimit = 10 * time.Second
+
+// AttachHistory waits for a capture reservation and an exchange within a
+// single deadline shared with the subsequent history operation.
+func (r *Router) AttachHistory(ctx context.Context, cluster, capture string) (*Attachment, error) {
+	return r.attach(ctx, cluster, capture, true, HistoryAttachLimit)
 }
 
-// TryAttachLimit bounds a TryAttach attachment: a history write's receiver
-// check, SQL claim and three-copy exchange exceeded five seconds on CI
-// (native run 41215337179).
-const TryAttachLimit = 10 * time.Second
-
-func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool, limit time.Duration) (*Attachment, error) {
+func (r *Router) attach(ctx context.Context, cluster, capture string, history bool, limit time.Duration) (*Attachment, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(cluster) || !authorization.UUID(capture) {
 		return nil, fleet.ErrInvalid
 	}
@@ -523,7 +541,10 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 	// conversation may still be opening. Wait only before selecting any work,
 	// within ordinary work of this caller's original bound and the existing
 	// query reserve: a longer start bound does not lengthen the wait.
-	waitUntil := identity.Earlier(deadline, time.Now().Add(standbyWork))
+	waitUntil := deadline
+	if !history {
+		waitUntil = identity.Earlier(deadline, time.Now().Add(standbyWork))
+	}
 	var done func()
 	defer func() {
 		if done != nil {
@@ -539,7 +560,8 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 	for {
 		r.mu.Lock()
 		c := r.clusters[cluster]
-		if r.closed || c == nil || c.captures >= c.limit.Captures || r.captures[capture] != nil {
+		busy := c != nil && (c.captures >= c.limit.Captures || r.captures[capture] != nil)
+		if r.closed || c == nil || busy && !history {
 			r.mu.Unlock()
 			return nil, fleet.ErrCapacity
 		}
@@ -548,7 +570,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 			return nil, fleet.ErrUnavailable
 		}
 		r.pruneLocked(cluster)
-		// A bound beyond ordinary work (history up to TryAttachLimit, a start
+		// A bound beyond ordinary work (history up to HistoryAttachLimit, a start
 		// up to the ADR-311 interval) needs only a standby that covers ordinary
 		// work: an idle standby short of the whole bound is never retired, so
 		// requiring it left history refused until the standby aged out
@@ -560,7 +582,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 			cover = ordinary
 		}
 		selected := r.selectLocked(cluster, cover, func(*Standby) bool { return true })
-		if selected != nil {
+		if !busy && selected != nil {
 			selected.attached = true
 			if r.lastAttach == nil {
 				r.lastAttach = map[string]time.Time{}
@@ -578,18 +600,15 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 		}
 		registered := r.registered
 		r.mu.Unlock()
-		if wait && !time.Now().Before(waitUntil.Add(-queryReserve)) {
+		if !time.Now().Before(waitUntil.Add(-queryReserve)) {
 			return nil, fleet.ErrUnavailable
 		}
-		if done == nil && r.RequestExchange != nil {
+		if !busy && done == nil && r.RequestExchange != nil {
 			var err error
 			done, err = r.request(ctx, cluster)
 			if err != nil {
 				return nil, fleet.ErrUnavailable
 			}
-		}
-		if !wait {
-			return nil, fleet.ErrUnavailable
 		}
 		if timer == nil {
 			wait := time.Until(waitUntil.Add(-queryReserve))
@@ -707,6 +726,10 @@ func (a *Attachment) Close() {
 		if a.router.captures[a.capture] == a {
 			delete(a.router.captures, a.capture)
 			a.router.clusters[a.standby.channel.Connector.Binding.ClusterID].captures--
+			if !a.router.closed {
+				close(a.router.registered)
+				a.router.registered = make(chan struct{})
+			}
 		}
 		a.router.mu.Unlock()
 	})

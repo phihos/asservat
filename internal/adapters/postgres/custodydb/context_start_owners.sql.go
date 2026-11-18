@@ -10,7 +10,7 @@ import (
 )
 
 const notifyConnectorReady = `-- name: NotifyConnectorReady :exec
-SELECT pg_notify('asservat_connector_ready', $1::text)
+SELECT pg_notify('asservat_connector_work', $1::text)
 `
 
 func (q *Queries) NotifyConnectorReady(ctx context.Context, clusterID string) error {

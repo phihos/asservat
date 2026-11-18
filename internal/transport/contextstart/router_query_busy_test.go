@@ -249,41 +249,12 @@ func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
 	}
 }
 
-// TryAttach never waits: without an idle standby it fails at once.
-func TestRouterTryAttachDoesNotWait(t *testing.T) {
-	w := workFixture()
-	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer router.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-	defer cancel()
-	started := time.Now()
-	if _, err := router.TryAttach(ctx, cluster, w.Work.CaptureID); !errors.Is(err, fleet.ErrUnavailable) || time.Since(started) > 100*time.Millisecond {
-		t.Fatal("try attach waited or succeeded without a standby", err, time.Since(started))
-	}
-	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
-	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer standby.Finish()
-	call, end := context.WithTimeout(context.Background(), time.Second)
-	defer end()
-	if a, err := router.TryAttach(call, cluster, w.Work.CaptureID); err != nil || a == nil {
-		t.Fatal("try attach refused an idle standby", err)
-	}
-}
-
-// A history TryAttach (up to TryAttachLimit) takes an idle standby that can
+// A history AttachHistory (up to HistoryAttachLimit) takes an idle standby that can
 // still cover ordinary work but not the whole ten seconds, and narrows its
 // attachment to that standby's residency instead of refusing: such a standby
 // is not retired, so refusing left history without any standby until it
 // aged out (installed native 41525755470: 25 refused attaches over 6 s).
-func TestRouterTryAttachNarrowsToAnAgedStandby(t *testing.T) {
+func TestRouterAttachHistoryNarrowsToAnAgedStandby(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
 	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
@@ -302,9 +273,9 @@ func TestRouterTryAttachNarrowsToAnAgedStandby(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer standby.Finish()
-	call, end := context.WithTimeout(context.Background(), TryAttachLimit)
+	call, end := context.WithTimeout(context.Background(), HistoryAttachLimit)
 	defer end()
-	a, err := router.TryAttach(call, cluster, w.Work.CaptureID)
+	a, err := router.AttachHistory(call, cluster, w.Work.CaptureID)
 	if err != nil || a == nil {
 		t.Fatal("try attach refused an idle standby that covers ordinary work", err)
 	}

@@ -31,7 +31,7 @@ func RuntimeRoles(installation string) ([]RuntimeRole, error) {
 	}
 	var out []RuntimeRole
 	add := func(name string, named bool, connections int, limited bool, grants []publicRuntimeGrant, planned bool) error {
-		if !named || !limited || !planned || connections < 1 {
+		if !named || !limited || !planned || connections == 0 || connections < -1 {
 			return cfg.ErrInvalid
 		}
 		out = append(out, RuntimeRole{Name: name, Connections: connections, grants: grants})

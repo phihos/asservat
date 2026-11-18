@@ -18,7 +18,7 @@ func TestRuntimeRolesCoverAllCompiledPlansWithUniqueNames(t *testing.T) {
 	seen := map[string]bool{}
 	var pub, configuration, owner int
 	for _, r := range roles {
-		if seen[r.Name] || !strings.HasPrefix(r.Name, prefix) || len(r.Name) > 63 || r.Connections < 1 || len(r.grants) == 0 {
+		if seen[r.Name] || !strings.HasPrefix(r.Name, prefix) || len(r.Name) > 63 || r.Connections == 0 || r.Connections < -1 || len(r.grants) == 0 {
 			t.Fatalf("invalid runtime role %+v", r)
 		}
 		seen[r.Name] = true

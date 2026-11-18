@@ -30,6 +30,9 @@ func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 		if n >= len(wantHub) {
 			wantLimit = 3
 		}
+		if slices.Contains(contracts.PublicRuntimeFederationPurposes(), purpose) {
+			wantLimit = -1
+		}
 		if !known || limit != wantLimit {
 			t.Fatalf("wrong fixed connection compartment: %s", purpose)
 		}

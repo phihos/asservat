@@ -90,15 +90,51 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal("rerun", from, to, e)
 	}
 
-	// P2: two runtime roles with mounted credentials; the rest are missing.
+	// Provision the hub and federation roles from their mounted credentials.
 	hub, _ := postgres.PublicRuntimeRoleName(installation, "hub-runtime")
 	fleetRole, _ := postgres.ConfigurationRuntimeRoleName(installation, "configuration-fleet")
 	password := strings.Repeat("Setup-0", 7)
-	logins := map[string]string{hub: password, fleetRole: password}
+	federation, _ := postgres.PublicRuntimeRoleName(installation, "connector-owner-read")
+	logins := map[string]string{hub: password, fleetRole: password, federation: password}
 	report, e := postgres.EnsureRuntimeRoles(ctx, config, installation, logins)
-	if e != nil || len(report.Created) != 2 || len(report.Updated) != 0 || len(report.Missing) != len(roles)-2 {
+	if e != nil || len(report.Created) != 3 || len(report.Updated) != 0 || len(report.Missing) != len(roles)-3 {
 		t.Fatal("first role reconciliation", report, e)
 	}
+	// Two serving federation replicas and one rolling replacement each need a
+	// persistent listener and an independent session for ordinary work.
+	t.Run("federation overlap", func(t *testing.T) {
+		login := config.Copy()
+		login.User, login.Password = federation, password
+		var listeners, queries []*pgx.Conn
+		for i := range 6 {
+			conn, err := pgx.ConnectConfig(ctx, login)
+			if err != nil {
+				t.Fatal("federation session", i, err)
+			}
+			defer conn.Close(ctx)
+			if i%2 == 0 {
+				if _, err = conn.Exec(ctx, "LISTEN asservat_connector_work"); err != nil {
+					t.Fatal(err)
+				}
+				listeners = append(listeners, conn)
+			} else {
+				queries = append(queries, conn)
+			}
+		}
+		for _, q := range queries {
+			if _, err := q.Exec(ctx, "SELECT pg_notify('asservat_connector_work','ready')"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, l := range listeners {
+			for range queries {
+				n, err := l.WaitForNotification(ctx)
+				if err != nil || n.Payload != "ready" {
+					t.Fatal("work dispatch", err)
+				}
+			}
+		}
+	})
 	// Drift: an extra grant is revoked again and the password follows the
 	// mounted credential.
 	owned, e := pgx.ConnectConfig(ctx, config)
@@ -110,7 +146,7 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	logins[hub] = strings.Repeat("Rotate-1", 6)
-	if report, e = postgres.EnsureRuntimeRoles(ctx, config, installation, logins); e != nil || len(report.Created) != 0 || len(report.Updated) != 2 {
+	if report, e = postgres.EnsureRuntimeRoles(ctx, config, installation, logins); e != nil || len(report.Created) != 0 || len(report.Updated) != 3 {
 		t.Fatal("second role reconciliation", report, e)
 	}
 	var extra bool

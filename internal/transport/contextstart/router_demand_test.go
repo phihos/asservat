@@ -145,3 +145,103 @@ func TestRouterRefusesIneligibleDemandBeforeSignallingConnector(t *testing.T) {
 	}
 	router.ResendDemand("")
 }
+
+func TestHistoryWaitsForOneDemandThroughReconnect(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := workFixture().Work
+		cluster := w.Channel.Connector.Binding.ClusterID
+		router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer router.Close()
+		ctx, cancel := context.WithTimeout(t.Context(), HistoryAttachLimit)
+		defer cancel()
+		signals := 0
+		router.RequestExchange = func(call context.Context, _ string) error {
+			if until, _ := call.Deadline(); !until.Equal(time.Now().Add(HistoryAttachLimit)) && signals == 0 {
+				t.Fatal("history deadline changed")
+			}
+			signals++
+			return nil
+		}
+		result := make(chan *Attachment, 1)
+		go func() { a, _ := router.AttachHistory(ctx, cluster, w.CaptureID); result <- a }()
+		synctest.Wait()
+		time.Sleep(2 * time.Second)
+		if signals != 1 {
+			t.Fatalf("history signalled %d times before reconnect", signals)
+		}
+		router.ResendDemand(cluster)
+		if signals != 2 {
+			t.Fatal("waiting history lost across reconnect")
+		}
+		now := time.Now()
+		receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(now, identity.Recheck)}
+		s, err := router.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := <-result
+		if a == nil {
+			t.Fatal("history failed after delayed registration")
+		}
+		router.ResendDemand(cluster)
+		if signals != 2 {
+			t.Fatal("reannounced attached history")
+		}
+		s.Finish()
+		a.Close()
+	})
+}
+
+func TestForeignOwnerDemandReleasesSingleConnectorSlot(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := workFixture().Work
+		cluster := w.Channel.Connector.Binding.ClusterID
+		first, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		second, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+		defer first.Close()
+		defer second.Close()
+		start := func(r *Router) *Standby {
+			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(time.Now(), identity.Recheck)}
+			s, err := r.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s
+		}
+		only := start(first)
+		defer only.Finish()
+		ctx, stop := context.WithTimeout(t.Context(), 5*time.Second)
+		defer stop()
+		query := func(r *Router) <-chan error {
+			done := make(chan error, 1)
+			go func() { _, err := r.Query(ctx, cluster, queryResolvePod, nil, nil); done <- err }()
+			return done
+		}
+		a := query(first)
+		job := <-only.query
+		second.RequestExchange = func(context.Context, string) error { first.YieldIdle(cluster); return nil }
+		b := query(second)
+		synctest.Wait()
+		if only.Context().Err() != nil {
+			t.Fatal("yield interrupted query")
+		}
+		job.result <- queryResult{until: time.Now().Add(time.Second)}
+		if err := <-a; err != nil {
+			t.Fatal(err)
+		}
+		if only.Context().Err() == nil {
+			t.Fatal("completed exchange retained connector slot")
+		}
+		only.Finish()
+		replacement := start(second)
+		defer replacement.Finish()
+		job = <-replacement.query
+		job.result <- queryResult{until: time.Now().Add(time.Second)}
+		if err := <-b; err != nil {
+			t.Fatal("second owner query", err)
+		}
+	})
+}

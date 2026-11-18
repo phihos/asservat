@@ -232,8 +232,17 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	*closers = append(*closers, router.Close)
 	// Keep one listener slot on a hub with no registrations. Its empty router refuses starts.
 	connections := max(1, router.StandbyCapacity())
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections, ListenReady: func(ctx context.Context, ready func(string)) {
-		postgres.ListenPayloads(ctx, sql["hub-metadata-read"], postgres.ConnectorReadyChannel, ready)
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections, WatchWork: func(ctx context.Context, owner fleet.OwnerBinding, router *contextstart.Router) {
+		postgres.ListenPayloads(ctx, sql["hub-metadata-read"], postgres.ConnectorWorkChannel, func(payload string) {
+			if payload == "" || authorization.UUID(payload) {
+				router.ResendDemand(payload)
+				return
+			}
+			var hint connectorlifecycle.WorkHint
+			if json.Unmarshal([]byte(payload), &hint) == nil && hint.Owner != owner && time.Now().Before(hint.Until) {
+				router.YieldIdle(hint.Cluster)
+			}
+		})
 	}, Wake: func(ctx context.Context, cluster string, owner fleet.OwnerBinding) error {
 		until, _ := ctx.Deadline()
 		payload, err := json.Marshal(connectorlifecycle.WorkHint{Cluster: cluster, Owner: owner, Until: until})

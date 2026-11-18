@@ -32,7 +32,7 @@ type OwnerNativeRuntimeConfig struct {
 // router used by RegionalAPIContextStart; this gives no public caller a route.
 // Tokens verifies the connectors' ServiceAccount tokens (ADR-334).
 type OwnerContextStartRuntimeConfig struct {
-	ListenReady            func(context.Context, func(string))
+	WatchWork              func(context.Context, value.OwnerBinding, *contextstart.Router)
 	Wake                   func(context.Context, string, value.OwnerBinding) error
 	RootID                 string
 	Router                 *contextstart.Router
@@ -87,7 +87,7 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 		}
 		if start.Wake != nil {
 			start.Router.RequestExchange = func(ctx context.Context, cluster string) error { return start.Wake(ctx, cluster, r.binding) }
-			start.ListenReady(r.root, start.Router.ResendDemand)
+			start.WatchWork(r.root, r.binding, start.Router)
 		}
 		self := auth
 		if start.Authenticator != nil {

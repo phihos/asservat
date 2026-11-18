@@ -55,7 +55,8 @@ outbound HTTP/2 work subscription per connector. A waiting owner sends a
 PostgreSQL notification when it needs an exchange. The connector opens that
 exchange through its existing connection. Federation resolves the requesting
 owner's binding to a ready Pod address in the installed Service's EndpointSlice
-and uses the configured native port. The connector verifies the TLS identity
+and uses the configured native port. If the endpoint lists both IP families,
+federation can try either address within the original dial deadline. The connector verifies the TLS identity
 of that exact owner process. Ordinary Service load balancing could select a
 different replica with no waiting request.
 An available exchange can serve further work within its original lifetime.
@@ -64,7 +65,11 @@ One database listener per federation replica receives work notifications. One
 per hub-api replica hears subscriptions and reannounces its still-waiting
 callers after reconnect. Neither notification persists a request, carries
 credentials or grants collection authority. This uses the existing database
-credentials and service endpoints. An idle fleet sends no owner lookups or
+credentials and service endpoints. The shared federation SQL logins use one pooled
+connection per purpose per process, plus the work listener. PostgreSQL enforces
+the server connection budget across replicas. A replica releases an idle
+exchange when another replica needs the same connector. History waits for
+exchange registration within the caller's original deadline. An idle fleet sends no owner lookups or
 exchange renewals. Upgrade a development installation's hub and connectors
 together when crossing from the old standby protocol to major 2. Registering before resynchronization
 follows PostgreSQL’s documented startup ordering. [PostgreSQL LISTEN](https://www.postgresql.org/docs/18/sql-listen.html#SQL-LISTEN-NOTES).

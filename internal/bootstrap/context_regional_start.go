@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"context"
 	"errors"
+	"math/rand/v2"
 	"sync"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -380,7 +381,7 @@ func (e exchangeStepError) ExchangeStep() string { return e.step }
 // RegionalContextStartConnections opens work exchanges only when a hub owner
 // has a waiting request. The connector never replays a capture on reconnect.
 type RegionalContextStartConnections struct {
-	Watch  func(context.Context, func(connectorlifecycle.WorkHint)) error
+	Watch  func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error)
 	Client interface {
 		OpenRequested(context.Context, fleetvalue.OwnerBinding, time.Time) (*mtls.ContextStartExchange, error)
 		Close()
@@ -423,18 +424,27 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			}
 		})
 	}
+	backoff := time.Second
 	for ctx.Err() == nil {
-		if err := s.Watch(ctx, receive); err != nil && ctx.Err() == nil {
+		connected, err := s.Watch(ctx, receive)
+		if ctx.Err() != nil {
+			break
+		}
+		if err != nil {
 			s.reportFailure("work-stream", err)
 		}
-		// Back off only after the event stream ends. Already attached work
-		// continues to its original deadline during a subscription reconnect.
-		timer := time.NewTimer(time.Second)
+		if connected {
+			backoff = time.Second
+		}
+		// Jitter each reconnect, including at the ceiling, to spread a fleet
+		// returning after the same hub outage. Attached work continues meanwhile.
+		timer := time.NewTimer(backoff + rand.N(backoff))
 		select {
 		case <-ctx.Done():
 			timer.Stop()
 		case <-timer.C:
 		}
+		backoff = min(30*time.Second, backoff*2)
 	}
 	return ctx.Err()
 }

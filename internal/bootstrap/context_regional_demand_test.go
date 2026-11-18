@@ -34,16 +34,16 @@ func TestRegionalDemandKeepsIdleSubscriptionWithoutOpeningExchanges(t *testing.T
 		client := &regionalDemandClient{opened: make(chan connectorlifecycle.WorkHint, 4)}
 		subscriptions := 0
 		regional := RegionalContextStartConnections{Client: client, Concurrency: 2, Local: contextstart.RegionalLocal{Now: time.Now},
-			Watch: func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) error {
+			Watch: func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) (bool, error) {
 				subscriptions++
 				for {
 					select {
 					case hint := <-hints:
 						receive(hint)
 					case <-reconnect:
-						return fleet.ErrUnavailable
+						return true, fleet.ErrUnavailable
 					case <-ctx.Done():
-						return ctx.Err()
+						return true, ctx.Err()
 					}
 				}
 			},
@@ -77,6 +77,37 @@ func TestRegionalDemandKeepsIdleSubscriptionWithoutOpeningExchanges(t *testing.T
 		stop()
 		if err := <-done; !errors.Is(err, context.Canceled) || !client.closed {
 			t.Fatal("connector shutdown", err, client.closed)
+		}
+	})
+}
+
+func TestRegionalDisconnectBacksOffAndCancels(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, stop := context.WithCancel(t.Context())
+		calls := 0
+		var last time.Time
+		run := RegionalContextStartConnections{Client: &regionalDemandClient{}, Concurrency: 1, Local: contextstart.RegionalLocal{Now: time.Now},
+			Watch: func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error) {
+				calls++
+				now := time.Now()
+				if calls > 1 {
+					base := time.Second << min(calls-2, 5)
+					base = min(base, 30*time.Second)
+					if calls == 9 {
+						base = time.Second
+					} // preceding handshake succeeded
+					if dt := now.Sub(last); dt < base || dt >= 2*base {
+						t.Errorf("attempt %d waited %s, base %s", calls, dt, base)
+					}
+				}
+				last = now
+				if calls == 9 {
+					stop()
+				}
+				return calls == 8, errors.New("disconnected")
+			}}
+		if err := run.Run(ctx); !errors.Is(err, context.Canceled) || calls != 9 {
+			t.Fatal(calls, err)
 		}
 	})
 }

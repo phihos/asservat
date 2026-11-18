@@ -1,10 +1,10 @@
 package postgres
 
 import (
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"context"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,7 +20,6 @@ const (
 )
 
 const ConnectorWorkChannel = "asservat_connector_work"
-const ConnectorReadyChannel = "asservat_connector_ready"
 
 func NotifyConnectorReady(ctx context.Context, pool *pgxpool.Pool, cluster string) error {
 	return custodydb.New(pool).NotifyConnectorReady(ctx, cluster)
