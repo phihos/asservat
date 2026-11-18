@@ -99,7 +99,7 @@ func TestReviewSourcesInUIDOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, change := range map[string]func(*PermissionBatch){
-		"duplicate": func(b *PermissionBatch) { b.ReviewSources = append(got, got[0]) },
+		"duplicate":       func(b *PermissionBatch) { b.ReviewSources = append(got, got[0]) },
 		"unreadable list": func(b *PermissionBatch) { b.SourcesUnavailable = true },
 		"tampered authority": func(b *PermissionBatch) {
 			b.ReviewSources = append([]ReviewSource{}, got...)
