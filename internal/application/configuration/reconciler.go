@@ -296,10 +296,10 @@ func (s *bindingRun) checkTrust(ctx context.Context) (PermissionTrust, error) {
 	return t, nil
 }
 
-// Bound a blocking baseline or refresh by its actual authority. Watch streams
-// opened at the returned cursors belong to the epoch's longer-lived context.
+// Bound a source read by the active controller lease. A renewable trust
+// observation is checked at publication. Watch lifetimes belong to the epoch.
 func (s *bindingRun) listContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	until := value.PermissionDeadline(s.fence.LeaseUntil, s.trust.FreshUntil)
+	until := s.fence.LeaseUntil
 	if until.IsZero() {
 		return context.WithCancel(ctx)
 	}
