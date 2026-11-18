@@ -31,6 +31,9 @@ type helmNativeKind struct {
 	// registered in the hub's values as "work"
 	// (TestHelmNativeKindClusterJoin only).
 	WorkKubeconfig string
+	// Optional public listener addresses, one per hub Pod. Separate dial
+	// addresses preserve the installed public origin for TLS and OIDC.
+	ConsoleAddresses []string
 }
 
 // TestHelmNativeKindJourney drives the real user journey against a running
@@ -137,9 +140,16 @@ func runHelmNativeKindJourney(t *testing.T, joined bool) {
 	}
 	noDeletion := func(string) func() { return func() {} }
 	noProjection := func(string) func(string, string) func() { return func(string, string) func() { return func() {} } }
-	journey := installedJourney(t, ctx, admin, root, identity, block.Bytes, net.JoinHostPort(k.NodeIP, fmt.Sprint(k.ConsolePort)), origin, diagnose, noDeletion, noProjection,
-		func(string, installedProcessingRun) { t.Log("hn journey: native download verified") })
-	journey(cluster, workload.ns.Name, workload.app.Name, nil, nil)
+	addresses := k.ConsoleAddresses
+	if len(addresses) == 0 {
+		addresses = []string{net.JoinHostPort(k.NodeIP, fmt.Sprint(k.ConsolePort))}
+	}
+	for n, address := range addresses {
+		t.Logf("hn journey: public listener %d of %d at %s", n+1, len(addresses), address)
+		journey := installedJourney(t, ctx, admin, root, identity, block.Bytes, address, origin, diagnose, noDeletion, noProjection,
+			func(string, installedProcessingRun) { t.Log("hn journey: native download verified") })
+		journey(cluster, workload.ns.Name, workload.app.Name, nil, nil)
+	}
 	t.Logf("hn journey: complete for installation %s", installation)
 }
 
