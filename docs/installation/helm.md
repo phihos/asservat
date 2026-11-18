@@ -431,6 +431,19 @@ regional keys issued to a removed or revoked cluster. Registering the same
 name again issues fresh keys for its existing evidence and history. Its old
 keys stay unusable. Continuously registered clusters keep their keys.
 
+To replace a cluster or its trusted issuer under the same name, apply two
+separate Helm upgrades to the hub using its full values file.
+
+1. Set `revoked: true` on the old entry and run `helm upgrade` with
+   `--wait --wait-for-jobs`. Wait for the bundled object store rollout to finish.
+2. Set the replacement’s `issuer` and any pinned `jwks`, clear `revoked`,
+   and run the hub upgrade again. The replacement receives fresh storage keys
+   and access to that name’s existing evidence and history.
+
+An in-place issuer edit keeps the storage keys of a continuously active
+registration. For a routine ServiceAccount signing-key rotation on the same
+cluster, update its pinned `jwks` if configured. Its storage keys stay active.
+
 If an older development chart failed an upgrade with `PolicyTooLarge` and
 setup now reports a bucket-policy conflict, reapply the last successful chart
 and values to restore the previous desired policy, then upgrade. Keep the
