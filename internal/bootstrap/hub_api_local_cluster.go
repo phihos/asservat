@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -38,9 +37,8 @@ func (o *hubAPIRegionalOffer) ensure(ctx context.Context, api kubernetes.Interfa
 		return zero, &fixedStepError{"regional-offer-read", mounts.ErrUnavailable}
 	}
 	var stored contracts.RegionalOffer
-	d := json.NewDecoder(bytes.NewReader([]byte(current.Data[contracts.RegionalOfferFile])))
-	d.DisallowUnknownFields()
-	if d.Decode(&stored) != nil || stored.InstallationID != o.offer.InstallationID || stored.HubClusterID != o.offer.HubClusterID {
+	// Older stored offers also named the native Service. Exact-owner tunnels only use the pool.
+	if json.Unmarshal([]byte(current.Data[contracts.RegionalOfferFile]), &stored) != nil || stored.InstallationID != o.offer.InstallationID || stored.HubClusterID != o.offer.HubClusterID {
 		return zero, &fixedStepError{"regional-offer-stored", mounts.ErrUnavailable}
 	}
 	return stored, nil

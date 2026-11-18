@@ -212,7 +212,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if in.offer != nil && in.offer.ownersAddress != "" {
+	if in.offer != nil && in.offer.offer.KeyService != nil {
 		// The combined-mode regional executor dials the accepted owner pool.
 		if err = in.offer.setOwners(parts.pool, parts.revision, parts.issuerRoots); err != nil {
 			return nil, &fixedStepError{"regional-offer-owners", err}

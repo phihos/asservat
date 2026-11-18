@@ -169,7 +169,7 @@ func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c 
 	out.evidence, out.history = s.Evidence, s.History
 	st, k := out.store, out.keys
 	if !ownerEndpoint(st.Endpoint) || !identity.Text(st.Region, 128) || !identity.Text(st.Bucket, 63) || !authorization.UUID(st.StoreID) || !ownerEndpoint(k.Endpoint) ||
-		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() || !ownerDialAddress(out.owners.Address) {
+		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() {
 		return out, &fixedStepError{"hub-settings/executor", mounts.ErrUnavailable}
 	}
 	for _, x := range []contracts.OwnerStorageCredential{out.evidence, out.history} {

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,12 +35,11 @@ type ContextStartClient struct {
 	roots     *x509.CertPool
 	verifier  *OwnerPeerVerifier
 	owners    OwnerPeerAuthenticator
-	address   string // ADR-172 fixed dial endpoint
 	connector value.ConnectorProcessIdentity
 	token     func() ([]byte, error)
 	process   execution.APIProcessReader
 	now       func() time.Time
-	dial      func(context.Context, string, string) (net.Conn, error)
+	dial      func(context.Context, value.OwnerBinding) (net.Conn, error)
 	mu        sync.Mutex
 	closed    bool
 	maximum   int
@@ -54,17 +52,13 @@ type OwnerPeerAuthenticator interface {
 	AuthenticateOwner(context.Context, app.OwnerPeerConnection) (value.AuthenticatedOwner, error)
 }
 
-// NewContextStartClient dials one installer-pinned host:port with the exact
-// SNI and HTTP authority of each owner (ADR-157/172). connector is this
+// NewContextStartClient dials the requested owner with its exact SNI and
+// HTTP authority (ADR-157/172). connector is this
 // process's identity; token reads the current projected ServiceAccount token.
-// dial opens the raw connection to address (the connector's hub tunnel).
-func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, address string, dial func(context.Context, string, string) (net.Conn, error), owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
-	host, port, e := net.SplitHostPort(address)
-	number, pe := strconv.Atoi(port)
-	if e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || owners == nil || dial == nil {
-		return nil, value.ErrInvalid
-	}
-	if ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || !connector.Valid() || token == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
+// dial opens the raw connection through the connector's hub tunnel.
+func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, dial func(context.Context, value.OwnerBinding) (net.Conn, error), owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+
+	if dial == nil || owners == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || !connector.Valid() || token == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
 		return nil, value.ErrInvalid
 	}
 	if connector.Binding.InstallationID != pool.InstallationID || connector.Binding.IssuerEpoch != pool.IssuerEpoch {
@@ -75,7 +69,7 @@ func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 		return nil, e
 	}
 	root, cancel := context.WithCancel(ctx)
-	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, address: address, connector: connector, token: token, process: process, now: now, dial: dial, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
+	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, connector: connector, token: token, process: process, now: now, dial: dial, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
 }
 
 // ContextStartExchange owns the actual one-socket HTTP/2 request. The transport
@@ -332,7 +326,7 @@ func (c *ContextStartClient) OpenRequested(ctx context.Context, owner value.Owne
 		return nil, e
 	}
 	diagnostic.at("dial")
-	raw, e := c.dial(setup, "tcp", c.address)
+	raw, e := c.dial(setup, owner)
 	if e != nil || raw == nil {
 		if raw != nil {
 			_ = raw.Close()

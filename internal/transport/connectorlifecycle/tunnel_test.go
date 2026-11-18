@@ -43,6 +43,12 @@ func tunnelFixture(t *testing.T) (*Client, string, *httptest.Server, *x509.CertP
 	allowed := echo.Addr().String()
 	tokens := &tunnelTokens{until: time.Now().Add(time.Minute)}
 	h := &TunnelHandler{Tokens: tokens, Allowed: func(_ context.Context, target string) bool { return target == allowed }, Dial: (&net.Dialer{}).DialContext}
+	client, server, roots := serveTunnel(t, h)
+	return client, allowed, server, roots, tokens
+}
+
+func serveTunnel(t *testing.T, h *TunnelHandler) (*Client, *httptest.Server, *x509.CertPool) {
+	t.Helper()
 	server := httptest.NewUnstartedServer(h)
 	server.EnableHTTP2 = true
 	server.StartTLS()
@@ -54,7 +60,7 @@ func tunnelFixture(t *testing.T) (*Client, string, *httptest.Server, *x509.CertP
 		t.Fatal(err)
 	}
 	t.Cleanup(client.Close)
-	return client, allowed, server, roots, tokens
+	return client, server, roots
 }
 
 func echoOnce(t *testing.T, conn net.Conn, msg string) {
@@ -157,5 +163,60 @@ func TestTunnelCloseStopsDeadlines(t *testing.T) {
 	}
 	if err = tc.Conn.SetDeadline(time.Now()); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatal("deadline after close", err)
+	}
+}
+
+type tunnelOwnerRoutes map[value.OwnerBinding]string
+
+func (r tunnelOwnerRoutes) CurrentOwnerRoute(_ context.Context, owner value.OwnerBinding) (value.OwnerRoute, error) {
+	ip, ok := r[owner]
+	if !ok {
+		return value.OwnerRoute{}, value.ErrUnavailable
+	}
+	return value.OwnerRoute{Endpoint: value.OwnerEndpoint{Binding: owner, Pool: value.OwnerPool{NativePort: 9444}, Addresses: []string{ip}}}, nil
+}
+
+// Both replicas sit behind the same native Service. Only the hub's endpoint
+// lookup can choose a Pod IP. The connector supplies the waiting binding.
+func TestOwnerTunnelReachesTheRequestedReplica(t *testing.T) {
+	id := func(n string) string { return "10000000-0000-4000-8000-0000000000" + n }
+	first := value.OwnerBinding{InstallationID: id("01"), ClusterID: id("02"), IssuerEpoch: id("03"), PodUID: id("04"), ProcessEpoch: id("05")}
+	second := first
+	second.PodUID, second.ProcessEpoch = id("06"), id("07")
+	routes := tunnelOwnerRoutes{first: "10.0.0.11", second: "10.0.0.12"}
+	tokens := &tunnelTokens{until: time.Now().Add(time.Minute)}
+	dials := make(chan string, 2)
+	h := &TunnelHandler{Tokens: tokens, Owners: routes, Allowed: func(context.Context, string) bool { return false },
+		Dial: func(_ context.Context, _, address string) (net.Conn, error) {
+			dials <- address
+			local, remote := net.Pipe()
+			go func() { _, _ = io.Copy(remote, remote); remote.Close() }()
+			return local, nil
+		},
+	}
+	client, _, _ := serveTunnel(t, h)
+	for _, owner := range []value.OwnerBinding{first, second} {
+		conn, err := client.DialOwner(t.Context(), owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		echoOnce(t, conn, owner.PodUID)
+		conn.Close()
+		if got, want := <-dials, net.JoinHostPort(routes[owner], "9444"); got != want {
+			t.Fatalf("tunnel to %s dialed %s, want %s", owner.PodUID, got, want)
+		}
+	}
+	unknown := second
+	unknown.PodUID = id("08")
+	if conn, err := client.DialOwner(t.Context(), unknown); err == nil {
+		conn.Close()
+		t.Fatal("opened for an unknown owner binding")
+	}
+	if conn, err := client.DialTunnel(t.Context(), "tcp", "10.0.0.12:9444"); err == nil {
+		conn.Close()
+		t.Fatal("opened directly to a caller-supplied Pod address")
+	}
+	if len(dials) != 0 {
+		t.Fatal("refused owner or address reached a backend")
 	}
 }

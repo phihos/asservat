@@ -48,7 +48,6 @@ type regionalContext struct {
 	history   objectstore.HistoryObjects
 	owners    *RegionalLifecycle
 	token     func() ([]byte, error)
-	dial      dialFunc
 }
 
 // regionalOwnerPool converts the pinned hub owner configuration. Its pool must
@@ -89,7 +88,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken, dial: dial}
+	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken}
 	if out.pool, err = regionalOwnerPool(c, c.owners.Configuration); err != nil {
 		return nil, closers, err
 	}
@@ -181,7 +180,7 @@ func (r *regionalContext) run(ctx context.Context) error {
 	if err != nil {
 		return &fixedStepError{"execution-process", err}
 	}
-	client, err := mtls.NewContextStartClient(ctx, r.rootID, r.pool, r.roots, r.c.owners.Address, r.dial, r.owners, r.owners.Process, r.token, process, r.c.Executor.Concurrency, time.Now)
+	client, err := mtls.NewContextStartClient(ctx, r.rootID, r.pool, r.roots, r.owners.Client.DialOwner, r.owners, r.owners.Process, r.token, process, r.c.Executor.Concurrency, time.Now)
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}

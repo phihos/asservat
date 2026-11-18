@@ -102,8 +102,17 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if d.Decode(&back) != nil {
 		t.Fatal("offer decode")
 	}
-	if !back.Complete() || back.Owners.Address != "asservat-hub-api-native.hub.svc:9444" || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" {
+	if !back.Complete() || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" {
 		t.Fatal("executor section", string(raw))
+	}
+	// A kept offer from before owner-directed tunnels can be read after upgrade.
+	legacy := bytes.Replace(raw, []byte(`"owners":{`), []byte(`"owners":{"address":"old-native.hub.svc:9444",`), 1)
+	if bytes.Equal(raw, legacy) {
+		t.Fatal("legacy offer missing owners")
+	}
+	legacyAPI := fake.NewSimpleClientset(&core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: o.name, Namespace: o.namespace}, Data: map[string]string{contracts.RegionalOfferFile: string(legacy)}})
+	if stored, err := o.ensure(ctx, legacyAPI); err != nil || !stored.Complete() || stored.Owners.Configuration.Service != back.Owners.Configuration.Service {
+		t.Fatal("could not reuse the stored owner pool", err)
 	}
 	cfg := regionalConfig{binding: value.PeerBinding{InstallationID: runtimeID, IssuerEpoch: runtimeID}}
 	if p, err := regionalOwnerPool(cfg, back.Owners.Configuration); err != nil || p != pool {

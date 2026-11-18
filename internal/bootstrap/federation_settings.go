@@ -124,14 +124,13 @@ func (s *federationSettings) Settings(ctx context.Context, p value.ConnectorClus
 	return out, nil
 }
 
-// allowed reports whether target is one of the offer's services: the
-// owners' native address, the key service or the evidence store.
+// Generic tunnels serve only the offer's key service and evidence store.
 func (s *federationSettings) allowed(ctx context.Context, target string) bool {
 	offer, err := s.stored(ctx)
 	if err != nil {
 		return false
 	}
-	return target == offer.Owners.Address || target == endpointAddress(offer.KeyService.Endpoint) || target == endpointAddress(offer.EvidenceStore.Endpoint)
+	return target == endpointAddress(offer.KeyService.Endpoint) || target == endpointAddress(offer.EvidenceStore.Endpoint)
 }
 
 // endpointAddress is an https URL's host:port.

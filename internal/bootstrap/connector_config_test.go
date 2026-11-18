@@ -34,7 +34,7 @@ func connectorTestOffer(t *testing.T, roots [][]byte) contracts.RegionalOffer {
 	id := connectorTestID
 	return contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: id("01"), HubClusterID: id("30"), PermissionRootID: id("03"), IssuerEpoch: id("04"),
 		Image: "registry.invalid/asservat@sha256:" + strings.Repeat("a", 64),
-		Owners: &contracts.RegionalContextOwners{Address: "hub.synthetic.invalid:30444", Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: id("01"), ClusterID: id("30"), IssuerEpoch: id("04"), Revision: 1,
+		Owners: &contracts.RegionalContextOwners{Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: id("01"), ClusterID: id("30"), IssuerEpoch: id("04"), Revision: 1,
 			Namespace: contracts.WorkerObjectReference{Name: "asservat", UID: id("31")}, Service: contracts.WorkerObjectReference{Name: "hub-api", UID: id("32")}, Deployment: contracts.WorkerObjectReference{Name: "hub-api", UID: id("33")}, ServiceAccount: contracts.WorkerObjectReference{Name: "hub-api", UID: id("34")}, Port: 9443, NativePort: 9444, IssuerRoots: roots}},
 		KeyService:    &contracts.RegionalWrapService{Endpoint: "https://keys.synthetic.invalid:30448", Roots: roots, KeyID: "artifact-key"},
 		EvidenceStore: &contracts.RegionalEvidenceStore{Endpoint: "https://evidence.synthetic.invalid", Roots: roots, Region: "local", Bucket: "evidence", StoreID: connectorTestID("14")}}
@@ -56,10 +56,7 @@ type settingsHub struct {
 func (h settingsHub) Settings(context.Context, value.ConnectorCluster) (connectorlifecycle.Settings, error) {
 	return h.settings, nil
 }
-func (settingsHub) OwnerCandidates(context.Context, *connectorlifecycle.Region) (value.APIContextOwnerCandidates, error) {
-	return value.APIContextOwnerCandidates{}, value.ErrUnavailable
-}
-func (settingsHub) AuthenticateOwner(context.Context, *connectorlifecycle.Region, value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
+func (settingsHub) AuthenticateOwner(context.Context, value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
 	return connectorlifecycle.OwnerAuthentication{}, value.ErrUnavailable
 }
 
@@ -136,7 +133,7 @@ func TestHubSettingsCompleteTheConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !out.executor || out.ClusterID != connectorTestID("02") || out.binding.PeerID != connectorTestID("05") || out.binding.InstallationID != offer.InstallationID ||
-		out.owners.Address != offer.Owners.Address || out.evidence.AccessKeyID != "AK" || out.rootID() != offer.PermissionRootID {
+		out.owners.Configuration.Service != offer.Owners.Configuration.Service || out.evidence.AccessKeyID != "AK" || out.rootID() != offer.PermissionRootID {
 		t.Fatalf("settings %+v", out.binding)
 	}
 	c := connectorTestConfig()

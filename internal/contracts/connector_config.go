@@ -157,10 +157,8 @@ type RegionalWrapService struct {
 	KeyID    string   `json:"keyID"`
 }
 
-// RegionalContextOwners pins the hub's native listener address and its exact
-// accepted owner configuration (pool and issuer roots), ADR-172.
+// RegionalContextOwners pins the accepted owner pool and issuer roots.
 type RegionalContextOwners struct {
-	Address       string             `json:"address"`
 	Configuration OwnerConfiguration `json:"configuration"`
 }
 
