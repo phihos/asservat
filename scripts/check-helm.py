@@ -201,8 +201,9 @@ def check_accessbindings(render):
     # DELETE stays unchecked, like RoleBindings: the namespace controller
     # must be able to remove a deleted namespace's bindings.
     assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings", "clusteraccessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
+    assert policy["spec"]["variables"] == [{"name": "bindingNamespace", "expression": "has(request.namespace) ? request.namespace : ''"}]
     expressions = [v["expression"] for v in policy["spec"]["validations"]]
-    assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
+    assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
     assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
     # A workload-cluster release renders the same RBAC and policy: its
