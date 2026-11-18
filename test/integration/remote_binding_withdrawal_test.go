@@ -95,7 +95,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		// Both incarnations have the exact same wall clock observation.
 		sameTime := func() string {
 			t.Helper()
-			if _, err := admin.Exec(ctx, "UPDATE remote_access_binding_delivery SET observed_at='2001-01-01T00:00:00Z' WHERE root_id=$1 AND cluster_id=$2", regionRoot, cluster); err != nil {
+			if _, err := admin.Exec(ctx, "UPDATE remote_access_binding_delivery SET observed_at='2024-01-01T00:00:00Z' WHERE root_id=$1 AND cluster_id=$2", regionRoot, cluster); err != nil {
 				t.Fatal(err)
 			}
 			token, err := receiver.BeginRemoteBindings(ctx, cluster)
