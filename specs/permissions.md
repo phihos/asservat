@@ -2,7 +2,11 @@
 
 This specification defines application permissions inside one organization; there is no tenant model. Read with [authorization](authorization.md), [targets](targets.md), [ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md), [ADR-335](../docs/decisions/335-usable-by-default.md) D4/D14 and the [research](../docs/research/permission-automation.md).
 
-Permission state reaches the evaluator through events ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1): the hub watches its own cluster with informers, and each remote connector watches its cluster and pushes changes. On startup and on a change notification, the hub reconciles the latest binding sets from every cluster that has delivered one. A failed database read suspends reconciliation before the hub accepts another snapshot. On retry the hub reads the complete set. An empty replacement removes that cluster’s prior bindings. Each set remains in effect until replaced.
+The hub watches its own cluster. Each remote connector watches its cluster and
+pushes changed bindings. The evaluator includes every cluster that has delivered
+bindings. An empty replacement or registration withdrawal removes that cluster's
+bindings. Losing a connection leaves its last accepted delivery in effect.
+[ADR-330 D1](../docs/decisions/330-event-driven-system-design.md).
 
 ## REQ-PER-001 — Canonical permission configuration
 
@@ -97,7 +101,7 @@ Given a user who can `create pods/exec` only for Pod A, when a selector resolves
 
 ## REQ-PER-005 — Workload ownership and integration adapters
 
-`workloadMetadata` applies the same mapping to Deployment/StatefulSet metadata in shared namespaces. It requires `admissionEnforced` (the chart renders the workload label ValidatingAdmissionPolicy when workload keys are configured) and a non-empty `workloadSelector`. Connectors watch matching workloads and push key values. Pods are never matched by labels: the workload is derived through the Pod's validated controller chain.
+`workloadMetadata` applies the same mapping to Deployment/StatefulSet metadata in shared namespaces. It requires `admissionEnforced` (the chart renders the workload label ValidatingAdmissionPolicy when workload keys are configured) and a non-empty `workloadSelector`. Connectors watch matching workloads and push key values. Pods are never matched by labels: the workload is derived through the Pod's validated controller chain. The evaluator supports this mapping. The installed connector does not yet deliver workload metadata, so these sources currently grant nothing.
 
 GitOps, Terraform, provisioners and service catalogs MAY manage AccessBindings through the Kubernetes API within their RBAC. Catalog ownership, CODEOWNERS, field managers and arbitrary labels are not permission evidence. No external catalog, policy engine or SCIM service is required.
 
@@ -109,27 +113,31 @@ Given two applications owned by different teams in one namespace, when protected
 
 An operation requires an eligible identity, a current allow, no deny, local ceilings and all grant/share conditions. Independent allows are unioned; no failure falls back to a broader role.
 
-The evaluator reads one snapshot: the hub cluster's informer caches and each remote cluster's last delivered state. It stays valid until an event replaces it. State that is not yet available (during a hub relist, or before a connector's first delivery) grants nothing and fails closed for that cluster. An operation reuses its snapshot for at most 30 s ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
+The evaluator combines observed hub configuration and each remote cluster's
+last accepted bindings in one snapshot. An operation may reuse that snapshot
+for up to 30 seconds within its original deadlines. A failed database read
+cannot produce a partial fleet snapshot. [ADR-311](../docs/decisions/311-operation-authority-recheck.md).
 
-When Kubernetes reports lost namespace watch history, namespace-derived access is unavailable until the relist completes. Explicit AccessBindings and observations from other clusters remain usable. The hub retries an incomplete PermissionSource list at its next permission lease renewal, even when the objects have stayed unchanged.
+A healthy Kubernetes watch stays current while idle. Its total lifetime, bytes
+received across events and number of bindings do not invalidate the observation.
+After a normal watch restart, the hub can resume from the last resource version.
+If Kubernetes denies the watch or its history is lost, the hub withdraws access
+that depended on that observation until it has a new baseline and watch. Loss of
+namespace or PermissionSource history leaves independent explicit grants usable.
+Without a complete ClusterAccessBinding observation the hub cannot rule out a
+cluster-wide deny. It suspends the permission epoch. Incomplete sources are
+retried even if the objects have stayed unchanged.
 
-The hub follows the local AccessBinding list with a sustained Kubernetes watch.
-Each watch event has its own byte budget. Idle time, total stream bytes, and
-the number of local bindings do not end an otherwise valid watch. Each connector
-exchange compares against the digest and revision it read from the database.
-A concurrent replacement or confirmation invalidates that revision. A losing
-exchange rereads the cluster before retrying. The hub applies the committed
-bindings independently of wall-clock differences between replicas.
+Concurrent deliveries from one connector must preserve the latest accepted
+observation. A connector whose original comparison has become stale rereads
+the cluster before retrying. Wall-clock differences between replicas cannot
+discard a committed change. Readers see assignment additions and retirements
+together. Idle lease renewal does not rebuild the fleet.
 
-The hub computes the input digest incrementally across all delivered bindings.
-It accepts assignment additions and retirements together under one permission
-epoch in PostgreSQL. A committed replacement at the same observation timestamp
-takes effect when its delivery digest changes. A binding change or its original
-expiry updates the projection. The live writer renews its database lease
-independently, without rebuilding the bindings. The 8 MiB plaintext budget applies to one authority audit
-event, which the audit format encrypts and verifies as a whole. PostgreSQL may
-expand its JSON representation up to the separate 12 MiB row limit. Previously
-accepted bindings do not count as assignment changes.
+The 8 MiB plaintext budget applies to one authority audit event, which the audit
+format encrypts and verifies as a whole. PostgreSQL's expanded representation
+has a separate 12 MiB row limit. Previously accepted bindings do not count as
+assignment changes.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 
