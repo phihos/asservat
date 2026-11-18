@@ -28,6 +28,7 @@ func TestFederationLocatesOwnerFromReadyNativeEndpointSlices(t *testing.T) {
 	const service = "asservat-hub-api-native"
 	v4 := item("v4", service, "10.1.0.11", discovery.AddressTypeIPv4)
 	v6 := item("v6", service, "fd00::11", discovery.AddressTypeIPv6)
+	v6.Endpoints[0].Conditions.Ready = nil // The discovery API treats nil as ready.
 	other := item("other", service, "10.1.0.12", discovery.AddressTypeIPv4)
 	other.Endpoints[0].TargetRef.UID = types.UID(id("05"))
 	unready := item("unready", service, "10.1.0.13", discovery.AddressTypeIPv4)

@@ -152,7 +152,7 @@ func (s *federationSettings) ownerEndpoints(ctx context.Context, owner value.Own
 			}
 			for _, endpoint := range slice.Endpoints {
 				ref, conditions := endpoint.TargetRef, endpoint.Conditions
-				if ref == nil || ref.Kind != "Pod" || string(ref.UID) != owner.PodUID || conditions.Ready == nil || !*conditions.Ready || conditions.Terminating != nil && *conditions.Terminating {
+				if ref == nil || ref.Kind != "Pod" || string(ref.UID) != owner.PodUID || conditions.Ready != nil && !*conditions.Ready || conditions.Terminating != nil && *conditions.Terminating {
 					continue
 				}
 				for _, ip := range endpoint.Addresses {
