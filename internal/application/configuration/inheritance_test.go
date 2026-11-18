@@ -107,11 +107,7 @@ func TestNamespaceJournalAppliesEveryTransition(t *testing.T) {
 	if live := j.Observation(true); live.Namespaces[0].ResourceVersion != "11" {
 		t.Fatal("live observation lost the namespace version")
 	}
-	j.Fresh(now.Add(-time.Second))
-	j.Fresh(now.Add(time.Second))
-	if !j.ObservedAt().Equal(now.Add(time.Second)) {
-		t.Fatal("freshness moved backwards or not forward")
-	}
+
 	renamed := observedNamespace("other", "p", "13", "payments")
 	if err = j.Apply(value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: "13", Namespace: &renamed}); err == nil || j.Observation(false) != nil {
 		t.Fatal("inconsistent transition did not poison the journal")
@@ -261,7 +257,7 @@ func TestInheritanceUnavailableStatesKeepNothingCurrent(t *testing.T) {
 		t.Fatal("observed source not granted")
 	}
 	// Nothing expires because time passed (REQ-PER-006).
-	if later := s.inheritance(s.namespaces.ObservedAt().Add(time.Hour)); len(later.Bases) == 0 {
+	if later := s.inheritance(s.r.Now().Add(time.Hour)); len(later.Bases) == 0 {
 		t.Fatal("an older observation stopped granting")
 	}
 	// An unreadable source list keeps every source unavailable.

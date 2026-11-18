@@ -2,6 +2,12 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,80 +24,130 @@ type namespaceRelistFixture struct {
 	remoteBindingHubFixture
 	ns                        cfg.NamespaceRef
 	source                    cfg.Source
+	lossKind                  string
+	status                    int
 	expired, blocked, release chan struct{}
+	blockedOnce               sync.Once
+	watches                   atomic.Int32
 }
 
-func (f namespaceRelistFixture) PermissionSnapshot(ctx context.Context) (cfg.Snapshot, error) {
+func (f *namespaceRelistFixture) lost() bool {
+	select {
+	case <-f.expired:
+		return true
+	default:
+		return false
+	}
+}
+func (f *namespaceRelistFixture) restored() bool {
+	select {
+	case <-f.release:
+		return true
+	default:
+		return false
+	}
+}
+func (f *namespaceRelistFixture) PermissionSnapshot(ctx context.Context) (cfg.Snapshot, error) {
 	s, err := f.remoteBindingHubFixture.PermissionSnapshot(ctx)
 	s.Sources = []cfg.Source{f.source}
+	s.ClusterBindingResourceVersion, s.SourceResourceVersion = "1", "1"
+	if f.lossKind != "namespaces" && f.lost() {
+		f.blockedOnce.Do(func() { close(f.blocked) })
+		select {
+		case <-ctx.Done():
+			return cfg.Snapshot{}, ctx.Err()
+		case <-f.release:
+		}
+		s.Sources = nil
+		s.ClusterBindingResourceVersion, s.SourceResourceVersion = "2", "2"
+	}
 	return s, err
 }
 
-func (f namespaceRelistFixture) ListNamespaces(ctx context.Context, keys cfg.NamespaceKeys) (cfg.NamespaceList, error) {
-	version, team := "1", "old"
-	select {
-	case <-f.expired:
-		close(f.blocked)
-		select {
-		case <-ctx.Done():
-			return cfg.NamespaceList{}, ctx.Err()
-		case <-f.release:
+func (f *namespaceRelistFixture) serve(w http.ResponseWriter, r *http.Request) {
+	kind := r.URL.Path[strings.LastIndexByte(r.URL.Path, '/')+1:]
+	affected := kind == f.lossKind
+	if kind == "namespaces" && r.URL.Query().Get("watch") != "true" {
+		rv, team := "1", "old"
+		if f.lost() && affected {
+			f.blockedOnce.Do(func() { close(f.blocked) })
+			if f.status == http.StatusGone {
+				select {
+				case <-r.Context().Done():
+					return
+				case <-f.release:
+				}
+			}
+			// The LIST may remain authorized throughout a watch-only denial.
+			rv, team = "2", "new"
 		}
-		version, team = "2", "new"
-	default:
+		_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "v1", "kind": "NamespaceList", "metadata": map[string]string{"resourceVersion": rv}, "items": []any{map[string]any{"metadata": map[string]any{"name": f.ns.Name, "uid": f.ns.UID, "resourceVersion": rv, "labels": map[string]string{"team": team}}}}})
+		return
 	}
-	n := cfg.ObservedNamespace{Name: f.ns.Name, UID: f.ns.UID, ResourceVersion: version, Labels: map[string]string{"team": configapp.ValueDigest(team)}}
-	return cfg.NamespaceList{ClusterID: f.cluster, ResourceVersion: version, Keys: keys, ObservedAt: time.Now(), Namespaces: []cfg.ObservedNamespace{n}}, nil
-}
-
-type namespaceHistoryWatch <-chan struct{}
-
-func (w namespaceHistoryWatch) Close() {}
-func (w namespaceHistoryWatch) Next(ctx context.Context) (cfg.NamespaceEvent, error) {
-	select {
-	case <-ctx.Done():
-		return cfg.NamespaceEvent{}, ctx.Err()
-	case <-w:
-		return cfg.NamespaceEvent{}, cfg.ErrChanged // Kubernetes 410
+	if r.URL.Query().Get("watch") != "true" {
+		http.NotFound(w, r)
+		return
 	}
-}
-
-func (f namespaceRelistFixture) WatchNamespaces(_ context.Context, rv string, _ cfg.NamespaceKeys) (configapp.NamespaceWatch, error) {
-	if rv == "1" {
-		return namespaceHistoryWatch(f.expired), nil
+	if affected {
+		f.watches.Add(1)
+		if f.lost() && !f.restored() {
+			w.WriteHeader(f.status)
+			_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "v1", "kind": "Status", "status": "Failure", "code": f.status, "reason": http.StatusText(f.status)})
+			return
+		}
 	}
-	return namespaceHistoryWatch(nil), nil
+	w.(http.Flusher).Flush()
+	if affected && !f.lost() {
+		select {
+		case <-r.Context().Done():
+		case <-f.expired:
+		}
+		return // EOF, then the real watch opener encounters the status above.
+	}
+	<-r.Context().Done()
 }
 
 func qualifyBlockedNamespaceRelist(t *testing.T, pool *pgxpool.Pool, flush func(*testing.T, *postgres.Permissions)) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	for _, tc := range []struct {
+		kind   string
+		status int
+	}{{"namespaces", http.StatusGone}, {"namespaces", http.StatusForbidden}, {"permissionsources", http.StatusGone}, {"clusteraccessbindings", http.StatusGone}} {
+		t.Run(tc.kind+"-"+http.StatusText(tc.status), func(t *testing.T) { qualifyLostPermissionWatch(t, pool, flush, tc.kind, tc.status) })
+	}
+}
+
+func qualifyLostPermissionWatch(t *testing.T, pool *pgxpool.Pool, flush func(*testing.T, *postgres.Permissions), kind string, status int) {
+	ctx, cancel := context.WithTimeout(t.Context(), 55*time.Second)
 	defer cancel()
 	root, cluster, issuer := custodyID(), custodyID(), "https://identity.synthetic.invalid"
 	ns := cfg.NamespaceRef{Name: "app", UID: custodyID()}
 	source := cfg.Source{Resource: cfg.Resource{ClusterID: cluster, Namespace: "asservat", NamespaceUID: cluster, Kind: "PermissionSource", Name: "owner", UID: custodyID(), Generation: 1, ResourceVersion: "1", SpecDigest: artifact.Digest{1}}, Enabled: true, Type: "namespaceMetadata", ClusterID: cluster, Role: "evidence-reader", Protection: cfg.Protection{Mode: "administratorManaged", ReviewRef: "platform-review"}, Mapping: cfg.Mapping{Field: "label", Key: "team", Mode: "valueMap", Issuer: issuer, Values: map[string][]string{"old": {"old-team"}, "new": {"new-team"}}}}
 	direct := cfg.Binding{Resource: cfg.Resource{ClusterID: cluster, Namespace: ns.Name, NamespaceUID: ns.UID, Kind: "AccessBinding", Name: "direct", UID: custodyID(), Generation: 1, ResourceVersion: "1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: ns}, Effect: "Allow", Roles: []string{"evidence-reader"}, Subjects: []cfg.Subject{{Kind: "Group", Issuer: issuer, ID: "direct-team"}}}
-	hub := namespaceRelistFixture{remoteBindingHubFixture: remoteBindingHubFixture{cluster: cluster, bindings: []cfg.Binding{direct}}, ns: ns, source: source, expired: make(chan struct{}), blocked: make(chan struct{}), release: make(chan struct{})}
+	hub := &namespaceRelistFixture{lossKind: kind, status: status, remoteBindingHubFixture: remoteBindingHubFixture{cluster: cluster, bindings: []cfg.Binding{direct}}, ns: ns, source: source, expired: make(chan struct{}), blocked: make(chan struct{}), release: make(chan struct{})}
 	permissions, err := postgres.NewPermissions(ctx, pool, root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writer := &observedPermissionWriter{permissions, make(chan cfg.PermissionAcceptance, 6), make(chan cfg.PermissionFence, 1), make(chan struct{}, 1)}
-	watcher := idleKubernetesBindingWatch(t, cluster)
-	r := configapp.BindingReconciler{RootID: root, NamespaceClusterID: cluster, Reader: hub, Watcher: watcher, Trust: hub, Namespaces: hub, Store: writer, NewID: custodyID, Now: time.Now}
+	watcher := idleKubernetesBindingWatch(t, cluster, hub.serve)
+	r := configapp.BindingReconciler{RootID: root, NamespaceClusterID: cluster, Reader: hub, Watcher: watcher, Trust: hub, Namespaces: watcher, WatchConfiguration: watcher.WatchConfiguration, Store: writer, NewID: custodyID, Now: time.Now}
 	done := make(chan error, 1)
-	go func() { done <- r.Run(ctx); close(done) }()
-	defer func() { cancel(); <-done }()
+	var workers sync.WaitGroup
+	start := func() {
+		workers.Go(func() {
+			err := r.Run(ctx)
+			select {
+			case done <- err:
+			case <-ctx.Done():
+			}
+		})
+	}
+	start()
+	defer func() { cancel(); workers.Wait() }()
 	target := authorization.Target{ClusterID: cluster, NamespaceUID: ns.UID, WorkloadUID: custodyID(), PodUID: custodyID()}
-	expect := func(old, new bool) {
+	eligible := func(old, new bool) {
 		t.Helper()
-		select {
-		case <-writer.accepted:
-		case err := <-done:
-			t.Fatal("permission worker stopped", err)
-		case <-ctx.Done():
-			t.Fatal("permission transition missing")
-		}
 		flush(t, permissions)
 		projection, err := permissions.Permissions(ctx, target)
 		if err != nil {
@@ -106,6 +162,17 @@ func qualifyBlockedNamespaceRelist(t *testing.T, pool *pgxpool.Pool, flush func(
 			}
 		}
 	}
+	expect := func(old, new bool) {
+		t.Helper()
+		select {
+		case <-writer.accepted:
+		case err := <-done:
+			t.Fatal("permission worker stopped", err)
+		case <-ctx.Done():
+			t.Fatal("permission transition missing")
+		}
+		eligible(old, new)
+	}
 	// Start with the explicit binding. The initial namespace LIST can
 	// already have committed by the time its predecessor's audit drains.
 	select {
@@ -114,13 +181,51 @@ func qualifyBlockedNamespaceRelist(t *testing.T, pool *pgxpool.Pool, flush func(
 		t.Fatal("initial permission baseline missing")
 	}
 	expect(true, false)
+	if status == http.StatusForbidden {
+		select {
+		case <-writer.renewed:
+		case <-ctx.Done():
+			t.Fatal("idle selector did not reach lease renewal")
+		}
+		if hub.watches.Load() != 1 {
+			t.Fatal("idle selector reopened its watch", hub.watches.Load())
+		}
+		eligible(true, false)
+	}
 	close(hub.expired)
+	if kind == "clusteraccessbindings" {
+		// A missing cluster Deny can affect every assignment. The current
+		// epoch must already be suspended when its successor starts to LIST.
+		select {
+		case err := <-done:
+			if !errors.Is(err, cfg.ErrChanged) {
+				t.Fatal(err)
+			}
+		case <-ctx.Done():
+			t.Fatal("history loss left epoch running")
+		}
+		start()
+	}
 	select {
 	case <-hub.blocked:
 	case <-ctx.Done():
-		t.Fatal("namespace relist never started")
+		t.Fatal("replacement LIST never started")
 	}
-	expect(false, false)
+	if kind == "clusteraccessbindings" {
+		if _, err := permissions.Permissions(ctx, target); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("old grants still current during cluster binding relist", err)
+		}
+	} else {
+		expect(false, false)
+		if status == http.StatusForbidden {
+			select {
+			case <-writer.renewed:
+			case <-ctx.Done():
+				t.Fatal("no lease renewal during denied watch")
+			}
+			eligible(false, false)
+		}
+	}
 	close(hub.release)
-	expect(false, true)
+	expect(false, kind == "namespaces")
 }

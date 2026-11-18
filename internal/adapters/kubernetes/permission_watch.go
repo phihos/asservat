@@ -11,6 +11,7 @@ import (
 	port "asservat.local/asservat/internal/application/configuration"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -51,6 +52,85 @@ func (d *permissionWatchEvents) next() (event metav1.WatchEvent, err error) {
 	return event, nil
 }
 
+// openWatch bounds the opening request. Once opened, the caller owns the
+// sustained stream; each event is framed separately.
+func (c *PermissionClient) openWatch(ctx context.Context, path, rv string, metadataOnly bool) (*permissionWatchEvents, context.CancelFunc, error) {
+	if !identity.Text(rv, 128) || rv == "0" {
+		return nil, nil, value.ErrInvalid
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	opening := time.AfterFunc(5*time.Second, cancel)
+	defer opening.Stop()
+	r := c.watchAPI.Get().AbsPath(path).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
+	if metadataOnly {
+		r.SetHeader("Accept", "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1")
+	}
+	body, err := r.Stream(ctx)
+	if err != nil {
+		mapped := permissionError(ctx, err)
+		if apierrors.IsGone(err) || apierrors.IsResourceExpired(err) {
+			mapped = value.ErrChanged
+		}
+		cancel()
+		return nil, nil, mapped
+	}
+	return newPermissionWatchEvents(body), cancel, nil
+}
+
+// WatchConfiguration follows metadata from the same LIST used for acceptance.
+// A closed channel requires a new baseline. Normal EOF resumes at the last
+// delivered resourceVersion.
+func (c *PermissionClient) WatchConfiguration(ctx context.Context, resource, rv string) (<-chan struct{}, error) {
+	if resource != "clusteraccessbindings" && resource != "permissionsources" {
+		return nil, value.ErrInvalid
+	}
+	path := c.listPath(resource)
+	stream, cancel, err := c.openWatch(ctx, path, rv, true)
+	if err != nil {
+		return nil, err
+	}
+	changed := make(chan struct{})
+	go func() {
+		defer close(changed)
+		for {
+			event, err := stream.next()
+			if err != nil {
+				cancel()
+				stream.Close()
+				if !errors.Is(err, io.EOF) || ctx.Err() != nil {
+					return
+				}
+				stream, cancel, err = c.openWatch(ctx, path, rv, true)
+				if err != nil {
+					return
+				}
+				continue
+			}
+			var obj metav1.PartialObjectMetadata
+			if json.Unmarshal(event.Object.Raw, &obj) != nil || !identity.Text(obj.ResourceVersion, 128) {
+				cancel()
+				stream.Close()
+				return
+			}
+			rv = obj.ResourceVersion
+			switch event.Type {
+			case "BOOKMARK":
+				continue
+			case "ADDED", "MODIFIED", "DELETED":
+				select {
+				case changed <- struct{}{}:
+					continue
+				case <-ctx.Done():
+				}
+			}
+			cancel()
+			stream.Close()
+			return
+		}
+	}()
+	return changed, nil
+}
+
 type permissionBindingWatch struct {
 	client  *PermissionClient
 	decoder *permissionWatchEvents
@@ -63,30 +143,21 @@ func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.B
 	if !identity.Text(rv, 128) || rv == "0" {
 		return nil, value.ErrInvalid
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	// Bound establishing the watch; its healthy stream stays open until an
-	// API watch restart or caller cancellation.
-	opening := time.AfterFunc(5*time.Second, cancel)
-	defer opening.Stop()
 	start := c.now()
 	ns, err := c.namespace(ctx, c.control)
 	if err != nil || ns.Deleting {
-		cancel()
 		return nil, value.ErrChanged
 	}
-	r := c.watchAPI.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
-	body, err := r.Stream(ctx)
+	stream, cancel, err := c.openWatch(ctx, c.listPath("accessbindings"), rv, false)
 	if err != nil {
-		mapped := permissionError(ctx, err)
-		cancel()
-		return nil, mapped
-	}
-	if err = c.current(ctx, start, 5*time.Second); err != nil {
-		body.Close()
-		cancel()
 		return nil, err
 	}
-	return &permissionBindingWatch{client: c, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
+	if err = c.current(ctx, start, 5*time.Second); err != nil {
+		cancel()
+		stream.Close()
+		return nil, err
+	}
+	return &permissionBindingWatch{client: c, decoder: stream, cancel: cancel}, nil
 }
 func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, error) {
 	w.mu.Lock()

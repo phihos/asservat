@@ -100,11 +100,11 @@ type AdmissionParity struct{ Mode, ReviewRef, AdapterRef string }
 // resource kinds, an admission receipt, or a SQL accepted projection. RVs are
 // opaque. Status/field managers/writer annotations are deliberately absent.
 type Snapshot struct {
-	ClusterID                                     string
-	ControlNamespace                              NamespaceRef
-	BindingResourceVersion, SourceResourceVersion string
-	ObservedAt, FreshUntil                        time.Time
-	Bindings                                      []Binding
+	ClusterID                                                                    string
+	ControlNamespace                                                             NamespaceRef
+	BindingResourceVersion, ClusterBindingResourceVersion, SourceResourceVersion string
+	ObservedAt, FreshUntil                                                       time.Time
+	Bindings                                                                     []Binding
 	// ClusterBindings are the hub cluster's ClusterAccessBindings, one
 	// binding per cluster each covers (ADR-335 D14).
 	ClusterBindings []Binding

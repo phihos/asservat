@@ -282,7 +282,7 @@ func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
 		return snapshot, nil
 	})
 	changes := make(chan struct{}, 1)
-	r.ConfigurationChanges = changes
+	r.WatchConfiguration = func(context.Context, string, string) (<-chan struct{}, error) { return changes, nil }
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	s := &bindingRun{r: r}

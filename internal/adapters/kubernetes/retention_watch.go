@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"time"
 
 	port "asservat.local/asservat/internal/application/privacy"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -27,17 +26,11 @@ func (c *RetentionClient) WatchRetentionPolicies(ctx context.Context, rv string)
 	if !identity.Text(rv, 128) {
 		return nil, value.ErrInvalid
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	opening := time.AfterFunc(5*time.Second, cancel)
-	defer opening.Stop()
-	r := c.client.watchAPI.Get().AbsPath("/apis/asservat.io/v1alpha1/namespaces/"+c.client.control.Name+"/evidenceretentionpolicies").MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
-	body, err := r.Stream(ctx)
+	stream, cancel, err := c.client.openWatch(ctx, c.client.listPath("evidenceretentionpolicies"), rv, false)
 	if err != nil {
-		mapped := permissionError(ctx, err)
-		cancel()
-		return nil, mapped
+		return nil, err
 	}
-	return &retentionPolicyWatch{client: c, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
+	return &retentionPolicyWatch{c, stream, cancel}, nil
 }
 
 func (w *retentionPolicyWatch) Next(ctx context.Context) (port.RetentionEvent, error) {

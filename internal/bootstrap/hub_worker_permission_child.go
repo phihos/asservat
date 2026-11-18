@@ -236,18 +236,8 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	listening, stopListening := context.WithCancel(ctx)
 	p.closers = append(p.closers, stopListening)
 	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
-	group := accessBindingsResource.GroupVersion()
-	settingsWatch, err := startResourceWatch(listening, w.inputs.kubernetes(contracts.HubWorkerKubernetesTokenFile),
-		watchedResource{resource: group.WithResource("clusteraccessbindings")},
-		watchedResource{resource: group.WithResource("permissionsources"), namespace: w.namespace.Name})
-	if err != nil {
-		return nil, err
-	}
-	if !settingsWatch.synced(startup) {
-		return nil, &fixedStepError{"permission/configuration-watch", cfg.ErrUnavailable}
-	}
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		RemoteBindings: remoteBindings, RemoteBindingChanges: changes, ConfigurationChanges: settingsWatch.trigger, Now: time.Now, NewID: uuid.NewString}
+		RemoteBindings: remoteBindings, RemoteBindingChanges: changes, WatchConfiguration: observer.WatchConfiguration, Now: time.Now, NewID: uuid.NewString}
 	if id := c.Identity; id != nil {
 		uid, e := observer.ConfigMapUID(startup, id.Settings)
 		if e != nil {

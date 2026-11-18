@@ -430,7 +430,7 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	}
 	// ClusterAccessBindings deny as well, so an incomplete LIST fails the
 	// snapshot like AccessBindings.
-	_, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", start)
+	out.ClusterBindingResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", start)
 	if err != nil {
 		return value.Snapshot{}, nil, err
 	}

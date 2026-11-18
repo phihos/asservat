@@ -31,20 +31,19 @@ type Inheritance struct {
 }
 
 // namespaceItem is one ordered delivery of the namespace feed: a complete
-// LIST, a watch transition or the start time of a cleanly ended session.
+// LIST, a watch transition or definitive loss of the observed history.
 type namespaceItem struct {
 	historyLost bool
 	list        *value.NamespaceList
 	event       *value.NamespaceEvent
-	fresh       time.Time
 }
 
-// runNamespaceFeed lists the namespaces once, then follows them with finite
-// watch sessions resumed from the last delivered cursor. A transient watch
+// runNamespaceFeed lists the namespaces once, then follows them with a watch
+// resumed from the last delivered cursor. A transient watch
 // failure resumes from the same cursor, which keeps continuity; expired
 // history (value.ErrChanged) needs a new LIST and so a new journal. Items are
 // delivered in order and each is processed before the next is read.
-func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.NamespaceKeys, now func() time.Time, out chan<- namespaceItem) {
+func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.NamespaceKeys, out chan<- namespaceItem) {
 	send := func(it namespaceItem) bool {
 		select {
 		case out <- it:
@@ -71,14 +70,20 @@ func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.Names
 			}
 			continue
 		}
-		if !send(namespaceItem{list: &list}) {
-			return
-		}
 		cursor := list.ResourceVersion
 		for ctx.Err() == nil {
-			start := now()
 			w, err := o.WatchNamespaces(ctx, cursor, keys)
 			if err == nil {
+				if list.ResourceVersion != "" {
+					baseline := list
+					if !send(namespaceItem{list: &baseline}) {
+						w.Close()
+						return
+					}
+					// Publish a baseline only after its watch has opened.
+					// Reopening from the same cursor preserves that baseline.
+					list = value.NamespaceList{}
+				}
 				for {
 					var e value.NamespaceEvent
 					if e, err = w.Next(ctx); err != nil {
@@ -92,14 +97,14 @@ func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.Names
 				}
 				w.Close()
 				if errors.Is(err, io.EOF) {
-					if !send(namespaceItem{fresh: start}) {
-						return
-					}
 					continue
 				}
 			}
-			if errors.Is(err, value.ErrChanged) {
+			if errors.Is(err, value.ErrChanged) || errors.Is(err, value.ErrDenied) {
 				if !send(namespaceItem{historyLost: true}) {
+					return
+				}
+				if errors.Is(err, value.ErrDenied) && !pause() {
 					return
 				}
 				break
@@ -158,7 +163,7 @@ func (s *bindingRun) restartFeed(ctx context.Context, keys value.NamespaceKeys) 
 	f := &namespaceFeed{keys: keys, items: make(chan namespaceItem, 1), cancel: cancel, done: make(chan struct{})}
 	go func() {
 		defer close(f.done)
-		runNamespaceFeed(child, s.r.Namespaces, keys, s.r.Now, f.items)
+		runNamespaceFeed(child, s.r.Namespaces, keys, f.items)
 	}()
 	s.feed = f
 }
@@ -176,6 +181,9 @@ func (s *bindingRun) feedItems() <-chan namespaceItem {
 func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error {
 	switch {
 	case it.historyLost:
+		if s.namespaces == nil {
+			return nil
+		}
 		s.namespaces = nil
 	case it.list != nil:
 		j, err := NewNamespaceJournal(*it.list)
@@ -194,9 +202,6 @@ func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error 
 			return nil
 		}
 	default:
-		if s.namespaces != nil {
-			s.namespaces.Fresh(it.fresh)
-		}
 		return nil
 	}
 	return s.accept(ctx, true)
@@ -248,11 +253,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	var live *value.NamespaceObservation
 	if s.namespaces != nil {
 		live = s.namespaces.Observation(true)
-		// The recorded observation is what the preview evaluates against;
-		// it is withdrawn once older than the positive freshness interval.
-		if now.Before(s.namespaces.ObservedAt().Add(authorization.PermissionObservationInterval)) {
-			out.Namespaces = s.namespaces.Observation(false)
-		}
+		out.Namespaces = s.namespaces.Observation(false)
 	}
 	sources := slices.Clone(s.sources)
 	slices.SortFunc(sources, func(a, b value.Source) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })

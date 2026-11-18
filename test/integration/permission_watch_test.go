@@ -15,7 +15,7 @@ import (
 
 // Exercise the production HTTP transport through the enrolled fleet's idle
 // database lease renewal. No binding event is delivered during this interval.
-func idleKubernetesBindingWatch(t *testing.T, cluster string) *kubernetes.PermissionClient {
+func idleKubernetesBindingWatch(t *testing.T, cluster string, extras ...http.HandlerFunc) *kubernetes.PermissionClient {
 	t.Helper()
 	control := cfg.NamespaceRef{Name: "asservat", UID: cluster}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,11 @@ func idleKubernetesBindingWatch(t *testing.T, cluster string) *kubernetes.Permis
 			w.(http.Flusher).Flush()
 			<-r.Context().Done()
 		default:
-			http.NotFound(w, r)
+			if len(extras) > 0 {
+				extras[0](w, r)
+			} else {
+				http.NotFound(w, r)
+			}
 		}
 	}))
 	t.Cleanup(server.Close)

@@ -48,7 +48,7 @@ type BindingReconciler struct {
 	// RemoteBindingChanges signals a changed stored delivery (PostgreSQL
 	// LISTEN/NOTIFY); deliveries are reread only on a signal and at start.
 	RemoteBindingChanges <-chan struct{}
-	ConfigurationChanges <-chan struct{} // hub ClusterAccessBinding and PermissionSource events
+	WatchConfiguration   func(context.Context, string, string) (<-chan struct{}, error)
 	Now                  func() time.Time
 	NewID                func() string
 }
@@ -96,11 +96,12 @@ type remoteNamespaces struct {
 }
 
 type bindingRun struct {
-	r          BindingReconciler
-	fence      value.PermissionFence
-	journal    *BindingJournal
-	trustUntil time.Time
-	nextExpiry time.Time
+	r                               BindingReconciler
+	fence                           value.PermissionFence
+	journal                         *BindingJournal
+	trustUntil                      time.Time
+	nextExpiry                      time.Time
+	clusterSettings, sourceSettings <-chan struct{}
 	// Inheritance state (ADR-242). continuity counts namespace journals and
 	// dropped transitions; a source's bases are continuous only while
 	// included holds the counter value of its last accepted inclusion.
@@ -287,6 +288,20 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context, first PermissionTrust)
 	if err != nil {
 		return value.Snapshot{}, err
 	}
+	if watch := s.r.WatchConfiguration; watch != nil {
+		if s.clusterSettings == nil {
+			s.clusterSettings, err = watch(ctx, "clusteraccessbindings", snapshot.ClusterBindingResourceVersion)
+			if err != nil {
+				return value.Snapshot{}, err
+			}
+		}
+		if snapshot.SourcesComplete && s.sourceSettings == nil {
+			s.sourceSettings, err = watch(ctx, "permissionsources", snapshot.SourceResourceVersion)
+			if err != nil {
+				snapshot.Sources, snapshot.SourcesComplete = nil, false
+			}
+		}
+	}
 	last, err := s.r.trust(ctx)
 	if err != nil {
 		return value.Snapshot{}, err
@@ -436,6 +451,8 @@ func (r BindingReconciler) runEpoch(ctx context.Context) (err error, suspended b
 		return value.ErrInvalid, false
 	}
 	s := &bindingRun{r: r}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	defer func() { s.feed.stop() }()
 	defer func() {
 		if s.fence.Epoch != "" {
@@ -526,7 +543,21 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 			if err := s.accept(ctx, false); err != nil {
 				return reconcileStep("expiry", err)
 			}
-		case <-s.r.ConfigurationChanges:
+		case _, open := <-s.clusterSettings:
+			if !open {
+				return reconcileStep("cluster-binding-watch", value.ErrChanged)
+			}
+			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
+				return reconcileStep("refresh", err)
+			}
+		case _, open := <-s.sourceSettings:
+			if !open {
+				s.sourceSettings = nil
+				s.syncSources(ctx, value.Snapshot{ClusterBindings: s.clusterBindings})
+				if err := s.accept(ctx, true); err != nil {
+					return reconcileStep("source-watch", err)
+				}
+			}
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
 				return reconcileStep("refresh", err)
 			}

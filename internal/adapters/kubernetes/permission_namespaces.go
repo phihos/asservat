@@ -12,7 +12,6 @@ import (
 	port "asservat.local/asservat/internal/application/configuration"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -22,9 +21,6 @@ const (
 	namespacePageSize   = 200
 	namespaceMaxPages   = 80
 	namespaceTotalBytes = 64 << 20
-	// A session shorter than the client's five-second request timeout; each
-	// clean end renews the observation's freshness.
-	namespaceWatchSeconds = "2"
 )
 
 var _ port.NamespaceObserver = (*PermissionClient)(nil)
@@ -144,29 +140,18 @@ type namespaceWatch struct {
 
 func (w *namespaceWatch) Close() { w.cancel(); w.decoder.Close() }
 
-// WatchNamespaces opens one finite watch session from rv. A server ERROR
+// WatchNamespaces opens a sustained watch from rv. A server ERROR
 // event (such as expired history) is value.ErrChanged; a transport failure is
 // value.ErrUnavailable and may be resumed from the same cursor.
 func (c *PermissionClient) WatchNamespaces(ctx context.Context, rv string, keys value.NamespaceKeys) (port.NamespaceWatch, error) {
 	if !identity.Text(rv, 128) || rv == "0" || !namespaceKeysValid(keys) {
 		return nil, value.ErrInvalid
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	r := c.api.Get().AbsPath("/api/v1/namespaces").MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true").Param("timeoutSeconds", namespaceWatchSeconds)
-	body, err := r.Stream(ctx)
+	stream, cancel, err := c.openWatch(ctx, "/api/v1/namespaces", rv, false)
 	if err != nil {
-		mapped := permissionError(ctx, err)
-		switch {
-		case apierrors.IsGone(err) || apierrors.IsResourceExpired(err):
-			mapped = value.ErrChanged
-		case errors.Is(mapped, value.ErrChanged):
-			// A 404 is not expired history; resume or relist later.
-			mapped = value.ErrUnavailable
-		}
-		cancel()
-		return nil, mapped
+		return nil, err
 	}
-	return &namespaceWatch{client: c, keys: keys, decoder: newPermissionWatchEvents(body), cancel: cancel}, nil
+	return &namespaceWatch{client: c, keys: keys, decoder: stream, cancel: cancel}, nil
 }
 
 func (w *namespaceWatch) Next(ctx context.Context) (value.NamespaceEvent, error) {

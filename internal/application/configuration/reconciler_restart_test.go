@@ -109,7 +109,7 @@ func TestPermissionEpochRestartRebuildsGuardListAndJournal(t *testing.T) {
 	r.Store, r.Reader = store, store
 	changes := make(chan struct{}, 1)
 	changes <- struct{}{}
-	r.ConfigurationChanges = changes
+	r.WatchConfiguration = func(context.Context, string, string) (<-chan struct{}, error) { return changes, nil }
 	firstCtx, stopFirst := context.WithTimeout(t.Context(), 3*time.Second)
 	defer stopFirst()
 	first := r.RunEpoch(firstCtx) // Existing one-second tick reaches refresh.

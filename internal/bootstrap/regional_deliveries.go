@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
@@ -27,61 +26,26 @@ const (
 	deliveryRetry = 5 * time.Second
 )
 
-// resourceWatch is a metadata informer set whose every event signals
-// trigger (coalesced). It holds the watched objects' metadata.
-type resourceWatch struct {
-	trigger   chan struct{}
-	informers []cache.SharedIndexInformer
-}
-
-type watchedResource struct {
-	resource  schema.GroupVersionResource
-	namespace string
-}
-
-func startResourceWatch(ctx context.Context, config *rest.Config, resources ...watchedResource) (*resourceWatch, error) {
+// The regional informer coalesces AccessBinding changes into delivery signals.
+func watchRegionalBindings(ctx context.Context, config *rest.Config) (cache.SharedIndexInformer, <-chan struct{}, error) {
 	client, err := metadata.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	w := &resourceWatch{trigger: make(chan struct{}, 1)}
+	informer := metadatainformer.NewFilteredMetadataInformer(client, accessBindingsResource, "", 0, nil, nil).Informer()
+	changes := make(chan struct{}, 1)
 	signal := func() {
 		select {
-		case w.trigger <- struct{}{}:
+		case changes <- struct{}{}:
 		default:
 		}
 	}
 	handler := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { signal() }, UpdateFunc: func(any, any) { signal() }, DeleteFunc: func(any) { signal() }}
-	for _, r := range resources {
-		informer := metadatainformer.NewFilteredMetadataInformer(client, r.resource, r.namespace, 0, nil, nil).Informer()
-		if _, err = informer.AddEventHandler(handler); err != nil {
-			return nil, err
-		}
-		w.informers = append(w.informers, informer)
+	if _, err = informer.AddEventHandler(handler); err != nil {
+		return nil, nil, err
 	}
-	for _, informer := range w.informers {
-		go informer.RunWithContext(ctx)
-	}
-	return w, nil
-}
-
-// synced waits for the initial LISTs.
-func (w *resourceWatch) synced(ctx context.Context) bool {
-	var s []cache.InformerSynced
-	for _, i := range w.informers {
-		s = append(s, i.HasSynced)
-	}
-	return cache.WaitForCacheSync(ctx.Done(), s...)
-}
-
-func (w *resourceWatch) items(i int) []*metav1.PartialObjectMetadata {
-	var out []*metav1.PartialObjectMetadata
-	for _, o := range w.informers[i].GetStore().List() {
-		if m, ok := o.(*metav1.PartialObjectMetadata); ok {
-			out = append(out, m)
-		}
-	}
-	return out
+	go informer.RunWithContext(ctx)
+	return informer, changes, nil
 }
 
 // deliverOnChange sends a delivery when the watched state changed, at most
@@ -145,15 +109,15 @@ func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.
 func (r *Regional) runDeliveries(ctx context.Context, resync <-chan struct{}) {
 	var joins []func()
 	if r.bindings != nil {
-		bindings, err := startResourceWatch(ctx, r.watchConfig, watchedResource{resource: accessBindingsResource})
+		bindings, changes, err := watchRegionalBindings(ctx, r.watchConfig)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "connector access binding watch unavailable")
 		} else {
 			joins = append(joins, goJoined(func() {
-				if !bindings.synced(ctx) {
+				if !cache.WaitForCacheSync(ctx.Done(), bindings.HasSynced) {
 					return
 				}
-				deliverOnChange(ctx, resync, bindings.trigger, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
+				deliverOnChange(ctx, resync, changes, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
 					d, err := r.bindings.AccessBindingDelivery(ctx)
 					return d.Digest(), func(ctx context.Context) error {
 						return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))
