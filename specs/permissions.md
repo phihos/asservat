@@ -189,8 +189,9 @@ serialize at commit.
 Bindings watched from a Kubernetes resource version remain current until a
 replacement or definitive loss of watch history. A five-second Kubernetes or
 PostgreSQL I/O timeout applies to an individual operation. A multi-binding
-reconciliation remains subject to its actual controller lease, earlier source
-or caller deadline, and each binding's expiry.
+reconciliation, including the initial SQL read of joined-cluster deliveries,
+remains subject to its actual controller lease, earlier source or caller
+deadline, and each binding's expiry.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 

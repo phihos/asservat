@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -210,6 +211,42 @@ func TestRemoteBindingReadFailureSuspendsBeforeAcceptance(t *testing.T) {
 			if fail == "notification" && (reads != 2 || remoteBases(f.accepted[0], remoteCluster)["readers"] != "Allow") {
 				t.Fatal("expected an allow only in the initial snapshot")
 			}
+		})
+	}
+}
+
+type delayedRemoteRead struct{ delay time.Duration }
+
+func (r delayedRemoteRead) RemoteBindings(ctx context.Context) ([]value.RemoteBindings, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(r.delay):
+		return nil, nil
+	}
+}
+func TestRemoteBindingColdReadUsesRemainingWriterLease(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		lease, caller, elapsed time.Duration
+		want                   error
+	}{
+		{"cold-read", 10 * time.Second, 15 * time.Second, 4 * time.Second, nil},
+		{"writer-lease", 2 * time.Second, 10 * time.Second, 2 * time.Second, context.DeadlineExceeded},
+		{"caller", 10 * time.Second, time.Second, time.Second, context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				started := time.Now()
+				s := bindingRun{r: BindingReconciler{Now: time.Now, RemoteBindings: delayedRemoteRead{4 * time.Second}}}
+				s.fence.LeaseUntil = started.Add(tc.lease)
+				ctx, cancel := context.WithTimeout(t.Context(), tc.caller)
+				defer cancel()
+				_, err := s.refreshRemoteBindings(ctx)
+				if !errors.Is(err, tc.want) || time.Since(started) != tc.elapsed {
+					t.Fatalf("read ran %s, error %v", time.Since(started), err)
+				}
+			})
 		})
 	}
 }

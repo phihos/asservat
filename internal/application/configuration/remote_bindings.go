@@ -11,13 +11,13 @@ import (
 )
 
 // refreshRemoteBindings rereads the joined clusters' AccessBinding
-// deliveries (ADR-329) within three seconds. A read failure stops this epoch
+// deliveries (ADR-329) within the active writer lease. A read failure stops this epoch
 // before another acceptance. The supervisor retries with a full baseline.
 func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 	if s.r.RemoteBindings == nil {
 		return false, nil
 	}
-	call, cancel := context.WithTimeout(ctx, 3*time.Second)
+	call, cancel := s.listContext(ctx)
 	defer cancel()
 	deliveries, err := s.r.RemoteBindings.RemoteBindings(call)
 	if err != nil {
