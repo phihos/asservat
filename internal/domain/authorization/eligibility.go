@@ -107,6 +107,7 @@ func (t Target) Valid() bool {
 func (op Operation) Valid() bool {
 	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == ReadLogQuery || op == ReadLiveSource || op == DownloadApproved || op == ApproveAction
 }
+
 const ClusterAccessBindingKind = "ClusterAccessBinding"
 
 // ValidPermissionBasisKind identifies the resources that can establish an assignment.
