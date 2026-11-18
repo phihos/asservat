@@ -246,25 +246,33 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	ended := make(chan struct{})
 	go func() { defer close(ended); reconciler.RunEpoch(live) }()
 	defer func() { stop(); <-ended }()
-	awaitAcceptance := func() {
+	awaitAcceptance := func() int64 {
 		t.Helper()
 		select {
-		case <-writer.accepted:
+		case a := <-writer.accepted:
+			return a.Sequence
 		case <-ended:
 			t.Fatal("permission reconciler stopped before acceptance")
 		case <-live.Done():
 			t.Fatal("permission acceptance timed out")
 		}
-
+		return 0
 	}
 	projection := func() authorization.Projection {
 		t.Helper()
-		awaitAcceptance()
-		got, err := permissions.Permissions(ctx, target)
-		if err != nil || !got.DeniesComplete {
-			t.Fatal("replacement projection unavailable", err)
+		for {
+			sequence := awaitAcceptance()
+			got, err := permissions.Permissions(ctx, target)
+			if errors.Is(err, cfg.ErrUnavailable) || err == nil && got.Revision.Generation > sequence {
+				// A preflight marker may have its own acceptance. Wait for the
+				// completed observation and consume its matching notification.
+				continue
+			}
+			if err != nil || !got.DeniesComplete || got.Revision.Generation != sequence {
+				t.Fatal("replacement projection unavailable", err)
+			}
+			return got
 		}
-		return got
 	}
 	awaitAcceptance()
 	if got, err := permissions.Permissions(ctx, target); !errors.Is(err, cfg.ErrUnavailable) || len(got.Allows) != 0 {
@@ -277,6 +285,9 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	previous, err := store.BeginRemoteBindings(ctx, d.ClusterID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got, err := permissions.Permissions(ctx, target); !errors.Is(err, cfg.ErrUnavailable) || len(got.Allows) != 0 {
+		t.Fatal("registration preflight restored an earlier grant", err)
 	}
 	if _, err := store.StoreRemoteBindings(ctx, d.ClusterID, previous, strings.Repeat("bd", 32), d.Bindings, false); err != nil {
 		t.Fatal(err)
