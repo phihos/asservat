@@ -13,6 +13,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -53,7 +54,7 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 	if c.Public == nil {
 		return contracts.OwnerPublicCluster{}, &fixedStepError{"local-cluster-offer", mounts.ErrUnavailable}
 	}
-	return catalogCluster(stored, o.offer.Image, stored.HubClusterID, o.peerID, o.namespace, o.release, c.Public.Standby, c.Public.Captures, "local-cluster")
+	return catalogCluster(stored, o.offer.Image, stored.HubClusterID, o.peerID, o.namespace, o.release, c.Public.Captures, "local-cluster")
 }
 
 // catalogCluster is one cluster's context-start entry derived from the
@@ -62,9 +63,9 @@ func localCatalogCluster(c contracts.OwnerDeployment, o *hubAPIRegionalOffer, st
 // entry with its own IDs and release namespace; its retention topology is the
 // in-process one of the hub retention source. image is the hub's current
 // chart image: the capability names it as the collector release that plans
-// the capture (provenance). The connector may run another release within the
-// skew window (ADR-333); its own digests are recorded with each execution.
-func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, namespace, release string, standby, captures int, step string) (contracts.OwnerPublicCluster, error) {
+// the capture (provenance). Each execution records the actual connector
+// digests. Admission checks the wire protocol and capabilities (ADR-334).
+func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, namespace, release string, captures int, step string) (contracts.OwnerPublicCluster, error) {
 	var zero contracts.OwnerPublicCluster
 	if !stored.Complete() {
 		return zero, &fixedStepError{step + "-offer", mounts.ErrUnavailable}
@@ -82,7 +83,7 @@ func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, name
 	}
 	projection := compiler.ProjectionDigest()
 	root, installation, epoch := stored.PermissionRootID, stored.InstallationID, stored.IssuerEpoch
-	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: standby, Captures: captures,
+	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: mtls.ContextStartExchangesPerOwner, Captures: captures,
 		Settings: contracts.ContextCapabilitySettings{Format: contracts.ContextCapabilityFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true,
 			ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "sha256-" + image[:32], CollectorImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])}}, nil
 }

@@ -2,7 +2,7 @@
 
 This specification defines application permissions inside one organization; there is no tenant model. Read with [authorization](authorization.md), [targets](targets.md), [ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md), [ADR-335](../docs/decisions/335-usable-by-default.md) D4/D14 and the [research](../docs/research/permission-automation.md).
 
-Permission state reaches the evaluator through events ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1): the hub watches its own cluster with informers, and each remote connector watches its cluster and pushes changes. The hub keeps each cluster's last delivered set until the connector replaces it. Nothing here expires because time passed.
+Permission state reaches the evaluator through events ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1): the hub watches its own cluster with informers, and each remote connector watches its cluster and pushes changes. On startup and on a change notification, the hub reconciles the latest binding sets from every cluster that has delivered one. An empty replacement removes that cluster’s prior bindings. Each set remains in effect until replaced.
 
 ## REQ-PER-001 — Canonical permission configuration
 

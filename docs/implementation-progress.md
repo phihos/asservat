@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Registered workload clusters (2026-11-18)
+
+Helm derives standby socket reservations from the connector implementation.
+Remove `clusters[].standby` and `hub.hub-api.public.standby` from custom values.
+Each cluster keeps its capture reservation. Registration drives router admission
+and download paths, and the permission reader consumes all delivered revisions.
+ADR-334 now contains the registration, identity and protocol decisions.
+
+The router, download-path selection and real PostgreSQL permission reconciliation
+regressions each reproduce the previous cutoff and pass with 65 clusters.
+The HTTP/2 Hello regression exercises larger announcements within the frame.
+
+
 ## Processing cleanup (2026-11-17)
 
 Branch `codex/processing-cleanup`. Removed the dead manual processing

@@ -22,7 +22,7 @@ import (
 func TestLiveManualQueryKeepsOriginalRegionalProcess(t *testing.T) {
 	work := workFixture()
 	cluster := work.Work.Target.ClusterID
-	r, e := NewRouter(RouterLimits{Standby: 2, Captures: 1, Clusters: []ClusterLimit{{cluster, 2, 1}}})
+	r, e := NewRouter([]ClusterLimit{{cluster, 2, 1}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -125,7 +125,7 @@ func TestLiveManualRegionalCompactReplyRebindsSixteenOriginals(t *testing.T) {
 			work := workFixture()
 			c := work.Work.Channel
 			now := time.Now().UTC()
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{work.Work.Target.ClusterID, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{work.Work.Target.ClusterID, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

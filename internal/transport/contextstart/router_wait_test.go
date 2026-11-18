@@ -16,7 +16,7 @@ import (
 func TestRouterQueryWaitsForNextStandbyWithinDeadline(t *testing.T) {
 	work := workFixture()
 	cluster := work.Work.Channel.Connector.Binding.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

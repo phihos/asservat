@@ -39,7 +39,7 @@ BUNDLED = {
 
 # contracts.HubAPIConfig / HubAPIPublic JSON tags.
 CONFIG_KEYS = {"format", "name", "namespace", "postgres", "objectStore", "openBao", "connections", "concurrency", "observation", "native", "public", "connectorTokens"}
-PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "standby", "captures", "previewSeconds", "downloadPlan", "proxyTLS", "version",
+PUBLIC_KEYS = {"origin", "browserAudience", "processing", "captureHistory", "captures", "previewSeconds", "downloadPlan", "proxyTLS", "version",
                "operationConcurrency", "mcpPerIdentity", "downloadConcurrency", "operationAudit",
                "regionalOffer"}
 # Files the loader and runtime open under each mount.

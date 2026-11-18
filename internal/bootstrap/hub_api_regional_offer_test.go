@@ -119,7 +119,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if err != nil {
 		t.Fatal("ensure", err)
 	}
-	c.Namespace, c.PermissionRootID, c.Public.Standby, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 2, 1
+	c.Namespace, c.PermissionRootID, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 1
 	local, err := localCatalogCluster(c, o, stored)
 	if err != nil {
 		t.Fatal("local cluster", err)
@@ -131,13 +131,13 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 		t.Fatal("local catalog entry", local.Standby)
 	}
 	// A registered mode=cluster cluster derives the same entry for its own IDs
-	// and release namespace; no executor digest is pinned (ADR-333).
+	// and release namespace; no executor digest is pinned (ADR-334).
 	const remote = "40000000-0000-4000-8000-000000000001"
 	remotePeer, ok := contracts.RemotePeerID(runtimeID, remote)
 	if !ok || remotePeer == peer {
 		t.Fatal("remote peer", remotePeer)
 	}
-	entry, err := catalogCluster(stored, stored.Image, remote, remotePeer, "asservat-system", "asservat", 2, 1, "remote-cluster")
+	entry, err := catalogCluster(stored, stored.Image, remote, remotePeer, "asservat-system", "asservat", 1, "remote-cluster")
 	if err != nil {
 		t.Fatal("remote cluster", err)
 	}

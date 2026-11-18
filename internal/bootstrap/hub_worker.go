@@ -96,7 +96,7 @@ func RunHubWorker(ctx context.Context) error {
 // readHubWorkerConfig reads the Helm-rendered config, completes the OpenBao
 // names Helm does not render and checks it.
 func readHubWorkerConfig(ctx context.Context, files *os.Root, ids contracts.InstallationIDs) (contracts.HubWorkerConfig, error) {
-	b, err := mounts.Read(ctx, files, contracts.HubWorkerConfigFile, contracts.HubWorkerConfigMaxBytes)
+	b, err := mounts.Read(ctx, files, contracts.HubWorkerConfigFile, contracts.ServiceConfigMaxBytes)
 	if err != nil {
 		return contracts.HubWorkerConfig{}, mounts.ErrUnavailable
 	}

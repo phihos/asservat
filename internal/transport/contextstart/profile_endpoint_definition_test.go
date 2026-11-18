@@ -41,7 +41,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			cluster := w.Work.Target.ClusterID
 			now := time.Now()
 			receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

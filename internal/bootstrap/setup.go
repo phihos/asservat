@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -366,7 +367,7 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 	// Bucket policies (Deny statements) are compiled with the IAM Secret by
 	// `asservat secrets` (key bucket-policies.json of `<name>-objectstore-iam`).
 	var policies map[string]json.RawMessage
-	raw, err = readSetupFile(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json"), 256<<10)
+	raw, err = readSetupFile(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json"), corev1.MaxSecretSize)
 	if err != nil {
 		return setupStep("objectstore/policies", err)
 	}
@@ -387,7 +388,7 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 // waitSchema polls with one runtime credential until the database serves
 // this binary's schema. Deployments run it as an init container.
 func waitSchema(ctx context.Context, path, credentialPath, caPath string, out io.Writer) error {
-	raw, err := readSetupFile(path, contracts.OwnerDeploymentMaxBytes)
+	raw, err := readSetupFile(path, contracts.ServiceConfigMaxBytes)
 	if err != nil {
 		return setupStep("configuration", err)
 	}

@@ -34,7 +34,7 @@ func (i *residenceIngress) AuthenticateContextStart(ctx context.Context, _ contr
 func TestHandlerRefusesInvalidOriginalConversationEndBeforeIngress(t *testing.T) {
 	for _, mode := range []string{"missing", "null", "malformed", "expired", "overlong"} {
 		t.Run(mode, func(t *testing.T) {
-			router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
+			router, e := NewRouter(nil)
 			if e != nil {
 				t.Fatal(e)
 			}

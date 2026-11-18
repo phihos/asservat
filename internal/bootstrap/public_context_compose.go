@@ -140,7 +140,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
 	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
-		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
+		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Captures < 1 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
 	historyBounds, err := captureHistoryBounds(p.CaptureHistory)
@@ -169,7 +169,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	capabilities := publicCapabilities{}
-	limits := contextstart.RouterLimits{Standby: p.Standby, Captures: p.Captures}
+	var reservations []contextstart.ClusterLimit
 	// ADR-185: the regional clusters come from the guarded catalog, read once
 	// at start before the native configuration (ADR-196 decision 7). Each
 	// entry still passes the SQL registry and guard checks below; an empty
@@ -185,7 +185,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// admit adds one cluster's capability and limits.
 	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource) {
 		capabilities[v.ClusterID] = capability
-		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+		reservations = append(reservations, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
 	}
 	for _, v := range catalog.catalog.Clusters {
 		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Settings.InstallationID != installation {
@@ -223,22 +223,14 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		admit(v, capability)
 	}
-	// The installation-wide ceilings cover every joined cluster's own
-	// reservation; each cluster stays bounded by its catalog entry.
-	standby, captures := 0, 0
-	for _, v := range limits.Clusters {
-		standby, captures = standby+v.Standby, captures+v.Captures
-	}
-	limits.Standby, limits.Captures = max(limits.Standby, standby), max(limits.Captures, captures)
-	if limits.Standby > 64 || c.Native.Connections+limits.Standby > 64 {
-		return nil, mounts.ErrUnavailable
-	}
-	router, err := contextstart.NewRouter(limits)
+	router, err := contextstart.NewRouter(reservations)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	*closers = append(*closers, router.Close)
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: limits.Standby, Preflight: limits.Standby}
+	// Keep one listener slot on a hub with no registrations. Its empty router refuses starts.
+	connections := max(1, router.StandbyCapacity())
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections}
 
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable

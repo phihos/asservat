@@ -320,7 +320,7 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		}
 		principals = append(principals, principal{purpose, scope, p.Name + "-s3-" + purpose})
 	}
-	// ADR-331: each joined cluster's regional capabilities, scoped to it.
+	// ADR-334: each joined cluster's regional capabilities, scoped to it.
 	for _, name := range p.RemoteClusters {
 		id := contracts.RemoteClusterID(installation, name)
 		if !authorization.UUID(id) {
@@ -631,7 +631,7 @@ func RunSecrets(ctx context.Context) error {
 		return mounts.ErrUnavailable
 	}
 	defer files.Close()
-	raw, err := mounts.Read(ctx, files, "secrets.json", contracts.SecretsMaxBytes)
+	raw, err := mounts.Read(ctx, files, "secrets.json", contracts.ServiceConfigMaxBytes)
 	if err != nil {
 		return mounts.ErrUnavailable
 	}

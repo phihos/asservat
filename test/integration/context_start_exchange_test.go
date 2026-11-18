@@ -220,7 +220,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 	// ADR-334: the connector is this cluster's token-attributed peer.
 	connector := fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, PodUID: b.PodUID, ProcessEpoch: custodyID()}
 	tokens := contextStartTestTokens{fleet.ConnectorCluster{RootID: s.a.RootID, PeerID: connector.Binding.PeerID, InstallationID: pool.InstallationID, ClusterID: b.ClusterID}}
-	router, e := contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: b.ClusterID, Standby: 1, Captures: 1}}})
+	router, e := contextstart.NewRouter([]contextstart.ClusterLimit{{ClusterID: b.ClusterID, Standby: 1, Captures: 1}})
 	if e != nil {
 		t.Fatal(e)
 	}

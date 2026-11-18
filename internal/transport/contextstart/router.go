@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -15,28 +16,24 @@ import (
 )
 
 // ClusterLimit is an installed finite reservation, not a request parameter.
-// Reservations cannot overcommit the whole-process caps, so one cluster cannot
-// take the standby or active capacity reserved for another cluster.
+// Only registered clusters can use the router. Each cluster has its own
+// reservations, so adding a cluster cannot consume another's capacity.
 type ClusterLimit struct {
 	ClusterID         string
 	Standby, Captures int
-}
-type RouterLimits struct {
-	Standby, Captures int
-	Clusters          []ClusterLimit
 }
 type clusterCount struct {
 	limit             ClusterLimit
 	standby, captures int
 }
 type Router struct {
-	mu       sync.Mutex
-	closed   bool
-	limits   RouterLimits
-	clusters map[string]*clusterCount
-	standby  map[string]*Standby
-	captures map[string]*Attachment
-	serial   uint64
+	mu              sync.Mutex
+	closed          bool
+	standbyCapacity int
+	clusters        map[string]*clusterCount
+	standby         map[string]*Standby
+	captures        map[string]*Attachment
+	serial          uint64
 	// registered is closed and replaced when a standby registers or a query
 	// releases it, so a waiting query can retry within its original reserve.
 	registered chan struct{}
@@ -147,26 +144,21 @@ type Attachment struct {
 	once               sync.Once
 }
 
-func NewRouter(l RouterLimits) (*Router, error) {
-	if l.Standby < 1 || l.Standby > 64 || l.Captures < 1 || len(l.Clusters) > 16 {
-		return nil, fleet.ErrInvalid
-	}
-	clusters := make(map[string]*clusterCount, len(l.Clusters))
-	standby, captures := 0, 0
-	for _, c := range l.Clusters {
-		if !authorization.UUID(c.ClusterID) || c.Standby < 1 || c.Standby > 16 || c.Captures < 1 || clusters[c.ClusterID] != nil {
+func NewRouter(reservations []ClusterLimit) (*Router, error) {
+	clusters := make(map[string]*clusterCount, len(reservations))
+	standby := 0
+	for _, c := range reservations {
+		if !authorization.UUID(c.ClusterID) || c.Standby < 1 || c.Standby > math.MaxInt-standby || c.Captures < 1 || clusters[c.ClusterID] != nil {
 			return nil, fleet.ErrInvalid
 		}
 		standby += c.Standby
-		captures += c.Captures
 		clusters[c.ClusterID] = &clusterCount{limit: c}
 	}
-	if standby > l.Standby || captures > l.Captures {
-		return nil, fleet.ErrInvalid
-	}
-	l.Clusters = append([]ClusterLimit(nil), l.Clusters...)
-	return &Router{limits: l, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment), registered: make(chan struct{})}, nil
+	return &Router{standbyCapacity: standby, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment), registered: make(chan struct{})}, nil
 }
+
+// StandbyCapacity sizes the shared listener for all registered connectors.
+func (r *Router) StandbyCapacity() int { return r.standbyCapacity }
 
 // RegisterStandby runs only after actual TLS authentication, before any human
 // request attaches. The handler must call Finish only after its stream joins.
@@ -177,7 +169,7 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cluster := r.clusters[receiver.Channel.Connector.Binding.ClusterID]
-	if r.closed || cluster == nil || len(r.standby) >= r.limits.Standby || cluster.standby >= cluster.limit.Standby || r.standby[receiver.Channel.ExchangeID] != nil {
+	if r.closed || cluster == nil || cluster.standby >= cluster.limit.Standby || r.standby[receiver.Channel.ExchangeID] != nil {
 		return nil, fleet.ErrCapacity
 	}
 	// This bounds passive socket residency, not an authority interval. Attachment
@@ -466,7 +458,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 	for {
 		r.mu.Lock()
 		c := r.clusters[cluster]
-		if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
+		if r.closed || c == nil || c.captures >= c.limit.Captures || r.captures[capture] != nil {
 			r.mu.Unlock()
 			return nil, fleet.ErrCapacity
 		}

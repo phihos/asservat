@@ -19,7 +19,7 @@ func TestPacketTargetOneQueryPreservesEveryOriginalBound(t *testing.T) {
 			now := time.Now().UTC()
 			work := workFixture()
 			request := targets.Request{ClusterID: work.Work.Channel.Connector.Binding.ClusterID, Namespace: cfg.NamespaceRef{Name: "app", UID: "namespace"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "deployment"}, PodName: "app-0", PodUID: "pod"}
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{request.ClusterID, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{request.ClusterID, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

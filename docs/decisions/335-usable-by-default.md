@@ -4,8 +4,7 @@ Date: 2026-11-14. Status: accepted (maintainer: operator and user friction must
 be found and removed without being asked; resolves
 [the friction audit](../reviews/friction-audit-2026-11-14.md)). Supersedes every
 earlier ADR, specification or chart default that contradicts the decisions
-below. ADR-334 (connector workload identity) and ADR-332 (standing connector
-identity) cover the multi-cluster items.
+below. [ADR-334](334-connector-workload-identity.md) covers registration and connector compatibility.
 
 The product capabilities and maintainer decisions in AGENTS.md "Authority and
 invariants" stay; four are honoured with less friction (D5–D8).
@@ -31,7 +30,7 @@ values. Changes apply on `helm upgrade`.
 
 Every value can change on `helm upgrade` and takes effect without reinstall:
 Keycloak hostname/realm/redirects (the realm is reconciled), capacity, retention,
-connector counts (none exist, ADR-332), namespace keys. Write-once storage of
+registered clusters and namespace keys. Write-once storage of
 configuration is removed; generated secrets stay stable but are never compared
 against values.
 

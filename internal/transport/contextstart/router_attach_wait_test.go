@@ -21,7 +21,7 @@ import (
 func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 	w, receiver, bundle, copies := historyFixture()
 	cluster := receiver.Channel.Connector.Binding.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 func TestRouterAttachmentWaitPreservesRefusals(t *testing.T) {
 	w, r, _, _ := historyFixture()
 	cluster := r.Channel.Connector.Binding.ClusterID
-	router, e := NewRouter(RouterLimits{Standby: 2, Captures: 2, Clusters: []ClusterLimit{{cluster, 2, 2}}})
+	router, e := NewRouter([]ClusterLimit{{cluster, 2, 2}})
 	if e != nil {
 		t.Fatal(e)
 	}

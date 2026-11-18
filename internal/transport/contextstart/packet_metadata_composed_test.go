@@ -242,7 +242,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 	if e != nil {
 		t.Fatal(e)
 	}
-	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{f.channel.Connector.Binding.ClusterID, 1, 1}}})
+	router, e := NewRouter([]ClusterLimit{{f.channel.Connector.Binding.ClusterID, 1, 1}})
 	if e != nil {
 		t.Fatal(e)
 	}

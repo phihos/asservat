@@ -67,7 +67,7 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{request.ClusterID, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{request.ClusterID, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

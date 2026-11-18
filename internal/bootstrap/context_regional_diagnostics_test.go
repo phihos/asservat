@@ -101,7 +101,7 @@ func TestRegionalContextOpeningTimingDoesNotExpandRateLimitKey(t *testing.T) {
 	}
 }
 
-// ADR-333: a connector of another protocol major logs the hub's own refusal
+// ADR-334: a connector of another protocol major logs the hub's own refusal
 // and waits 30 seconds before the next attempt.
 func TestRegionalContextLogsHubProtocolRefusal(t *testing.T) {
 	var out bytes.Buffer

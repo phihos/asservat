@@ -9,7 +9,7 @@ WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
  OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest);
 
 -- name: ListRemoteAccessBindingDigests :many
-SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id LIMIT 64;
+SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id;
 
 -- name: ReadRemoteAccessBindings :one
 SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;

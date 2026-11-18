@@ -103,7 +103,7 @@ func TestSnapshotBatchSixteenUsesTwoRealFramedRouterQueries(t *testing.T) {
 		return queryAnswerFrame(t, reply)
 	})
 	cluster := requests[0].Request.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestSnapshotBatchRejectsPartialSwappedAndExpiredAnswers(t *testing.T) {
 			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{requests[0].Request.ClusterID, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{requests[0].Request.ClusterID, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -223,7 +223,7 @@ func TestSnapshotBatchDoesNotRefreshEarlierChunkProof(t *testing.T) {
 	receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(base, identity.Recheck).Narrow(base.Add(5 * time.Second))}
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{requests[0].Request.ClusterID, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{requests[0].Request.ClusterID, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

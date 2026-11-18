@@ -1,7 +1,6 @@
 # Connector identity
 
-C-04/C-21 under REQ-FED-001, ADR-330 D2/D3, ADR-332 (standing connector
-identity) and ADR-334 (connector workload identity).
+C-04/C-21 under REQ-FED-001, ADR-330 D2/D3 and [ADR-334](../decisions/334-connector-workload-identity.md).
 
 Each workload cluster has one standing connector identity: the cluster's name
 in the hub's `clusters` values. Connector process restarts and replicas reuse

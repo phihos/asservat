@@ -12,7 +12,7 @@ import (
 )
 
 const listRemoteAccessBindingDigests = `-- name: ListRemoteAccessBindingDigests :many
-SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id LIMIT 64
+SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id
 `
 
 type ListRemoteAccessBindingDigestsRow struct {

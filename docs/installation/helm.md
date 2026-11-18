@@ -289,8 +289,7 @@ per-sync hooks are safe.
 
 Migrations are expand/contract: the previous minor release runs on the
 current schema, so `helm rollback` to it works. Rolling back further needs a
-[restore](#restore). Workload clusters may run the hub's version or the
-previous minor one.
+[restore](#restore). For connector compatibility, see [version skew](#version-skew).
 
 ## Rotate credentials
 
@@ -413,7 +412,9 @@ the URL's host to the federation's generated certificate, whose CA is
 implemented yet. The connector reaches the hub's owners, key service and
 object store through tunnels on that one connection. The hub generates the
 cluster's ID from its name and sends its settings and object-store
-capabilities on connect. Add clusters at any time.
+capabilities on connect. The hub reserves the connections that each connector
+opens. When upgrading a development installation, remove `clusters[].standby`
+and `hub.hub-api.public.standby` from custom values.
 
 If the hub cannot reach the workload cluster's issuer (k3s and kubeadm default to the
 in-cluster `https://kubernetes.default.svc.cluster.local`), copy the public keys into that cluster's
@@ -425,21 +426,18 @@ connection and refuses its tokens.
 
 ### Version skew
 
-[ADR-333](../decisions/333-connector-version-skew.md). A workload cluster's
-connector and node collectors may run one minor release older or newer than
-the hub, as long as both speak the same connector protocol major (during 0.x
-development, the protocol major is the boundary). Upgrade the hub first,
-then each workload cluster at its own pace. Image digests are recorded as
-provenance and are never compared.
+The hub and workload clusters can upgrade in either order when their connector
+protocol majors match. Use a cluster release that advertises the capabilities
+your workflows need. Each cluster's node collectors use that cluster's
+connector release. The hub records image digests as provenance.
 
-The connector announces its protocol and capabilities when it connects. The
-hub refuses a connector of another protocol major with HTTP 426 and a
-message naming its protocol (hub-api log `context start refused
-connector-protocol`; connector log `open/connector-protocol (denied): hub
-says: … upgrade the connector …`) and refuses only the requests an older connector
-lacks, with `connector too old for <capability>` (diagnostic step
-`connector-too-old/<capability>`); everything else keeps working. Upgrade
-that cluster's release to use the feature.
+A missing or different protocol major returns HTTP 426. The connector log at
+`open/connector-protocol` shows the hub's required major and the connector's
+announced major. Choose releases that speak the same major. With a matching
+major, `connector too old for <capability>` identifies one unsupported request.
+Upgrade the cluster to use that feature. Adjacent minor releases in both
+directions are the release qualification target. Mixed-release installed
+qualification remains open. [ADR-334](../decisions/334-connector-workload-identity.md).
 
 ### Regional connector options
 

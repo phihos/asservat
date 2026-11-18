@@ -15,7 +15,7 @@ import (
 func TestRouterQueryExcludesAttachmentUntilJoinedResult(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestRouterQueryExcludesAttachmentUntilJoinedResult(t *testing.T) {
 func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 func TestRouterCancellationBeforeHandoffReleasesBusyWithoutRefund(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
 	for _, c := range []struct{ last, other bool }{{false, true}, {true, false}, {true, true}} {
 		w := workFixture()
 		cluster := w.Work.Target.ClusterID
-		router, err := NewRouter(RouterLimits{Standby: 2, Captures: 1, Clusters: []ClusterLimit{{cluster, 2, 1}}})
+		router, err := NewRouter([]ClusterLimit{{cluster, 2, 1}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +253,7 @@ func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
 func TestRouterTryAttachDoesNotWait(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestRouterTryAttachDoesNotWait(t *testing.T) {
 func TestRouterTryAttachNarrowsToAnAgedStandby(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

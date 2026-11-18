@@ -52,9 +52,10 @@
      list); the hub derives their IDs from the names. */}}
 {{- define "asservat.hubApi.clusters" -}}
 {{- $root := . -}}
+{{- $captures := int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" .))) -}}
 {{- $out := list -}}
 {{- range .Values.clusters -}}
-{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "namespace" (default $root.Release.Namespace .namespace) "standby" (int (default 2 .standby)) "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" $root))))) -}}
+{{- $out = append $out (dict "name" (required "clusters[].name is required" .name) "namespace" (default $root.Release.Namespace .namespace) "captures" $captures) -}}
 {{- end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -88,7 +89,7 @@
 {{- $pub := dict "origin" .Values.origin "browserAudience" $id.browserAudience "version" (.Chart.AppVersion | default .Chart.Version) -}}
 {{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (fromJson (include "asservat.capacity" .)))) -}}
 {{- with dig "workload" "dump" nil (default dict .Values.capacity) }}{{ $_ := set $pub "workloadRate" . }}{{ end -}}
-{{- range $key := list "standby" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "operationAudit" "downloadPlan" -}}
+{{- range $key := list "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}
 {{- if or $u.processing (include "asservat.capacity" .) }}{{ $_ := set $pub "processing" true }}{{ end -}}

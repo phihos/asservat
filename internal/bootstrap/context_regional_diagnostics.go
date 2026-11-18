@@ -43,7 +43,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 	if cause != nil {
 		stage += " (" + regionalCause(cause) + ")"
 	}
-	// ADR-333: the hub's own explanation of a protocol refusal.
+	// ADR-334: the hub's own explanation of a protocol refusal.
 	var refusal *mtls.HubProtocolRefusal
 	if errors.As(cause, &refusal) {
 		stage += ": hub says: " + refusal.Message

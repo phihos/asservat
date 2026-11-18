@@ -236,7 +236,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		// own IDs and namespace. Their connectors receive the stored offer
 		// from the federation on connect.
 		for _, r := range in.remote {
-			entry, e := catalogCluster(stored, in.offer.offer.Image, r.clusterID, r.peerID, r.Namespace, in.release, r.Standby, r.Captures, "remote-cluster")
+			entry, e := catalogCluster(stored, in.offer.offer.Image, r.clusterID, r.peerID, r.Namespace, in.release, r.Captures, "remote-cluster")
 			if e != nil {
 				return nil, e
 			}

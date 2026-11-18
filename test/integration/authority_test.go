@@ -249,6 +249,50 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			})
 		}
 	}
+	t.Run("remote-bindings-after-fleet-grows", func(t *testing.T) {
+		root := custodyID()
+		reader, err := postgres.NewRemoteAccessBindings(ctx, pool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		const cluster = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+		ns := cfg.NamespaceRef{Name: "payments", UID: custodyID()}
+		binding := cfg.Binding{
+			Resource: cfg.Resource{Kind: "AccessBinding", Name: "readers", UID: custodyID(), ClusterID: cluster, Namespace: ns.Name, NamespaceUID: ns.UID, ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}},
+			Scope:    cfg.Scope{ClusterID: cluster, Namespace: ns}, Effect: "Allow",
+			Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "payments"}}, Roles: []string{"evidence-reader"},
+		}
+		body, err := json.Marshal([]cfg.Binding{binding})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
+			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)`, root, cluster, body); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := reader.RemoteBindings(ctx)
+		if err != nil || len(rows) != 1 || !rows[0].Valid() || len(rows[0].Bindings) != 1 || rows[0].Bindings[0].Resource.UID != binding.Resource.UID {
+			t.Fatal("initial binding delivery", rows, err)
+		}
+		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
+			SELECT $1, ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, clock_timestamp(), sha256('[]'::bytea), '[]'::bytea FROM generate_series(1,64) AS i`, root); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET observed_at=clock_timestamp(), digest=sha256('[]'::bytea), bindings='[]'::bytea
+			WHERE root_id=$1 AND cluster_id=$2`, root, cluster); err != nil {
+			t.Fatal(err)
+		}
+		rows, err = reader.RemoteBindings(ctx)
+		if err != nil || len(rows) != 65 {
+			t.Fatalf("expected all 65 deliveries after removal, got %d: %v", len(rows), err)
+		}
+		for _, row := range rows {
+			if row.ClusterID == cluster && row.Valid() && len(row.Bindings) == 0 {
+				return
+			}
+		}
+		t.Fatal("missing replacement of the previously populated binding set")
+	})
 	// ADR-237: the impact preview reads every workload cell of the affected
 	// namespace from the same accepted projection, and the real evaluator
 	// turns a removed allow into Deny and a proposed deny into ExplicitDeny.

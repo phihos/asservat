@@ -31,7 +31,7 @@ func newRouterStreamFixture(t *testing.T) *routerStreamFixture {
 	t.Helper()
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	r, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	r, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

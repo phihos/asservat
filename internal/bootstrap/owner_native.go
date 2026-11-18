@@ -78,7 +78,7 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 	out := &ownerNativeRuntime{roots: r.roots.Clone(), router: router, authority: net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), connections: c.Connections, peers: &p, hub: serving, concurrency: c.Concurrency}
 	if c.ContextStarts != nil {
 		start := c.ContextStarts
-		if !authorization.UUID(start.RootID) || start.Router == nil || start.Tokens == nil || start.Connections < 1 || start.Connections > 64 || start.Preflight < 1 || start.Preflight > start.Connections || c.Connections+start.Connections > 64 {
+		if !authorization.UUID(start.RootID) || start.Router == nil || start.Tokens == nil || start.Connections < 1 || start.Preflight < 1 || start.Preflight > start.Connections {
 			router.Close()
 			return nil, artifact.ErrInvalid
 		}

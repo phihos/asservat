@@ -479,7 +479,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, value.ErrUnavailable
 	}
 	if response.StatusCode == http.StatusUpgradeRequired && response.ProtoMajor == 2 {
-		// ADR-333: the authenticated hub refuses this connector's protocol;
+		// ADR-334: the authenticated hub refuses this connector's protocol;
 		// keep its bounded, printable message for the operator's log.
 		message := hubRefusalText(response.Body)
 		exchange.interrupt()
@@ -534,7 +534,7 @@ func (e receiverCheckStep) Unwrap() error             { return e.err }
 func (e receiverCheckStep) ReceiverCheckStep() string { return e.step }
 
 // HubProtocolRefusal is the hub's refusal of this connector's protocol major
-// (HTTP 426, ADR-333). Message is the hub's bounded printable text.
+// (HTTP 426, ADR-334). Message is the hub's bounded printable text.
 type HubProtocolRefusal struct{ Message string }
 
 func (e *HubProtocolRefusal) Error() string     { return "hub refused connector protocol: " + e.Message }

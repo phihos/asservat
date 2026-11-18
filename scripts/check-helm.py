@@ -315,7 +315,7 @@ def check_collector(directory):
 
 
 def check_cluster_join(render):
-    # ADR-331: clusters[] in the hub's values: the offer and the regional
+    # ADR-334: clusters[] in the hub's values: the offer and the regional
     # capabilities exist in mode=hub, and the hub components know the
     # registered cluster names (IDs derive from them, ADR-335 D4).
     url = "https://hub.example:31446"
@@ -323,7 +323,7 @@ def check_cluster_join(render):
     v.update({"clusters": [{"name": "eu", "issuer": "https://eu.example", "jwks": {"keys": [{"kty": "EC"}]}}], "hub": {**v.get("hub", {}), "url": url}})
     docs = render(v)
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
-    assert config["clusters"][0] == {"name": "eu", "namespace": "asservat-system", "standby": 2, "captures": 8}, config.get("clusters")
+    assert config["clusters"][0] == {"name": "eu", "namespace": "asservat-system", "captures": 8}, config.get("clusters")
     # ADR-334: the federation registers clusters by public issuer data only.
     fed = json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])
     tokens = fed["connectorTokens"]

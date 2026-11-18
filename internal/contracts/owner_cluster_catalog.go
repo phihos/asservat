@@ -21,8 +21,8 @@ const (
 	// (one dry-run probe pair per slot) at install time; an unused slot's
 	// names grant nothing because its sources do not exist. Eight covers the
 	// S-02 second cluster with headroom, keeps the catalog (about 6 KiB per
-	// entry) well under its 128 KiB bound and stays below the context-start
-	// router's 16-cluster limit.
+	// entry) well under its 128 KiB bound. Helm registrations derive
+	// their entries directly and do not use these legacy catalog slots.
 	OwnerClusterCatalogSlots = 8
 )
 
