@@ -16,7 +16,9 @@ ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("custody_fixture",ROOT/"scripts/test-custody.py")
 fixture=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
-TESTS=("TestHistoryCiphertextStorageCapabilityWithRealS3", "TestRevokedRegionalStorageKeysWithRealS3")
+TESTS={"TestHistoryCiphertextStorageCapabilityWithRealS3": "s3.json",
+       "TestRevokedRegionalStorageKeysWithRealS3": "s3-revoked.json",
+       "TestReRegisteredRegionalStorageKeysWithRealS3": "s3-returned.json"}
 SEAWEED="chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0"
 
 def hashes():
@@ -49,7 +51,7 @@ def main(name):
     cache=Path.home()/".cache/asservat-build"
     cache.mkdir(parents=True,exist_ok=True)
     started=time.monotonic()
-    report={"scope":"bundled SeaweedFS with compiled regional S3 permissions, synthetic ciphertexts, TLS bridge, multipart delivery, exact-prefix cleanup and cross-region denials","requestedImage":SEAWEED,"sourceBefore":hashes(),"cleanupFailures":[],"selectedTests":TESTS,"testExit":1}
+    report={"scope":"bundled SeaweedFS with compiled regional S3 permissions, synthetic ciphertexts, TLS bridge, multipart delivery, exact-prefix cleanup and cross-region denials","requestedImage":SEAWEED,"sourceBefore":hashes(),"cleanupFailures":[],"selectedTests":list(TESTS),"testExit":1}
     code=1
     with tempfile.TemporaryDirectory(prefix="history-storage-",dir=cache) as directory:
         work=Path(directory);network="asservat-"+work.name;container=network+"-s3"
@@ -57,7 +59,7 @@ def main(name):
         try:
             env=os.environ.copy()
             env["TMPDIR"]=str(work)
-            subprocess.run(["go","test","-count=1","-run","^TestPrepareRegionalStorageFixture$","./test/integration"],cwd=ROOT,env={**env,"ASSERVAT_REGIONAL_STORAGE_FIXTURE_DIR":str(work)},check=True,timeout=240)
+            subprocess.run(["go","test","-count=1","-run","^TestRegionalStorageReRegistration$","./internal/bootstrap"],cwd=ROOT,env={**env,"ASSERVAT_REGIONAL_STORAGE_FIXTURE_DIR":str(work)},check=True,timeout=240)
             config_path=work/"s3.json"
             fixture.run(["docker","network","create","--internal","--label","asservat.test="+work.name,network]);made_network=True
             fixture.run(["docker","create","--name",container,"--network",network,"--label","asservat.test="+work.name,"--user","1000:1000","--read-only","--memory","768m","--cpus","2","--pids-limit","512","--tmpfs","/tmp:rw,nosuid,nodev,size=64m","-v","/data","-v",str(config_path)+":/config/s3.json:ro","--entrypoint","/usr/bin/weed",SEAWEED,"server","-dir=/data","-ip=127.0.0.1","-ip.bind=127.0.0.1","-master.volumeSizeLimitMB=16","-volume.max=2","-filer=true","-s3=true","-s3.ip.bind=0.0.0.0","-s3.iam=false","-iam=false","-s3.autoCreateBucket=false","-master.telemetry=false","-s3.port.iceberg=0","-s3.port.lance=0","-s3.port=8333","-s3.config=/config/s3.json"]);made_container=True
@@ -65,11 +67,11 @@ def main(name):
             descriptor=work/"fixture.json"
             env["ASSERVAT_HISTORY_STORAGE_FIXTURE"]=str(descriptor)
             with (out/"test.log").open("w") as log:
-                for test in TESTS:
-                    if test == "TestRevokedRegionalStorageKeysWithRealS3":
+                for test, config in TESTS.items():
+                    if config != config_path.name:
                         fixture.run(["docker","stop","-t","10",container])
                         # The pod rollout remounts the hook's new IAM Secret with the same data volume.
-                        (work/"s3-revoked.json").replace(config_path)
+                        (work/config).replace(config_path)
                     endpoint = start_provider(container, network, report)
                     data=json.loads(descriptor.read_text())
                     data["S3"]=endpoint

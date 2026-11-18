@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"maps"
 	"math/big"
 	"net"
 	"os"
@@ -305,6 +306,27 @@ var seaweedEvidencePurposes = []string{"download-read", "evidence-delete", "regi
 // and compiles the complete IAM configuration and bucket policies from them.
 func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, ids installationIDs, admin contracts.SeaweedCredential) error {
 	installation, cluster, root := ids["installationID"], ids["clusterID"], ids["permissionRootID"]
+	name := p.ObjectStore.IAMSecretName()
+	current, err := s.api.Get(ctx, name, meta.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		current = nil
+	} else if err != nil {
+		return secretsFailure("SecretUnavailable " + name)
+	}
+	var active map[string]contracts.OwnerStorageCredential
+	var previousPolicies []byte
+	if current != nil {
+		defer clearData(current.Data)
+		active, err = providerconfig.ActiveSeaweedKeys(current.Data[providerconfig.SeaweedConfigKey])
+		if err != nil {
+			return secretsFailure("InvalidObjectStoreIAM")
+		}
+		previousPolicies = current.Data[SeaweedBucketPoliciesKey]
+	}
+	// The IAM Secret decides which regional keys are active. Per-connector
+	// delivery Secrets are reconciled from it, including on hook retries.
+	regional := map[string][]byte{}
+	defer clearData(regional)
 	var grants []contracts.SeaweedGrant
 	defer func() {
 		for i := range grants {
@@ -337,18 +359,30 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		if err != nil {
 			return secretsFailure("ObjectStoreCredentialUnavailable " + purpose)
 		}
-		want, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: generated.AccessKeyID, SecretAccessKey: generated.SecretAccessKey})
-		name := x.secret
-		data, err := s.ensure(ctx, name, map[string][]byte{contracts.ObjectStoreCredentialFile: want})
-		clear(want)
-		if err != nil {
-			return err
+		credential := generated
+		stored := contracts.OwnerStorageCredential{AccessKeyID: generated.AccessKeyID, SecretAccessKey: generated.SecretAccessKey}
+		if strings.HasPrefix(purpose, "regional-") {
+			principal, _ := providerconfig.SeaweedPrincipalName(key)
+			if previous, ok := active[principal]; ok {
+				stored = previous
+			}
+			regional[x.secret], _ = json.Marshal(stored)
+		} else {
+			want, _ := json.Marshal(stored)
+			data, err := s.ensure(ctx, x.secret, map[string][]byte{contracts.ObjectStoreCredentialFile: want})
+			clear(want)
+			if err != nil {
+				return err
+			}
+			stored, err = contracts.DecodeOwnerStorageCredential(bytes.NewReader(data[contracts.ObjectStoreCredentialFile]))
+			clearData(data)
+			if err != nil {
+				return secretsFailure("InvalidObjectStoreCredential " + x.secret)
+			}
 		}
-		stored, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(data[contracts.ObjectStoreCredentialFile]))
-		clearData(data)
-		credential := contracts.SeaweedCredential{Principal: key, AccessKeyID: stored.AccessKeyID, SecretAccessKey: stored.SecretAccessKey}
-		if err != nil || providerconfig.ValidateSeaweedCredential(credential) != nil {
-			return secretsFailure("InvalidObjectStoreCredential " + name)
+		credential.AccessKeyID, credential.SecretAccessKey = stored.AccessKeyID, stored.SecretAccessKey
+		if providerconfig.ValidateSeaweedCredential(credential) != nil {
+			return secretsFailure("InvalidObjectStoreCredential " + x.secret)
 		}
 		bucket := p.Name + "-audit"
 		if slices.Contains(seaweedEvidencePurposes, purpose) {
@@ -368,34 +402,46 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		return secretsFailure("ObjectStoreIAMUnavailable")
 	}
 	defer clear(compiled.Config)
-	evidence := p.Name + "-evidence"
-	want, err := compiledIAMData(compiled, evidence, nil)
+	want, err := compiledIAMData(compiled, p.Name+"-evidence", previousPolicies)
 	if err != nil {
 		return err
 	}
-	name := p.ObjectStore.IAMSecretName()
-	data, err := s.ensure(ctx, name, want)
-	if err != nil {
-		return err
-	}
-	defer clearData(data)
-	if previous := data[SeaweedBucketPoliciesKey]; !bytes.Equal(previous, want[SeaweedBucketPoliciesKey]) {
-		want, err = compiledIAMData(compiled, evidence, previous)
+	if current == nil {
+		data, err := s.ensure(ctx, name, want)
 		if err != nil {
 			return err
 		}
-	}
-	changed := map[string][]byte{}
-	for k, v := range want {
-		if !bytes.Equal(data[k], v) {
-			changed[k] = v
+		same := bytes.Equal(data[providerconfig.SeaweedConfigKey], compiled.Config)
+		clearData(data)
+		if !same {
+			return secretsFailure("ObjectStoreIAMChanged")
+		}
+	} else if !maps.EqualFunc(current.Data, want, bytes.Equal) {
+		// Refuse a stale hook's update if another run already published new membership.
+		body, err := json.Marshal(map[string]any{"metadata": map[string]string{"resourceVersion": current.ResourceVersion}, "data": want})
+		if err != nil {
+			return err
+		}
+		defer clear(body)
+		if _, err := s.api.Patch(ctx, name, types.MergePatchType, body, meta.PatchOptions{}); err != nil {
+			return secretsFailure("ObjectStoreIAMChanged")
 		}
 	}
-	if len(changed) > 0 {
-		// A new principal set (chart upgrade) replaces the compiled documents.
-		patched, err := s.patch(ctx, name, changed)
-		clearData(patched)
-		return err
+	for secret, key := range regional {
+		want := map[string][]byte{contracts.ObjectStoreCredentialFile: key}
+		data, err := s.ensure(ctx, secret, want)
+		if err != nil {
+			return err
+		}
+		same := bytes.Equal(data[contracts.ObjectStoreCredentialFile], key)
+		clearData(data)
+		if !same {
+			updated, err := s.patch(ctx, secret, want)
+			clearData(updated)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

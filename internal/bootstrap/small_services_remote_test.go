@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/google/uuid"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -152,4 +155,88 @@ func TestSecretsHookPreservesExistingRegionalPolicy(t *testing.T) {
 	if _, err := compiledIAMData(compiled, evidence, previous); err != secretsFailure("ObjectStoreIAMExceedsKubernetesSecretSize") {
 		t.Fatal("oversize combined IAM data", err)
 	}
+}
+
+// Run the same hook for the initial registration, withdrawal and replacement.
+// The owned provider fixture optionally mounts the actual IAM produced at each step.
+func TestRegionalStorageReRegistration(t *testing.T) {
+	dir := os.Getenv("ASSERVAT_REGIONAL_STORAGE_FIXTURE_DIR")
+	write := func(name string, data []byte, mode os.FileMode) {
+		t.Helper()
+		if dir != "" {
+			if err := os.WriteFile(filepath.Join(dir, name), data, mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	ids := installationIDs{"installationID": uuid.NewString(), "clusterID": uuid.NewString(), "permissionRootID": uuid.NewString()}
+	root, installation := ids["permissionRootID"], ids["installationID"]
+	admin, err := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "admin", ScopeID: installation})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := fake.NewClientset()
+	store := secretStore{api: api.CoreV1().Secrets("hub"), namespace: "hub"}
+	p := contracts.SecretsPlan{Name: "asservat", Mode: "hub", ObjectStore: &contracts.SmallSeaweedPlan{Name: "asservat", Namespace: "hub"}}
+	data := func(secret, key string) []byte {
+		t.Helper()
+		s, err := store.api.Get(t.Context(), secret, meta.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s.Data[key]
+	}
+	apply := func(file string, clusters ...string) []byte {
+		t.Helper()
+		p.RemoteClusters = clusters
+		if err := store.objectStore(t.Context(), p, ids, admin); err != nil {
+			t.Fatal(err)
+		}
+		config := data(p.ObjectStore.IAMSecretName(), providerconfig.SeaweedConfigKey)
+		write(file, config, 0444)
+		return config
+	}
+	credential := func(region, purpose string) contracts.SeaweedCredential {
+		t.Helper()
+		key, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(data(contracts.RemoteObjectStoreSecret(p.Name, purpose, region), contracts.ObjectStoreCredentialFile)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return contracts.SeaweedCredential{Principal: contracts.SeaweedPrincipalKey{Purpose: purpose, ScopeID: contracts.RemoteClusterID(installation, region)}, AccessKeyID: key.AccessKeyID, SecretAccessKey: key.SecretAccessKey}
+	}
+	apply("s3.json", "eu", "us")
+	writer, history := credential("eu", "regional-write"), credential("eu", "regional-history")
+	oldWriter, oldHistory := credential("us", "regional-write"), credential("us", "regional-history")
+	revoked := apply("s3-revoked.json", "eu")
+	returned := apply("s3-returned.json", "us", "eu")
+	newWriter, newHistory := credential("us", "regional-write"), credential("us", "regional-history")
+	if newWriter.AccessKeyID == oldWriter.AccessKeyID || newHistory.AccessKeyID == oldHistory.AccessKeyID || newWriter.SecretAccessKey == oldWriter.SecretAccessKey || newHistory.SecretAccessKey == oldHistory.SecretAccessKey {
+		t.Fatal("re-registration restored withdrawn credentials")
+	}
+	for _, config := range [][]byte{revoked, returned} {
+		if bytes.Contains(config, []byte(oldHistory.AccessKeyID)) || bytes.Contains(config, []byte(oldWriter.AccessKeyID)) {
+			t.Fatal("withdrawn credential present in IAM")
+		}
+	}
+	// Simulate losing a delivery Secret after the new IAM was published. Retry
+	// must recover the same active key from IAM.
+	if err := store.api.Delete(t.Context(), contracts.RemoteObjectStoreSecret(p.Name, "regional-history", "us"), meta.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.objectStore(t.Context(), p, ids, admin); err != nil {
+		t.Fatal(err)
+	}
+	if writer != credential("eu", "regional-write") || history != credential("eu", "regional-history") || newWriter != credential("us", "regional-write") || newHistory != credential("us", "regional-history") {
+		t.Fatal("continuous registration or retry changed active credentials")
+	}
+	bucket := p.Name + "-evidence"
+	var policies map[string]json.RawMessage
+	if err := json.Unmarshal(data(p.ObjectStore.IAMSecretName(), SeaweedBucketPoliciesKey), &policies); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{"Bucket": bucket, "BucketPolicy": string(policies[bucket]), "Root": root, "Cluster": writer.Principal.ScopeID, "OtherCluster": oldWriter.Principal.ScopeID, "Admin": admin, "Writer": writer, "History": history, "OtherWriter": oldWriter, "OtherHistory": oldHistory, "ReplacementWriter": newWriter, "ReplacementHistory": newHistory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("fixture.json", raw, 0600)
 }

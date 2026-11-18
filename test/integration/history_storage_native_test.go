@@ -8,14 +8,11 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
@@ -29,58 +26,8 @@ import (
 type regionalStorageFixture struct {
 	S3, Bucket, Root, Cluster, OtherCluster           string
 	Admin, Writer, History, OtherWriter, OtherHistory contracts.SeaweedCredential
+	ReplacementWriter, ReplacementHistory             contracts.SeaweedCredential
 	BucketPolicy                                      string
-}
-
-// The fixture script mounts the production compiler's s3.json before the
-// pinned server starts. All credentials and object contents are synthetic.
-func TestPrepareRegionalStorageFixture(t *testing.T) {
-	dir := os.Getenv("ASSERVAT_REGIONAL_STORAGE_FIXTURE_DIR")
-	if dir == "" {
-		t.Skip("prepared by make history-storage-integration")
-	}
-	f := regionalStorageFixture{Bucket: "synthetic-history-capability", Root: custodyID(), Cluster: custodyID(), OtherCluster: custodyID()}
-	installation := custodyID()
-	credential := func(role, scope string) contracts.SeaweedCredential {
-		c, err := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: role, ScopeID: scope})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return c
-	}
-	f.Admin = credential("admin", installation)
-	f.Writer, f.History = credential("regional-write", f.Cluster), credential("regional-history", f.Cluster)
-	f.OtherWriter, f.OtherHistory = credential("regional-write", f.OtherCluster), credential("regional-history", f.OtherCluster)
-	var grants []contracts.SeaweedGrant
-	for _, c := range []contracts.SeaweedCredential{f.Writer, f.History, f.OtherWriter, f.OtherHistory, credential("download-read", installation), credential("evidence-delete", installation)} {
-		grants = append(grants, contracts.SeaweedGrant{Credential: c, Bucket: f.Bucket, InstallationID: installation, ClusterID: c.Principal.ScopeID, RootID: f.Root})
-	}
-	writeConfig := func(file string, grants []contracts.SeaweedGrant) string {
-		t.Helper()
-		config, err := providerconfig.CompileSeaweedStorage(f.Admin, grants)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// The fixture container runs as UID 1000. The parent directory is private.
-		if err = os.WriteFile(filepath.Join(dir, file), config.Config, 0444); err != nil {
-			t.Fatal(err)
-		}
-		return string(config.Policies[f.Bucket])
-	}
-	f.BucketPolicy = writeConfig("s3.json", grants)
-	active := slices.DeleteFunc(grants, func(g contracts.SeaweedGrant) bool {
-		return g.Credential.Principal.ScopeID == f.OtherCluster
-	})
-	if writeConfig("s3-revoked.json", active) != f.BucketPolicy {
-		t.Fatal("withdrawal changed the shared bucket policy")
-	}
-	raw, err := json.Marshal(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = os.WriteFile(filepath.Join(dir, "fixture.json"), raw, 0600); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func readRegionalStorageFixture(t *testing.T) regionalStorageFixture {
@@ -278,7 +225,11 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 // This phase runs after the same store restarts with one registration removed.
 // Use both originally issued credentials and objects from before withdrawal.
 func TestRevokedRegionalStorageKeysWithRealS3(t *testing.T) {
-	f := readRegionalStorageFixture(t)
+	checkWithdrawnRegionalKeys(t, readRegionalStorageFixture(t))
+}
+
+func checkWithdrawnRegionalKeys(t *testing.T, f regionalStorageFixture) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	client := regionalStorageClients(tlsBridge(t, f.S3))
@@ -308,5 +259,26 @@ func TestRevokedRegionalStorageKeysWithRealS3(t *testing.T) {
 		if _, err := client(item.credential).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &item.key, Body: strings.NewReader("retained")}); err != nil {
 			t.Fatal("remaining cluster credential refused", item.credential.Principal.Purpose, err)
 		}
+	}
+}
+
+func TestReRegisteredRegionalStorageKeysWithRealS3(t *testing.T) {
+	f := readRegionalStorageFixture(t)
+	checkWithdrawnRegionalKeys(t, f)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	client := regionalStorageClients(tlsBridge(t, f.S3))
+	key := "history/v1/" + f.Root + "/" + f.OtherCluster + "/foreign"
+	obj, err := client(f.ReplacementHistory).GetObject(ctx, &s3.GetObjectInput{Bucket: &f.Bucket, Key: &key})
+	if err != nil {
+		t.Fatal("replacement history credential cannot read existing history", err)
+	}
+	defer obj.Body.Close()
+	body, err := io.ReadAll(obj.Body)
+	if err != nil || string(body) != "synthetic foreign metadata" {
+		t.Fatal("history changed after re-registration", err)
+	}
+	if _, err := client(f.ReplacementWriter).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: aws.String("v1/" + f.OtherCluster + "/replacement"), Body: strings.NewReader("synthetic replacement evidence")}); err != nil {
+		t.Fatal("replacement evidence writer", err)
 	}
 }

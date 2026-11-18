@@ -60,6 +60,25 @@ type seaweedKey struct {
 	Access string `json:"accessKey"`
 	Secret string `json:"secretKey"`
 }
+
+// ActiveSeaweedKeys recovers the keys from the hook's own installed IAM
+// document, including documents written before named policies were introduced.
+func ActiveSeaweedKeys(raw []byte) (map[string]contracts.OwnerStorageCredential, error) {
+	var doc struct{ Identities []seaweedIdentity }
+	if json.Unmarshal(raw, &doc) != nil || len(doc.Identities) == 0 {
+		return nil, ErrSeaweedStorage
+	}
+	keys := make(map[string]contracts.OwnerStorageCredential, len(doc.Identities))
+	for _, id := range doc.Identities {
+		if len(id.Credentials) != 1 {
+			return nil, ErrSeaweedStorage
+		}
+		key := id.Credentials[0]
+		keys[id.Name] = contracts.OwnerStorageCredential{AccessKeyID: key.Access, SecretAccessKey: key.Secret}
+	}
+	return keys, nil
+}
+
 type seaweedNamedPolicy struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
