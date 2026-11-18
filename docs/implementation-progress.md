@@ -11,15 +11,25 @@ consolidates the registration, identity, dispatch and compatibility decisions.
 - The former router, permission reader and download policy lost clusters at 17,
   65 and 33 entries respectively. Tests cover 65 registrations, a 129-cluster
   policy, and 201 populated deliveries with 20 ms injected SQL read and write
-  latency. PostgreSQL accepted 32,768 assignment additions and their subsequent
-  retirement, keeping a peer’s existing grant usable throughout. One audit row
-  per transaction records the basis revisions, scope digests and counts. A
-  1,025-binding automation change produced a 1,025,354-byte canonical event.
-  The decision-time source fixture accepted 65 sources. A real permission
-  read immediately after renewal authorized the caller with the database
-  clock 500 ms ahead of the API. The existing permission publisher still
-  requires an encrypted object receipt. Its transition to database-only audit
-  under ADR-330 D6 remains open.
+  latency. PostgreSQL accepted 32,768 assignment additions and their
+  retirement, 1,025 automation bindings, and 24,000 distinct binding
+  additions and removals. Each permission change commits one audit header
+  plus its changed source and scope rows. Assignments reference the change
+  that activated or retired them. No serialized fleet change or object-store
+  acknowledgement gates the transaction. Tests also cover 65 decision-time
+  sources and a database clock 500 ms ahead of the API.
+- Owner configuration now commits its audit event alongside the revision.
+  A refused audit insert rolls both back. Eight concurrent observations of
+  one revision produced one event, and the observer accepted generation
+  1,025 with 1,024 prior revisions. On the previous candidate, a missing
+  object-store acknowledgement stalled a Helm withdrawal for over six minutes.
+  The new transaction removes that external dependency and its publisher.
+- Migrating a populated schema-5 PostgreSQL database backfilled the owner's
+  original source, generation and snapshot digest. Already-prepared schema-5
+  API and worker statements could neither read nor renew the new permission
+  projection. The migrated stream suspended previous authority pending a fresh
+  observation. Migrations 00006–00008 cover the delivery, permission audit and
+  owner audit changes.
 - At `7f775c274`, a fresh two-cluster Kind installation ran two hub API and
   two federation replicas, with one connected remote cluster and 64 offline
   registrations. Two Helm upgrades withdrew and restored unchanged bindings on
