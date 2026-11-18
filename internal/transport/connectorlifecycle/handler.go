@@ -71,7 +71,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusUnauthorized)
 		return
 	}
-	verifiedAt := time.Now()
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
@@ -109,7 +108,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if control.Flush() != nil {
 		return
 	}
-	region := &Region{conn: conn, presented: presented, verifiedAt: verifiedAt, process: opening.Process}
+	region := &Region{conn: conn, presented: presented, process: opening.Process}
 	defer region.closeChannel()
 	result := HubFrame{Kind: "result"}
 	switch opening.Purpose {
@@ -175,11 +174,10 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 // Region is one conversation's presenting connector: its token's cluster and
 // at most one delivery read.
 type Region struct {
-	conn       *Conn
-	presented  value.ConnectorCluster
-	verifiedAt time.Time
-	process    value.ConnectorProcessIdentity
-	closed     bool
+	conn      *Conn
+	presented value.ConnectorCluster
+	process   value.ConnectorProcessIdentity
+	closed    bool
 	// delivered marks the conversation's one AccessBinding or capacity
 	// request.
 	delivered bool
@@ -187,9 +185,6 @@ type Region struct {
 
 // Presented is the cluster the conversation's token was attributed to.
 func (r *Region) Presented() value.ConnectorCluster { return r.presented }
-
-// VerifiedAt is when the token was verified; deliveries are observed no later.
-func (r *Region) VerifiedAt() time.Time { return r.verifiedAt }
 
 // Binding is the presenting process's peer binding, checked against the cluster.
 func (r *Region) Binding() value.PeerBinding { return r.process.Binding }

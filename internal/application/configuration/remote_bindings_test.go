@@ -107,6 +107,24 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	}
 }
 
+func TestCommittedWithdrawalIgnoresWorkerClockSkew(t *testing.T) {
+	_, _, s, ctx := inheritanceRun(t)
+	d := value.RemoteBindings{ClusterID: remoteCluster, ObservedAt: s.r.Now(), Digest: artifact.Digest{1},
+		Bindings: []value.Binding{remoteBinding(remoteCluster, "reader", "uid-reader", "Allow")}}
+	r := &remoteBindingFixture{deliveries: []value.RemoteBindings{d}}
+	s.r.RemoteBindings = r
+	if changed, err := s.refreshRemoteBindings(ctx); err != nil || !changed {
+		t.Fatal("initial grant", changed, err)
+	}
+	d.ObservedAt = d.ObservedAt.Add(2 * time.Second)
+	d.Digest[0]++
+	d.Bindings = nil
+	r.deliveries[0] = d
+	if changed, err := s.refreshRemoteBindings(ctx); err != nil || !changed || len(s.remoteBindings[remoteCluster].Bindings) != 0 {
+		t.Fatal("database withdrawal was not applied", changed, err)
+	}
+}
+
 func TestRemoteBindingsValidBounds(t *testing.T) {
 	d := value.RemoteBindings{ClusterID: remoteCluster, ObservedAt: time.Now(), Bindings: []value.Binding{remoteBinding(remoteCluster, "a", "uid-a", "Allow")}}
 	if !d.Valid() {

@@ -51,7 +51,7 @@ func journalIdentity(b value.Binding, cluster string) bool {
 // bindingName keys a binding by namespace and name.
 func bindingName(r value.Resource) string { return r.Namespace + "/" + r.Name }
 func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error) {
-	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || len(s.Bindings) > 1024 {
+	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) {
 		return nil, value.ErrInvalid
 	}
 	j := &BindingJournal{cluster: s.ClusterID, control: s.ControlNamespace, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
@@ -101,7 +101,7 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	old, exists := j.byUID[b.Resource.UID]
 	switch e.Type {
 	case "ADDED":
-		if exists || j.names[bindingName(b.Resource)] != "" || len(j.byUID) >= 1024 {
+		if exists || j.names[bindingName(b.Resource)] != "" {
 			return fail()
 		}
 		j.byUID[b.Resource.UID] = cloneBinding(b)

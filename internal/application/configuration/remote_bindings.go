@@ -24,13 +24,12 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 		return false, reconcileStep("remote-bindings", err)
 	}
 	next := make(map[string]value.RemoteBindings, len(deliveries))
-	now := s.r.Now()
 	changed := false
 	for _, d := range deliveries {
 		if d.ClusterID == s.r.NamespaceClusterID {
 			continue
 		}
-		if !d.Valid() || d.ObservedAt.After(now.Add(time.Second)) {
+		if !d.Valid() {
 			if old, ok := s.remoteBindings[d.ClusterID]; ok {
 				next[d.ClusterID] = old
 			}

@@ -43,12 +43,14 @@ This uses the gateway's static configuration and requires
 no IAM API service or additional credential. [SeaweedFS policy size](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/s3api/policy_engine/bucket_policy.go#L7-L11),
 [static identity policies](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/pb/iam.proto#L170-L192).
 
-The connector watches local namespace and workload metadata and delivers
-changed capacity observations over its connection. The hub attributes each
-observation to the authenticated cluster and wakes reconciliation on change.
-The last delivered capacity state remains current during a disconnect.
-On reconnect the connector compares digests and resends on mismatch.
-[Cluster observations](../architecture/cluster-observations.md).
+The connector watches AccessBindings in its cluster's application namespaces.
+On a change or reconnect it compares the current digest with the hub and
+delivers the bindings if they differ. The hub attributes the delivery to the
+authenticated cluster. All federation replicas use the database clock to order
+overlapping deliveries. An idle disconnect preserves the last accepted binding
+set, and an explicit withdrawal invalidates it. The hub worker applies capture
+capacity from the installation's Helm values.
+[Permission contract](../../specs/permissions.md).
 
 ### Work dispatch
 

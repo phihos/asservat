@@ -21,4 +21,7 @@ FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
 WHERE d.root_id=sqlc.arg(root_id) ORDER BY d.cluster_id;
 
 -- name: ReadRemoteAccessBindingDigest :one
-SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;
+-- Use the same database clock on all federation replicas. Order overlapping
+-- deliveries by the start of their digest exchange, not by completion time.
+SELECT statement_timestamp()::timestamptz AS observed_at,
+ (SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2)::bytea AS digest;

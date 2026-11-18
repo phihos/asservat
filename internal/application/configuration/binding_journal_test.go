@@ -14,6 +14,39 @@ import (
 	value "asservat.local/asservat/internal/domain/configuration"
 )
 
+func TestLocalBindingJournalAcceptsLargeListAndWatch(t *testing.T) {
+	_, snapshot, fence, now := journalFixture(t)
+	seed := snapshot.Bindings[0]
+	binding := func(n int) value.Binding {
+		b := seed
+		b.Resource.Name = fmt.Sprintf("team-%d", n)
+		b.Resource.UID = b.Resource.Name
+		return b
+	}
+	for i := 1; i < 1025; i++ {
+		snapshot.Bindings = append(snapshot.Bindings, binding(i))
+	}
+	for _, size := range []int{1025, 1024} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			list := snapshot
+			list.Bindings = list.Bindings[:size]
+			j, err := NewBindingJournal(list, now)
+			if err != nil {
+				t.Fatal("initial list", err)
+			}
+			batch, err := j.Prepare(fence, journalID, now, Inheritance{})
+			if err != nil || len(batch.Bases) != size {
+				t.Fatal("prepare initial list", len(batch.Bases), err)
+			}
+			journalAck(t, j, batch)
+			b := binding(size)
+			if err = j.Apply(value.BindingEvent{Type: "ADDED", ResourceVersion: b.Resource.ResourceVersion, Binding: &b}); err != nil {
+				t.Fatal("watch addition", err)
+			}
+		})
+	}
+}
+
 func TestBindingAcceptancePreservesAutomationEnvelope(t *testing.T) {
 	_, snapshot, fence, now := journalFixture(t)
 	snapshot.Bindings[0].Automation = &authorization.AutomationEnvelope{AllowedActions: []string{"logs"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 1024}

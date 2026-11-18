@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
@@ -33,8 +34,8 @@ func (r *recordedBindings) StoreRemoteBindings(_ context.Context, d configuratio
 	return nil
 }
 
-func (r *recordedBindings) RemoteBindingsDigest(context.Context, string) (string, error) {
-	return r.digest, nil
+func (r *recordedBindings) RemoteBindingsDigest(context.Context, string) (string, time.Time, error) {
+	return r.digest, time.Unix(1234567890, 0), nil
 }
 
 type staticBindings struct {
@@ -88,7 +89,7 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 		t.Fatal("delivery", result.Kind, err, len(store.stored))
 	}
 	d := store.stored[0]
-	if d.ClusterID != remote || len(d.Bindings) != 1 || d.Bindings[0].Scope.ClusterID != remote || d.Bindings[0].Invalid || d.ObservedAt.IsZero() || !d.Valid() {
+	if d.ClusterID != remote || len(d.Bindings) != 1 || d.Bindings[0].Scope.ClusterID != remote || d.Bindings[0].Invalid || !d.ObservedAt.Equal(time.Unix(1234567890, 0)) || !d.Valid() {
 		t.Fatalf("stored %+v", d)
 	}
 	// An unchanged LIST matches the stored digest: nothing is stored again.

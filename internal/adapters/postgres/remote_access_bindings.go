@@ -5,13 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"sync"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -60,22 +59,18 @@ func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, d cfg.Re
 	}))
 }
 
-// RemoteBindingsDigest is cluster's stored delivery digest (hex), "" when
-// none is stored.
-func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster string) (string, error) {
+// RemoteBindingsDigest begins a delivery on the database clock and returns the
+// current digest (empty when there is no delivery) in the same round trip.
+func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster string) (string, time.Time, error) {
 	if s == nil || ctx == nil || !authorization.UUID(cluster) {
-		return "", cfg.ErrInvalid
+		return "", time.Time{}, cfg.ErrInvalid
 	}
-	var out string
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		d, err := q.ReadRemoteAccessBindingDigest(ctx, custodydb.ReadRemoteAccessBindingDigestParams{RootID: id(s.root), ClusterID: id(cluster)})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		out = hex.EncodeToString(d)
+	var observation custodydb.ReadRemoteAccessBindingDigestRow
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) (err error) {
+		observation, err = q.ReadRemoteAccessBindingDigest(ctx, custodydb.ReadRemoteAccessBindingDigestParams{RootID: id(s.root), ClusterID: id(cluster)})
 		return err
 	})
-	return out, permissionError(err)
+	return hex.EncodeToString(observation.Digest), observation.ObservedAt.Time, permissionError(err)
 }
 
 // RemoteBindings returns every cluster's latest delivery. Bindings are read

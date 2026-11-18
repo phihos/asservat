@@ -240,12 +240,12 @@ type federationBindings struct {
 	decoder *kube.AccessBindingSpecDecoder
 	store   interface {
 		StoreRemoteBindings(context.Context, configuration.RemoteBindings, string) error
-		RemoteBindingsDigest(context.Context, string) (string, error)
+		RemoteBindingsDigest(context.Context, string) (string, time.Time, error)
 	}
 }
 
 // AccessBindings stores the presenting connector's delivery under its
-// authenticated cluster, observed no later than the presentation (ADR-329).
+// authenticated cluster, ordered by the database at the digest exchange (ADR-329).
 // The payload names no cluster; a binding the schema refuses grants nothing.
 func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region) error {
 	if s.bindings == nil || region == nil {
@@ -257,7 +257,7 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 	}
 	// The connector answers "unchanged" when its current LIST has the
 	// stored digest; the stored delivery then stays in effect.
-	stored, err := s.bindings.store.RemoteBindingsDigest(ctx, p.ClusterID)
+	stored, observedAt, err := s.bindings.store.RemoteBindingsDigest(ctx, p.ClusterID)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
 		return err
 	}
-	d := configuration.RemoteBindings{ClusterID: p.ClusterID, ObservedAt: region.VerifiedAt(), Bindings: bindings}
+	d := configuration.RemoteBindings{ClusterID: p.ClusterID, ObservedAt: observedAt, Bindings: bindings}
 	if !d.Valid() {
 		fmt.Fprintln(os.Stderr, "federation access bindings refused: over the per-cluster bounds")
 		return configuration.ErrLimit

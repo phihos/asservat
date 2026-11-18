@@ -63,7 +63,8 @@ func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAc
 }
 
 const readRemoteAccessBindingDigest = `-- name: ReadRemoteAccessBindingDigest :one
-SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
+SELECT statement_timestamp()::timestamptz AS observed_at,
+ (SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2)::bytea AS digest
 `
 
 type ReadRemoteAccessBindingDigestParams struct {
@@ -71,11 +72,18 @@ type ReadRemoteAccessBindingDigestParams struct {
 	ClusterID pgtype.UUID
 }
 
-func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) ([]byte, error) {
+type ReadRemoteAccessBindingDigestRow struct {
+	ObservedAt pgtype.Timestamptz
+	Digest     []byte
+}
+
+// Use the same database clock on all federation replicas. Order overlapping
+// deliveries by the start of their digest exchange, not by completion time.
+func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) (ReadRemoteAccessBindingDigestRow, error) {
 	row := q.db.QueryRow(ctx, readRemoteAccessBindingDigest, arg.RootID, arg.ClusterID)
-	var digest []byte
-	err := row.Scan(&digest)
-	return digest, err
+	var i ReadRemoteAccessBindingDigestRow
+	err := row.Scan(&i.ObservedAt, &i.Digest)
+	return i, err
 }
 
 const storeRemoteAccessBindings = `-- name: StoreRemoteAccessBindings :execrows

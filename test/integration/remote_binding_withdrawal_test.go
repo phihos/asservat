@@ -94,7 +94,10 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		s               *postgres.RemoteAccessBindings
 		cluster, digest string
 	}{{store, active, sum}, {store, target.ClusterID, ""}, {otherRoot, target.ClusterID, sum}} {
-		got, err := d.s.RemoteBindingsDigest(ctx, d.cluster)
+		got, observed, err := d.s.RemoteBindingsDigest(ctx, d.cluster)
+		if observed.IsZero() {
+			t.Fatal("missing database observation", err)
+		}
 		if err != nil || got != d.digest {
 			t.Fatal("incorrect delivery after same-name registration", got, err)
 		}
@@ -110,9 +113,9 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	case <-live.Done():
 		t.Fatal("binding notification connection unavailable")
 	}
-	hub := remoteBindingHubFixture{cluster: custodyID(), watch: quietBindingWatch{}}
+	hub := remoteBindingHubFixture{cluster: custodyID()}
 	writer := &observedPermissionWriter{permissions, make(chan cfg.PermissionAcceptance, 4), make(chan cfg.PermissionFence, 4), make(chan struct{}, 4)}
-	reconciler := configapp.BindingReconciler{RootID: batch.RootID, NamespaceClusterID: hub.cluster, Reader: hub, Watcher: hub, Trust: hub, RemoteBindings: store, RemoteBindingChanges: changes, Store: writer, NewID: custodyID, Now: time.Now}
+	reconciler := configapp.BindingReconciler{RootID: batch.RootID, NamespaceClusterID: hub.cluster, Reader: hub, Watcher: idleKubernetesBindingWatch(t, hub.cluster), Trust: hub, RemoteBindings: store, RemoteBindingChanges: changes, Store: writer, NewID: custodyID, Now: time.Now}
 	ended := make(chan struct{})
 	go func() { defer close(ended); reconciler.RunEpoch(live) }()
 	defer func() { stop(); <-ended }()

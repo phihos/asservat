@@ -11,8 +11,7 @@ import (
 // RemoteBindings is the latest complete AccessBinding list of one workload
 // cluster joined with mode: cluster, delivered by its connector (ADR-329).
 // The hub sets ClusterID from the connector's authenticated cluster
-// credential, never from the payload, and ObservedAt from its own clock when
-// it admitted the delivering conversation, before the connector's LIST.
+// credential and ObservedAt from the database clock at the digest exchange.
 type RemoteBindings struct {
 	ClusterID  string
 	ObservedAt time.Time
