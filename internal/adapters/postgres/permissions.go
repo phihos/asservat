@@ -636,8 +636,12 @@ type permissionClockOffset time.Duration
 func readPermissionStreamClock(ctx context.Context, q *custodydb.Queries, root string) (custodydb.PermissionStream, permissionClockOffset, error) {
 	start := time.Now()
 	row, err := q.ReadPermissionStreamClock(ctx, id(root))
-	return row.PermissionStream, permissionClockOffset(min(time.Duration(0), start.Sub(row.ReadAt.Time))), err
+	return row.PermissionStream, clockOffsetAt(start, row.ReadAt.Time), err
 }
+func clockOffsetAt(local, database time.Time) permissionClockOffset {
+	return permissionClockOffset(min(time.Duration(0), local.Sub(database)))
+}
+
 func (offset permissionClockOffset) at(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
