@@ -349,3 +349,47 @@ func TestColdAttachSharesCallerDeadlineWithPublishedDemand(t *testing.T) {
 		}
 	})
 }
+
+func TestRouterCloseEndsWaitsAndDemand(t *testing.T) {
+	for _, blocked := range []bool{false, true} {
+		t.Run(map[bool]string{false: "awaiting registration", true: "publishing demand"}[blocked], func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				w := workFixture().Work
+				cluster := w.Channel.Connector.Binding.ClusterID
+				r, _ := NewRouter([]ClusterLimit{{cluster, 1, 1}})
+				ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+				defer cancel()
+				var notifications int
+				r.RequestExchange = func(ctx context.Context, _ string) error {
+					notifications++
+					if blocked {
+						<-ctx.Done()
+						return ctx.Err()
+					}
+					return nil
+				}
+				done := make(chan error, 1)
+				go func() { _, err := r.Attach(ctx, cluster, w.CaptureID); done <- err }()
+				synctest.Wait()
+				r.Close()
+				r.ResendDemand(cluster)
+				r.Close()
+				synctest.Wait()
+				select {
+				case err := <-done:
+					if err == nil || ctx.Err() != nil {
+						t.Fatal("wait did not end at router closure", err)
+					}
+				default:
+					t.Fatal("router closure left a pending request")
+				}
+				if stop, err := r.request(ctx, cluster); err == nil || stop != nil {
+					t.Fatal("demand accepted after closure")
+				}
+				if notifications != 1 {
+					t.Fatalf("published %d notifications for one closed request", notifications)
+				}
+			})
+		})
+	}
+}

@@ -18,14 +18,20 @@ import (
 // notifications wake connected clients; reconnects reannounce only live waits.
 type exchangeWait struct {
 	ctx     context.Context
+	cancel  context.CancelFunc
 	cluster string
 	yield   bool // Another replica needs this slot after the local query.
 }
 
 func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
 	call, cancel := context.WithCancel(ctx)
-	w := &exchangeWait{ctx: call, cluster: cluster}
+	w := &exchangeWait{ctx: call, cancel: cancel, cluster: cluster}
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		cancel()
+		return nil, fleet.ErrUnavailable
+	}
 	if r.waiting == nil {
 		r.waiting = make(map[string]map[*exchangeWait]bool)
 	}
@@ -55,6 +61,10 @@ func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
 func (r *Router) ResendDemand(cluster string) {
 	var waiting []*exchangeWait
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
 	for k, set := range r.waiting {
 		if cluster == "" || k == cluster {
 			for w := range set {
@@ -698,7 +708,17 @@ func (r *Router) Close() {
 		return
 	}
 	r.mu.Lock()
-	r.closed = true
+	if !r.closed {
+		r.closed = true
+		if r.registered != nil {
+			close(r.registered)
+		}
+		for _, set := range r.waiting {
+			for w := range set {
+				w.cancel()
+			}
+		}
+	}
 	connections := make([]*Standby, 0, len(r.standby))
 	for _, s := range r.standby {
 		connections = append(connections, s)
