@@ -2,12 +2,10 @@ package configuration
 
 import (
 	"cmp"
-	"crypto/sha256"
 	"encoding/json"
 	"slices"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -209,19 +207,14 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	slices.SortFunc(bindings, func(a, b value.Binding) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
 	// The input digest covers the explicit bindings and the derived
 	// inheritance; continuity flags never change what is accepted.
-	derived := inherited
-	derived.Bases = slices.Clone(inherited.Bases)
-	for n := range derived.Bases {
-		derived.Bases[n].Continuous = false
-	}
-	encoded, err := json.Marshal(struct {
+	input, err := permissionInputDigest(struct {
 		Bindings  []value.Binding
 		Inherited Inheritance `json:",omitzero"`
-	}{bindings, derived})
-	if err != nil || len(encoded) > 8<<20 {
-		return value.PermissionBatch{}, value.ErrLimit
+	}{bindings, inherited.withoutContinuity()})
+	if err != nil {
+		return value.PermissionBatch{}, value.ErrInvalid
 	}
-	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: artifact.Digest(sha256.Sum256(encoded)), ObservedAt: now, FreshUntil: j.until}
+	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: input, ObservedAt: now, FreshUntil: j.until}
 	for _, b := range bindings {
 		if p, ok := bindingBasis(b, now); ok {
 			p.Continuous = j.sequence > 0

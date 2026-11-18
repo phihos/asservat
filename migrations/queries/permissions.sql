@@ -34,7 +34,7 @@ INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_di
 -- name: ListPermissionBases :many
 SELECT b.* FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key;
 
--- name: UpsertPermissionBasis :exec
+-- name: UpsertPermissionBases :batchexec
 INSERT INTO permission_basis(stream_id,basis_key,uid,kind,generation,resource_version,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,seen_sequence,observation_version,automation_json,automation_audit_id)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 ON CONFLICT(stream_id,basis_key) DO UPDATE SET generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,scope_digest=EXCLUDED.scope_digest,workload_uids=EXCLUDED.workload_uids,effect=EXCLUDED.effect,not_after=EXCLUDED.not_after,seen_sequence=EXCLUDED.seen_sequence,observation_version=EXCLUDED.observation_version,automation_json=EXCLUDED.automation_json,automation_audit_id=EXCLUDED.automation_audit_id;
@@ -50,12 +50,12 @@ ORDER BY b.basis_key LIMIT 2;
 -- name: ListCurrentPermissionAssignments :many
 SELECT * FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL ORDER BY id;
 
--- name: InsertPermissionAssignment :one
+-- name: InsertPermissionAssignments :batchone
 INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
 VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
 
--- name: RetirePermissionAssignment :exec
-UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$2 WHERE id=$1 AND retired_at IS NULL;
+-- name: RetirePermissionAssignments :exec
+UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=sqlc.arg(audit_id) WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND retired_at IS NULL;
 
 -- name: RetirePermissionStream :execrows
 UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$2 WHERE stream_id=$1 AND retired_at IS NULL;

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"slices"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -34,4 +35,14 @@ func PermissionScopeDigest(b value.PermissionBasis) artifact.Digest {
 		return artifact.Digest{}
 	}
 	return artifact.Digest(sha256.Sum256(c))
+}
+
+// permissionInputDigest streams the same deterministic JSON bytes used by
+// existing permission epochs, including sorted map keys.
+func permissionInputDigest(v any) (artifact.Digest, error) {
+	h := sha256.New()
+	if err := jsonv2.MarshalWrite(h, v, json.DefaultOptionsV1()); err != nil {
+		return artifact.Digest{}, err
+	}
+	return artifact.Digest(h.Sum(nil)), nil
 }

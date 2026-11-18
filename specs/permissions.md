@@ -111,6 +111,12 @@ An operation requires an eligible identity, a current allow, no deny, local ceil
 
 The evaluator reads one snapshot: the hub cluster's informer caches and each remote cluster's last delivered state. It stays valid until an event replaces it. State that is not yet available (during a hub relist, or before a connector's first delivery) grants nothing and fails closed for that cluster. An operation reuses its snapshot for at most 30 s ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
 
+The hub computes the input digest incrementally across all delivered bindings.
+It accepts assignment additions and retirements together under one permission
+epoch in PostgreSQL. The 8 MiB plaintext budget applies to one authority audit
+event, which the audit format encrypts and verifies as a whole. Previously
+accepted bindings do not count as assignment changes.
+
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 
 An artifact records its complete audience (REQ-PER-008). The audit row records the deciding bindings or sources with their generations.

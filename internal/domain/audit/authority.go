@@ -102,7 +102,7 @@ type AutomationDelegation struct {
 }
 
 func (r AuthorityRecord) Valid() bool {
-	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || r.Sequence < 0 || r.CreatedAt.IsZero() || r.InputDigest == (artifact.Digest{}) || len(r.Changes) > 8192 {
+	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || r.Sequence < 0 || r.CreatedAt.IsZero() || r.InputDigest == (artifact.Digest{}) {
 		return false
 	}
 	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" && r.Kind != "permission-review" {

@@ -84,10 +84,17 @@ func (p PermissionBasis) Key() string {
 // Roles are the roles a binding or source may grant.
 var Roles = []string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}
 
+// Current verifies the original observation and every basis expiry against
+// now. SQL checks these bounds again before committing an immutable batch.
+func (b PermissionBatch) Current(now time.Time) bool {
+	return identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) &&
+		!slices.ContainsFunc(b.Bases, func(p PermissionBasis) bool { return !p.NotAfter.IsZero() && !now.Before(p.NotAfter) })
+}
+
 // Validate checks a prepared batch. No count limits: Kubernetes object limits
 // bound each spec and the store pages its rows.
 func (b PermissionBatch) Validate(now time.Time) error {
-	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) {
+	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !b.Current(now) {
 		return ErrInvalid
 	}
 	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, len(b.UnavailableSources), 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
@@ -155,9 +162,6 @@ func (b PermissionBatch) Validate(now time.Time) error {
 				return ErrInvalid
 			}
 			workloads[w.Kind+"/"+w.Name] = true
-		}
-		if !p.NotAfter.IsZero() && !now.Before(p.NotAfter) {
-			return ErrInvalid
 		}
 	}
 	return nil

@@ -109,51 +109,6 @@ func (q *Queries) InsertPermissionAcceptance(ctx context.Context, arg InsertPerm
 	return err
 }
 
-const insertPermissionAssignment = `-- name: InsertPermissionAssignment :one
-INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
-VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, stream_id, basis_key, subject_kind, issuer, subject_id, role, basis_digest, created_at, retired_at, activation_audit_id, retirement_audit_id
-`
-
-type InsertPermissionAssignmentParams struct {
-	StreamID          pgtype.UUID
-	BasisKey          string
-	SubjectKind       string
-	Issuer            string
-	SubjectID         string
-	Role              string
-	BasisDigest       []byte
-	ActivationAuditID pgtype.UUID
-}
-
-func (q *Queries) InsertPermissionAssignment(ctx context.Context, arg InsertPermissionAssignmentParams) (PermissionAssignment, error) {
-	row := q.db.QueryRow(ctx, insertPermissionAssignment,
-		arg.StreamID,
-		arg.BasisKey,
-		arg.SubjectKind,
-		arg.Issuer,
-		arg.SubjectID,
-		arg.Role,
-		arg.BasisDigest,
-		arg.ActivationAuditID,
-	)
-	var i PermissionAssignment
-	err := row.Scan(
-		&i.ID,
-		&i.StreamID,
-		&i.BasisKey,
-		&i.SubjectKind,
-		&i.Issuer,
-		&i.SubjectID,
-		&i.Role,
-		&i.BasisDigest,
-		&i.CreatedAt,
-		&i.RetiredAt,
-		&i.ActivationAuditID,
-		&i.RetirementAuditID,
-	)
-	return i, err
-}
-
 const insertPermissionStream = `-- name: InsertPermissionStream :exec
 INSERT INTO permission_stream(id,epoch,trust_digest,lease_until)
 VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds') ON CONFLICT(id) DO NOTHING
@@ -448,17 +403,17 @@ func (q *Queries) ResetPermissionStream(ctx context.Context, arg ResetPermission
 	return err
 }
 
-const retirePermissionAssignment = `-- name: RetirePermissionAssignment :exec
-UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$2 WHERE id=$1 AND retired_at IS NULL
+const retirePermissionAssignments = `-- name: RetirePermissionAssignments :exec
+UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$1 WHERE id=ANY($2::uuid[]) AND retired_at IS NULL
 `
 
-type RetirePermissionAssignmentParams struct {
-	ID                pgtype.UUID
-	RetirementAuditID pgtype.UUID
+type RetirePermissionAssignmentsParams struct {
+	AuditID pgtype.UUID
+	Ids     []pgtype.UUID
 }
 
-func (q *Queries) RetirePermissionAssignment(ctx context.Context, arg RetirePermissionAssignmentParams) error {
-	_, err := q.db.Exec(ctx, retirePermissionAssignment, arg.ID, arg.RetirementAuditID)
+func (q *Queries) RetirePermissionAssignments(ctx context.Context, arg RetirePermissionAssignmentsParams) error {
+	_, err := q.db.Exec(ctx, retirePermissionAssignments, arg.AuditID, arg.Ids)
 	return err
 }
 
@@ -705,55 +660,6 @@ func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissi
 		arg.ProjectionDigest,
 		arg.ObservedAt,
 		arg.FreshUntil,
-	)
-	return err
-}
-
-const upsertPermissionBasis = `-- name: UpsertPermissionBasis :exec
-INSERT INTO permission_basis(stream_id,basis_key,uid,kind,generation,resource_version,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,seen_sequence,observation_version,automation_json,automation_audit_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-ON CONFLICT(stream_id,basis_key) DO UPDATE SET generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,scope_digest=EXCLUDED.scope_digest,workload_uids=EXCLUDED.workload_uids,effect=EXCLUDED.effect,not_after=EXCLUDED.not_after,seen_sequence=EXCLUDED.seen_sequence,observation_version=EXCLUDED.observation_version,automation_json=EXCLUDED.automation_json,automation_audit_id=EXCLUDED.automation_audit_id
-`
-
-type UpsertPermissionBasisParams struct {
-	StreamID           pgtype.UUID
-	BasisKey           string
-	Uid                string
-	Kind               string
-	Generation         int64
-	ResourceVersion    string
-	SpecDigest         []byte
-	ScopeDigest        []byte
-	ClusterID          pgtype.UUID
-	NamespaceUid       string
-	WorkloadUids       []string
-	Effect             string
-	NotAfter           pgtype.Timestamptz
-	SeenSequence       int64
-	ObservationVersion string
-	AutomationJson     []byte
-	AutomationAuditID  pgtype.UUID
-}
-
-func (q *Queries) UpsertPermissionBasis(ctx context.Context, arg UpsertPermissionBasisParams) error {
-	_, err := q.db.Exec(ctx, upsertPermissionBasis,
-		arg.StreamID,
-		arg.BasisKey,
-		arg.Uid,
-		arg.Kind,
-		arg.Generation,
-		arg.ResourceVersion,
-		arg.SpecDigest,
-		arg.ScopeDigest,
-		arg.ClusterID,
-		arg.NamespaceUid,
-		arg.WorkloadUids,
-		arg.Effect,
-		arg.NotAfter,
-		arg.SeenSequence,
-		arg.ObservationVersion,
-		arg.AutomationJson,
-		arg.AutomationAuditID,
 	)
 	return err
 }

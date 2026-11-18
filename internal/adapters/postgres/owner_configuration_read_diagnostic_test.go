@@ -23,6 +23,7 @@ import (
 )
 
 type ownerReadDiagnosticQuery struct {
+	custodydb.DBTX
 	head     custodydb.HubOwnerConfiguration
 	revision custodydb.HubOwnerConfigurationRevision
 	now      pgtype.Timestamptz

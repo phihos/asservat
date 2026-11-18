@@ -3,8 +3,6 @@ package configuration
 import (
 	"cmp"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"io"
 	"maps"
@@ -326,13 +324,18 @@ func (s *bindingRun) observation(cluster string, now time.Time) *value.Namespace
 // inheritanceDigest identifies the derived state independent of continuity
 // flags, which never change what is accepted.
 func inheritanceDigest(i inheritanceState) [32]byte {
-	v := i.Inheritance
-	v.Bases = slices.Clone(v.Bases)
-	for n := range v.Bases {
-		v.Bases[n].Continuous = false
+	d, _ := permissionInputDigest(i.Inheritance.withoutContinuity())
+	return d
+}
+
+// Continuity affects assignment retention during an acceptance, but does not
+// change the observed contents of the inputs.
+func (i Inheritance) withoutContinuity() Inheritance {
+	i.Bases = slices.Clone(i.Bases)
+	for n := range i.Bases {
+		i.Bases[n].Continuous = false
 	}
-	b, _ := json.Marshal(v)
-	return sha256.Sum256(b)
+	return i
 }
 
 // minimizedObservation drops the versions, as the accepted form does.

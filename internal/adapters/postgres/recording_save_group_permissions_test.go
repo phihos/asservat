@@ -23,6 +23,7 @@ import (
 )
 
 type groupProjectionSQL struct {
+	custodydb.DBTX
 	now                                  time.Time
 	loads, clocks, basis                 int
 	authority                            *custodydb.AuthorityAudit

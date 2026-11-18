@@ -2,7 +2,10 @@ package configuration
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -180,5 +183,40 @@ func TestBindingJournalScopeIsTheBindingsNamespace(t *testing.T) {
 	b, err := j.Prepare(fence, journalID, now, Inheritance{})
 	if err != nil || len(b.Bases) != 1 || b.Bases[0].Resource.UID != "binding" {
 		t.Fatalf("invalid binding granted: %v %+v", err, b.Bases)
+	}
+}
+
+// A fleet can have many independently valid deliveries. Its input digest
+// must match the original JSON representation at any combined size.
+func TestPermissionInputDigestAcrossPopulatedFleet(t *testing.T) {
+	journal, snapshot, fence, now := journalFixture(t)
+	inherited := Inheritance{}
+	workloads := make([]value.WorkloadRef, 180)
+	for i := range workloads {
+		workloads[i] = value.WorkloadRef{Kind: "Deployment", Name: fmt.Sprintf("app-%03d-%s", i, strings.Repeat("a", 230))}
+	}
+	for i := 1; i <= 201; i++ {
+		b := cloneBinding(snapshot.Bindings[0])
+		b.Resource.ClusterID = fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
+		b.Scope.ClusterID, b.Scope.Workloads = b.Resource.ClusterID, workloads
+		p, ok := bindingBasis(b, now)
+		if !ok {
+			t.Fatal("invalid remote binding")
+		}
+		inherited.Bases = append(inherited.Bases, p)
+	}
+	expected, err := json.Marshal(struct {
+		Bindings  []value.Binding
+		Inherited Inheritance `json:",omitzero"`
+	}{snapshot.Bindings, inherited})
+	if err != nil || len(expected) <= 8<<20 {
+		t.Fatal("fixture does not exercise fleet-sized input", len(expected), err)
+	}
+	// A continuous watch and a fresh list over the same observations have
+	// the same content digest.
+	inherited.Bases[len(inherited.Bases)-1].Continuous = true
+	batch, err := journal.Prepare(fence, journalID, now, inherited)
+	if err != nil || len(batch.Bases) != 202 || batch.InputDigest != sha256.Sum256(expected) {
+		t.Fatal("incomplete or unstable fleet digest", len(batch.Bases), err)
 	}
 }
