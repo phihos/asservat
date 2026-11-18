@@ -2,69 +2,38 @@
 
 ## Registered workload clusters (2026-11-18)
 
-The hub requests exchanges when work arrives. Connectors wait on their existing
-HTTP/2 connections while idle.
-Remove `clusters[].standby` and `hub.hub-api.public.standby` from custom values.
-Each cluster keeps its capture reservation. Registration drives router admission
-and download paths, and the permission reader consumes all delivered revisions.
-ADR-334 now contains the registration, identity and protocol decisions.
+The hub routes work to registered clusters on demand through the connector's
+existing HTTP/2 connection. The router no longer polls for owners or requires
+standby settings. Remove `clusters[].standby` and `hub.hub-api.public.standby`
+on development upgrades. Upgrade both ends to protocol major 2. ADR-334
+consolidates the registration, identity, dispatch and compatibility decisions.
 
-The router, download-path selection and real PostgreSQL permission reconciliation
-regressions each reproduce the previous cutoff and pass with 65 clusters.
-The production permission reconciler also passes the 201-cluster PostgreSQL
-regression with 20 ms of injected latency on both client reads and writes. A failed snapshot suspends
-reconciliation. Ordinary downloads and live reads pass with 129 cluster ceilings.
-The HTTP/2 Hello regression exercises larger announcements within the frame.
-A fresh 65-registration installation exposed a second failure: SeaweedFS
-rejected the 210,581-byte evidence bucket policy. Regional permissions now live
-on each identity. The pinned SeaweedFS 4.53 integration passed versioned reads,
-regional writes, multipart completion and cleanup, and cross-region denials
-against existing objects. The installed capture driver submits the reviewed
-stateless preview and verifies that retrying its idempotency key returns the
-same capture. Bundled SeaweedFS refused both withdrawn keys after a restart
-on the existing data volume and continued serving the remaining region.
-The three-phase provider test then re-registered the cluster and verified
-both old keys still failed, both new keys worked, and retained history had
-its original bytes. The fixture waits for volume registration through one
-read-only readiness probe before evaluating access with single-attempt calls.
-
-A fresh two-cluster Kind installation at `ebd5b16d8` accepted 65 registrations
-with one real remote connector and one hub-api replica. During 36 seconds idle,
-the native listener had zero established sockets at both observations. The
-first remote capture then published and downloaded the expected 353-byte
-pod-status file. Exact replay returned the original capture and altered input
-returned Conflict. The installed test took 15.82 seconds and cleanup exited 0.
-
-A two-owner installation exposed a native download opening routed to the other
-replica. The diagnostic at `30925e72f` completed the authenticated capture
-and download through each public listener after correction. The worker keeps
-the original operation and deadline when reaching its SQL-recorded owner.
-The reviewed candidate also batches permission changes in the same transaction,
-hashes the aggregate fleet input without buffering it in one document, and
-issues fresh storage keys after a registration has been withdrawn.
-
-Fresh Kind qualification at `106f3d636` installed two hub API replicas, two
-federation replicas, and 65 registrations including one connected remote
-cluster. Both hub API replicas remained idle for 36 seconds with zero open
-native exchanges at both observations. Through each replica, the Keycloak
-user submitted a capture, replayed the original capture ID, received Conflict
-for a changed digest and for changed input, and downloaded the native file
-for the selected remote Pod (352 and 353 bytes). The installed test passed
-in 21.42 seconds and cleanup exited 0. Both federation replicas held SQL
-listeners while a third connection with the same role read owner records.
-
-The follow-up router tests passed 24 consecutive queries through one exchange.
-A request from a second owner arriving during the initial opening obtained the
-slot after the first query finished. The registration wait uses the caller's
-deadline, and closing the router wakes its waiters. The exchange still obeys
-its wire-byte budget.
-
-With 1,025 automation bindings, the PostgreSQL regression wrote and
-acknowledged an 8,377,659-byte audit event (8,812,305 bytes in PostgreSQL's
-JSON representation). The 201-cluster fixture stayed idle through a permission
-lease renewal, then applied a replacement delivery with the same timestamp
-and a different digest. A withdrawal drops the saved delivery before federation
-accepts traffic. The connector loads its current storage keys on reconnect.
+- The former router, permission reader and download policy lost clusters at
+  17, 65 and 33 entries respectively. Tests now cover 65 registrations, a
+  129-cluster policy, and 201 populated remote permission deliveries with 20 ms
+  injected SQL read and write latency. The permission reconciler applies
+  same-timestamp replacements and renews its lease without rebuilding the fleet.
+  PostgreSQL read and acknowledged an 8,377,659-byte canonical audit event for
+  1,025 automation bindings, which occupies 8,812,305 bytes in its JSON format.
+- A fresh two-cluster Kind installation at `106f3d636` ran two hub API and two
+  federation replicas. One remote cluster connected and 64 registrations used
+  offline issuers. Neither owner held a native socket at either end of a
+  36-second idle interval. Both public listeners accepted and replayed a
+  capture, refused changed input and downloaded the selected Pod's native file.
+  One connector slot also served 24 consecutive framed queries in focused tests.
+- Pinned SeaweedFS 4.53 rejected the former 210,581-byte evidence policy at 65
+  registrations. Per-identity permissions keep the combined bucket policies at
+  5,626 bytes in that installation. Withdrawal and re-registration on the same
+  volume preserved the original bytes, invalidated both old keys, and left the
+  continuously registered cluster's keys active.
+- At `3ee9aafd4`, real Helm upgrades withdrew the old bindings and restored an
+  unchanged workload binding from the same connector process. Evidence and
+  history writes succeeded with refreshed keys. Native download exposed a
+  five-second HTTP client timeout on the permission watch. The corrected
+  client bounds individual events and connection setup separately. Focused
+  HTTP tests cross the old time and cumulative-byte cutoffs for both permission
+  and retention watches. The current installed capture/download results and
+  exact source are recorded in [PR #304](https://github.com/phihos/asservat/pull/304).
 
 ## Processing cleanup (2026-11-17)
 
