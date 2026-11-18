@@ -17,6 +17,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -235,11 +236,7 @@ func checkWithdrawnRegionalKeys(t *testing.T, f regionalStorageFixture) {
 	client := regionalStorageClients(tlsBridge(t, f.S3))
 	otherHistory := "history/v1/" + f.Root + "/" + f.OtherCluster + "/foreign"
 	read := &s3.GetObjectInput{Bucket: &f.Bucket, Key: &otherHistory}
-	object, err := client(f.Admin).GetObject(ctx, read)
-	if err != nil {
-		t.Fatal("revoked cluster's retained history is missing", err)
-	}
-	object.Body.Close()
+	waitForRetainedHistory(t, ctx, client(f.Admin), read)
 	denied := func(label string, err error) {
 		t.Helper()
 		var failure smithy.APIError
@@ -247,7 +244,7 @@ func checkWithdrawnRegionalKeys(t *testing.T, f regionalStorageFixture) {
 			t.Fatalf("%s: expected InvalidAccessKeyId for withdrawn credential, got %v", label, err)
 		}
 	}
-	_, err = client(f.OtherHistory).GetObject(ctx, read)
+	_, err := client(f.OtherHistory).GetObject(ctx, read)
 	denied("revoked history read", err)
 	write := &s3.PutObjectInput{Bucket: &f.Bucket, Key: aws.String("v1/" + f.OtherCluster + "/foreign"), Body: strings.NewReader("refused")}
 	_, err = client(f.OtherWriter).PutObject(ctx, write)
@@ -259,6 +256,27 @@ func checkWithdrawnRegionalKeys(t *testing.T, f regionalStorageFixture) {
 		if _, err := client(item.credential).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &item.key, Body: strings.NewReader("retained")}); err != nil {
 			t.Fatal("remaining cluster credential refused", item.credential.Principal.Purpose, err)
 		}
+	}
+}
+
+// The S3 frontend can accept requests while the master is still registering the
+// previous data volume. Check an original object's bytes before probing grants.
+// The SDK retries only the observed InternalError during this readiness read.
+func waitForRetainedHistory(t *testing.T, ctx context.Context, admin *s3.Client, read *s3.GetObjectInput) {
+	t.Helper()
+	object, err := admin.GetObject(ctx, read, func(o *s3.Options) {
+		o.Retryer = retry.AddWithMaxAttempts(retry.NewStandard(func(r *retry.StandardOptions) {
+			r.Retryables = []retry.IsErrorRetryable{retry.RetryableErrorCode{Codes: map[string]struct{}{"InternalError": {}}}}
+			r.MaxBackoff = 2 * time.Second
+		}), 0) // The caller's original one-minute deadline bounds recovery.
+	})
+	if err != nil {
+		t.Fatal("retained history did not become readable after restart", err)
+	}
+	defer object.Body.Close()
+	body, err := io.ReadAll(object.Body)
+	if err != nil || string(body) != "synthetic foreign metadata" {
+		t.Fatal("retained history bytes changed during restart", err)
 	}
 }
 

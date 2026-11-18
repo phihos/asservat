@@ -12,7 +12,7 @@ ADR-334 now contains the registration, identity and protocol decisions.
 The router, download-path selection and real PostgreSQL permission reconciliation
 regressions each reproduce the previous cutoff and pass with 65 clusters.
 The production permission reconciler also passes the 201-cluster PostgreSQL
-regression with 20 ms of latency per client write. A failed snapshot suspends
+regression with 20 ms of injected latency on both client reads and writes. A failed snapshot suspends
 reconciliation. Ordinary downloads and live reads pass with 129 cluster ceilings.
 The HTTP/2 Hello regression exercises larger announcements within the frame.
 A fresh 65-registration installation exposed a second failure: SeaweedFS
@@ -23,6 +23,10 @@ against existing objects. The installed capture driver submits the reviewed
 stateless preview and verifies that retrying its idempotency key returns the
 same capture. Bundled SeaweedFS refused both withdrawn keys after a restart
 on the existing data volume and continued serving the remaining region.
+The three-phase provider test then re-registered the cluster and verified
+both old keys still failed, both new keys worked, and retained history had
+its original bytes. The fixture waits for volume registration through one
+read-only readiness probe before evaluating access with single-attempt calls.
 
 A fresh two-cluster Kind installation at `ebd5b16d8` accepted 65 registrations
 with one real remote connector and one hub-api replica. During 36 seconds idle,
@@ -38,6 +42,16 @@ the original operation and deadline when reaching its SQL-recorded owner.
 The reviewed candidate also batches permission changes in the same transaction,
 hashes the aggregate fleet input without buffering it in one document, and
 issues fresh storage keys after a registration has been withdrawn.
+
+Fresh Kind qualification at `106f3d636` installed two hub API replicas, two
+federation replicas, and 65 registrations including one connected remote
+cluster. Both hub API replicas remained idle for 36 seconds with zero open
+native exchanges at both observations. Through each replica, the Keycloak
+user submitted a capture, replayed the original capture ID, received Conflict
+for a changed digest and for changed input, and downloaded the native file
+for the selected remote Pod (352 and 353 bytes). The installed test passed
+in 21.42 seconds and cleanup exited 0. Both federation replicas held SQL
+listeners while a third connection with the same role read owner records.
 
 ## Processing cleanup (2026-11-17)
 
