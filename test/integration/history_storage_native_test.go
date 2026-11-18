@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io"
 	"os"
-	"reflect"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,6 +23,53 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 )
+
+type regionalStorageFixture struct {
+	S3, Bucket, Root, Cluster, OtherCluster           string
+	Admin, Writer, History, OtherWriter, OtherHistory contracts.SeaweedCredential
+	BucketPolicy                                      string
+}
+
+// The fixture script mounts the production compiler's s3.json before the
+// pinned server starts. All credentials and object contents are synthetic.
+func TestPrepareRegionalStorageFixture(t *testing.T) {
+	dir := os.Getenv("ASSERVAT_REGIONAL_STORAGE_FIXTURE_DIR")
+	if dir == "" {
+		t.Skip("prepared by make history-storage-integration")
+	}
+	f := regionalStorageFixture{Bucket: "synthetic-history-capability", Root: custodyID(), Cluster: custodyID(), OtherCluster: custodyID()}
+	installation := custodyID()
+	credential := func(role, scope string) contracts.SeaweedCredential {
+		c, err := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: role, ScopeID: scope})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	f.Admin = credential("admin", installation)
+	f.Writer, f.History = credential("regional-write", f.Cluster), credential("regional-history", f.Cluster)
+	f.OtherWriter, f.OtherHistory = credential("regional-write", f.OtherCluster), credential("regional-history", f.OtherCluster)
+	var grants []contracts.SeaweedGrant
+	for _, c := range []contracts.SeaweedCredential{f.Writer, f.History, f.OtherWriter, f.OtherHistory, credential("download-read", installation), credential("evidence-delete", installation)} {
+		grants = append(grants, contracts.SeaweedGrant{Credential: c, Bucket: f.Bucket, InstallationID: installation, ClusterID: c.Principal.ScopeID, RootID: f.Root})
+	}
+	config, err := providerconfig.CompileSeaweedStorage(f.Admin, grants)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The fixture container runs as UID 1000. The parent directory is private.
+	if err = os.WriteFile(filepath.Join(dir, "s3.json"), config.Config, 0444); err != nil {
+		t.Fatal(err)
+	}
+	f.BucketPolicy = string(config.Policies[f.Bucket])
+	raw, err := json.Marshal(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, "fixture.json"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // Actual IAM and storage SDK/TLS behavior, synthetic ciphertexts and registration.
 // No test fact supplies production history, recovery, writer or deletion authority.
@@ -34,69 +83,31 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clear(raw)
-	var f struct {
-		S3, Bucket, Root, Cluster, Identity string
-		Actions                             []string
+	var f regionalStorageFixture
+	if json.Unmarshal(raw, &f) != nil || f.S3 == "" || f.BucketPolicy == "" {
+		t.Fatal("invalid owned regional storage fixture")
 	}
-	if json.Unmarshal(raw, &f) != nil || f.S3 == "" {
-		t.Fatal("invalid owned history fixture")
-	}
-	cap, err := objectstore.SeaweedHistoryCapability(f.Bucket, f.Root, f.Cluster)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f.Identity != cap.Identity || !reflect.DeepEqual(f.Actions, cap.SeaweedIdentityActions) {
-		t.Fatal("fixture identity differs from production proposal")
-	}
+	historyPrefix := "history/v1/" + f.Root + "/" + f.Cluster + "/"
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	bridge := tlsBridge(t, f.S3)
-	client := func(key, secret string) *s3.Client {
-		return s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(key, secret, ""), HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
+	client := func(c contracts.SeaweedCredential) *s3.Client {
+		return s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(c.AccessKeyID, c.SecretAccessKey, ""), HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
 	}
-	admin := client("synthetic-only", "synthetic-only-secret")
-	history := client("synthetic-history", "synthetic-history-secret")
-	writer := client("synthetic-evidence", "synthetic-evidence-secret")
+	admin := client(f.Admin)
+	history := client(f.History)
+	writer := client(f.Writer)
 	if _, err = admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &f.Bucket}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &f.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
 		t.Fatal(err)
 	}
-	// Merge the additional purpose, retaining the existing writer deletion denial.
-	var original, addition map[string]json.RawMessage
-	if json.Unmarshal([]byte(installerEvidenceBucketPolicy(f.Bucket)), &original) != nil || json.Unmarshal(cap.S3BucketPolicy, &addition) != nil {
-		t.Fatal("policy proposal invalid")
+	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &f.Bucket, Policy: &f.BucketPolicy}); err != nil {
+		t.Fatal("shared bucket policy", err)
 	}
-	var statements, extra []json.RawMessage
-	if json.Unmarshal(original["Statement"], &statements) != nil || json.Unmarshal(addition["Statement"], &extra) != nil {
-		t.Fatal("policy statements invalid")
-	}
-	statements = append(statements, extra...)
-	original["Statement"], _ = json.Marshal(statements)
-	policyRaw, _ := json.Marshal(original)
-	policy := string(policyRaw)
-	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &f.Bucket, Policy: &policy}); err != nil {
-		t.Fatal("history policy", err)
-	}
-	// Only fixture setup convergence of a bounded read-only LIST may retry.
-	setup, end := context.WithTimeout(ctx, 10*time.Second)
-	defer end()
-	for {
-		_, err = history.ListObjectsV2(setup, &s3.ListObjectsV2Input{Bucket: &f.Bucket, Prefix: &cap.Prefix, MaxKeys: aws.Int32(1)})
-		if err == nil {
-			break
-		}
-		var failure smithy.APIError
-		if !errors.As(err, &failure) || (failure.ErrorCode() != "AccessDenied" && failure.ErrorCode() != "InvalidAccessKeyId") {
-			t.Fatal(err)
-		}
-		select {
-		case <-setup.Done():
-			t.Fatal("history policy unavailable", setup.Err())
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
+
 	denied := func(label string, err error) {
 		t.Helper()
 		var failure smithy.APIError
@@ -125,15 +136,15 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 	denied("original writer deletion", err)
 	_, err = history.PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &evidenceKey, Body: strings.NewReader("forbidden")})
 	denied("evidence write", err)
-	foreign := "history/v1/" + f.Root + "/30000000-0000-4000-8000-000000000003/foreign"
-	foreignObject, err := admin.PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &foreign, Body: strings.NewReader("synthetic foreign metadata")})
+	foreign := "history/v1/" + f.Root + "/" + f.OtherCluster + "/foreign"
+	foreignObject, err := client(f.OtherHistory).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &foreign, Body: strings.NewReader("synthetic foreign metadata")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	readDenied(foreign, foreignObject.VersionId)
 	_, err = history.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &f.Bucket, Key: &foreign, VersionId: foreignObject.VersionId})
 	denied("foreign metadata deletion", err)
-	for _, prefix := range []*string{nil, aws.String("v1/"), aws.String("history/v1/" + f.Root + "/30000000-0000-4000-8000-000000000003/")} {
+	for _, prefix := range []*string{nil, aws.String("v1/"), aws.String("history/v1/" + f.Root + "/" + f.OtherCluster + "/")} {
 		_, err = history.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &f.Bucket, Prefix: prefix, MaxKeys: aws.Int32(1)})
 		denied("evidence/foreign object inventory", err)
 		_, err = history.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: &f.Bucket, Prefix: prefix, MaxKeys: aws.Int32(1)})
@@ -141,9 +152,43 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 		_, err = history.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: &f.Bucket, Prefix: prefix, MaxUploads: aws.Int32(1)})
 		denied("evidence/foreign multipart inventory", err)
 	}
+	foreignEvidence := "v1/" + f.OtherCluster + "/foreign"
+	_, err = client(f.OtherWriter).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &foreignEvidence, Body: strings.NewReader("other region")})
+	if err != nil {
+		t.Fatal("other region writer", err)
+	}
+	_, err = writer.PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &foreignEvidence, Body: strings.NewReader("forbidden")})
+	denied("foreign evidence write", err)
+	_, err = writer.GetObject(ctx, &s3.GetObjectInput{Bucket: &f.Bucket, Key: &evidenceKey})
+	denied("evidence writer read", err)
+	_, err = writer.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &f.Bucket, Prefix: &evidenceKey})
+	denied("evidence writer list", err)
+	for _, c := range []*s3.Client{writer, history} {
+		_, err = c.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &f.Bucket, Policy: &f.BucketPolicy})
+		denied("regional bucket administration", err)
+	}
+	for _, abort := range []bool{false, true} {
+		mpKey := evidenceKey + "-multipart"
+		start, err := writer.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: &f.Bucket, Key: &mpKey})
+		if err != nil {
+			t.Fatal("writer start multipart", err)
+		}
+		part, err := writer.UploadPart(ctx, &s3.UploadPartInput{Bucket: &f.Bucket, Key: &mpKey, UploadId: start.UploadId, PartNumber: aws.Int32(1), Body: strings.NewReader("synthetic part")})
+		if err != nil {
+			t.Fatal("writer upload part", err)
+		}
+		if abort {
+			_, err = writer.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{Bucket: &f.Bucket, Key: &mpKey, UploadId: start.UploadId})
+		} else {
+			_, err = writer.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{Bucket: &f.Bucket, Key: &mpKey, UploadId: start.UploadId, MultipartUpload: &s3types.CompletedMultipartUpload{Parts: []s3types.CompletedPart{{PartNumber: aws.Int32(1), ETag: part.ETag}}}})
+		}
+		if err != nil {
+			t.Fatal("writer finish multipart", err)
+		}
+	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	e := capture.HistoryExpectation{RootID: f.Root, CaptureID: "40000000-0000-4000-8000-000000000004", Registration: artifact.Registration{Location: artifact.Location{ClusterID: f.Cluster, ArtifactID: "50000000-0000-4000-8000-000000000005", AttemptID: "60000000-0000-4000-8000-000000000006"}, StoreID: "70000000-0000-4000-8000-000000000007", AllocationID: "80000000-0000-4000-8000-000000000008", PoolRevision: 1, AllocationRevision: 1, NativeLimit: capture.MaxHistoryParameters, AnchorAt: now, WriteUntil: now.Add(time.Minute), ExpiresAt: now.Add(time.Hour), DeleteBy: now.Add(2 * time.Hour)}, SelectorKey: artifact.Digest{1}, SettingsKey: artifact.Digest{2}, MACVersion: "synthetic", OriginalExecutionDigest: artifact.Digest{3}}
-	store, err := objectstore.New(bridge.URL, "us-east-1", f.Bucket, credentials.NewStaticCredentialsProvider("synthetic-history", "synthetic-history-secret", ""), bridge.Client())
+	store, err := objectstore.New(bridge.URL, "us-east-1", f.Bucket, credentials.NewStaticCredentialsProvider(f.History.AccessKeyID, f.History.SecretAccessKey, ""), bridge.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +210,7 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 			t.Fatal("history ciphertext changed")
 		}
 	}
-	prefix := cap.Prefix + e.Registration.Location.ArtifactID + "/" + e.Registration.Location.AttemptID + "/"
+	prefix := historyPrefix + e.Registration.Location.ArtifactID + "/" + e.Registration.Location.AttemptID + "/"
 	dataKey := prefix + "data"
 	if _, err = admin.PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &dataKey, Body: strings.NewReader("synthetic newer history version")}); err != nil {
 		t.Fatal(err)
