@@ -416,3 +416,46 @@ func connectorDeliveryPool(t *testing.T, admin, authority *pgxpool.Pool) *pgxpoo
 	t.Cleanup(pool.Close)
 	return pool
 }
+
+// A single connection separates the pool wait from the subsequent real SELECT.
+// Only this connection sees the delayed view; the deployed query is unchanged.
+func testColdRemoteRead(t *testing.T, admin, authority *pgxpool.Pool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 14*time.Second)
+	defer cancel()
+	base := connectorDeliveryPool(t, admin, authority)
+	conf := base.Config()
+	conf.MaxConns = 1
+	conf.MinConns = 0
+	pool, err := pgxpool.NewWithConfig(ctx, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	root, cluster := custodyID(), custodyID()
+	reader, err := postgres.NewRemoteAccessBindings(ctx, pool, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = reader.BeginRemoteBindings(ctx, cluster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	occupied, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer occupied.Release()
+	_, err = occupied.Exec(ctx, `CREATE TEMP VIEW remote_access_binding_delivery AS
+ SELECT d.* FROM public.remote_access_binding_delivery d CROSS JOIN (SELECT pg_sleep(2.75)) pause`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	released := time.AfterFunc(3*time.Second, occupied.Release)
+	defer released.Stop()
+	rows, err := reader.RemoteBindings(ctx)
+	if err != nil || len(rows) != 1 || rows[0].ClusterID != cluster || !rows[0].Unavailable || time.Since(started) < 5500*time.Millisecond {
+		t.Fatal("cold remote pool wait and statement", time.Since(started), len(rows), err)
+	}
+}

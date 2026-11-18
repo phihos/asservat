@@ -167,7 +167,9 @@ the cluster before retrying. Wall-clock differences between replicas cannot
 discard a committed change. Readers see assignment additions and retirements
 together. The hub processes namespaced AccessBinding events in order and reads
 the ClusterAccessBinding collection independently when it changes. The writer
-epoch and sequence order accepted changes. Idle lease renewal maintains
+epoch and sequence order accepted changes. The writer schedules renewal from the
+accepted lease and projection deadlines, including time spent publishing the first
+batch. Idle lease renewal maintains
 freshness without rebuilding the fleet or advancing its sequence. PostgreSQL
 validates the lease on its own clock. A reader on a slower clock consumes the
 remaining lifetime without extending any lease, grant or review deadline.
@@ -183,8 +185,9 @@ historical outcome with an unknown deadline. Migration suspends the old epoch.
 A decision recorded against a PermissionSource before its role changes retires
 with that revision. A new review uses the replacement role. During a bulk change,
 capture admission and download reservation in a healthy peer use the complete
-committed projection. Publication and the operation's final authority check
-serialize at commit.
+committed projection, including when the caller needs a first-time review
+against an unchanged PermissionSource. Publication and the operation's final
+authority check serialize at commit.
 
 Bindings watched from a Kubernetes resource version remain current until a
 replacement or definitive loss of watch history. A five-second Kubernetes or

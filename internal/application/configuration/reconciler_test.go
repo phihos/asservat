@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -338,65 +339,62 @@ func TestBindingExpiresDuringQuietWatch(t *testing.T) {
 }
 
 func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
-	f, r := reconciliationTest(t)
-	store := expiryPermissionStore{f, make(chan value.PermissionBatch, 4)}
-	r.Store = store
-	var reads atomic.Int32
-	r.ReadSources = func(context.Context) (value.Snapshot, error) {
-		if reads.Add(1) == 2 {
-			return value.Snapshot{}, value.ErrUnavailable
-		}
-		return value.Snapshot{Sources: []value.Source{inheritanceSource()}, SourcesComplete: true, SourceResourceVersion: "1"}, nil
-	}
-	changes := make(chan struct{}, 1)
-	r.WatchConfiguration = func(_ context.Context, resource, rv string) (SettingsWatch, error) {
-		if resource == "permissionsources" {
-			return SettingsWatch{Changed: changes}, nil
-		}
-		return SettingsWatch{}, nil
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	s := &bindingRun{r: r}
-	if err := s.start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	assertBatch := func(incomplete bool) {
-		t.Helper()
-		select {
-		case b := <-store.transitions:
-			if b.SourcesUnavailable != incomplete || len(b.Bases) != 1 {
-				t.Fatal("unexpected source or explicit binding state", b.SourcesUnavailable, len(b.Bases))
+	synctest.Test(t, func(t *testing.T) {
+		f, r := reconciliationTest(t)
+		store := expiryPermissionStore{f, make(chan value.PermissionBatch, 4)}
+		r.Store = store
+		var reads atomic.Int32
+		r.ReadSources = func(context.Context) (value.Snapshot, error) {
+			if reads.Add(1) == 2 {
+				return value.Snapshot{}, value.ErrUnavailable
 			}
-		case <-ctx.Done():
-			t.Fatal("no source transition")
+			return value.Snapshot{Sources: []value.Source{inheritanceSource()}, SourcesComplete: true, SourceResourceVersion: "1"}, nil
 		}
-	}
-	assertBatch(true)
-	ticks := make(chan time.Time)
-	done := make(chan error, 1)
-	go func() { done <- s.consume(ctx, &fixtureWatch{}, ticks) }()
-	defer func() { cancel(); <-done }()
-	assertBatch(false)
-	changes <- struct{}{}
-	assertBatch(true)
-	select {
-	case ticks <- time.Now():
-	case <-ctx.Done():
-		t.Fatal("renewal not read")
-	}
-	assertBatch(false)
-	// After the source LIST succeeds, another renewal performs no LIST.
-	for range 2 {
-		select {
-		case ticks <- time.Now():
-		case <-ctx.Done():
-			t.Fatal("renewal not read")
+		changes := make(chan struct{}, 1)
+		r.WatchConfiguration = func(_ context.Context, resource, rv string) (SettingsWatch, error) {
+			if resource == "permissionsources" {
+				return SettingsWatch{Changed: changes}, nil
+			}
+			return SettingsWatch{}, nil
 		}
-	}
-	if reads.Load() != 3 {
-		t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads.Load())
-	}
+		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+		defer cancel()
+		s := &bindingRun{r: r}
+		if err := s.start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		assertBatch := func(incomplete bool) {
+			t.Helper()
+			select {
+			case b := <-store.transitions:
+				if b.SourcesUnavailable != incomplete || len(b.Bases) != 1 {
+					t.Fatal("unexpected source or explicit binding state", b.SourcesUnavailable, len(b.Bases))
+				}
+			case <-ctx.Done():
+				t.Fatal("no source transition")
+			}
+		}
+		assertBatch(true)
+		renewal := time.NewTimer(time.Hour)
+		defer renewal.Stop()
+		done := make(chan error, 1)
+		go func() { done <- s.consume(ctx, &fixtureWatch{}, renewal) }()
+		defer func() { cancel(); <-done }()
+		assertBatch(false)
+		changes <- struct{}{}
+		assertBatch(true)
+		renewal.Reset(0)
+		assertBatch(false)
+		// After the source LIST succeeds, another renewal performs no LIST.
+		for range 2 {
+			renewal.Reset(0)
+			synctest.Wait()
+		}
+
+		if reads.Load() != 3 {
+			t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads.Load())
+		}
+	})
 }
 
 type blockedBindingOpen struct {
@@ -429,4 +427,53 @@ func TestReplacementBindingListCannotGrantBeforeItsWatchOpens(t *testing.T) {
 	if accepted != 0 || !result.Suspended || !errors.Is(result.Err, value.ErrDenied) {
 		t.Fatal("listed grant before watch admission", accepted, result)
 	}
+}
+
+type slowFirstPublication struct {
+	*reconciliationFixture
+	renewals chan time.Time
+}
+
+func (f *slowFirstPublication) AcceptPermissions(ctx context.Context, b value.PermissionBatch) (value.PermissionAcceptance, error) {
+	time.Sleep(12 * time.Second)
+	return f.reconciliationFixture.AcceptPermissions(ctx, b)
+}
+func (f *slowFirstPublication) RenewPermissions(ctx context.Context, fence value.PermissionFence) (value.PermissionFence, error) {
+	f.renewals <- time.Now()
+	if !time.Now().Before(fence.LeaseUntil) {
+		return value.PermissionFence{}, value.ErrChanged
+	}
+	f.storeFence.LeaseUntil = time.Now().Add(30 * time.Second)
+	return f.storeFence, nil
+}
+func TestFirstPermissionLeaseRenewalAfterSlowPublication(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f, r := reconciliationTest(t)
+		start := time.Now()
+		r.Now = time.Now
+		f.storeFence.LeaseUntil = start.Add(30 * time.Second)
+		f.trust.ObservedAt, f.trust.FreshUntil = start, time.Time{}
+		f.snapshot.ObservedAt, f.snapshot.FreshUntil = start, time.Time{}
+		store := &slowFirstPublication{f, make(chan time.Time, 2)}
+		r.Store = store
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- r.Run(ctx) }()
+		for _, want := range []time.Duration{20 * time.Second, 40 * time.Second} {
+			select {
+			case got := <-store.renewals:
+				if got.Sub(start) != want {
+					t.Errorf("renewal after %s; want %s", got.Sub(start), want)
+					cancel()
+					<-done
+					return
+				}
+			case err := <-done:
+				t.Fatalf("reconciliation ended before renewal: %v", err)
+			}
+		}
+		cancel()
+		<-done
+	})
 }

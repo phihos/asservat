@@ -1578,6 +1578,9 @@ GRANT USAGE ON SCHEMA permission_test_clock TO authority_runtime`)
 	t.Run("hub-local-unrepresentable-deny", func(t *testing.T) {
 		qualifyHubLegacyDeny(t, admin, pool)
 	})
+	t.Run("cold-remote-read-io-bounds", func(t *testing.T) {
+		testColdRemoteRead(t, admin, pool)
+	})
 	t.Run("withdrawn-registration", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)

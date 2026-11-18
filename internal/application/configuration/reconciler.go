@@ -110,7 +110,7 @@ type bindingRun struct {
 	fence                           value.PermissionFence
 	trust                           PermissionTrust
 	journal                         *BindingJournal
-	nextExpiry                      time.Time
+	nextExpiry, renewBy             time.Time
 	clusterSettings, sourceSettings SettingsWatch
 	readingSources                  <-chan sourceRead
 	firstWatch                      BindingWatch
@@ -379,6 +379,7 @@ func (s *bindingRun) commit(ctx context.Context, onlyChangedInheritance bool) er
 		return reconcileStep("accepted", err)
 	}
 	s.fence = accepted.PermissionFence
+	s.renewBy = value.PermissionDeadline(s.fence.LeaseUntil, b.ObservedAt.Add(authorization.PermissionObservationInterval))
 	s.included, s.lastInheritance = inherited.included, derived
 	s.nextExpiry = time.Time{}
 	consider := func(at time.Time) {
@@ -503,11 +504,11 @@ func (r BindingReconciler) runEpoch(ctx context.Context) (err error, suspended b
 	}
 	// The live writer renews its 30-second database lease with ten seconds
 	// left. Idle renewal never enumerates or hashes the accepted projection.
-	ticker := time.NewTicker(20 * time.Second)
-	defer ticker.Stop()
+	renewal := time.NewTimer(s.renewBy.Sub(r.Now()) - 10*time.Second)
+	defer renewal.Stop()
 	watch := s.firstWatch
 	for {
-		err = s.consume(ctx, watch, ticker.C)
+		err = s.consume(ctx, watch, renewal)
 		if !errors.Is(err, io.EOF) {
 			return err, false
 		}
@@ -548,7 +549,7 @@ func (s *bindingRun) sourceSnapshot(ctx context.Context, snapshot value.Snapshot
 	return s.accept(ctx, true)
 }
 
-func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-chan time.Time) error {
+func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, renewal *time.Timer) error {
 	child, cancel := context.WithCancel(ctx)
 	type result struct {
 		event value.BindingEvent
@@ -595,12 +596,15 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticks:
+		case <-renewal.C:
+			started := s.r.Now()
 			fence, err := s.r.Store.RenewPermissions(ctx, s.fence)
 			if err != nil {
 				return reconcileStep("renew", err)
 			}
 			s.fence = fence
+			s.renewBy = value.PermissionDeadline(fence.LeaseUntil, started.Add(authorization.PermissionObservationInterval))
+			renewal.Reset(s.renewBy.Sub(s.r.Now()) - 10*time.Second)
 			// A failed PermissionSource LIST carries no change event when
 			// Kubernetes recovers. Retry it at the next lease renewal.
 			if !s.sourcesComplete {

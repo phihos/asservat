@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/contracts"
@@ -147,31 +148,40 @@ func (s *RemoteAccessBindings) RemoteBindings(ctx context.Context) ([]cfg.Remote
 		params.ClusterIds = append(params.ClusterIds, id(cluster))
 		params.Digests = append(params.Digests, cached.digest)
 	}
-	var out []cfg.RemoteBindings
-	var next map[string]cachedRemoteBindings
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ListRemoteAccessBindings(ctx, params)
-		if err != nil {
-			return err
-		}
-		out = make([]cfg.RemoteBindings, 0, len(rows))
-		next = make(map[string]cachedRemoteBindings, len(rows))
-		for _, row := range rows {
-			cluster := uid(row.ClusterID)
-			cached := s.cache[cluster]
-			if row.Bindings != nil {
-				var bindings []cfg.Binding
-				if err := json.Unmarshal(row.Bindings, &bindings); err != nil {
-					return cfg.ErrInvalid
-				}
-				cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest, unavailable: row.Unavailable}
-			}
-			next[cluster] = cached
-			out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Digest: [32]byte(row.Digest), Bindings: cached.bindings, Unavailable: cached.unavailable})
-		}
-		return nil
-	})
+	// The single SELECT reads a consistent snapshot. Pool acquisition and SQL
+	// execution have separate I/O bounds, both inside the caller's lease.
+	acquire, cancel := context.WithTimeout(ctx, 5*time.Second)
+	conn, err := s.ledger.pool.Acquire(acquire)
+	cancel()
 	if err != nil {
+		return nil, permissionError(err)
+	}
+	query, cancel := context.WithTimeout(ctx, 5*time.Second)
+	rows, err := custodydb.New(conn).ListRemoteAccessBindings(query, params)
+	cancel()
+	conn.Release()
+	if err != nil {
+		return nil, permissionError(err)
+	}
+	out := make([]cfg.RemoteBindings, 0, len(rows))
+	next := make(map[string]cachedRemoteBindings, len(rows))
+	for _, row := range rows {
+		if err := ctx.Err(); err != nil {
+			return nil, permissionError(err)
+		}
+		cluster := uid(row.ClusterID)
+		cached := s.cache[cluster]
+		if row.Bindings != nil {
+			var bindings []cfg.Binding
+			if err := json.Unmarshal(row.Bindings, &bindings); err != nil {
+				return nil, cfg.ErrInvalid
+			}
+			cached = cachedRemoteBindings{bindings: bindings, digest: row.Digest, unavailable: row.Unavailable}
+		}
+		next[cluster] = cached
+		out = append(out, cfg.RemoteBindings{ClusterID: cluster, ObservedAt: row.ObservedAt.Time, Digest: [32]byte(row.Digest), Bindings: cached.bindings, Unavailable: cached.unavailable})
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, permissionError(err)
 	}
 	s.cache = next
