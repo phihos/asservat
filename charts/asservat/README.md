@@ -30,7 +30,9 @@ kubectl --context MANAGEMENT_CONTEXT -n asservat-system wait \
 selected providers. This one command drives three steps:
 
 1. The `secrets` hook Job (pre-install, pre-upgrade) creates every missing
-   generated Secret and never changes an existing value.
+   generated Secret. It preserves keys for active registrations, revokes regional
+   keys on withdrawal and replaces them on re-registration. It prunes retired
+   SQL credentials from the hub-worker Secret.
 2. The bundled providers start, if selected.
 3. The `setup` Job applies the database schema, creates or updates the
    runtime SQL roles and configures bundled OpenBao and SeaweedFS. Hub

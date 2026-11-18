@@ -21,7 +21,9 @@ Helm renders every Kubernetes object, including the CRDs. Two Jobs do the
 work that needs live state:
 
 1. **`<name>-secrets`** (pre-install and pre-upgrade hook) creates each missing
-   generated Secret and never changes an existing value. Its Role can only
+   generated Secret. It preserves active regional keys, revokes them in bundled
+   object-store IAM on withdrawal and writes fresh keys on re-registration.
+   It prunes retired SQL credentials from the hub-worker Secret. Its Role can only
    create Secrets and get or patch the named ones.
 2. The selected bundled services start: PostgreSQL with pgBackRest, SeaweedFS,
    the local key service and, if selected, Keycloak.
