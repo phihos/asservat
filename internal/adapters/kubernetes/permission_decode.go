@@ -287,17 +287,21 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 func subjects(in []wire.Subject, effect string) ([]value.Subject, error) {
 	var out []value.Subject
 	for _, s := range in {
-		// The schema checks the issuer URI. A binding compares it literally
-		// with the verified issuer and never uses it as a network endpoint.
+		// A binding compares its issuer literally with a verified identity.
+		// Only the identity provider uses the issuer as a network endpoint.
 		if (s.Issuer != "" && !identity.Text(s.Issuer, 2048)) || !identity.Text(s.ID, 256) {
 			// A previously admitted Deny may exceed the SQL subject representation.
 			// Dropping the binding here would also discard its other subjects.
 			if effect == "Deny" {
 				return nil, value.ErrLimit
 			}
-			return nil, value.ErrUnavailable
+			// Other subjects of an Allow keep their independent grant.
+			continue
 		}
 		out = append(out, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
+	}
+	if len(out) == 0 {
+		return nil, value.ErrUnavailable
 	}
 	return out, nil
 }

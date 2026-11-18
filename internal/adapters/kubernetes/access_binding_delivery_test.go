@@ -94,21 +94,39 @@ func TestDeliveredClusterDenyRetainsSchemaValidLongReason(t *testing.T) {
 	}
 }
 
-func TestLegacyMixedSubjectDenyClosesDelivery(t *testing.T) {
+func TestLegacyMixedBindingSubjects(t *testing.T) {
 	decoder, err := NewAccessBindingSpecDecoder()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, kind := range []string{"", value.ClusterAccessBindingKind} {
-		item := contracts.DeliveredAccessBinding{Kind: kind, Name: "blocked", UID: "binding", Generation: 1, ResourceVersion: "1"}
+		item := contracts.DeliveredAccessBinding{Kind: kind, Name: "binding", UID: "binding", Generation: 1, ResourceVersion: "1"}
 		if kind == "" {
 			item.Namespace, item.NamespaceUID = "app", "app-uid"
 		}
-		for _, id := range []string{strings.Repeat("x", 257), strings.Repeat("é", 129)} {
-			item.Spec, _ = json.Marshal(map[string]any{"effect": "Deny", "subjects": []map[string]string{{"kind": "Group", "id": "developers"}, {"kind": "Group", "id": id}}, "roles": []string{"workload-maintainer"}, "reason": "synthetic"})
-			got, err := decoder.DeliveredBindings(permissionCluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
-			if !errors.Is(err, value.ErrLimit) || len(got) != 0 {
-				t.Fatalf("unrepresentable mixed-subject %q Deny accepted: %v", kind, err)
+		// Kubernetes accepted a path as a URI in the former CRD. Its literal
+		// value never substitutes for the verified issuer of another subject.
+		item.Spec = json.RawMessage(`{"effect":"Deny","subjects":[{"kind":"Group","id":"developers"},{"kind":"Group","id":"other","issuer":"/legacy"}],"roles":["workload-maintainer"],"reason":"synthetic"}`)
+		got, err := decoder.DeliveredBindings(permissionCluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
+		if err != nil || len(got) != 1 || got[0].Invalid || len(got[0].Subjects) != 2 || got[0].Subjects[1].Issuer != "/legacy" {
+			t.Fatalf("legacy issuer obscured valid %q Deny: %v", kind, err)
+		}
+		for _, bad := range []map[string]string{
+			{"kind": "Group", "id": strings.Repeat("x", 257)},
+			{"kind": "Group", "id": strings.Repeat("é", 129)},
+			{"kind": "Group", "id": "developers\u0000"},
+			{"kind": "Group", "id": "developers", "issuer": "https://example.test/" + strings.Repeat("x", 2048)},
+		} {
+			for _, effect := range []string{"Allow", "Deny"} {
+				item.Spec, _ = json.Marshal(map[string]any{"effect": effect, "subjects": []map[string]string{{"kind": "Group", "id": "developers"}, bad}, "roles": []string{"workload-maintainer"}, "reason": "synthetic"})
+				got, err := decoder.DeliveredBindings(permissionCluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
+				if effect == "Deny" {
+					if !errors.Is(err, value.ErrLimit) || len(got) != 0 {
+						t.Fatalf("unrepresentable mixed-subject %q Deny accepted: %v", kind, err)
+					}
+				} else if err != nil || len(got) != 1 || got[0].Invalid || len(got[0].Subjects) != 1 || got[0].Subjects[0].ID != "developers" {
+					t.Fatalf("unrepresentable subject obscured valid %q Allow", kind)
+				}
 			}
 		}
 	}
