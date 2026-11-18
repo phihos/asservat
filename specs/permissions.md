@@ -8,7 +8,9 @@ bindings. An empty replacement or registration withdrawal removes that clusterâ€
 bindings. A remote cluster can author both AccessBindings in application namespaces
 and ClusterAccessBindings scoped to that cluster. Only the hub can target other
 clusters. Before its first complete observation, including after re-registration,
-a remote cluster cannot authorize fresh access even from an overlapping hub Allow. If a connected cluster reports that its binding list cannot be read or
+a remote cluster cannot authorize fresh access even from an overlapping hub Allow.
+A complete delivery applies every valid binding within the transfer budget.
+Unrelated subjects and assignments cannot suppress a callerâ€™s Allow or Deny. If a connected cluster reports that its binding list cannot be read or
 exceeds the transfer budget, fresh operations in that cluster fail closed until a
 complete replacement arrives. Other clusters remain usable. Losing a connection leaves its last accepted delivery in effect.
 [ADR-330 D1](../docs/decisions/330-event-driven-system-design.md).
