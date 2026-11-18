@@ -441,10 +441,16 @@ To replace a cluster or its trusted issuer under the same name, apply two
 separate Helm upgrades to the hub using its full values file.
 
 1. Set `revoked: true` on the old entry and run `helm upgrade` with
-   `--wait --wait-for-jobs`. Wait for the bundled object store rollout to finish.
+   `--wait --wait-for-jobs`. Wait for this upgrade to succeed, including
+   the bundled object store and federation rollouts. Federation becomes ready
+   after removing the old cluster’s AccessBinding delivery and ending its
+   authority. If the upgrade fails, retry the withdrawal before registering
+   the replacement.
 2. Set the replacement’s `issuer` and any pinned `jwks`, clear `revoked`,
    and run the hub upgrade again. The replacement receives fresh storage keys
-   and access to that name’s existing evidence and history.
+   and access to that name’s existing evidence and history. A surviving
+   connector refreshes both credentials when it reconnects. The hub evaluates
+   the replacement’s own AccessBinding delivery.
 
 An in-place issuer edit keeps the storage keys of a continuously active
 registration. For a routine ServiceAccount signing-key rotation on the same

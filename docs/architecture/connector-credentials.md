@@ -29,8 +29,19 @@ discovery of the issuer, or the static JWKS), `iss`, `aud`, expiry and
 `sub = system:serviceaccount:<namespace>:<account>`, and attributes the
 connection to that cluster. Discovered JWKS are cached and refreshed on an
 unknown `kid`; the kubelet rotates the token. Removing the cluster from
-`clusters` or setting `revoked: true` disables its row; the hub refuses its
-tokens and closes its open connections when the change event arrives (D1).
+`clusters` or setting `revoked: true` replaces the federation Deployment,
+closing its old connections. The new Pods accept tokens from the current
+registrations. Before listening, each Pod prunes withdrawn AccessBinding
+deliveries for the installation’s permission root. If a delivery was removed,
+the transaction ends the current permission-stream lease and signals the
+reconciler to read the remaining deliveries. Concurrent federation starts
+with the same registrations leave an already reconciled stream alone.
+
+The `connector-delivery` SQL role may execute this withdrawal operation.
+The function qualifies its objects, locks its search path to `pg_catalog,
+pg_temp`, and revokes the default public execution grant in its migration.
+The permission reconciler retains ownership of accepted assignments and audit.
+[PostgreSQL function privilege guidance](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY).
 
 ## Connection
 

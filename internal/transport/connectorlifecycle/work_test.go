@@ -66,7 +66,7 @@ func startWorkWatch(t *testing.T, client *Client) (<-chan WorkHint, <-chan error
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	t.Cleanup(cancel)
 	hints, done := make(chan WorkHint, 8), make(chan error, 1)
-	go func() { _, err := client.WatchWork(ctx, func(h WorkHint) { hints <- h }); done <- err }()
+	go func() { _, err := client.WatchWork(ctx, nil, func(h WorkHint) { hints <- h }); done <- err }()
 	return hints, done, cancel
 }
 
@@ -227,5 +227,35 @@ func TestWorkHintsBoundEachControlFrame(t *testing.T) {
 	oversized := strings.Repeat(" ", MaxFrameBytes) + record
 	if err := readWorkHints(strings.NewReader(oversized), func(WorkHint) { t.Fatal("oversized hint dispatched") }); err == nil || errors.Is(err, io.EOF) {
 		t.Fatal("oversized record accepted")
+	}
+}
+
+func TestWorkWatchRefreshesSettingsBeforeDispatch(t *testing.T) {
+	h := &WorkHandler{Tokens: workTokens{}, Concurrency: 2}
+	hint := testWorkHint(workClusterA, time.Now().UTC().Add(time.Minute))
+	h.Ready = func(context.Context, string) error { publishHint(t, h, hint); return nil }
+	newClient, _ := workFixture(t, h)
+	client := newClient("A")
+	failure := errors.New("settings unavailable")
+	for _, fail := range []bool{true, false} {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		refreshed, received := false, false
+		connected, err := client.WatchWork(ctx, func(context.Context) error {
+			refreshed = true
+			if fail {
+				return failure
+			}
+			return nil
+		}, func(got WorkHint) {
+			if !refreshed || got != hint {
+				t.Error("dispatch before settings or mismatched hint")
+			}
+			received = true
+			cancel()
+		})
+		cancel()
+		if !refreshed || connected == fail || received == fail || (fail && !errors.Is(err, failure)) {
+			t.Fatal("settings refresh and dispatch", fail, connected, received, err)
+		}
 	}
 }

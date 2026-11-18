@@ -155,6 +155,16 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, err
 	}
+	active := make([]string, 0, len(settings.names)+1)
+	for cluster := range settings.names {
+		active = append(active, cluster)
+	}
+	if c.ConnectorTokens.LocalConnector != "" {
+		active = append(active, c.ClusterID)
+	}
+	if err = remote.WithdrawUnregistered(startup, active); err != nil {
+		return f, &fixedStepError{"sql/withdraw-remote-bindings", err}
+	}
 	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{owners, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable

@@ -1237,6 +1237,27 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("deny hidden behind audit")
 		}
 	})
+	t.Run("withdrawn-registration", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		if len(projection(t, s).Allows) != 1 {
+			t.Fatal("original audited Allow unavailable")
+		}
+		qualifyRegistrationWithdrawal(t, admin, pool, s.p, s.target, s.b)
+		s.b.Epoch, s.b.ExpectedSequence = custodyID(), 0
+		if _, err := s.p.BeginPermissions(ctx, s.b.RootID, s.b.Epoch, s.b.TrustDigest); err != nil {
+			t.Fatal(err)
+		}
+		s.b.Bases = nil
+		s.b.InputDigest[0]++
+		s.b = fresh(s.b)
+		accept(t, &s)
+		flush(t, s.p)
+		if got := projection(t, s); len(got.Allows) != 0 || !got.DeniesComplete {
+			t.Fatal("new permission epoch retained the withdrawn Allow")
+		}
+	})
 	t.Run("competing-reconcilers-and-restart", func(t *testing.T) {
 		s := create(t)
 		if _, err := s.p.BeginPermissions(ctx, s.b.RootID, custodyID(), s.b.TrustDigest); !errors.Is(err, cfg.ErrChanged) {

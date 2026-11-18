@@ -11,6 +11,7 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
 			out = append(out, publicRuntimeGrant{"table", "remote_access_binding_delivery", "", privilege})
 		}
+		out = append(out, publicRuntimeGrant{"function", "withdraw_remote_bindings(uuid,uuid[])", "", "EXECUTE"})
 	case "connector-owner-read":
 		// The federation authenticates a regional connection's exact owner
 		// against the hub registry.

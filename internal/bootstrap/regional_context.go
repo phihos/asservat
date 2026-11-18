@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/kms"
@@ -23,6 +24,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
@@ -42,12 +44,13 @@ type regionalContext struct {
 	// peers re-resolves frozen Kubernetes packet peers for the running
 	// recordings' membership verifiers (ADR-283 part 3) with its own client
 	// and limiter, so verification never starves target resolution.
-	peers     *kube.PodTargets
-	collector *kube.ContextCollector
-	output    regionalArtifactOutput
-	history   objectstore.HistoryObjects
-	owners    *RegionalLifecycle
-	token     func() ([]byte, error)
+	peers       *kube.PodTargets
+	collector   *kube.ContextCollector
+	output      regionalArtifactOutput
+	history     objectstore.HistoryObjects
+	storageKeys atomic.Pointer[regionalStorageKeys]
+	owners      *RegionalLifecycle
+	token       func() ([]byte, error)
 }
 
 // regionalOwnerPool converts the pinned hub owner configuration. Its pool must
@@ -66,11 +69,35 @@ func regionalOwnerPool(c regionalConfig, w contracts.OwnerConfiguration) (value.
 // dialFunc opens a connection to one of the hub's services.
 type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
 
-// staticCredentials is an object-store capability the hub sent on connect.
-func staticCredentials(c contracts.OwnerStorageCredential) aws.CredentialsProviderFunc {
+// Each store retrieves its own key from the latest authenticated settings.
+type regionalStorageKeys struct {
+	evidence, history contracts.OwnerStorageCredential
+}
+
+func (r *regionalContext) storageCredentials(history bool) aws.CredentialsProviderFunc {
 	return func(context.Context) (aws.Credentials, error) {
-		return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "hub-settings"}, nil
+		pair := r.storageKeys.Load()
+		key := pair.evidence
+		if history {
+			key = pair.history
+		}
+		return aws.Credentials{AccessKeyID: key.AccessKeyID, SecretAccessKey: key.SecretAccessKey, SessionToken: key.SessionToken, Source: "hub-settings"}, nil
 	}
+}
+
+func (r *regionalContext) refreshStorageKeys(ctx context.Context) error {
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	settings, err := readHubSettings(call, r.owners.Client, r.c.ConnectorConfig)
+	if err != nil {
+		return err
+	}
+	if settings.binding != r.c.binding || settings.rootID() != r.rootID || settings.store.Endpoint != r.c.store.Endpoint ||
+		settings.store.StoreID != r.c.store.StoreID || settings.store.Bucket != r.c.store.Bucket || settings.store.Region != r.c.store.Region {
+		return mounts.ErrUnavailable
+	}
+	r.storageKeys.Store(&regionalStorageKeys{settings.evidence, settings.history})
+	return nil
 }
 
 // newRegionalContext builds every input that does not need an enrolled
@@ -89,6 +116,8 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 		return nil, closers, mounts.ErrUnavailable
 	}
 	out := &regionalContext{c: c, rootID: c.rootID(), podUID: podUID, owners: owners, token: hubToken}
+	out.storageKeys.Store(&regionalStorageKeys{c.evidence, c.history})
+	out.c.evidence, out.c.history = contracts.OwnerStorageCredential{}, contracts.OwnerStorageCredential{}
 	if out.pool, err = regionalOwnerPool(c, c.owners.Configuration); err != nil {
 		return nil, closers, err
 	}
@@ -142,7 +171,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	}
 	storage.Transport.(*http.Transport).DialContext = dial
 	closers = append(closers, storage.CloseIdleConnections)
-	store, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, staticCredentials(c.evidence), storage)
+	store, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, out.storageCredentials(false), storage)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -153,7 +182,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 	}
 	// History is a separate purpose-limited capability in the same qualified
 	// backend/bucket. It never receives the raw evidence writer's credential.
-	metadata, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, staticCredentials(c.history), storage)
+	metadata, err := objectstore.New(a.Endpoint, a.Region, a.Bucket, out.storageCredentials(true), storage)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -200,7 +229,9 @@ func (r *regionalContext) run(ctx context.Context) error {
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Watch: r.owners.Client.WatchWork, Concurrency: r.c.Executor.Concurrency, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context exchange refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
+	return RegionalContextStartConnections{Watch: func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) (bool, error) {
+		return r.owners.Client.WatchWork(ctx, r.refreshStorageKeys, receive)
+	}, Concurrency: r.c.Executor.Concurrency, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context exchange refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer

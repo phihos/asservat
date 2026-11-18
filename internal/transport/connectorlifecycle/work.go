@@ -155,7 +155,7 @@ func (h *WorkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *Client) WatchWork(ctx context.Context, receive func(WorkHint)) (connected bool, err error) {
+func (c *Client) WatchWork(ctx context.Context, connectedSettings func(context.Context) error, receive func(WorkHint)) (connected bool, err error) {
 	if c == nil || ctx == nil || receive == nil {
 		return false, ErrChannel
 	}
@@ -166,6 +166,11 @@ func (c *Client) WatchWork(ctx context.Context, receive func(WorkHint)) (connect
 	defer resp.Body.Close()
 	if resp.Header.Get("Content-Type") != ContentType {
 		return false, ErrChannel
+	}
+	if connectedSettings != nil {
+		if err := connectedSettings(ctx); err != nil {
+			return false, err
+		}
 	}
 	return true, readWorkHints(resp.Body, receive)
 }
