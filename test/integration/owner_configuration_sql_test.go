@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,10 +29,10 @@ import (
 )
 
 type ownerConfigLab struct {
-	observation                            syntheticFleetBinding
-	admin, writerPool, ackPool, readerPool *pgxpool.Pool
-	writer, ack, reader                    *postgres.OwnerConfigurations
-	audit                                  *objectstore.OwnerConfigurationAuditObjects
+	observation                   syntheticFleetBinding
+	admin, writerPool, readerPool *pgxpool.Pool
+	writer, reader                *postgres.OwnerConfigurations
+	audit                         *objectstore.OwnerEnrollmentAuditObjects
 }
 
 // Real SQL/S3; trust activation and wrapping roots are explicitly synthetic.
@@ -80,8 +80,14 @@ func ownerConfigurationLab(t *testing.T, ctx context.Context, f fixture, c value
 		return p, v
 	}
 	l.writerPool, l.writer = makeLedger("owner_configuration_runtime", "synthetic-owner-configuration")
-	l.ackPool, l.ack = makeLedger("owner_configuration_audit_runtime", "synthetic-owner-configuration-audit")
 	l.readerPool, l.reader = makeLedger("owner_configuration_read_runtime", "synthetic-owner-configuration-read")
+	return l
+}
+
+func ownerEnrollmentLab(t *testing.T, ctx context.Context, f fixture, c value.OwnerConfiguration) *ownerConfigLab {
+	t.Helper()
+	l := ownerConfigurationLab(t, ctx, f, c)
+	var e error
 	tls := tlsBridge(t, f.S3)
 	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
 	s3admin := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &tls.URL, UsePathStyle: true, Credentials: creds, HTTPClient: tls.Client(), RetryMaxAttempts: 1})
@@ -111,7 +117,7 @@ func ownerConfigurationLab(t *testing.T, ctx context.Context, f fixture, c value
 		t.Fatal(e)
 	}
 	keys := authorityTestKeys{a: aead}
-	l.audit = &objectstore.OwnerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}
+	l.audit = &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: keys, Open: keys}
 	return l
 }
 
@@ -152,20 +158,13 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 			t.Fatal(reason)
 		}
 	}
-	accept := func(c value.OwnerConfiguration) (value.OwnerConfigurationObservation, audit.Receipt) {
+	accept := func(c value.OwnerConfiguration) value.OwnerConfigurationObservation {
 		t.Helper()
 		o := observation(c)
-		if _, _, e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
+		if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
 			t.Fatal("observe", e)
 		}
-		r, e := l.audit.WriteOwnerConfiguration(ctx, c)
-		if e != nil {
-			t.Fatal("audit", e)
-		}
-		if e = l.ack.AcknowledgeOwnerConfiguration(ctx, c, r); e != nil {
-			t.Fatal("acknowledge", e)
-		}
-		return o, r
+		return o
 	}
 	denied("missing configuration usable")
 	// Persist an outage before any successful observation; old delayed work is
@@ -174,37 +173,34 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
 		t.Fatal(e)
 	}
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, old); e == nil {
+	if e = l.writer.ObserveOwnerConfiguration(ctx, old); e == nil {
 		t.Fatal("delayed pre-outage observation accepted")
 	}
 	o := observation(c)
-	if _, ack, e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil || ack {
-		t.Fatal("first observation", e)
-	}
-	denied("unaudited configuration usable")
-	r, e := l.audit.WriteOwnerConfiguration(ctx, c)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e = l.writer.AcknowledgeOwnerConfiguration(ctx, c, r); e == nil {
-		t.Fatal("observer acknowledged its own audit")
-	}
-	if e = l.ack.AcknowledgeOwnerConfiguration(ctx, c, r); e != nil {
+	if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
 		t.Fatal(e)
 	}
 	current, e := l.reader.ReadOwnerConfiguration(ctx)
 	if e != nil || !current.Configuration.Equal(c) || !current.ObservedAt.Equal(o.ObservedAt) || !current.FreshUntil.Equal(o.FreshUntil) {
 		t.Fatal("accepted original observation", e)
 	}
-	if r2, e := l.audit.WriteOwnerConfiguration(ctx, c); e != nil || r2 != r {
-		t.Fatal("audit replay changed receipt", e)
+	checkAudit := func(config value.OwnerConfiguration, want int) {
+		t.Helper()
+		body, err := json.Marshal(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var count int
+		err = l.admin.QueryRow(ctx, `SELECT count(*) FROM audit_event WHERE operation_id=$1 AND operation='observe_owner_configuration'
+			AND issuer=$2 AND subject=$3 AND reason=$4 AND input_digest=sha256($5::bytea) AND effect='accepted'`, config.Revision.UID, config.Pool.InstallationID, config.Pool.ClusterID, strconv.FormatInt(config.Revision.Generation, 10), body).Scan(&count)
+		if err != nil || count != want {
+			t.Fatal("revision audit", count, want, err)
+		}
 	}
-	if rr, ack, e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil || !ack || rr != r {
-		t.Fatal("acknowledged observation replay", e)
-	}
+	checkAudit(c, 1)
 	extended := o
 	extended.FreshUntil = extended.FreshUntil.Add(time.Microsecond)
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, extended); e == nil {
+	if e = l.writer.ObserveOwnerConfiguration(ctx, extended); e == nil {
 		t.Fatal("same observation extended")
 	}
 	// A replacement SQL reader preserves the exact source pin and deadline.
@@ -221,11 +217,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	errs := make(chan error, 8)
 	for range 8 {
 		wg.Go(func() {
-			rr, ack, e := l.writer.ObserveOwnerConfiguration(ctx, o)
-			if e == nil && (!ack || rr != r) {
-				e = errors.New("lost audit receipt")
-			}
-			errs <- e
+			errs <- l.writer.ObserveOwnerConfiguration(ctx, o)
 		})
 	}
 	wg.Wait()
@@ -237,30 +229,45 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	}
 	// Same-generation mutation and rollback must commit an immediate fence,
 	// rather than returning an error that rolls the denial back.
+	checkAudit(c, 1)
 	changed := c.Clone()
 	changed.Pool.Port++
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, observation(changed)); !errors.Is(e, value.ErrConflict) {
+	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(changed)); !errors.Is(e, value.ErrConflict) {
 		t.Fatal("mutation", e)
 	}
 	denied("mutation left old trust fresh")
-	o, r = accept(c)
+	o = accept(c)
 	c2 := c.Clone()
 	c2.Revision.Generation++
 	c2.Revision.Digest = artifact.Digest{3}
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, observation(c2)); e != nil {
+	// Reject this synthetic event at the destination table. The same transaction
+	// must leave the previous head current, with no new revision or event.
+	reject := "ALTER TABLE audit_event ADD CONSTRAINT test_owner_reject CHECK (operation_id <> '" + c.Revision.UID + "'::uuid OR reason <> '2') NOT VALID"
+	if _, e = l.admin.Exec(ctx, reject); e != nil {
 		t.Fatal(e)
 	}
-	denied("new unaudited revision left old trust usable")
-	if e = l.ack.AcknowledgeOwnerConfiguration(ctx, c, r); e != nil {
+	defer l.admin.Exec(context.Background(), "ALTER TABLE audit_event DROP CONSTRAINT IF EXISTS test_owner_reject")
+	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(c2)); e == nil {
+		t.Fatal("configuration committed after audit insert failed")
+	}
+	checkAudit(c2, 0)
+	var revisions int
+	if e = l.admin.QueryRow(ctx, "SELECT count(*) FROM hub_owner_configuration_revision WHERE source_uid=$1 AND generation=2", c.Revision.UID).Scan(&revisions); e != nil || revisions != 0 {
+		t.Fatal("failed revision survived", revisions, e)
+	}
+	if got, err := l.reader.ReadOwnerConfiguration(ctx); err != nil || !got.Configuration.Equal(c) {
+		t.Fatal("failed audit replaced the previous head", err)
+	}
+	if _, e = l.admin.Exec(ctx, "ALTER TABLE audit_event DROP CONSTRAINT test_owner_reject"); e != nil {
 		t.Fatal(e)
 	}
-	denied("late old audit revived configuration")
 	accept(c2)
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, observation(c)); !errors.Is(e, value.ErrConflict) {
+	checkAudit(c2, 1)
+	if e = l.writer.ObserveOwnerConfiguration(ctx, observation(c)); !errors.Is(e, value.ErrConflict) {
 		t.Fatal("rollback", e)
 	}
 	denied("rollback left old trust fresh")
-	o, _ = accept(c2)
+	o = accept(c2)
 	if e = l.writer.FenceOwnerConfiguration(ctx, o.ObservedAt.Add(-time.Microsecond)); e != nil {
 		t.Fatal(e)
 	}
@@ -270,7 +277,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e = l.writer.FenceOwnerConfiguration(ctx, o.ObservedAt); e != nil {
 		t.Fatal(e)
 	}
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, o); e == nil {
+	if e = l.writer.ObserveOwnerConfiguration(ctx, o); e == nil {
 		t.Fatal("same-time replay undid fence")
 	}
 	denied("fenced observation usable")
@@ -282,10 +289,10 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, _, e = replacement.ObserveOwnerConfiguration(ctx, observation(other)); e == nil {
+	if e = replacement.ObserveOwnerConfiguration(ctx, observation(other)); e == nil {
 		t.Fatal("source replacement silently accepted")
 	}
-	for name, p := range map[string]*pgxpool.Pool{"writer": l.writerPool, "audit": l.ackPool, "reader": l.readerPool} {
+	for name, p := range map[string]*pgxpool.Pool{"writer": l.writerPool, "reader": l.readerPool} {
 		for _, sql := range []string{"DELETE FROM hub_owner_configuration", "UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()", "UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')"} {
 			if _, e = p.Exec(ctx, sql); e == nil {
 				t.Fatalf("%s bypassed immutable source: %s", name, sql)
@@ -295,8 +302,8 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if _, e = l.readerPool.Exec(ctx, "UPDATE hub_owner_configuration SET generation=generation+1"); e == nil {
 		t.Fatal("reader advanced revision")
 	}
-	if _, e = l.ackPool.Exec(ctx, "UPDATE hub_owner_configuration_revision SET audit_receipt_json=decode('00','hex')"); e == nil {
-		t.Fatal("ack overwrote receipt")
+	if _, e = l.writerPool.Exec(ctx, "UPDATE audit_event SET reason='changed' WHERE operation_id=$1", c.Revision.UID); e == nil {
+		t.Fatal("source role rewrote its audit")
 	}
 	c3 := c2.Clone()
 	c3.Revision.Generation++
@@ -313,7 +320,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	// The reader checks original expiry after an actual blocking row lock.
 	short := observation(c4)
 	short.FreshUntil = short.ObservedAt.Add(200 * time.Millisecond)
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, short); e != nil {
+	if e = l.writer.ObserveOwnerConfiguration(ctx, short); e != nil {
 		t.Fatal(e)
 	}
 	tx, e := l.admin.Begin(ctx)
@@ -348,20 +355,17 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal("expiry during lock wait ignored")
 	}
 	accept(c4)
-	// SQL enforces the finite history even when a caller bypasses the Go
-	// capacity check. These extra snapshots are synthetic, unaudited history.
-	if _, e = l.writerPool.Exec(ctx, "INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json) SELECT installation_id,cluster_id,source_uid,n,snapshot_json FROM hub_owner_configuration_revision CROSS JOIN generate_series(5,1024) n WHERE installation_id=$1 AND generation=4", c.Pool.InstallationID); e != nil {
-		t.Fatal("fill bounded history", e)
-	}
-	if _, e = l.writerPool.Exec(ctx, "INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json) SELECT installation_id,cluster_id,source_uid,1025,snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND generation=4", c.Pool.InstallationID); e == nil {
-		t.Fatal("database accepted history above limit")
+	// More than 1024 actual revisions remain auditable and the source is usable.
+	if _, e = l.writerPool.Exec(ctx, `INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json)
+		SELECT installation_id,cluster_id,source_uid,n,snapshot_json FROM hub_owner_configuration_revision
+		CROSS JOIN generate_series(5,1024) n WHERE installation_id=$1 AND generation=4`, c.Pool.InstallationID); e != nil {
+		t.Fatal(e)
 	}
 	next := c4.Clone()
 	next.Revision.Generation = 1025
-	if _, _, e = l.writer.ObserveOwnerConfiguration(ctx, observation(next)); !errors.Is(e, value.ErrCapacity) {
-		t.Fatal("revision capacity", e)
+	accept(next)
+	checkAudit(next, 1)
+	if got, err := l.reader.ReadOwnerConfiguration(ctx); err != nil || !got.Configuration.Equal(next) {
+		t.Fatal("later configuration unavailable", err)
 	}
-	denied("full history left previous trust usable after new revision")
-	accept(c4)
-	t.Log("real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles/history bound, suspension and expiry after proven lock wait")
 }

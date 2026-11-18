@@ -24,8 +24,6 @@ const (
 	ownerReadSnapshotBinding
 	ownerReadSnapshotSuspended
 	ownerReadSnapshotGeneration
-	ownerReadAuditDecode
-	ownerReadAuditBinding
 	ownerReadClock
 	ownerReadObservationConfiguration
 	ownerReadObservationInterval
@@ -35,7 +33,7 @@ func (c OwnerConfigurationReadCheck) String() string {
 	names := [...]string{
 		"transaction", "share-owner", "head-source", "head-generation",
 		"revision", "snapshot-decode", "snapshot-binding", "snapshot-suspended",
-		"snapshot-generation", "audit-decode", "audit-binding",
+		"snapshot-generation",
 		"database-time", "owner-configuration", "owner-interval",
 	}
 	if int(c) >= len(names) {

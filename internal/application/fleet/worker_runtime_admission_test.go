@@ -46,7 +46,7 @@ func TestWorkerRuntimeAdmissionPreservesFivePurposeFIFO(t *testing.T) {
 		err     error
 	}
 	results := make(chan admitted, 4)
-	for _, purpose := range []workerRuntimePurpose{workerUnwrapRefresh, workerOwnerAuditPurpose, workerCapacity, workerCleanup} {
+	for _, purpose := range []workerRuntimePurpose{workerUnwrapRefresh, workerAuthorityAudit, workerCapacity, workerCleanup} {
 		go func() {
 			p, e := s.wait(root, purpose)
 			results <- admitted{purpose, p, e}
@@ -62,7 +62,7 @@ func TestWorkerRuntimeAdmissionPreservesFivePurposeFIFO(t *testing.T) {
 		}
 	}
 	first.Release()
-	for _, want := range []workerRuntimePurpose{workerUnwrapRefresh, workerOwnerAuditPurpose, workerCapacity, workerCleanup} {
+	for _, want := range []workerRuntimePurpose{workerUnwrapRefresh, workerAuthorityAudit, workerCapacity, workerCleanup} {
 		select {
 		case got := <-results:
 			if got.err != nil || got.purpose != want || got.lease == nil {
@@ -95,13 +95,13 @@ func TestWorkerRuntimeAdmissionExpiredObservationNeverGetsFreshWindow(t *testing
 	defer cancel()
 	failed := make(chan error, 1)
 	go func() {
-		p, e := s.WaitOwnerAudit(original)
+		p, e := s.WaitAuthorityAudit(original)
 		if p != nil {
 			p.Release()
 		}
 		failed <- e
 	}()
-	workerAdmissionQueued(t, s, workerOwnerAuditPurpose)
+	workerAdmissionQueued(t, s, workerAuthorityAudit)
 	<-original.Done()
 	if e := <-failed; e == nil {
 		t.Fatal("expired original observation gained admission")
@@ -111,7 +111,7 @@ func TestWorkerRuntimeAdmissionExpiredObservationNeverGetsFreshWindow(t *testing
 	// retains its own existing child deadline exactly. The old one remains dead.
 	call, end := context.WithTimeout(t.Context(), time.Second)
 	defer end()
-	p, err := s.WaitOwnerAudit(call)
+	p, err := s.WaitAuthorityAudit(call)
 	if err != nil {
 		t.Fatal(err)
 	}

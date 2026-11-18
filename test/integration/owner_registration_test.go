@@ -61,7 +61,7 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	t.Helper()
 	ctx, end := context.WithTimeout(context.Background(), 45*time.Second)
 	defer end()
-	l := ownerConfigurationLab(t, ctx, f, c)
+	l := ownerEnrollmentLab(t, ctx, f, c)
 	pools := map[string]*pgxpool.Pool{}
 	makeLedger := func(role string) *postgres.OwnerEnrollments {
 		config := l.writerPool.Config()
@@ -88,18 +88,8 @@ func exerciseOwnerRegistration(t *testing.T, f fixture, c value.OwnerConfigurati
 	refresh := func(ctx context.Context) (value.OwnerConfigurationObservation, error) {
 		n := time.Now().UTC().Truncate(time.Microsecond)
 		o := value.OwnerConfigurationObservation{Configuration: c.Clone(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
-		r, ok, e := l.writer.ObserveOwnerConfiguration(ctx, o)
-		if e != nil {
+		if e := l.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
 			return o, e
-		}
-		if !ok {
-			r, e = l.audit.WriteOwnerConfiguration(ctx, c)
-			if e != nil {
-				return o, e
-			}
-			if e = l.ack.AcknowledgeOwnerConfiguration(ctx, c, r); e != nil {
-				return o, e
-			}
 		}
 		return l.reader.ReadOwnerConfiguration(ctx)
 	}

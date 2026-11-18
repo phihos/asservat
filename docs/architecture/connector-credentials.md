@@ -7,6 +7,8 @@ in the hub's `clusters` values. Connector process restarts and replicas reuse
 it; there is no per-process identity, no certificate and no expiry that forces
 renewal.
 
+Hub owners read the accepted owner configuration from PostgreSQL. The source role inserts each new immutable revision. A database trigger appends its digest and generation to `audit_event` in the same transaction, including revisions written by an older worker during an upgrade. The migration records previously retained revisions at migration time. The trigger runs with its installer-defined owner, a fixed `search_path` and a schema-qualified audit destination. [PostgreSQL function privileges](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY)
+
 ## Registration
 
 1. An administrator adds the cluster to the hub's `clusters` values with its

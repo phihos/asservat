@@ -137,18 +137,8 @@ func (s *contextStartOwnerSQL) closeEffects() {
 func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
-	r, ack, e := s.lab.writer.ObserveOwnerConfiguration(ctx, o)
-	if e != nil {
+	if e := s.lab.writer.ObserveOwnerConfiguration(ctx, o); e != nil {
 		return o, e
-	}
-	if !ack {
-		r, e = s.lab.audit.WriteOwnerConfiguration(ctx, s.config)
-		if e != nil {
-			return o, e
-		}
-		if e = s.lab.ack.AcknowledgeOwnerConfiguration(ctx, s.config, r); e != nil {
-			return o, e
-		}
 	}
 	return s.lab.reader.ReadOwnerConfiguration(ctx)
 }
@@ -187,7 +177,7 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 	ca, key := connectorSQLCA(t)
 	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444, NativeBootstrap: value.OwnerBootstrapProfile, NativeCandidateLimit: 16}
 	c := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
-	l := ownerConfigurationLab(t, ctx, f, c)
+	l := ownerEnrollmentLab(t, ctx, f, c)
 	s := newContextStartOwnerSQL(t, ctx, l, c, contextStartOwnerIssuer{ca, key})
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("missing current configuration yielded candidates")

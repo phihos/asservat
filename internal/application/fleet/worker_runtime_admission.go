@@ -8,7 +8,7 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
-// WorkerRuntimeAdmission only schedules the six fixed expensive worker2
+// WorkerRuntimeAdmission only schedules the fixed expensive worker
 // operations. A ticket supplies no native/SQL/provider proof or new deadline.
 // The owner source observer never enters this queue.
 type WorkerRuntimeAdmission struct {
@@ -19,7 +19,7 @@ type WorkerRuntimeAdmission struct {
 	closed    bool
 	active    *workerRuntimeTicket
 	queue     []*workerRuntimeTicket
-	slots     [6]*workerRuntimeTicket
+	slots     [workerAuthorityAudit + 1]*workerRuntimeTicket
 	changed   chan struct{}
 	stop      func() bool
 	done      chan struct{}
@@ -30,7 +30,6 @@ type workerRuntimePurpose uint8
 const (
 	workerWrapRefresh workerRuntimePurpose = iota
 	workerUnwrapRefresh
-	workerOwnerAuditPurpose
 	workerCapacity
 	workerCleanup
 	workerAuthorityAudit
@@ -44,7 +43,7 @@ type workerRuntimeTicket struct {
 	granted         bool
 	schedulingUntil time.Time
 	scheduled       bool
-	ownerAuditTaken bool
+	auditTaken      bool
 }
 
 // A lease is only admitted process work. Native and SQL effects must establish
@@ -72,9 +71,6 @@ func (s *WorkerRuntimeAdmission) WaitWrapRefresh(ctx context.Context) (*WorkerRu
 }
 func (s *WorkerRuntimeAdmission) WaitUnwrapRefresh(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
 	return s.wait(ctx, workerUnwrapRefresh)
-}
-func (s *WorkerRuntimeAdmission) WaitOwnerAudit(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
-	return s.wait(ctx, workerOwnerAuditPurpose)
 }
 func (s *WorkerRuntimeAdmission) WaitCapacity(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
 	return s.wait(ctx, workerCapacity)

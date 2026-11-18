@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/fleet"
 )
 
 // ConfigurationProviderAuditOperation owns the current material, native
@@ -25,11 +24,8 @@ type ConfigurationProviderAuditOperation struct {
 	closeOnce              sync.Once
 	endBorrow              func()
 	native                 *configurationProviderRefreshOperation
-	configuration          fleet.OwnerConfiguration
-	material               contracts.OwnerStorageCredential
-	// authority marks an ADR-189 permission authority audit, which has no
-	// owner configuration to match.
-	authority bool
+
+	material contracts.OwnerStorageCredential
 }
 
 // No token is borrowed, exposed or renewed by this local availability hint.
@@ -55,26 +51,12 @@ func (s *InstalledConfigurationProviderEffects) AuditAvailable() bool {
 	return s.configurationAuditAvailable()
 }
 
-func (s *InstalledConfigurationProviderEffects) BeginOwnerConfigurationAudit(ctx context.Context, c fleet.OwnerConfiguration) (*ConfigurationProviderAuditOperation, error) {
-	if s == nil || s.admission == nil || ctx == nil || ctx.Err() != nil || !c.Valid() ||
-		c.Pool.InstallationID != s.input.InstallationID || c.Pool.ClusterID != s.input.ClusterID ||
-		c.Pool.NamespaceUID != s.input.NamespaceUID || c.Revision.UID != s.input.OwnerSourceUID || !s.configurationAuditAvailable() || !s.admission.ClaimOwnerAudit(ctx) {
-		return nil, ErrKeyService
-	}
-	return s.beginAudit(ctx, &ConfigurationProviderAuditOperation{configuration: c.Clone()})
-}
-
-// BeginAuthorityAudit is the ADR-189 sibling for one permission authority
-// record: the same audit-only material under the same native interval. The
-// caller scopes the object key to its own stream root.
 func (s *InstalledConfigurationProviderEffects) BeginAuthorityAudit(ctx context.Context) (*ConfigurationProviderAuditOperation, error) {
 	if s == nil || s.admission == nil || ctx == nil || ctx.Err() != nil || !s.configurationAuditAvailable() || !s.admission.ClaimAuthorityAudit(ctx) {
 		return nil, ErrKeyService
 	}
-	return s.beginAudit(ctx, &ConfigurationProviderAuditOperation{authority: true})
-}
 
-func (s *InstalledConfigurationProviderEffects) beginAudit(ctx context.Context, p *ConfigurationProviderAuditOperation) (*ConfigurationProviderAuditOperation, error) {
+	p := &ConfigurationProviderAuditOperation{}
 	// The application acquired its fixed ticket before selecting this exact
 	// candidate. Its unchanged end bounds all work here; no nested ticket,
 	// new source selection or renewed interval is introduced by this borrow.

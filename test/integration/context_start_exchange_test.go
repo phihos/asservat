@@ -152,7 +152,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		pool.Port = 8445
 	}
 	config := fleet.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{21}}, ProtectionDigest: artifact.Digest{22}, IssuerRoots: [][]byte{ca.Raw}}
-	lab := &ownerConfigLab{observation: s.recovery.observation, admin: admin, audit: &objectstore.OwnerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}}
+	lab := &ownerConfigLab{observation: s.recovery.observation, admin: admin, audit: &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: keys, Open: keys}}
 	configured := func(role, password string) (*pgxpool.Pool, *postgres.OwnerConfigurations) {
 		p := poolFor(role, password)
 		t.Cleanup(p.Close)
@@ -163,7 +163,6 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		return p, v
 	}
 	lab.writerPool, lab.writer = configured("owner_configuration_runtime", "synthetic-owner-configuration")
-	lab.ackPool, lab.ack = configured("owner_configuration_audit_runtime", "synthetic-owner-configuration-audit")
 	lab.readerPool, lab.reader = configured("owner_configuration_read_runtime", "synthetic-owner-configuration-read")
 	sql := newContextStartOwnerSQL(t, ctx, lab, config, contextStartOwnerIssuer{ca, key})
 	owner := fleet.OwnerBinding{InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, PodUID: custodyID(), ProcessEpoch: custodyID()}

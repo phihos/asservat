@@ -34,7 +34,7 @@ func TestOwnerObservationCandidatesWithRealServices(t *testing.T) {
 	ca, key := connectorSQLCA(t)
 	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444, NativeBootstrap: value.OwnerBootstrapProfile, NativeCandidateLimit: 17}
 	c := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
-	l := ownerConfigurationLab(t, ctx, f, c)
+	l := ownerEnrollmentLab(t, ctx, f, c)
 	s := newContextStartOwnerSQL(t, ctx, l, c, contextStartOwnerIssuer{ca, key})
 	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("missing accepted configuration authorized candidate read")

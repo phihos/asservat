@@ -251,17 +251,12 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	at = "sql"
 	// The configuration-fleet login only waits for the schema; the fleet
 	// trust row is static (ADR-330 D13) and needs no observer pool.
-	var pools [2]*pgxpool.Pool
-	for i, purpose := range contracts.ConfigurationRuntimeRolePurposes()[1:] {
-		name, known := postgres.ConfigurationRuntimeRoleName(w.ids.InstallationID, purpose)
-		if !known {
-			return nil, mounts.ErrUnavailable
-		}
-		if pools[i], err = w.pool(startup, "sql-"+purpose+".json", name, "asservat-hub-worker"); err != nil {
-			return nil, err
-		}
-		w.closers = append(w.closers, pools[i].Close)
+	sourceRole, _ := postgres.ConfigurationRuntimeRoleName(w.ids.InstallationID, "configuration-source")
+	sourcePool, err := w.pool(startup, "sql-configuration-source.json", sourceRole, "asservat-hub-worker")
+	if err != nil {
+		return nil, err
 	}
+	w.closers = append(w.closers, sourcePool.Close)
 	at = "admission"
 	if w.admission, err = app.NewWorkerRuntimeAdmission(root); err != nil {
 		return nil, err
@@ -269,11 +264,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	w.closers = append(w.closers, w.admission.Close)
 	w.authority = newAuthorityAuditTurn(w.admission)
 	at = "stores"
-	ownerStore, err := postgres.NewOwnerConfigurations(startup, pools[0], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
-	if err != nil {
-		return nil, err
-	}
-	ack, err := postgres.NewCurrentOwnerConfigurationAcknowledgements(startup, pools[1], w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
+	ownerStore, err := postgres.NewOwnerConfigurations(startup, sourcePool, w.ids.InstallationID, w.ids.ClusterID, nsUID, w.ownerUID)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +280,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	if err != nil {
 		return nil, err
 	}
-	if w.audit, err = newInstalledConfigurationAudit(w.auditScope(), w.providers); err != nil {
+	if w.audit, err = newInstalledConfigurationAudit(w.auditStore, w.providers); err != nil {
 		return nil, err
 	}
 	w.closers = append(w.closers, w.audit.Close)
@@ -303,7 +294,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	w.reconciler = &app.ConfigurationReconciler{
-		Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Audit: w.audit, Acknowledgements: ack, Now: time.Now},
+		Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Now: time.Now},
 	}
 	at = "leader"
 	leaderClient, err := w.kubeClient()
@@ -315,10 +306,6 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}
 	complete = true
 	return w, nil
-}
-
-func (w *hubWorker) auditScope() hubWorkerAuditScope {
-	return hubWorkerAuditScope{store: w.auditStore, installationID: w.ids.InstallationID, clusterID: w.ids.ClusterID, namespaceUID: w.namespace.UID, ownerSourceUID: w.ownerUID}
 }
 
 // kubeClient returns a new client of the worker's own account in its
@@ -444,7 +431,7 @@ func (w *hubWorker) runConfiguration(ctx context.Context) error {
 	call, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 2)
-	go func() { done <- w.reconciler.RunWithIndependentOwnerAudit(call, w.admission) }()
+	go func() { done <- w.reconciler.Run(call) }()
 	go func() { done <- w.providers.Run(call) }()
 	err := <-done
 	cancel()

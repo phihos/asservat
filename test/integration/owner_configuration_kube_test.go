@@ -124,12 +124,12 @@ func exerciseOwnerConfiguration(t *testing.T, ctx context.Context, f fixture, ad
 		t.Fatal("owner source admission qualification", err)
 	}
 	lab := ownerConfigurationLab(t, ctx, f, observed.Configuration)
-	observer := &app.OwnerConfigurationObserver{Reader: source, Ledger: lab.writer, Audit: lab.audit, Acknowledgements: lab.ack, Now: time.Now}
-	if _, _, err = lab.writer.ObserveOwnerConfiguration(ctx, observed); err != nil {
+	observer := &app.OwnerConfigurationObserver{Reader: source, Ledger: lab.writer, Now: time.Now}
+	if err = lab.writer.ObserveOwnerConfiguration(ctx, observed); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = lab.reader.ReadOwnerConfiguration(ctx); err == nil {
-		t.Fatal("unaudited owner configuration usable")
+	if _, err = lab.reader.ReadOwnerConfiguration(ctx); err != nil {
+		t.Fatal("committed owner configuration unavailable", err)
 	}
 	routes := app.OwnerRoutes{Configurations: refreshedOwnerConfiguration{observer, lab.reader}, Endpoints: endpoints, Now: time.Now}
 	route, err := routes.CurrentOwnerRoute(ctx, b)

@@ -72,8 +72,7 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 			return e
 		}
 		var config value.OwnerConfiguration
-		var receipt audit.Receipt
-		if json.Unmarshal(row.SnapshotJson, &config) != nil || !c.matches(config) || config.Revision.Generation != h.Generation || config.Suspended || json.Unmarshal(row.AuditReceiptJson, &receipt) != nil || !receipt.ValidOwnerConfiguration(config) {
+		if json.Unmarshal(row.SnapshotJson, &config) != nil || !c.matches(config) || config.Revision.Generation != h.Generation || config.Suspended {
 			return value.ErrUnavailable
 		}
 		check := func() (value.OwnerConfigurationObservation, time.Time, error) {

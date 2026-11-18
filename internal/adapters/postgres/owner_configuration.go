@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	auditapp "asservat.local/asservat/internal/application/audit"
+
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/audit"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5"
@@ -24,7 +24,6 @@ type OwnerConfigurations struct {
 
 var _ app.OwnerConfigurationLedger = (*OwnerConfigurations)(nil)
 var _ app.OwnerConfigurationReader = (*OwnerConfigurations)(nil)
-var _ auditapp.OwnerConfigurationAcknowledgements = (*OwnerConfigurations)(nil)
 
 func NewOwnerConfigurations(ctx context.Context, pool *pgxpool.Pool, installation, cluster, namespace, source string) (*OwnerConfigurations, error) {
 	for _, v := range []string{installation, cluster, namespace, source} {
@@ -46,11 +45,9 @@ func (s *OwnerConfigurations) matches(c value.OwnerConfiguration) bool {
 // cannot masquerade as a later observation by its discarded nanoseconds.
 func ownerTime(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
 
-func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o value.OwnerConfigurationObservation) (audit.Receipt, bool, error) {
-	var receipt audit.Receipt
-	var ack bool
+func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o value.OwnerConfigurationObservation) error {
 	if s == nil || ctx == nil || !o.Valid(o.ObservedAt) || !s.matches(o.Configuration) {
-		return receipt, false, value.ErrInvalid
+		return value.ErrInvalid
 	}
 	o.Configuration = o.Configuration.Clone()
 	o.ObservedAt, o.FreshUntil = ownerTime(o.ObservedAt), ownerTime(o.FreshUntil)
@@ -59,11 +56,11 @@ func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o v
 	c := o.Configuration
 	b, err := json.Marshal(c)
 	if err != nil || len(b) > 64<<10 {
-		return receipt, false, value.ErrInvalid
+		return value.ErrInvalid
 	}
 	var rejected error
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		receipt, ack, rejected = audit.Receipt{}, false, nil
+		rejected = nil
 		check := func() error {
 			n, e := q.CurrentTime(ctx)
 			if e != nil {
@@ -113,20 +110,7 @@ func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o v
 			if !bytes.Equal(old.SnapshotJson, b) {
 				return fence(value.ErrConflict)
 			}
-			if old.AuditReceiptJson != nil {
-				if json.Unmarshal(old.AuditReceiptJson, &receipt) != nil || !receipt.ValidOwnerConfiguration(c) {
-					return fence(value.ErrDenied)
-				}
-				ack = true
-			}
 		} else if errors.Is(e, pgx.ErrNoRows) {
-			n, e := q.CountOwnerConfigurationRevisions(ctx, custodydb.CountOwnerConfigurationRevisionsParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid})
-			if e != nil {
-				return e
-			}
-			if n >= 1024 {
-				return fence(value.ErrCapacity)
-			}
 			e = q.InsertOwnerConfigurationRevision(ctx, custodydb.InsertOwnerConfigurationRevisionParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, Generation: c.Revision.Generation, SnapshotJson: b})
 			if e != nil {
 				return e
@@ -141,12 +125,9 @@ func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o v
 		return check()
 	})
 	if err != nil {
-		return audit.Receipt{}, false, err
+		return err
 	}
-	if rejected != nil {
-		return audit.Receipt{}, false, rejected
-	}
-	return receipt, ack, nil
+	return rejected
 }
 
 func (s *OwnerConfigurations) FenceOwnerConfiguration(ctx context.Context, at time.Time) error {
@@ -174,44 +155,6 @@ func (s *OwnerConfigurations) FenceOwnerConfiguration(ctx context.Context, at ti
 			return value.ErrDenied
 		}
 		return q.FenceOwnerConfiguration(ctx, custodydb.FenceOwnerConfigurationParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, ObservedAt: ts(at)})
-	})
-}
-
-func (s *OwnerConfigurations) AcknowledgeOwnerConfiguration(ctx context.Context, c value.OwnerConfiguration, r audit.Receipt) error {
-	if s == nil || ctx == nil || !s.matches(c) || !r.ValidOwnerConfiguration(c) {
-		return value.ErrInvalid
-	}
-	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		h, e := q.LockOwnerConfiguration(ctx, custodydb.LockOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster)})
-		if e != nil {
-			return e
-		}
-		if uid(h.SourceUid) != s.source {
-			return value.ErrDenied
-		}
-		v, e := q.ReadOwnerConfigurationRevision(ctx, custodydb.ReadOwnerConfigurationRevisionParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, Generation: c.Revision.Generation})
-		if e != nil {
-			return e
-		}
-		b, _ := json.Marshal(c)
-		if !bytes.Equal(b, v.SnapshotJson) {
-			return value.ErrDenied
-		}
-		b, _ = json.Marshal(r)
-		if v.AuditReceiptJson != nil {
-			if !bytes.Equal(b, v.AuditReceiptJson) {
-				return value.ErrConflict
-			}
-			return nil
-		}
-		n, e := q.AcknowledgeOwnerConfiguration(ctx, custodydb.AcknowledgeOwnerConfigurationParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, Generation: c.Revision.Generation, AuditReceiptJson: b})
-		if e != nil {
-			return e
-		}
-		if n != 1 {
-			return value.ErrConflict
-		}
-		return nil
 	})
 }
 
@@ -253,8 +196,6 @@ func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *cus
 		return out, diagnostic.query(ownerReadRevision, e)
 	}
 	var c value.OwnerConfiguration
-	var r audit.Receipt
-	// Preserve the original conjunction's exact short-circuit order.
 	if json.Unmarshal(v.SnapshotJson, &c) != nil {
 		return out, diagnostic.reject(ownerReadSnapshotDecode)
 	}
@@ -266,12 +207,6 @@ func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *cus
 	}
 	if c.Revision.Generation != h.Generation {
 		return out, diagnostic.reject(ownerReadSnapshotGeneration)
-	}
-	if json.Unmarshal(v.AuditReceiptJson, &r) != nil {
-		return out, diagnostic.reject(ownerReadAuditDecode)
-	}
-	if !r.ValidOwnerConfiguration(c) {
-		return out, diagnostic.reject(ownerReadAuditBinding)
 	}
 	n, e := q.CurrentTime(ctx)
 	if e != nil {

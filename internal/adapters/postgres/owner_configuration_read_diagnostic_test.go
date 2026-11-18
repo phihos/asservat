@@ -14,7 +14,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
@@ -69,7 +68,7 @@ func (q *ownerReadDiagnosticQuery) QueryRow(_ context.Context, sql string, args 
 		wantArgs = []any{q.head.InstallationID, q.head.ClusterID}
 	case "ReadOwnerConfigurationRevision":
 		v := q.revision
-		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.SnapshotJson, v.AuditReceiptJson}
+		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.SnapshotJson}
 		wantArgs = []any{q.head.InstallationID, q.head.ClusterID, q.head.SourceUid, q.head.Generation}
 	case "CurrentTime":
 		values = []any{q.now}
@@ -91,16 +90,16 @@ func ownerReadDiagnosticFixture(t *testing.T) (*OwnerConfigurations, *ownerReadD
 		Revision:         identity.Revision{UID: uid(8), Generation: 1, Digest: [32]byte{1}},
 		ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{{3}},
 	}
-	r := audit.Receipt{Key: audit.OwnerConfigurationAuditKey(c), Version: "synthetic-version", ETag: "synthetic-etag", Bytes: 1, SHA256: artifact.Digest{4}}
-	if !c.Valid() || !r.ValidOwnerConfiguration(c) {
+
+	if !c.Valid() {
 		t.Fatal("invalid synthetic read fixture")
 	}
 	b, _ := json.Marshal(c)
-	a, _ := json.Marshal(r)
+
 	s := &OwnerConfigurations{installation: uid(1), cluster: uid(2), namespace: uid(4), source: uid(8)}
 	q := &ownerReadDiagnosticQuery{
 		head:     custodydb.HubOwnerConfiguration{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, ObservedAt: ts(at.Add(-time.Second)), FreshUntil: ts(at.Add(3 * time.Second))},
-		revision: custodydb.HubOwnerConfigurationRevision{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, SnapshotJson: b, AuditReceiptJson: a}, now: ts(at),
+		revision: custodydb.HubOwnerConfigurationRevision{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, SnapshotJson: b}, now: ts(at),
 	}
 	return s, q, c
 }
@@ -117,24 +116,17 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 			q.head.Generation = 0
 		}},
 		{"head-generation", "head-generation", "predicate", 1, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.Generation = 0 }},
-		{"decode-before-audit", "snapshot-decode", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"snapshot-decode", "snapshot-decode", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.revision.SnapshotJson = []byte("{")
-			q.revision.AuditReceiptJson = nil
+
 		}},
 		{"binding-before-suspension", "snapshot-binding", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { c.Pool.Port = 0; c.Suspended = true }},
 		{"suspension-before-generation", "snapshot-suspended", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			c.Suspended = true
 			c.Revision.Generation = 2
 		}},
-		{"generation-before-audit", "snapshot-generation", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
+		{"snapshot-generation", "snapshot-generation", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			c.Revision.Generation = 2
-			q.revision.AuditReceiptJson = nil
-		}},
-		{"audit-decode", "audit-decode", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.revision.AuditReceiptJson = nil
-		}},
-		{"audit-binding", "audit-binding", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
-			q.revision.AuditReceiptJson = []byte("{}")
 		}},
 		{"owner-start-future", "owner-interval", "future-start", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
 			q.head.ObservedAt = ts(q.now.Time.Add(time.Second))
@@ -191,7 +183,7 @@ func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T)
 			t.Run(statement+"/"+tc.name, func(t *testing.T) {
 				s, q, _ := ownerReadDiagnosticFixture(t)
 				q.fail, q.err = statement, tc.err
-				d := ownerConfigurationReadDiagnostic{ownerReadAuditBinding, ownerReadPredicate}
+				d := ownerConfigurationReadDiagnostic{ownerReadSnapshotBinding, ownerReadPredicate}
 				_, err := s.readOwnerConfiguration(context.Background(), custodydb.New(q), &d)
 				if err != tc.err || d.reason.String() != tc.reason {
 					t.Fatal("raw callback result or diagnostic changed", d.check, d.reason)
@@ -250,13 +242,13 @@ func TestOwnerConfigurationReadDiagnosticIntervalParityAndErrorIdentity(t *testi
 		}
 	}
 	for _, cause := range []error{value.ErrUnavailable, value.ErrInvalid, value.ErrConflict, privacy.ErrUnavailable, privacy.ErrConflict} {
-		d := ownerConfigurationReadDiagnostic{ownerReadAuditBinding, ownerReadPredicate}
+		d := ownerConfigurationReadDiagnostic{ownerReadSnapshotBinding, ownerReadPredicate}
 		err := d.failure(cause)
 		if !errors.Is(err, cause) || errors.Unwrap(err) != cause {
 			t.Fatal("sanitized sentinel changed")
 		}
 		for _, format := range []string{"%s", "%v", "%+v"} {
-			if fmt.Sprintf(format, err) != "owner configuration read: audit-binding: predicate" {
+			if fmt.Sprintf(format, err) != "owner configuration read: snapshot-binding: predicate" {
 				t.Fatal("diagnostic rendered non-enumerated text")
 			}
 		}

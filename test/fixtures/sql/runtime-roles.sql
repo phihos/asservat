@@ -188,21 +188,19 @@ GRANT UPDATE(id) ON permission_stream,artifact_download,download_worker TO worke
 GRANT UPDATE(source_uid) ON download_worker_configuration TO worker_owner_runtime;
 GRANT INSERT ON download_worker_owner TO worker_owner_runtime;
 GRANT UPDATE(request_id,pod_uid,process_epoch,fence,started_at,expires_at,released_at) ON download_worker_owner TO worker_owner_runtime;
--- Hub owner source acceptance, encrypted audit acknowledgement and consumers
+-- Hub owner source acceptance, transactional audit and consumers
 -- are separate principals. Dummy UPDATE grants permit PostgreSQL row locks;
 -- immutable-identity triggers prevent them from changing those identities.
 CREATE ROLE owner_configuration_runtime LOGIN PASSWORD 'synthetic-owner-configuration';
-CREATE ROLE owner_configuration_audit_runtime LOGIN PASSWORD 'synthetic-owner-configuration-audit';
 CREATE ROLE owner_configuration_read_runtime LOGIN PASSWORD 'synthetic-owner-configuration-read';
-GRANT CONNECT ON DATABASE custody_test TO owner_configuration_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime;
-GRANT USAGE ON SCHEMA public TO owner_configuration_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime;
-GRANT SELECT ON goose_db_version,fleet_trust,hub_owner_configuration,hub_owner_configuration_revision TO owner_configuration_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime;
+GRANT CONNECT ON DATABASE custody_test TO owner_configuration_runtime,owner_configuration_read_runtime;
+GRANT USAGE ON SCHEMA public TO owner_configuration_runtime,owner_configuration_read_runtime;
+GRANT SELECT ON goose_db_version,fleet_trust,hub_owner_configuration,hub_owner_configuration_revision TO owner_configuration_runtime,owner_configuration_read_runtime;
 GRANT UPDATE(installation_id) ON fleet_trust TO owner_configuration_runtime,owner_configuration_read_runtime;
 GRANT INSERT ON hub_owner_configuration TO owner_configuration_runtime;
 GRANT INSERT(installation_id,cluster_id,source_uid,generation,snapshot_json) ON hub_owner_configuration_revision TO owner_configuration_runtime;
 GRANT UPDATE(generation,observed_at,fresh_until) ON hub_owner_configuration TO owner_configuration_runtime;
-GRANT UPDATE(source_uid) ON hub_owner_configuration TO owner_configuration_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime;
-GRANT UPDATE(audit_receipt_json) ON hub_owner_configuration_revision TO owner_configuration_audit_runtime;
+GRANT UPDATE(source_uid) ON hub_owner_configuration TO owner_configuration_runtime,owner_configuration_read_runtime;
 
 -- Hub process ownership: independent enrollment, audit, activation/read and cleanup.
 CREATE ROLE owner_enrollment_runtime LOGIN PASSWORD 'synthetic-owner-enrollment';
@@ -236,7 +234,7 @@ GRANT UPDATE(source_uid) ON download_worker_configuration TO worker_routing_read
 
 -- Effective recovery is computed from this PostgreSQL process/database.
 -- Runtime roles cannot set either activation field or mutate the derived flag.
-GRANT SELECT ON fleet_current_trust TO capture_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_audit_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
+GRANT SELECT ON fleet_current_trust TO capture_runtime,download_key_bind_runtime,download_key_read_runtime,download_runtime,download_worker_identity_runtime,download_worker_runtime,local_keys_runtime,owner_configuration_read_runtime,owner_configuration_runtime,owner_enrollment_activate_runtime,owner_enrollment_read_runtime,owner_enrollment_runtime,peer_read_runtime,policy_accept_runtime,policy_read_runtime,worker_configuration_audit_runtime,worker_configuration_read_runtime,worker_configuration_runtime,worker_enrollment_activate_runtime,worker_enrollment_runtime,worker_owner_runtime,worker_routing_read_runtime;
 
 -- Placement observations confer no reservation or configuration authority.
 CREATE ROLE context_storage_read_runtime LOGIN PASSWORD 'synthetic-context-storage-read';

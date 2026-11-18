@@ -34,22 +34,14 @@ func configurationRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool)
 			out = append(out, publicRuntimeGrant{"table", table, column, privilege})
 		}
 	}
-	// Derived from OwnerConfigurations' source/read graph and
-	// CurrentOwnerConfigurationAcknowledgements, not a union of fixture roles.
 	add("fleet_current_trust", "SELECT")
 	add("fleet_current_trust", "UPDATE", "installation_id")
-	switch purpose {
-	case "configuration-source", "configuration-audit":
+	if purpose == "configuration-source" {
 		add("hub_owner_configuration", "SELECT")
 		add("hub_owner_configuration_revision", "SELECT")
-		add("hub_owner_configuration", "UPDATE", "source_uid")
-		if purpose == "configuration-source" {
-			add("hub_owner_configuration", "INSERT")
-			add("hub_owner_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
-			add("hub_owner_configuration", "UPDATE", "generation", "observed_at", "fresh_until")
-		} else {
-			add("hub_owner_configuration_revision", "UPDATE", "audit_receipt_json")
-		}
+		add("hub_owner_configuration", "UPDATE", "source_uid", "generation", "observed_at", "fresh_until")
+		add("hub_owner_configuration", "INSERT")
+		add("hub_owner_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
 	}
 	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
 	return slices.CompactFunc(out, func(a, b publicRuntimeGrant) bool { return a == b }), true
@@ -65,6 +57,6 @@ func ConfigurationRuntimeRoleLayoutDigest() string {
 			h.Write([]byte(g.key() + "\x00"))
 		}
 	}
-	h.Write([]byte("projection\x00" + contracts.ConfigurationRuntimeRoleManifestFile + "\x00sql-fleet.json\x00sql-configuration.json\x00sql-audit.json\x00"))
+	h.Write([]byte("projection\x00" + contracts.ConfigurationRuntimeRoleManifestFile + "\x00sql-fleet.json\x00sql-configuration.json\x00"))
 	return hex.EncodeToString(h.Sum(nil))
 }

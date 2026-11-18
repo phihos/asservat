@@ -11,50 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acknowledgeOwnerConfiguration = `-- name: AcknowledgeOwnerConfiguration :execrows
-UPDATE hub_owner_configuration_revision SET audit_receipt_json=$5
-WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4 AND audit_receipt_json IS NULL
-`
-
-type AcknowledgeOwnerConfigurationParams struct {
-	InstallationID   pgtype.UUID
-	ClusterID        pgtype.UUID
-	SourceUid        pgtype.UUID
-	Generation       int64
-	AuditReceiptJson []byte
-}
-
-func (q *Queries) AcknowledgeOwnerConfiguration(ctx context.Context, arg AcknowledgeOwnerConfigurationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, acknowledgeOwnerConfiguration,
-		arg.InstallationID,
-		arg.ClusterID,
-		arg.SourceUid,
-		arg.Generation,
-		arg.AuditReceiptJson,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const countOwnerConfigurationRevisions = `-- name: CountOwnerConfigurationRevisions :one
-SELECT count(*) FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
-`
-
-type CountOwnerConfigurationRevisionsParams struct {
-	InstallationID pgtype.UUID
-	ClusterID      pgtype.UUID
-	SourceUid      pgtype.UUID
-}
-
-func (q *Queries) CountOwnerConfigurationRevisions(ctx context.Context, arg CountOwnerConfigurationRevisionsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countOwnerConfigurationRevisions, arg.InstallationID, arg.ClusterID, arg.SourceUid)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const fenceOwnerConfiguration = `-- name: FenceOwnerConfiguration :exec
 UPDATE hub_owner_configuration SET observed_at=$4,fresh_until=least(fresh_until,$4::timestamptz)
 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND observed_at<=$4
@@ -176,7 +132,7 @@ func (q *Queries) ObserveOwnerConfiguration(ctx context.Context, arg ObserveOwne
 }
 
 const readOwnerConfigurationRevision = `-- name: ReadOwnerConfigurationRevision :one
-SELECT installation_id, cluster_id, source_uid, generation, snapshot_json, audit_receipt_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
+SELECT installation_id, cluster_id, source_uid, generation, snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
 `
 
 type ReadOwnerConfigurationRevisionParams struct {
@@ -200,7 +156,6 @@ func (q *Queries) ReadOwnerConfigurationRevision(ctx context.Context, arg ReadOw
 		&i.SourceUid,
 		&i.Generation,
 		&i.SnapshotJson,
-		&i.AuditReceiptJson,
 	)
 	return i, err
 }
