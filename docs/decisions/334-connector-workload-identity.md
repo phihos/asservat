@@ -35,7 +35,11 @@ Putting every connector's statements in the evidence bucket reached 210,581
 bytes for 65 registrations and stopped installation. Instead, each regional
 write and history identity carries its own prefix-scoped policy in the existing
 private IAM Secret. Adding a cluster changes that Secret without growing the
-shared bucket policy. This uses the gateway's static configuration and requires
+shared bucket policy. Withdrawing a regional identity and registering it again
+issues new keys so a former holder cannot access the reactivated prefixes.
+[AWS access-key guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/securing_access-keys.html).
+
+This uses the gateway's static configuration and requires
 no IAM API service or additional credential. [SeaweedFS policy size](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/s3api/policy_engine/bucket_policy.go#L7-L11),
 [static identity policies](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/pb/iam.proto#L170-L192).
 
@@ -58,7 +62,7 @@ owner's binding to a ready Pod address in the installed Service's EndpointSlice
 and uses the configured native port. If the endpoint lists both IP families,
 federation can try either address within the original dial deadline. The connector verifies the TLS identity
 of that exact owner process. Ordinary Service load balancing could select a
-different replica with no waiting request.
+different replica with no waiting request. [Kubernetes EndpointSlice API](https://kubernetes.io/docs/reference/kubernetes-api/discovery/endpoint-slice-v1/).
 An available exchange can serve further work within its original lifetime.
 
 One database listener per federation replica receives work notifications. One

@@ -111,3 +111,23 @@ func TestRegionalDisconnectBacksOffAndCancels(t *testing.T) {
 		}
 	})
 }
+
+func TestRegionalCancelsDuringReconnectWait(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, stop := context.WithCancel(t.Context())
+		started := time.Now()
+		calls := 0
+		run := RegionalContextStartConnections{Client: &regionalDemandClient{}, Concurrency: 1, Local: contextstart.RegionalLocal{Now: time.Now},
+			Watch: func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error) {
+				calls++
+				return false, errors.New("offline")
+			}}
+		done := make(chan error, 1)
+		go func() { done <- run.Run(ctx) }()
+		synctest.Wait()
+		stop()
+		if err := <-done; !errors.Is(err, context.Canceled) || calls != 1 || !time.Now().Equal(started) {
+			t.Fatal("cancellation waited for reconnect", calls, time.Since(started), err)
+		}
+	})
+}
