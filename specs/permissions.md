@@ -168,8 +168,10 @@ An assignment keeps its ID, subject, issuer, role and source digest, together
 with its activation and retirement event IDs. Indexed source history preserves
 the binding revision, original scope, effect and automation envelope at a change,
 including when a binding is replaced or removed. A request retry returns its
-original result. Readers see a complete committed projection while another
-cluster's changes are being written.
+original result and its original controller lease deadline. During a bulk change,
+capture admission and download reservation in a healthy peer use the complete
+committed projection. Publication and the operation's final authority check
+serialize at commit.
 
 Bindings watched from a Kubernetes resource version remain current until a
 replacement or definitive loss of watch history. A five-second Kubernetes or

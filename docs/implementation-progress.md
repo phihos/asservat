@@ -2,60 +2,45 @@
 
 ## Registered workload clusters (2026-11-18)
 
-The hub routes work to registered clusters on demand through the connector's
-existing HTTP/2 connection. The router no longer polls for owners or requires
-standby settings. Remove `clusters[].standby` and `hub.hub-api.public.standby`
-on development upgrades. Upgrade both ends to protocol major 2. ADR-334
-consolidates the registration, identity, dispatch and compatibility decisions.
+The connector subscribes over its existing HTTP/2 connection. The hub finds
+its serving endpoint on demand. Remove `clusters[].standby` and
+`hub.hub-api.public.standby` on development upgrades and upgrade both ends
+to protocol major 2. ADR-334 consolidates the federation contract.
 
-- The former router, permission reader and download policy lost clusters at 17,
-  65 and 33 entries respectively. Tests cover 65 registrations, a 129-cluster
-  policy, and 201 populated deliveries with 20 ms injected SQL read and write
-  latency. PostgreSQL accepted 32,768 assignment additions and their
-  retirement, 1,025 automation bindings, and 24,000 distinct binding
-  additions and removals. Each permission change commits one audit header
-  plus its changed source and scope rows. Assignments reference the change
-  that activated or retired them. No serialized fleet change or object-store
-  acknowledgement gates the transaction. Tests also cover 65 decision-time
-  sources and a database clock 500 ms ahead of the API.
-- Owner configuration now commits its audit event alongside the revision.
-  A refused audit insert rolls both back. Eight concurrent observations of
-  one revision produced one event, and the observer accepted generation
-  1,025 with 1,024 prior revisions. On the previous candidate, a missing
-  object-store acknowledgement stalled a Helm withdrawal for over six minutes.
-  The new transaction removes that external dependency and its publisher.
-- Migrating a populated schema-5 PostgreSQL database backfilled the owner's
-  original source, generation and snapshot digest. Already-prepared schema-5
-  API and worker statements could neither read nor renew the new permission
-  projection. The migrated stream suspended previous authority pending a fresh
-  observation. Migrations 00006–00008 cover the delivery, permission audit and
-  owner audit changes.
-- At `7f775c274`, a fresh two-cluster Kind installation ran two hub API and
-  two federation replicas, with one connected remote cluster and 64 offline
-  registrations. Two Helm upgrades withdrew and restored unchanged bindings on
-  the same running connector. Across 36 idle seconds neither owner opened a
-  native exchange. The permission epoch and sequence stayed constant while
-  its lease advanced. Each public endpoint independently accepted a capture,
-  replayed the duplicate, refused changed input, committed history and
-  downloaded the selected Pod's native file (353 and 354 bytes). On the same
-  installation a single mounted Secret update added versions 2 through 17.
-  The original key-service Pod published a v17 artifact and a fresh session
-  downloaded all 353 bytes of the retained v1 artifact. Cleanup succeeded.
-- SeaweedFS 4.53 rejected the former 210,581-byte evidence bucket policy.
-  With permissions on the regional identities, the combined bucket-policy
-  file measured 5,626 bytes for 65 registrations. On re-registration both
-  withdrawn keys stayed unusable and the original evidence remained readable.
-- The remote binding exchange now includes ClusterAccessBindings authored
-  in the workload cluster. An unavailable binding observation blocks fresh
-  decisions in that cluster. Established pre-upgrade clients receive HTTP 426
-  on delivery and digest confirmation after switching the hub. A PostgreSQL
-  18 schema-5 upgrade also rejected the previous writer on insert and conflict.
-  Namespace and workload metadata delivery from
-  installed connectors is still pending. The key service accepts additive
-  changes to mounted material. Original operation deadlines and the protection
-  against mixing generations within one cryptographic operation still apply.
-  Exact-source qualification for these changes is tracked in
-  [PR #304](https://github.com/phihos/asservat/pull/304).
+- Routing, permission reconciliation and downloads previously lost clusters
+  at 17, 65 and 33 entries respectively. PostgreSQL tests cover a 129-cluster
+  download policy, 201 populated deliveries with 20 ms injected SQL latency,
+  1,025 automation bindings, and addition and withdrawal of 32,768
+  assignments and 24,000 distinct bindings. A healthy peer completed capture
+  admission and download reservation while another transaction staged a
+  permission change. One audit header and indexed source changes retain
+  original scope and assignment identity for each committed change.
+- Owner configuration and its audit commit together. A refused audit insert
+  rolls both back. Eight concurrent observations produced one event and a
+  database with 1,024 historical revisions accepted generation 1,025. Upgrading
+  disables the two retired publisher logins, revokes privileges from existing
+  sessions and removes their keys from the generated hub-worker Secret.
+- On `151c07b9c`, a fresh two-cluster Kind run exercised one connected workload
+  cluster, 64 offline registrations, two public API replicas and two federation
+  replicas. The same connector withdrew and restored a remote binding across
+  two unattended Helm upgrades. Both owner revision digests matched in SQL.
+  Across 36 idle seconds the permission lease advanced without changing its
+  epoch or sequence, and neither owner opened a native exchange. Both public
+  endpoints replayed identical requests, refused conflicting input, and
+  downloaded 354 bytes from the selected Pod. A metadata-only change preserved
+  the original user grant. The same key-service process produced a v17 artifact
+  and returned all 354 original v1 bytes after one Secret update. Cleanup passed.
+- Bundled SeaweedFS rejected the original 210,581-byte evidence bucket policy.
+  Applying regional permissions to storage identities reduced the combined
+  policies to 5,626 bytes at 65 registrations. Withdrawal invalidated the
+  old credentials and retained evidence remained readable.
+- Migrations 00006–00008 cover delivery, permission projection and owner
+  audit. A schema-5 connector received HTTP 426 on delivery and confirmation.
+  Already-prepared schema-5 SQL statements could neither read nor renew the
+  new permission projection. Installed connectors still lack remote namespace
+  and workload ownership metadata. Key rotation requires a mounted Secret
+  update, and a lost successful wrap response cannot be replayed.
+  [Qualification and remaining boundaries](https://github.com/phihos/asservat/pull/304).
 
 ## Processing cleanup (2026-11-17)
 
