@@ -13,9 +13,11 @@ The connector reduces its Kubernetes LIST page size when a page exceeds its
 response budget. The hub applies the complete binding set within the transfer
 budget. Persisted assignments and recorded artifact audiences represent a subject
 ID in up to 256 UTF-8 bytes and its optional issuer in up to 2,048. Both fields
-exclude control characters. An existing Deny with an
-unrepresentable subject makes the cluster unavailable until it is corrected.
-Unrelated subjects and assignments cannot suppress a caller’s Allow or Deny. If a connected cluster reports that its binding list cannot be read or
+exclude control characters. An Allow retains every representable subject. A Deny
+with an unrepresentable subject makes its target clusters unavailable until
+correction or removal. A namespaced binding affects only its own cluster. A hub
+ClusterAccessBinding affects the registered clusters it names. Other clusters
+continue to use their own complete observations. If a connected cluster reports that its binding list cannot be read or
 exceeds the transfer budget, fresh operations in that cluster fail closed until a
 complete replacement arrives. Other clusters remain usable. Losing a connection leaves its last accepted delivery in effect.
 [ADR-330 D1](../docs/decisions/330-event-driven-system-design.md).
