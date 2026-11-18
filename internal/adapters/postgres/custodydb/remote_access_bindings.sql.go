@@ -11,10 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const insertRemoteAccessBindings = `-- name: InsertRemoteAccessBindings :execrows
+const insertRemoteAccessBindings = `-- name: InsertRemoteAccessBindings :one
 INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
 VALUES ($1,$2,statement_timestamp(),$3,$4,$5)
-ON CONFLICT(root_id,cluster_id) DO NOTHING
+ON CONFLICT(root_id,cluster_id) DO NOTHING RETURNING revision
 `
 
 type InsertRemoteAccessBindingsParams struct {
@@ -25,18 +25,17 @@ type InsertRemoteAccessBindingsParams struct {
 	Unavailable bool
 }
 
-func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemoteAccessBindingsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertRemoteAccessBindings,
+func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemoteAccessBindingsParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertRemoteAccessBindings,
 		arg.RootID,
 		arg.ClusterID,
 		arg.Digest,
 		arg.Bindings,
 		arg.Unavailable,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var revision pgtype.UUID
+	err := row.Scan(&revision)
+	return revision, err
 }
 
 const listRemoteAccessBindings = `-- name: ListRemoteAccessBindings :many
@@ -93,7 +92,7 @@ func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAc
 }
 
 const readRemoteAccessBindingDigest = `-- name: ReadRemoteAccessBindingDigest :one
-SELECT digest, observed_at FROM remote_access_binding_delivery
+SELECT digest, revision FROM remote_access_binding_delivery
 WHERE root_id=$1 AND cluster_id=$2
 `
 
@@ -103,25 +102,25 @@ type ReadRemoteAccessBindingDigestParams struct {
 }
 
 type ReadRemoteAccessBindingDigestRow struct {
-	Digest     []byte
-	ObservedAt pgtype.Timestamptz
+	Digest   []byte
+	Revision pgtype.UUID
 }
 
 func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) (ReadRemoteAccessBindingDigestRow, error) {
 	row := q.db.QueryRow(ctx, readRemoteAccessBindingDigest, arg.RootID, arg.ClusterID)
 	var i ReadRemoteAccessBindingDigestRow
-	err := row.Scan(&i.Digest, &i.ObservedAt)
+	err := row.Scan(&i.Digest, &i.Revision)
 	return i, err
 }
 
-const replaceRemoteAccessBindings = `-- name: ReplaceRemoteAccessBindings :execrows
+const replaceRemoteAccessBindings = `-- name: ReplaceRemoteAccessBindings :one
 UPDATE remote_access_binding_delivery SET
- observed_at=GREATEST(statement_timestamp(), observed_at + interval '1 microsecond'),
+ observed_at=statement_timestamp(),revision=DEFAULT,
  unavailable=CASE WHEN digest=$1 THEN unavailable ELSE $2 END,
  bindings=CASE WHEN digest=$1 THEN bindings ELSE $3 END,
  digest=$1
 WHERE root_id=$4 AND cluster_id=$5
- AND observed_at=$6
+ AND revision=$6 RETURNING revision
 `
 
 type ReplaceRemoteAccessBindingsParams struct {
@@ -130,13 +129,13 @@ type ReplaceRemoteAccessBindingsParams struct {
 	Bindings    []byte
 	RootID      pgtype.UUID
 	ClusterID   pgtype.UUID
-	Previous    pgtype.Timestamptz
+	Previous    pgtype.UUID
 }
 
 // Every completed exchange, including confirmation, advances the same token.
-// The existing timestamp column stays increasing even across clock corrections.
-func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRemoteAccessBindingsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, replaceRemoteAccessBindings,
+// A deletion followed by a new observation also has a distinct revision.
+func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRemoteAccessBindingsParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, replaceRemoteAccessBindings,
 		arg.Digest,
 		arg.Unavailable,
 		arg.Bindings,
@@ -144,8 +143,7 @@ func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRe
 		arg.ClusterID,
 		arg.Previous,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var revision pgtype.UUID
+	err := row.Scan(&revision)
+	return revision, err
 }

@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,12 +45,47 @@ func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root strin
 	return &RemoteAccessBindings{ledger: l, root: root}, nil
 }
 
+// BeginRemoteBindings establishes a durable predecessor before the connector
+// reads Kubernetes. A new registration grants nothing until its first LIST.
+func (s *RemoteAccessBindings) BeginRemoteBindings(ctx context.Context, cluster string) (string, error) {
+	_, revision, err := s.RemoteBindingsDigest(ctx, cluster)
+	if err != nil || revision != "" {
+		return revision, err
+	}
+	marker := contracts.AccessBindingDelivery{Unavailable: true}
+	sum, _ := hex.DecodeString(marker.Digest())
+	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		token, err := q.InsertRemoteAccessBindings(ctx, custodydb.InsertRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Digest: sum, Bindings: []byte("[]"), Unavailable: true})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return cfg.ErrChanged
+		}
+		revision = uid(token)
+		return err
+	})
+	if err == nil {
+		return revision, nil
+	}
+	if !errors.Is(err, cfg.ErrChanged) {
+		return "", permissionError(err)
+	}
+	// Another transaction initialized the registration. A concurrent
+	// withdrawal can also remove it again before this read.
+	_, revision, err = s.RemoteBindingsDigest(ctx, cluster)
+	if err == nil && revision == "" {
+		return "", cfg.ErrChanged
+	}
+	return revision, err
+}
+
 // StoreRemoteBindings confirms the exact predecessor the connector compared.
 // A concurrent commit makes this exchange retry from a fresh workload LIST.
-func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster string, previous time.Time, digest string, bindings []cfg.Binding, unavailable bool) error {
+func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster string, previous, digest string, bindings []cfg.Binding, unavailable bool) (string, error) {
+	if !authorization.UUID(previous) {
+		return "", cfg.ErrChanged
+	}
 	sum, err := hex.DecodeString(digest)
 	if s == nil || ctx == nil || !cfg.ValidClusterBindings(cluster, bindings) || err != nil || len(sum) != sha256.Size {
-		return cfg.ErrInvalid
+		return "", cfg.ErrInvalid
 	}
 	body, err := json.Marshal(bindings)
 	// The normalized SQL representation is independently bounded at 32 MiB
@@ -61,28 +97,28 @@ func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, cluster 
 		body = []byte("[]")
 	}
 	if err != nil {
-		return cfg.ErrInvalid
+		return "", cfg.ErrInvalid
 	}
-	return permissionError(s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var rows int64
+	var token pgtype.UUID
+	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		var err error
-		if previous.IsZero() {
-			rows, err = q.InsertRemoteAccessBindings(ctx, custodydb.InsertRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Digest: sum, Bindings: body, Unavailable: unavailable})
-		} else {
-			rows, err = q.ReplaceRemoteAccessBindings(ctx, custodydb.ReplaceRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Previous: ts(previous), Digest: sum, Bindings: body, Unavailable: unavailable})
-		}
-		if err == nil && rows == 0 {
+		token, err = q.ReplaceRemoteAccessBindings(ctx, custodydb.ReplaceRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(cluster), Previous: id(previous), Digest: sum, Bindings: body, Unavailable: unavailable})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return cfg.ErrChanged
 		}
 		return err
-	}))
+	})
+	if err != nil {
+		return "", permissionError(err)
+	}
+	return uid(token), nil
 }
 
 // RemoteBindingsDigest returns the digest and revision atomically. An absent
-// row has an empty digest and a zero revision.
-func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster string) (string, time.Time, error) {
+// row has an empty digest and revision.
+func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster string) (string, string, error) {
 	if s == nil || ctx == nil || !authorization.UUID(cluster) {
-		return "", time.Time{}, cfg.ErrInvalid
+		return "", "", cfg.ErrInvalid
 	}
 	var observation custodydb.ReadRemoteAccessBindingDigestRow
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) (err error) {
@@ -92,7 +128,10 @@ func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster
 		}
 		return err
 	})
-	return hex.EncodeToString(observation.Digest), observation.ObservedAt.Time, permissionError(err)
+	if err != nil || !observation.Revision.Valid {
+		return "", "", permissionError(err)
+	}
+	return hex.EncodeToString(observation.Digest), uid(observation.Revision), nil
 }
 
 // RemoteBindings returns every cluster's latest delivery. Bindings are read

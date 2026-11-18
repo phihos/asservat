@@ -1,18 +1,18 @@
--- name: InsertRemoteAccessBindings :execrows
+-- name: InsertRemoteAccessBindings :one
 INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
 VALUES ($1,$2,statement_timestamp(),$3,$4,$5)
-ON CONFLICT(root_id,cluster_id) DO NOTHING;
+ON CONFLICT(root_id,cluster_id) DO NOTHING RETURNING revision;
 
--- name: ReplaceRemoteAccessBindings :execrows
+-- name: ReplaceRemoteAccessBindings :one
 -- Every completed exchange, including confirmation, advances the same token.
--- The existing timestamp column stays increasing even across clock corrections.
+-- A deletion followed by a new observation also has a distinct revision.
 UPDATE remote_access_binding_delivery SET
- observed_at=GREATEST(statement_timestamp(), observed_at + interval '1 microsecond'),
+ observed_at=statement_timestamp(),revision=DEFAULT,
  unavailable=CASE WHEN digest=sqlc.arg(digest) THEN unavailable ELSE sqlc.arg(unavailable) END,
  bindings=CASE WHEN digest=sqlc.arg(digest) THEN bindings ELSE sqlc.arg(bindings) END,
  digest=sqlc.arg(digest)
 WHERE root_id=sqlc.arg(root_id) AND cluster_id=sqlc.arg(cluster_id)
- AND observed_at=sqlc.arg(previous);
+ AND revision=sqlc.arg(previous) RETURNING revision;
 
 -- name: ListRemoteAccessBindings :many
 -- Compare the reader's cached digests within the same database snapshot.
@@ -27,5 +27,5 @@ FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
 WHERE d.root_id=sqlc.arg(root_id) ORDER BY d.cluster_id;
 
 -- name: ReadRemoteAccessBindingDigest :one
-SELECT digest, observed_at FROM remote_access_binding_delivery
+SELECT digest, revision FROM remote_access_binding_delivery
 WHERE root_id=$1 AND cluster_id=$2;

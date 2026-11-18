@@ -1447,6 +1447,7 @@ type RemoteAccessBindingDelivery struct {
 	Digest      []byte
 	Bindings    []byte
 	Unavailable bool
+	Revision    pgtype.UUID
 }
 
 type RetentionDecision struct {

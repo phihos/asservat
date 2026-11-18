@@ -47,6 +47,80 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	original := cfg.Binding{Resource: basis.Resource, Scope: basis.Scope, Subjects: basis.Subjects, Roles: basis.Roles, Effect: basis.Effect}
 	original.Resource.ClusterID = target.ClusterID
 	original.Resource.Name, original.Resource.Namespace, original.Resource.NamespaceUID = "readers", basis.Scope.Namespace.Name, basis.Scope.Namespace.UID
+	t.Run("concurrent-observations-and-same-clock-reregistration", func(t *testing.T) {
+		regionRoot := custodyID()
+		receiver := deliveries(regionRoot)
+		cluster := target.ClusterID
+		type result struct {
+			token string
+			err   error
+		}
+		started := make(chan result, 2)
+		for range 2 {
+			go func() {
+				token, err := receiver.BeginRemoteBindings(ctx, cluster)
+				started <- result{token, err}
+			}()
+		}
+		a, b := <-started, <-started
+		marker := (contracts.AccessBindingDelivery{Unavailable: true}).Digest()
+		stored, revision, err := receiver.RemoteBindingsDigest(ctx, cluster)
+		if a.err != nil || b.err != nil || err != nil || !authorization.UUID(revision) || a.token != revision || b.token != revision || stored != marker {
+			t.Fatal("concurrent first reads did not establish one unavailable predecessor", a, b, stored, revision, err)
+		}
+		publish := func(previous, digest string, bindings []cfg.Binding, unavailable bool) string {
+			t.Helper()
+			token, err := receiver.StoreRemoteBindings(ctx, cluster, previous, digest, bindings, unavailable)
+			if err != nil || !authorization.UUID(token) || token == previous {
+				t.Fatal("commit new revision", token, err)
+			}
+			d, current, err := receiver.RemoteBindingsDigest(ctx, cluster)
+			if err != nil || d != digest || current != token {
+				t.Fatal("returned token differs from the stored one", err)
+			}
+			return token
+		}
+		stale := func(previous, digest string, bindings []cfg.Binding, unavailable bool) {
+			t.Helper()
+			token, err := receiver.StoreRemoteBindings(ctx, cluster, previous, digest, bindings, unavailable)
+			if token != "" || !errors.Is(err, cfg.ErrChanged) {
+				t.Fatal("stale observation accepted", previous, token, err)
+			}
+		}
+		positive := publish(a.token, sum, []cfg.Binding{original}, false)
+		stale(b.token, marker, nil, true)
+		negative := publish(positive, strings.Repeat("db", 32), nil, false)
+		stale(positive, sum, []cfg.Binding{original}, false)
+
+		// Both incarnations have the exact same wall clock observation.
+		sameTime := func() string {
+			t.Helper()
+			if _, err := admin.Exec(ctx, "UPDATE remote_access_binding_delivery SET observed_at='2001-01-01T00:00:00Z' WHERE root_id=$1 AND cluster_id=$2", regionRoot, cluster); err != nil {
+				t.Fatal(err)
+			}
+			token, err := receiver.BeginRemoteBindings(ctx, cluster)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return token
+		}
+		before := sameTime()
+		if before != negative {
+			t.Fatal("wall clock correction changed the revision")
+		}
+		if err := receiver.WithdrawUnregistered(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		stale("", sum, []cfg.Binding{original}, false)
+		stale(before, sum, []cfg.Binding{original}, false)
+		if _, err := receiver.BeginRemoteBindings(ctx, cluster); err != nil {
+			t.Fatal(err)
+		}
+		after := sameTime()
+		stale(before, sum, []cfg.Binding{original}, false)
+		stale(positive, marker, nil, true)
+		publish(after, sum, []cfg.Binding{original}, false)
+	})
 	for _, d := range []struct {
 		s       *postgres.RemoteAccessBindings
 		cluster string
@@ -55,7 +129,11 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		if d.cluster == target.ClusterID {
 			b.Bindings = []cfg.Binding{original}
 		}
-		if err := d.s.StoreRemoteBindings(ctx, b.ClusterID, time.Time{}, sum, b.Bindings, false); err != nil {
+		previous, err := d.s.BeginRemoteBindings(ctx, b.ClusterID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := d.s.StoreRemoteBindings(ctx, b.ClusterID, previous, sum, b.Bindings, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -66,31 +144,31 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		t.Fatal(err)
 	}
 	_, initial, err := store.RemoteBindingsDigest(ctx, active)
-	if err != nil || !initial.After(time.Now()) {
+	if err != nil || !authorization.UUID(initial) {
 		t.Fatal("future predecessor", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, initial, sum, nil, false); err != nil {
+	if _, err := store.StoreRemoteBindings(ctx, active, initial, sum, nil, false); err != nil {
 		t.Fatal("confirm", err)
 	}
 	replacementDigest := strings.Repeat("ca", 32)
-	if err := store.StoreRemoteBindings(ctx, active, initial, replacementDigest, nil, false); !errors.Is(err, cfg.ErrChanged) {
+	if _, err := store.StoreRemoteBindings(ctx, active, initial, replacementDigest, nil, false); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("stale replacement acknowledged")
 	}
 	_, confirmed, err := store.RemoteBindingsDigest(ctx, active)
-	if err != nil || !confirmed.After(initial) {
+	if err != nil || confirmed == initial || !authorization.UUID(confirmed) {
 		t.Fatal("confirmation did not advance revision", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, confirmed, replacementDigest, nil, false); err != nil {
+	if _, err := store.StoreRemoteBindings(ctx, active, confirmed, replacementDigest, nil, false); err != nil {
 		t.Fatal("replace", err)
 	}
-	if err := store.StoreRemoteBindings(ctx, active, confirmed, sum, nil, false); !errors.Is(err, cfg.ErrChanged) {
+	if _, err := store.StoreRemoteBindings(ctx, active, confirmed, sum, nil, false); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("stale confirmation acknowledged")
 	}
 	_, current, err := store.RemoteBindingsDigest(ctx, target.ClusterID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.StoreRemoteBindings(ctx, target.ClusterID, current, sum, nil, false); err != nil {
+	if _, err := store.StoreRemoteBindings(ctx, target.ClusterID, current, sum, nil, false); err != nil {
 		t.Fatal("confirm populated delivery", err)
 	}
 	rows, err := store.RemoteBindings(ctx)
@@ -136,7 +214,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		cluster, digest string
 	}{{store, active, replacementDigest}, {store, target.ClusterID, ""}, {otherRoot, target.ClusterID, sum}} {
 		got, observed, err := d.s.RemoteBindingsDigest(ctx, d.cluster)
-		if observed.IsZero() != (d.digest == "") {
+		if (observed == "") != (d.digest == "") {
 			t.Fatal("missing database observation", err)
 		}
 		if err != nil || got != d.digest {
@@ -196,7 +274,11 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	replacement.Resource.UID = custodyID()
 	replacement.Subjects = []cfg.Subject{{Kind: "Group", Issuer: original.Subjects[0].Issuer, ID: "replacement-team"}}
 	d := cfg.RemoteBindings{ClusterID: target.ClusterID, ObservedAt: time.Now().UTC(), Bindings: []cfg.Binding{replacement}}
-	if err := store.StoreRemoteBindings(ctx, d.ClusterID, time.Time{}, strings.Repeat("bd", 32), d.Bindings, false); err != nil {
+	previous, err := store.BeginRemoteBindings(ctx, d.ClusterID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.StoreRemoteBindings(ctx, d.ClusterID, previous, strings.Repeat("bd", 32), d.Bindings, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := projection(); len(got.Allows) != 2 || !slices.ContainsFunc(got.Allows, func(a authorization.CurrentAssignment) bool {
@@ -213,7 +295,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := store.StoreRemoteBindings(ctx, target.ClusterID, previous, digest, bindings, unavailable); err != nil {
+		if _, err := store.StoreRemoteBindings(ctx, target.ClusterID, previous, digest, bindings, unavailable); err != nil {
 			t.Fatal(err)
 		}
 	}

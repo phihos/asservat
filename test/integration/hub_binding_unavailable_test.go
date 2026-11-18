@@ -35,13 +35,18 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deliveries, err := postgres.NewRemoteAccessBindings(ctx, connectorDeliveryPool(t, admin, authority), root)
+	deliveryPool := connectorDeliveryPool(t, admin, authority)
+	deliveries, err := postgres.NewRemoteAccessBindings(ctx, deliveryPool, root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, cluster := range []string{peer, blocked} {
 		grant := cfg.Binding{Resource: cfg.Resource{ClusterID: cluster, Namespace: ns.Name, NamespaceUID: ns.UID, Kind: "AccessBinding", Name: "readers", UID: custodyID(), ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: ns}, Subjects: []cfg.Subject{{Kind: "Group", Issuer: issuer, ID: "team"}}, Roles: []string{"workload-maintainer"}, Effect: "Allow"}
-		if err := deliveries.StoreRemoteBindings(ctx, cluster, time.Time{}, strings.Repeat("da", 32), []cfg.Binding{grant}, false); err != nil {
+		previous, err := deliveries.BeginRemoteBindings(ctx, cluster)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := deliveries.StoreRemoteBindings(ctx, cluster, previous, strings.Repeat("da", 32), []cfg.Binding{grant}, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -148,6 +153,9 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 		cluster := custodyID()
 		var removed atomic.Bool
 		client := idleKubernetesBindingWatch(t, cluster, func(w http.ResponseWriter, r *http.Request) {
+			if n := deliveryPool.Stat().AcquiredConns(); n != 0 {
+				t.Errorf("%d connector SQL connections held during Kubernetes read", n)
+			}
 			reply := json.NewEncoder(w)
 			switch r.URL.Path {
 			case "/api/v1/namespaces/app":
@@ -172,7 +180,7 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 			t.Fatal(err)
 		}
 		for _, want := range []int{1, 0} {
-			_, previous, err := deliveries.RemoteBindingsDigest(ctx, cluster)
+			previous, err := deliveries.BeginRemoteBindings(ctx, cluster)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -184,7 +192,7 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 			if err != nil {
 				t.Fatal("replacement refused", err)
 			}
-			if err = deliveries.StoreRemoteBindings(ctx, cluster, previous, wire.Digest(), bindings, false); err != nil {
+			if _, err = deliveries.StoreRemoteBindings(ctx, cluster, previous, wire.Digest(), bindings, false); err != nil {
 				t.Fatal(err)
 			}
 			rows, err := deliveries.RemoteBindings(ctx)

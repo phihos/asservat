@@ -9,7 +9,9 @@ UPDATE permission_stream SET suspended=true, lease_until=statement_timestamp(), 
 DELETE FROM remote_access_binding_delivery;
 -- Require writers to specify whether the two-kind observation is available.
 -- A still-running v5 hub omits this column in its upsert.
-ALTER TABLE remote_access_binding_delivery ADD COLUMN unavailable boolean NOT NULL;
+ALTER TABLE remote_access_binding_delivery
+ ADD COLUMN unavailable boolean NOT NULL,
+ ADD COLUMN revision uuid NOT NULL DEFAULT gen_random_uuid();
 -- +goose StatementBegin
 CREATE FUNCTION public.withdraw_remote_bindings(target_root uuid, active_clusters uuid[]) RETURNS void
 LANGUAGE plpgsql STRICT SECURITY DEFINER SET search_path TO pg_catalog, pg_temp AS $$
