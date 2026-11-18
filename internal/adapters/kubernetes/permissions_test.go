@@ -294,8 +294,8 @@ func TestPermissionInvalidSpecGrantsNothing(t *testing.T) {
 		"empty subjects": func(o map[string]any) { o["spec"].(map[string]any)["subjects"] = []any{} },
 		"wildcard role":  func(o map[string]any) { o["spec"].(map[string]any)["roles"] = []string{"*"} },
 		"null roles":     func(o map[string]any) { o["spec"].(map[string]any)["roles"] = nil },
-		"http issuer": func(o map[string]any) {
-			o["spec"].(map[string]any)["subjects"] = []any{map[string]any{"kind": "Group", "issuer": "http://id.example.invalid", "id": "team-a"}}
+		"explicit empty issuer": func(o map[string]any) {
+			o["spec"].(map[string]any)["subjects"] = []any{map[string]any{"kind": "Group", "issuer": "", "id": "team-a"}}
 		},
 		"invalid workload name": func(o map[string]any) {
 			o["spec"].(map[string]any)["workloads"] = []any{map[string]any{"kind": "Deployment", "name": "../other", "uid": "uid"}}

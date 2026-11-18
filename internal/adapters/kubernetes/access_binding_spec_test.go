@@ -23,7 +23,7 @@ func TestAccessBindingSpecDecoder(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`{"effect":"Deny"}`,
-		`{"effect":"Allow","subjects":[{"kind":"Group","issuer":"http://id.example.invalid","id":"team-a"}],"roles":["evidence-reader"],"reason":"x"}`,
+		`{"effect":"Allow","subjects":[{"kind":"Group","issuer":"","id":"team-a"}],"roles":["evidence-reader"],"reason":"x"}`,
 		// ADR-329: the old scope field is gone; the namespace is the scope.
 		`{"effect":"Allow","subjects":[{"kind":"Group","issuer":"https://id.example.invalid","id":"team-a"}],"roles":["evidence-reader"],"scope":{"clusterID":"00000000-0000-4000-8000-000000000001"},"reason":"x"}`,
 		`[]`,
