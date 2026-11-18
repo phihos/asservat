@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -173,6 +174,25 @@ func TestNativeClientFrameCancellationJoinsActualRead(t *testing.T) {
 	}
 	if err = s.Send(ctx, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: []byte(`{}`)}); err == nil {
 		t.Fatal("cancelled stream reused")
+	}
+}
+
+func TestNativeOwnerDialUsesImplicitHTTPSPort(t *testing.T) {
+	u, err := url.Parse("https://hub.example" + contracts.NativeWorkerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var destination string
+	dial := nativeOwnerDial(u, []string{"2001:db8::5"}, time.Now().Add(time.Second),
+		func(_ context.Context, _, address string) (net.Conn, error) {
+			destination = address
+			return nil, nil
+		})
+	if _, err := dial(t.Context(), "tcp", "hub.example:443"); err != nil || destination != "[2001:db8::5]:443" {
+		t.Fatalf("owner destination %q, error %v", destination, err)
+	}
+	if _, err := dial(t.Context(), "tcp", "hub.example:8443"); !errors.Is(err, contracts.ErrNativeProtocol) {
+		t.Fatalf("unexpected authority was accepted: %v", err)
 	}
 }
 

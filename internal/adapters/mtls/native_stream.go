@@ -104,20 +104,26 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		return nil, contracts.ErrNativeProtocol
 	}
 	// A single new opening, before any command. A second move is a refusal.
-	dial := func(ctx context.Context, network, authority string) (net.Conn, error) {
-		if authority != u.Host || network != "tcp" {
+	until, _ := setup.Deadline()
+	dial := nativeOwnerDial(u, route.Addresses, until, (&net.Dialer{KeepAlive: -1}).DialContext)
+	stream, err = c.openAt(ctx, setup, hello, dial)
+	if errors.As(err, &route) {
+		return nil, contracts.ErrNativeProtocol
+	}
+	return stream, err
+}
+
+func nativeOwnerDial(u *url.URL, addresses []string, limit time.Time, dial func(context.Context, string, string) (net.Conn, error)) func(context.Context, string, string) (net.Conn, error) {
+	port := httpsPort(u)
+	return func(ctx context.Context, network, authority string) (net.Conn, error) {
+		if authority != net.JoinHostPort(u.Hostname(), port) || network != "tcp" {
 			return nil, contracts.ErrNativeProtocol
 		}
-		port := u.Port()
-		if port == "" {
-			port = "443"
-		}
 		var err error
-		for i, address := range route.Addresses {
-			limit, _ := setup.Deadline()
-			call, stop := context.WithTimeout(ctx, time.Until(limit)/time.Duration(len(route.Addresses)-i))
+		for i, address := range addresses {
+			call, stop := context.WithTimeout(ctx, time.Until(limit)/time.Duration(len(addresses)-i))
 			var conn net.Conn
-			conn, err = (&net.Dialer{KeepAlive: -1}).DialContext(call, network, net.JoinHostPort(address, port))
+			conn, err = dial(call, network, net.JoinHostPort(address, port))
 			stop()
 			if err == nil {
 				return conn, nil
@@ -125,11 +131,6 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		}
 		return nil, err
 	}
-	stream, err = c.openAt(ctx, setup, hello, dial)
-	if errors.As(err, &route) {
-		return nil, contracts.ErrNativeProtocol
-	}
-	return stream, err
 }
 
 func (c *NativeClient) openAt(ctx, setup context.Context, hello contracts.NativeHello, dial func(context.Context, string, string) (net.Conn, error)) (*NativeClientStream, error) {

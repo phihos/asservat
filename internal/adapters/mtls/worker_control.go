@@ -45,6 +45,13 @@ func workerAddress(address string) error {
 	return nil
 }
 
+func httpsPort(endpoint *url.URL) string {
+	if port := endpoint.Port(); port != "" {
+		return port
+	}
+	return "443"
+}
+
 // workerDial returns a dialer that connects only for the exact authority of
 // endpoint and then only to address. Without an address it is nil, so the
 // transport keeps its own dialer for the endpoint host.
@@ -52,11 +59,7 @@ func workerDial(endpoint *url.URL, address string, dial func(context.Context, st
 	if address == "" {
 		return nil
 	}
-	port := endpoint.Port()
-	if port == "" {
-		port = "443"
-	}
-	expected := net.JoinHostPort(endpoint.Hostname(), port)
+	expected := net.JoinHostPort(endpoint.Hostname(), httpsPort(endpoint))
 	return func(ctx context.Context, network, authority string) (net.Conn, error) {
 		if network != "tcp" || authority != expected {
 			return nil, artifact.ErrDownloadUnavailable
