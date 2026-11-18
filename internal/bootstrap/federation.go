@@ -163,7 +163,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	f.work = &connectorlifecycle.WorkHandler{Tokens: tokens, Concurrency: c.Concurrency, Ready: func(ctx context.Context, cluster string) error {
 		return postgres.NotifyConnectorReady(ctx, f.workPool, cluster)
 	}}
-	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Owners: owners.Routes, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
+	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Owners: settings.ownerEndpoints, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
 	// The serving identity is deployment-provided server authentication only;
 	// connectors authenticate with their ServiceAccount tokens.
 	pair, err := readServingPair(startup, files)

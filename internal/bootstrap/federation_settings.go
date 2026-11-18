@@ -6,10 +6,15 @@ import (
 	"encoding/json"
 	"net"
 	"net/url"
+	"slices"
+	"strconv"
 	"sync"
 	"time"
 
+	core "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -122,6 +127,42 @@ func (s *federationSettings) Settings(ctx context.Context, p value.ConnectorClus
 		return connectorlifecycle.Settings{}, err
 	}
 	return out, nil
+}
+
+// ownerEndpoints uses the native Service's ready endpoints to locate one Pod.
+// The connector authenticates the exact process epoch over its TLS connection.
+func (s *federationSettings) ownerEndpoints(ctx context.Context, owner value.OwnerBinding) ([]string, error) {
+	if owner.InstallationID != s.ids.InstallationID || owner.ClusterID != s.ids.ClusterID || owner.IssuerEpoch != s.ids.IssuerEpoch {
+		return nil, value.ErrDenied
+	}
+	service := contracts.HubAPIName(s.prefix, "hub-api-native")
+	options := meta.ListOptions{LabelSelector: labels.Set{discovery.LabelServiceName: service}.AsSelector().String()}
+	list, err := s.api.DiscoveryV1().EndpointSlices(s.namespace).List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	var addresses []string
+	for _, slice := range list.Items {
+		if slice.AddressType != discovery.AddressTypeIPv4 && slice.AddressType != discovery.AddressTypeIPv6 {
+			continue
+		}
+		for _, port := range slice.Ports {
+			if port.Name == nil || *port.Name != "native" || port.Port == nil || port.Protocol != nil && *port.Protocol != core.ProtocolTCP {
+				continue
+			}
+			for _, endpoint := range slice.Endpoints {
+				ref, conditions := endpoint.TargetRef, endpoint.Conditions
+				if ref == nil || ref.Kind != "Pod" || string(ref.UID) != owner.PodUID || conditions.Ready == nil || !*conditions.Ready || conditions.Terminating != nil && *conditions.Terminating {
+					continue
+				}
+				for _, ip := range endpoint.Addresses {
+					addresses = append(addresses, net.JoinHostPort(ip, strconv.Itoa(int(*port.Port))))
+				}
+			}
+		}
+	}
+	slices.Sort(addresses)
+	return slices.Compact(addresses), nil
 }
 
 // Generic tunnels serve only the offer's key service and evidence store.

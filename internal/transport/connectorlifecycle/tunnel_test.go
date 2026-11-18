@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -166,16 +168,6 @@ func TestTunnelCloseStopsDeadlines(t *testing.T) {
 	}
 }
 
-type tunnelOwnerRoutes map[value.OwnerBinding]string
-
-func (r tunnelOwnerRoutes) CurrentOwnerRoute(_ context.Context, owner value.OwnerBinding) (value.OwnerRoute, error) {
-	ip, ok := r[owner]
-	if !ok {
-		return value.OwnerRoute{}, value.ErrUnavailable
-	}
-	return value.OwnerRoute{Endpoint: value.OwnerEndpoint{Binding: owner, Pool: value.OwnerPool{NativePort: 9444}, Addresses: []string{ip}}}, nil
-}
-
 // Both replicas sit behind the same native Service. Only the hub's endpoint
 // lookup can choose a Pod IP. The connector supplies the waiting binding.
 func TestOwnerTunnelReachesTheRequestedReplica(t *testing.T) {
@@ -183,10 +175,16 @@ func TestOwnerTunnelReachesTheRequestedReplica(t *testing.T) {
 	first := value.OwnerBinding{InstallationID: id("01"), ClusterID: id("02"), IssuerEpoch: id("03"), PodUID: id("04"), ProcessEpoch: id("05")}
 	second := first
 	second.PodUID, second.ProcessEpoch = id("06"), id("07")
-	routes := tunnelOwnerRoutes{first: "10.0.0.11", second: "10.0.0.12"}
+	routes := map[value.OwnerBinding]string{first: "10.0.0.11", second: "10.0.0.12"}
 	tokens := &tunnelTokens{until: time.Now().Add(time.Minute)}
 	dials := make(chan string, 2)
-	h := &TunnelHandler{Tokens: tokens, Owners: routes, Allowed: func(context.Context, string) bool { return false },
+	h := &TunnelHandler{Tokens: tokens, Owners: func(_ context.Context, owner value.OwnerBinding) ([]string, error) {
+		ip, ok := routes[owner]
+		if !ok {
+			return nil, value.ErrUnavailable
+		}
+		return []string{net.JoinHostPort(ip, "9444")}, nil
+	}, Allowed: func(context.Context, string) bool { return false },
 		Dial: func(_ context.Context, _, address string) (net.Conn, error) {
 			dials <- address
 			local, remote := net.Pipe()
@@ -219,4 +217,36 @@ func TestOwnerTunnelReachesTheRequestedReplica(t *testing.T) {
 	if len(dials) != 0 {
 		t.Fatal("refused owner or address reached a backend")
 	}
+}
+
+func TestTunnelFallsBackAcrossFamiliesWithinOriginalDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, end := context.WithTimeout(t.Context(), 5*time.Second)
+		defer end()
+		until, _ := ctx.Deadline()
+		addresses := []string{"10.1.0.11:9444", "[fd00::11]:9444"}
+		var tried []string
+		local, remote := net.Pipe()
+		defer remote.Close()
+		h := TunnelHandler{Dial: func(call context.Context, network, address string) (net.Conn, error) {
+			tried = append(tried, address)
+			deadline, _ := call.Deadline()
+			if network != "tcp" || deadline.After(until) {
+				t.Fatal("dial exceeded the original deadline", deadline)
+			}
+			if address == addresses[0] {
+				<-call.Done() // The first address family is unreachable until its deadline.
+				return nil, call.Err()
+			}
+			if call.Err() != nil || !time.Now().Before(until) {
+				t.Fatal("no time for the second family")
+			}
+			return local, nil
+		}}
+		conn, err := h.dialEndpoints(ctx, addresses)
+		if err != nil || conn != local || !slices.Equal(tried, addresses) {
+			t.Fatal("dual-stack fallback", tried, err)
+		}
+		conn.Close()
+	})
 }

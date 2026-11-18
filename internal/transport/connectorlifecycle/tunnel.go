@@ -6,12 +6,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -35,7 +33,7 @@ type TunnelTokens interface {
 // hub allows.
 type TunnelHandler struct {
 	Tokens TunnelTokens
-	Owners app.OwnerRouteReader
+	Owners func(context.Context, value.OwnerBinding) ([]string, error)
 	// Allowed reports whether host:port is one of the hub's services.
 	Allowed func(context.Context, string) bool
 	Dial    func(ctx context.Context, network, address string) (net.Conn, error)
@@ -65,13 +63,13 @@ func (h *TunnelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithDeadline(r.Context(), until)
 	defer cancel()
 	dial, endDial := context.WithTimeout(ctx, 5*time.Second)
-	address, ok := h.destination(dial, target)
+	addresses, ok := h.destinations(dial, target)
 	if !ok {
 		endDial()
 		fail(http.StatusForbidden)
 		return
 	}
-	upstream, err := h.Dial(dial, "tcp", address)
+	upstream, err := h.dialEndpoints(dial, addresses)
 	endDial()
 	if err != nil {
 		fail(http.StatusBadGateway)
@@ -104,21 +102,36 @@ func (h *TunnelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // A connector supplies an owner binding, never a Pod address. The federation
 // dials the current Kubernetes endpoint and installed native port for that owner.
-func (h *TunnelHandler) destination(ctx context.Context, target string) (string, bool) {
+func (h *TunnelHandler) destinations(ctx context.Context, target string) ([]string, bool) {
 	locator, owner := strings.CutPrefix(target, "owner/")
 	if !owner {
-		return target, h.Allowed(ctx, target)
+		return []string{target}, h.Allowed(ctx, target)
 	}
 	var binding value.OwnerBinding
 	if h.Owners == nil || json.Unmarshal([]byte(locator), &binding) != nil || !binding.Valid() {
-		return "", false
+		return nil, false
 	}
-	route, err := h.Owners.CurrentOwnerRoute(ctx, binding)
-	endpoint := route.Endpoint
-	if err != nil || endpoint.Binding != binding || len(endpoint.Addresses) == 0 || endpoint.Pool.NativePort < 1 {
-		return "", false
+	addresses, err := h.Owners(ctx, binding)
+	return addresses, err == nil && len(addresses) > 0
+}
+
+// Share the original dial window between the endpoint's address families. An
+// unreachable first family cannot consume the time needed to try the second.
+func (h *TunnelHandler) dialEndpoints(ctx context.Context, addresses []string) (net.Conn, error) {
+	until, _ := ctx.Deadline()
+	for len(addresses) > 1 {
+		call, cancel := context.WithTimeout(ctx, time.Until(until)/time.Duration(len(addresses)))
+		conn, err := h.Dial(call, "tcp", addresses[0])
+		cancel()
+		if err == nil {
+			return conn, nil
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		addresses = addresses[1:]
 	}
-	return net.JoinHostPort(endpoint.Addresses[0], strconv.Itoa(endpoint.Pool.NativePort)), true
+	return h.Dial(ctx, "tcp", addresses[0])
 }
 
 // DialOwner tunnels to the specific replica with a waiting caller.
