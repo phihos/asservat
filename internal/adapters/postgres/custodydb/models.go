@@ -1117,7 +1117,6 @@ type PermissionReviewSource struct {
 	StreamID        pgtype.UUID
 	Uid             string
 	Epoch           pgtype.UUID
-	SeenSequence    int64
 	Generation      int64
 	ResourceVersion string
 	SpecDigest      []byte

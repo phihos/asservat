@@ -319,7 +319,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// assignments only retire here.
 		add("permission_review_source", "INSERT")
 		add("permission_review_source", "DELETE")
-		add("permission_review_source", "UPDATE", "epoch", "seen_sequence", "generation", "resource_version", "spec_digest", "authority_digest", "cluster_id", "role", "source_json", "accepted_audit_id")
+		add("permission_review_source", "UPDATE", "epoch", "generation", "resource_version", "spec_digest", "authority_digest", "cluster_id", "role", "source_json", "accepted_audit_id")
 		add("permission_review_assignment", "UPDATE", "retired_at", "retirement_audit_id")
 		// ADR-329: joined clusters' AccessBinding deliveries.
 		read("remote_access_binding_delivery")

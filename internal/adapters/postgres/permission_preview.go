@@ -53,7 +53,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			if !isReview(ref) {
 				continue
 			}
-			rows, err := q.SelectPreviewReviewAssignments(ctx, custodydb.SelectPreviewReviewAssignmentsParams{StreamID: s.ID, SourceUid: ref.UID, Epoch: s.Epoch, SeenSequence: s.Sequence})
+			rows, err := q.SelectPreviewReviewAssignments(ctx, custodydb.SelectPreviewReviewAssignmentsParams{StreamID: s.ID, SourceUid: ref.UID, Epoch: s.Epoch})
 			if err != nil {
 				return err
 			}

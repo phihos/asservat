@@ -144,7 +144,7 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 		if err := q.InsertPermissionStream(ctx, custodydb.InsertPermissionStreamParams{ID: id(root), Epoch: id(epoch), TrustDigest: trust[:]}); err != nil {
 			return err
 		}
-		reviews, err := q.LockChangingReviewSources(ctx, custodydb.LockChangingReviewSourcesParams{StreamID: id(root), KeepingTrust: trust[:]})
+		reviews, err := q.LockReviewSourcesForTrustChange(ctx, custodydb.LockReviewSourcesForTrustChangeParams{StreamID: id(root), KeepingTrust: trust[:]})
 		if err != nil {
 			return err
 		}
@@ -751,7 +751,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	// ADR-245: fresh decision-time allows of this exact Pod, each one
 	// principal's own recorded review by a current, acknowledged source.
 	if target.PodUID != "" {
-		reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
+		reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
 		if err != nil {
 			return authorization.Projection{}, err
 		}

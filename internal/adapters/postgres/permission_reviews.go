@@ -27,35 +27,46 @@ import (
 // unreadable source list keeps every row without renewing it, so none
 // grants until a current list is accepted.
 func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, b cfg.PermissionBatch, record *audit.AuthorityRecord) error {
-	rows, err := q.LockChangingReviewSources(ctx, custodydb.LockChangingReviewSourcesParams{StreamID: s.ID})
+	if b.SourcesUnavailable {
+		return q.MarkReviewSourcesUnavailable(ctx, s.ID)
+	}
+	rows, err := q.ListPermissionReviewSources(ctx, s.ID)
 	if err != nil {
 		return err
 	}
-	next := map[string]cfg.ReviewSource{}
+	unseen := map[string]cfg.ReviewSource{}
 	for _, r := range b.ReviewSources {
-		next[r.Resource.UID] = r
+		unseen[r.Resource.UID] = r
 	}
-	kept := map[string]bool{}
 	upsert := func(r cfg.ReviewSource, accepted string) error {
 		data, err := json.Marshal(r)
 		if err != nil {
 			return err
 		}
-		return q.UpsertPermissionReviewSource(ctx, custodydb.UpsertPermissionReviewSourceParams{StreamID: s.ID, Uid: r.Resource.UID, Epoch: id(b.Epoch), SeenSequence: record.Sequence, Generation: r.Resource.Generation, ResourceVersion: r.Resource.ResourceVersion, SpecDigest: r.Resource.SpecDigest[:], AuthorityDigest: reviewAuthorityDigest(r), ClusterID: id(r.ClusterID), Role: r.Role, SourceJson: data, AcceptedAuditID: id(accepted)})
+		return q.UpsertPermissionReviewSource(ctx, custodydb.UpsertPermissionReviewSourceParams{StreamID: s.ID, Uid: r.Resource.UID, Epoch: s.Epoch, Generation: r.Resource.Generation, ResourceVersion: r.Resource.ResourceVersion, SpecDigest: r.Resource.SpecDigest[:], AuthorityDigest: reviewAuthorityDigest(r), ClusterID: id(r.ClusterID), Role: r.Role, SourceJson: data, AcceptedAuditID: id(accepted)})
 	}
 	for _, row := range rows {
-		n, present := next[row.Uid]
-		if !present && b.SourcesUnavailable {
-			continue
-		}
-		var old cfg.ReviewSource
-		if present && json.Unmarshal(row.SourceJson, &old) == nil && cfg.EquivalentReview(old, n) {
-			if err = upsert(n, uid(row.AcceptedAuditID)); err != nil {
+		n, present := unseen[row.Uid]
+		if present {
+			delete(unseen, row.Uid)
+			var old cfg.ReviewSource
+			if json.Unmarshal(row.SourceJson, &old) == nil && cfg.EquivalentReview(old, n) {
+				if row.Epoch == s.Epoch && old.Resource == n.Resource {
+					continue
+				}
+				if err = upsert(n, uid(row.AcceptedAuditID)); err != nil {
+					return err
+				}
+				continue
+			}
+			if err = upsert(n, record.ID); err != nil {
 				return err
 			}
-			kept[row.Uid] = true
-			continue
+		} else if err = q.DeletePermissionReviewSource(ctx, custodydb.DeletePermissionReviewSourceParams{StreamID: s.ID, Uid: row.Uid}); err != nil {
+			return err
 		}
+		// Replacing or deleting the source locks it before scanning assignments.
+		// Any first-time decision for its old role has now finished.
 		retired, err := q.RetirePermissionReviewSource(ctx, custodydb.RetirePermissionReviewSourceParams{StreamID: s.ID, SourceUid: row.Uid, RetirementAuditID: id(record.ID)})
 		if err != nil {
 			return err
@@ -63,16 +74,8 @@ func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.
 		if retired > 0 {
 			record.ReviewRetirements = append(record.ReviewRetirements, audit.ReviewRetirement{SourceUID: row.Uid, Retired: retired})
 		}
-		if !present {
-			if err = q.DeletePermissionReviewSource(ctx, custodydb.DeletePermissionReviewSourceParams{StreamID: s.ID, Uid: row.Uid}); err != nil {
-				return err
-			}
-		}
 	}
-	for _, r := range b.ReviewSources {
-		if kept[r.Resource.UID] {
-			continue
-		}
+	for _, r := range unseen {
 		if err = upsert(r, record.ID); err != nil {
 			return err
 		}
@@ -162,7 +165,7 @@ func (r *AccessReviews) ReviewSources(ctx context.Context, cluster string) ([]cf
 		if err != nil {
 			return err
 		}
-		rows, err := q.CurrentPermissionReviewSources(ctx, custodydb.CurrentPermissionReviewSourcesParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(cluster)})
+		rows, err := q.CurrentPermissionReviewSources(ctx, custodydb.CurrentPermissionReviewSourcesParams{StreamID: s.ID, Epoch: s.Epoch, ClusterID: id(cluster)})
 		if err != nil {
 			return err
 		}
@@ -238,7 +241,7 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		if err != nil {
 			return err
 		}
-		if row.Epoch != s.Epoch || row.SeenSequence != s.Sequence || row.Generation != src.Resource.Generation || string(row.SpecDigest) != string(src.Resource.SpecDigest[:]) {
+		if row.Epoch != s.Epoch || row.Generation != src.Resource.Generation || string(row.SpecDigest) != string(src.Resource.SpecDigest[:]) {
 			return cfg.ErrChanged
 		}
 		n, err := q.CurrentTime(ctx)

@@ -14,6 +14,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -65,8 +66,28 @@ func qualifyHistoricalPermissionReplay(t *testing.T, ctx context.Context, admin,
 	if _, err = db.ExecContext(ctx, "INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired) VALUES($1,$2,$3,1,$4,$1,0,0)", b.RequestID, b.RootID, b.Epoch, digest[:]); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = db.ExecContext(ctx, `INSERT INTO permission_review_source(stream_id,uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
+		VALUES($1,'old-source',$2,1,1,'1',$3,$3,$4,'workload-maintainer','{}',$5)`, b.RootID, b.Epoch, b.TrustDigest[:], custodyID(), b.RequestID); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer legacy.Close()
+	if _, err = legacy.ExecContext(ctx, "PREPARE legacy_sources AS SELECT uid FROM permission_review_source WHERE seen_sequence=1"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = g.Up(ctx); err != nil {
 		t.Fatal(err)
+	}
+	var oldSourceDisabled bool
+	if err = db.QueryRowContext(ctx, "SELECT epoch IS NULL FROM permission_review_source WHERE stream_id=$1 AND uid='old-source'", b.RootID).Scan(&oldSourceDisabled); err != nil || !oldSourceDisabled {
+		t.Fatal("old review source current before a new baseline", err)
+	}
+	var schemaError *pgconn.PgError
+	if _, err = legacy.ExecContext(ctx, "EXECUTE legacy_sources"); !errors.As(err, &schemaError) || schemaError.Code != "42703" {
+		t.Fatal("legacy source query remained executable after upgrade", err)
 	}
 	if _, err = db.ExecContext(ctx, "GRANT SELECT ON goose_db_version,permission_acceptance,permission_stream TO authority_runtime; GRANT UPDATE(id) ON permission_stream TO authority_runtime"); err != nil {
 		t.Fatal(err)

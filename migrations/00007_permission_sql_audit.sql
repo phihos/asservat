@@ -5,6 +5,10 @@ ALTER TABLE permission_stream DROP COLUMN initial_audit_id;
 -- A replay returns the original controller deadline, even after a renewal.
 ALTER TABLE permission_acceptance ADD COLUMN lease_until timestamptz;
 UPDATE permission_stream SET suspended=true, lease_until=statement_timestamp(), observed_at=NULL, fresh_until=NULL;
+-- The watched source list stays current across unrelated permission changes.
+-- Retain existing assignment history, but require a new list after upgrade.
+ALTER TABLE permission_review_source ALTER COLUMN epoch DROP NOT NULL, DROP COLUMN seen_sequence;
+UPDATE permission_review_source SET epoch=NULL;
 -- Object receipts on historical events remain readable. New events commit
 -- with their mutation and never enter a publication queue.
 DROP INDEX authority_audit_pending;

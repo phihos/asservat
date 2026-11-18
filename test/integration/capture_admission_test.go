@@ -16,6 +16,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -340,6 +341,72 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			_, err := s.s.AdmitContext(ctx, s.a)
 			return err
 		})
+	})
+	t.Run("first-review-capture-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		target := s.a.Plan.Input.Target
+		source, reason := cfg.ReviewSourceFor(cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{8}},
+			Enabled: true, Type: cfg.SourceKubernetesExec, ClusterID: target.Request.ClusterID, Role: "workload-maintainer", IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "test"}})
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		s.batch.Bases = s.batch.Bases[1:] // the capturing principal now requires a Pod review
+		s.batch.ReviewSources = []cfg.ReviewSource{source}
+		s.batch.RequestID = custodyID()
+		s.batch.InputDigest[0]++
+		a, err := s.p.AcceptPermissions(ctx, s.batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.batch.ExpectedSequence = a.Sequence
+		reviews, err := postgres.NewAccessReviews(ctx, authorityPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor := s.a.Eligibility.VerifiedIdentity
+		decide := func() authorization.CaptureEligibility {
+			t.Helper()
+			p, err := s.p.Permissions(ctx, target.Target())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return authorization.ContextEligibility(actor, p, target.Target(), time.Now())
+		}
+		if decide().Eligible {
+			t.Fatal("capture already eligible before its first review")
+		}
+		sourceVersion := func() string {
+			t.Helper()
+			var version string
+			if err := admin.QueryRow(ctx, "SELECT xmin::text FROM permission_review_source WHERE stream_id=$1 AND uid=$2", s.a.RootID, source.Resource.UID).Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			return version
+		}
+		before := sourceVersion()
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			if err := reviews.RecordReview(ctx, authapp.ReviewDecision{Source: source, Principal: actor.Principal, Target: target.Request, Allowed: true, DecidedAt: time.Now()}); err != nil {
+				return err
+			}
+			s.a.Eligibility = decide()
+			_, err := s.s.AdmitContext(ctx, s.a)
+			return err
+		})
+		if sourceVersion() != before {
+			t.Fatal("peer publication rewrote the unchanged review source")
+		}
+		// A registration replacement can change the resolved cluster without
+		// editing the PermissionSource object itself.
+		s.batch.ExpectedSequence++
+		s.batch.RequestID = custodyID()
+		s.batch.InputDigest[0]++
+		s.batch.ReviewSources[0].ClusterID = custodyID()
+		if _, err := s.p.AcceptPermissions(ctx, s.batch); err != nil {
+			t.Fatal(err)
+		}
+		if decide().Eligible {
+			t.Fatal("old cluster retained its reviewed assignment after replacement")
+		}
 	})
 	t.Run("suspension-during-peer-permission-publication", func(t *testing.T) {
 		s := create(t, 1)

@@ -46,27 +46,21 @@ func (q *Queries) CurrentPermissionReviewAssignment(ctx context.Context, arg Cur
 }
 
 const currentPermissionReviewSources = `-- name: CurrentPermissionReviewSources :many
-SELECT rs.stream_id, rs.uid, rs.epoch, rs.seen_sequence, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id
+SELECT rs.stream_id, rs.uid, rs.epoch, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id
 FROM permission_review_source rs JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4
+WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.cluster_id=$3
 ORDER BY rs.uid
 `
 
 type CurrentPermissionReviewSourcesParams struct {
-	StreamID     pgtype.UUID
-	Epoch        pgtype.UUID
-	SeenSequence int64
-	ClusterID    pgtype.UUID
+	StreamID  pgtype.UUID
+	Epoch     pgtype.UUID
+	ClusterID pgtype.UUID
 }
 
 // The current, acknowledged decision-time sources of one cluster.
 func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg CurrentPermissionReviewSourcesParams) ([]PermissionReviewSource, error) {
-	rows, err := q.db.Query(ctx, currentPermissionReviewSources,
-		arg.StreamID,
-		arg.Epoch,
-		arg.SeenSequence,
-		arg.ClusterID,
-	)
+	rows, err := q.db.Query(ctx, currentPermissionReviewSources, arg.StreamID, arg.Epoch, arg.ClusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +72,6 @@ func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg Curren
 			&i.StreamID,
 			&i.Uid,
 			&i.Epoch,
-			&i.SeenSequence,
 			&i.Generation,
 			&i.ResourceVersion,
 			&i.SpecDigest,
@@ -194,7 +187,7 @@ func (q *Queries) InsertPermissionReviewAssignment(ctx context.Context, arg Inse
 }
 
 const listPermissionReviewSources = `-- name: ListPermissionReviewSources :many
-SELECT stream_id, uid, epoch, seen_sequence, generation, resource_version, spec_digest, authority_digest, cluster_id, role, source_json, accepted_audit_id FROM permission_review_source WHERE stream_id=$1 ORDER BY uid
+SELECT stream_id, uid, epoch, generation, resource_version, spec_digest, authority_digest, cluster_id, role, source_json, accepted_audit_id FROM permission_review_source WHERE stream_id=$1 ORDER BY uid
 `
 
 // ADR-245: every accepted decision-time source row of a stream, current or not.
@@ -211,54 +204,6 @@ func (q *Queries) ListPermissionReviewSources(ctx context.Context, streamID pgty
 			&i.StreamID,
 			&i.Uid,
 			&i.Epoch,
-			&i.SeenSequence,
-			&i.Generation,
-			&i.ResourceVersion,
-			&i.SpecDigest,
-			&i.AuthorityDigest,
-			&i.ClusterID,
-			&i.Role,
-			&i.SourceJson,
-			&i.AcceptedAuditID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const lockChangingReviewSources = `-- name: LockChangingReviewSources :many
-SELECT rs.stream_id, rs.uid, rs.epoch, rs.seen_sequence, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id FROM permission_review_source rs JOIN permission_stream s ON s.id=rs.stream_id
-WHERE rs.stream_id=$1 AND s.trust_digest IS DISTINCT FROM $2::bytea
-ORDER BY rs.uid FOR NO KEY UPDATE OF rs
-`
-
-type LockChangingReviewSourcesParams struct {
-	StreamID     pgtype.UUID
-	KeepingTrust []byte
-}
-
-// A normal acceptance passes NULL. At epoch start only a change of trust
-// retires review assignments. Lock sources before the final stream fence,
-// in the same order used to record a decision.
-func (q *Queries) LockChangingReviewSources(ctx context.Context, arg LockChangingReviewSourcesParams) ([]PermissionReviewSource, error) {
-	rows, err := q.db.Query(ctx, lockChangingReviewSources, arg.StreamID, arg.KeepingTrust)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []PermissionReviewSource{}
-	for rows.Next() {
-		var i PermissionReviewSource
-		if err := rows.Scan(
-			&i.StreamID,
-			&i.Uid,
-			&i.Epoch,
-			&i.SeenSequence,
 			&i.Generation,
 			&i.ResourceVersion,
 			&i.SpecDigest,
@@ -279,7 +224,7 @@ func (q *Queries) LockChangingReviewSources(ctx context.Context, arg LockChangin
 }
 
 const lockPermissionReviewSource = `-- name: LockPermissionReviewSource :one
-SELECT stream_id, uid, epoch, seen_sequence, generation, resource_version, spec_digest, authority_digest, cluster_id, role, source_json, accepted_audit_id FROM permission_review_source WHERE stream_id=$1 AND uid=$2 FOR SHARE
+SELECT stream_id, uid, epoch, generation, resource_version, spec_digest, authority_digest, cluster_id, role, source_json, accepted_audit_id FROM permission_review_source WHERE stream_id=$1 AND uid=$2 FOR SHARE
 `
 
 type LockPermissionReviewSourceParams struct {
@@ -294,7 +239,6 @@ func (q *Queries) LockPermissionReviewSource(ctx context.Context, arg LockPermis
 		&i.StreamID,
 		&i.Uid,
 		&i.Epoch,
-		&i.SeenSequence,
 		&i.Generation,
 		&i.ResourceVersion,
 		&i.SpecDigest,
@@ -305,6 +249,61 @@ func (q *Queries) LockPermissionReviewSource(ctx context.Context, arg LockPermis
 		&i.AcceptedAuditID,
 	)
 	return i, err
+}
+
+const lockReviewSourcesForTrustChange = `-- name: LockReviewSourcesForTrustChange :many
+SELECT rs.stream_id, rs.uid, rs.epoch, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id FROM permission_review_source rs JOIN permission_stream s ON s.id=rs.stream_id
+WHERE rs.stream_id=$1 AND s.trust_digest <> $2::bytea
+ORDER BY rs.uid FOR NO KEY UPDATE OF rs
+`
+
+type LockReviewSourcesForTrustChangeParams struct {
+	StreamID     pgtype.UUID
+	KeepingTrust []byte
+}
+
+// At epoch start only a change of trust
+// retires review assignments. Lock sources before the final stream fence,
+// in the same order used to record a decision.
+func (q *Queries) LockReviewSourcesForTrustChange(ctx context.Context, arg LockReviewSourcesForTrustChangeParams) ([]PermissionReviewSource, error) {
+	rows, err := q.db.Query(ctx, lockReviewSourcesForTrustChange, arg.StreamID, arg.KeepingTrust)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PermissionReviewSource{}
+	for rows.Next() {
+		var i PermissionReviewSource
+		if err := rows.Scan(
+			&i.StreamID,
+			&i.Uid,
+			&i.Epoch,
+			&i.Generation,
+			&i.ResourceVersion,
+			&i.SpecDigest,
+			&i.AuthorityDigest,
+			&i.ClusterID,
+			&i.Role,
+			&i.SourceJson,
+			&i.AcceptedAuditID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markReviewSourcesUnavailable = `-- name: MarkReviewSourcesUnavailable :exec
+UPDATE permission_review_source SET epoch=NULL WHERE stream_id=$1 AND epoch IS NOT NULL
+`
+
+func (q *Queries) MarkReviewSourcesUnavailable(ctx context.Context, streamID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markReviewSourcesUnavailable, streamID)
+	return err
 }
 
 const prunePermissionReviewDecisions = `-- name: PrunePermissionReviewDecisions :exec
@@ -378,15 +377,14 @@ const selectPermissionReviews = `-- name: SelectPermissionReviews :many
 SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until
 FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
-WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2 AND rs.seen_sequence=$3
-AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7 AND d.fresh_until>clock_timestamp()
+WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2
+AND d.cluster_id=$3 AND d.namespace_uid=$4 AND d.workload_uid=$5 AND d.pod_uid=$6 AND d.fresh_until>clock_timestamp()
 ORDER BY d.decided_at DESC,a.id
 `
 
 type SelectPermissionReviewsParams struct {
 	StreamID     pgtype.UUID
 	Epoch        pgtype.UUID
-	SeenSequence int64
 	ClusterID    pgtype.UUID
 	NamespaceUid string
 	WorkloadUid  string
@@ -409,7 +407,6 @@ func (q *Queries) SelectPermissionReviews(ctx context.Context, arg SelectPermiss
 	rows, err := q.db.Query(ctx, selectPermissionReviews,
 		arg.StreamID,
 		arg.Epoch,
-		arg.SeenSequence,
 		arg.ClusterID,
 		arg.NamespaceUid,
 		arg.WorkloadUid,
@@ -448,16 +445,15 @@ max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS
 FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
 JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3
 GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
 ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001
 `
 
 type SelectPreviewReviewAssignmentsParams struct {
-	StreamID     pgtype.UUID
-	SourceUid    string
-	Epoch        pgtype.UUID
-	SeenSequence int64
+	StreamID  pgtype.UUID
+	SourceUid string
+	Epoch     pgtype.UUID
 }
 
 type SelectPreviewReviewAssignmentsRow struct {
@@ -476,12 +472,7 @@ type SelectPreviewReviewAssignmentsRow struct {
 // ADR-245 preview: the current assignments a decision-time source minted, per
 // recorded workload, with their newest decision; at most 1,001 rows.
 func (q *Queries) SelectPreviewReviewAssignments(ctx context.Context, arg SelectPreviewReviewAssignmentsParams) ([]SelectPreviewReviewAssignmentsRow, error) {
-	rows, err := q.db.Query(ctx, selectPreviewReviewAssignments,
-		arg.StreamID,
-		arg.SourceUid,
-		arg.Epoch,
-		arg.SeenSequence,
-	)
+	rows, err := q.db.Query(ctx, selectPreviewReviewAssignments, arg.StreamID, arg.SourceUid, arg.Epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -696,16 +687,15 @@ func (q *Queries) UpsertPermissionReviewDecision(ctx context.Context, arg Upsert
 }
 
 const upsertPermissionReviewSource = `-- name: UpsertPermissionReviewSource :exec
-INSERT INTO permission_review_source(stream_id,uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-ON CONFLICT(stream_id,uid) DO UPDATE SET epoch=EXCLUDED.epoch,seen_sequence=EXCLUDED.seen_sequence,generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,authority_digest=EXCLUDED.authority_digest,cluster_id=EXCLUDED.cluster_id,role=EXCLUDED.role,source_json=EXCLUDED.source_json,accepted_audit_id=EXCLUDED.accepted_audit_id
+INSERT INTO permission_review_source(stream_id,uid,epoch,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+ON CONFLICT(stream_id,uid) DO UPDATE SET epoch=EXCLUDED.epoch,generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,authority_digest=EXCLUDED.authority_digest,cluster_id=EXCLUDED.cluster_id,role=EXCLUDED.role,source_json=EXCLUDED.source_json,accepted_audit_id=EXCLUDED.accepted_audit_id
 `
 
 type UpsertPermissionReviewSourceParams struct {
 	StreamID        pgtype.UUID
 	Uid             string
 	Epoch           pgtype.UUID
-	SeenSequence    int64
 	Generation      int64
 	ResourceVersion string
 	SpecDigest      []byte
@@ -721,7 +711,6 @@ func (q *Queries) UpsertPermissionReviewSource(ctx context.Context, arg UpsertPe
 		arg.StreamID,
 		arg.Uid,
 		arg.Epoch,
-		arg.SeenSequence,
 		arg.Generation,
 		arg.ResourceVersion,
 		arg.SpecDigest,
