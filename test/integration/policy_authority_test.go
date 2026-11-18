@@ -420,10 +420,6 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("old policy inherited new delegation")
 		}
 		s.input.Authority.Delegation = identity.Revision{UID: s.batch.Bases[0].Resource.UID, Generation: s.batch.Bases[0].Resource.Generation, Digest: s.batch.Bases[0].Resource.SpecDigest}
-		if _, err := s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target); err == nil {
-			t.Fatal("unaudited current envelope accepted")
-		}
-
 		current, err := s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target)
 		if err != nil {
 			t.Fatal(err)
@@ -435,12 +431,26 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if !authorization.ValidatePolicyAcceptance(s.input.Author, s.input.Authority, current, use, clock()).Eligible {
 			t.Fatal("new policy cannot use unchanged historical assignment")
 		}
-		// Simulated storage corruption cannot borrow the acknowledged source audit.
-		if _, err = admin.Exec(ctx, `UPDATE permission_basis SET automation_json=jsonb_set(automation_json,'{MaxBytes}','999') WHERE stream_id=$1`, s.input.RootID); err != nil {
-			t.Fatal(err)
-		}
+		// A new, narrower source revision applies immediately and its exact
+		// envelope and scope commit with the matching permission change.
+		basis := &s.batch.Bases[0]
+		basis.Automation.MaxBytes--
+		rebind(t, &s)
 		if _, err = s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target); err == nil {
-			t.Fatal("changed unaudited envelope inherited acknowledgement")
+			t.Fatal("previous delegation survived a narrower replacement")
+		}
+		s.input.Authority.Delegation = identity.Revision{UID: basis.Resource.UID, Generation: basis.Resource.Generation, Digest: basis.Resource.SpecDigest}
+		current, err = s.current.PolicyAutomationAuthority(ctx, s.input.Authority, s.input.Target)
+		if err != nil || current.Envelope.MaxBytes != basis.Automation.MaxBytes || authorization.ValidatePolicyAcceptance(s.input.Author, s.input.Authority, current, use, clock()).Eligible {
+			t.Fatal("replacement permitted the original higher byte limit", err)
+		}
+		var accepted bool
+		if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM authority_audit e JOIN permission_basis_change b ON b.event_id=e.id
+			WHERE e.stream_id=$1 AND e.id=$2 AND NOT b.retired AND b.uid=$3 AND b.generation=$4 AND b.spec_digest=$5
+			AND b.scope_digest=$6 AND b.cluster_id=$7 AND b.namespace_uid=$8 AND (b.automation_json->>'MaxBytes')::bigint=$9)`,
+			s.input.RootID, s.batch.RequestID, basis.Resource.UID, basis.Resource.Generation, basis.Resource.SpecDigest[:],
+			basis.ScopeDigest[:], s.input.Target.ClusterID, s.input.Target.NamespaceUID, basis.Automation.MaxBytes).Scan(&accepted); err != nil || !accepted {
+			t.Fatal("missing committed audit for the replacement delegation", err)
 		}
 	})
 	t.Run("pause-resume-does-not-create-new-authority", func(t *testing.T) {
