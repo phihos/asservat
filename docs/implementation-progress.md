@@ -32,8 +32,15 @@ consolidates the registration, identity, dispatch and compatibility decisions.
   five-second HTTP client timeout on the permission watch. The corrected
   client bounds individual events and connection setup separately. Focused
   HTTP tests cross the old time and cumulative-byte cutoffs for both permission
-  and retention watches. The current installed capture/download results and
-  exact source are recorded in [PR #304](https://github.com/phihos/asservat/pull/304).
+  and retention watches. At `e52b4bd35`, both Helm upgrades passed and the
+  permission epoch stayed stable. The first replica completed the download.
+  The second received a key-service refusal before capture. Two fresh requests
+  on those same replicas later completed through native download. The original
+  refusal had no stage detail. A separate regression showed that a previous
+  request's nearly expired key-cache entry could interrupt a valid wrap.
+  Each operation now reads the mounted keys within its own permit and reports
+  which check failed. Final installed results are recorded in
+  [PR #304](https://github.com/phihos/asservat/pull/304).
 
 ## Processing cleanup (2026-11-17)
 

@@ -75,9 +75,11 @@ credentials or grants collection authority. This uses the existing database
 credentials and service endpoints. The shared federation SQL logins use one pooled
 connection per purpose per process, plus the work listener. PostgreSQL enforces
 the server connection budget across replicas. A replica releases an idle
-exchange when another replica needs the same connector. History waits for
-exchange registration within the caller's original deadline. An idle fleet sends no owner lookups or
-exchange renewals. Upgrade a development installation's hub and connectors
+exchange when another replica needs the same connector. After listener
+reconnection it yields any potentially contested slot once its current request
+finishes. History waits within the caller's original deadline until the
+connector handshake flushes successfully. An idle fleet sends no owner lookups
+or exchange renewals. Upgrade a development installation's hub and connectors
 together when crossing from the old standby protocol to major 2. Registering before resynchronization
 follows PostgreSQL’s documented startup ordering. [PostgreSQL LISTEN](https://www.postgresql.org/docs/18/sql-listen.html#SQL-LISTEN-NOTES).
 
