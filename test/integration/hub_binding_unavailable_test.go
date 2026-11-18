@@ -98,7 +98,11 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 		}
 	}).WithClusterNames(map[string]string{"blocked": blocked, "healthy": peer})
 	writer := &observedPermissionWriter{permissions, make(chan cfg.PermissionAcceptance, 1), make(chan cfg.PermissionFence, 1), make(chan struct{}, 1)}
-	r := configapp.BindingReconciler{RootID: root, NamespaceClusterID: hub, RegisteredClusters: []string{peer, blocked}, Reader: client, Watcher: client, Trust: remoteBindingHubFixture{cluster: hub}, RemoteBindings: deliveries, Store: writer, NewID: custodyID, Now: time.Now}
+	trust, err := kube.NewPlainPermissionTrust(client, artifact.Digest{4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := configapp.BindingReconciler{RootID: root, NamespaceClusterID: hub, RegisteredClusters: []string{peer, blocked}, Reader: client, Watcher: client, Trust: trust, RemoteBindings: deliveries, Store: writer, NewID: custodyID, Now: time.Now}
 	done := make(chan struct{})
 	go func() { defer close(done); r.RunEpoch(ctx) }()
 	defer func() { cancel(); <-done }()
