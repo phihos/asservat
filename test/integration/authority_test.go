@@ -1669,6 +1669,9 @@ GRANT USAGE ON SCHEMA permission_test_clock TO authority_runtime`)
 			t.Fatal("deny hidden behind audit")
 		}
 	})
+	t.Run("hub-local-unrepresentable-deny", func(t *testing.T) {
+		qualifyHubLegacyDeny(t, admin, pool, flush)
+	})
 	t.Run("withdrawn-registration", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)

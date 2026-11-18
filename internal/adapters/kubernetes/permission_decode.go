@@ -257,7 +257,9 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
-	if b.Subjects, err = subjects(spec.Subjects, spec.Effect); err != nil {
+	b.Subjects, err = subjects(spec.Subjects, spec.Effect)
+	b.UnavailableDeny = err == value.ErrLimit
+	if err != nil && !b.UnavailableDeny {
 		return value.Binding{}, err
 	}
 	seen := map[string]bool{}
@@ -323,7 +325,7 @@ func notAfter(s string) (time.Time, error) {
 // cluster; "*" is every known cluster. A spec that fails validation becomes
 // one invalid binding that grants and denies nothing. A Deny that the
 // assignment store cannot represent makes the observation unavailable.
-func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) ([]value.Binding, error) {
+func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) []value.Binding {
 	invalid := func() []value.Binding {
 		ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
 		return []value.Binding{{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.AllNamespaces}}}
@@ -331,26 +333,24 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	var spec wire.ClusterAccessBindingSpec
 	digest, err := decodePermissionSpec(object.Spec, v.clusterBindingSchema, &spec)
 	if err != nil {
-		return invalid(), nil
+		return invalid()
 	}
 	ref.SpecDigest = digest
 	subjects, err := subjects(spec.Subjects, spec.Effect)
-	if err == value.ErrLimit {
-		return nil, err
-	}
-	if err != nil {
-		return invalid(), nil
+	unavailableDeny := err == value.ErrLimit
+	if err != nil && !unavailableDeny {
+		return invalid()
 	}
 	expires, err := notAfter(spec.NotAfter)
 	if err != nil {
-		return invalid(), nil
+		return invalid()
 	}
 	var selector map[string]string
 	if spec.NamespaceSelector != nil && len(spec.NamespaceSelector.MatchLabels) > 0 {
 		selector = spec.NamespaceSelector.MatchLabels
 	}
 	if !selectorValid(selector) {
-		return invalid(), nil
+		return invalid()
 	}
 	clusters := []string{ref.ClusterID}
 	if len(spec.Clusters) > 0 {
@@ -368,9 +368,9 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	for _, cluster := range slices.Compact(clusters) {
 		r := ref
 		r.ClusterID = cluster
-		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
+		out = append(out, value.Binding{Resource: r, UnavailableDeny: unavailableDeny, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
 	}
-	return out, nil
+	return out
 }
 
 // observedBinding decodes an observed binding. A spec that fails validation
@@ -378,16 +378,13 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 // it must not stop the cluster's permission stream. Neither does a binding
 // that could not be placed in its namespace (empty NamespaceUID). It keeps its identity
 // with the digest of its raw spec, so the journal still sees each change.
-func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) (value.Binding, error) {
+func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) value.Binding {
 	b, err := v.binding(object, ref)
-	if err == value.ErrLimit {
-		return value.Binding{}, err
-	}
 	if err == nil && ref.NamespaceUID != "" {
-		return b, nil
+		return b
 	}
 	ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
-	return value.Binding{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}, nil
+	return value.Binding{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}
 }
 
 // AccessBindingSpecDecoder decodes a proposed AccessBinding spec with the same
@@ -409,7 +406,7 @@ func (d *AccessBindingSpecDecoder) DecodeAccessBindingSpec(spec []byte) (value.B
 		return value.Binding{}, value.ErrUnavailable
 	}
 	b, err := d.validator.binding(permissionObject{Spec: spec}, value.Resource{Kind: "AccessBinding"})
-	if err != nil {
+	if err != nil || b.UnavailableDeny {
 		return value.Binding{}, value.ErrInvalid
 	}
 	return b, nil

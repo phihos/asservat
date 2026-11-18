@@ -180,7 +180,12 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		return value.PermissionBatch{}, value.ErrInvalid
 	}
 	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: input, ObservedAt: now, FreshUntil: j.until}
+	batch.UnavailableClusters = slices.Clone(inherited.UnavailableClusters)
 	for _, b := range bindings {
+		if b.UnavailableDeny {
+			batch.UnavailableClusters = append(batch.UnavailableClusters, b.Scope.ClusterID)
+			continue
+		}
 		if p, ok := bindingBasis(b, now); ok {
 			p.Continuous = j.sequence > 0
 			batch.Bases = append(batch.Bases, p)
@@ -188,7 +193,8 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	}
 	batch.Bases = append(batch.Bases, inherited.Bases...)
 	batch.Bases = withIssuer(batch.Bases, j.Issuer)
-	batch.UnavailableClusters = slices.Clone(inherited.UnavailableClusters)
+	slices.Sort(batch.UnavailableClusters)
+	batch.UnavailableClusters = slices.Compact(batch.UnavailableClusters)
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces

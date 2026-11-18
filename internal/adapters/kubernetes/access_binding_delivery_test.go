@@ -165,3 +165,28 @@ func TestBindingDeliveryReadsOversizedKubernetesPage(t *testing.T) {
 		t.Fatal("complete delivery refused", len(d.Items), err)
 	}
 }
+
+func TestHubListsLegacyDeniesAtTheirActualClusters(t *testing.T) {
+	const peer = "22222222-2222-4222-8222-222222222222"
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		var obj map[string]any
+		var kind string
+		switch r.URL.Path {
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			kind, obj = "AccessBinding", permissionBinding(1)
+		case "/apis/asservat.io/v1alpha1/clusteraccessbindings":
+			kind, obj = value.ClusterAccessBindingKind, permissionClusterBinding()
+			obj["spec"].(map[string]any)["clusters"] = []string{"peer"}
+		default:
+			return false
+		}
+		spec := obj["spec"].(map[string]any)
+		spec["effect"], spec["subjects"] = "Deny", []map[string]string{{"kind": "Group", "id": strings.Repeat("x", 257)}}
+		permissionReply(w, permissionList(kind, "1", "", obj))
+		return true
+	})
+	s, err := f.client.WithClusterNames(map[string]string{"peer": peer}).PermissionSnapshot(t.Context())
+	if err != nil || len(s.Bindings) != 1 || len(s.ClusterBindings) != 1 || !s.Bindings[0].UnavailableDeny || !s.ClusterBindings[0].UnavailableDeny || s.Bindings[0].Scope.ClusterID != permissionCluster || s.ClusterBindings[0].Scope.ClusterID != peer {
+		t.Fatal("unrelated cluster lost when the hub observed a legacy Deny", err)
+	}
+}

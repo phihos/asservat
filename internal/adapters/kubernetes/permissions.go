@@ -430,11 +430,7 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	}
 	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
-		binding, err := c.validator.observedBinding(o, refs[i])
-		if err != nil {
-			return value.Snapshot{}, nil, err
-		}
-		out.Bindings = append(out.Bindings, binding)
+		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
 	}
 	// ClusterAccessBindings deny as well, so an incomplete LIST fails the
 	// snapshot like AccessBindings.
@@ -468,11 +464,7 @@ func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Sna
 	}
 	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
-		bindings, err := c.validator.clusterBindings(o, refs[i])
-		if err != nil {
-			return value.Snapshot{}, err
-		}
-		out.ClusterBindings = append(out.ClusterBindings, bindings...)
+		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
 	}
 	if err = c.current(ctx, start, 5*time.Second); err != nil {
 		return value.Snapshot{}, err

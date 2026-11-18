@@ -65,6 +65,9 @@ type Binding struct {
 	// Invalid marks a stored binding whose spec failed validation: it grants
 	// and denies nothing and only keeps its identity in the journal.
 	Invalid bool `json:",omitempty"`
+	// UnavailableDeny retains the scope and identity of a legacy Deny whose
+	// subjects cannot be represented. Other clusters remain evaluable.
+	UnavailableDeny bool `json:",omitempty"`
 }
 type Protection struct{ Mode, ReviewRef, GuardRef string }
 type Mapping struct {

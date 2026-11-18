@@ -364,6 +364,10 @@ func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source) {
 
 // appendBindingBasis applies the same namespace selector to local and delivered bindings.
 func (s *bindingRun) appendBindingBasis(out *inheritanceState, b value.Binding, now time.Time) {
+	if b.UnavailableDeny {
+		out.UnavailableClusters = append(out.UnavailableClusters, b.Scope.ClusterID)
+		return
+	}
 	p, ok := bindingBasis(b, now)
 	if !ok {
 		return
