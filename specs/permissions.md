@@ -180,8 +180,9 @@ A permission mutation and its audit event commit in the same PostgreSQL transact
 An assignment keeps its ID, subject, issuer, role and source digest, together
 with its activation and retirement event IDs. Indexed source history preserves
 the binding revision, original scope, effect and automation envelope at a change,
-including when a binding is replaced or removed. A request retry returns its
-original result and its recorded controller lease deadline. Acceptances written
+including when a binding is replaced or removed. Acceptance returns the controller
+lease deadline committed with that publication. A retry returns the same result
+and deadline even if the controller has renewed since then. Acceptances written
 before schema 7 have no recorded lease deadline. Replaying one returns its
 historical outcome with an unknown deadline. Migration suspends the old epoch.
 A decision recorded against a PermissionSource before its role changes retires

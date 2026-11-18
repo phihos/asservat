@@ -408,6 +408,22 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			t.Fatal("old cluster retained its reviewed assignment after replacement")
 		}
 	})
+	t.Run("lease-renewal-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		f := cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, Sequence: s.batch.ExpectedSequence, TrustDigest: s.batch.TrustDigest, Initialized: true}
+		var renewed cfg.PermissionFence
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			var err error
+			renewed, err = s.p.RenewPermissions(ctx, f)
+			return err
+		})
+		var stream, recorded time.Time
+		if err := admin.QueryRow(ctx, `SELECT s.lease_until,a.lease_until FROM permission_stream s
+			JOIN permission_acceptance a ON a.stream_id=s.id AND a.epoch=s.epoch AND a.sequence=s.sequence WHERE s.id=$1`,
+			f.RootID).Scan(&stream, &recorded); err != nil || !stream.Equal(renewed.LeaseUntil) || !recorded.Equal(stream) {
+			t.Fatalf("staged publication lost the concurrent renewal: renewed %s, stream %s, receipt %s: %v", renewed.LeaseUntil, stream, recorded, err)
+		}
+	})
 	t.Run("suspension-during-peer-permission-publication", func(t *testing.T) {
 		s := create(t, 1)
 		f := cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}

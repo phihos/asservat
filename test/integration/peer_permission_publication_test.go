@@ -30,13 +30,13 @@ func withStagedPeerPermission(t *testing.T, ctx context.Context, admin *pgxpool.
 	b.FreshUntil = b.ObservedAt.Add(30 * time.Second)
 	if _, err := admin.Exec(ctx, `CREATE FUNCTION pause_permission_publication() RETURNS trigger
 	 LANGUAGE plpgsql SET lock_timeout='0' AS $$ BEGIN
-	 PERFORM pg_advisory_xact_lock(hashtextextended(NEW.request_id::text, 42)); RETURN NEW; END $$;
-	 CREATE TRIGGER pause_permission_publication BEFORE INSERT ON permission_acceptance
-	 FOR EACH ROW EXECUTE FUNCTION pause_permission_publication()`); err != nil {
+	 PERFORM pg_advisory_xact_lock(hashtextextended(NEW.id::text, 42)); RETURN NEW; END $$;
+	 CREATE TRIGGER pause_permission_publication AFTER INSERT ON authority_audit
+	 FOR EACH ROW WHEN (NEW.event_kind='permission-change') EXECUTE FUNCTION pause_permission_publication()`); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if _, err := admin.Exec(ctx, "DROP TRIGGER pause_permission_publication ON permission_acceptance; DROP FUNCTION pause_permission_publication()"); err != nil {
+		if _, err := admin.Exec(ctx, "DROP TRIGGER pause_permission_publication ON authority_audit; DROP FUNCTION pause_permission_publication()"); err != nil {
 			t.Error(err)
 		}
 	}()

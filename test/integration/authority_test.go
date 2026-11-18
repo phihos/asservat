@@ -645,9 +645,20 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	})
 	t.Run("replay-preserves-original-controller-lease", func(t *testing.T) {
 		s := create(t)
+		// The controller already consumed part of its initial lease before
+		// observing this change. Publication extends it on the database.
+		var initial time.Time
+		if err := admin.QueryRow(ctx, "UPDATE permission_stream SET lease_until=clock_timestamp()+interval '12 seconds' WHERE id=$1 RETURNING lease_until", s.b.RootID).Scan(&initial); err != nil {
+			t.Fatal(err)
+		}
+		s.b.ObservedAt = s.b.ObservedAt.Add(-2 * time.Second)
 		accepted, err := s.p.AcceptPermissions(ctx, s.b)
 		if err != nil {
 			t.Fatal(err)
+		}
+		var stream, recorded time.Time
+		if err = admin.QueryRow(ctx, `SELECT s.lease_until,a.lease_until FROM permission_acceptance a JOIN permission_stream s ON s.id=a.stream_id WHERE a.request_id=$1`, s.b.RequestID).Scan(&stream, &recorded); err != nil || !stream.After(initial) || !accepted.LeaseUntil.Equal(stream) || !recorded.Equal(stream) {
+			t.Fatalf("publication lease differs: initial %s, stream %s, receipt %s, result %s: %v", initial, stream, recorded, accepted.LeaseUntil, err)
 		}
 		renewed, err := s.p.RenewPermissions(ctx, accepted.PermissionFence)
 		if err != nil || !renewed.LeaseUntil.After(accepted.LeaseUntil) {

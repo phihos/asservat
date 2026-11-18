@@ -616,8 +616,8 @@ func (q *Queries) SuspendPermissionStream(ctx context.Context, id pgtype.UUID) e
 	return err
 }
 
-const updatePermissionStream = `-- name: UpdatePermissionStream :exec
-UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,unavailable_clusters=COALESCE($6::text[], '{}'),lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1
+const updatePermissionStream = `-- name: UpdatePermissionStream :one
+UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,unavailable_clusters=COALESCE($6::text[], '{}'),lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1 RETURNING lease_until
 `
 
 type UpdatePermissionStreamParams struct {
@@ -631,8 +631,8 @@ type UpdatePermissionStreamParams struct {
 
 // ADR-200 revision (2026-10-23): the live lease holder's accepted observation
 // also keeps the lease at least until that observation's 30-second lifetime.
-func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissionStreamParams) error {
-	_, err := q.db.Exec(ctx, updatePermissionStream,
+func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissionStreamParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, updatePermissionStream,
 		arg.ID,
 		arg.Sequence,
 		arg.ProjectionDigest,
@@ -640,7 +640,9 @@ func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissi
 		arg.FreshUntil,
 		arg.UnavailableClusters,
 	)
-	return err
+	var lease_until pgtype.Timestamptz
+	err := row.Scan(&lease_until)
+	return lease_until, err
 }
 
 const upsertPermissionBases = `-- name: UpsertPermissionBases :exec

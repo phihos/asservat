@@ -556,9 +556,6 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = insertAuthority(ctx, q, record); err != nil {
 			return err
 		}
-		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired)), LeaseUntil: s.LeaseUntil}); err != nil {
-			return err
-		}
 		if err = q.CheckPermissionConstraints(ctx); err != nil {
 			return err
 		}
@@ -569,7 +566,11 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if current.Sequence != s.Sequence || current.Suspended != s.Suspended || !sameFence(current, requested) {
 			return cfg.ErrChanged
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
+		publishedUntil, err := q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))})
+		if err != nil {
+			return err
+		}
+		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired)), LeaseUntil: publishedUntil}); err != nil {
 			return err
 		}
 		n, err = q.CurrentTime(ctx)
@@ -582,7 +583,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if !cfg.PermissionObservationCurrent(b.ObservedAt, until, n.Time) {
 			return cfg.ErrInvalid
 		}
-		s.Sequence = record.Sequence
+		s.Sequence, s.LeaseUntil = record.Sequence, publishedUntil
 		out = cfg.PermissionAcceptance{PermissionFence: fence(s), AuditID: record.ID, Assignments: len(wanted), Retired: len(retired)}
 		return nil
 	}))
@@ -615,7 +616,7 @@ func (p *Permissions) RefreshPermissions(ctx context.Context, b cfg.PermissionBa
 		if !b.Current(n.Time) {
 			return cfg.ErrInvalid
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
+		if _, err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
 			return err
 		}
 		n, err = q.CurrentTime(ctx)
