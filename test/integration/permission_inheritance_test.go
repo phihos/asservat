@@ -2,25 +2,16 @@ package integration
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"net/url"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +27,7 @@ import (
 // API server's namespace LIST/watch into PostgreSQL with encrypted audit.
 // The guard, review and KMS boundaries are the same synthetic fixtures as the
 // explicit-binding reconciliation; nothing here enables collection.
-func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, s3endpoint string) {
+func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	cluster := permissionFixtureCluster
@@ -103,35 +94,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 	if err != nil {
 		t.Fatal(err)
 	}
-	bridge := tlsBridge(t, s3endpoint)
-	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
-	s3api := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
-	bucket := "inheritance-audit"
-	if _, err = s3api.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s3api.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
-	}
-	objects, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := make([]byte, 32)
-	if _, err = rand.Read(key); err != nil {
-		t.Fatal(err)
-	}
-	block, err := aes.NewCipher(key)
-	clear(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keys := authorityTestKeys{aead}
-	writer := &objectstore.AuthorityObjects{Store: objects, Seal: keys, Open: keys}
+
 	namespaces, err := kube.NewPermissionClient(c, cluster, control, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -167,12 +130,6 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		}
 	}()
 	target := authorization.Target{ClusterID: cluster, NamespaceUID: string(ns.UID), WorkloadUID: custodyID(), PodUID: custodyID()}
-	publish := func() {
-		t.Helper()
-		if err := (auditapp.AuthorityPublisher{Ledger: store, Objects: writer}).PublishAuthority(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
 	assignment := func(subject string) string {
 		p, e := store.Permissions(ctx, target)
 		if e != nil {
@@ -192,7 +149,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		tick := time.NewTicker(50 * time.Millisecond)
 		defer tick.Stop()
 		for {
-			publish()
+
 			if check() {
 				return
 			}

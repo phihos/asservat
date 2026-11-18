@@ -1066,6 +1066,23 @@ type PermissionBasis struct {
 	AutomationAuditID  pgtype.UUID
 }
 
+type PermissionBasisChange struct {
+	EventID        pgtype.UUID
+	BasisKey       string
+	Retired        bool
+	Uid            string
+	Kind           string
+	Generation     int64
+	SpecDigest     []byte
+	ScopeDigest    []byte
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUids   []string
+	Effect         string
+	NotAfter       pgtype.Timestamptz
+	AutomationJson []byte
+}
+
 type PermissionReviewAssignment struct {
 	ID                pgtype.UUID
 	StreamID          pgtype.UUID
@@ -1118,7 +1135,6 @@ type PermissionStream struct {
 	ObservedAt          pgtype.Timestamptz
 	FreshUntil          pgtype.Timestamptz
 	Suspended           bool
-	InitialAuditID      pgtype.UUID
 	UnavailableClusters []string
 }
 

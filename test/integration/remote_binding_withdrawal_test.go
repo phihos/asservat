@@ -21,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool, permissions *postgres.Permissions, target authorization.Target, batch cfg.PermissionBatch, flush func(*testing.T, *postgres.Permissions)) {
+func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool, permissions *postgres.Permissions, target authorization.Target, batch cfg.PermissionBatch) {
 	t.Helper()
 	ctx := t.Context()
 	pool := connectorDeliveryPool(t, admin, authority)
@@ -177,7 +177,7 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		case <-live.Done():
 			t.Fatal("permission acceptance timed out")
 		}
-		flush(t, permissions)
+
 	}
 	projection := func() authorization.Projection {
 		t.Helper()

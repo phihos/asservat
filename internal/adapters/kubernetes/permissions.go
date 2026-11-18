@@ -428,7 +428,7 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	if len(unplaced) != 0 {
 		return value.Snapshot{}, unplaced, nil
 	}
-	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
+	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start}
 	for i, o := range objects {
 		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
 	}
@@ -462,7 +462,7 @@ func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Sna
 	if err != nil {
 		return value.Snapshot{}, err
 	}
-	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
+	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start}
 	for i, o := range objects {
 		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
 	}

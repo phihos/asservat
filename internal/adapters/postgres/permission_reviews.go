@@ -150,7 +150,7 @@ func currentReviewStream(ctx context.Context, q *custodydb.Queries, root, cluste
 	if err != nil {
 		return s, err
 	}
-	if slices.Contains(s.UnavailableClusters, cluster) || !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+	if slices.Contains(s.UnavailableClusters, cluster) || s.Sequence < 1 || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return s, cfg.ErrUnavailable
 	}
 	return s, nil
@@ -172,9 +172,6 @@ func (r *AccessReviews) ReviewSources(ctx context.Context, cluster string) ([]cf
 		}
 		for _, row := range rows {
 			var src cfg.ReviewSource
-			if !currentAuthorityAuditReceipt(uid(s.ID), uid(row.AcceptedAuditID), row.AcknowledgedAt.Valid, row.ObjectKey, row.ObjectVersion, row.ObjectEtag, row.ObjectBytes, row.ObjectSha256) {
-				continue
-			}
 			if json.Unmarshal(row.SourceJson, &src) != nil || !src.Valid() || src.Resource.UID != row.Uid || src.ClusterID != cluster || src.Resource.Generation != row.Generation {
 				return cfg.ErrUnavailable
 			}
@@ -341,8 +338,7 @@ func reviewOutcome(d authapp.ReviewDecision) string {
 }
 
 // recordReviewChange appends one immutable decision-change event to the
-// stream's authority audit outbox (REQ-PER-006, ADR-245). The hub-worker's
-// authority publisher encrypts and acknowledges it like every other event.
+// PostgreSQL permission history in the transaction changing the decision.
 // A review that confirms the current state writes no event.
 func recordReviewChange(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, now time.Time, change, outcome string, src cfg.ReviewSource, p identity.Principal, assignment string, t targets.Request, decided, until time.Time) error {
 	c := audit.ReviewDecisionChange{Change: change, Outcome: outcome, SourceUID: src.Resource.UID, SourceGeneration: src.Resource.Generation, SourceDigest: src.Resource.SpecDigest, IdentityMapping: src.IdentityMappingRef,

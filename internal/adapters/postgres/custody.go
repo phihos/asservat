@@ -115,8 +115,14 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 	// SQL statement/lock timeouts alone do not limit pool acquisition.
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	return l.runTransaction(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, f)
+}
+
+// Callers with an existing operation deadline can share the same SQL lock,
+// statement, retry and rollback handling without installing a second deadline.
+func (l *Ledger) runTransaction(ctx context.Context, options pgx.TxOptions, f func(*custodydb.Queries) error) error {
 	for attempt := 0; attempt < 3; attempt++ {
-		tx, err := l.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+		tx, err := l.pool.BeginTx(ctx, options)
 		if err != nil {
 			if ctx.Err() != nil {
 				return unavailableCause("begin-deadline")

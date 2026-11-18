@@ -298,7 +298,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// those of reset/renew/suspend/update; assignments only retire.
 		read("permission_stream", "permission_basis", "permission_assignment", "permission_acceptance", "authority_audit")
 		add("permission_stream", "INSERT")
-		add("permission_stream", "UPDATE", "epoch", "sequence", "initial_audit_id", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended", "unavailable_clusters")
+		add("permission_stream", "UPDATE", "epoch", "sequence", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended", "unavailable_clusters")
 		// The joined protected-settings observer uses this existing credential.
 		// Grant updates can only shorten effective periods; its trigger forbids
 		// changing scope, decisions, revision or spend in the same statement.
@@ -309,6 +309,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_grant_settings", "UPDATE", "issuer", "source_uid", "source_generation", "source_digest", "observed_at", "fresh_until", "default_age_seconds", "max_age_seconds", "renewal_notice_seconds")
 		add("access_grant", "UPDATE", "policy_not_after", "expires_at")
 		add("permission_acceptance", "INSERT")
+		add("permission_basis_change", "INSERT")
 		add("permission_basis", "INSERT")
 		add("permission_basis", "UPDATE", "generation", "resource_version", "spec_digest", "scope_digest", "workload_uids", "effect", "not_after", "seen_sequence", "observation_version", "automation_json", "automation_audit_id")
 		add("permission_assignment", "INSERT")
@@ -322,12 +323,6 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_review_assignment", "UPDATE", "retired_at", "retirement_audit_id")
 		// ADR-329: joined clusters' AccessBinding deliveries.
 		read("remote_access_binding_delivery")
-	case "permission-audit":
-		// The audit publisher's pending read and acknowledgement only; the stream
-		// column grant permits its existing FOR UPDATE lock.
-		read("permission_stream", "authority_audit")
-		add("permission_stream", "UPDATE", "id")
-		add("authority_audit", "UPDATE", "acknowledged_at", "object_key", "object_version", "object_etag", "object_bytes", "object_sha256")
 	case "retention-source":
 		// ADR-330 D12: the retention follower stores the policy set and
 		// shortens stored deadlines with one audit row per event.

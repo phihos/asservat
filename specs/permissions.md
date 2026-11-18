@@ -158,15 +158,19 @@ freshness without rebuilding the fleet or advancing its sequence. PostgreSQL
 validates the lease on its own clock. A reader on a slower clock consumes the
 remaining lifetime without extending any lease, grant or review deadline.
 
-The 8 MiB plaintext budget applies to one authority audit event, which the audit
-format encrypts and verifies as a whole. PostgreSQL's expanded representation
-has a separate 12 MiB row limit. The event can contain any number of decision-time
-sources and retirements that fit this budget. One permission-change row records the source kind, revision, scope digest and
-counts of added and retired assignments for each changed basis. Each assignment
-retains its ID, subject, issuer, role and source digest in PostgreSQL, with links
-to its activation and retirement events. Replacing or removing a binding keeps
-its original provenance available. The transaction commits all changes together.
-Previously accepted bindings do not count as assignment changes.
+A permission mutation and its audit event commit in the same PostgreSQL transaction.
+An assignment keeps its ID, subject, issuer, role and source digest, together
+with its activation and retirement event IDs. Indexed source history preserves
+the binding revision, original scope, effect and automation envelope at a change,
+including when a binding is replaced or removed. A request retry returns its
+original result. Readers see a complete committed projection while another
+cluster's changes are being written.
+
+Bindings watched from a Kubernetes resource version remain current until a
+replacement or definitive loss of watch history. A five-second Kubernetes or
+PostgreSQL I/O timeout applies to an individual operation. A multi-binding
+reconciliation remains subject to its actual controller lease, earlier source
+or caller deadline, and each binding's expiry.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 

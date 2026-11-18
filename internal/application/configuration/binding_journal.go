@@ -50,7 +50,7 @@ func journalIdentity(b value.Binding, cluster string) bool {
 // bindingName keys a binding by namespace and name.
 func bindingName(r value.Resource) string { return r.Namespace + "/" + r.Name }
 func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error) {
-	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) {
+	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !value.PermissionObservationCurrent(s.ObservedAt, s.FreshUntil, now) {
 		return nil, value.ErrInvalid
 	}
 	j := &BindingJournal{cluster: s.ClusterID, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
@@ -159,7 +159,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		}
 		return cloneBatch(*j.pending), nil
 	}
-	if !identity.Fresh(j.observed, j.until, now, 5*time.Second) {
+	if !value.PermissionObservationCurrent(j.observed, j.until, now) {
 		return value.PermissionBatch{}, value.ErrChanged
 	}
 	if j.sequence != 0 && (f.Sequence != j.sequence || f.RootID != j.acceptedFence.RootID || f.Epoch != j.acceptedFence.Epoch || f.TrustDigest != j.acceptedFence.TrustDigest) {
@@ -179,7 +179,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	if err != nil {
 		return value.PermissionBatch{}, value.ErrInvalid
 	}
-	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: input, ObservedAt: now, FreshUntil: j.until}
+	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: input, ObservedAt: now, FreshUntil: value.PermissionDeadline(j.until, f.LeaseUntil)}
 	batch.UnavailableClusters = slices.Clone(inherited.UnavailableClusters)
 	for _, b := range bindings {
 		if b.UnavailableDeny {

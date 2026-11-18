@@ -120,7 +120,7 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Bindings) != 1 || len(sources.Sources) != 1 || sources.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || sources.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
+	if len(s.Bindings) != 1 || len(sources.Sources) != 1 || sources.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || sources.SourceResourceVersion != "opaque:sources" || !s.FreshUntil.IsZero() {
 		t.Fatal("incomplete snapshot")
 	}
 	b := s.Bindings[0]

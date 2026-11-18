@@ -46,9 +46,9 @@ func (q *Queries) CurrentPermissionReviewAssignment(ctx context.Context, arg Cur
 }
 
 const currentPermissionReviewSources = `-- name: CurrentPermissionReviewSources :many
-SELECT rs.stream_id, rs.uid, rs.epoch, rs.seen_sequence, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id, au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256,au.acknowledged_at
+SELECT rs.stream_id, rs.uid, rs.epoch, rs.seen_sequence, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id
 FROM permission_review_source rs JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4 AND au.acknowledged_at IS NOT NULL
+WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4
 ORDER BY rs.uid
 `
 
@@ -59,29 +59,8 @@ type CurrentPermissionReviewSourcesParams struct {
 	ClusterID    pgtype.UUID
 }
 
-type CurrentPermissionReviewSourcesRow struct {
-	StreamID        pgtype.UUID
-	Uid             string
-	Epoch           pgtype.UUID
-	SeenSequence    int64
-	Generation      int64
-	ResourceVersion string
-	SpecDigest      []byte
-	AuthorityDigest []byte
-	ClusterID       pgtype.UUID
-	Role            string
-	SourceJson      []byte
-	AcceptedAuditID pgtype.UUID
-	ObjectKey       pgtype.Text
-	ObjectVersion   pgtype.Text
-	ObjectEtag      pgtype.Text
-	ObjectBytes     pgtype.Int8
-	ObjectSha256    []byte
-	AcknowledgedAt  pgtype.Timestamptz
-}
-
 // The current, acknowledged decision-time sources of one cluster.
-func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg CurrentPermissionReviewSourcesParams) ([]CurrentPermissionReviewSourcesRow, error) {
+func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg CurrentPermissionReviewSourcesParams) ([]PermissionReviewSource, error) {
 	rows, err := q.db.Query(ctx, currentPermissionReviewSources,
 		arg.StreamID,
 		arg.Epoch,
@@ -92,9 +71,9 @@ func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg Curren
 		return nil, err
 	}
 	defer rows.Close()
-	items := []CurrentPermissionReviewSourcesRow{}
+	items := []PermissionReviewSource{}
 	for rows.Next() {
-		var i CurrentPermissionReviewSourcesRow
+		var i PermissionReviewSource
 		if err := rows.Scan(
 			&i.StreamID,
 			&i.Uid,
@@ -108,12 +87,6 @@ func (q *Queries) CurrentPermissionReviewSources(ctx context.Context, arg Curren
 			&i.Role,
 			&i.SourceJson,
 			&i.AcceptedAuditID,
-			&i.ObjectKey,
-			&i.ObjectVersion,
-			&i.ObjectEtag,
-			&i.ObjectBytes,
-			&i.ObjectSha256,
-			&i.AcknowledgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -355,11 +328,9 @@ func (q *Queries) RetirePermissionReviewStream(ctx context.Context, arg RetirePe
 }
 
 const selectPermissionReviews = `-- name: SelectPermissionReviews :many
-SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until,rs.accepted_audit_id,
-au.acknowledged_at,au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
+SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until
 FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
-LEFT JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2 AND rs.seen_sequence=$3
 AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7 AND d.fresh_until>clock_timestamp()
 ORDER BY d.decided_at DESC,a.id
@@ -376,21 +347,14 @@ type SelectPermissionReviewsParams struct {
 }
 
 type SelectPermissionReviewsRow struct {
-	ID              pgtype.UUID
-	Issuer          string
-	SubjectID       string
-	Role            string
-	BasisDigest     []byte
-	SourceUid       string
-	DecidedAt       pgtype.Timestamptz
-	FreshUntil      pgtype.Timestamptz
-	AcceptedAuditID pgtype.UUID
-	AcknowledgedAt  pgtype.Timestamptz
-	ObjectKey       pgtype.Text
-	ObjectVersion   pgtype.Text
-	ObjectEtag      pgtype.Text
-	ObjectBytes     pgtype.Int8
-	ObjectSha256    []byte
+	ID          pgtype.UUID
+	Issuer      string
+	SubjectID   string
+	Role        string
+	BasisDigest []byte
+	SourceUid   string
+	DecidedAt   pgtype.Timestamptz
+	FreshUntil  pgtype.Timestamptz
 }
 
 // The fresh decision-time allows of one exact Pod, newest first.
@@ -420,13 +384,6 @@ func (q *Queries) SelectPermissionReviews(ctx context.Context, arg SelectPermiss
 			&i.SourceUid,
 			&i.DecidedAt,
 			&i.FreshUntil,
-			&i.AcceptedAuditID,
-			&i.AcknowledgedAt,
-			&i.ObjectKey,
-			&i.ObjectVersion,
-			&i.ObjectEtag,
-			&i.ObjectBytes,
-			&i.ObjectSha256,
 		); err != nil {
 			return nil, err
 		}
@@ -444,7 +401,7 @@ max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS
 FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
 JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4
 GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
 ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001
 `

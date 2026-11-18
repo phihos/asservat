@@ -8,7 +8,7 @@ import (
 func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	want := []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
-	if len(all) != 20 || !slices.Equal(hub, want) {
+	if len(all) != 19 || !slices.Equal(hub, want) {
 		t.Fatalf("wrong physical inventory: all=%d hub=%v", len(all), hub)
 	}
 	if n, ok := PublicRuntimeRoleOrdinal("hub-runtime"); !ok || n != 95 {
@@ -17,7 +17,7 @@ func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 	if n, ok := PublicRuntimeRoleConnectionLimit("hub-runtime"); !ok || n != 81 {
 		t.Fatal("shared role lost its aggregate retained-process bound")
 	}
-	for _, duty := range append(PublicRuntimeHubSharedDuties(), "browser-cleanup", "worker-owner", "permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read", "api-execution-read", "api-execution-prepare", "api-execution-record", "retention-source-audit", "retention-catchup", "publisher-retention-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "key-verify") {
+	for _, duty := range append(PublicRuntimeHubSharedDuties(), "permission-audit", "browser-cleanup", "worker-owner", "permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read", "api-execution-read", "api-execution-prepare", "api-execution-record", "retention-source-audit", "retention-catchup", "publisher-retention-read", "publication-gate", "context-verify", "context-verification-audit", "context-publish", "publisher-identity-read", "key-verify") {
 		_, ordinal := PublicRuntimeRoleOrdinal(duty)
 		_, bounded := PublicRuntimeRoleConnectionLimit(duty)
 		if slices.Contains(all, duty) || ordinal || bounded {

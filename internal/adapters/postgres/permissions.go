@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
-	auditapp "asservat.local/asservat/internal/application/audit"
+
 	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -34,7 +35,6 @@ type Permissions struct {
 
 var _ configapp.PermissionStore = (*Permissions)(nil)
 var _ authapp.ProjectionReader = (*Permissions)(nil)
-var _ auditapp.AuthorityLedger = (*Permissions)(nil)
 
 func NewPermissions(ctx context.Context, pool *pgxpool.Pool, root string) (*Permissions, error) {
 	if !authorization.UUID(root) {
@@ -75,13 +75,22 @@ func (e permissionCause) Error() string     { return cfg.ErrUnavailable.Error() 
 func (e permissionCause) Unwrap() error     { return cfg.ErrUnavailable }
 func (e permissionCause) FixedStep() string { return e.cause }
 func fence(s custodydb.PermissionStream) cfg.PermissionFence {
-	f := cfg.PermissionFence{RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, LeaseUntil: s.LeaseUntil.Time, Initialized: s.InitialAuditID.Valid}
+	f := cfg.PermissionFence{RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, LeaseUntil: s.LeaseUntil.Time, Initialized: s.Sequence > 0}
 	copy(f.TrustDigest[:], s.TrustDigest)
 	return f
 }
 func (p *Permissions) transaction(ctx context.Context, f func(*custodydb.Queries) error) error {
 	return permissionError(p.ledger.transaction(ctx, f))
 }
+
+// A read-only projection sees either committed batch in full. Readers of a
+// healthy cluster need not wait for an unrelated fleet mutation to commit.
+func (p *Permissions) snapshot(ctx context.Context, f func(*custodydb.Queries) error) error {
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return permissionError(p.ledger.runTransaction(call, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, f))
+}
+
 func sameFence(s custodydb.PermissionStream, f cfg.PermissionFence) bool {
 	return s.ID == id(f.RootID) && s.Epoch == id(f.Epoch) && bytes.Equal(s.TrustDigest, f.TrustDigest[:])
 }
@@ -94,14 +103,6 @@ func liveStream(ctx context.Context, q *custodydb.Queries, s custodydb.Permissio
 		return cfg.ErrChanged
 	}
 	return nil
-}
-func retiredBases(counts map[string]int, bases map[string]custodydb.PermissionBasis) []audit.BasisChange {
-	var changes []audit.BasisChange
-	for _, key := range slices.Sorted(maps.Keys(counts)) {
-		basis := bases[key]
-		changes = append(changes, audit.BasisChange{BasisKey: key, Kind: basis.Kind, Revision: identity.Revision{UID: basis.Uid, Generation: basis.Generation, Digest: artifact.Digest(basis.SpecDigest)}, ScopeDigest: artifact.Digest(basis.ScopeDigest), Retired: counts[key]})
-	}
-	return changes
 }
 func currentPermissionRows(ctx context.Context, q *custodydb.Queries, root string) (map[string]custodydb.PermissionBasis, []custodydb.PermissionAssignment, error) {
 	bases, err := q.ListPermissionBases(ctx, id(root))
@@ -122,10 +123,10 @@ func insertAuthority(ctx context.Context, q *custodydb.Queries, r audit.Authorit
 	if !r.Valid() {
 		return cfg.ErrInvalid
 	}
-	// Each outbox event must fit the authority audit format's plaintext budget.
+	// Batch membership and source history live in indexed transaction-linked rows.
 	data, err := json.Marshal(r)
-	if err != nil || len(data) > audit.AuthorityPlaintextBytes {
-		return cfg.ErrLimit
+	if err != nil {
+		return err
 	}
 	sum := sha256.Sum256(data)
 	return q.InsertAuthorityAudit(ctx, custodydb.InsertAuthorityAuditParams{ID: id(r.ID), StreamID: id(r.RootID), Epoch: id(r.Epoch), Sequence: r.Sequence, EventKind: r.Kind, EventDigest: sum[:], Record: data})
@@ -171,20 +172,22 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 				return err
 			}
 		}
-		bases, rows, err := currentPermissionRows(ctx, q, root)
-		if err != nil {
-			return err
-		}
 		record := audit.AuthorityRecord{ID: epoch, RootID: root, Epoch: epoch, Kind: "permission-reset", InputDigest: trust, CreatedAt: n.Time}
 		// A routine restart suspends authority but keeps candidate history for
 		// reconciliation against exact observed versions. Trust replacement retires
 		// everything; equal final values alone never establish continuity.
 		if !bytes.Equal(s.TrustDigest, trust[:]) {
-			counts := map[string]int{}
-			for _, a := range rows {
-				counts[a.BasisKey]++
+			bases, err := q.ListPermissionBases(ctx, s.ID)
+			if err != nil {
+				return err
 			}
-			record.BasisChanges = retiredBases(counts, bases)
+			keys := make([]string, len(bases))
+			for i, b := range bases {
+				keys[i] = b.BasisKey
+			}
+			if err = q.RecordPermissionBasisChanges(ctx, custodydb.RecordPermissionBasisChangesParams{StreamID: s.ID, EventID: id(epoch), Keys: keys, Retired: true}); err != nil {
+				return err
+			}
 			if _, err = q.RetirePermissionStream(ctx, custodydb.RetirePermissionStreamParams{StreamID: id(root), RetirementAuditID: id(epoch)}); err != nil {
 				return err
 			}
@@ -337,6 +340,25 @@ func equivalentBasis(old custodydb.PermissionBasis, next cfg.PermissionBasis) bo
 	return true
 }
 
+// A single SQL recordset carries the variable-size workload and automation
+// fields. PostgreSQL expands it once for the whole accepted batch.
+type permissionBasisWrite struct {
+	Key         string                            `json:"key"`
+	UID         string                            `json:"uid"`
+	Kind        string                            `json:"kind"`
+	Generation  int64                             `json:"generation"`
+	RV          string                            `json:"rv"`
+	Spec        string                            `json:"spec"`
+	Scope       string                            `json:"scope"`
+	Cluster     string                            `json:"cluster"`
+	Namespace   string                            `json:"namespace"`
+	Workloads   []string                          `json:"workloads,omitempty"`
+	Effect      string                            `json:"effect"`
+	Expiry      *time.Time                        `json:"expiry,omitempty"`
+	Observation string                            `json:"observation"`
+	Automation  *authorization.AutomationEnvelope `json:"automation,omitempty"`
+}
+
 type memberKey struct{ basis, kind, issuer, subject, role string }
 
 func member(a custodydb.PermissionAssignment) memberKey {
@@ -353,16 +375,36 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		return out, err
 	}
 	b = normalizedBatch(b)
-	requestDigest := digest(b)
 	projected := projectionDigest(b)
-	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+	// The projection covers every normalized field except the request envelope
+	// and continuity flags. Hash those alongside it for idempotent retry.
+	continuity := make([]bool, len(b.Bases))
+	for i, basis := range b.Bases {
+		continuity[i] = basis.Continuous
+	}
+	requestDigest := digest(struct {
+		Projection           []byte
+		Root, Epoch, Request string
+		Sequence             int64
+		Observed, Until      time.Time
+		Continuous           []bool
+	}{projected, b.RootID, b.Epoch, b.RequestID, b.ExpectedSequence, b.ObservedAt, b.FreshUntil, continuity})
+	// An expired request may still resolve the outcome of its original commit.
+	until := b.FreshUntil
+	expired := !time.Now().Before(until)
+	if expired {
+		until = time.Now().Add(5 * time.Second)
+	}
+	ctx, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	err := permissionError(p.ledger.runTransaction(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(q *custodydb.Queries) error {
 		s, err := q.LockPermissionStream(ctx, id(p.root))
 		if err != nil {
 			return err
 		}
 		previous, e := q.ReadPermissionAcceptance(ctx, id(b.RequestID))
 		if e == nil {
-			if previous.StreamID != s.ID || previous.Epoch != id(b.Epoch) || !bytes.Equal(previous.RequestDigest, requestDigest) {
+			if previous.StreamID != s.ID || previous.Epoch != id(b.Epoch) || (!bytes.Equal(previous.RequestDigest, requestDigest) && !bytes.Equal(previous.RequestDigest, digest(b))) {
 				return cfg.ErrChanged
 			}
 			out = cfg.PermissionAcceptance{PermissionFence: cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, Sequence: previous.Sequence, TrustDigest: b.TrustDigest, Initialized: true}, AuditID: uid(previous.AuditID), Assignments: int(previous.Assignments), Retired: int(previous.Retired)}
@@ -370,6 +412,9 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		}
 		if !errors.Is(e, pgx.ErrNoRows) {
 			return e
+		}
+		if expired {
+			return cfg.ErrInvalid
 		}
 		requested := cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, TrustDigest: b.TrustDigest}
 		if err = liveStream(ctx, q, s, requested); err != nil {
@@ -406,7 +451,8 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		record.Namespaces = b.Namespaces
 		record.RemoteNamespaces = b.RemoteNamespaces
 		record.Workloads = b.Workloads
-		retiredCounts := map[string]int{}
+		oldKeys := map[string]bool{}
+		newKeys := map[string]bool{}
 		var retired []pgtype.UUID
 		for _, a := range rows {
 			basis, exists := next[a.BasisKey]
@@ -423,16 +469,15 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 				continue
 			}
 			retired = append(retired, a.ID)
-			retiredCounts[a.BasisKey]++
+			oldKeys[a.BasisKey] = true
 		}
 		if len(retired) > 0 {
-			record.BasisChanges = retiredBases(retiredCounts, bases)
 			if err := q.RetirePermissionAssignments(ctx, custodydb.RetirePermissionAssignmentsParams{Ids: retired, AuditID: id(record.ID)}); err != nil {
 				return err
 			}
 		}
-		var basisWrites []custodydb.UpsertPermissionBasesParams
-		var additions []custodydb.InsertPermissionAssignmentsParams
+		basisWrites := make([]permissionBasisWrite, 0, len(b.Bases))
+		additions := custodydb.InsertPermissionAssignmentsParams{StreamID: s.ID, EventID: id(record.ID)}
 		for _, basis := range b.Bases {
 			workloads := make([]string, 0, len(basis.Scope.Workloads))
 			// ADR-335 D4: a uid pins one instance; otherwise the workload
@@ -444,57 +489,64 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 					workloads = append(workloads, w.UID)
 				}
 			}
-			expiry := pgtype.Timestamptz{}
-			if !basis.NotAfter.IsZero() {
-				expiry = ts(basis.NotAfter)
-			}
-			params := custodydb.UpsertPermissionBasesParams{StreamID: s.ID, BasisKey: basis.Key(), Uid: basis.Resource.UID, Kind: basis.Resource.Kind, Generation: basis.Resource.Generation, ResourceVersion: basis.Resource.ResourceVersion, SpecDigest: basis.Resource.SpecDigest[:], ScopeDigest: basis.ScopeDigest[:], ClusterID: id(basis.Scope.ClusterID), NamespaceUid: basis.Scope.Namespace.UID, WorkloadUids: workloads, Effect: basis.Effect, NotAfter: expiry, SeenSequence: record.Sequence, ObservationVersion: basis.ObservationVersion}
-			if basis.Automation != nil {
-				params.AutomationJson, err = json.Marshal(basis.Automation)
-				if err != nil {
-					return err
+			key := basis.Key()
+			old, exists := bases[key]
+			if !exists || old.Generation != basis.Resource.Generation || !bytes.Equal(old.ScopeDigest, basis.ScopeDigest[:]) || !bytes.Equal(old.SpecDigest, basis.Resource.SpecDigest[:]) {
+				newKeys[key] = true
+				if exists {
+					oldKeys[key] = true
 				}
-				params.AutomationAuditID = id(record.ID)
-				record.Automation = append(record.Automation, audit.AutomationDelegation{BasisKey: basis.Key(), Revision: identity.Revision{UID: basis.Resource.UID, Generation: basis.Resource.Generation, Digest: basis.Resource.SpecDigest}, ScopeDigest: basis.ScopeDigest, Envelope: *basis.Automation})
 			}
-			basisWrites = append(basisWrites, params)
-			add := custodydb.InsertPermissionAssignmentsParams{StreamID: s.ID, BasisKey: basis.Key(), BasisDigest: basis.Resource.SpecDigest[:], ActivationAuditID: id(record.ID)}
+			row := permissionBasisWrite{Key: key, UID: basis.Resource.UID, Kind: basis.Resource.Kind, Generation: basis.Resource.Generation, RV: basis.Resource.ResourceVersion, Spec: hex.EncodeToString(basis.Resource.SpecDigest[:]), Scope: hex.EncodeToString(basis.ScopeDigest[:]), Cluster: basis.Scope.ClusterID, Namespace: basis.Scope.Namespace.UID, Workloads: workloads, Effect: basis.Effect, Observation: basis.ObservationVersion, Automation: basis.Automation}
+			if !basis.NotAfter.IsZero() {
+				row.Expiry = &basis.NotAfter
+			}
+			basisWrites = append(basisWrites, row)
 			for _, subject := range basis.Subjects {
 				for _, role := range basis.Roles {
-					if wanted[memberKey{add.BasisKey, subject.Kind, subject.Issuer, subject.ID, role}] {
+					if wanted[memberKey{key, subject.Kind, subject.Issuer, subject.ID, role}] {
 						continue
 					}
-					add.Kinds = append(add.Kinds, subject.Kind)
-					add.Issuers = append(add.Issuers, subject.Issuer)
-					add.Subjects = append(add.Subjects, subject.ID)
-					add.Roles = append(add.Roles, role)
+					newKeys[key] = true
+					additions.Bases = append(additions.Bases, key)
+					additions.Kinds = append(additions.Kinds, subject.Kind)
+					additions.Issuers = append(additions.Issuers, subject.Issuer)
+					additions.Subjects = append(additions.Subjects, subject.ID)
+					additions.Roles = append(additions.Roles, role)
 				}
 			}
-			if len(add.Roles) > 0 {
-				additions = append(additions, add)
-				record.BasisChanges = append(record.BasisChanges, audit.BasisChange{BasisKey: add.BasisKey, Kind: basis.Resource.Kind, Revision: identity.Revision{UID: basis.Resource.UID, Generation: basis.Resource.Generation, Digest: basis.Resource.SpecDigest}, ScopeDigest: basis.ScopeDigest, Added: len(add.Roles)})
+		}
+		note := func(keys map[string]bool, retired bool) error {
+			if len(keys) == 0 {
+				return nil
 			}
+			return q.RecordPermissionBasisChanges(ctx, custodydb.RecordPermissionBasisChangesParams{StreamID: s.ID, EventID: id(record.ID), Keys: slices.Collect(maps.Keys(keys)), Retired: retired})
+		}
+		if err = note(oldKeys, true); err != nil {
+			return err
 		}
 		if len(basisWrites) > 0 {
-			if err := q.UpsertPermissionBases(ctx, basisWrites).Close(); err != nil {
+			encoded, err := json.Marshal(basisWrites)
+			if err != nil {
+				return err
+			}
+			if err = q.UpsertPermissionBases(ctx, custodydb.UpsertPermissionBasesParams{StreamID: s.ID, EventID: id(record.ID), Sequence: record.Sequence, Bases: encoded}); err != nil {
 				return err
 			}
 		}
-		if len(additions) > 0 {
-			if err := q.InsertPermissionAssignments(ctx, additions).Close(); err != nil {
+		if len(additions.Bases) > 0 {
+			if err = q.InsertPermissionAssignments(ctx, additions); err != nil {
 				return err
 			}
+		}
+		if err = note(newKeys, false); err != nil {
+			return err
 		}
 		if err = acceptReviewSources(ctx, q, s, b, &record); err != nil {
 			return err
 		}
 		if err = insertAuthority(ctx, q, record); err != nil {
 			return err
-		}
-		if !s.InitialAuditID.Valid {
-			if err = q.InitializePermissionStream(ctx, custodydb.InitializePermissionStreamParams{ID: s.ID, InitialAuditID: id(record.ID)}); err != nil {
-				return err
-			}
 		}
 		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired))}); err != nil {
 			return err
@@ -512,11 +564,10 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if !b.Current(n.Time) {
 			return cfg.ErrInvalid
 		}
-		s.InitialAuditID = id(record.ID)
 		s.Sequence = record.Sequence
 		out = cfg.PermissionAcceptance{PermissionFence: fence(s), AuditID: record.ID, Assignments: len(wanted), Retired: len(retired)}
 		return nil
-	})
+	}))
 	return out, err
 }
 
@@ -593,7 +644,7 @@ func (p *Permissions) Permissions(ctx context.Context, target authorization.Targ
 	if !target.Valid() {
 		return out, cfg.ErrInvalid
 	}
-	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+	err := p.snapshot(ctx, func(q *custodydb.Queries) error {
 		s, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
@@ -616,7 +667,7 @@ func (p *Permissions) WorkloadPermissions(ctx context.Context, target authorizat
 		return authorization.WorkloadProjection{}, cfg.ErrInvalid
 	}
 	var concrete authorization.Projection
-	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+	err := p.snapshot(ctx, func(q *custodydb.Queries) error {
 		stream, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
@@ -639,16 +690,8 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	if err != nil {
 		return authorization.Projection{}, err
 	}
-	if slices.Contains(s.UnavailableClusters, target.ClusterID) || !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
+	if slices.Contains(s.UnavailableClusters, target.ClusterID) || s.Sequence < 1 || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
 		return authorization.Projection{}, cfg.ErrUnavailable
-	}
-	reset, err := q.ReadAuthorityAudit(ctx, s.Epoch)
-	if err != nil {
-		return authorization.Projection{}, err
-	}
-	initial, err := q.ReadAuthorityAudit(ctx, s.InitialAuditID)
-	if err != nil {
-		return authorization.Projection{}, err
 	}
 	rows, err := q.SelectPermissionAssignments(ctx, custodydb.SelectPermissionAssignmentsParams{StreamID: s.ID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column4: target.WorkloadUID})
 	if err != nil {
@@ -657,7 +700,6 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	until := identity.Earlier(s.FreshUntil.Time, s.LeaseUntil.Time)
 	out = authorization.Projection{Target: target, Revision: identity.Revision{UID: uid(s.Epoch), Generation: s.Sequence}, ObservedAt: s.ObservedAt.Time, FreshUntil: until, DeniesComplete: true, DeniesObservedAt: s.ObservedAt.Time, DeniesFreshUntil: until}
 	copy(out.Revision.Digest[:], s.ProjectionDigest)
-	rootAudited := currentAuthorityAudit(reset, s.ID, s.Epoch) && currentAuthorityAudit(initial, s.ID, s.InitialAuditID)
 	for _, a := range rows {
 		if a.SeenSequence != s.Sequence {
 			// Only an unavailable source's kept allow may lag the stream
@@ -680,8 +722,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		row := authorization.CurrentAssignment{Audience: audience, ObservedAt: s.ObservedAt.Time, FreshUntil: deadline}
 		if a.Effect == "Deny" {
 			out.Denies = append(out.Denies, row)
-		} else if rootAudited &&
-			currentAuthorityAuditReceipt(uid(s.ID), uid(a.ActivationAuditID), a.AcknowledgedAt.Valid, a.ObjectKey, a.ObjectVersion, a.ObjectEtag, a.ObjectBytes, a.ObjectSha256) {
+		} else {
 			out.Allows = append(out.Allows, row)
 		}
 	}
@@ -694,7 +735,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		}
 		for _, r := range reviews {
 			deadline := identity.Earlier(until, r.FreshUntil.Time)
-			if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
+			if !n.Time.Before(deadline) {
 				continue
 			}
 			audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}

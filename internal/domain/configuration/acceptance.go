@@ -85,10 +85,26 @@ func (p PermissionBasis) Key() string {
 // Roles are the roles a binding or source may grant.
 var Roles = []string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}
 
+// Permission observations held by a watch have no time-based expiry. A
+// source that supplies an independent deadline keeps it through commit.
+func PermissionObservationCurrent(observed, until, now time.Time) bool {
+	return !observed.IsZero() && !now.Before(observed) && (until.IsZero() || now.Before(until))
+}
+
+func PermissionDeadline(a, b time.Time) time.Time {
+	if a.IsZero() {
+		return b
+	}
+	if b.IsZero() {
+		return a
+	}
+	return identity.Earlier(a, b)
+}
+
 // Current verifies the original observation and every basis expiry against
 // now. SQL checks these bounds again before committing an immutable batch.
 func (b PermissionBatch) Current(now time.Time) bool {
-	return identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) &&
+	return !b.FreshUntil.IsZero() && PermissionObservationCurrent(b.ObservedAt, b.FreshUntil, now) &&
 		!slices.ContainsFunc(b.Bases, func(p PermissionBasis) bool { return !p.NotAfter.IsZero() && !now.Before(p.NotAfter) })
 }
 

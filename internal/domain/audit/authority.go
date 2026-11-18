@@ -2,42 +2,19 @@
 package audit
 
 import (
+	"time"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	"time"
 )
-
-// Permission changes record assignment identities, never group membership lists,
-// Kubernetes free text, tokens or collected evidence. Source digests link config.
-type AssignmentChange struct {
-	ID, Change  string
-	Audience    artifact.AudienceAssignment
-	ScopeDigest artifact.Digest
-}
-
-// AuthorityPlaintextBytes is the maximum plaintext of one encrypted audit event.
-const AuthorityPlaintextBytes = 8 << 20
-
-// BasisChange counts assignments linked to this event by their activation or
-// retirement audit ID. The original scope remains available after replacement.
-type BasisChange struct {
-	Kind           string
-	Revision       identity.Revision
-	BasisKey       string
-	ScopeDigest    artifact.Digest
-	Added, Retired int
-}
 
 type AuthorityRecord struct {
 	ID, RootID, Epoch, Kind string
 	Sequence                int64
 	InputDigest             artifact.Digest
 	CreatedAt               time.Time
-	Changes                 []AssignmentChange     // Historical full-member records.
-	BasisChanges            []BasisChange          `json:",omitempty"`
-	Automation              []AutomationDelegation `json:",omitempty"`
 	// Namespaces is the minimized namespace observation that the accepted
 	// PermissionSource assignments were derived from (ADR-242): keys, names,
 	// UIDs and value digests only.
@@ -107,15 +84,6 @@ type ReviewRetirement struct {
 	Retired   int64
 }
 
-// Complete minimized delegation snapshot for this accepted configuration. It
-// records envelopes, not personal group membership or authored free text.
-type AutomationDelegation struct {
-	BasisKey    string
-	Revision    identity.Revision
-	ScopeDigest artifact.Digest
-	Envelope    authorization.AutomationEnvelope
-}
-
 func (r AuthorityRecord) Valid() bool {
 	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || r.Sequence < 0 || r.CreatedAt.IsZero() || r.InputDigest == (artifact.Digest{}) {
 		return false
@@ -123,10 +91,10 @@ func (r AuthorityRecord) Valid() bool {
 	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" && r.Kind != "permission-review" {
 		return false
 	}
-	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.Changes) > 0 || len(r.ReviewRetirements) > 0) {
+	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.ReviewRetirements) > 0) {
 		return false
 	}
-	if (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
+	if (r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
 		return false
 	}
 	for _, s := range r.ReviewSources {
@@ -139,28 +107,6 @@ func (r AuthorityRecord) Valid() bool {
 			return false
 		}
 	}
-	delegations := map[string]bool{}
-	for _, a := range r.Automation {
-		if !identity.Text(a.BasisKey, 256) || delegations[a.BasisKey] || !a.Revision.Valid() || a.ScopeDigest == (artifact.Digest{}) || !a.Envelope.Valid() {
-			return false
-		}
-		delegations[a.BasisKey] = true
-	}
-	if len(r.BasisChanges) > 0 && ((r.Kind != "permission-change" && r.Kind != "permission-reset") || len(r.Changes) > 0) {
-		return false
-	}
-	for _, change := range r.BasisChanges {
-		if !identity.Text(change.BasisKey, 256) || !authorization.ValidPermissionBasisKind(change.Kind) || !change.Revision.Valid() || change.ScopeDigest == (artifact.Digest{}) || change.Added < 0 || change.Retired < 0 || change.Added+change.Retired == 0 {
-			return false
-		}
-	}
-	seen := map[string]bool{}
-	for _, c := range r.Changes {
-		if c.ID != c.Audience.AssignmentID || seen[c.ID] || (c.Change != "added" && c.Change != "retired") || c.ScopeDigest == (artifact.Digest{}) || !authorization.ValidAudienceAssignment(c.Audience) {
-			return false
-		}
-		seen[c.ID] = true
-	}
 	return true
 }
 
@@ -168,11 +114,4 @@ type Receipt struct {
 	Key, Version, ETag string
 	Bytes              int64
 	SHA256             artifact.Digest
-}
-
-func AuthorityKey(root, event string) string {
-	return "authority/v1/" + root + "/" + event + "/record"
-}
-func (r Receipt) Valid(root, event string) bool {
-	return authorization.UUID(root) && authorization.UUID(event) && r.Key == AuthorityKey(root, event) && r.Version != "null" && identity.Text(r.Version, 1024) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 16<<20 && r.SHA256 != (artifact.Digest{})
 }

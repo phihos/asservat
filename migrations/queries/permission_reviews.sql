@@ -21,9 +21,9 @@ DELETE FROM permission_review_source WHERE stream_id=$1;
 
 -- name: CurrentPermissionReviewSources :many
 -- The current, acknowledged decision-time sources of one cluster.
-SELECT rs.*, au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256,au.acknowledged_at
+SELECT rs.*
 FROM permission_review_source rs JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4 AND au.acknowledged_at IS NOT NULL
+WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4
 ORDER BY rs.uid;
 
 -- name: LockPermissionReviewSource :one
@@ -56,11 +56,9 @@ DELETE FROM permission_review_decision x WHERE x.assignment_id=sqlc.arg(assignme
 
 -- name: SelectPermissionReviews :many
 -- The fresh decision-time allows of one exact Pod, newest first.
-SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until,rs.accepted_audit_id,
-au.acknowledged_at,au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
+SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until
 FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
-LEFT JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2 AND rs.seen_sequence=$3
 AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7 AND d.fresh_until>clock_timestamp()
 ORDER BY d.decided_at DESC,a.id;
@@ -90,7 +88,7 @@ max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS
 FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
 JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4
 GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
 ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001;
 

@@ -29,7 +29,7 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 			t.Fatal("download compartment changed", purpose)
 		}
 	}
-	if !slices.Equal(PermissionProjectionPurposes(false, true, false), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
+	if !slices.Equal(PermissionProjectionPurposes(false, true, false), []string{"permission-accept", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
 		t.Fatal("download logins left their projections")
 	}
 	seen := map[int]bool{}

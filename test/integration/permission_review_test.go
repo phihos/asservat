@@ -2,18 +2,13 @@ package integration
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"encoding/json"
 	"net/url"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
@@ -22,10 +17,6 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
@@ -41,7 +32,7 @@ import (
 // kubernetesExec source with encrypted authority audit. The hub-to-region
 // query transport is not exercised here; the region adapter is called
 // directly with the same request the transport carries.
-func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn, s3endpoint string) {
+func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	native, err := kubernetes.NewForConfig(c)
@@ -171,34 +162,7 @@ func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn, s3endpoint strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	bridge := tlsBridge(t, s3endpoint)
-	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
-	s3api := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
-	bucket := "review-audit"
-	if _, err = s3api.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s3api.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
-	}
-	objects, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := make([]byte, 32)
-	if _, err = rand.Read(key); err != nil {
-		t.Fatal(err)
-	}
-	block, err := aes.NewCipher(key)
-	clear(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writer := &objectstore.AuthorityObjects{Store: objects, Seal: authorityTestKeys{aead}, Open: authorityTestKeys{aead}}
+
 	trust := artifact.Digest{1}
 	if _, err = store.BeginPermissions(ctx, root, epoch, trust); err != nil {
 		t.Fatal(err)
@@ -216,11 +180,6 @@ func testDecisionTimeReviews(t *testing.T, c *rest.Config, dsn, s3endpoint strin
 			t.Fatal(err)
 		}
 		sequence = r.Sequence
-		for range 4 {
-			if err = (auditapp.AuthorityPublisher{Ledger: store, Objects: writer}).PublishAuthority(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
 	acceptBatch(nil, true)
 	acceptBatch(nil, false)

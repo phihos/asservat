@@ -1,8 +1,6 @@
 package audit
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -47,22 +45,5 @@ func TestReviewDecisionChangeRecordIsBoundedAndClosed(t *testing.T) {
 	r.Review = nil
 	if r.Valid() {
 		t.Fatal("review event without payload")
-	}
-}
-
-func TestAuthorityAuditFitsByBytesAcrossManyAssignments(t *testing.T) {
-	const root = "11111111-1111-4111-8111-111111111111"
-	record := AuthorityRecord{ID: root, RootID: root, Epoch: root, Kind: "permission-change", Sequence: 1, InputDigest: artifact.Digest{1}, CreatedAt: time.Now()}
-	for i := 0; i < 8193; i++ {
-		id := fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
-		record.Changes = append(record.Changes, AssignmentChange{ID: id, Change: "added", ScopeDigest: artifact.Digest{2},
-			Audience: artifact.AudienceAssignment{Kind: "Group", Issuer: "https://id.example", SubjectID: "team", Role: "evidence-reader", BasisKind: "AccessBinding", BasisUID: "readers", AssignmentID: id, BasisDigest: artifact.Digest{1}}})
-	}
-	for i := range 129 {
-		record.ReviewRetirements = append(record.ReviewRetirements, ReviewRetirement{SourceUID: fmt.Sprintf("source-%d", i), Retired: 1})
-	}
-	plain, err := json.Marshal(record)
-	if err != nil || len(plain) > AuthorityPlaintextBytes || !record.Valid() {
-		t.Fatal("valid changes that fit one audit record refused", len(plain), err)
 	}
 }

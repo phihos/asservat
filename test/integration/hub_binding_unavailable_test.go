@@ -22,7 +22,7 @@ import (
 // The hub's legacy namespaced Deny is present in the first LIST and changes
 // on its original watch. A separate hub ClusterAccessBinding targets one
 // remote. The other remote keeps its independent, audited Allow throughout.
-func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool, flush func(*testing.T, *postgres.Permissions)) {
+func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	root, hub, peer, blocked := custodyID(), custodyID(), custodyID(), custodyID()
@@ -95,7 +95,6 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool, flush fu
 		case <-ctx.Done():
 			t.Fatal("permission acceptance timed out")
 		}
-		flush(t, permissions)
 		for cluster, want := range map[string]string{hub: local, blocked: "Unavailable", peer: "Allow"} {
 			target := authorization.Target{ClusterID: cluster, NamespaceUID: ns.UID, WorkloadUID: "fixture-workload", PodUID: "fixture-pod"}
 			projection, err := permissions.Permissions(ctx, target)

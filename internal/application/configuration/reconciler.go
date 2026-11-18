@@ -12,7 +12,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // BindingReconciler accepts explicit AccessBindings and, with a namespace
@@ -279,7 +278,7 @@ func (r BindingReconciler) trust(ctx context.Context) (PermissionTrust, error) {
 	if err != nil {
 		return PermissionTrust{}, err
 	}
-	if t.Digest == ([32]byte{}) || !identity.Fresh(t.ObservedAt, t.FreshUntil, r.Now(), 5*time.Second) {
+	if t.Digest == ([32]byte{}) || !value.PermissionObservationCurrent(t.ObservedAt, t.FreshUntil, r.Now()) {
 		return PermissionTrust{}, value.ErrUnavailable
 	}
 	return t, nil
@@ -318,7 +317,7 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context) (value.Snapshot, error
 	if err != nil {
 		return value.Snapshot{}, err
 	}
-	snapshot.FreshUntil = identity.Earlier(snapshot.FreshUntil, t.FreshUntil)
+	snapshot.FreshUntil = value.PermissionDeadline(snapshot.FreshUntil, t.FreshUntil)
 	return snapshot, nil
 }
 func (s *bindingRun) accept(ctx context.Context, onlyChangedInheritance bool) error {
@@ -423,7 +422,7 @@ func (s *bindingRun) refreshClusterBindings(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if snapshot.ClusterID != s.journal.cluster || !identity.Fresh(snapshot.ObservedAt, snapshot.FreshUntil, s.r.Now(), 5*time.Second) {
+	if snapshot.ClusterID != s.journal.cluster || !value.PermissionObservationCurrent(snapshot.ObservedAt, snapshot.FreshUntil, s.r.Now()) {
 		return value.ErrUnavailable
 	}
 	snapshot.Sources, snapshot.SourcesComplete = s.sources, s.sourcesComplete
@@ -433,13 +432,13 @@ func (s *bindingRun) refreshClusterBindings(ctx context.Context) error {
 	if err = s.observeTrust(ctx); err != nil {
 		return err
 	}
-	s.journal.until = identity.Earlier(s.journal.until, snapshot.FreshUntil)
+	s.journal.until = value.PermissionDeadline(s.journal.until, snapshot.FreshUntil)
 	return s.commit(ctx, true)
 }
 
 // Run processes ordered watch transitions, database notifications and original
 // binding expirations. The live epoch renews its lease separately from changes.
-// New allows become available after their audit record is acknowledged.
+// Permission changes and their audit become visible at the same commit.
 // PermissionEpochResult is a completed run's scheduling result, never current
 // permission authority. Suspended is true only after exact owned-epoch
 // suspension was acknowledged and all original watch/feed children joined.

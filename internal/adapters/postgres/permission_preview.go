@@ -25,7 +25,7 @@ import (
 // It reads no catalog, evidence or group membership and writes nothing.
 func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
 	var out cfg.PreviewSnapshot
-	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+	err := p.snapshot(ctx, func(q *custodydb.Queries) error {
 		s, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
@@ -195,7 +195,7 @@ func currentNamespaceObservations(ctx context.Context, q *custodydb.Queries, s c
 	if err != nil {
 		return nil, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || s.Sequence < 1 || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+	if s.Suspended || s.Sequence < 1 || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return nil, nil
 	}
 	raw, err := q.ReadPermissionChangeRecord(ctx, custodydb.ReadPermissionChangeRecordParams{StreamID: s.ID, Epoch: s.Epoch, Sequence: s.Sequence})

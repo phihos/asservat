@@ -141,17 +141,17 @@ func (f *namespaceRelistFixture) serve(w http.ResponseWriter, r *http.Request) {
 	<-r.Context().Done()
 }
 
-func qualifyBlockedNamespaceRelist(t *testing.T, pool *pgxpool.Pool, flush func(*testing.T, *postgres.Permissions)) {
+func qualifyBlockedNamespaceRelist(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, tc := range []struct {
 		kind   string
 		status int
 	}{{"namespaces", http.StatusGone}, {"namespaces", http.StatusForbidden}, {"namespaces", http.StatusUnprocessableEntity}, {"accessbindings", http.StatusForbidden}, {"permissionsources", http.StatusGone}, {"clusteraccessbindings", http.StatusGone}} {
-		t.Run(tc.kind+"-"+http.StatusText(tc.status), func(t *testing.T) { qualifyLostPermissionWatch(t, pool, flush, tc.kind, tc.status) })
+		t.Run(tc.kind+"-"+http.StatusText(tc.status), func(t *testing.T) { qualifyLostPermissionWatch(t, pool, tc.kind, tc.status) })
 	}
 }
 
-func qualifyLostPermissionWatch(t *testing.T, pool *pgxpool.Pool, flush func(*testing.T, *postgres.Permissions), kind string, status int) {
+func qualifyLostPermissionWatch(t *testing.T, pool *pgxpool.Pool, kind string, status int) {
 	ctx, cancel := context.WithTimeout(t.Context(), 55*time.Second)
 	defer cancel()
 	root, cluster, issuer := custodyID(), custodyID(), "https://identity.synthetic.invalid"
@@ -190,7 +190,7 @@ func qualifyLostPermissionWatch(t *testing.T, pool *pgxpool.Pool, flush func(*te
 	target := authorization.Target{ClusterID: cluster, NamespaceUID: ns.UID, WorkloadUID: custodyID(), PodUID: custodyID()}
 	eligible := func(old, new bool) bool {
 		t.Helper()
-		flush(t, permissions)
+
 		projection, err := permissions.Permissions(ctx, target)
 		if err != nil {
 			t.Fatal(err)
