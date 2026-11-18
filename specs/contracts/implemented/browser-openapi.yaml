@@ -4179,6 +4179,7 @@ components:
                       basis_kind:
                         enum:
                         - AccessBinding
+                        - ClusterAccessBinding
                         - PermissionSource
                       basis_uid:
                         type: string
@@ -6037,6 +6038,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string
@@ -6076,6 +6078,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string

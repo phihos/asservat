@@ -1041,6 +1041,7 @@
                               "basis_kind": {
                                 "enum": [
                                   "AccessBinding",
+                                  "ClusterAccessBinding",
                                   "PermissionSource"
                                 ]
                               },
@@ -1094,6 +1095,7 @@
                               "basis_kind": {
                                 "enum": [
                                   "AccessBinding",
+                                  "ClusterAccessBinding",
                                   "PermissionSource"
                                 ]
                               },

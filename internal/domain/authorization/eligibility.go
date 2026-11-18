@@ -107,8 +107,16 @@ func (t Target) Valid() bool {
 func (op Operation) Valid() bool {
 	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == ReadLogQuery || op == ReadLiveSource || op == DownloadApproved || op == ApproveAction
 }
-func validAudience(a artifact.AudienceAssignment) bool {
-	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
+const ClusterAccessBindingKind = "ClusterAccessBinding"
+
+// ValidPermissionBasisKind identifies the resources that can establish an assignment.
+func ValidPermissionBasisKind(kind string) bool {
+	return kind == "AccessBinding" || kind == ClusterAccessBindingKind || kind == "PermissionSource"
+}
+
+// ValidAudienceAssignment checks the assignment shared by eligibility and audit.
+func ValidAudienceAssignment(a artifact.AudienceAssignment) bool {
+	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && ValidPermissionBasisKind(a.BasisKind) && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
 }
 func validRole(role string) bool {
 	return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner" || role == "action-approver"
@@ -144,7 +152,7 @@ func rowsValid(rows []CurrentAssignment) bool {
 	}
 	seen := map[string]bool{}
 	for _, a := range rows {
-		if !validAudience(a.Audience) || seen[a.Audience.AssignmentID] {
+		if !ValidAudienceAssignment(a.Audience) || seen[a.Audience.AssignmentID] {
 			return false
 		}
 		seen[a.Audience.AssignmentID] = true
@@ -157,7 +165,7 @@ func (e Retained) valid() bool {
 	}
 	seen := map[string]bool{}
 	for _, a := range e.Audience {
-		if !validAudience(a) || seen[a.AssignmentID] {
+		if !ValidAudienceAssignment(a) || seen[a.AssignmentID] {
 			return false
 		}
 		seen[a.AssignmentID] = true

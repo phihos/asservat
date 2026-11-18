@@ -36,7 +36,7 @@ type Subject struct{ Kind, Issuer, ID string }
 // ClusterAccessBindingKind is the cluster-scoped AccessBinding (ADR-335 D14).
 // Its bases cover AllNamespaces of each cluster it names, or each namespace
 // its NamespaceSelector matches.
-const ClusterAccessBindingKind = "ClusterAccessBinding"
+const ClusterAccessBindingKind = authorization.ClusterAccessBindingKind
 
 // AllNamespaces is the namespace of a ClusterAccessBinding basis.
 var AllNamespaces = NamespaceRef{Name: "*", UID: "*"}

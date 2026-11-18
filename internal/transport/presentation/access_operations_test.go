@@ -79,6 +79,12 @@ func TestExplainAccessOperationContract(t *testing.T) {
 	if got["decision"] != "Allow" || len(rows) != 1 || rows[0].(map[string]any)["basis_uid"] != "binding-a" || got["target"] == nil || got["valid_until"] == nil {
 		t.Fatalf("allow: %v", got)
 	}
+	f.allows[0].Audience.BasisKind = authorization.ClusterAccessBindingKind
+	got = accessCall(t, s, f, accessRequest("read"))
+	rows = got["assignments"].([]any)
+	if got["decision"] != "Allow" || len(rows) != 1 || rows[0].(map[string]any)["basis_kind"] != authorization.ClusterAccessBindingKind {
+		t.Fatal("cluster-wide explanation lost its binding", got)
+	}
 	got = accessCall(t, s, f, accessRequest("download"))
 	if got["decision"] != "Deny" || got["unmet"] != "ClientScopeMissing" || got["missing_scope"] != "evidence:download" {
 		t.Fatalf("download without scope: %v", got)

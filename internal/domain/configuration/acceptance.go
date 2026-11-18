@@ -23,8 +23,9 @@ type PermissionBatch struct {
 	// neither retired nor renewed, and grant nothing until a fresh
 	// observation is accepted. SourcesUnavailable applies this to every
 	// source because the source list itself could not be read.
-	UnavailableSources []string `json:",omitempty"`
-	SourcesUnavailable bool     `json:",omitempty"`
+	UnavailableClusters []string `json:",omitempty"`
+	UnavailableSources  []string `json:",omitempty"`
+	SourcesUnavailable  bool     `json:",omitempty"`
 	// Namespaces is the minimized namespace observation the source bases were
 	// derived from; nil while none is current.
 	Namespaces *NamespaceObservation `json:",omitempty"`
@@ -116,7 +117,7 @@ func (b PermissionBatch) Validate(now time.Time) error {
 			return ErrInvalid
 		}
 		r := p.Resource
-		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || (r.Kind != "AccessBinding" && r.Kind != "PermissionSource" && r.Kind != ClusterAccessBindingKind) || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Roles) == 0 || !identity.Strings(p.Roles, len(p.Roles), 32) {
+		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || !authorization.ValidPermissionBasisKind(r.Kind) || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Roles) == 0 || !identity.Strings(p.Roles, len(p.Roles), 32) {
 			return ErrInvalid
 		}
 		seen[p.Key()] = true

@@ -312,6 +312,70 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			})
 		}
 	}
+	t.Run("cluster-wide-allow-deny-and-retirement", func(t *testing.T) {
+		s := create(t)
+		allow := s.b.Bases[0]
+		allow.Resource.Kind = cfg.ClusterAccessBindingKind
+		allow.Scope.Namespace = cfg.AllNamespaces
+		allow.ScopeDigest = configapp.PermissionScopeDigest(allow)
+		deny := allow
+		deny.Resource.UID = custodyID()
+		deny.Effect = "Deny"
+		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
+
+		check := func(want bool, reason string, bases ...cfg.PermissionBasis) {
+			t.Helper()
+			s.b = fresh(s.b)
+			s.b.InputDigest[0]++
+			s.b.Bases = bases
+			accept(t, &s)
+			flush(t, s.p)
+			now := time.Now()
+			who := identity.Identity{Principal: identity.Principal{Issuer: allow.Subjects[0].Issuer, Subject: "alice", ClientID: "console", Kind: identity.Human},
+				Groups: []string{allow.Subjects[0].ID}, Scopes: []string{"evidence:read", "evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			// Each decision targets a different namespace in the covered cluster.
+			s.target.NamespaceUID = custodyID()
+			got := authorization.ContextEligibility(who, projection(t, s), s.target, now)
+			if got.Eligible != want || (!want && got.Reason != reason) || (want && (len(got.DefaultAudience) != 1 || got.DefaultAudience[0].BasisKind != cfg.ClusterAccessBindingKind || got.DefaultAudience[0].BasisUID != allow.Resource.UID)) {
+				t.Fatalf("cluster-wide decision eligible=%v reason=%s audience=%v", got.Eligible, got.Reason, got.DefaultAudience)
+			}
+		}
+		check(true, "", allow)
+		check(false, "ExplicitDeny", allow, deny)
+		check(true, "", allow)
+		check(false, "NoEntitlement")
+		var retired int
+		err := admin.QueryRow(ctx, `SELECT count(*) FROM permission_assignment a JOIN authority_audit e ON e.id=a.retirement_audit_id WHERE a.stream_id=$1 AND a.retired_at IS NOT NULL AND e.acknowledged_at IS NOT NULL`, s.b.RootID).Scan(&retired)
+		if err != nil || retired != 2 {
+			t.Fatal("audited cluster-wide retirements", retired, err)
+		}
+	})
+
+	t.Run("decision-time-source-audit-readback", func(t *testing.T) {
+		s := create(t)
+		for range 65 {
+			s.b.ReviewSources = append(s.b.ReviewSources, cfg.ReviewSource{
+				Resource:  cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}},
+				ClusterID: s.target.ClusterID, Type: cfg.SourceKubernetesExec, Check: cfg.ReviewPodExec, Role: "workload-maintainer", IdentityMappingRef: "company",
+			})
+		}
+		accept(t, &s)
+		flush(t, s.p)
+		reviews, err := postgres.NewAccessReviews(ctx, pool, s.b.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := reviews.ReviewSources(ctx, s.target.ClusterID)
+		if err != nil || len(got) != len(s.b.ReviewSources) {
+			t.Fatal("acknowledged decision sources", len(got), err)
+		}
+		for _, want := range s.b.ReviewSources {
+			if !slices.ContainsFunc(got, func(r cfg.ReviewSource) bool { return r.Resource == want.Resource && r.SameAuthority(want) }) {
+				t.Fatal("lost source", want.Resource.UID)
+			}
+		}
+	})
+
 	t.Run("fleet-automation-audit-readback", func(t *testing.T) {
 		s := create(t)
 		template := s.b.Bases[0]

@@ -136,8 +136,10 @@ together. Idle lease renewal does not rebuild the fleet.
 
 The 8 MiB plaintext budget applies to one authority audit event, which the audit
 format encrypts and verifies as a whole. PostgreSQL's expanded representation
-has a separate 12 MiB row limit. Previously accepted bindings do not count as
-assignment changes.
+has a separate 12 MiB row limit. The event can contain any number of decision-time
+sources and retirements that fit this budget. Each changed assignment retains its
+source kind, including ClusterAccessBinding, through audit and access explanations.
+Previously accepted bindings do not count as assignment changes.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 

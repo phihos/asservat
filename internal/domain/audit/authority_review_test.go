@@ -58,8 +58,11 @@ func TestAuthorityAuditFitsByBytesAcrossManyAssignments(t *testing.T) {
 		record.Changes = append(record.Changes, AssignmentChange{ID: id, Change: "added", ScopeDigest: artifact.Digest{2},
 			Audience: artifact.AudienceAssignment{Kind: "Group", Issuer: "https://id.example", SubjectID: "team", Role: "evidence-reader", BasisKind: "AccessBinding", BasisUID: "readers", AssignmentID: id, BasisDigest: artifact.Digest{1}}})
 	}
+	for i := range 129 {
+		record.ReviewRetirements = append(record.ReviewRetirements, ReviewRetirement{SourceUID: fmt.Sprintf("source-%d", i), Retired: 1})
+	}
 	plain, err := json.Marshal(record)
-	if err != nil || len(plain) > 8<<20 || !record.Valid() {
+	if err != nil || len(plain) > AuthorityPlaintextBytes || !record.Valid() {
 		t.Fatal("valid changes that fit one audit record refused", len(plain), err)
 	}
 }

@@ -13579,7 +13579,7 @@
     },
     {
       "name": "explain_access",
-      "description": "Explain your own current access to one named workload for one operation (capture, read or download), evaluated by the same rules as the operation itself (ADR-234): Allow, Deny or Indeterminate, the unmet condition, and your own contributing AccessBinding assignments with their revisions. Never evaluates another principal and never reveals evidence. Without any assignment of yours on the workload, or for a workload that does not resolve, the answer is uniformly Deny/NoMatchingAllow.",
+      "description": "Explain your own current access to one named workload for one operation (capture, read or download), evaluated by the same rules as the operation itself (ADR-234): Allow, Deny or Indeterminate, the unmet condition, and your own contributing assignments and their configuration revisions. Never evaluates another principal and never reveals evidence. Without any assignment of yours on the workload, or for a workload that does not resolve, the answer is uniformly Deny/NoMatchingAllow.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -13766,6 +13766,7 @@
                             "basis_kind": {
                               "enum": [
                                 "AccessBinding",
+                                "ClusterAccessBinding",
                                 "PermissionSource"
                               ]
                             },
@@ -13788,7 +13789,7 @@
                             "revision"
                           ]
                         },
-                        "description": "All of the caller's contributing assignments; bounded by the caller's AccessBinding and PermissionSource objects, so the list is not paged."
+                        "description": "All of the caller's contributing assignments; bounded by the caller's AccessBinding, ClusterAccessBinding and PermissionSource objects, so the list is not paged."
                       },
                       "assignments_total": {
                         "type": "integer",
@@ -14211,6 +14212,7 @@
                                   "basis_kind": {
                                     "enum": [
                                       "AccessBinding",
+                                      "ClusterAccessBinding",
                                       "PermissionSource"
                                     ]
                                   },
@@ -14262,6 +14264,7 @@
                                   "basis_kind": {
                                     "enum": [
                                       "AccessBinding",
+                                      "ClusterAccessBinding",
                                       "PermissionSource"
                                     ]
                                   },

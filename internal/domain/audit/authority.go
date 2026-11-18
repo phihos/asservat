@@ -118,9 +118,6 @@ func (r AuthorityRecord) Valid() bool {
 	if (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
 		return false
 	}
-	if len(r.ReviewSources) > 64 || len(r.ReviewRetirements) > 128 {
-		return false
-	}
 	for _, s := range r.ReviewSources {
 		if !s.Valid() {
 			return false
@@ -140,14 +137,7 @@ func (r AuthorityRecord) Valid() bool {
 	}
 	seen := map[string]bool{}
 	for _, c := range r.Changes {
-		a := c.Audience
-		if !authorization.UUID(c.ID) || seen[c.ID] || c.ID != a.AssignmentID || (c.Change != "added" && c.Change != "retired") || c.ScopeDigest == (artifact.Digest{}) {
-			return false
-		}
-		if (a.Kind != "User" && a.Kind != "Group" && a.Kind != "Workload") || !identity.Text(a.Issuer, 2048) || !identity.Text(a.SubjectID, 256) || (a.BasisKind != "AccessBinding" && a.BasisKind != "PermissionSource") || !identity.Text(a.BasisUID, 64) || a.BasisDigest == (artifact.Digest{}) {
-			return false
-		}
-		if a.Role != "workload-maintainer" && a.Role != "evidence-reader" && a.Role != "evidence-owner" && a.Role != "action-approver" {
+		if c.ID != c.Audience.AssignmentID || seen[c.ID] || (c.Change != "added" && c.Change != "retired") || c.ScopeDigest == (artifact.Digest{}) || !authorization.ValidAudienceAssignment(c.Audience) {
 			return false
 		}
 		seen[c.ID] = true
