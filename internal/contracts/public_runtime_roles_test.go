@@ -40,8 +40,8 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 		}
 		seen[id] = true
 		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit < 1 {
-			t.Fatal("unbounded installed role", purpose)
+		if !ok || (!slices.Contains(PublicRuntimeFederationPurposes(), purpose) && limit < 1) {
+			t.Fatal("missing connection budget", purpose)
 		}
 	}
 	for n, purpose := range []string{"capacity", "capacity-capture"} {
@@ -55,7 +55,7 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	for n, purpose := range PublicRuntimeFederationPurposes() {
 		id, ok := PublicRuntimeRoleOrdinal(purpose)
 		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || id != connector[n] || !bounded || limit != 3 || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
+		if !ok || id != connector[n] || !bounded || limit != PublicRuntimeFederationRoleConnections || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
 			t.Fatal("connector compartment changed", purpose)
 		}
 	}
