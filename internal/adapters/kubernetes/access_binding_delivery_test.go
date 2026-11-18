@@ -327,7 +327,7 @@ func TestNamespacedBindingsAloneExceedBudget(t *testing.T) {
 			if r.URL.Query().Get("limit") != "1" || !strings.Contains(r.Header.Get("Accept"), "as=PartialObjectMetadataList") {
 				t.Error("read full cluster binding data after budget was exhausted")
 			}
-			permissionReply(w, map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadataList", "metadata": map[string]string{"resourceVersion": "cluster-metadata", "continue": "unneeded"}, "items": []any{}})
+			permissionReply(w, map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadataList", "metadata": map[string]string{"resourceVersion": "cluster-metadata", "continue": "unneeded"}, "items": nil})
 		default:
 			return false
 		}
