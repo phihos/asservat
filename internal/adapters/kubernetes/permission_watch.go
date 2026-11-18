@@ -201,6 +201,9 @@ func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, 
 		return fail()
 	}
 	ref := value.Resource{ClusterID: w.client.clusterID, Namespace: m.Namespace, NamespaceUID: namespace.UID, Kind: "AccessBinding", Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting}
-	binding := w.client.validator.observedBinding(o, ref)
+	binding, err := w.client.validator.observedBinding(o, ref)
+	if err != nil {
+		return fail()
+	}
 	return value.BindingEvent{Type: event.Type, ResourceVersion: m.RV, Binding: &binding}, nil
 }

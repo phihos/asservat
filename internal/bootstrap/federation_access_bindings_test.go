@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,6 +72,7 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 	store := &recordedBindings{}
 	ids := contracts.ServiceIDs{InstallationID: inst, ClusterID: hub, PermissionRootID: root}
 	services := federationServices{ids: ids, bindings: &federationBindings{decoder, store}}
+	var legacyMixedDeny bool
 	run := func(lineageCluster string) (connectorlifecycle.HubFrame, error) {
 		h, err := connectorlifecycle.NewHandler(clusterTokens{lineageCluster, root, "10000000-0000-4000-8000-000000000004", inst}, services, 2)
 		if err != nil {
@@ -91,7 +93,11 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 		process := value.ConnectorProcessIdentity{Binding: value.PeerBinding{InstallationID: inst, ClusterID: lineageCluster, IssuerEpoch: "10000000-0000-4000-8000-000000000003", PeerID: "10000000-0000-4000-8000-000000000004", Role: value.ConnectorPeer}, PodUID: "10000000-0000-4000-8000-000000000005", ProcessEpoch: "10000000-0000-4000-8000-000000000006"}
 		spec, _ := json.Marshal(map[string]any{"reason": "synthetic fixture", "effect": "Allow", "roles": []string{"evidence-reader"}, "subjects": []any{map[string]string{"kind": "Group", "issuer": "https://id.example.test", "id": "team-a"}}})
 		delivery := contracts.AccessBindingDelivery{ResourceVersion: "9", Items: []contracts.DeliveredAccessBinding{{Namespace: "payments", NamespaceUID: "payments-uid", Name: "readers", UID: "b-1", ResourceVersion: "3", Generation: 1, Spec: spec}}}
-		return client.Run(context.Background(), connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeAccessBindings, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}, deliveringLocal{staticBindings{delivery}})
+		if legacyMixedDeny {
+			spec, _ := json.Marshal(map[string]any{"reason": "synthetic", "effect": "Deny", "roles": []string{"evidence-reader"}, "subjects": []map[string]string{{"kind": "Group", "id": "team-a"}, {"kind": "Group", "id": strings.Repeat("x", 257)}}})
+			delivery.Items = append(delivery.Items, contracts.DeliveredAccessBinding{Kind: configuration.ClusterAccessBindingKind, Name: "blocked", UID: "b-2", ResourceVersion: "4", Generation: 1, Spec: spec})
+		}
+		return client.Run(context.Background(), connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}, deliveringLocal{staticBindings{delivery}})
 	}
 	result, err := run(remote)
 	if err != nil || result.Kind != "result" || len(store.stored) != 1 {
@@ -108,9 +114,16 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 	if store.confirmations != 1 {
 		t.Fatal("unchanged delivery was not confirmed")
 	}
+	legacyMixedDeny = true
+	if result, err = run(remote); err != nil || result.Kind != "result" || len(store.stored) != 2 || !store.stored[1].Unavailable || len(store.stored[1].Bindings) != 0 {
+		t.Fatal("legacy mixed-subject Deny left its overlapping Allow active", result.Kind, err)
+	}
+	if result, err = run(remote); err != nil || result.Kind != "result" || len(store.stored) != 2 || store.confirmations != 2 {
+		t.Fatal("unchanged unrepresentable Deny restored the Allow", result.Kind, err)
+	}
 	store.digest = ""
 	// The hub cluster's own connector is observed directly, never delivered.
-	if result, err = run(hub); err != nil || result.Kind != "failure" || len(store.stored) != 1 {
+	if result, err = run(hub); err != nil || result.Kind != "failure" || len(store.stored) != 2 {
 		t.Fatal("hub cluster delivery accepted", result.Kind, err)
 	}
 }

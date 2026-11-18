@@ -22,8 +22,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
-// permissionPageBytes bounds one LIST page response (64 objects of at most
-// the Kubernetes object size limit stay well below it for real specs).
+// Keep at most 2 MiB per Kubernetes response. LIST retries the same cursor
+// with a smaller page when the objects and their metadata exceed this budget.
 const (
 	permissionPageBytes = 2 << 20
 	permissionPageSize  = 64
@@ -187,10 +187,16 @@ func (c *PermissionClient) raw(ctx context.Context, path string, params map[stri
 	}
 	b, err := r.DoRaw(ctx)
 	if err != nil {
+		if errors.Is(err, ErrContextUnavailable) {
+			return nil, value.ErrLimit
+		}
 		return nil, permissionError(ctx, err)
 	}
+	if len(b) > permissionPageBytes {
+		return nil, value.ErrLimit
+	}
 	if err = permissionJSON(b, permissionPageBytes, 0); err != nil {
-		return nil, err
+		return nil, value.ErrUnavailable
 	}
 	return b, nil
 }
@@ -319,18 +325,23 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 	var refs []value.Resource
 	var unplaced []permissionMetadata
 	rv, continuation := "", ""
+	pageSize := permissionPageSize
 	seenUID, seenName, seenContinue := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for {
 		if err := c.current(ctx, start, 5*time.Second); err != nil {
 			return "", nil, nil, nil, err
 		}
-		params := map[string]string{"limit": strconv.Itoa(permissionPageSize)}
+		params := map[string]string{"limit": strconv.Itoa(pageSize)}
 		if continuation != "" {
 			params["continue"] = continuation
 		}
 		// No selectors and no resourceVersion=0: authoritative denies require
 		// a complete, most-recent list with consistent pagination.
 		b, err := c.raw(ctx, c.listPath(plural), params)
+		if errors.Is(err, value.ErrLimit) && pageSize > 1 {
+			pageSize /= 2
+			continue
+		}
 		if err != nil {
 			return "", nil, nil, nil, err
 		}
@@ -342,7 +353,7 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 			return "", nil, nil, nil, value.ErrUnavailable
 		}
 		rv = meta.ResourceVersion
-		if len(items) > permissionPageSize {
+		if len(items) > pageSize {
 			return "", nil, nil, nil, value.ErrLimit
 		}
 		for _, item := range items {
@@ -419,7 +430,11 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	}
 	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
-		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
+		binding, err := c.validator.observedBinding(o, refs[i])
+		if err != nil {
+			return value.Snapshot{}, nil, err
+		}
+		out.Bindings = append(out.Bindings, binding)
 	}
 	// ClusterAccessBindings deny as well, so an incomplete LIST fails the
 	// snapshot like AccessBindings.
@@ -453,7 +468,11 @@ func (c *PermissionClient) ClusterAccessBindings(ctx context.Context) (value.Sna
 	}
 	out := value.Snapshot{ClusterID: c.clusterID, ClusterBindingResourceVersion: rv, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}
 	for i, o := range objects {
-		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
+		bindings, err := c.validator.clusterBindings(o, refs[i])
+		if err != nil {
+			return value.Snapshot{}, err
+		}
+		out.ClusterBindings = append(out.ClusterBindings, bindings...)
 	}
 	if err = c.current(ctx, start, 5*time.Second); err != nil {
 		return value.Snapshot{}, err

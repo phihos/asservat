@@ -72,7 +72,11 @@ func (d *AccessBindingSpecDecoder) DeliveredBindings(cluster string, delivery co
 			ref.Kind = item.Kind
 			// No registered fleet names are supplied to a remote author.
 			// Only the authenticated cluster is available as the default scope.
-			for _, b := range d.validator.clusterBindings(obj, ref) {
+			bindings, err := d.validator.clusterBindings(obj, ref)
+			if err != nil {
+				return nil, err
+			}
+			for _, b := range bindings {
 				if !value.BindingInCluster(b, cluster) {
 					return nil, value.ErrInvalid
 				}
@@ -83,7 +87,10 @@ func (d *AccessBindingSpecDecoder) DeliveredBindings(cluster string, delivery co
 		if item.Kind != "" || len(validation.IsDNS1123Label(item.Namespace)) != 0 {
 			return nil, value.ErrInvalid
 		}
-		b := d.validator.observedBinding(obj, ref)
+		b, err := d.validator.observedBinding(obj, ref)
+		if err != nil {
+			return nil, err
+		}
 		if !value.BindingInCluster(b, cluster) {
 			return nil, value.ErrInvalid
 		}

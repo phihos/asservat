@@ -522,7 +522,7 @@ func TestPermissionSchemaMatchesReviewedExamples(t *testing.T) {
 				_, err = v.binding(o, value.Resource{})
 			case value.ClusterAccessBindingKind:
 				v.clusters = map[string]string{LocalClusterName: "11111111-1111-4111-8111-111111111111"}
-				if b := v.clusterBindings(o, value.Resource{ClusterID: "11111111-1111-4111-8111-111111111111"}); len(b) == 0 || b[0].Invalid {
+				if b, err := v.clusterBindings(o, value.Resource{ClusterID: "11111111-1111-4111-8111-111111111111"}); err != nil || len(b) == 0 || b[0].Invalid {
 					err = value.ErrInvalid
 				}
 			default:

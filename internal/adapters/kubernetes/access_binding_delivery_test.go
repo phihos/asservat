@@ -3,7 +3,10 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -88,5 +91,59 @@ func TestDeliveredClusterDenyRetainsSchemaValidLongReason(t *testing.T) {
 	got, err := decoder.DeliveredBindings(cluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
 	if err != nil || len(got) != 1 || got[0].Invalid || got[0].Effect != "Deny" {
 		t.Fatal("valid cluster-wide Deny lost in delivery", err)
+	}
+}
+
+func TestLegacyMixedSubjectDenyClosesDelivery(t *testing.T) {
+	decoder, err := NewAccessBindingSpecDecoder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"", value.ClusterAccessBindingKind} {
+		item := contracts.DeliveredAccessBinding{Kind: kind, Name: "blocked", UID: "binding", Generation: 1, ResourceVersion: "1"}
+		if kind == "" {
+			item.Namespace, item.NamespaceUID = "app", "app-uid"
+		}
+		for _, id := range []string{strings.Repeat("x", 257), strings.Repeat("é", 129)} {
+			item.Spec, _ = json.Marshal(map[string]any{"effect": "Deny", "subjects": []map[string]string{{"kind": "Group", "id": "developers"}, {"kind": "Group", "id": id}}, "roles": []string{"workload-maintainer"}, "reason": "synthetic"})
+			got, err := decoder.DeliveredBindings(permissionCluster, contracts.AccessBindingDelivery{ResourceVersion: "1", Items: []contracts.DeliveredAccessBinding{item}})
+			if !errors.Is(err, value.ErrLimit) || len(got) != 0 {
+				t.Fatalf("unrepresentable mixed-subject %q Deny accepted: %v", kind, err)
+			}
+		}
+	}
+}
+
+func TestBindingDeliveryReadsOversizedKubernetesPage(t *testing.T) {
+	const count = 40
+	objects := make([]map[string]any, count)
+	for i := range objects {
+		o := permissionClusterBinding()
+		m := o["metadata"].(map[string]any)
+		m["name"], m["uid"] = fmt.Sprintf("binding-%d", i), fmt.Sprintf("uid-%d", i)
+		o["spec"].(map[string]any)["reason"] = strings.Repeat("x", 60<<10)
+		objects[i] = o
+	}
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/apis/asservat.io/v1alpha1/accessbindings" {
+			permissionReply(w, permissionList("AccessBinding", "1", ""))
+			return true
+		}
+		if r.URL.Path != "/apis/asservat.io/v1alpha1/clusteraccessbindings" {
+			return false
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		start, _ := strconv.Atoi(r.URL.Query().Get("continue"))
+		end := min(start+limit, count)
+		next := ""
+		if end < count {
+			next = strconv.Itoa(end)
+		}
+		permissionReply(w, permissionList(value.ClusterAccessBindingKind, "2", next, objects[start:end]...))
+		return true
+	})
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if err != nil || len(d.Items) != count || d.Bounded().Unavailable {
+		t.Fatal("complete delivery refused", len(d.Items), err)
 	}
 }

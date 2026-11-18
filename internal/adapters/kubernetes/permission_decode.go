@@ -257,7 +257,7 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
-	if b.Subjects, err = subjects(spec.Subjects); err != nil {
+	if b.Subjects, err = subjects(spec.Subjects, spec.Effect); err != nil {
 		return value.Binding{}, err
 	}
 	seen := map[string]bool{}
@@ -284,10 +284,17 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 
 // subjects decodes authored subjects; an omitted issuer stays empty and is
 // the installation's issuer (ADR-335 D4).
-func subjects(in []wire.Subject) ([]value.Subject, error) {
+func subjects(in []wire.Subject, effect string) ([]value.Subject, error) {
 	var out []value.Subject
 	for _, s := range in {
-		if s.Issuer != "" && !issuerValid(s.Issuer) || !identity.Text(s.ID, 256) {
+		// The schema checks the issuer URI. A binding compares it literally
+		// with the verified issuer and never uses it as a network endpoint.
+		if (s.Issuer != "" && !identity.Text(s.Issuer, 2048)) || !identity.Text(s.ID, 256) {
+			// A previously admitted Deny may exceed the SQL subject representation.
+			// Dropping the binding here would also discard its other subjects.
+			if effect == "Deny" {
+				return nil, value.ErrLimit
+			}
 			return nil, value.ErrUnavailable
 		}
 		out = append(out, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
@@ -310,8 +317,9 @@ func notAfter(s string) (time.Time, error) {
 // one binding per cluster it covers, each over AllNamespaces narrowed by its
 // namespaceSelector (ADR-335 D14). Omitted clusters are the binding's own
 // cluster; "*" is every known cluster. A spec that fails validation becomes
-// one invalid binding that grants and denies nothing.
-func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) []value.Binding {
+// one invalid binding that grants and denies nothing. A Deny that the
+// assignment store cannot represent makes the observation unavailable.
+func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) ([]value.Binding, error) {
 	invalid := func() []value.Binding {
 		ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
 		return []value.Binding{{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.AllNamespaces}}}
@@ -319,23 +327,26 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	var spec wire.ClusterAccessBindingSpec
 	digest, err := decodePermissionSpec(object.Spec, v.clusterBindingSchema, &spec)
 	if err != nil {
-		return invalid()
+		return invalid(), nil
 	}
 	ref.SpecDigest = digest
-	subjects, err := subjects(spec.Subjects)
+	subjects, err := subjects(spec.Subjects, spec.Effect)
+	if err == value.ErrLimit {
+		return nil, err
+	}
 	if err != nil {
-		return invalid()
+		return invalid(), nil
 	}
 	expires, err := notAfter(spec.NotAfter)
 	if err != nil {
-		return invalid()
+		return invalid(), nil
 	}
 	var selector map[string]string
 	if spec.NamespaceSelector != nil && len(spec.NamespaceSelector.MatchLabels) > 0 {
 		selector = spec.NamespaceSelector.MatchLabels
 	}
 	if !selectorValid(selector) {
-		return invalid()
+		return invalid(), nil
 	}
 	clusters := []string{ref.ClusterID}
 	if len(spec.Clusters) > 0 {
@@ -355,7 +366,7 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 		r.ClusterID = cluster
 		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
 	}
-	return out
+	return out, nil
 }
 
 // observedBinding decodes an observed binding. A spec that fails validation
@@ -363,13 +374,16 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 // it must not stop the cluster's permission stream. Neither does a binding
 // that could not be placed in its namespace (empty NamespaceUID). It keeps its identity
 // with the digest of its raw spec, so the journal still sees each change.
-func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) value.Binding {
+func (v *permissionValidator) observedBinding(object permissionObject, ref value.Resource) (value.Binding, error) {
 	b, err := v.binding(object, ref)
+	if err == value.ErrLimit {
+		return value.Binding{}, err
+	}
 	if err == nil && ref.NamespaceUID != "" {
-		return b
+		return b, nil
 	}
 	ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
-	return value.Binding{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}
+	return value.Binding{Resource: ref, Invalid: true, Scope: value.Scope{ClusterID: ref.ClusterID, Namespace: value.NamespaceRef{Name: ref.Namespace, UID: ref.NamespaceUID}}}, nil
 }
 
 // AccessBindingSpecDecoder decodes a proposed AccessBinding spec with the same

@@ -272,6 +272,9 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), nil, true)
 	}
 	bindings, err := s.bindings.decoder.DeliveredBindings(p.ClusterID, delivery)
+	if errors.Is(err, configuration.ErrLimit) {
+		return s.bindings.store.StoreRemoteBindings(ctx, p.ClusterID, observedAt, delivery.Digest(), nil, true)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
 		return err

@@ -75,6 +75,13 @@ spec:
     - name: unchangedSpec
       expression: "request.operation == 'UPDATE' && object.spec == oldObject.spec"
   validations:
+    # Match the permission_assignment byte bounds and verified identity text.
+    - expression: >-
+        variables.unchangedSpec || object.spec.subjects.all(s,
+          size(bytes(s.id)) <= 256 && !s.id.matches(r'\p{Cc}') &&
+          (!has(s.issuer) || (size(bytes(s.issuer)) <= 2048 && !s.issuer.matches(r'\p{Cc}'))))
+      message: "Subject IDs must fit 256 UTF-8 bytes and issuers 2048 bytes. Both must be free of control characters."
+      reason: Invalid
     # Like RoleBinding admission, recheck bind at this scope when a writer
     # changes the grant. Metadata-only updates can finish without it.
     - expression: "variables.unchangedSpec || !has(object.spec.roles) || object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind').allowed())"
