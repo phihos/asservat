@@ -168,7 +168,11 @@ An assignment keeps its ID, subject, issuer, role and source digest, together
 with its activation and retirement event IDs. Indexed source history preserves
 the binding revision, original scope, effect and automation envelope at a change,
 including when a binding is replaced or removed. A request retry returns its
-original result and its original controller lease deadline. During a bulk change,
+original result and its recorded controller lease deadline. Acceptances written
+before schema 7 have no recorded lease deadline. Replaying one returns its
+historical outcome with an unknown deadline. Migration suspends the old epoch.
+A decision recorded against a PermissionSource before its role changes retires
+with that revision. A new review uses the replacement role. During a bulk change,
 capture admission and download reservation in a healthy peer use the complete
 committed projection. Publication and the operation's final authority check
 serialize at commit.

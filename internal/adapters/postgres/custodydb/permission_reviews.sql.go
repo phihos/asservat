@@ -231,6 +231,53 @@ func (q *Queries) ListPermissionReviewSources(ctx context.Context, streamID pgty
 	return items, nil
 }
 
+const lockChangingReviewSources = `-- name: LockChangingReviewSources :many
+SELECT rs.stream_id, rs.uid, rs.epoch, rs.seen_sequence, rs.generation, rs.resource_version, rs.spec_digest, rs.authority_digest, rs.cluster_id, rs.role, rs.source_json, rs.accepted_audit_id FROM permission_review_source rs JOIN permission_stream s ON s.id=rs.stream_id
+WHERE rs.stream_id=$1 AND s.trust_digest IS DISTINCT FROM $2::bytea
+ORDER BY rs.uid FOR NO KEY UPDATE OF rs
+`
+
+type LockChangingReviewSourcesParams struct {
+	StreamID     pgtype.UUID
+	KeepingTrust []byte
+}
+
+// A normal acceptance passes NULL. At epoch start only a change of trust
+// retires review assignments. Lock sources before the final stream fence,
+// in the same order used to record a decision.
+func (q *Queries) LockChangingReviewSources(ctx context.Context, arg LockChangingReviewSourcesParams) ([]PermissionReviewSource, error) {
+	rows, err := q.db.Query(ctx, lockChangingReviewSources, arg.StreamID, arg.KeepingTrust)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PermissionReviewSource{}
+	for rows.Next() {
+		var i PermissionReviewSource
+		if err := rows.Scan(
+			&i.StreamID,
+			&i.Uid,
+			&i.Epoch,
+			&i.SeenSequence,
+			&i.Generation,
+			&i.ResourceVersion,
+			&i.SpecDigest,
+			&i.AuthorityDigest,
+			&i.ClusterID,
+			&i.Role,
+			&i.SourceJson,
+			&i.AcceptedAuditID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPermissionReviewSource = `-- name: LockPermissionReviewSource :one
 SELECT stream_id, uid, epoch, seen_sequence, generation, resource_version, spec_digest, authority_digest, cluster_id, role, source_json, accepted_audit_id FROM permission_review_source WHERE stream_id=$1 AND uid=$2 FOR SHARE
 `

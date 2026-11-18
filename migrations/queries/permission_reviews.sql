@@ -2,6 +2,14 @@
 -- ADR-245: every accepted decision-time source row of a stream, current or not.
 SELECT * FROM permission_review_source WHERE stream_id=$1 ORDER BY uid;
 
+-- name: LockChangingReviewSources :many
+-- A normal acceptance passes NULL. At epoch start only a change of trust
+-- retires review assignments. Lock sources before the final stream fence,
+-- in the same order used to record a decision.
+SELECT rs.* FROM permission_review_source rs JOIN permission_stream s ON s.id=rs.stream_id
+WHERE rs.stream_id=sqlc.arg(stream_id) AND s.trust_digest IS DISTINCT FROM sqlc.narg(keeping_trust)::bytea
+ORDER BY rs.uid FOR NO KEY UPDATE OF rs;
+
 -- name: UpsertPermissionReviewSource :exec
 INSERT INTO permission_review_source(stream_id,uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)

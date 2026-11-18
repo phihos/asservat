@@ -640,6 +640,9 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatalf("new trust reused old review: %v", err)
 		}
 	})
+	t.Run("historical-acceptance-replay-after-upgrade", func(t *testing.T) {
+		qualifyHistoricalPermissionReplay(t, ctx, admin, pool)
+	})
 	t.Run("replay-preserves-original-controller-lease", func(t *testing.T) {
 		s := create(t)
 		accepted, err := s.p.AcceptPermissions(ctx, s.b)
@@ -1437,6 +1440,63 @@ GRANT USAGE ON SCHEMA permission_test_clock TO authority_runtime`)
 		if err = record(t, alice, jumped, true); err != nil || reviewed(t, alice) == before {
 			t.Fatal("generation jump kept the assignment", err)
 		}
+		// A first decision can insert an assignment while a replacement is
+		// being staged. Hold the following Pod decision write uncommitted.
+		barrier, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer barrier.Rollback(ctx)
+		if _, err = barrier.Exec(ctx, "LOCK TABLE permission_review_decision IN SHARE MODE"); err != nil {
+			t.Fatal(err)
+		}
+		var blocker int
+		if err = barrier.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&blocker); err != nil {
+			t.Fatal(err)
+		}
+		carol := alice
+		carol.Principal.Subject = "carol"
+		decision := make(chan error, 1)
+		go func() { decision <- record(t, carol, jumped, true) }()
+		reviewer := waitForSQLBlocker(t, ctx, admin, blocker)
+		spec.Resource.Generation++
+		spec.Resource.SpecDigest[0]++
+		spec.Type, spec.AccessReviewCheck, spec.Role = cfg.SourceKubernetesAccessReview, cfg.ReviewWorkloadGet, "evidence-reader"
+		replacement, reason := cfg.ReviewSourceFor(spec)
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		batch := fresh(s.b)
+		batch.ReviewSources = []cfg.ReviewSource{replacement}
+		batch.InputDigest[0]++
+		applied := make(chan error, 1)
+		go func() {
+			_, err := s.p.AcceptPermissions(ctx, batch)
+			applied <- err
+		}()
+		waitForSQLBlocker(t, ctx, admin, reviewer)
+		if err = barrier.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-decision; err != nil {
+			t.Fatal("first review", err)
+		}
+		if err = <-applied; err != nil {
+			t.Fatal("downgrade", err)
+		}
+		if reviewed(t, carol) != "" || eligible(t, carol).Eligible {
+			t.Fatal("old role survived the source downgrade")
+		}
+		var retiredAtChange bool
+		if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT FROM permission_review_assignment
+			WHERE stream_id=$1 AND source_uid=$2 AND subject_id='carol' AND role='workload-maintainer'
+			AND retired_at IS NOT NULL AND retirement_audit_id=$3)`, batch.RootID, jumped.Resource.UID, batch.RequestID).Scan(&retiredAtChange); err != nil || !retiredAtChange {
+			t.Fatal("first assignment missing its source downgrade event", err)
+		}
+		if err = record(t, carol, replacement, true); err != nil || reviewed(t, carol) == "" || eligible(t, carol).Eligible {
+			t.Fatal("replacement review must grant only evidence-reader", err)
+		}
+
 	})
 	t.Run("scope-change-and-delete-retire", func(t *testing.T) {
 		s := create(t)

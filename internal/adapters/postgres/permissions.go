@@ -144,6 +144,10 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 		if err := q.InsertPermissionStream(ctx, custodydb.InsertPermissionStreamParams{ID: id(root), Epoch: id(epoch), TrustDigest: trust[:]}); err != nil {
 			return err
 		}
+		reviews, err := q.LockChangingReviewSources(ctx, custodydb.LockChangingReviewSourcesParams{StreamID: id(root), KeepingTrust: trust[:]})
+		if err != nil {
+			return err
+		}
 		s, err := q.LockPermissionStream(ctx, id(root))
 		if err != nil {
 			return err
@@ -194,7 +198,7 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 			if _, err = q.RetirePermissionStream(ctx, custodydb.RetirePermissionStreamParams{StreamID: id(root), RetirementAuditID: id(epoch)}); err != nil {
 				return err
 			}
-			if err = retireReviewStream(ctx, q, root, &record); err != nil {
+			if err = retireReviewStream(ctx, q, root, reviews, &record); err != nil {
 				return err
 			}
 		}

@@ -54,22 +54,7 @@ func withStagedPeerPermission(t *testing.T, ctx context.Context, admin *pgxpool.
 		_, err := s.p.AcceptPermissions(ctx, b)
 		done <- err
 	}()
-	wait, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	for {
-		var staged bool
-		if err = admin.QueryRow(wait, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE wait_event='advisory' AND $1=ANY(pg_blocking_pids(pid)))", blocker).Scan(&staged); err != nil {
-			t.Fatal("waiting for staged permission event", err)
-		}
-		if staged {
-			break
-		}
-		select {
-		case err = <-done:
-			t.Fatalf("writer finished before operation: %v", err)
-		case <-time.After(10 * time.Millisecond):
-		}
-	}
+	waitForSQLBlocker(t, ctx, admin, blocker)
 	if err = action(); err != nil {
 		t.Error("healthy peer operation while permission event is staged", err)
 	}
@@ -78,5 +63,22 @@ func withStagedPeerPermission(t *testing.T, ctx context.Context, admin *pgxpool.
 	}
 	if err = <-done; !errors.Is(err, wantPublication) {
 		t.Fatal("publish permission event", err)
+	}
+}
+
+// Return the backend held behind this fixture barrier.
+func waitForSQLBlocker(t *testing.T, ctx context.Context, admin *pgxpool.Pool, blocker int) int {
+	t.Helper()
+	wait, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	for {
+		var pid int
+		if err := admin.QueryRow(wait, "SELECT coalesce(min(pid),0) FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))", blocker).Scan(&pid); err != nil {
+			t.Fatal("waiting for blocked transaction", err)
+		}
+		if pid != 0 {
+			return pid
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }

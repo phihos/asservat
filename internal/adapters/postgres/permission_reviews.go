@@ -27,7 +27,7 @@ import (
 // unreadable source list keeps every row without renewing it, so none
 // grants until a current list is accepted.
 func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, b cfg.PermissionBatch, record *audit.AuthorityRecord) error {
-	rows, err := q.ListPermissionReviewSources(ctx, s.ID)
+	rows, err := q.LockChangingReviewSources(ctx, custodydb.LockChangingReviewSourcesParams{StreamID: s.ID})
 	if err != nil {
 		return err
 	}
@@ -92,11 +92,7 @@ func reviewAuthorityDigest(r cfg.ReviewSource) []byte {
 
 // retireReviewStream retires every decision-time assignment of a stream whose
 // trust root changed, and forgets its sources.
-func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, record *audit.AuthorityRecord) error {
-	rows, err := q.ListPermissionReviewSources(ctx, id(root))
-	if err != nil {
-		return err
-	}
+func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, rows []custodydb.PermissionReviewSource, record *audit.AuthorityRecord) error {
 	for _, row := range rows {
 		retired, err := q.RetirePermissionReviewSource(ctx, custodydb.RetirePermissionReviewSourceParams{StreamID: id(root), SourceUid: row.Uid, RetirementAuditID: id(record.ID)})
 		if err != nil {
@@ -108,7 +104,7 @@ func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, 
 	}
 	// A source row without a current assignment may remain from an older
 	// stream generation; retire anything left and forget the sources.
-	if _, err = q.RetirePermissionReviewStream(ctx, custodydb.RetirePermissionReviewStreamParams{StreamID: id(root), RetirementAuditID: id(record.ID)}); err != nil {
+	if _, err := q.RetirePermissionReviewStream(ctx, custodydb.RetirePermissionReviewStreamParams{StreamID: id(root), RetirementAuditID: id(record.ID)}); err != nil {
 		return err
 	}
 	return q.DeletePermissionReviewSources(ctx, id(root))
@@ -231,11 +227,14 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		return cfg.ErrInvalid
 	}
 	return permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := currentReviewStream(ctx, q, r.root, t.ClusterID)
+		row, err := q.LockPermissionReviewSource(ctx, custodydb.LockPermissionReviewSourceParams{StreamID: id(r.root), Uid: src.Resource.UID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return cfg.ErrChanged
+		}
 		if err != nil {
 			return err
 		}
-		row, err := q.LockPermissionReviewSource(ctx, custodydb.LockPermissionReviewSourceParams{StreamID: s.ID, Uid: src.Resource.UID})
+		s, err := currentReviewStream(ctx, q, r.root, t.ClusterID)
 		if err != nil {
 			return err
 		}
