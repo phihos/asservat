@@ -127,7 +127,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if local.Connector.SourceUID != peer || local.ClusterID != runtimeID {
 		t.Fatal("local connector peer", local.Connector)
 	}
-	if local.Standby != 2 {
+	if local.Standby != local.Captures+1 {
 		t.Fatal("local catalog entry", local.Standby)
 	}
 	// A registered mode=cluster cluster derives the same entry for its own IDs

@@ -201,7 +201,7 @@ func (r *regionalContext) run(ctx context.Context) error {
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
+	return RegionalContextStartConnections{Watch: r.owners.Client.WatchWork, Concurrency: r.c.Executor.Concurrency, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context exchange refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer

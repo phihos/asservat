@@ -13,7 +13,6 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/mtls"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -83,7 +82,9 @@ func catalogCluster(stored contracts.RegionalOffer, image, cluster, peerID, name
 	}
 	projection := compiler.ProjectionDigest()
 	root, installation, epoch := stored.PermissionRootID, stored.InstallationID, stored.IssuerEpoch
-	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: mtls.ContextStartExchangesPerOwner, Captures: captures,
+	// A cluster can serve its capture reservations and a simultaneous read.
+	// These are ceilings for requested work; no idle exchanges are opened.
+	return contracts.OwnerPublicCluster{ClusterID: cluster, Connector: peer, Standby: captures + 1, Captures: captures,
 		Settings: contracts.ContextCapabilitySettings{Format: contracts.ContextCapabilityFormat, RootID: root, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Enabled: true,
 			ExecutionClass: string(artifact.ContextAPIExecution), CollectorVersion: "sha256-" + image[:32], CollectorImageDigest: image, ProjectionDigest: hex.EncodeToString(projection[:])}}, nil
 }

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"context"
 	"time"
 
@@ -17,6 +18,17 @@ const (
 	// progress revision (migration 00168).
 	CaptureProgressChannel = "asservat_capture_progress"
 )
+
+const ConnectorWorkChannel = "asservat_connector_work"
+const ConnectorReadyChannel = "asservat_connector_ready"
+
+func NotifyConnectorReady(ctx context.Context, pool *pgxpool.Pool, cluster string) error {
+	return custodydb.New(pool).NotifyConnectorReady(ctx, cluster)
+}
+
+func NotifyConnectorWork(ctx context.Context, pool *pgxpool.Pool, payload string) error {
+	return custodydb.New(pool).NotifyConnectorWork(ctx, payload)
+}
 
 // listenReconnect spaces reconnects of a failed notification connection.
 const listenReconnect = 5 * time.Second

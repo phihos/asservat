@@ -12,3 +12,9 @@ WHERE e.installation_id=$1 AND e.cluster_id=$2 AND e.issuer_epoch=$3
       AND c.certificate_json IS NOT NULL AND c.audit_receipt_json IS NOT NULL
       AND c.not_after>clock_timestamp())
 ORDER BY e.pod_uid,e.process_epoch LIMIT 17;
+
+-- name: NotifyConnectorWork :exec
+SELECT pg_notify('asservat_connector_work', sqlc.arg(hint)::text);
+
+-- name: NotifyConnectorReady :exec
+SELECT pg_notify('asservat_connector_ready', sqlc.arg(cluster_id)::text);

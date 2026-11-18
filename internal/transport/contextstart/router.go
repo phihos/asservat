@@ -15,6 +15,61 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+// An outstanding caller is the source of truth for demand. PostgreSQL
+// notifications wake connected clients; reconnects reannounce only live waits.
+type exchangeWait struct {
+	ctx     context.Context
+	cluster string
+}
+
+func (r *Router) request(ctx context.Context, cluster string) (func(), error) {
+	call, cancel := context.WithCancel(ctx)
+	w := &exchangeWait{call, cluster}
+	r.mu.Lock()
+	if r.waiting == nil {
+		r.waiting = make(map[string]map[*exchangeWait]bool)
+	}
+	if r.waiting[cluster] == nil {
+		r.waiting[cluster] = make(map[*exchangeWait]bool)
+	}
+	r.waiting[cluster][w] = true
+	r.mu.Unlock()
+	stop := func() {
+		cancel()
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		delete(r.waiting[cluster], w)
+		if len(r.waiting[cluster]) == 0 {
+			delete(r.waiting, cluster)
+		}
+	}
+	if err := r.RequestExchange(call, cluster); err != nil {
+		stop()
+		return nil, err
+	}
+	return stop, nil
+}
+
+// ResendDemand is called for a subscribing cluster and for the database
+// listener's reconnect (an empty cluster). It never replays attached work.
+func (r *Router) ResendDemand(cluster string) {
+	var waiting []*exchangeWait
+	r.mu.Lock()
+	for k, set := range r.waiting {
+		if cluster == "" || k == cluster {
+			for w := range set {
+				waiting = append(waiting, w)
+			}
+		}
+	}
+	r.mu.Unlock()
+	for _, w := range waiting {
+		if w.ctx.Err() == nil {
+			_ = r.RequestExchange(w.ctx, w.cluster)
+		}
+	}
+}
+
 // ClusterLimit is an installed finite reservation, not a request parameter.
 // Only registered clusters can use the router. Each cluster has its own
 // reservations, so adding a cluster cannot consume another's capacity.
@@ -27,6 +82,10 @@ type clusterCount struct {
 	standby, captures int
 }
 type Router struct {
+	// RequestExchange is set at composition, before serving. A caller with no
+	// usable exchange wakes its connector on the standing federation connection.
+	RequestExchange func(context.Context, string) error
+	waiting         map[string]map[*exchangeWait]bool
 	mu              sync.Mutex
 	closed          bool
 	standbyCapacity int
@@ -348,6 +407,12 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 	// Between a standby's bounded residency and the region's next opening no
 	// standby may be idle. Wait for a registration within this query's original
 	// deadline, keeping queryReserve for the query and the caller (native 66).
+	var done func()
+	defer func() {
+		if done != nil {
+			done()
+		}
+	}()
 	var selected *Standby
 	for {
 		r.mu.Lock()
@@ -355,7 +420,7 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool {
 			return s.queries < contracts.APIContextMaximumQueries && (executor == nil || s.channel.Executor.PodUID == executor.PodUID && s.channel.Executor.ProcessEpoch == executor.ProcessEpoch)
 		})
-		if r.closed {
+		if r.closed || r.clusters[cluster] == nil {
 			r.mu.Unlock()
 			return time.Time{}, fleet.ErrUnavailable
 		}
@@ -363,15 +428,25 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 			selected.queries++
 			selected.queryBusy = true
 			r.mu.Unlock()
+			if done != nil {
+				done()
+				done = nil
+			}
 			break
 		}
 		registered := r.registered
 		r.mu.Unlock()
-		wait := time.Until(deadline.Add(-queryReserve))
-		if wait <= 0 {
+		if !time.Now().Before(deadline.Add(-queryReserve)) {
 			return time.Time{}, fleet.ErrUnavailable
 		}
-		timer := time.NewTimer(wait)
+		if done == nil && r.RequestExchange != nil {
+			var err error
+			done, err = r.request(ctx, cluster)
+			if err != nil {
+				return time.Time{}, fleet.ErrUnavailable
+			}
+		}
+		timer := time.NewTimer(time.Until(deadline.Add(-queryReserve)))
 		select {
 		case <-registered:
 			timer.Stop()
@@ -449,6 +524,12 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 	// within ordinary work of this caller's original bound and the existing
 	// query reserve: a longer start bound does not lengthen the wait.
 	waitUntil := identity.Earlier(deadline, time.Now().Add(standbyWork))
+	var done func()
+	defer func() {
+		if done != nil {
+			done()
+		}
+	}()
 	var timer *time.Timer
 	defer func() {
 		if timer != nil {
@@ -497,6 +578,16 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 		}
 		registered := r.registered
 		r.mu.Unlock()
+		if wait && !time.Now().Before(waitUntil.Add(-queryReserve)) {
+			return nil, fleet.ErrUnavailable
+		}
+		if done == nil && r.RequestExchange != nil {
+			var err error
+			done, err = r.request(ctx, cluster)
+			if err != nil {
+				return nil, fleet.ErrUnavailable
+			}
+		}
 		if !wait {
 			return nil, fleet.ErrUnavailable
 		}

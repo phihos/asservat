@@ -13,7 +13,7 @@ import (
 // by announced capabilities, and decoders ignore fields they do not know.
 // Raise it only for a change an older peer cannot ignore or refuse per
 // operation.
-const ConnectorProtocolMajor = 1
+const ConnectorProtocolMajor = 2
 
 // apiContextCapabilities is what this release's connector answers on the
 // context-start exchange: "operation/<method>", "query/<method>" and

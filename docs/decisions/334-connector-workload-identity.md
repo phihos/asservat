@@ -46,9 +46,27 @@ The last delivered capacity state remains current during a disconnect.
 On reconnect the connector compares digests and resends on mismatch.
 [Cluster observations](../architecture/cluster-observations.md).
 
+### Work dispatch
+
+The former connector looked up owners every second and renewed two idle exchanges
+per owner every 30 seconds. With 65 active connectors, that would mean 65 owner
+lookups per second before any user started work. Protocol major 2 keeps one
+outbound HTTP/2 work subscription per connector. A waiting owner sends a
+PostgreSQL notification when it needs an exchange. The connector opens that
+exchange through its existing connection and authenticates the actual owner.
+An available exchange can serve further work within its original lifetime.
+
+One database listener per federation replica receives work notifications. One
+per hub-api replica hears subscriptions and reannounces its still-waiting
+callers after reconnect. Neither notification persists a request, carries
+credentials or grants collection authority. This uses the existing database
+credentials and service endpoints. An idle fleet sends no owner lookups or
+exchange renewals. Upgrade a development installation's hub and connectors
+together when crossing from the old standby protocol to major 2.
+
 ## Compatibility
 
-The hub admits a connector that announces the same wire protocol major. For
+The hub checks the protocol major before handing out settings or storage credentials. The connector checks the major in the reply. For
 a missing or different major it returns HTTP 426 with both values. Within a
 major the hub sends only advertised operations and queries. A missing
 capability refuses that request while other supported work remains available.

@@ -51,11 +51,10 @@ func TestRegionalContextDiagnosticsKeepClosedVocabulary(t *testing.T) {
 	for range 8 {
 		s.reportFailure("open", wrapped)
 	}
-	s.reportFailure("candidates", nil)
-	s.reportFailure("candidates-empty", nil)
+	s.reportFailure("work-stream", nil)
 	s.reportFailure("exchange", &fixedStepError{"peer", private})
 	s.reportFailure("private-token-host-workload", private)
-	if !errors.Is(wrapped, fleet.ErrDenied) || strings.Contains(out.String(), "private-") || strings.Count(out.String(), "open (denied)") != 4 || !strings.Contains(out.String(), "exchange/peer (denied)") || !strings.Contains(out.String(), "candidates-empty") {
+	if !errors.Is(wrapped, fleet.ErrDenied) || strings.Contains(out.String(), "private-") || strings.Count(out.String(), "open (denied)") != 4 || !strings.Contains(out.String(), "exchange/peer (denied)") || !strings.Contains(out.String(), "work-stream") {
 		t.Fatalf("unsafe or unbounded diagnostic: %s", out.String())
 	}
 }
@@ -110,8 +109,5 @@ func TestRegionalContextLogsHubProtocolRefusal(t *testing.T) {
 	s.reportFailure("open", refusal)
 	if !strings.Contains(out.String(), "open/connector-protocol (denied): hub says: this hub speaks connector protocol 1; upgrade the connector") {
 		t.Fatalf("refusal not logged: %s", out.String())
-	}
-	if openingRetry(refusal) != 30*time.Second {
-		t.Fatal("protocol refusal retried immediately")
 	}
 }

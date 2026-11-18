@@ -24,12 +24,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ContextStartExchangesPerOwner bounds concurrent exchanges to one owner
-// process (ADR-271): a second standby per cluster keeps a query or attach
-// possible while the other is attached, querying or reopening. The hub's
-// per-cluster standby limit still applies.
-const ContextStartExchangesPerOwner = 2
-
 // ContextStartClient has one installed pool and connector, no caller URL or
 // callback. Every Open is one outbound POST, never a retry of attached work.
 // The connector authenticates each exchange with its ServiceAccount token
@@ -89,7 +83,6 @@ func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 // Close interrupts the socket/body and joins setup, including the Hello writer.
 type ContextStartExchange struct {
 	client             *ContextStartClient
-	owner              value.OwnerBinding
 	ctx                context.Context
 	cancel             context.CancelFunc
 	mu                 sync.Mutex
@@ -268,26 +261,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	return out, nil
 }
 
-// OpenDiscovered preserves the original complete discovery cutoff through
-// setup. It is distinct from the longer, non-authorizing standby residency.
-func (c *ContextStartClient) OpenDiscovered(ctx context.Context, owner value.OwnerBinding, observed value.APIContextOwnerCandidates) (*ContextStartExchange, error) {
-	diagnostic := newContextStartOpeningDiagnostic(ctx, observed.ValidUntil)
-	if c == nil || !observed.Valid(c.now()) || observed.Pool != c.pool {
-		return nil, diagnostic.wrap(value.ErrUnavailable)
-	}
-	found := false
-	for _, b := range observed.Owners {
-		if b == owner {
-			found = true
-		}
-	}
-	if !found {
-		return nil, diagnostic.wrap(value.ErrDenied)
-	}
-	return c.open(ctx, owner, observed.ValidUntil)
-}
-
-func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding, discoveryUntil time.Time) (result *ContextStartExchange, resultErr error) {
+// OpenRequested treats the hint as a locator. Opening still verifies the actual
+// TLS peer and its registered binding. The hint's deadline bounds setup.
+func (c *ContextStartClient) OpenRequested(ctx context.Context, owner value.OwnerBinding, discoveryUntil time.Time) (result *ContextStartExchange, resultErr error) {
 	diagnostic := newContextStartOpeningDiagnostic(ctx, discoveryUntil)
 	// Registered first: observe the refusal only after every existing join.
 	defer func() { resultErr = diagnostic.wrap(resultErr) }()
@@ -300,18 +276,12 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, value.ErrInvalid
 	}
 	c.mu.Lock()
-	same := 0
-	for e := range c.active {
-		if e.owner == owner {
-			same++
-		}
-	}
-	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum || same >= ContextStartExchangesPerOwner {
+	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum {
 		c.mu.Unlock()
 		return nil, value.ErrUnavailable
 	}
 	work, cancel := context.WithCancel(ctx)
-	exchange := &ContextStartExchange{client: c, owner: owner, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
+	exchange := &ContextStartExchange{client: c, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
 	c.active[exchange] = struct{}{}
 	c.mu.Unlock()
 	success := false

@@ -132,6 +132,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = ErrChannel
 		}
+		settings.Protocol = contracts.ConnectorProtocolMajor
 		result.Settings = &settings
 	case PurposeAccessBindings:
 		if sink, ok := h.services.(AccessBindingsService); ok {

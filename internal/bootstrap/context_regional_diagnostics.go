@@ -17,7 +17,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 		return
 	}
 	switch stage {
-	case "candidates", "candidates-empty", "open", "exchange":
+	case "work-stream", "open", "exchange":
 	default:
 		return
 	}
@@ -71,7 +71,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 // The event is already restricted by reportFailure. Durations never enter the
 // count map: many differently timed refusals still share one bounded key.
 func contextStartOpeningLog(out io.Writer) func(string, time.Duration, time.Duration, string) {
-	log := timedEventLog(out, "regional context standby refused")
+	log := timedEventLog(out, "regional context exchange refused")
 	return func(event string, elapsed, remaining time.Duration, trace string) {
 		if trace != "" {
 			trace = " setup=[" + trace + "]"

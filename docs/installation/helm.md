@@ -412,8 +412,8 @@ the URL's host to the federation's generated certificate, whose CA is
 implemented yet. The connector reaches the hub's owners, key service and
 object store through tunnels on that one connection. The hub generates the
 cluster's ID from its name and sends its settings and object-store
-capabilities on connect. The hub reserves the connections that each connector
-opens. When upgrading a development installation, remove `clusters[].standby`
+capabilities on connect. The connector waits for work on its existing hub connection. The hub asks
+for an exchange when a capture or query needs one. When upgrading a development installation, remove `clusters[].standby`
 and `hub.hub-api.public.standby` from custom values.
 
 If the hub cannot reach the workload cluster's issuer (k3s and kubeadm default to the
@@ -442,9 +442,8 @@ protocol majors match. Use a cluster release that advertises the capabilities
 your workflows need. Each cluster's node collectors use that cluster's
 connector release. The hub records image digests as provenance.
 
-A missing or different protocol major returns HTTP 426. The connector log at
-`open/connector-protocol` shows the hub's required major and the connector's
-announced major. Choose releases that speak the same major. With a matching
+A missing or different protocol major returns HTTP 426. The settings request checks compatibility before returning credentials.
+The startup log includes both majors. Choose releases that speak the same major. With a matching
 major, `connector too old for <capability>` identifies one unsupported request.
 Upgrade the cluster to use that feature. Adjacent minor releases in both
 directions are the release qualification target. Mixed-release installed

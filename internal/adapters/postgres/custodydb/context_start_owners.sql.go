@@ -57,3 +57,21 @@ func (q *Queries) ListContextStartOwnerCandidates(ctx context.Context, arg ListC
 	}
 	return items, nil
 }
+
+const notifyConnectorReady = `-- name: NotifyConnectorReady :exec
+SELECT pg_notify('asservat_connector_ready', $1::text)
+`
+
+func (q *Queries) NotifyConnectorReady(ctx context.Context, clusterID string) error {
+	_, err := q.db.Exec(ctx, notifyConnectorReady, clusterID)
+	return err
+}
+
+const notifyConnectorWork = `-- name: NotifyConnectorWork :exec
+SELECT pg_notify('asservat_connector_work', $1::text)
+`
+
+func (q *Queries) NotifyConnectorWork(ctx context.Context, hint string) error {
+	_, err := q.db.Exec(ctx, notifyConnectorWork, hint)
+	return err
+}

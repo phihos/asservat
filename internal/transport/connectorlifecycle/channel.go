@@ -44,6 +44,7 @@ const (
 // Settings are the hub's answer to PurposeSettings. Evidence and History are
 // the cluster's own object-store capabilities, scoped to its cluster ID.
 type Settings struct {
+	Protocol          int
 	ClusterID, PeerID string
 	Offer             contracts.RegionalOffer
 	Evidence, History contracts.OwnerStorageCredential

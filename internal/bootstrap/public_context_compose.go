@@ -29,7 +29,9 @@ import (
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -230,7 +232,16 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	*closers = append(*closers, router.Close)
 	// Keep one listener slot on a hub with no registrations. Its empty router refuses starts.
 	connections := max(1, router.StandbyCapacity())
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections}
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections, ListenReady: func(ctx context.Context, ready func(string)) {
+		postgres.ListenPayloads(ctx, sql["hub-metadata-read"], postgres.ConnectorReadyChannel, ready)
+	}, Wake: func(ctx context.Context, cluster string, owner fleet.OwnerBinding) error {
+		until, _ := ctx.Deadline()
+		payload, err := json.Marshal(connectorlifecycle.WorkHint{Cluster: cluster, Owner: owner, Until: until})
+		if err != nil {
+			return err
+		}
+		return postgres.NotifyConnectorWork(ctx, sql["hub-metadata-read"], string(payload))
+	}}
 
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable

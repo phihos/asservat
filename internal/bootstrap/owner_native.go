@@ -13,6 +13,7 @@ import (
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/transport/contextstart"
 	native "asservat.local/asservat/internal/transport/native"
 )
@@ -31,6 +32,8 @@ type OwnerNativeRuntimeConfig struct {
 // router used by RegionalAPIContextStart; this gives no public caller a route.
 // Tokens verifies the connectors' ServiceAccount tokens (ADR-334).
 type OwnerContextStartRuntimeConfig struct {
+	ListenReady            func(context.Context, func(string))
+	Wake                   func(context.Context, string, value.OwnerBinding) error
 	RootID                 string
 	Router                 *contextstart.Router
 	Tokens                 contextstart.TokenVerifier
@@ -81,6 +84,10 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 		if !authorization.UUID(start.RootID) || start.Router == nil || start.Tokens == nil || start.Connections < 1 || start.Preflight < 1 || start.Preflight > start.Connections {
 			router.Close()
 			return nil, artifact.ErrInvalid
+		}
+		if start.Wake != nil {
+			start.Router.RequestExchange = func(ctx context.Context, cluster string) error { return start.Wake(ctx, cluster, r.binding) }
+			start.ListenReady(r.root, start.Router.ResendDemand)
 		}
 		self := auth
 		if start.Authenticator != nil {

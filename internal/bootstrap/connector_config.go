@@ -146,6 +146,9 @@ func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c 
 		return out, &fixedStepError{"hub-settings", errors.Join(mounts.ErrUnavailable, errRegionalChannel)}
 	}
 	s := *frame.Settings
+	if s.Protocol != contracts.ConnectorProtocolMajor {
+		return out, &fixedStepError{"hub-settings", &connectorlifecycle.ProtocolMismatch{Required: s.Protocol, Announced: contracts.ConnectorProtocolMajor}}
+	}
 	o := s.Offer
 	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) || s.ClusterID == s.PeerID {
 		return out, &fixedStepError{"hub-settings/fields", mounts.ErrUnavailable}

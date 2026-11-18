@@ -2,7 +2,8 @@
 
 ## Registered workload clusters (2026-11-18)
 
-Helm derives standby socket reservations from the connector implementation.
+The hub requests exchanges when work arrives. Connectors wait on their existing
+HTTP/2 connections while idle.
 Remove `clusters[].standby` and `hub.hub-api.public.standby` from custom values.
 Each cluster keeps its capture reservation. Registration drives router admission
 and download paths, and the permission reader consumes all delivered revisions.
@@ -10,6 +11,9 @@ ADR-334 now contains the registration, identity and protocol decisions.
 
 The router, download-path selection and real PostgreSQL permission reconciliation
 regressions each reproduce the previous cutoff and pass with 65 clusters.
+The production permission reconciler also passes the 201-cluster PostgreSQL
+regression with 20 ms of latency per client write. A failed snapshot suspends
+reconciliation. Ordinary downloads and live reads pass with 129 cluster ceilings.
 The HTTP/2 Hello regression exercises larger announcements within the frame.
 A fresh 65-registration installation exposed a second failure: SeaweedFS
 rejected the 210,581-byte evidence bucket policy. Regional permissions now live
