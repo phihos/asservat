@@ -94,14 +94,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusBadRequest)
 		return
 	}
-	if !admit(opening, presented) {
-		fail(http.StatusForbidden)
-		return
-	}
 	if opening.Protocol != contracts.ConnectorProtocolMajor {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUpgradeRequired)
 		_ = json.NewEncoder(w).Encode(ProtocolMismatch{Required: contracts.ConnectorProtocolMajor, Announced: opening.Protocol})
+		return
+	}
+	if !admit(opening, presented) {
+		fail(http.StatusForbidden)
 		return
 	}
 	w.Header().Set("Content-Type", ContentType)

@@ -75,12 +75,16 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, major := range []int{0, contracts.ConnectorProtocolMajor + 1} {
-		opening := Opening{Purpose: PurposeSettings, Protocol: major, OperationID: "10000000-0000-4000-8000-000000000008"}
+	for _, opening := range []Opening{
+		{Purpose: PurposeSettings},
+		{Purpose: PurposeSettings, Protocol: contracts.ConnectorProtocolMajor + 1},
+		{Purpose: "owner-candidates", Protocol: 1, Process: testProcess()},
+	} {
+		opening.OperationID = "10000000-0000-4000-8000-000000000008"
 		frame, err := client.Run(t.Context(), opening, nil)
 		var mismatch *ProtocolMismatch
-		if !errors.As(err, &mismatch) || mismatch.Announced != major || mismatch.Required != contracts.ConnectorProtocolMajor || frame.Settings != nil {
-			t.Fatalf("settings negotiation for major %d: frame=%+v error=%v", major, frame, err)
+		if !errors.As(err, &mismatch) || mismatch.Announced != opening.Protocol || mismatch.Required != contracts.ConnectorProtocolMajor || frame.Settings != nil {
+			t.Fatalf("%s negotiation for major %d: frame=%+v error=%v", opening.Purpose, opening.Protocol, frame, err)
 		}
 	}
 	process := testProcess()
