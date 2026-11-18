@@ -307,6 +307,15 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- end -}}
 {{- end -}}
 
+{{/* Active remote identities for token trust, capability delivery and bundled IAM. */}}
+{{- define "asservat.activeClusters" -}}
+{{- $active := list -}}
+{{- range .Values.clusters -}}
+{{- if not .revoked }}{{ $active = append $active . }}{{ end -}}
+{{- end -}}
+{{- toJson $active -}}
+{{- end -}}
+
 {{/*
 How the hub verifies connector ServiceAccount tokens (ADR-334), as JSON:
 the accepted audiences, the combined-mode connector and the registered
@@ -316,12 +325,10 @@ their tokens are refused).
 {{- define "asservat.connectorTokens" -}}
 {{- $n := include "asservat.name" . -}}
 {{- $clusters := list -}}
-{{- range .Values.clusters -}}
-{{- if not .revoked -}}
+{{- range (include "asservat.activeClusters" . | fromJsonArray) -}}
 {{- $c := dict "name" .name "issuer" (required (printf "clusters[%s].issuer is the cluster's ServiceAccount issuer" .name) .issuer) "connector" (default (printf "%s/%s-connector" (default $.Release.Namespace .namespace) $n) .connector) -}}
 {{- with .jwks }}{{ $_ := set $c "jwks" (ternary . (toJson .) (kindIs "string" .)) }}{{ end -}}
 {{- $clusters = append $clusters $c -}}
-{{- end -}}
 {{- end -}}
 {{- $out := dict "audiences" (include "asservat.federationAudiences" . | fromJsonArray) "clusters" $clusters -}}
 {{- if eq .Values.mode "combined" }}{{ $_ := set $out "localConnector" (printf "%s/%s-connector" .Release.Namespace $n) }}{{ end -}}

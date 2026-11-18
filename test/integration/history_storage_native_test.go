@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -53,15 +55,25 @@ func TestPrepareRegionalStorageFixture(t *testing.T) {
 	for _, c := range []contracts.SeaweedCredential{f.Writer, f.History, f.OtherWriter, f.OtherHistory, credential("download-read", installation), credential("evidence-delete", installation)} {
 		grants = append(grants, contracts.SeaweedGrant{Credential: c, Bucket: f.Bucket, InstallationID: installation, ClusterID: c.Principal.ScopeID, RootID: f.Root})
 	}
-	config, err := providerconfig.CompileSeaweedStorage(f.Admin, grants)
-	if err != nil {
-		t.Fatal(err)
+	writeConfig := func(file string, grants []contracts.SeaweedGrant) string {
+		t.Helper()
+		config, err := providerconfig.CompileSeaweedStorage(f.Admin, grants)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The fixture container runs as UID 1000. The parent directory is private.
+		if err = os.WriteFile(filepath.Join(dir, file), config.Config, 0444); err != nil {
+			t.Fatal(err)
+		}
+		return string(config.Policies[f.Bucket])
 	}
-	// The fixture container runs as UID 1000. The parent directory is private.
-	if err = os.WriteFile(filepath.Join(dir, "s3.json"), config.Config, 0444); err != nil {
-		t.Fatal(err)
+	f.BucketPolicy = writeConfig("s3.json", grants)
+	active := slices.DeleteFunc(grants, func(g contracts.SeaweedGrant) bool {
+		return g.Credential.Principal.ScopeID == f.OtherCluster
+	})
+	if writeConfig("s3-revoked.json", active) != f.BucketPolicy {
+		t.Fatal("withdrawal changed the shared bucket policy")
 	}
-	f.BucketPolicy = string(config.Policies[f.Bucket])
 	raw, err := json.Marshal(f)
 	if err != nil {
 		t.Fatal(err)
@@ -71,9 +83,8 @@ func TestPrepareRegionalStorageFixture(t *testing.T) {
 	}
 }
 
-// Actual IAM and storage SDK/TLS behavior, synthetic ciphertexts and registration.
-// No test fact supplies production history, recovery, writer or deletion authority.
-func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
+func readRegionalStorageFixture(t *testing.T) regionalStorageFixture {
+	t.Helper()
 	path := os.Getenv("ASSERVAT_HISTORY_STORAGE_FIXTURE")
 	if path == "" {
 		t.Skip("run make history-storage-integration")
@@ -87,24 +98,34 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 	if json.Unmarshal(raw, &f) != nil || f.S3 == "" || f.BucketPolicy == "" {
 		t.Fatal("invalid owned regional storage fixture")
 	}
-	historyPrefix := "history/v1/" + f.Root + "/" + f.Cluster + "/"
+	return f
+}
 
+func regionalStorageClients(bridge *httptest.Server) func(contracts.SeaweedCredential) *s3.Client {
+	return func(c contracts.SeaweedCredential) *s3.Client {
+		return s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(c.AccessKeyID, c.SecretAccessKey, ""), HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
+	}
+}
+
+// Actual IAM and storage SDK/TLS behavior, synthetic ciphertexts and registration.
+// No test fact supplies production history, recovery, writer or deletion authority.
+func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
+	f := readRegionalStorageFixture(t)
+	historyPrefix := "history/v1/" + f.Root + "/" + f.Cluster + "/"
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	bridge := tlsBridge(t, f.S3)
-	client := func(c contracts.SeaweedCredential) *s3.Client {
-		return s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(c.AccessKeyID, c.SecretAccessKey, ""), HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
-	}
+	client := regionalStorageClients(bridge)
 	admin := client(f.Admin)
 	history := client(f.History)
 	writer := client(f.Writer)
-	if _, err = admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &f.Bucket}); err != nil {
+	if _, err := admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &f.Bucket}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &f.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
+	if _, err := admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &f.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &f.Bucket, Policy: &f.BucketPolicy}); err != nil {
+	if _, err := admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &f.Bucket, Policy: &f.BucketPolicy}); err != nil {
 		t.Fatal("shared bucket policy", err)
 	}
 
@@ -252,4 +273,40 @@ func TestHistoryCiphertextStorageCapabilityWithRealS3(t *testing.T) {
 		t.Fatal("evidence bytes changed", err)
 	}
 	t.Log("history-only actual write/read, retained version, ListParts, full version/marker/multipart cleanup; evidence and foreign get/delete/list denied; original writer deletion denial preserved")
+}
+
+// This phase runs after the same store restarts with one registration removed.
+// Use both originally issued credentials and objects from before withdrawal.
+func TestRevokedRegionalStorageKeysWithRealS3(t *testing.T) {
+	f := readRegionalStorageFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	client := regionalStorageClients(tlsBridge(t, f.S3))
+	otherHistory := "history/v1/" + f.Root + "/" + f.OtherCluster + "/foreign"
+	read := &s3.GetObjectInput{Bucket: &f.Bucket, Key: &otherHistory}
+	object, err := client(f.Admin).GetObject(ctx, read)
+	if err != nil {
+		t.Fatal("revoked cluster's retained history is missing", err)
+	}
+	object.Body.Close()
+	denied := func(label string, err error) {
+		t.Helper()
+		var failure smithy.APIError
+		if !errors.As(err, &failure) || failure.ErrorCode() != "InvalidAccessKeyId" {
+			t.Fatalf("%s: expected InvalidAccessKeyId for withdrawn credential, got %v", label, err)
+		}
+	}
+	_, err = client(f.OtherHistory).GetObject(ctx, read)
+	denied("revoked history read", err)
+	write := &s3.PutObjectInput{Bucket: &f.Bucket, Key: aws.String("v1/" + f.OtherCluster + "/foreign"), Body: strings.NewReader("refused")}
+	_, err = client(f.OtherWriter).PutObject(ctx, write)
+	denied("revoked evidence write", err)
+	for _, item := range []struct {
+		credential contracts.SeaweedCredential
+		key        string
+	}{{f.Writer, "v1/" + f.Cluster + "/retained"}, {f.History, "history/v1/" + f.Root + "/" + f.Cluster + "/retained"}} {
+		if _, err := client(item.credential).PutObject(ctx, &s3.PutObjectInput{Bucket: &f.Bucket, Key: &item.key, Body: strings.NewReader("retained")}); err != nil {
+			t.Fatal("remaining cluster credential refused", item.credential.Principal.Purpose, err)
+		}
+	}
 }

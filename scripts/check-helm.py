@@ -344,6 +344,16 @@ def check_cluster_join(render):
     revoked["clusters"][0]["revoked"] = True
     tokens = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
     assert tokens["clusters"] == [], tokens
+    # Revocation and removal produce the same active IAM and retain the other cluster.
+    larger["clusters"][0]["revoked"] = True  # us
+    active = render(larger)
+    assert iam_checksum(active) == iam_checksum(docs) != checksum, "revocation must roll the store with only active identities"
+    active_plan = json.loads(named(active, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
+    assert active_plan["remoteClusters"] == ["eu"], active_plan
+    for name in ("asservat-federation", "asservat-secrets"):
+        secret_names = {n for rule in named(active, "Role", name)["rules"] for n in rule.get("resourceNames", [])}
+        for purpose in ("regional-write", "regional-history"):
+            assert f"asservat-s3-{purpose}-us" not in secret_names and f"asservat-s3-{purpose}-eu" in secret_names
     # The hub-api and the key service verify the same tokens.
     assert config["connectorTokens"]["audiences"] == json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]["audiences"]
     offer = config["public"]["regionalOffer"]

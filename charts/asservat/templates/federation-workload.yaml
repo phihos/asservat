@@ -19,7 +19,7 @@
 {{- $_ := set $config "localStorage" $local }}
 {{- $storage = list $local.write $local.history }}
 {{- end }}
-{{- range .Values.clusters }}{{ $storage = concat $storage (list (printf "%s-s3-regional-write-%s" $n .name) (printf "%s-s3-regional-history-%s" $n .name)) }}{{ end }}
+{{- range (include "asservat.activeClusters" . | fromJsonArray) }}{{ $storage = concat $storage (list (printf "%s-s3-regional-write-%s" $n .name) (printf "%s-s3-regional-history-%s" $n .name)) }}{{ end }}
 {{- $rules := list
   (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n) (printf "%s-regional-offer" $n)) "verbs" (list "get"))
   (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))

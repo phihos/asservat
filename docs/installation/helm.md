@@ -425,8 +425,9 @@ Removing a cluster from `clusters`, or setting `revoked: true`, closes its
 connection and refuses its tokens.
 
 With bundled SeaweedFS, each regional credential carries its own prefix
-permissions. Adding a cluster restarts the bundled store to load its new
-identities. To reverse a membership change, run `helm upgrade` with the
+permissions. Adding, removing or revoking a cluster restarts the bundled store
+to load the active identities. After the rollout, the store refuses both
+regional keys issued to a removed or revoked cluster. To reverse a membership change, run `helm upgrade` with the
 desired cluster list so the credential hook runs again.
 
 If an older development chart failed an upgrade with `PolicyTooLarge` and

@@ -53,7 +53,7 @@ func liveProjection(p string) bool {
 	return p == "packetMetadata" || p == "syscallMetadata" || p == "httpHeaders"
 }
 func (l LiveRead) valid(paths map[string]bool) bool {
-	if !l.Root.Valid() || l.Projections == nil || len(l.Projections) > 3 || l.Clients == nil || len(l.Clients) > 64 || l.Ceilings == nil || len(l.Ceilings) > 128 {
+	if !l.Root.Valid() || l.Projections == nil || len(l.Projections) > 3 || l.Clients == nil || len(l.Clients) > 64 || l.Ceilings == nil {
 		return false
 	}
 	for n, p := range l.Projections {
