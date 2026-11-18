@@ -26,7 +26,7 @@ func TestAccessBindingDeliveryRoundTrip(t *testing.T) {
 		return true
 	})
 	d, err := f.client.AccessBindingDelivery(context.Background())
-	if err != nil || len(d.Items) != 3 || d.ResourceVersion != "opaque:bindings" {
+	if err != nil || len(d.Items) != 3 || d.ResourceVersion != "opaque:bindings" || d.ClusterResourceVersion != "opaque:cabs" {
 		t.Fatal(err, d)
 	}
 	if i := d.Items[0]; i.Namespace != "payments" || i.NamespaceUID != "payments-uid" || i.UID != "uid-1" || i.Generation != 1 || len(i.Spec) == 0 {

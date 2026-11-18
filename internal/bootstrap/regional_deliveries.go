@@ -2,144 +2,140 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
+	app "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-)
-
-// Watched resources of the connector's deliveries (ADR-329, ADR-334).
-var (
-	accessBindingsResource = schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
+	value "asservat.local/asservat/internal/domain/configuration"
 )
 
 const (
-	// deliverySpacing coalesces bursts: at most one delivery per second.
-	deliverySpacing = time.Second
-	// deliveryRetry retries a failed delivery; a success waits for a change.
-	deliveryRetry = 5 * time.Second
+	deliverySpacing = time.Second     // Coalesce changes before the next complete LIST.
+	deliveryRetry   = 5 * time.Second // Retry failed reads or conversations only.
 )
 
-// The regional informer coalesces AccessBinding changes into delivery signals.
-func watchRegionalBindings(ctx context.Context, config *rest.Config) ([]cache.InformerSynced, <-chan struct{}, error) {
-	client, err := metadata.NewForConfig(config)
-	if err != nil {
-		return nil, nil, err
-	}
-	factory := metadatainformer.NewSharedInformerFactory(client, 0)
-	changes := make(chan struct{}, 1)
-	signal := func() {
-		select {
-		case changes <- struct{}{}:
-		default:
-		}
-	}
-	handler := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { signal() }, UpdateFunc: func(any, any) { signal() }, DeleteFunc: func(any) { signal() }}
-	var synced []cache.InformerSynced
-	for _, resource := range []string{"accessbindings", "clusteraccessbindings"} {
-		informer := factory.ForResource(accessBindingsResource.GroupVersion().WithResource(resource)).Informer()
-		if _, err = informer.AddEventHandler(handler); err != nil {
-			return nil, nil, err
-		}
-		synced = append(synced, informer.HasSynced)
-	}
-	factory.Start(ctx.Done())
-	return synced, changes, nil
+type regionalBindingSource interface {
+	AccessBindingReader
+	WatchConfiguration(context.Context, string, string) (app.SettingsWatch, error)
 }
 
-// deliverOnChange sends a delivery when the watched state changed, at most
-// once per deliverySpacing: build returns the current delivery's digest and
-// its send. Every conversation carries the hub's stored digest, so the
-// first send after an authenticated reconnect only compares digests when
-// the hub has retained the delivery. A failed send is retried after
-// deliveryRetry; nothing is resent periodically.
-func deliverOnChange(ctx context.Context, resync <-chan struct{}, trigger <-chan struct{}, name string, build func(context.Context) (string, func(context.Context) error, error)) {
-	last, outcome, pending := "", "ok", true
-	var sent time.Time
-	for {
-		var retry <-chan time.Time
-		if pending {
-			if wait := deliverySpacing - time.Since(sent); wait > 0 && !sleepContext(ctx, wait) {
-				return
-			}
-			digest, send, err := build(ctx)
-			if err == nil && digest != last {
-				sent, err = time.Now(), send(ctx)
-				if err == nil {
-					last = digest
-				} else {
-					last = ""
-				}
-			}
-			pending = err != nil
-			if pending {
-				retry = time.After(deliveryRetry)
-			}
-			if cause := regionalOutcome(err); cause != outcome && ctx.Err() == nil {
-				outcome = cause
-				fmt.Fprintln(os.Stderr, "connector "+name+" delivery: "+cause)
-			}
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-resync:
-			// A new authenticated connection can point to a hub that
-			// discarded this registration’s previously accepted delivery.
-			last, pending = "", true
-		case <-trigger:
-			pending = true
-		case <-retry:
-			pending = true
-		}
-	}
-}
-
-// staticAccessBindings answers a conversation with the
-// delivery built before it.
 type staticAccessBindings contracts.AccessBindingDelivery
 
 func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.AccessBindingDelivery, error) {
 	return contracts.AccessBindingDelivery(s), nil
 }
 
-// runDeliveries watches this cluster's AccessBindings and delivers them on
-// change (ADR-329/330).
 func (r *Regional) runDeliveries(ctx context.Context, resync <-chan struct{}) {
-	var joins []func()
-	if r.bindings != nil {
-		bindings, changes, err := watchRegionalBindings(ctx, r.watchConfig)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "connector access binding watch unavailable")
-		} else {
-			joins = append(joins, goJoined(func() {
-				if !cache.WaitForCacheSync(ctx.Done(), bindings...) {
-					return
-				}
-				deliverOnChange(ctx, resync, changes, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
-					d, err := r.bindings.AccessBindingDelivery(ctx)
-					if err != nil {
-						d = contracts.AccessBindingDelivery{Unavailable: true}
-					}
-					d = d.Bounded()
-					return d.Digest(), func(ctx context.Context) error {
-						if sendErr := r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d)); sendErr != nil {
-							return sendErr
-						}
-						return err // Retry a failed Kubernetes read from a new complete list.
-					}, nil
-				})
-			}))
+	deliverRegionalBindings(ctx, resync, r.bindings, func(ctx context.Context, d contracts.AccessBindingDelivery) error {
+		return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))
+	})
+}
+
+func deliverRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, send func(context.Context, contracts.AccessBindingDelivery) error) {
+	last := ""
+	report := eventLog(os.Stderr, "connector access binding delivery")
+	publish := func(ctx context.Context, d contracts.AccessBindingDelivery, force bool) bool {
+		digest := d.Digest()
+		if !force && digest == last && last != "" {
+			return true
+		}
+		if err := send(ctx, d); err != nil {
+			last = ""
+			report(regionalOutcome(err))
+			return false
+		}
+		last = digest
+		return true
+	}
+	for ctx.Err() == nil {
+		err := followRegionalBindings(ctx, resync, source, publish)
+		if ctx.Err() != nil {
+			return
+		}
+		report(regionalOutcome(err))
+		// Withdraw the previous observation before starting any replacement
+		// LIST. If the hub cannot acknowledge it, retry the withdrawal first.
+		for {
+			acknowledged := publish(ctx, contracts.AccessBindingDelivery{Unavailable: true}, false)
+			select {
+			case <-ctx.Done():
+				return
+			case <-resync:
+				last = ""
+				continue
+			case <-time.After(deliveryRetry):
+			}
+			if acknowledged {
+				break
+			}
 		}
 	}
-	<-ctx.Done()
-	for _, join := range joins {
-		join()
+}
+
+// Each collection has its own LIST cursor. Both histories must be observable
+// before a complete snapshot is sent. Their loss interrupts even a blocked
+// refresh, so a stale read cannot restore an old allow or hide a removed deny.
+func followRegionalBindings(ctx context.Context, resync <-chan struct{}, source regionalBindingSource, publish func(context.Context, contracts.AccessBindingDelivery, bool) bool) error {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	d, err := source.AccessBindingDelivery(ctx)
+	if err != nil {
+		return err
+	}
+	local, err := source.WatchConfiguration(ctx, "accessbindings", d.ResourceVersion)
+	if err != nil {
+		return err
+	}
+	cluster, err := source.WatchConfiguration(ctx, "clusteraccessbindings", d.ClusterResourceVersion)
+	if err != nil {
+		return err
+	}
+
+	// Loss interrupts both an in-flight LIST and an in-flight hub conversation.
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-local.Lost:
+			cancel(value.ErrChanged)
+		case <-cluster.Lost:
+			cancel(value.ErrChanged)
+		}
+	}()
+	force := false
+	for {
+		select {
+		case <-ctx.Done():
+			return context.Cause(ctx)
+		case <-local.Lost:
+			return value.ErrChanged
+		case <-cluster.Lost:
+			return value.ErrChanged
+		default:
+		}
+		var next <-chan time.Time
+		if !publish(ctx, d, force) {
+			next = time.After(deliveryRetry)
+		}
+		force = false
+	waitForChange:
+		for {
+			select {
+			case <-ctx.Done():
+				return context.Cause(ctx)
+			case <-local.Changed:
+			case <-cluster.Changed:
+			case <-resync:
+				force = true
+			case <-next:
+				break waitForChange
+			}
+			if next == nil {
+				next = time.After(deliverySpacing)
+			}
+		}
+		if d, err = source.AccessBindingDelivery(ctx); err != nil {
+			return err
+		}
 	}
 }

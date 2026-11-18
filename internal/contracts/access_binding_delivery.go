@@ -16,9 +16,10 @@ const AccessBindingDeliveryMaxBytes = 8 << 20
 // raw spec. It names no cluster: the hub attributes it to the connector's
 // authenticated cluster and validates every spec itself.
 type AccessBindingDelivery struct {
-	Unavailable     bool                     `json:"unavailable,omitempty"`
-	ResourceVersion string                   `json:"resourceVersion"`
-	Items           []DeliveredAccessBinding `json:"items"`
+	Unavailable            bool                     `json:"unavailable,omitempty"`
+	ResourceVersion        string                   `json:"resourceVersion"`
+	ClusterResourceVersion string                   `json:"-"` // Local cursor for the ClusterAccessBinding watch.
+	Items                  []DeliveredAccessBinding `json:"items"`
 }
 
 type DeliveredAccessBinding struct {

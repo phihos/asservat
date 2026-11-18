@@ -42,7 +42,7 @@ func (c *PermissionClient) bindingDelivery(ctx context.Context) (contracts.Acces
 		r := refs[i]
 		out.Items = append(out.Items, contracts.DeliveredAccessBinding{Namespace: r.Namespace, NamespaceUID: r.NamespaceUID, Name: r.Name, UID: r.UID, ResourceVersion: r.ResourceVersion, Generation: r.Generation, Deleting: r.Deleting, Spec: o.Spec})
 	}
-	_, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", c.now())
+	out.ClusterResourceVersion, objects, refs, _, err = c.list(ctx, value.ClusterAccessBindingKind, "clusteraccessbindings", c.now())
 	if err != nil {
 		return contracts.AccessBindingDelivery{}, nil, err
 	}

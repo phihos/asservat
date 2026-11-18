@@ -88,7 +88,7 @@ func (c *PermissionClient) openWatch(ctx context.Context, path, rv string, metad
 // A closed channel requires a new baseline. Normal EOF resumes at the last
 // delivered resourceVersion.
 func (c *PermissionClient) WatchConfiguration(ctx context.Context, resource, rv string) (port.SettingsWatch, error) {
-	if resource != "clusteraccessbindings" && resource != "permissionsources" {
+	if resource != "accessbindings" && resource != "clusteraccessbindings" && resource != "permissionsources" {
 		return port.SettingsWatch{}, value.ErrInvalid
 	}
 	path := c.listPath(resource)

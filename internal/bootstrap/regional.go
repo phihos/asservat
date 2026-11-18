@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"k8s.io/client-go/rest"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -31,10 +30,9 @@ type Regional struct {
 	nodes   *regionalNodes   // nil without the optional ADR-246 input
 	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
-	bindings    AccessBindingReader
-	lifecycle   *RegionalLifecycle
-	watchConfig *rest.Config
-	closers     []func()
+	bindings  regionalBindingSource
+	lifecycle *RegionalLifecycle
+	closers   []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -169,7 +167,7 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	lifecycle := &RegionalLifecycle{Client: channel, Process: process, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
 	r.lifecycle = lifecycle
 	if raw.Mode == contracts.ConnectorModeCluster {
-		r.bindings, r.watchConfig = observer, in.kubernetes(contracts.ConnectorKubeTokenFile)
+		r.bindings = observer
 	}
 	if c.executor {
 		var closers []func()
