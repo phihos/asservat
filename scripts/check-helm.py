@@ -342,7 +342,14 @@ def check_cluster_join(render):
     assert "localStorage" not in fed, fed
     revoked = copy.deepcopy(v)
     revoked["clusters"][0]["revoked"] = True
-    tokens = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
+    withdrawn = render(revoked)
+    rollout = named(withdrawn, "Deployment", "asservat-federation")["spec"]
+    active_federation = named(docs, "Deployment", "asservat-federation")["spec"]["template"]
+    assert rollout["strategy"]["type"] == "Recreate"
+    assert rollout["template"]["metadata"]["annotations"]["checksum/config"] != active_federation["metadata"]["annotations"]["checksum/config"]
+    federation_container = next(c for c in rollout["template"]["spec"]["containers"] if c["name"] == "federation")
+    assert federation_container["readinessProbe"]["tcpSocket"]["port"] == "federation"
+    tokens = json.loads(named(withdrawn, "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
     assert tokens["clusters"] == [], tokens
     # Revocation and removal produce the same active IAM and retain the other cluster.
     larger["clusters"][0]["revoked"] = True  # us
