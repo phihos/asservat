@@ -424,6 +424,16 @@ Update it when that cluster rotates its ServiceAccount signing key.
 Removing a cluster from `clusters`, or setting `revoked: true`, closes its
 connection and refuses its tokens.
 
+With bundled SeaweedFS, each regional credential carries its own prefix
+permissions. Adding a cluster restarts the bundled store to load its new
+identities. To reverse a membership change, run `helm upgrade` with the
+desired cluster list so the credential hook runs again.
+
+If an older development chart failed an upgrade with `PolicyTooLarge` and
+setup now reports a bucket-policy conflict, reapply the last successful chart
+and values to restore the previous desired policy, then upgrade. Keep the
+existing evidence bucket and credential Secrets throughout.
+
 ### Version skew
 
 The hub and workload clusters can upgrade in either order when their connector

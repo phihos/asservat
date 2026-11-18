@@ -11,7 +11,13 @@ ADR-334 now contains the registration, identity and protocol decisions.
 The router, download-path selection and real PostgreSQL permission reconciliation
 regressions each reproduce the previous cutoff and pass with 65 clusters.
 The HTTP/2 Hello regression exercises larger announcements within the frame.
-
+A fresh 65-registration installation exposed a second failure: SeaweedFS
+rejected the 210,581-byte evidence bucket policy. Regional permissions now live
+on each identity. The pinned SeaweedFS 4.53 integration passed versioned reads,
+regional writes, multipart completion and cleanup, and cross-region denials
+against existing objects. The installed capture driver submits the reviewed
+stateless preview and verifies that retrying its idempotency key returns the
+same capture.
 
 ## Processing cleanup (2026-11-17)
 
