@@ -81,6 +81,7 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 				return value.OwnerConfigurationObservation{}, time.Time{}, e
 			}
 			observation := value.OwnerConfigurationObservation{Configuration: config, ObservedAt: h.ObservedAt.Time, FreshUntil: h.FreshUntil.Time}
+			observation = observation.ForOperation(original)
 			if !observation.Valid(n.Time) {
 				return observation, n.Time, value.ErrUnavailable
 			}

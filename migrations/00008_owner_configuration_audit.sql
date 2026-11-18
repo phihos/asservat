@@ -3,21 +3,24 @@
 -- and the indexed head row still serializes changes for this installation.
 DROP TRIGGER owner_configuration_revision_guard ON public.hub_owner_configuration_revision;
 DROP FUNCTION public.guard_owner_configuration_revision();
-ALTER TABLE public.hub_owner_configuration_revision DROP COLUMN audit_receipt_json;
+ALTER TABLE public.hub_owner_configuration_revision RENAME COLUMN audit_receipt_json TO legacy_audit_receipt_json;
+-- The source stays accepted until replaced, fenced, or its issuer certificate expires.
+ALTER TABLE public.hub_owner_configuration DROP CONSTRAINT hub_owner_configuration_check;
 
 -- Append one digest-only audit row per revision, including revisions retained
 -- across a development upgrade. Backfilled events record their migration time.
 -- The source UID groups the immutable generation numbers for this source.
 -- +goose StatementBegin
-CREATE FUNCTION public.audit_owner_configuration_revision(r public.hub_owner_configuration_revision)
+CREATE FUNCTION public.audit_owner_configuration_revision(r public.hub_owner_configuration_revision, event_status text)
 RETURNS void LANGUAGE sql SET search_path TO pg_catalog, pg_temp AS $$
  INSERT INTO public.audit_event(event_id,operation_id,kind,operation,issuer,subject,client_id,identity_type,input_digest,status,reason,effect)
  VALUES(gen_random_uuid(), r.source_uid, 'configuration', 'observe_owner_configuration', r.installation_id::text,
-        r.cluster_id::text, 'hub-worker', 'workload', sha256(r.snapshot_json), 'success', r.generation::text, 'accepted');
+        r.cluster_id::text, 'hub-worker', 'workload', sha256(r.snapshot_json), event_status, r.generation::text, 'accepted');
 $$;
 -- +goose StatementEnd
-REVOKE ALL ON FUNCTION public.audit_owner_configuration_revision(public.hub_owner_configuration_revision) FROM PUBLIC;
-SELECT public.audit_owner_configuration_revision(r) FROM public.hub_owner_configuration_revision r;
+REVOKE ALL ON FUNCTION public.audit_owner_configuration_revision(public.hub_owner_configuration_revision, text) FROM PUBLIC;
+SELECT public.audit_owner_configuration_revision(r, CASE WHEN r.legacy_audit_receipt_json IS NULL THEN 'legacy-pending' ELSE 'legacy-acknowledged' END)
+ FROM public.hub_owner_configuration_revision r;
 
 -- The source role can insert revisions only. The trigger records the event
 -- without giving it a general audit-table writer. See PostgreSQL CREATE FUNCTION,
@@ -29,7 +32,10 @@ BEGIN
  IF TG_OP <> 'INSERT' THEN
   RAISE EXCEPTION 'owner configuration revision is immutable' USING ERRCODE='23514';
  END IF;
- PERFORM public.audit_owner_configuration_revision(NEW);
+ IF NEW.legacy_audit_receipt_json IS NOT NULL THEN
+  RAISE EXCEPTION 'legacy owner receipts are historical' USING ERRCODE='23514';
+ END IF;
+ PERFORM public.audit_owner_configuration_revision(NEW, 'success');
  RETURN NULL;
 END $$;
 -- +goose StatementEnd

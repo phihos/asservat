@@ -294,7 +294,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	w.reconciler = &app.ConfigurationReconciler{
-		Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Now: time.Now},
+		Source: ownerSource, Ledger: ownerStore, Now: time.Now,
 	}
 	at = "leader"
 	leaderClient, err := w.kubeClient()

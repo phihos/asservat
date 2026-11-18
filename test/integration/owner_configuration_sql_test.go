@@ -355,6 +355,22 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal("expiry during lock wait ignored")
 	}
 	accept(c4)
+	// A Kubernetes baseline can remain unchanged across an idle interval. SQL
+	// gives each caller its own bounded observation, capped by the accepted CA.
+	durable := observation(c4)
+	durable.FreshUntil = durable.ObservedAt.Add(time.Minute)
+	if e = l.writer.ObserveOwnerConfiguration(ctx, durable); e != nil {
+		t.Fatal(e)
+	}
+	time.Sleep(5100 * time.Millisecond)
+	op, err := l.reader.ReadOwnerConfiguration(ctx)
+	if err != nil || !op.Valid(time.Now()) || op.ObservedAt.Before(durable.ObservedAt.Add(5*time.Second)) || op.FreshUntil.After(op.ObservedAt.Add(5*time.Second)) {
+		t.Fatal("idle durable owner source did not serve bounded operation", op.ObservedAt, op.FreshUntil, err)
+	}
+	var baseline time.Time
+	if e = l.admin.QueryRow(ctx, "SELECT observed_at FROM hub_owner_configuration WHERE installation_id=$1", c.Pool.InstallationID).Scan(&baseline); e != nil || !baseline.Equal(durable.ObservedAt) {
+		t.Fatal("idle baseline changed", baseline, durable.ObservedAt, e)
+	}
 	// More than 1024 actual revisions remain auditable and the source is usable.
 	if _, e = l.writerPool.Exec(ctx, `INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json)
 		SELECT installation_id,cluster_id,source_uid,n,snapshot_json FROM hub_owner_configuration_revision

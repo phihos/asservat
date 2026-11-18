@@ -945,11 +945,12 @@ type HubOwnerConfiguration struct {
 }
 
 type HubOwnerConfigurationRevision struct {
-	InstallationID pgtype.UUID
-	ClusterID      pgtype.UUID
-	SourceUid      pgtype.UUID
-	Generation     int64
-	SnapshotJson   []byte
+	InstallationID         pgtype.UUID
+	ClusterID              pgtype.UUID
+	SourceUid              pgtype.UUID
+	Generation             int64
+	SnapshotJson           []byte
+	LegacyAuditReceiptJson []byte
 }
 
 type HubOwnerEnrollment struct {

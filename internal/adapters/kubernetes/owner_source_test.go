@@ -49,8 +49,19 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/namespaces/" + ns:
 			permissionReply(w, permissionNamespace(ns, nsUID))
-		case "/api/v1/namespaces/" + ns + "/configmaps/asservat-owner-source":
-			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "asservat-owner-source", "namespace": ns, "uid": cmUID, "resourceVersion": "1"}, "data": map[string]string{"owner-pool.json": source}})
+		case "/api/v1/namespaces/" + ns + "/configmaps":
+			if r.URL.Query().Get("fieldSelector") != "metadata.name=asservat-owner-source" {
+				t.Error("unfiltered list/watch")
+				return true
+			}
+			if r.URL.Query().Get("watch") == "true" {
+				if r.URL.Query().Get("resourceVersion") != "12" {
+					t.Error("wrong watch cursor")
+				}
+				permissionReply(w, map[string]any{"type": "MODIFIED", "object": map[string]string{"kind": "PartialObjectMetadata"}})
+				return true
+			}
+			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMapList", "metadata": map[string]string{"resourceVersion": "12"}, "items": []any{map[string]any{"metadata": map[string]any{"name": "asservat-owner-source", "namespace": ns, "uid": cmUID, "resourceVersion": "1"}, "data": map[string]string{"owner-pool.json": source}}}})
 		default:
 			uid, ok := uids[r.URL.Path]
 			if !ok {
@@ -75,7 +86,13 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 2 {
-		o, err := reader.ReadOwnerConfiguration(context.Background())
+		o, rv, err := reader.OwnerSourceSnapshot(context.Background())
+		if err != nil || rv != "12" || !o.FreshUntil.Equal(f.client.now().Add(24*time.Hour).Truncate(time.Second)) {
+			t.Fatal("original CA cutoff or cursor lost", o.FreshUntil, rv, err)
+		}
+		if err = reader.WaitOwnerChange(t.Context(), rv); err != nil {
+			t.Fatal(err)
+		}
 		p := o.Configuration.Pool
 		if err != nil || p.InstallationID != installation || p.ClusterID != permissionCluster || p.IssuerEpoch != epoch || p.NamespaceUID != nsUID ||
 			p.ServiceUID != uids["/api/v1/namespaces/asservat-system/services/asservat-hub-api-owner"] || p.DeploymentUID != uids["/apis/apps/v1/namespaces/asservat-system/deployments/asservat-hub-api"] ||
@@ -94,7 +111,7 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		"port":         strings.Replace(ownerSourceJSON, `"port":9443`, `"port":80`, 1),
 	} {
 		source = bad
-		if _, err := reader.ReadOwnerConfiguration(context.Background()); err == nil {
+		if o, rv, err := reader.OwnerSourceSnapshot(context.Background()); err != nil || rv != "12" || o.CurrentSource(f.client.now()) {
 			t.Fatal("accepted", name)
 		}
 	}

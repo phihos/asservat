@@ -64,6 +64,22 @@ func (o OwnerConfigurationObservation) Valid(now time.Time) bool {
 	return o.Configuration.Valid() && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second)
 }
 
+// CurrentSource reports whether the accepted configuration and its issuer roots
+// are still usable. A Kubernetes change or deletion replaces the observation.
+func (o OwnerConfigurationObservation) CurrentSource(now time.Time) bool {
+	return o.Configuration.Valid() && !o.ObservedAt.IsZero() && !o.ObservedAt.After(now) && now.Before(o.FreshUntil)
+}
+
+// ForOperation bounds a current SQL observation by the original issuer cutoff
+// and the operation's five-second owner window. Invalid source times stay invalid.
+func (o OwnerConfigurationObservation) ForOperation(now time.Time) OwnerConfigurationObservation {
+	if o.CurrentSource(now) && o.FreshUntil.Sub(o.ObservedAt) > 5*time.Second {
+		o.ObservedAt = now
+		o.FreshUntil = identity.Earlier(o.FreshUntil, now.Add(5*time.Second))
+	}
+	return o
+}
+
 // OwnerRoute joins original configuration and endpoint observations. It remains
 // routing/trust input only; authentication and current ownership are separate.
 type OwnerRoute struct {

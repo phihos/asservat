@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	settings "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -38,7 +40,7 @@ type OwnerSourceReader struct {
 	roots [][]byte
 }
 
-var _ app.OwnerConfigurationReader = (*OwnerSourceReader)(nil)
+var _ app.OwnerConfigurationSource = (*OwnerSourceReader)(nil)
 
 func NewOwnerSourceReader(c *PermissionClient, name, uid, installation, issuerEpoch string, issuerRoots func(context.Context) ([][]byte, error)) (*OwnerSourceReader, error) {
 	if c == nil || issuerRoots == nil || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(installation) || !authorization.UUID(issuerEpoch) {
@@ -104,22 +106,73 @@ func (s *OwnerSourceReader) ownerRoots(ctx context.Context) ([][]byte, error) {
 	return roots, nil
 }
 
-func (s *OwnerSourceReader) ReadOwnerConfiguration(ctx context.Context) (value.OwnerConfigurationObservation, error) {
-	var out value.OwnerConfigurationObservation
-	if s == nil || ctx == nil {
-		return out, value.ErrInvalid
-	}
-	ctx, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
+func (s *OwnerSourceReader) path() string {
+	return "/api/v1/namespaces/" + s.client.control.Name + "/configmaps"
+}
+
+// A field-selected LIST gives the watch cursor even when the ConfigMap is absent.
+// A zero observation with a cursor is confirmed invalidation; a read error is retried.
+func (s *OwnerSourceReader) OwnerSourceSnapshot(ctx context.Context) (value.OwnerConfigurationObservation, string, error) {
+	var empty value.OwnerConfigurationObservation
 	start := s.client.now()
-	data, _, err := s.client.installationConfig(ctx, s.name, s.uid)
+	raw, err := s.client.raw(ctx, s.path(), map[string]string{"fieldSelector": "metadata.name=" + s.name})
 	if err != nil {
-		return out, value.ErrInvalid
+		return empty, "", err
+	}
+	list, items, err := listEnvelopeOf(raw, "v1", "ConfigMap")
+	if err != nil || list.Continue != "" || list.ResourceVersion == "0" || len(items) > 1 {
+		return empty, "", value.ErrUnavailable
+	}
+	if len(items) == 0 {
+		return empty, list.ResourceVersion, nil
+	}
+	ns, err := s.client.namespace(ctx, s.client.control)
+	if errors.Is(err, settings.ErrChanged) || ns.Deleting {
+		return empty, list.ResourceVersion, nil
+	}
+	if err != nil {
+		return empty, "", err
+	}
+	data, _, err := s.client.decodeConfigMap(items[0], s.name, s.uid, false, true)
+	if err != nil {
+		return empty, list.ResourceVersion, nil
 	}
 	wire, digest, err := decodeOwnerSource(data)
 	if err != nil {
-		return out, err
+		return empty, list.ResourceVersion, nil
 	}
+	o, err := s.complete(ctx, start, wire, digest)
+	if errors.Is(err, value.ErrInvalid) || errors.Is(err, value.ErrDenied) {
+		return empty, list.ResourceVersion, nil
+	}
+	return o, list.ResourceVersion, err
+}
+
+func (s *OwnerSourceReader) WaitOwnerChange(ctx context.Context, rv string) error {
+	stream, cancel, err := s.client.openSelectedWatch(ctx, s.path(), rv, true, "metadata.name="+s.name)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer stream.Close()
+	for {
+		event, err := stream.next()
+		if err != nil {
+			return err
+		}
+		switch event.Type {
+		case "BOOKMARK":
+			continue
+		case "ADDED", "MODIFIED", "DELETED":
+			return nil
+		default:
+			return value.ErrUnavailable
+		}
+	}
+}
+
+func (s *OwnerSourceReader) complete(ctx context.Context, start time.Time, wire contracts.OwnerSource, digest [32]byte) (value.OwnerConfigurationObservation, error) {
+	var out value.OwnerConfigurationObservation
 	ns := s.client.control
 	prefix := "/api/v1/namespaces/" + ns.Name
 	serviceUID, err := s.objectUID(ctx, prefix+"/services/"+wire.Service)
@@ -149,8 +202,8 @@ func (s *OwnerSourceReader) ReadOwnerConfiguration(ctx context.Context) (value.O
 		return out, err
 	}
 	c := value.OwnerConfiguration{Pool: p, Revision: identity.Revision{UID: s.uid, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, IssuerRoots: roots, ProtectionDigest: s.digest}
-	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Narrow(until).Until()}
-	if !out.Valid(s.client.now()) || ctx.Err() != nil {
+	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: until}
+	if !out.CurrentSource(s.client.now()) || ctx.Err() != nil {
 		return value.OwnerConfigurationObservation{}, value.ErrUnavailable
 	}
 	return out, nil

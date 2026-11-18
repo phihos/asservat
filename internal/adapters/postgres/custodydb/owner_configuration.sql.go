@@ -132,7 +132,7 @@ func (q *Queries) ObserveOwnerConfiguration(ctx context.Context, arg ObserveOwne
 }
 
 const readOwnerConfigurationRevision = `-- name: ReadOwnerConfigurationRevision :one
-SELECT installation_id, cluster_id, source_uid, generation, snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
+SELECT installation_id,cluster_id,source_uid,generation,snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
 `
 
 type ReadOwnerConfigurationRevisionParams struct {
@@ -142,14 +142,22 @@ type ReadOwnerConfigurationRevisionParams struct {
 	Generation     int64
 }
 
-func (q *Queries) ReadOwnerConfigurationRevision(ctx context.Context, arg ReadOwnerConfigurationRevisionParams) (HubOwnerConfigurationRevision, error) {
+type ReadOwnerConfigurationRevisionRow struct {
+	InstallationID pgtype.UUID
+	ClusterID      pgtype.UUID
+	SourceUid      pgtype.UUID
+	Generation     int64
+	SnapshotJson   []byte
+}
+
+func (q *Queries) ReadOwnerConfigurationRevision(ctx context.Context, arg ReadOwnerConfigurationRevisionParams) (ReadOwnerConfigurationRevisionRow, error) {
 	row := q.db.QueryRow(ctx, readOwnerConfigurationRevision,
 		arg.InstallationID,
 		arg.ClusterID,
 		arg.SourceUid,
 		arg.Generation,
 	)
-	var i HubOwnerConfigurationRevision
+	var i ReadOwnerConfigurationRevisionRow
 	err := row.Scan(
 		&i.InstallationID,
 		&i.ClusterID,

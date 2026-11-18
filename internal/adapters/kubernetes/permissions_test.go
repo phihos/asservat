@@ -61,7 +61,7 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 		if (r.Method != "GET" && !(r.Method == "POST" && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews")) || r.Header.Get("Authorization") != "Bearer synthetic-only" {
 			t.Error("unexpected request method/credential")
 		}
-		if (r.URL.Query().Get("watch") != "true" && r.URL.Query().Has("resourceVersion")) || r.URL.Query().Has("labelSelector") || r.URL.Query().Has("fieldSelector") {
+		if (r.URL.Query().Get("watch") != "true" && r.URL.Query().Has("resourceVersion")) || r.URL.Query().Has("labelSelector") || (r.URL.Query().Has("fieldSelector") && !strings.HasSuffix(r.URL.Path, "/configmaps")) {
 			t.Error("authority list was cached or filtered")
 		}
 		if extra != nil && extra(w, r) {

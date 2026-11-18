@@ -9,7 +9,7 @@ SELECT * FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2
 SELECT * FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR SHARE;
 
 -- name: ReadOwnerConfigurationRevision :one
-SELECT * FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4;
+SELECT installation_id,cluster_id,source_uid,generation,snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4;
 
 -- name: InsertOwnerConfigurationRevision :exec
 INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json)

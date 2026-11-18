@@ -46,7 +46,7 @@ func (s *OwnerConfigurations) matches(c value.OwnerConfiguration) bool {
 func ownerTime(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
 
 func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o value.OwnerConfigurationObservation) error {
-	if s == nil || ctx == nil || !o.Valid(o.ObservedAt) || !s.matches(o.Configuration) {
+	if s == nil || ctx == nil || !o.CurrentSource(o.ObservedAt) || !s.matches(o.Configuration) {
 		return value.ErrInvalid
 	}
 	o.Configuration = o.Configuration.Clone()
@@ -66,7 +66,7 @@ func (s *OwnerConfigurations) ObserveOwnerConfiguration(ctx context.Context, o v
 			if e != nil {
 				return e
 			}
-			if !o.Valid(n.Time) {
+			if !o.CurrentSource(n.Time) {
 				return value.ErrUnavailable
 			}
 			return nil
@@ -163,6 +163,8 @@ func (s *OwnerConfigurations) ReadOwnerConfiguration(ctx context.Context) (value
 	if s == nil || ctx == nil {
 		return out, value.ErrInvalid
 	}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
 	var diagnostic ownerConfigurationReadDiagnostic
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		var e error
@@ -213,6 +215,10 @@ func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *cus
 		return out, diagnostic.query(ownerReadClock, e)
 	}
 	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: h.ObservedAt.Time, FreshUntil: h.FreshUntil.Time}
+	out = out.ForOperation(n.Time)
+	if until, ok := ctx.Deadline(); ok && until.Before(out.FreshUntil) {
+		out.FreshUntil = until
+	}
 	if !out.Valid(n.Time) {
 		*diagnostic = ownerReadObservationFailure(out, n.Time)
 		return out, value.ErrUnavailable
