@@ -15,21 +15,27 @@ consolidates the registration, identity, dispatch and compatibility decisions.
   audit event for 1,025 automation bindings. A separate real-services test
   accepted 65 decision-time sources and retained the provenance of cluster-wide
   Allow and Deny assignments through retirement.
-- At `d4049fdfa`, a fresh two-cluster Kind installation ran two hub API and
+- At `7f775c274`, a fresh two-cluster Kind installation ran two hub API and
   two federation replicas, with one connected remote cluster and 64 offline
   registrations. Two Helm upgrades withdrew and restored unchanged bindings on
   the same running connector. Across 36 idle seconds neither owner opened a
   native exchange. The permission epoch and sequence stayed constant while
   its lease advanced. Each public endpoint independently accepted a capture,
   replayed the duplicate, refused changed input, committed history and
-  downloaded the selected Pod's 354-byte native file. Cleanup succeeded.
+  downloaded the selected Pod's native file (353 and 354 bytes). On the same
+  installation a single mounted Secret update added versions 2 through 17.
+  The original key-service Pod published a v17 artifact and a fresh session
+  downloaded all 353 bytes of the retained v1 artifact. Cleanup succeeded.
 - SeaweedFS 4.53 rejected the former 210,581-byte evidence bucket policy.
   With permissions on the regional identities, the combined bucket-policy
   file measured 5,626 bytes for 65 registrations. On re-registration both
   withdrawn keys stayed unusable and the original evidence remained readable.
 - The remote binding exchange now includes ClusterAccessBindings authored
   in the workload cluster. An unavailable binding observation blocks fresh
-  decisions in that cluster. Namespace and workload metadata delivery from
+  decisions in that cluster. Established pre-upgrade clients receive HTTP 426
+  on delivery and digest confirmation after switching the hub. A PostgreSQL
+  18 schema-5 upgrade also rejected the previous writer on insert and conflict.
+  Namespace and workload metadata delivery from
   installed connectors is still pending. The key service accepts additive
   changes to mounted material. Original operation deadlines and the protection
   against mixing generations within one cryptographic operation still apply.

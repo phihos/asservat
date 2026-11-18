@@ -11,8 +11,9 @@ clusters. Before its first complete observation, including after re-registration
 a remote cluster cannot authorize fresh access even from an overlapping hub Allow.
 The connector reduces its Kubernetes LIST page size when a page exceeds its
 response budget. The hub applies the complete binding set within the transfer
-budget. A subject ID must fit in the 256 UTF-8 bytes represented by persisted
-assignments and recorded artifact audiences. An existing Deny with an
+budget. Persisted assignments and recorded artifact audiences represent a subject
+ID in up to 256 UTF-8 bytes and its optional issuer in up to 2,048. Both fields
+exclude control characters. An existing Deny with an
 unrepresentable subject makes the cluster unavailable until it is corrected.
 Unrelated subjects and assignments cannot suppress a caller’s Allow or Deny. If a connected cluster reports that its binding list cannot be read or
 exceeds the transfer budget, fresh operations in that cluster fail closed until a
