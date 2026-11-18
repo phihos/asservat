@@ -44,7 +44,7 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 
 // installedJourney returns the first installed S-02 slice: as the owned
 // Keycloak user, over MCP through the public API's NodePort Service
-// (ADR-202), preview, request and resolve a pod-status capture of the
+// (ADR-202), preview and submit a pod-status capture of the
 // regional workload, download it, then see access end when the operator
 // revokes it and again when the capture expires. deny adds (true) or removes
 // (false) the operator's Deny binding for the user's group. Every authority
@@ -206,7 +206,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			qualifyInstalledBrowserSubmission(t, ctx, identity, cert, address, origin, previewArguments, diagnose)
 		}
 		var preview struct {
-			PreviewID      string `json:"preview_id"`
+			PlanDigest     string `json:"plan_digest"`
 			CaptureEnabled bool   `json:"capture_enabled"`
 			TargetRef      struct {
 				ClusterID string `json:"cluster_id"`
@@ -217,9 +217,8 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			} `json:"selected_pods"`
 		}
 		var accepted installedJourneyAcceptedReceipt
-		// Resolve failures under the original preview/key before continuing.
-		// Only an acknowledged close permits this fixture's next fresh review;
-		// continuation requires an acknowledged accepted capture.
+		// A retryable failure is retried with the same reviewed request and key;
+		// only ReviewChanged or PreviewExpired leads to a fresh review.
 		requestCapture := func(arguments map[string]any) string {
 			t.Helper()
 			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "request_capture", Arguments: arguments})
@@ -250,7 +249,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		for attempt := 1; ; attempt++ {
 			accepted = installedJourneyAcceptedReceipt{}
 			call(ctx, "preview_capture", previewArguments, &preview)
-			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
+			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PlanDigest == "" || preview.SelectedPods[0].UID == "" {
 				t.Fatal("installed preview did not pin the regional Pod", preview)
 			}
 			// No cross-cluster mixup: the preview names the requested cluster
@@ -258,53 +257,20 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			if preview.TargetRef.ClusterID != cluster || preview.SelectedPods[0].ClusterID != cluster {
 				t.Fatal("installed preview names another cluster", preview.TargetRef.ClusterID, preview.SelectedPods[0].ClusterID, cluster)
 			}
-			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("%s-capture-%d", keys, attempt)}
-			closed, err := installedJourneyRecoverCapture(ctx, requestCapture(request), func() (installedJourneyDisposition, error) {
-				reply, err := readReply(ctx, "resolve_capture_request", request)
-				if err != nil {
-					return installedJourneyDisposition{}, err
+			request = installedJourneyReviewedRequest(previewArguments, preview.PlanDigest, fmt.Sprintf("%s-capture-%d", keys, attempt))
+			code := requestCapture(request)
+			for retry := 1; installedJourneyRetryableRequest(code) && retry <= 4; retry++ {
+				if installedJourneyPause(ctx, 2*time.Second) != nil {
+					t.Fatal("installed capture request", ctx.Err())
 				}
-				if reply.Status != "ok" {
-					return installedJourneyDisposition{}, errors.New("original capture request remains unresolved")
-				}
-				var disposition installedJourneyDisposition
-				err = installedJourneyDecode(reply.Data, &disposition)
-				if err == nil && disposition.State == "accepted" {
-					err = accepted.remember(disposition.CaptureID, time.Now())
-				}
-				return disposition, err
-			}, func() (string, string) {
-				code := requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
-				return code, accepted.CaptureID
-			}, func() error {
-				var resolved installedJourneyDisposition
-				call(ctx, "resolve_capture_request", request, &resolved)
-				if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
-					return errors.New("installed request was not accepted once")
-				}
-				return nil
-			}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
-				var current installedJourneyCaptureProgress
-				reply, err := readReply(ctx, "get_capture", map[string]string{"capture_id": id})
-				if err != nil {
-					return current, err
-				}
-				if reply.Status != "ok" {
-					return current, errors.New("original accepted capture progress is unavailable")
-				}
-				err = installedJourneyDecode(reply.Data, &current)
-				return current, err
-			})
-			if err != nil {
-				diagnose()
-				t.Fatal("installed capture request was not accepted", err)
+				code = requestCapture(request)
 			}
-			if !closed {
+			if code == "" {
 				break
 			}
-			if attempt == 4 {
+			if code != "ReviewChanged" && code != "PreviewExpired" || attempt == 4 {
 				diagnose()
-				t.Fatal("installed capture requests closed without admission after four reviews")
+				t.Fatal("installed capture request was not accepted", code)
 			}
 			if installedJourneyPause(ctx, 2*time.Second) != nil {
 				t.Fatal("installed capture request", ctx.Err())
@@ -313,10 +279,8 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		if accepted.CaptureID == "" || accepted.AcceptedAt.IsZero() {
 			t.Fatal("installed capture lost its acknowledged original receipt")
 		}
-		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster %s as the Keycloak user", cluster)
-		if !short {
-			installedJourneyIdempotency(t, ctx, admin, root, accepted.CaptureID, request, requestCapture)
-		}
+		t.Logf("installed journey: MCP preview and submission of a regional pod-status capture in cluster %s as the Keycloak user", cluster)
+		installedJourneyIdempotency(t, ctx, admin, root, accepted.CaptureID, request, requestCapture)
 		// The regional executor collects; the publisher verifies and publishes
 		// (ADR-203). A successful capture may omit its independently authorized
 		// case link. Keep both passive waits inside one original phase deadline.
@@ -501,7 +465,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatal("installed explain_access for the developer", explained)
 		}
-		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
+		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PlanDigest, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
 		// the case no longer offers it and a new preparation is refused.
@@ -620,18 +584,18 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			// S-02 exit item 2: a reviewed Pod deleted before submission is a
 			// useful, non-retryable TargetGone, not an uncertain outcome.
 			var gonePreview struct {
-				PreviewID    string `json:"preview_id"`
+				PlanDigest   string `json:"plan_digest"`
 				SelectedPods []struct {
 					UID string `json:"uid"`
 				} `json:"selected_pods"`
 			}
 			call(ctx, "preview_capture", previewArguments, &gonePreview)
-			if gonePreview.PreviewID == "" || len(gonePreview.SelectedPods) != 1 || gonePreview.SelectedPods[0].UID == "" {
+			if gonePreview.PlanDigest == "" || len(gonePreview.SelectedPods) != 1 || gonePreview.SelectedPods[0].UID == "" {
 				t.Fatal("installed preview before Pod deletion", gonePreview)
 			}
 			gone(gonePreview.SelectedPods[0].UID)
-			// OutcomeUnknown asks for a retry with the same preview and key.
-			goneRequest := map[string]any{"preview_id": gonePreview.PreviewID, "idempotency_key": keys + "-gone"}
+			// OutcomeUnknown asks for a retry with the same request and key.
+			goneRequest := installedJourneyReviewedRequest(previewArguments, gonePreview.PlanDigest, keys+"-gone")
 			code := requestCapture(goneRequest)
 			for attempt := 1; code == "OutcomeUnknown" && attempt < 4 && installedJourneyPause(ctx, 2*time.Second) == nil; attempt++ {
 				code = requestCapture(goneRequest)
@@ -719,11 +683,6 @@ type installedJourneyEnvelope struct {
 	Data      json.RawMessage `json:"data"`
 }
 
-type installedJourneyDisposition struct {
-	State     string `json:"state"`
-	CaptureID string `json:"capture_id"`
-}
-
 type installedJourneyCaptureProgress struct {
 	CaptureID string `json:"capture_id"`
 	Phase     string `json:"phase"`
@@ -776,105 +735,31 @@ func (r *installedJourneyAcceptedReceipt) remember(id string, now time.Time) err
 	return nil
 }
 
-// Recovery never infers non-admission from a failed request. The resolver must
-// acknowledge closure before the fixture can review again. An accepted request
-// stays bound to its original identity, including across continuation failures.
-// Once acceptance is known, a fresh current progress read determines whether
-// another explicit continuation is appropriate. Progress past Pending hands
-// off to the unchanged terminal/publication checks; it is not success here.
-// Only immediate success needs a separate admission confirmation.
-func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), confirmAccepted func() error, pause func(context.Context, time.Duration) error, observe func(string) (installedJourneyCaptureProgress, error)) (closed bool, err error) {
-	acceptedID := ""
-	for continued := 0; code != ""; {
-		if err := ctx.Err(); err != nil {
-			return false, err
-		}
-		switch code {
-		case "OutcomeUnknown", "AcquisitionNotStarted", "ReviewChanged", "NotAvailable":
-		default:
-			return false, fmt.Errorf("original capture request failed: %s", code)
-		}
-		if acceptedID == "" {
-			disposition, err := resolve()
-			if err != nil {
-				return false, err
-			}
-			if err := ctx.Err(); err != nil {
-				return false, err
-			}
-			switch disposition.State {
-			case "closed":
-				if disposition.CaptureID != "" {
-					return false, errors.New("closed capture request contains an accepted identity")
-				}
-				return true, nil
-			case "accepted":
-				if disposition.CaptureID == "" {
-					return false, errors.New("original accepted capture identity is missing")
-				}
-				acceptedID = disposition.CaptureID
-			default:
-				return false, errors.New("original capture request remains unresolved")
-			}
-		}
-		if code != "OutcomeUnknown" && code != "AcquisitionNotStarted" {
-			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
-		}
-		current, err := observe(acceptedID)
-		if err != nil {
-			return false, err
-		}
-		if err := ctx.Err(); err != nil {
-			return false, err
-		}
-		if current.CaptureID != acceptedID {
-			return false, errors.New("current progress changed the original accepted capture identity")
-		}
-		switch current.Phase {
-		case "Running", "Finalizing", "Succeeded":
-			return false, nil
-		case "Pending":
-			if continued == 4 {
-				return false, errors.New("original accepted capture remains pending after four continuations")
-			}
-		default:
-			return false, fmt.Errorf("original accepted capture cannot continue in phase %s", current.Phase)
-		}
-		if err := pause(ctx, 2*time.Second); err != nil {
-			return false, err
-		}
-		if err := ctx.Err(); err != nil {
-			return false, err
-		}
-		var captureID string
-		code, captureID = continueCapture()
-		if code == "" && captureID != acceptedID {
-			return false, errors.New("successful continuation changed the original accepted capture identity")
-		}
-		continued++
+// errInstalledReviewAgain: the reviewed plan changed or lapsed before
+// admission; only a fresh preview (with its own key) may follow.
+var errInstalledReviewAgain = errors.New("reviewed plan changed before admission")
+
+// installedJourneyRetryableRequest names request_capture outcomes that a
+// same-key retry resolves: the retry returns the original capture or admits
+// the reviewed plan once, never a second capture (specs/mcp.md).
+func installedJourneyRetryableRequest(code string) bool {
+	switch code {
+	case "OutcomeUnknown", "AcquisitionNotStarted", "StorageRefreshing", "CapacityUnavailable", "NotAvailable":
+		return true
 	}
-	if err := ctx.Err(); err != nil {
-		return false, err
-	}
-	if acceptedID != "" {
-		return false, nil
-	}
-	if err := confirmAccepted(); err != nil {
-		return false, err
-	}
-	return false, ctx.Err()
+	return false
 }
 
-// errInstalledRequestClosed: the resolver acknowledged that the request was
-// never admitted; only then may a fresh review follow.
-var errInstalledRequestClosed = errors.New("capture request closed without admission")
+// installedJourneyReviewedRequest is the canonical request_capture input of
+// one review: the reviewed preview_capture input, its plan digest and a key.
+func installedJourneyReviewedRequest(preview map[string]any, planDigest, key string) map[string]any {
+	return map[string]any{"preview": preview, "expected_plan_digest": planDigest, "idempotency_key": key}
+}
 
-// installedJourneyReviewAndSubmit is a focus's preview and request_capture
-// with the journey's own recovery: a retryable reply is resolved under the
-// original preview and key, an accepted capture whose start was refused
-// before any effect (ADR-212) is continued explicitly, and only an
-// acknowledged closed request is reviewed again (at most four reviews, each
-// with its own key). review returns the request arguments of one review.
+// installedJourneyReviewAndSubmit is a focus's preview and request_capture:
+// a retryable reply is retried with the same input and key, and only a
+// ReviewChanged or PreviewExpired reply is reviewed again (at most four
+// reviews, each with its own key). review returns one review's request.
 func installedJourneyReviewAndSubmit(ctx context.Context, call func(name string, arguments any, data any) (string, string), review func(attempt int) (map[string]any, error)) (string, error) {
 	for attempt := 1; ; attempt++ {
 		request, err := review(attempt)
@@ -882,7 +767,7 @@ func installedJourneyReviewAndSubmit(ctx context.Context, call func(name string,
 			return "", err
 		}
 		id, err := installedJourneySubmit(ctx, call, request)
-		if !errors.Is(err, errInstalledRequestClosed) || attempt == 4 {
+		if !errors.Is(err, errInstalledReviewAgain) || attempt == 4 {
 			return id, err
 		}
 		if err = installedJourneyPause(ctx, 2*time.Second); err != nil {
@@ -891,64 +776,67 @@ func installedJourneyReviewAndSubmit(ctx context.Context, call func(name string,
 	}
 }
 
-// installedJourneySubmit submits one review; call returns the validated
-// status and error code.
+// installedJourneySubmit submits one review, retrying the same input and key.
 func installedJourneySubmit(ctx context.Context, call func(name string, arguments any, data any) (string, string), request map[string]any) (string, error) {
-	var accepted struct {
-		CaptureID string `json:"capture_id"`
-	}
-	status, code := call("request_capture", request, &accepted)
-	if status == "ok" {
-		if accepted.CaptureID == "" {
-			return "", errors.New("accepted capture identity is missing")
-		}
-		return accepted.CaptureID, nil
-	}
-	return installedJourneyRecoverSubmitted(ctx, call, request, code)
-}
-
-// installedJourneyRecoverSubmitted resolves and, when admitted but not started,
-// explicitly continues an original request_capture that already returned code.
-// A plain same-key resubmission would only replay the acceptance passively
-// (ADR-134), leaving an admitted capture unstarted.
-func installedJourneyRecoverSubmitted(ctx context.Context, call func(name string, arguments any, data any) (string, string), request map[string]any, code string) (string, error) {
-	acceptedID := ""
-	closed, err := installedJourneyRecoverCapture(ctx, code, func() (installedJourneyDisposition, error) {
-		var d installedJourneyDisposition
-		if s, c := call("resolve_capture_request", request, &d); s != "ok" {
-			return d, fmt.Errorf("original capture request remains unresolved: %s", c)
-		}
-		if d.State == "accepted" {
-			acceptedID = d.CaptureID
-		}
-		return d, nil
-	}, func() (string, string) {
-		continued := map[string]any{"continue_acquisition": true}
-		for k, v := range request {
-			continued[k] = v
-		}
-		var r struct {
+	for attempt := 1; ; attempt++ {
+		var accepted struct {
 			CaptureID string `json:"capture_id"`
 		}
-		_, c := call("request_capture", continued, &r)
-		return c, r.CaptureID
-	}, func() error { return nil }, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
-		var p installedJourneyCaptureProgress
-		if s, c := call("get_capture", map[string]string{"capture_id": id}, &p); s != "ok" {
-			return p, fmt.Errorf("original accepted capture progress is unavailable: %s", c)
+		status, code := call("request_capture", request, &accepted)
+		switch {
+		case status == "ok" && accepted.CaptureID != "":
+			return accepted.CaptureID, nil
+		case status == "ok":
+			return "", errors.New("accepted capture identity is missing")
+		case code == "ReviewChanged" || code == "PreviewExpired":
+			return "", errInstalledReviewAgain
+		case !installedJourneyRetryableRequest(code) || attempt == 5:
+			return "", fmt.Errorf("capture request failed: %s", code)
 		}
-		return p, nil
-	})
+		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
+			return "", err
+		}
+	}
+}
+
+// An uncertain transport outcome replays the same reviewed input and key.
+func TestInstalledJourneyRetriesReviewedCapture(t *testing.T) {
+	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
-		return "", err
+		t.Fatal(err)
 	}
-	if closed {
-		return "", errInstalledRequestClosed
+	const id = "00000000-0000-4000-8000-000000000001"
+	preview := map[string]any{
+		"target_ref":                  map[string]string{"cluster_id": id, "namespace": "payments", "kind": "Deployment", "name": "api"},
+		"preset_ref":                  map[string]string{"name": "pod-status", "version": "v1"},
+		"requested_retention_seconds": installedJourneyRetention,
 	}
-	if acceptedID == "" {
-		return "", errors.New("capture request was not accepted")
+	request := installedJourneyReviewedRequest(preview, strings.Repeat("a", 64), "same-key")
+	canonical, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return acceptedID, nil
+	reviews, calls := 0, 0
+	got, err := installedJourneyReviewAndSubmit(t.Context(), func(name string, arguments any, data any) (string, string) {
+		calls++
+		raw, err := json.Marshal(arguments)
+		if name != "request_capture" || err != nil || !bytes.Equal(raw, canonical) || wire.ValidateInput(name, raw) != nil {
+			t.Fatalf("unexpected submission on attempt %d: %s", calls, name)
+		}
+		if calls == 1 {
+			return "error", "OutcomeUnknown"
+		}
+		if err := json.Unmarshal([]byte(`{"capture_id":"`+id+`"}`), data); err != nil {
+			t.Fatal(err)
+		}
+		return "ok", ""
+	}, func(attempt int) (map[string]any, error) {
+		reviews++
+		return request, nil
+	})
+	if err != nil || got != id || reviews != 1 || calls != 2 {
+		t.Fatal(got, reviews, calls, err)
+	}
 }
 
 // installedJourneyRetryUnavailable retries a read or preview, as the journey's
@@ -1113,15 +1001,15 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 				reply, err = installedJourneyReply(wire, "preview_capture", result)
 			}
 			var previewed struct {
-				PreviewID string `json:"preview_id"`
+				PlanDigest string `json:"plan_digest"`
 			}
-			if err != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &previewed) != nil || previewed.PreviewID == "" {
+			if err != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &previewed) != nil || previewed.PlanDigest == "" {
 				fmt.Fprintf(out, "%s request: preview after %s failed: %v %s\n", started.Format(time.TimeOnly), time.Since(started).Round(time.Millisecond), err, reply.Status)
 				continue
 			}
 			requested := time.Now()
 			call, end = context.WithTimeout(ctx, 30*time.Second)
-			result, err = session.CallTool(call, &sdk.CallToolParams{Name: "request_capture", Arguments: map[string]string{"preview_id": previewed.PreviewID, "idempotency_key": "hold-" + requested.Format("150405.000")}})
+			result, err = session.CallTool(call, &sdk.CallToolParams{Name: "request_capture", Arguments: installedJourneyReviewedRequest(preview, previewed.PlanDigest, "hold-"+requested.Format("150405.000"))})
 			end()
 			line := fmt.Sprintf("%s request after %s: ", requested.Format(time.TimeOnly), time.Since(requested).Round(time.Millisecond))
 			if err != nil {

@@ -16,6 +16,8 @@ Bundled Keycloak is an explicit identity choice, independent of the PostgreSQL, 
 
 The bundled object store uses one bucket with disjoint prefixes for evidence and audit export. An external object store needs one credential limited to one bucket and prefix, or the platform's ambient workload identity (IRSA, GKE/Azure Workload Identity) with no Secret; per-purpose principals are not required. Asservat does not administer external IAM. Connections to public endpoints use the system trust store; a CA bundle per service is optional (ADR-335 D12).
 
+In the bundled profile, the regional writer may write only within its cluster's evidence prefix. The history credential may read, write, list and delete within its own history prefix. The shared bucket policy must remain within the provider's byte limit as clusters join. Registration must preserve existing credentials and their access to existing data. [Bundled storage and cluster registration](../docs/decisions/334-connector-workload-identity.md).
+
 Preserve the same authorization, audit, retention, fair capacity and native-download contracts in both profiles. Do not require a broker, email service, external monitoring backend, paid service, licence key or runtime internet access. Existing Kubernetes and durable persistent storage remain explicit prerequisites. Offline analysis may be unavailable without qualified encrypted scratch under ADR-036; that MUST NOT disable independently usable collection, live projections or native downloads.
 
 ### SC-DEP-001

@@ -120,7 +120,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	}
 	// 4. Collect again: the ordinary preview of the same target, then submit.
 	var preview struct {
-		PreviewID    string `json:"preview_id"`
+		PlanDigest   string `json:"plan_digest"`
 		Repeated     string `json:"repeated_from_capture_id"`
 		Enabled      bool   `json:"capture_enabled"`
 		SelectedPods []struct {
@@ -145,15 +145,15 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 		}
 		return call(developer, name, arguments, data)
 	}, func(attempt int) (map[string]any, error) {
-		preview.PreviewID, preview.Repeated, preview.Enabled, preview.SelectedPods = "", "", false, nil
+		preview.PlanDigest, preview.Repeated, preview.Enabled, preview.SelectedPods = "", "", false, nil
 		status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) {
 			return try(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview)
 		})
-		if err != nil || status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
+		if err != nil || status != "ok" || preview.PlanDigest == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
 			diagnose()
 			t.Fatal("installed repeat preview", status, code, err, preview)
 		}
-		return map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-history-repeat-%d", attempt)}, nil
+		return installedJourneyReviewedRequest(map[string]any{"history_capture_id": captureID}, preview.PlanDigest, fmt.Sprintf("installed-history-repeat-%d", attempt)), nil
 	})
 	if err != nil {
 		diagnose()

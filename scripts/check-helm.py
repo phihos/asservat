@@ -322,6 +322,16 @@ def check_cluster_join(render):
     v = bundled_values("hub")
     v.update({"clusters": [{"name": "eu", "issuer": "https://eu.example", "jwks": {"keys": [{"kty": "EC"}]}}], "hub": {**v.get("hub", {}), "url": url}})
     docs = render(v)
+    def iam_checksum(objects):
+        return named(objects, "StatefulSet", "asservat-objectstore")["spec"]["template"]["metadata"]["annotations"]["checksum/iam"]
+
+    larger = copy.deepcopy(v)
+    larger["clusters"].append({"name": "us", "issuer": "https://us.example"})
+    checksum = iam_checksum(render(larger))
+    assert checksum != iam_checksum(docs), "cluster membership must roll the object store"
+    larger["clusters"].reverse()
+    assert iam_checksum(render(larger)) == checksum, "unchanged principals must keep the rollout checksum"
+
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
     assert config["clusters"][0] == {"name": "eu", "namespace": "asservat-system", "captures": 8}, config.get("clusters")
     # ADR-334: the federation registers clusters by public issuer data only.

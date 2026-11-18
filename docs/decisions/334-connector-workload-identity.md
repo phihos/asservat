@@ -30,6 +30,15 @@ capabilities. The bundled store scopes each regional credential to its
 cluster. The design allows optional client certificates with TLS passthrough
 using a CSR authenticated by the same token. [Optional certificate design](../architecture/enrollment-activation.md).
 
+The bundled SeaweedFS gateway limits each bucket policy to 20,480 bytes.
+Putting every connector's statements in the evidence bucket reached 210,581
+bytes for 65 registrations and stopped installation. Instead, each regional
+write and history identity carries its own prefix-scoped policy in the existing
+private IAM Secret. Adding a cluster changes that Secret without growing the
+shared bucket policy. This uses the gateway's static configuration and requires
+no IAM API service or additional credential. [SeaweedFS policy size](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/s3api/policy_engine/bucket_policy.go#L7-L11),
+[static identity policies](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/pb/iam.proto#L170-L192).
+
 The connector watches local namespace and workload metadata and delivers
 changed capacity observations over its connection. The hub attributes each
 observation to the authenticated cluster and wakes reconciliation on change.

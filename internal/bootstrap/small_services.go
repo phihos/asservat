@@ -368,17 +368,23 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		return secretsFailure("ObjectStoreIAMUnavailable")
 	}
 	defer clear(compiled.Config)
-	policies, err := json.Marshal(compiled.Policies)
+	evidence := p.Name + "-evidence"
+	want, err := compiledIAMData(compiled, evidence, nil)
 	if err != nil {
-		return secretsFailure("ObjectStoreIAMUnavailable")
+		return err
 	}
-	want := map[string][]byte{providerconfig.SeaweedConfigKey: compiled.Config, SeaweedBucketPoliciesKey: policies}
 	name := p.ObjectStore.IAMSecretName()
 	data, err := s.ensure(ctx, name, want)
 	if err != nil {
 		return err
 	}
 	defer clearData(data)
+	if previous := data[SeaweedBucketPoliciesKey]; !bytes.Equal(previous, want[SeaweedBucketPoliciesKey]) {
+		want, err = compiledIAMData(compiled, evidence, previous)
+		if err != nil {
+			return err
+		}
+	}
 	changed := map[string][]byte{}
 	for k, v := range want {
 		if !bytes.Equal(data[k], v) {

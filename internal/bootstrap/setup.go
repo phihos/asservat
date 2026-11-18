@@ -364,15 +364,9 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 	if err != nil {
 		return setupStep("objectstore/credentials", cfg.ErrInvalid)
 	}
-	// Bucket policies (Deny statements) are compiled with the IAM Secret by
-	// `asservat secrets` (key bucket-policies.json of `<name>-objectstore-iam`).
-	var policies map[string]json.RawMessage
-	raw, err = readSetupFile(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json"), corev1.MaxSecretSize)
+	policies, err := readSetupBucketPolicies(filepath.Join(contracts.SetupObjectStoreRoot, SeaweedBucketPoliciesKey))
 	if err != nil {
-		return setupStep("objectstore/policies", err)
-	}
-	if json.Unmarshal(raw, &policies) != nil {
-		return setupStep("objectstore/policies", cfg.ErrInvalid)
+		return err
 	}
 	buckets := []string{c.ObjectStore.AuditBucket, c.ObjectStore.EvidenceBucket}
 	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
@@ -383,6 +377,27 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 	}
 	_, _ = fmt.Fprintln(out, "object store configured")
 	return nil
+}
+
+// SeaweedFS 4.53 rejects a PutBucketPolicy body larger than 20 KiB.
+const seaweedBucketPolicyBytes = 20 << 10
+
+func readSetupBucketPolicies(path string) (map[string]json.RawMessage, error) {
+	raw, err := readSetupFile(path, corev1.MaxSecretSize)
+	if err != nil {
+		return nil, setupStep("objectstore/policies", err)
+	}
+	var policies map[string]json.RawMessage
+	if json.Unmarshal(raw, &policies) != nil {
+		return nil, setupStep("objectstore/policies", cfg.ErrInvalid)
+	}
+	for _, policy := range policies {
+		if len(policy) > seaweedBucketPolicyBytes {
+			step := fmt.Sprintf("objectstore/bucket-policy (%d bytes exceeds the %d-byte provider limit)", len(policy), seaweedBucketPolicyBytes)
+			return nil, setupStep(step, cfg.ErrInvalid)
+		}
+	}
+	return policies, nil
 }
 
 // waitSchema polls with one runtime credential until the database serves

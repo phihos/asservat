@@ -97,3 +97,21 @@ func TestSetupConfigurationIsClosed(t *testing.T) {
 		t.Fatal("invalid name accepted")
 	}
 }
+
+func TestSetupBucketPolicyProviderSize(t *testing.T) {
+	path := filepath.Join(t.TempDir(), SeaweedBucketPoliciesKey)
+	for _, size := range []int{seaweedBucketPolicyBytes, seaweedBucketPolicyBytes + 1} {
+		policy := `{"s":"` + strings.Repeat("x", size-len(`{"s":""}`)) + `"}`
+		if err := os.WriteFile(path, []byte(`{"evidence":`+policy+`}`), 0600); err != nil {
+			t.Fatal(err)
+		}
+		policies, err := readSetupBucketPolicies(path)
+		if size == seaweedBucketPolicyBytes {
+			if err != nil || len(policies["evidence"]) != size {
+				t.Fatalf("provider-sized policy: %v", err)
+			}
+		} else if !errors.Is(err, cfg.ErrInvalid) || !strings.Contains(err.Error(), "20481 bytes") {
+			t.Fatalf("expected permanent provider-size diagnostic, got %v", err)
+		}
+	}
+}
