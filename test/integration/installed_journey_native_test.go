@@ -270,7 +270,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			}
 			if code != "ReviewChanged" && code != "PreviewExpired" || attempt == 4 {
 				diagnose()
-				t.Fatal("installed capture request was not accepted", code)
+				t.Fatal("installed capture request failed", code)
 			}
 			if installedJourneyPause(ctx, 2*time.Second) != nil {
 				t.Fatal("installed capture request", ctx.Err())
@@ -744,7 +744,7 @@ var errInstalledReviewAgain = errors.New("reviewed plan changed before admission
 // the reviewed plan once, never a second capture (specs/mcp.md).
 func installedJourneyRetryableRequest(code string) bool {
 	switch code {
-	case "OutcomeUnknown", "AcquisitionNotStarted", "StorageRefreshing", "CapacityUnavailable", "NotAvailable":
+	case "OutcomeUnknown", "StorageRefreshing", "CapacityUnavailable", "NotAvailable":
 		return true
 	}
 	return false
@@ -836,6 +836,24 @@ func TestInstalledJourneyRetriesReviewedCapture(t *testing.T) {
 	})
 	if err != nil || got != id || reviews != 1 || calls != 2 {
 		t.Fatal(got, reviews, calls, err)
+	}
+}
+
+// An accepted capture whose acquisition never started cannot recover by passive replay.
+func TestInstalledJourneyReportsStartFailure(t *testing.T) {
+	calls, reviews := 0, 0
+	id, err := installedJourneyReviewAndSubmit(t.Context(), func(string, any, any) (string, string) {
+		calls++
+		if calls > 1 {
+			t.Fatal("retried a passive admission")
+		}
+		return "error", "AcquisitionNotStarted"
+	}, func(int) (map[string]any, error) {
+		reviews++
+		return map[string]any{}, nil
+	})
+	if id != "" || err == nil || !strings.Contains(err.Error(), "AcquisitionNotStarted") || reviews != 1 || calls != 1 {
+		t.Fatal(id, err, reviews, calls)
 	}
 }
 

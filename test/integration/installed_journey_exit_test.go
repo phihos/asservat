@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -86,6 +87,13 @@ func installedJourneyIdempotency(t *testing.T, ctx context.Context, admin *pgxpo
 	// digest must conflict before the hub can admit anything else.
 	if code := submit(changed); code != "Conflict" {
 		t.Fatal("installed request_capture reusing the key with different content was not Conflict", code)
+	}
+	changedPreview := maps.Clone(original["preview"].(map[string]any))
+	changedPreview["requested_retention_seconds"] = installedJourneyRetentionSeconds() + 1
+	changed = maps.Clone(original)
+	changed["preview"] = changedPreview
+	if code := submit(changed); code != "Conflict" {
+		t.Fatal("installed request_capture with changed retention under original key and digest was not Conflict", code)
 	}
 	if after := installedJourneyCaptures(t, ctx, admin, root, captureID); after != before {
 		t.Fatal("installed duplicate/conflicting request changed the admitted captures", before, after)

@@ -738,7 +738,13 @@ func (s *ContextOperations) request(ctx context.Context, current identities.Curr
 	if err != nil {
 		return value.Accepted{}, value.ErrInvalid
 	}
-	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: in.ResultAccess.access(), Submission: submission, Preview: func(ctx context.Context) (value.ContextPreview, error) {
+	// Profile overrides may contain raw objects whose member order changes
+	// across transports or a round trip through PostgreSQL jsonb.
+	normalized := jsontext.Value(submission)
+	if err := normalized.Format(jsontext.ReorderRawObjects(true)); err != nil {
+		return value.Accepted{}, value.ErrInvalid
+	}
+	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: in.ResultAccess.access(), Submission: normalized, Preview: func(ctx context.Context) (value.ContextPreview, error) {
 		_, _, p, err := s.previewCapture(ctx, current, preview)
 		return p, err
 	}})

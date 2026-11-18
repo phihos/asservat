@@ -10,14 +10,14 @@ import (
 
 // CaptureRequest submits a reviewed preview (ADR-330 D9). Preview recomputes
 // the plan under the request's plan scope; a plan whose digest differs from
-// Plan is ReviewChanged. The same requester, key and plan always name the
+// Plan is ReviewChanged. The same requester, key, plan and submitted input always name the
 // same capture, so a retry never collects twice.
 type CaptureRequest struct {
 	Key     string
 	Plan    artifact.Digest
 	Access  *authorization.ResultAccess
 	Preview func(context.Context) (value.ContextPreview, error)
-	// Submission is this request as request_capture input. A plan that
+	// Submission is the normalized request_capture input, including result_access. A plan that
 	// needs approval stores it so approval can submit it (ADR-335 D5).
 	Submission []byte
 }

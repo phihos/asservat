@@ -441,7 +441,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 
 // requestScope derives the request's plan scope, its ID and submission digest.
 func (s ContextInvestigation) requestScope(ctx context.Context, i identity.Identity, in CaptureRequest) (context.Context, *planScope, string, artifact.Digest) {
-	ctx, scope := requestPlanScope(ctx, s.RootID, i.Principal, in.Key, in.Plan)
+	ctx, scope := requestPlanScope(ctx, s.RootID, i.Principal, in)
 	requestID := seededID(scope.seed, ^uint64(0))
 	return ctx, scope, requestID, ContextRequestDigest(requestID)
 }
