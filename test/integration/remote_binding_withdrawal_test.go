@@ -24,21 +24,8 @@ import (
 func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool, permissions *postgres.Permissions, target authorization.Target, batch cfg.PermissionBatch, flush func(*testing.T, *postgres.Permissions)) {
 	t.Helper()
 	ctx := t.Context()
-	const password = "synthetic-delivery"
-	role := narrowRole(t, ctx, admin, "delivery_", password, func(role string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("connector-delivery", role)
-		if !ok {
-			t.Fatal("missing connector delivery grants")
-		}
-		return grants
-	})
-	pc := authority.Config()
-	pc.ConnConfig.User, pc.ConnConfig.Password = role, password
-	pool, err := pgxpool.NewWithConfig(ctx, pc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
+	pool := connectorDeliveryPool(t, admin, authority)
+	var err error
 	if _, err = pool.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE false"); err == nil {
 		t.Fatal("delivery role can edit arbitrary permission streams")
 	}
@@ -314,4 +301,25 @@ func (h remoteWithdrawalHub) PermissionSnapshot(ctx context.Context) (cfg.Snapsh
 	snapshot, err := h.remoteBindingHubFixture.PermissionSnapshot(ctx)
 	snapshot.ClusterBindings = []cfg.Binding{h.grant}
 	return snapshot, err
+}
+
+func connectorDeliveryPool(t *testing.T, admin, authority *pgxpool.Pool) *pgxpool.Pool {
+	t.Helper()
+	ctx := t.Context()
+	const password = "synthetic-delivery"
+	role := narrowRole(t, ctx, admin, "delivery_", password, func(role string) []string {
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("connector-delivery", role)
+		if !ok {
+			t.Fatal("missing connector delivery grants")
+		}
+		return grants
+	})
+	pc := authority.Config()
+	pc.ConnConfig.User, pc.ConnConfig.Password = role, password
+	pool, err := pgxpool.NewWithConfig(ctx, pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
 }

@@ -32,7 +32,7 @@ func qualifyHubLegacyDeny(t *testing.T, admin, authority *pgxpool.Pool, flush fu
 	if err != nil {
 		t.Fatal(err)
 	}
-	deliveries, err := postgres.NewRemoteAccessBindings(ctx, admin, root)
+	deliveries, err := postgres.NewRemoteAccessBindings(ctx, connectorDeliveryPool(t, admin, authority), root)
 	if err != nil {
 		t.Fatal(err)
 	}
