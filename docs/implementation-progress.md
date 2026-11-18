@@ -14,13 +14,17 @@ to protocol major 2. ADR-334 consolidates the federation contract.
   assignments and 24,000 distinct bindings. A healthy peer completed capture
   admission and download reservation while another transaction staged a
   permission change. One audit header and indexed source changes retain
-  original scope and assignment identity for each committed change.
+  original scope and assignment identity for each committed change. A real
+  PostgreSQL race between a first access review and a downgrade retired the
+  old role before the replacement became visible.
 - Owner configuration and its audit commit together. A refused audit insert
   rolls both back. Eight concurrent observations produced one event and a
   database with 1,024 historical revisions accepted generation 1,025. Upgrading
   disables the two retired publisher logins, revokes privileges from existing
   sessions and removes their keys from the generated hub-worker Secret.
-- On `151c07b9c`, a fresh two-cluster Kind run exercised one connected workload
+  PostgreSQL tests also covered deletion during a Kubernetes API outage and
+  both startup readers with the database clock 500 ms ahead.
+- On `6e9fc5c76`, a fresh two-cluster Kind run exercised one connected workload
   cluster, 64 offline registrations, two public API replicas and two federation
   replicas. The same connector withdrew and restored a remote binding across
   two unattended Helm upgrades. Both owner revision digests matched in SQL.
