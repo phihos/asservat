@@ -84,7 +84,14 @@ func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.Permi
 var errBaselineAccepted = errors.New("test stops at watch after initial acceptance")
 
 func (f remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
-	return nil, errBaselineAccepted
+	return stopAfterBaseline{}, nil
+}
+
+type stopAfterBaseline struct{}
+
+func (stopAfterBaseline) Close() {}
+func (stopAfterBaseline) Next(context.Context) (cfg.BindingEvent, error) {
+	return cfg.BindingEvent{}, errBaselineAccepted
 }
 
 type observedPermissionWriter struct {

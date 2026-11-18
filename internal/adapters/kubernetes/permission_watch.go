@@ -38,15 +38,22 @@ func (d *permissionWatchEvents) next() (event metav1.WatchEvent, err error) {
 		if d.limit.N == 0 {
 			return event, value.ErrLimit
 		}
+		var syntax *json.SyntaxError
+		if errors.As(err, &syntax) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return event, value.ErrInvalid
+		}
 		return event, err
 	}
 	d.limit.N += d.json.InputOffset() - start
 	if err = permissionJSON(data, permissionPageBytes, 131072); err != nil {
-		return event, err
+		if errors.Is(err, value.ErrLimit) {
+			return event, err
+		}
+		return event, value.ErrInvalid
 	}
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(data, &fields) != nil || len(fields) != 2 || fields["type"] == nil || fields["object"] == nil || json.Unmarshal(fields["type"], &event.Type) != nil {
-		return event, value.ErrUnavailable
+		return event, value.ErrInvalid
 	}
 	event.Object.Raw = fields["object"]
 	return event, nil
@@ -80,18 +87,19 @@ func (c *PermissionClient) openWatch(ctx context.Context, path, rv string, metad
 // WatchConfiguration follows metadata from the same LIST used for acceptance.
 // A closed channel requires a new baseline. Normal EOF resumes at the last
 // delivered resourceVersion.
-func (c *PermissionClient) WatchConfiguration(ctx context.Context, resource, rv string) (<-chan struct{}, error) {
+func (c *PermissionClient) WatchConfiguration(ctx context.Context, resource, rv string) (port.SettingsWatch, error) {
 	if resource != "clusteraccessbindings" && resource != "permissionsources" {
-		return nil, value.ErrInvalid
+		return port.SettingsWatch{}, value.ErrInvalid
 	}
 	path := c.listPath(resource)
 	stream, cancel, err := c.openWatch(ctx, path, rv, true)
 	if err != nil {
-		return nil, err
+		return port.SettingsWatch{}, err
 	}
-	changed := make(chan struct{})
+	changed := make(chan struct{}, 1)
+	lost := make(chan struct{})
 	go func() {
-		defer close(changed)
+		defer close(lost)
 		for {
 			event, err := stream.next()
 			if err != nil {
@@ -119,16 +127,16 @@ func (c *PermissionClient) WatchConfiguration(ctx context.Context, resource, rv 
 			case "ADDED", "MODIFIED", "DELETED":
 				select {
 				case changed <- struct{}{}:
-					continue
-				case <-ctx.Done():
+				default:
 				}
+				continue
 			}
 			cancel()
 			stream.Close()
 			return
 		}
 	}()
-	return changed, nil
+	return port.SettingsWatch{Changed: changed, Lost: lost}, nil
 }
 
 type permissionBindingWatch struct {
@@ -140,21 +148,8 @@ type permissionBindingWatch struct {
 
 func (w *permissionBindingWatch) Close() { w.cancel(); w.decoder.Close() }
 func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.BindingWatch, error) {
-	if !identity.Text(rv, 128) || rv == "0" {
-		return nil, value.ErrInvalid
-	}
-	start := c.now()
-	ns, err := c.namespace(ctx, c.control)
-	if err != nil || ns.Deleting {
-		return nil, value.ErrChanged
-	}
 	stream, cancel, err := c.openWatch(ctx, c.listPath("accessbindings"), rv, false)
 	if err != nil {
-		return nil, err
-	}
-	if err = c.current(ctx, start, 5*time.Second); err != nil {
-		cancel()
-		stream.Close()
 		return nil, err
 	}
 	return &permissionBindingWatch{client: c, decoder: stream, cancel: cancel}, nil

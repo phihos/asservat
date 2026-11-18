@@ -24,6 +24,10 @@ func idleKubernetesBindingWatch(t *testing.T, cluster string, extras ...http.Han
 		case "/api/v1/namespaces/asservat":
 			_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]string{"name": control.Name, "uid": control.UID, "resourceVersion": "1"}})
 		case "/apis/asservat.io/v1alpha1/accessbindings":
+			if len(extras) > 0 {
+				extras[0](w, r)
+				return
+			}
 			if r.URL.Query().Get("watch") != "true" || r.URL.Query().Get("resourceVersion") != "1" {
 				t.Error("unexpected binding watch", r.URL)
 			}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -259,30 +260,24 @@ func TestBindingExpiresDuringQuietWatch(t *testing.T) {
 	}
 }
 
-type permissionSnapshotFunc func(context.Context) (value.Snapshot, error)
-
-func (read permissionSnapshotFunc) PermissionSnapshot(ctx context.Context) (value.Snapshot, error) {
-	return read(ctx)
-}
-
 func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
 	f, r := reconciliationTest(t)
 	store := expiryPermissionStore{f, make(chan value.PermissionBatch, 4)}
 	r.Store = store
-	var reads int
-	r.Reader = permissionSnapshotFunc(func(context.Context) (value.Snapshot, error) {
-		reads++
-		snapshot := f.snapshot
-		snapshot.ObservedAt = r.Now()
-		snapshot.FreshUntil = snapshot.ObservedAt.Add(5 * time.Second)
-		snapshot.SourcesComplete = reads != 2
-		if snapshot.SourcesComplete {
-			snapshot.Sources = []value.Source{inheritanceSource()}
+	var reads atomic.Int32
+	r.ReadSources = func(context.Context) (value.Snapshot, error) {
+		if reads.Add(1) == 2 {
+			return value.Snapshot{}, value.ErrUnavailable
 		}
-		return snapshot, nil
-	})
+		return value.Snapshot{Sources: []value.Source{inheritanceSource()}, SourcesComplete: true, SourceResourceVersion: "1"}, nil
+	}
 	changes := make(chan struct{}, 1)
-	r.WatchConfiguration = func(context.Context, string, string) (<-chan struct{}, error) { return changes, nil }
+	r.WatchConfiguration = func(_ context.Context, resource, rv string) (SettingsWatch, error) {
+		if resource == "permissionsources" {
+			return SettingsWatch{Changed: changes}, nil
+		}
+		return SettingsWatch{}, nil
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	s := &bindingRun{r: r}
@@ -300,11 +295,12 @@ func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
 			t.Fatal("no source transition")
 		}
 	}
-	assertBatch(false)
+	assertBatch(true)
 	ticks := make(chan time.Time)
 	done := make(chan error, 1)
 	go func() { done <- s.consume(ctx, &fixtureWatch{}, ticks) }()
 	defer func() { cancel(); <-done }()
+	assertBatch(false)
 	changes <- struct{}{}
 	assertBatch(true)
 	select {
@@ -321,7 +317,39 @@ func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
 			t.Fatal("renewal not read")
 		}
 	}
-	if reads != 3 {
-		t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads)
+	if reads.Load() != 3 {
+		t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads.Load())
+	}
+}
+
+type blockedBindingOpen struct {
+	opening chan struct{}
+	release chan struct{}
+}
+
+func (w blockedBindingOpen) WatchBindings(ctx context.Context, _ string) (BindingWatch, error) {
+	close(w.opening)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-w.release:
+		return nil, value.ErrDenied
+	}
+}
+
+func TestReplacementBindingListCannotGrantBeforeItsWatchOpens(t *testing.T) {
+	f, r := reconciliationTest(t)
+	w := blockedBindingOpen{make(chan struct{}), make(chan struct{})}
+	r.Watcher = w
+	done := make(chan PermissionEpochResult, 1)
+	go func() { done <- r.RunEpoch(t.Context()) }()
+	<-w.opening
+	f.mu.Lock()
+	accepted := len(f.accepted)
+	f.mu.Unlock()
+	close(w.release)
+	result := <-done
+	if accepted != 0 || !result.Suspended || !errors.Is(result.Err, value.ErrDenied) {
+		t.Fatal("listed grant before watch admission", accepted, result)
 	}
 }

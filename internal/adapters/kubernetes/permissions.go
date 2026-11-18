@@ -380,8 +380,8 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 }
 
 // PermissionSnapshot discards incomplete lists (including 410). A binding error
-// fails the snapshot because denies are unknown; allow-only source failures do
-// not discard independently complete bindings, and are explicitly marked.
+// fails the snapshot because the denies are unknown. Allow-only sources are
+// observed independently by PermissionSources.
 // List freshness starts BEFORE the first API read and is never reset per page.
 // A fresh list is not evidence of continuous assignment history after a gap.
 //
@@ -437,19 +437,6 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 	for i, o := range objects {
 		out.ClusterBindings = append(out.ClusterBindings, c.validator.clusterBindings(o, refs[i])...)
 	}
-	rv, objects, refs, _, err = c.list(ctx, "PermissionSource", "permissionsources", start)
-	if err == nil {
-		out.SourcesComplete = true
-		out.SourceResourceVersion = rv
-		for i, o := range objects {
-			s, err := c.validator.source(o, refs[i])
-			if err != nil {
-				out.InvalidSources = append(out.InvalidSources, refs[i])
-				continue
-			}
-			out.Sources = append(out.Sources, s)
-		}
-	}
 	ns, err = c.namespace(ctx, c.control)
 	if err != nil {
 		return value.Snapshot{}, nil, err
@@ -461,6 +448,30 @@ func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []perm
 		return value.Snapshot{}, nil, err
 	}
 	return out, nil, nil
+}
+
+// PermissionSources independently reads the optional allow-only configuration.
+func (c *PermissionClient) PermissionSources(ctx context.Context) (value.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	start := c.now()
+	rv, objects, refs, _, err := c.list(ctx, "PermissionSource", "permissionsources", start)
+	if err != nil {
+		return value.Snapshot{}, err
+	}
+	out := value.Snapshot{SourceResourceVersion: rv, SourcesComplete: true}
+	for i, o := range objects {
+		source, err := c.validator.source(o, refs[i])
+		if err != nil {
+			out.InvalidSources = append(out.InvalidSources, refs[i])
+			continue
+		}
+		out.Sources = append(out.Sources, source)
+	}
+	if err := c.current(ctx, start, 5*time.Second); err != nil {
+		return value.Snapshot{}, err
+	}
+	return out, nil
 }
 
 func (c *PermissionClient) NamespaceMetadata(ctx context.Context, q value.NamespaceQuery) (value.NamespaceMetadata, error) {

@@ -61,7 +61,7 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 		if (r.Method != "GET" && !(r.Method == "POST" && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews")) || r.Header.Get("Authorization") != "Bearer synthetic-only" {
 			t.Error("unexpected request method/credential")
 		}
-		if r.URL.Query().Has("resourceVersion") || r.URL.Query().Has("labelSelector") || r.URL.Query().Has("fieldSelector") {
+		if (r.URL.Query().Get("watch") != "true" && r.URL.Query().Has("resourceVersion")) || r.URL.Query().Has("labelSelector") || r.URL.Query().Has("fieldSelector") {
 			t.Error("authority list was cached or filtered")
 		}
 		if extra != nil && extra(w, r) {
@@ -101,7 +101,11 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	if c := s.ClusterBindings; len(c) != 1 || c[0].Invalid || c[0].Scope.ClusterID != permissionCluster || c[0].Scope.Namespace != value.AllNamespaces || c[0].NamespaceSelector["example.invalid/managed"] != "true" || len(c[0].Roles) != 1 || c[0].Subjects[0].Issuer != "" {
 		t.Fatalf("cluster binding %+v", c)
 	}
-	if len(s.Bindings) != 1 || len(s.Sources) != 1 || s.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || s.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
+	sources, err := f.client.PermissionSources(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Bindings) != 1 || len(sources.Sources) != 1 || sources.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || sources.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
 		t.Fatal("incomplete snapshot")
 	}
 	b := s.Bindings[0]
@@ -123,7 +127,7 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	target := value.Target{ClusterID: permissionCluster, Namespace: ns.Namespace, Workload: value.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload-uid"}}
 	observation := &value.NamespaceObservation{ClusterID: permissionCluster, Keys: value.NamespaceKeys{Labels: []string{"example.invalid/managed"}, Annotations: []string{"example.invalid/owner"}},
 		Namespaces: []value.ObservedNamespace{{Name: ns.Namespace.Name, UID: ns.Namespace.UID, Labels: map[string]string{"example.invalid/managed": port.ValueDigest(ns.Labels["example.invalid/managed"])}, Annotations: map[string]string{"example.invalid/owner": port.ValueDigest(ns.Annotations["example.invalid/owner"])}}}}
-	if grants, reason := port.NamespaceGrants(s.Sources[0], permissionCluster, observation); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
+	if grants, reason := port.NamespaceGrants(sources.Sources[0], permissionCluster, observation); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
 		t.Fatal("mapping did not preserve multiple teams", reason)
 	}
 	if p := value.ProposeBinding(b, target, s.ObservedAt); len(p.Candidates) != 1 || p.Reason != "RequiresAcceptance" {
@@ -143,7 +147,8 @@ func TestUnavailableAllowSourcesDoNotDiscardCompleteBindings(t *testing.T) {
 	if err != nil || len(s.Bindings) != 1 {
 		t.Fatal("unavailable allow-only sources discarded complete explicit bindings")
 	}
-	if s.SourcesComplete || len(s.Sources) != 0 || s.SourceResourceVersion != "" {
+	sources, err := f.client.PermissionSources(t.Context())
+	if err == nil || sources.SourcesComplete || len(sources.Sources) != 0 || sources.SourceResourceVersion != "" {
 		t.Fatal("failed source list presented as current")
 	}
 }
@@ -421,6 +426,12 @@ func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 			defer cancel()
 			if mode == "cancel" {
 				cancel()
+			}
+			if mode == "advance" || mode == "rollback" {
+				if _, err := f.client.PermissionSources(ctx); err == nil {
+					t.Fatal("invalid source observation clock accepted")
+				}
+				return
 			}
 			if s, err := f.client.PermissionSnapshot(ctx); err == nil || len(s.Bindings) != 0 {
 				t.Fatal("stale/replaced source accepted")

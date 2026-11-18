@@ -149,7 +149,7 @@ func testInheritedReconciliation(t *testing.T, c *rest.Config, reader *kube.Perm
 		t.Helper()
 		run, cancel := context.WithCancel(ctx)
 		stop, done = cancel, make(chan error, 1)
-		r := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Store: store, Namespaces: observer, NamespaceClusterID: cluster, Now: time.Now, NewID: custodyID}
+		r := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, WatchConfiguration: reader.WatchConfiguration, ReadSources: reader.PermissionSources, Trust: guard, Store: store, Namespaces: observer, NamespaceClusterID: cluster, Now: time.Now, NewID: custodyID}
 		go func() { done <- r.Run(run) }()
 	}
 	halt := func() {

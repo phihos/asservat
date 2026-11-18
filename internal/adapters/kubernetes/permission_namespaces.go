@@ -165,6 +165,9 @@ func (w *namespaceWatch) Next(ctx context.Context) (value.NamespaceEvent, error)
 	event, err := w.decoder.next()
 	if err != nil || ctx.Err() != nil {
 		w.Close()
+		if errors.Is(err, value.ErrInvalid) || errors.Is(err, value.ErrLimit) {
+			return value.NamespaceEvent{}, value.ErrChanged
+		}
 		if ctx.Err() == nil && errors.Is(err, io.EOF) {
 			return value.NamespaceEvent{}, io.EOF
 		}

@@ -208,3 +208,61 @@ func TestPermissionRequestsStillBoundOpeningAndFiniteReads(t *testing.T) {
 		})
 	}
 }
+
+// A full LIST can remain blocked while the API sends multiple settings
+// changes and then invalidates the watch. Both signals must be observable.
+func TestSettingsBurstCoalescesWhileProductionSourceListIsBlocked(t *testing.T) {
+	listed, release, burst := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.HasSuffix(r.URL.Path, "/permissionsources") {
+			return false
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("watch") != "true" {
+			close(listed)
+			select {
+			case <-r.Context().Done():
+				return true
+			case <-release:
+			}
+			return false // fixture supplies the normal complete LIST
+		}
+		w.(http.Flusher).Flush()
+		select {
+		case <-r.Context().Done():
+			return true
+		case <-burst:
+		}
+		for i := range 100 {
+			_ = json.NewEncoder(w).Encode(map[string]any{"type": "MODIFIED", "object": map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadata", "metadata": map[string]string{"resourceVersion": strconv.Itoa(i + 11)}}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"type": "ERROR", "object": map[string]any{"apiVersion": "v1", "kind": "Status", "code": 410, "reason": "Expired"}})
+		return true
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+	defer cancel()
+	w, err := f.client.WatchConfiguration(ctx, "permissionsources", "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := f.client.PermissionSources(ctx); done <- err }()
+	select {
+	case <-listed:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	close(burst)
+	select {
+	case <-w.Lost:
+	case <-ctx.Done():
+		t.Fatal("watch decoder stalled behind the blocked LIST")
+	}
+	if len(w.Changed) != 1 {
+		t.Fatal("expected one pending full LIST", len(w.Changed))
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}

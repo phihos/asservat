@@ -128,7 +128,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
-	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Store: store, Now: time.Now, NewID: custodyID}
+	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, WatchConfiguration: reader.WatchConfiguration, ReadSources: reader.PermissionSources, Trust: guard, Store: store, Now: time.Now, NewID: custodyID}
 	go func() { done <- reconciler.Run(runCtx) }()
 	stopped := false
 	defer func() {
