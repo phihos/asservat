@@ -48,6 +48,7 @@ type BindingReconciler struct {
 	// RemoteBindingChanges signals a changed stored delivery (PostgreSQL
 	// LISTEN/NOTIFY); deliveries are reread only on a signal and at start.
 	RemoteBindingChanges <-chan struct{}
+	RegisteredClusters   []string // Helm registrations that must report both binding kinds before use.
 	WatchConfiguration   func(context.Context, string, string) (SettingsWatch, error)
 	ReadSources          func(context.Context) (value.Snapshot, error)
 	Now                  func() time.Time
@@ -109,7 +110,6 @@ type bindingRun struct {
 	r                               BindingReconciler
 	fence                           value.PermissionFence
 	journal                         *BindingJournal
-	trustUntil                      time.Time
 	nextExpiry                      time.Time
 	clusterSettings, sourceSettings SettingsWatch
 	readingSources                  <-chan sourceRead
@@ -318,27 +318,30 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context) (value.Snapshot, error
 	if err != nil {
 		return value.Snapshot{}, err
 	}
-	s.trustUntil = t.FreshUntil
-	snapshot.FreshUntil = identity.Earlier(snapshot.FreshUntil, s.trustUntil)
+	snapshot.FreshUntil = identity.Earlier(snapshot.FreshUntil, t.FreshUntil)
 	return snapshot, nil
 }
 func (s *bindingRun) accept(ctx context.Context, onlyChangedInheritance bool) error {
-	select {
-	case <-s.clusterSettings.Lost:
-		return value.ErrChanged
-	default:
+	if err := s.observeTrust(ctx); err != nil {
+		return err
 	}
-	if !s.r.Now().Before(s.journal.until) || !s.r.Now().Before(s.trustUntil) {
-		// The ordered watch supplies binding continuity. Obtain a new trust
-		// observation when a later event needs an acceptance window.
+	return s.commit(ctx, onlyChangedInheritance)
+}
+func (s *bindingRun) observeTrust(ctx context.Context) error {
+	if !s.r.Now().Before(s.journal.until) {
 		t, err := s.checkTrust(ctx)
 		if err != nil {
 			return err
 		}
-		s.journal.observed, s.journal.until, s.trustUntil = t.ObservedAt, t.FreshUntil, t.FreshUntil
+		s.journal.observed, s.journal.until = t.ObservedAt, t.FreshUntil
 	}
-	if err := s.journal.Constrain(s.trustUntil); err != nil {
-		return reconcileStep("constrain", err)
+	return nil
+}
+func (s *bindingRun) commit(ctx context.Context, onlyChangedInheritance bool) error {
+	select {
+	case <-s.clusterSettings.Lost:
+		return value.ErrChanged
+	default:
 	}
 	now := s.r.Now()
 	inherited := s.inheritance(now)
@@ -408,35 +411,30 @@ func (s *bindingRun) start(ctx context.Context) error {
 		return reconcileStep("watch", err)
 	}
 	s.readSources(ctx)
-	if err = s.accept(ctx, false); err != nil {
+	if err = s.commit(ctx, false); err != nil {
 		s.firstWatch.Close()
 		return reconcileStep("accept", err)
 	}
 	return nil
 }
 
-var errWatchBehind = errors.New("permission watch has not reached current complete list")
-
-func (s *bindingRun) refresh(ctx context.Context) error {
-	snapshot, err := s.guardedSnapshot(ctx)
+func (s *bindingRun) refreshClusterBindings(ctx context.Context) error {
+	snapshot, err := s.r.Reader.ClusterAccessBindings(ctx)
 	if err != nil {
-		return reconcileStep("snapshot", err)
+		return err
 	}
+	if snapshot.ClusterID != s.journal.cluster || !identity.Fresh(snapshot.ObservedAt, snapshot.FreshUntil, s.r.Now(), 5*time.Second) {
+		return value.ErrUnavailable
+	}
+	snapshot.Sources, snapshot.SourcesComplete = s.sources, s.sourcesComplete
 	s.syncSources(ctx, snapshot)
 	s.refreshRemote(ctx)
 	s.refreshWorkloads(ctx)
-	if err = s.journal.Confirm(snapshot, s.r.Now()); err != nil {
-		// Do not replace a journal with a newer LIST and thereby skip an
-		// intermediate owner. Process queued events, then retry the full LIST.
-		if !s.r.Now().Before(s.journal.until) {
-			return reconcileStep("confirm-expired", value.ErrUnavailable)
-		}
-		return errWatchBehind
+	if err = s.observeTrust(ctx); err != nil {
+		return err
 	}
-	if err = s.accept(ctx, true); err != nil {
-		return reconcileStep("accept", err)
-	}
-	return nil
+	s.journal.until = identity.Earlier(s.journal.until, snapshot.FreshUntil)
+	return s.commit(ctx, true)
 }
 
 // Run processes ordered watch transitions, database notifications and original
@@ -599,7 +597,7 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 				return reconcileStep("cluster-binding-watch", value.ErrChanged)
 			default:
 			}
-			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
+			if err := s.refreshClusterBindings(ctx); err != nil {
 				return reconcileStep("refresh", err)
 			}
 		case <-s.sourceSettings.Lost:

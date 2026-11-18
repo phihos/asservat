@@ -72,13 +72,15 @@ spec:
     # namespace asks for a cluster-wide bind, as for a ClusterRoleBinding.
     - name: bindingNamespace
       expression: "has(request.namespace) ? request.namespace : ''"
+    - name: unchangedSpec
+      expression: "request.operation == 'UPDATE' && object.spec == oldObject.spec"
   validations:
-    # Only roles and automation that a write adds or changes need bind, as for
-    # RoleBindings; metadata-only updates (finalizers, labels) pass.
-    - expression: "!has(object.spec.roles) || object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind').allowed())"
+    # Like RoleBinding admission, recheck bind at this scope when a writer
+    # changes the grant. Metadata-only updates can finish without it.
+    - expression: "variables.unchangedSpec || !has(object.spec.roles) || object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind').allowed())"
       messageExpression: "'granting ' + (has(object.spec.roles) ? object.spec.roles.join(', ') : '') + ' needs the bind verb on accessroles.asservat.io with each role name at the binding scope'"
       reason: Forbidden
-    - expression: "!has(object.spec.automation) || (request.operation == 'UPDATE' && has(oldObject.spec.automation) && object.spec.automation == oldObject.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name('automation').check('bind').allowed()"
+    - expression: "variables.unchangedSpec || !has(object.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name('automation').check('bind').allowed()"
       messageExpression: "'spec.automation needs the bind verb on accessroles.asservat.io named automation at the binding scope'"
       reason: Forbidden
 ---

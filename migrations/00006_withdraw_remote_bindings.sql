@@ -3,6 +3,11 @@ ALTER TABLE remote_access_binding_delivery ADD COLUMN unavailable boolean NOT NU
 -- Committed with the permission projection so decisions never use superseded
 -- grants when a replacement observation cannot be represented in full.
 ALTER TABLE permission_stream ADD COLUMN unavailable_clusters text[] NOT NULL DEFAULT '{}';
+-- Older deliveries contain only namespaced AccessBindings. Their digest cannot
+-- confirm the complete two-kind observation. Pause the old permission epoch
+-- until its worker establishes a new baseline, even on a hub with no rows yet.
+UPDATE permission_stream SET suspended=true, lease_until=statement_timestamp(), observed_at=NULL, fresh_until=NULL;
+DELETE FROM remote_access_binding_delivery;
 -- +goose StatementBegin
 CREATE FUNCTION public.withdraw_remote_bindings(target_root uuid, active_clusters uuid[]) RETURNS void
 LANGUAGE plpgsql STRICT SECURITY DEFINER SET search_path TO pg_catalog, pg_temp AS $$

@@ -58,6 +58,11 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 // is a health signal, not authority, and new remote actions need the
 // connector anyway.
 func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState) {
+	for _, cluster := range s.r.RegisteredClusters {
+		if _, delivered := s.remoteBindings[cluster]; !delivered {
+			out.UnavailableClusters = append(out.UnavailableClusters, cluster)
+		}
+	}
 	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
 		delivery := s.remoteBindings[cluster]
 		if delivery.Unavailable {
@@ -68,4 +73,5 @@ func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState) {
 			s.appendBindingBasis(out, b, now)
 		}
 	}
+	slices.Sort(out.UnavailableClusters)
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -237,7 +238,7 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	p.closers = append(p.closers, stopListening)
 	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		RemoteBindings: remoteBindings, RemoteBindingChanges: changes, WatchConfiguration: observer.WatchConfiguration, ReadSources: observer.PermissionSources, Now: time.Now, NewID: uuid.NewString}
+		RemoteBindings: remoteBindings, RegisteredClusters: slices.Sorted(maps.Values(names)), RemoteBindingChanges: changes, WatchConfiguration: observer.WatchConfiguration, ReadSources: observer.PermissionSources, Now: time.Now, NewID: uuid.NewString}
 	if id := c.Identity; id != nil {
 		uid, e := observer.ConfigMapUID(startup, id.Settings)
 		if e != nil {

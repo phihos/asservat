@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -160,9 +161,17 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	case <-live.Done():
 		t.Fatal("binding notification connection unavailable")
 	}
-	hub := remoteBindingHubFixture{cluster: custodyID()}
+	// A fleet administrator has already entitled a subject in the remote
+	// cluster. A missing workload Deny observation must still block it.
+	hubGrant := original
+	hubGrant.Resource.Kind = cfg.ClusterAccessBindingKind
+	hubGrant.Resource.Name, hubGrant.Resource.UID = "hub-readers", custodyID()
+	hubGrant.Resource.Namespace, hubGrant.Resource.NamespaceUID = "", ""
+	hubGrant.Scope.Namespace = cfg.AllNamespaces
+	hubGrant.Subjects = []cfg.Subject{{Kind: "Group", Issuer: original.Subjects[0].Issuer, ID: "hub-team"}}
+	hub := remoteWithdrawalHub{remoteBindingHubFixture{cluster: custodyID()}, hubGrant}
 	writer := &observedPermissionWriter{permissions, make(chan cfg.PermissionAcceptance, 4), make(chan cfg.PermissionFence, 4), make(chan struct{}, 4)}
-	reconciler := configapp.BindingReconciler{RootID: batch.RootID, NamespaceClusterID: hub.cluster, Reader: hub, Watcher: idleKubernetesBindingWatch(t, hub.cluster), Trust: hub, RemoteBindings: store, RemoteBindingChanges: changes, Store: writer, NewID: custodyID, Now: time.Now}
+	reconciler := configapp.BindingReconciler{RootID: batch.RootID, NamespaceClusterID: hub.cluster, RegisteredClusters: both, Reader: hub, Watcher: idleKubernetesBindingWatch(t, hub.cluster), Trust: hub, RemoteBindings: store, RemoteBindingChanges: changes, Store: writer, NewID: custodyID, Now: time.Now}
 	ended := make(chan struct{})
 	go func() { defer close(ended); reconciler.RunEpoch(live) }()
 	defer func() { stop(); <-ended }()
@@ -186,8 +195,9 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 		}
 		return got
 	}
-	if got := projection(); len(got.Allows) != 0 {
-		t.Fatal("old grant reactivated before replacement sent bindings")
+	awaitAcceptance()
+	if got, err := permissions.Permissions(ctx, target); !errors.Is(err, cfg.ErrUnavailable) || len(got.Allows) != 0 {
+		t.Fatal("hub-wide Allow granted before first complete remote observation", err)
 	}
 	replacement := original
 	replacement.Resource.UID = custodyID()
@@ -196,7 +206,9 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	if err := store.StoreRemoteBindings(ctx, d.ClusterID, time.Time{}, strings.Repeat("bd", 32), d.Bindings, false); err != nil {
 		t.Fatal(err)
 	}
-	if got := projection(); len(got.Allows) != 1 || got.Allows[0].Audience.SubjectID != "replacement-team" || got.Allows[0].Audience.BasisUID != replacement.Resource.UID {
+	if got := projection(); len(got.Allows) != 2 || !slices.ContainsFunc(got.Allows, func(a authorization.CurrentAssignment) bool {
+		return a.Audience.SubjectID == "replacement-team" && a.Audience.BasisUID == replacement.Resource.UID
+	}) {
 		t.Fatal("same-name replacement did not receive only its own grant")
 	}
 
@@ -230,4 +242,15 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	if got := projection(); len(got.Denies) != 1 || len(got.Allows) != 1 || got.Denies[0].Audience.SubjectID != got.Allows[0].Audience.SubjectID {
 		t.Fatal("restored cluster-wide Deny missing alongside the overlapping Allow")
 	}
+}
+
+type remoteWithdrawalHub struct {
+	remoteBindingHubFixture
+	grant cfg.Binding
+}
+
+func (h remoteWithdrawalHub) PermissionSnapshot(ctx context.Context) (cfg.Snapshot, error) {
+	snapshot, err := h.remoteBindingHubFixture.PermissionSnapshot(ctx)
+	snapshot.ClusterBindings = []cfg.Binding{h.grant}
+	return snapshot, err
 }
