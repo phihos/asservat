@@ -158,6 +158,8 @@ Previously accepted bindings do not count as assignment changes.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
 
+A labels-only or status update to a direct binding preserves its assignment IDs and access to earlier captures. The binding UID, generation, authority scope and spec still identify the same grant. Kubernetes advances the generation on a spec edit. [Custom resource generation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#status-subresource).
+
 An artifact records its complete audience (REQ-PER-008). The audit row records the deciding bindings or sources with their generations.
 
 ### SC-PER-006
@@ -172,7 +174,7 @@ Accepted executions live in SQL; CRD status is a projection. A controller never 
 
 ### SC-PER-007
 
-Given a developer who can create DebugCapture objects, when they set a forged requester or name a powerful service account, then no collection starts. A valid admission dry-run starts nothing. A GitOps edit of a DebugPolicy is attributed to the controller's identity, runs only within its envelope and needs review again when its intrusive execution scope changes. After a team policy's author leaves, that person cannot manage or read through former membership, while the team policy remains eligible. A deleted envelope, a sponsoring group without a current allow, a deny or a forged executor blocks execution. A namespace writer without `bind` on `automation` cannot add, change or remove an envelope.
+Given a developer who can create DebugCapture objects, when they set a forged requester or name a powerful service account, then no collection starts. A valid admission dry-run starts nothing. A GitOps edit of a DebugPolicy is attributed to the controller's identity, runs only within its envelope and needs review again when its intrusive execution scope changes. After a team policy's author leaves, that person cannot manage or read through former membership, while the team policy remains eligible. A deleted envelope, a sponsoring group without a current allow, a deny or a forged executor blocks execution. Adding or editing an envelope requires `bind` on `automation`. Removing the envelope withdraws the delegation and requires `bind` for the ordinary roles remaining in the binding.
 
 ## REQ-PER-008 — Ownership changes and retained evidence
 

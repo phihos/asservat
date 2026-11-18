@@ -313,13 +313,11 @@ func validBatch(b cfg.PermissionBatch, now time.Time) error {
 	return nil
 }
 func equivalentBasis(old custodydb.PermissionBasis, next cfg.PermissionBasis) bool {
-	// A PermissionSource confers authority only through its spec, whose every
-	// transition advances metadata.generation; the generation checks below
-	// therefore prove its continuity, and a status or metadata write that
-	// changes only its resourceVersion keeps assignments (ADR-242). The
-	// namespace metadata it maps has no generation: its own resourceVersion
-	// must match exactly unless the namespace watch was continuous.
-	if next.Resource.Kind != "PermissionSource" && old.ResourceVersion != next.Resource.ResourceVersion && !next.Continuous {
+	// Kubernetes increments generation for every spec edit. A changed
+	// resourceVersion at the same generation therefore cannot by itself
+	// revoke an assignment. Basis identity, scope and spec are checked
+	// independently, as is the namespace metadata behind inherited grants.
+	if old.Generation != next.Resource.Generation && next.Resource.Kind != "PermissionSource" && old.ResourceVersion != next.Resource.ResourceVersion && !next.Continuous {
 		return false
 	}
 	if !bytes.Equal(old.ScopeDigest, next.ScopeDigest[:]) || old.Effect != next.Effect || old.Kind != next.Resource.Kind {

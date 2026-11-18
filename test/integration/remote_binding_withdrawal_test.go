@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -270,6 +271,32 @@ func qualifyRegistrationWithdrawal(t *testing.T, admin, authority *pgxpool.Pool,
 	if got := authorization.ContextEligibility(who, p, target, now); len(p.Allows) != 259 || !got.Eligible || len(got.DefaultAudience) != 2 {
 		t.Fatal("unrelated subjects obscured independent grant", len(p.Allows), got.Reason)
 	}
+	// A retained download names the original assignment, including its ID.
+	// Only this remote cluster binding authorizes this synthetic reader.
+	readerBinding := clusterBinding("Allow", "evidence-reader", "reader", []map[string]string{{"kind": "User", "issuer": issuer, "id": "archive-reader"}})
+	readerBinding.Resource.Name = "archive-readers"
+	replace([]cfg.Binding{replacement, readerBinding}, strings.Repeat("cd", 32), false)
+	p = projection()
+	reader := who
+	reader.Principal.Subject, reader.Groups = "archive-reader", nil
+	reader.Scopes = []string{"evidence:read", "evidence:download"}
+	retained := authorization.Retained{ArtifactID: custodyID(), Target: target, DataClass: "metadata", ExpiresAt: reader.ValidUntil}
+	for _, a := range p.Allows {
+		if a.Audience.BasisUID == readerBinding.Resource.UID {
+			retained.Audience = []artifact.AudienceAssignment{a.Audience}
+		}
+	}
+	checkDownload := func() {
+		t.Helper()
+		if got := authorization.Evaluate(reader, p, authorization.DownloadApproved, target, &retained, time.Now()); !got.Eligible {
+			t.Fatal("retained file download", got.Reason)
+		}
+	}
+	checkDownload()
+	readerBinding.Resource.ResourceVersion = "labels-only"
+	replace([]cfg.Binding{replacement, readerBinding}, strings.Repeat("dc", 32), false)
+	p = projection()
+	checkDownload()
 	deny := clusterBinding("Deny", "workload-maintainer", strings.Repeat("x", 70<<10), []map[string]string{{"kind": "Group", "issuer": issuer, "id": replacement.Subjects[0].ID}})
 	replace([]cfg.Binding{replacement, wide, deny}, strings.Repeat("db", 32), false)
 	p = projection()

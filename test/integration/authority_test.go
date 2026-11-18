@@ -1565,6 +1565,8 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("routine restart discarded exact unchanged observation")
 		}
 		s.b = fresh(s.b)
+		// The same final spec can hide an intervening change and reversal.
+		s.b.Bases[0].Resource.Generation += 2
 		s.b.Bases[0].Resource.ResourceVersion = "changed-during-gap"
 		accept(t, &s)
 		flush(t, s.p)

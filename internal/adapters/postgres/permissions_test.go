@@ -12,9 +12,14 @@ func TestPermissionContinuityRequiresExactVersionsOrVerifiedTransitions(t *testi
 	next := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", Generation: 3, ResourceVersion: "opaque-new", SpecDigest: artifact.Digest{1}}, Effect: "Allow", ScopeDigest: artifact.Digest{2}}
 	old := custodydb.PermissionBasis{Kind: "AccessBinding", Generation: 3, ResourceVersion: "opaque-old", SpecDigest: []byte{1}, Effect: "Allow", ScopeDigest: next.ScopeDigest[:]}
 	old.SpecDigest = append([]byte{}, next.Resource.SpecDigest[:]...)
-	if equivalentBasis(old, next) {
-		t.Fatal("matching final spec and generation hid a possible ownership cycle")
+	if !equivalentBasis(old, next) {
+		t.Fatal("metadata-only update to a direct binding retired the assignment")
 	}
+	next.Resource.Generation++
+	if equivalentBasis(old, next) {
+		t.Fatal("unobserved spec transition retained the assignment")
+	}
+	next.Resource.Generation--
 	next.Resource.ResourceVersion = old.ResourceVersion
 	if !equivalentBasis(old, next) {
 		t.Fatal("exact unchanged observation discarded")
