@@ -194,7 +194,20 @@ func TestBindingReconcilerIndependentBindingChangesAfterIdle(t *testing.T) {
 			if err := s.start(t.Context()); err != nil {
 				t.Fatal(err)
 			}
-			clock = clock.Add(time.Minute)
+			// Keep the original controller lease live while the watched bindings
+			// stay idle, as the running reconciler does between events.
+			for range 3 {
+				clock = clock.Add(20 * time.Second)
+				if !clock.Before(s.fence.LeaseUntil) {
+					t.Fatal("fixture missed the controller lease renewal")
+				}
+				f.storeFence.LeaseUntil = clock.Add(30 * time.Second)
+				renewed, err := f.RenewPermissions(t.Context(), s.fence)
+				if err != nil {
+					t.Fatal(err)
+				}
+				s.fence = renewed
+			}
 			f.snapshot.ObservedAt, f.snapshot.FreshUntil = clock, clock.Add(5*time.Second)
 			f.trust.ObservedAt, f.trust.FreshUntil = clock, clock.Add(5*time.Second)
 			direct := cloneBinding(f.snapshot.Bindings[0])
