@@ -24,7 +24,6 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/targets"
-	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
@@ -203,7 +202,7 @@ func newRegionalContext(ctx context.Context, c regionalConfig, in *providerInput
 
 // run builds the executor process and serves outbound standby exchanges
 // until ctx ends or a component fails.
-func (r *regionalContext) run(ctx context.Context) error {
+func (r *regionalContext) run(ctx context.Context, watch regionalWorkWatch) error {
 	// Fixed stage names for the stop line; never inputs or API text.
 	process, err := kube.NewConnectorAPIProcess(r.settings, r.podUID, time.Now)
 	if err != nil {
@@ -229,9 +228,7 @@ func (r *regionalContext) run(ctx context.Context) error {
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Watch: func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) (bool, error) {
-		return r.owners.Client.WatchWork(ctx, r.refreshStorageKeys, receive)
-	}, Concurrency: r.c.Executor.Concurrency, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context exchange refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
+	return RegionalContextStartConnections{Watch: watch, Concurrency: r.c.Executor.Concurrency, Client: client, Local: local, Report: eventLog(os.Stderr, "regional context exchange refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer

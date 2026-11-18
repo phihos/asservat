@@ -167,8 +167,9 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	}
 	process := value.ConnectorProcessIdentity{Binding: c.binding, PodUID: podUID, ProcessEpoch: uuid.NewString()}
 	lifecycle := &RegionalLifecycle{Client: channel, Process: process, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
+	r.lifecycle = lifecycle
 	if raw.Mode == contracts.ConnectorModeCluster {
-		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
+		r.bindings, r.watchConfig = observer, in.kubernetes(contracts.ConnectorKubeTokenFile)
 	}
 	if c.executor {
 		var closers []func()
@@ -240,10 +241,36 @@ func (r *Regional) Run(ctx context.Context) error {
 		}
 	}()
 	// ADR-329/330: watch-driven deliveries beside the context starts.
+	var resync chan struct{}
 	if r.bindings != nil {
-		ready := make(chan struct{})
-		close(ready)
-		wait := goJoined(func() { r.runDeliveries(contextCtx, ready) })
+		resync = make(chan struct{}, 1)
+		wait := goJoined(func() { r.runDeliveries(contextCtx, resync) })
+		defer func() { stopContext(); wait() }()
+	}
+	connected := func(ctx context.Context) error {
+		if r.context != nil {
+			if err := r.context.refreshStorageKeys(ctx); err != nil {
+				return err
+			}
+		}
+		select {
+		case resync <- struct{}{}:
+		default:
+		}
+		return nil
+	}
+	watch := func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) (bool, error) {
+		return r.lifecycle.Client.WatchWork(ctx, connected, receive)
+	}
+	if r.context == nil && r.bindings != nil {
+		// A delivery-only connector observes a new hub through the same
+		// authenticated subscription as an executor. It opens no exchanges.
+		report := eventLog(os.Stderr, "regional binding subscription")
+		wait := goJoined(func() {
+			reconnectRegional(contextCtx, func() (bool, error) {
+				return watch(contextCtx, func(connectorlifecycle.WorkHint) {})
+			}, func(err error) { report(regionalCause(err)) })
+		})
 		defer func() { stopContext(); wait() }()
 	}
 	var attemptAt time.Time
@@ -256,7 +283,7 @@ func (r *Regional) Run(ctx context.Context) error {
 		attemptAt = time.Now()
 		observerAt, observerTime = r.observerStats.load()
 		contextRunning = true
-		go func() { contextDone <- r.context.run(contextCtx) }()
+		go func() { contextDone <- r.context.run(contextCtx, watch) }()
 	}
 	for {
 		startContext()

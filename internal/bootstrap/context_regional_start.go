@@ -378,10 +378,12 @@ type exchangeStepError struct {
 func (e exchangeStepError) Unwrap() error        { return e.error }
 func (e exchangeStepError) ExchangeStep() string { return e.step }
 
+type regionalWorkWatch func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error)
+
 // RegionalContextStartConnections opens work exchanges only when a hub owner
 // has a waiting request. The connector never replays a capture on reconnect.
 type RegionalContextStartConnections struct {
-	Watch  func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error)
+	Watch  regionalWorkWatch
 	Client interface {
 		OpenRequested(context.Context, fleetvalue.OwnerBinding, time.Time) (*mtls.ContextStartExchange, error)
 		Close()
@@ -424,14 +426,18 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			}
 		})
 	}
+	return reconnectRegional(ctx, func() (bool, error) { return s.Watch(ctx, receive) }, func(err error) { s.reportFailure("work-stream", err) })
+}
+
+func reconnectRegional(ctx context.Context, subscribe func() (bool, error), report func(error)) error {
 	backoff := time.Second
 	for ctx.Err() == nil {
-		connected, err := s.Watch(ctx, receive)
+		connected, err := subscribe()
 		if ctx.Err() != nil {
 			break
 		}
 		if err != nil {
-			s.reportFailure("work-stream", err)
+			report(err)
 		}
 		if connected {
 			backoff = time.Second

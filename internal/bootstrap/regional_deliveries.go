@@ -87,15 +87,10 @@ func (w *resourceWatch) items(i int) []*metav1.PartialObjectMetadata {
 // deliverOnChange sends a delivery when the watched state changed, at most
 // once per deliverySpacing: build returns the current delivery's digest and
 // its send. Every conversation carries the hub's stored digest, so the
-// first send after the process starts (or after a failure) only compares
-// when nothing changed meanwhile. A failed send is retried after
+// first send after an authenticated reconnect only compares digests when
+// the hub has retained the delivery. A failed send is retried after
 // deliveryRetry; nothing is resent periodically.
-func deliverOnChange(ctx context.Context, enrolled <-chan struct{}, trigger <-chan struct{}, name string, build func(context.Context) (string, func(context.Context) error, error)) {
-	select {
-	case <-ctx.Done():
-		return
-	case <-enrolled:
-	}
+func deliverOnChange(ctx context.Context, resync <-chan struct{}, trigger <-chan struct{}, name string, build func(context.Context) (string, func(context.Context) error, error)) {
 	last, outcome, pending := "", "ok", true
 	var sent time.Time
 	for {
@@ -125,6 +120,10 @@ func deliverOnChange(ctx context.Context, enrolled <-chan struct{}, trigger <-ch
 		select {
 		case <-ctx.Done():
 			return
+		case <-resync:
+			// A new authenticated connection can point to a hub that
+			// discarded this registration’s previously accepted delivery.
+			last, pending = "", true
 		case <-trigger:
 			pending = true
 		case <-retry:
@@ -143,7 +142,7 @@ func (s staticAccessBindings) AccessBindingDelivery(context.Context) (contracts.
 
 // runDeliveries watches this cluster's AccessBindings and delivers them on
 // change (ADR-329/330).
-func (r *Regional) runDeliveries(ctx context.Context, enrolled <-chan struct{}) {
+func (r *Regional) runDeliveries(ctx context.Context, resync <-chan struct{}) {
 	var joins []func()
 	if r.bindings != nil {
 		bindings, err := startResourceWatch(ctx, r.watchConfig, watchedResource{resource: accessBindingsResource})
@@ -154,7 +153,7 @@ func (r *Regional) runDeliveries(ctx context.Context, enrolled <-chan struct{}) 
 				if !bindings.synced(ctx) {
 					return
 				}
-				deliverOnChange(ctx, enrolled, bindings.trigger, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
+				deliverOnChange(ctx, resync, bindings.trigger, "access binding", func(ctx context.Context) (string, func(context.Context) error, error) {
 					d, err := r.bindings.AccessBindingDelivery(ctx)
 					return d.Digest(), func(ctx context.Context) error {
 						return r.lifecycle.DeliverAccessBindings(ctx, staticAccessBindings(d))

@@ -14,8 +14,7 @@ import (
 func TestDeliverOnChangeSendsOnlyChanges(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	enrolled, trigger := make(chan struct{}), make(chan struct{}, 1)
-	close(enrolled)
+	resync, trigger := make(chan struct{}, 1), make(chan struct{}, 1)
 	var mu sync.Mutex
 	digest, sends, fail := "a", 0, false
 	sent := make(chan struct{}, 16)
@@ -35,7 +34,7 @@ func TestDeliverOnChangeSendsOnlyChanges(t *testing.T) {
 		}, nil
 	}
 	done := make(chan struct{})
-	go func() { defer close(done); deliverOnChange(ctx, enrolled, trigger, "test", build) }()
+	go func() { defer close(done); deliverOnChange(ctx, resync, trigger, "test", build) }()
 	<-sent // the first delivery after start compares with the hub
 	trigger <- struct{}{}
 	time.Sleep(1200 * time.Millisecond)
@@ -43,6 +42,14 @@ func TestDeliverOnChangeSendsOnlyChanges(t *testing.T) {
 	if sends != 1 {
 		t.Fatal("unchanged digest sent again", sends)
 	}
+	mu.Unlock()
+	resync <- struct{}{}
+	select {
+	case <-sent: // unchanged local digest is compared to the new hub
+	case <-time.After(3 * time.Second):
+		t.Fatal("unchanged delivery never compared with the reconnected hub")
+	}
+	mu.Lock()
 	digest, fail = "b", true
 	mu.Unlock()
 	trigger <- struct{}{}
