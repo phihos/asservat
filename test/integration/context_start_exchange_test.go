@@ -88,7 +88,7 @@ func (s *regionalAPIStartFixture) standby(t *testing.T, ctx context.Context) {
 		ctx, streamDiagnostic = contextstart.NewStreamDiagnosticContext(ctx)
 	}
 	standby, stop := context.WithTimeout(ctx, 30*time.Second)
-	exchange, e := s.client.OpenDiscovered(standby, s.owner, candidates)
+	exchange, e := s.client.OpenRequested(standby, s.owner, candidates.ValidUntil)
 	if e != nil {
 		stop()
 		t.Fatalf("actual shared NativePort standby elapsed=%s error=%v", time.Since(n), e)
