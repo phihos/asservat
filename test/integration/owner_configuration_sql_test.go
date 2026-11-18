@@ -200,7 +200,7 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 		t.Fatal(e)
 	}
 	current, e := l.reader.ReadOwnerConfiguration(ctx)
-	if e != nil || !current.Configuration.Equal(c) || current.ObservedAt.Before(o.ObservedAt) || !current.FreshUntil.Equal(o.FreshUntil) {
+	if e != nil || !current.Configuration.Equal(c) || !current.Valid(time.Now()) || current.FreshUntil.After(o.FreshUntil) {
 		t.Fatal("accepted original observation", e)
 	}
 	checkAudit := func(config value.OwnerConfiguration, want int) {
@@ -222,12 +222,12 @@ func TestEnrollmentOwnerConfigurationWithRealServices(t *testing.T) {
 	if e = l.observe(ctx, extended); e == nil {
 		t.Fatal("same observation extended")
 	}
-	// A replacement SQL reader preserves the exact source pin and deadline.
+	// A replacement SQL reader keeps the source pin and cannot extend its original cutoff.
 	restarted, e := postgres.NewOwnerConfigurations(ctx, l.readerPool, c.Pool.InstallationID, c.Pool.ClusterID, c.Pool.NamespaceUID, c.Revision.UID)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if again, e := restarted.ReadOwnerConfiguration(ctx); e != nil || !again.FreshUntil.Equal(current.FreshUntil) {
+	if again, e := restarted.ReadOwnerConfiguration(ctx); e != nil || !again.Configuration.Equal(c) || !again.Valid(time.Now()) || again.FreshUntil.After(o.FreshUntil) {
 		t.Fatal("restart changed acceptance", e)
 	}
 	// Actual concurrent transactions may replay an observation, never create a
