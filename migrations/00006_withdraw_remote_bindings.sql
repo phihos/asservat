@@ -32,3 +32,9 @@ FOR EACH ROW EXECUTE FUNCTION public.notify_remote_delivery('asservat_remote_bin
 CREATE TRIGGER remote_access_binding_delivery_update AFTER UPDATE ON public.remote_access_binding_delivery
 FOR EACH ROW WHEN (OLD.digest IS DISTINCT FROM NEW.digest)
 EXECUTE FUNCTION public.notify_remote_delivery('asservat_remote_bindings');
+
+-- A mounted key Secret is limited to 1 MiB. Each public fingerprint encoded
+-- as 32 JSON integers uses less than three times the bytes of its Secret entry.
+ALTER TABLE local_key_configuration DROP CONSTRAINT local_key_configuration_snapshot_json_check;
+ALTER TABLE local_key_configuration ADD CONSTRAINT local_key_configuration_snapshot_json_check
+ CHECK (octet_length(snapshot_json) BETWEEN 1 AND 3 * 1024 * 1024);

@@ -25,6 +25,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/keyservice"
 	"github.com/jackc/pgx/v5/pgxpool"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -278,7 +279,7 @@ func (s *mountedKeySource) ReadKeyMaterial(ctx context.Context) (authapp.KeyMate
 		return zero, authapp.ErrKeyUnavailable
 	}
 	started := s.now()
-	payload, err := mounts.Read(ctx, s.files, contracts.ArtifactKeyFile, 16<<10)
+	payload, err := mounts.Read(ctx, s.files, contracts.ArtifactKeyFile, corev1.MaxSecretSize)
 	if err != nil || len(payload) == 0 {
 		clear(payload)
 		return zero, authapp.ErrKeyUnavailable

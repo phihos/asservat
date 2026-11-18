@@ -122,6 +122,9 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
+	t.Run("retained-local-key-versions", func(t *testing.T) {
+		qualifyRetainedLocalKeyVersions(t, ctx, admin, poolFor)
+	})
 	installedPoolFor := func(user, password string) *pgxpool.Pool {
 		t.Helper()
 		pc, err := captureAdmissionPoolConfig("postgres://"+user+":"+password+"@"+address+"/custody_test?sslmode=disable", tls)

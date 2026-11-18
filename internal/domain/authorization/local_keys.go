@@ -25,7 +25,7 @@ type LocalKeyConfiguration struct {
 }
 
 func (c LocalKeyConfiguration) Valid(now time.Time) bool {
-	if !c.Scope.Valid() || !UUID(c.ClusterID) || !identity.Text(c.NamespaceUID, 64) || !UUID(c.RecoveryEpoch) || !c.Revision.Valid() || !identity.Text(c.SecretUID, 64) || c.SecretDigest == (artifact.Digest{}) || c.ActiveVersion < 1 || c.ActiveVersion > 2147483647 || len(c.Versions) < 1 || len(c.Versions) > 16 || !identity.Fresh(c.ObservedAt, c.FreshUntil, now, 5*time.Second) {
+	if !c.Scope.Valid() || !UUID(c.ClusterID) || !identity.Text(c.NamespaceUID, 64) || !UUID(c.RecoveryEpoch) || !c.Revision.Valid() || !identity.Text(c.SecretUID, 64) || c.SecretDigest == (artifact.Digest{}) || c.ActiveVersion < 1 || c.ActiveVersion > 2147483647 || len(c.Versions) < 1 || !identity.Fresh(c.ObservedAt, c.FreshUntil, now, 5*time.Second) {
 		return false
 	}
 	active, last := false, 0

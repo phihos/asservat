@@ -8,7 +8,7 @@ The Helm `secrets` Job creates the key Secret once if it is missing. The Secret 
 
 The artifact key service reads the projected Secret at each operation boundary. When the mounted version increases, the service installs an immutable backend for the accepted keyset. Each operation uses one backend through cryptography. If the final check observes a different generation, the caller receives no result. Subsequent operations use the new active version for wrapping and can unwrap keys from retained versions. Idle Pods do no refresh work. Kubernetes propagates a Secret update to each volume asynchronously. [Kubernetes Secret volumes](https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod).
 
-The current implementation checks per-version fingerprints in PostgreSQL before accepting the keyset. It refuses rollback, removal and changed bytes for an existing version. The intended key-service contract removes that second ledger (ADR-330 D1).
+The current implementation checks per-version fingerprints in PostgreSQL before accepting the keyset. A rotation inserts all new versions in one statement. The stored public snapshot allows 3 MiB because a JSON array of 32 fingerprint bytes uses more space than a base64 key in the 1 MiB Secret. It refuses rollback, removal and changed bytes for an existing version. The intended key-service contract removes that second ledger (ADR-330 D1).
 
 ## Format
 

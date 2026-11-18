@@ -96,8 +96,10 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rotated.clear()
-	rotated.ActiveVersion = 2
-	rotated.Keys = append(rotated.Keys, localKeyVersion{Version: 2, Material: bytes.Repeat([]byte{0x42}, 32)})
+	rotated.ActiveVersion = 17
+	for version := 2; version <= rotated.ActiveVersion; version++ {
+		rotated.Keys = append(rotated.Keys, localKeyVersion{Version: version, Material: bytes.Repeat([]byte{byte(version)}, 32)})
+	}
 	updated, err := json.Marshal(rotated)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +114,7 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 		if reads == 2 {
 			payload = updated
 			snapshot.Revision.Digest = artifact.Digest(sha256.Sum256(payload))
-			snapshot.Revision.Generation = 2
+			snapshot.Revision.Generation = int64(rotated.ActiveVersion)
 		}
 	}
 	if crossed, err := service.Execute(t.Context(), peer, r); !errors.Is(err, app.ErrKeyUnavailable) || crossed.Sealed != (artifact.SealedKey{}) {
@@ -120,8 +122,8 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 	}
 	onRead = nil
 	after, err := service.Execute(t.Context(), peer, r)
-	if err != nil || !strings.HasSuffix(after.Sealed.Reference, "/2") {
-		t.Fatal("next operation did not wrap with v2", err)
+	if err != nil || !strings.HasSuffix(after.Sealed.Reference, "/17") {
+		t.Fatal("next operation did not wrap with v17", err)
 	}
 	reader := peer
 	reader.Role = "acquisition"
@@ -130,7 +132,7 @@ func TestFreshKeyPermitUsesItsOwnConfigurationObservation(t *testing.T) {
 	if err != nil || !bytes.Equal(plain.Output, r.Input) || !strings.HasSuffix(before.Reference, "/1") {
 		t.Fatal("retained v1 key could not unwrap after rotation", err)
 	}
-	// A delayed v1 observation cannot reinstall v1 after the v2 operation.
+	// A delayed v1 observation cannot reinstall v1 after the v17 operation.
 	payload, snapshot = originalPayload, originalSnapshot
 	requireRefusal("configuration-before/rotation")
 	sourceUnavailable = true

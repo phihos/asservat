@@ -135,6 +135,12 @@ func TestLocalKeyRestartRotationAndBinding(t *testing.T) {
 
 func TestLocalKeySecretRejectsAmbiguousOrInvalidConfiguration(t *testing.T) {
 	raw := localSecret(t, localScope, 1, 1, 2)
+	// A valid projected file at the Kubernetes Secret size boundary parses.
+	padded := append(bytes.Clone(raw), bytes.Repeat([]byte(" "), maxLocalSecret-len(raw))...)
+	defer clear(padded)
+	if _, err := NewLocalKeyBackend(localScope, bytes.NewReader(padded)); err != nil {
+		t.Fatal("valid Secret at upstream size boundary", err)
+	}
 	changes := map[string]func(*localKeySecret){
 		"format":             func(s *localKeySecret) { s.Format = "unknown" },
 		"installation":       func(s *localKeySecret) { s.InstallationID = "00000000-0000-4000-8000-000000000002" },
@@ -148,11 +154,6 @@ func TestLocalKeySecretRejectsAmbiguousOrInvalidConfiguration(t *testing.T) {
 		"duplicate-material": func(s *localKeySecret) { copy(s.Keys[1].Material, s.Keys[0].Material) },
 		"short-key":          func(s *localKeySecret) { s.Keys[0].Material = s.Keys[0].Material[:31] },
 		"zero-key":           func(s *localKeySecret) { clear(s.Keys[0].Material) },
-		"too-many": func(s *localKeySecret) {
-			for len(s.Keys) <= maxLocalVersions {
-				s.Keys = append(s.Keys, s.Keys[0])
-			}
-		},
 	}
 	for name, change := range changes {
 		t.Run(name, func(t *testing.T) {
