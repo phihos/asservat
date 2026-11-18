@@ -35,7 +35,9 @@ func qualifyRetainedLocalKeyVersions(t *testing.T, ctx context.Context, admin *p
 		}
 	}
 	c := authorization.LocalKeyConfiguration{Scope: scope, ClusterID: custodyID(), NamespaceUID: "synthetic", RecoveryEpoch: fixtureIssuerEpoch(t, ctx, admin, scope.InstallationID), Revision: identity.Revision{UID: "mount", Generation: 1, Digest: artifact.Digest{1}}, SecretUID: "key", SecretDigest: artifact.Digest{1}, ActiveVersion: 1}
-	ledger, err := postgres.NewLocalKeyConfigurations(ctx, poolFor(role, "fixture-only"), scope, c.ClusterID, c.NamespaceUID, c.Revision.UID)
+	pool := poolFor(role, "fixture-only")
+	defer pool.Close()
+	ledger, err := postgres.NewLocalKeyConfigurations(ctx, pool, scope, c.ClusterID, c.NamespaceUID, c.Revision.UID)
 	if err != nil {
 		t.Fatal(err)
 	}
