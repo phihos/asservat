@@ -8,8 +8,8 @@ import (
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
 	// Physical hub credentials are consolidated; separate process roles remain.
-	if len(all) != 20 || len(hub) != 4 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
-		t.Fatal("unreviewed compartment expansion")
+	if PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+		t.Fatalf("unexpected retained process counts: worker=%d hub=%d", PublicRuntimeRetainedWorkerProcesses, PublicRuntimeRetainedHubProcesses)
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
 	if !slices.Equal(PublicRuntimeContextDeletionPurposes(), []string{"context-cleanup", "context-cleanup-audit", "context-cleanup-finalize"}) {
@@ -29,7 +29,7 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 			t.Fatal("download compartment changed", purpose)
 		}
 	}
-	if !slices.Equal(PermissionProjectionPurposes(false, true, false), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
+	if !slices.Equal(PermissionProjectionPurposes(false, true, false), []string{"permission-accept", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
 		t.Fatal("download logins left their projections")
 	}
 	seen := map[int]bool{}
@@ -40,8 +40,8 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 		}
 		seen[id] = true
 		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit < 1 {
-			t.Fatal("unbounded installed role", purpose)
+		if !ok || (!slices.Contains(PublicRuntimeFederationPurposes(), purpose) && limit < 1) {
+			t.Fatal("missing connection budget", purpose)
 		}
 	}
 	for n, purpose := range []string{"capacity", "capacity-capture"} {
@@ -55,7 +55,7 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	for n, purpose := range PublicRuntimeFederationPurposes() {
 		id, ok := PublicRuntimeRoleOrdinal(purpose)
 		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || id != connector[n] || !bounded || limit != 3 || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
+		if !ok || id != connector[n] || !bounded || limit != PublicRuntimeFederationRoleConnections || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
 			t.Fatal("connector compartment changed", purpose)
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"maps"
 	"slices"
-	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -21,29 +20,7 @@ type NamespaceJournal struct {
 	cluster  string
 	keys     value.NamespaceKeys
 	byUID    map[string]value.ObservedNamespace
-	observed time.Time
 	poisoned bool
-	// changes counts, per namespace UID, the transitions of its observed
-	// key values (or deletion state) within this journal, including to and
-	// from carrying no key; sequence counts every such transition (ADR-247).
-	changes  map[string]int64
-	sequence int64
-}
-
-// sameObserved reports whether two reductions carry the same observed values.
-func sameObserved(a, b value.ObservedNamespace, aok, bok bool) bool {
-	if aok != bok {
-		return false
-	}
-	return !aok || a.Deleting == b.Deleting && maps.Equal(a.Labels, b.Labels) && maps.Equal(a.Annotations, b.Annotations)
-}
-
-func (j *NamespaceJournal) changed(uid string) {
-	if j.changes == nil {
-		j.changes = map[string]int64{}
-	}
-	j.changes[uid]++
-	j.sequence++
 }
 
 func cloneNamespace(n value.ObservedNamespace) value.ObservedNamespace {
@@ -55,7 +32,7 @@ func NewNamespaceJournal(l value.NamespaceList) (*NamespaceJournal, error) {
 	if !authorization.UUID(l.ClusterID) || !identity.Text(l.ResourceVersion, 128) || !l.Keys.Valid() || l.ObservedAt.IsZero() {
 		return nil, value.ErrInvalid
 	}
-	j := &NamespaceJournal{cluster: l.ClusterID, keys: l.Keys, byUID: map[string]value.ObservedNamespace{}, observed: l.ObservedAt}
+	j := &NamespaceJournal{cluster: l.ClusterID, keys: l.Keys, byUID: map[string]value.ObservedNamespace{}}
 	names := map[string]bool{}
 	for _, n := range l.Namespaces {
 		if !n.Valid(l.Keys, true) || names[n.Name] {
@@ -94,9 +71,6 @@ func (j *NamespaceJournal) Apply(e value.NamespaceEvent) error {
 	switch e.Type {
 	case "ADDED", "MODIFIED":
 		if len(n.Labels)+len(n.Annotations) == 0 {
-			if exists {
-				j.changed(n.UID)
-			}
 			delete(j.byUID, n.UID)
 			return nil
 		}
@@ -108,32 +82,14 @@ func (j *NamespaceJournal) Apply(e value.NamespaceEvent) error {
 				return fail()
 			}
 		}
-		if !sameObserved(old, *n, exists, true) {
-			j.changed(n.UID)
-		}
 		j.byUID[n.UID] = cloneNamespace(*n)
 	case "DELETED":
-		if exists {
-			j.sequence++
-		}
 		delete(j.byUID, n.UID)
-		delete(j.changes, n.UID)
 	default:
 		return fail()
 	}
 	return nil
 }
-
-// Fresh records that a watch session started at at ended cleanly after all
-// of its transitions were applied: the journal is current as of at.
-func (j *NamespaceJournal) Fresh(at time.Time) {
-	if at.After(j.observed) {
-		j.observed = at
-	}
-}
-
-// ObservedAt is the start of the latest LIST or clean watch session.
-func (j *NamespaceJournal) ObservedAt() time.Time { return j.observed }
 
 // Observation is the current namespace state, sorted by UID. live keeps the
 // resourceVersions for source bases; the accepted form omits them.

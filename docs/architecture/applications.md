@@ -85,7 +85,7 @@ Control Pods use read-only filesystems, non-root identities and Restricted secur
 - Shutdown stops new work and drains in-flight work within its existing deadline. A node source cannot migrate to another node; a replacement reports a gap.
 - Each effect carries its idempotency key and attempt identity; a leader Lease does not by itself fence an effect.
 - Database restore uses the chart's `recovery` value ([restore](../installation/helm.md#restore)): `helm upgrade` with it scales hub workloads and the local connector to zero, restores and runs setup's recovery step, which advances the installation epoch; a following upgrade without it starts them again. Components read the epoch at startup and on reconnect.
-- N/N−1 hub–connector protocol compatibility is the rule, so hub and workload clusters upgrade independently. Hub upgrades roll without downtime. Rolling node upgrades drain or expire source sessions; rings are not migrated. Schema migrations expand/contract so the previous minor release runs on the current schema.
+- Hub and workload clusters upgrade independently. A connector on the same wire protocol major receives work for its advertised capabilities. Release qualification exercises adjacent minor releases in both directions. Hub upgrades roll without downtime. Rolling node upgrades drain or expire source sessions; rings are not migrated. Schema migrations expand/contract so the previous minor release runs on the current schema.
 
 ## Isolation and capacity
 

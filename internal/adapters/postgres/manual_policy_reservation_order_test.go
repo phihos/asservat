@@ -17,6 +17,7 @@ import (
 // Execute the real generated SQL calls against the existing output guard's
 // counter semantics. This is ordering evidence, not a PostgreSQL rollback test.
 type manualReservationBudget struct {
+	custodydb.DBTX
 	executions, executionCalls, collectedCalls, windows, reservations, occurrences int
 	bytes, limit                                                                   int64
 }

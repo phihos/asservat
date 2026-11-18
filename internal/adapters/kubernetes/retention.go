@@ -93,13 +93,14 @@ func retentionPolicy(v *permissionValidator, hub bool, o permissionObject, ref c
 func (c *RetentionClient) ListRetentionPolicies(ctx context.Context) ([]value.ScopedPolicy, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	rv, objects, refs, _, err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", c.client.now())
+	var rv string
+	out := []value.ScopedPolicy{}
+	err := c.client.list(ctx, "EvidenceRetentionPolicy", "evidenceretentionpolicies", &rv, false, func(o permissionObject, ref configvalue.Resource) error {
+		out = append(out, c.policy(o, ref))
+		return nil
+	})
 	if err != nil {
 		return nil, "", value.ErrUnavailable
-	}
-	out := make([]value.ScopedPolicy, 0, len(objects))
-	for i, o := range objects {
-		out = append(out, c.policy(o, refs[i]))
 	}
 	slices.SortFunc(out, func(a, b value.ScopedPolicy) int {
 		return strings.Compare(a.Policy.Revision.UID, b.Policy.Revision.UID)

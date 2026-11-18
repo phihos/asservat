@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +25,7 @@ import (
 )
 
 // The connector's announcement names exactly the operations, queries and
-// history work this package sends and answers (ADR-333).
+// history work this package sends and answers (ADR-334).
 func TestAnnouncedCapabilitiesMatchEveryMethod(t *testing.T) {
 	want := []string{capabilityHistory}
 	for _, m := range operationMethods {
@@ -35,7 +37,7 @@ func TestAnnouncedCapabilitiesMatchEveryMethod(t *testing.T) {
 	got := contracts.APIContextCapabilities()
 	slices.Sort(want)
 	slices.Sort(got)
-	if !slices.Equal(want, got) || len(got) > contracts.MaxConnectorCapabilities {
+	if !slices.Equal(want, got) {
 		t.Fatalf("announcement differs from the methods\nwant %v\ngot  %v", want, got)
 	}
 }
@@ -165,7 +167,7 @@ func helloBody(t *testing.T, h contracts.APIContextHello) []byte {
 // naming the hub's protocol, and logged with a named stage. Real
 // HTTP/2 over TLS 1.3, as the handler requires.
 func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
-	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
+	router, e := NewRouter(nil)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -181,6 +183,11 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 	srv.StartTLS()
 	defer srv.Close()
 	w := workFixture().Work
+	future := contracts.APIContextCapabilities()
+	for i := range 129 {
+		future = append(future, fmt.Sprintf("query/new-feature-%d", i))
+	}
+	future = append(future, "operation/"+strings.Repeat("x", 65))
 	for _, c := range []struct {
 		name     string
 		protocol int
@@ -192,6 +199,8 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 		// Same major, fewer capabilities (an older release): the Hello is
 		// accepted and the exchange proceeds to authentication.
 		{"older-release", contracts.ConnectorProtocolMajor, []string{"history"}, "authenticate"},
+		{"newer-release", contracts.ConnectorProtocolMajor, future, "authenticate"},
+		{"malformed-capability", contracts.ConnectorProtocolMajor, []string{""}, "hello"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			mu.Lock()
@@ -220,7 +229,7 @@ func TestHandlerChecksProtocolMajorOnly(t *testing.T) {
 			want, wantBody := http.StatusNotFound, "Unavailable\n"
 			if c.stage == "connector-protocol" {
 				// A clear refusal naming the hub's protocol, not a bare 404.
-				want, wantBody = http.StatusUpgradeRequired, ConnectorProtocolRefusal(c.protocol)
+				want, wantBody = http.StatusUpgradeRequired, fmt.Sprintf("Hub requires connector protocol major %d. Connector announced major %d (0 means unspecified). Use releases that speak the same protocol major.", contracts.ConnectorProtocolMajor, c.protocol)
 			}
 			if resp.ProtoMajor != 2 || resp.StatusCode != want || string(text) != wantBody || len(stages) != 1 || stages[0] != c.stage {
 				t.Fatalf("proto=%d status=%d body=%q stages=%v", resp.ProtoMajor, resp.StatusCode, text, stages)

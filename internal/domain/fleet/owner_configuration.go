@@ -61,7 +61,23 @@ type OwnerConfigurationObservation struct {
 }
 
 func (o OwnerConfigurationObservation) Valid(now time.Time) bool {
-	return o.Configuration.Valid() && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second)
+	return o.Configuration.Valid() && identity.Fresh(o.ObservedAt, o.FreshUntil, now, identity.SQLFencedInterval)
+}
+
+// CurrentSource reports whether the accepted configuration and its issuer roots
+// are still usable. A Kubernetes change or deletion replaces the observation.
+func (o OwnerConfigurationObservation) CurrentSource(now time.Time) bool {
+	return o.Configuration.Valid() && !o.ObservedAt.IsZero() && !o.ObservedAt.After(now) && now.Before(o.FreshUntil)
+}
+
+// ForOperation bounds a current SQL observation by the original issuer cutoff
+// and the operation's five-second owner window. Invalid source times stay invalid.
+func (o OwnerConfigurationObservation) ForOperation(now time.Time) OwnerConfigurationObservation {
+	if o.CurrentSource(now) && o.FreshUntil.Sub(o.ObservedAt) > identity.SQLFencedInterval {
+		o.ObservedAt = now
+		o.FreshUntil = identity.Check(now, identity.SQLFenced).Narrow(o.FreshUntil).Until()
+	}
+	return o
 }
 
 // OwnerRoute joins original configuration and endpoint observations. It remains
@@ -73,5 +89,5 @@ type OwnerRoute struct {
 }
 
 func (r OwnerRoute) Valid(now time.Time) bool {
-	return r.Configuration.Valid(now) && !r.Configuration.Configuration.Suspended && r.Endpoint.Valid(now) && r.Endpoint.Pool == r.Configuration.Configuration.Pool && identity.Fresh(r.ObservedAt, r.FreshUntil, now, 5*time.Second) && !r.FreshUntil.After(r.Configuration.FreshUntil) && !r.FreshUntil.After(r.Endpoint.FreshUntil)
+	return r.Configuration.Valid(now) && !r.Configuration.Configuration.Suspended && r.Endpoint.Valid(now) && r.Endpoint.Pool == r.Configuration.Configuration.Pool && identity.Fresh(r.ObservedAt, r.FreshUntil, now, identity.SQLFencedInterval) && !r.FreshUntil.After(r.Configuration.FreshUntil) && !r.FreshUntil.After(r.Endpoint.FreshUntil)
 }

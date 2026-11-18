@@ -26,7 +26,7 @@ func TestProjectionTwoBatchCleanupStaysChargedWithRealServices(t *testing.T) {
 	projectionEarlyCleanupWithRealServices(t, false)
 }
 func projectionEarlyCleanupWithRealServices(t *testing.T, single bool) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, f *queryLedgerFixture) {
 			qualifySharedProjectionLifecycleClient(t, f, "", 0, func(stage string, f *queryLedgerFixture, workers *postgres.ProjectionWorkers, q query.ContextQuery, w value.AcquisitionWorker) {
 				if !time.Now().Before(w.Intent.RunUntil) || (q.Scope.ReadBatches() == 1) != single {

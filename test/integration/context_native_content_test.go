@@ -670,6 +670,7 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 	}
 	t.Logf("actual authenticated HTTPS native GET bytes=%d; conditional request disclosed no bytes/reservation and both GETs wrote an audit row", len(body))
 }
+
 // Subtests share one database and run in sequence, so a subtest counts only
 // the content call rows recorded after its own start.
 func contentAuditStart(t *testing.T, ctx context.Context, f nativeExchangeFixture) time.Time {

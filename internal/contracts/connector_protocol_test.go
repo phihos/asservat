@@ -7,7 +7,7 @@ import (
 )
 
 // Cross-release decoding ignores unknown members but keeps the closed
-// decoder's rules for known ones (ADR-333): encoding/json matches names
+// decoder's rules for known ones (ADR-334): encoding/json matches names
 // case-insensitively, so a wrong-case alias must not reach a known field.
 func TestOpenDecoderIgnoresUnknownButKeepsKnownFieldsExact(t *testing.T) {
 	b, e := EncodeAPIContextOperation(APIContextOperation{Format: APIContextExchangeFormat, Sequence: 1, Method: "read-process", Body: json.RawMessage(`{"known":1}`)})

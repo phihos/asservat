@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"sync"
@@ -47,7 +48,7 @@ func ServeWorker(ctx context.Context, listener net.Listener, roots ClientRoots, 
 // socket and its handler have joined. No request chooses an endpoint, lifetime
 // or handler.
 func ServeOwner(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, host string, starts *contextstart.Handler, live *LiveOwnerHandler, liveConnections, startConnections int) error {
-	if starts == nil && live == nil || starts == nil && startConnections != 0 || starts != nil && startConnections < 1 || live != nil && (live.authority != host || cap(live.slots) > liveConnections) || liveConnections < 1 || liveConnections+startConnections > 64 {
+	if starts == nil && live == nil || starts == nil && startConnections != 0 || starts != nil && startConnections < 1 || live != nil && (live.authority != host || cap(live.slots) > liveConnections) || liveConnections < 1 {
 		return contracts.ErrNativeProtocol
 	}
 	return serve(ctx, listener, roots, nil, credentials, host, nil, starts, live, liveConnections, startConnections)
@@ -56,8 +57,12 @@ func ServeOwner(ctx context.Context, listener net.Listener, roots *x509.CertPool
 // Exactly one of roots (fixed) and current (per handshake) supplies ClientCAs.
 // handler is nil on the owner port, which serves only starts and live.
 func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, authority string, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
+	// Each registered cluster adds its own standby sockets to the native reservation.
+	if startConnections < 0 || nativeConnections < 1 || startConnections > math.MaxInt-nativeConnections {
+		return contracts.ErrNativeProtocol
+	}
 	connections := nativeConnections + startConnections
-	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil && starts == nil && live == nil || nativeConnections < 1 || connections > 64 || handler != nil && cap(handler.slots) > nativeConnections {
+	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil && starts == nil && live == nil || nativeConnections > 64 || handler != nil && cap(handler.slots) > nativeConnections {
 		return contracts.ErrNativeProtocol
 	}
 	host, _, err := net.SplitHostPort(authority)

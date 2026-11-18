@@ -139,7 +139,7 @@ func (p AcceptedPolicyAuthority) Valid(now time.Time) bool {
 	}
 	seen := map[string]bool{}
 	for _, o := range p.Owners {
-		if !validAudience(o) || o.Kind != "Group" || o.Role != "workload-maintainer" || o.BasisKind != "AccessBinding" || o.BasisUID != p.Delegation.UID || seen[o.AssignmentID] {
+		if !ValidAudienceAssignment(o) || o.Kind != "Group" || o.Role != "workload-maintainer" || o.BasisKind != "AccessBinding" || o.BasisUID != p.Delegation.UID || seen[o.AssignmentID] {
 			return false
 		}
 		seen[o.AssignmentID] = true

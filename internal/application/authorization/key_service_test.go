@@ -22,24 +22,6 @@ func (f keyBackendFunc) Execute(c context.Context, r value.KeyRequest) (value.Ke
 	return f(c, r)
 }
 
-func TestKeyServiceRequiresCurrentKeyConfiguration(t *testing.T) {
-	now := time.Now().UTC()
-	scope := value.KeyScope{InstallationID: "00000000-0000-4000-8000-000000000001", Purpose: "artifact", KeyID: "evidence"}
-	r := value.KeyRequest{Scope: scope, AuthorityID: "00000000-0000-4000-8000-000000000002", Operation: "wrap", Binding: []byte("binding"), Input: []byte("synthetic keyset")}
-	p := value.KeyPeer{InstallationID: scope.InstallationID, PeerID: "00000000-0000-4000-8000-000000000003", Role: "collector", Certificate: artifact.Digest{1}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Minute)}
-	s := KeyService{Scope: scope, Now: time.Now,
-		Authority: keyAuthorityFunc(func(_ context.Context, p value.KeyPeer, i value.KeyRequestInfo) (value.KeyOperationPermit, error) {
-			return value.KeyOperationPermit{AuthorityID: i.AuthorityID, RecoveryEpoch: "00000000-0000-4000-8000-000000000004", Revision: 1, Certificate: p.Certificate, RequestDigest: i.RequestDigest, ObservedAt: now, ValidUntil: now.Add(4 * time.Second)}, nil
-		}),
-		Backend: keyBackendFunc(func(context.Context, value.KeyRequest) (value.KeyResult, error) {
-			return value.KeyResult{Sealed: artifact.SealedKey{Reference: "synthetic", Ciphertext: "synthetic"}}, nil
-		}),
-	}
-	if _, err := s.Execute(context.Background(), p, r); err == nil {
-		t.Fatal("a service without current key configuration accepted an operation")
-	}
-}
-
 func TestKeyServiceOriginalAuthorityBounds(t *testing.T) {
 	base := time.Now().UTC()
 	scope := value.KeyScope{InstallationID: "00000000-0000-4000-8000-000000000001", Purpose: "artifact", KeyID: "evidence"}
@@ -84,7 +66,7 @@ func TestKeyServiceOriginalAuthorityBounds(t *testing.T) {
 			if mode == "missing-authority" {
 				s.Authority = nil
 			}
-			s.Backend = keyBackendFunc(func(c context.Context, r value.KeyRequest) (value.KeyResult, error) {
+			operations := keyBackendFunc(func(c context.Context, r value.KeyRequest) (value.KeyResult, error) {
 				calls++
 				if !bytes.Equal(r.Binding, request.Binding) {
 					t.Fatal("authority changed backend binding")
@@ -106,7 +88,7 @@ func TestKeyServiceOriginalAuthorityBounds(t *testing.T) {
 				return value.KeyResult{Output: secret}, nil
 			})
 			checks := 0
-			s.Backend = guardedKeyBackend{s.Backend, func(_ context.Context, k value.KeyScope, epoch string) (time.Time, error) {
+			s.Backend = guardedKeyBackend{&KeyGeneration{Operations: operations}, func(_ context.Context, k value.KeyScope, epoch string) (time.Time, error) {
 				checks++
 				if k != scope || epoch != "00000000-0000-4000-8000-000000000004" {
 					t.Fatal("configuration lost operation binding")
@@ -175,10 +157,11 @@ func TestKeyRequestDigestCoversExactOperation(t *testing.T) {
 
 // Unit-only configuration source; the production backend uses Kubernetes/SQL.
 type guardedKeyBackend struct {
-	KeyOperationBackend
+	keys  *KeyGeneration
 	check func(context.Context, value.KeyScope, string) (time.Time, error)
 }
 
-func (s guardedKeyBackend) CurrentKeyConfiguration(c context.Context, k value.KeyScope, e string) (time.Time, error) {
-	return s.check(c, k, e)
+func (s guardedKeyBackend) CurrentKeyConfiguration(c context.Context, k value.KeyScope, e string) (*KeyGeneration, time.Time, error) {
+	until, err := s.check(c, k, e)
+	return s.keys, until, err
 }

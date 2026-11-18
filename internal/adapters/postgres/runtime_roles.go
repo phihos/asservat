@@ -31,7 +31,7 @@ func RuntimeRoles(installation string) ([]RuntimeRole, error) {
 	}
 	var out []RuntimeRole
 	add := func(name string, named bool, connections int, limited bool, grants []publicRuntimeGrant, planned bool) error {
-		if !named || !limited || !planned || connections < 1 {
+		if !named || !limited || !planned || connections == 0 || connections < -1 {
 			return cfg.ErrInvalid
 		}
 		out = append(out, RuntimeRole{Name: name, Connections: connections, grants: grants})
@@ -97,6 +97,9 @@ func EnsureRuntimeRoles(ctx context.Context, admin *pgx.ConnConfig, installation
 		defer cancel()
 		_ = conn.Close(end)
 	}()
+	if err := retireAuditPublisherLogins(ctx, conn, installation); err != nil {
+		return report, err
+	}
 	for _, role := range roles {
 		password, ok := logins[role.Name]
 		if !ok {
@@ -114,6 +117,45 @@ func EnsureRuntimeRoles(ctx context.Context, admin *pgx.ConnConfig, installation
 		}
 	}
 	return report, nil
+}
+
+// The two audit publishers formerly had stable role ordinals and disk-backed
+// credentials. Revoking their privileges also fences already-open sessions.
+func retireAuditPublisherLogins(ctx context.Context, conn *pgx.Conn, installation string) error {
+	prefix := "as_" + strings.ReplaceAll(installation, "-", "")
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", runtimeRoleLockID); err != nil {
+			return err
+		}
+		rows, err := tx.Query(ctx, "SELECT rolname FROM pg_roles WHERE rolname=ANY($1::text[])", []string{prefix + "_pub_73", prefix + "_cfg_02"})
+		if err != nil {
+			return err
+		}
+		names, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return err
+		}
+		for _, role := range names {
+			name := pgx.Identifier{role}.Sanitize()
+			if _, err := tx.Exec(ctx, "ALTER ROLE "+name+" NOLOGIN PASSWORD NULL"); err != nil {
+				return &RuntimeRoleError{Role: role, Err: err}
+			}
+			if err := revokeRuntimeGrants(ctx, tx, name); err != nil {
+				return &RuntimeRoleError{Role: role, Err: err}
+			}
+		}
+		return nil
+	})
+}
+
+// REVOKE on tables also revokes privileges on their columns.
+func revokeRuntimeGrants(ctx context.Context, tx pgx.Tx, quotedName string) error {
+	for _, object := range []string{"ALL TABLES IN SCHEMA public", "ALL SEQUENCES IN SCHEMA public", "ALL ROUTINES IN SCHEMA public", "SCHEMA public"} {
+		if _, err := tx.Exec(ctx, "REVOKE ALL ON "+object+" FROM "+quotedName); err != nil {
+			return cfg.ErrDenied
+		}
+	}
+	return nil
 }
 
 // RuntimeRoleError names the role whose reconciliation failed.
@@ -170,18 +212,8 @@ func ensureRuntimeRole(ctx context.Context, conn *pgx.Conn, role RuntimeRole, pa
 	if err != nil {
 		return false, cfg.ErrDenied
 	}
-	// Reconcile privileges: revoke everything in the schema, then grant the
-	// compiled plan, inside one transaction. Revoking table privileges also
-	// revokes column privileges.
-	for _, statement := range []string{
-		"REVOKE ALL ON ALL TABLES IN SCHEMA public FROM " + name,
-		"REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM " + name,
-		"REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM " + name,
-		"REVOKE ALL ON SCHEMA public FROM " + name,
-	} {
-		if _, err = tx.Exec(ctx, statement); err != nil {
-			return false, cfg.ErrDenied
-		}
+	if err = revokeRuntimeGrants(ctx, tx, name); err != nil {
+		return false, err
 	}
 	for _, g := range role.grants {
 		if _, err = tx.Exec(ctx, g.sql(role.Name)); err != nil {

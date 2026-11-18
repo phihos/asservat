@@ -297,7 +297,7 @@ func (f *publicJourneyNative) enrollAndStart(t *testing.T, ctx context.Context, 
 	digest, e := c.PublicKeyDigest()
 	publicJourneyRequire(t, "original worker public key", e)
 	keyTLS := newKeyTLSFor(t, f.target.InstallationID, "artifact", f.keyAuthority, f.keys.backend, func(http.Handler) http.Handler {
-		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keys.scope, Authority: f.keyAuthority, Backend: fixtureConfiguredKeyBackend{f.keys.backend}, Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
+		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keys.scope, Authority: f.keyAuthority, Backend: configuredFixtureKeys(f.keys.backend), Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
 		publicJourneyRequire(t, "actual key handler", e)
 		return h
 	})

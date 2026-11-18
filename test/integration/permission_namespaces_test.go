@@ -85,13 +85,13 @@ func TestPermissionNamespaceBindingsWithRealKubernetes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("reconciliation-with-SQL-and-encrypted-audit", func(t *testing.T) {
-		testGuardedReconciliation(t, ctx, c, observer, trust, plan, fixture.Postgres, fixture.S3, fixture.Token)
+		testGuardedReconciliation(t, ctx, c, observer, trust, plan, fixture.Postgres, fixture.Token)
 		testIdentitySettings(t, ctx, c, permissionFixtureCluster, plan.ControlNamespace, fixture.Token)
 	})
 	t.Run("namespace-inheritance-with-real-namespaces-SQL-and-audit", func(t *testing.T) {
-		testInheritedReconciliation(t, c, observer, trust, plan, fixture.Postgres, fixture.S3)
+		testInheritedReconciliation(t, c, observer, trust, plan, fixture.Postgres)
 	})
 	t.Run("decision-time-reviews-with-real-subject-access-reviews-SQL-and-audit", func(t *testing.T) {
-		testDecisionTimeReviews(t, c, fixture.Postgres, fixture.S3)
+		testDecisionTimeReviews(t, c, fixture.Postgres)
 	})
 }

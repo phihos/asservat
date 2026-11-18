@@ -10,10 +10,8 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ReadOwnerObservationCandidates is a separate complete observation-routing
-// read using the original accepted candidate limit. It never changes the old
-// fixed-limit context-start reader and reuses the existing read credential.
-// It shares the owner configuration lock. No writes,
+// ReadOwnerObservationCandidates selects the server bindings under the current
+// configuration's candidate limit and shared lock. No writes,
 // addresses, certificate claims or human authority are produced by discovery.
 func (s *OwnerEnrollments) ReadOwnerObservationCandidates(ctx context.Context) (value.APIContextOwnerCandidates, error) {
 	var out value.APIContextOwnerCandidates

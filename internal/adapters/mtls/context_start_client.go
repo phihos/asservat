@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,12 +23,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ContextStartExchangesPerOwner bounds concurrent exchanges to one owner
-// process (ADR-271): a second standby per cluster keeps a query or attach
-// possible while the other is attached, querying or reopening. The hub's
-// per-cluster standby limit still applies.
-const ContextStartExchangesPerOwner = 2
-
 // ContextStartClient has one installed pool and connector, no caller URL or
 // callback. Every Open is one outbound POST, never a retry of attached work.
 // The connector authenticates each exchange with its ServiceAccount token
@@ -42,12 +35,11 @@ type ContextStartClient struct {
 	roots     *x509.CertPool
 	verifier  *OwnerPeerVerifier
 	owners    OwnerPeerAuthenticator
-	address   string // ADR-172 fixed dial endpoint
 	connector value.ConnectorProcessIdentity
 	token     func() ([]byte, error)
 	process   execution.APIProcessReader
 	now       func() time.Time
-	dial      func(context.Context, string, string) (net.Conn, error)
+	dial      func(context.Context, value.OwnerBinding) (net.Conn, error)
 	mu        sync.Mutex
 	closed    bool
 	maximum   int
@@ -60,17 +52,13 @@ type OwnerPeerAuthenticator interface {
 	AuthenticateOwner(context.Context, app.OwnerPeerConnection) (value.AuthenticatedOwner, error)
 }
 
-// NewContextStartClient dials one installer-pinned host:port with the exact
-// SNI and HTTP authority of each owner (ADR-157/172). connector is this
+// NewContextStartClient dials the requested owner with its exact SNI and
+// HTTP authority (ADR-157/172). connector is this
 // process's identity; token reads the current projected ServiceAccount token.
-// dial opens the raw connection to address (the connector's hub tunnel).
-func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, address string, dial func(context.Context, string, string) (net.Conn, error), owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
-	host, port, e := net.SplitHostPort(address)
-	number, pe := strconv.Atoi(port)
-	if e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || owners == nil || dial == nil {
-		return nil, value.ErrInvalid
-	}
-	if ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || !connector.Valid() || token == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
+// dial opens the raw connection through the connector's hub tunnel.
+func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, dial func(context.Context, value.OwnerBinding) (net.Conn, error), owners OwnerPeerAuthenticator, connector value.ConnectorProcessIdentity, token func() ([]byte, error), process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+
+	if dial == nil || owners == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || !connector.Valid() || token == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
 		return nil, value.ErrInvalid
 	}
 	if connector.Binding.InstallationID != pool.InstallationID || connector.Binding.IssuerEpoch != pool.IssuerEpoch {
@@ -81,7 +69,7 @@ func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 		return nil, e
 	}
 	root, cancel := context.WithCancel(ctx)
-	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, address: address, connector: connector, token: token, process: process, now: now, dial: dial, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
+	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, owners: owners, connector: connector, token: token, process: process, now: now, dial: dial, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
 }
 
 // ContextStartExchange owns the actual one-socket HTTP/2 request. The transport
@@ -89,7 +77,6 @@ func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 // Close interrupts the socket/body and joins setup, including the Hello writer.
 type ContextStartExchange struct {
 	client             *ContextStartClient
-	owner              value.OwnerBinding
 	ctx                context.Context
 	cancel             context.CancelFunc
 	mu                 sync.Mutex
@@ -268,26 +255,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	return out, nil
 }
 
-// OpenDiscovered preserves the original complete discovery cutoff through
-// setup. It is distinct from the longer, non-authorizing standby residency.
-func (c *ContextStartClient) OpenDiscovered(ctx context.Context, owner value.OwnerBinding, observed value.APIContextOwnerCandidates) (*ContextStartExchange, error) {
-	diagnostic := newContextStartOpeningDiagnostic(ctx, observed.ValidUntil)
-	if c == nil || !observed.Valid(c.now()) || observed.Pool != c.pool {
-		return nil, diagnostic.wrap(value.ErrUnavailable)
-	}
-	found := false
-	for _, b := range observed.Owners {
-		if b == owner {
-			found = true
-		}
-	}
-	if !found {
-		return nil, diagnostic.wrap(value.ErrDenied)
-	}
-	return c.open(ctx, owner, observed.ValidUntil)
-}
-
-func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding, discoveryUntil time.Time) (result *ContextStartExchange, resultErr error) {
+// OpenRequested treats the hint as a locator. Opening still verifies the actual
+// TLS peer and its registered binding. The hint's deadline bounds setup.
+func (c *ContextStartClient) OpenRequested(ctx context.Context, owner value.OwnerBinding, discoveryUntil time.Time) (result *ContextStartExchange, resultErr error) {
 	diagnostic := newContextStartOpeningDiagnostic(ctx, discoveryUntil)
 	// Registered first: observe the refusal only after every existing join.
 	defer func() { resultErr = diagnostic.wrap(resultErr) }()
@@ -300,18 +270,12 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, value.ErrInvalid
 	}
 	c.mu.Lock()
-	same := 0
-	for e := range c.active {
-		if e.owner == owner {
-			same++
-		}
-	}
-	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum || same >= ContextStartExchangesPerOwner {
+	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum {
 		c.mu.Unlock()
 		return nil, value.ErrUnavailable
 	}
 	work, cancel := context.WithCancel(ctx)
-	exchange := &ContextStartExchange{client: c, owner: owner, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
+	exchange := &ContextStartExchange{client: c, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
 	c.active[exchange] = struct{}{}
 	c.mu.Unlock()
 	success := false
@@ -362,7 +326,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, e
 	}
 	diagnostic.at("dial")
-	raw, e := c.dial(setup, "tcp", c.address)
+	raw, e := c.dial(setup, owner)
 	if e != nil || raw == nil {
 		if raw != nil {
 			_ = raw.Close()
@@ -479,7 +443,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, value.ErrUnavailable
 	}
 	if response.StatusCode == http.StatusUpgradeRequired && response.ProtoMajor == 2 {
-		// ADR-333: the authenticated hub refuses this connector's protocol;
+		// ADR-334: the authenticated hub refuses this connector's protocol;
 		// keep its bounded, printable message for the operator's log.
 		message := hubRefusalText(response.Body)
 		exchange.interrupt()
@@ -534,7 +498,7 @@ func (e receiverCheckStep) Unwrap() error             { return e.err }
 func (e receiverCheckStep) ReceiverCheckStep() string { return e.step }
 
 // HubProtocolRefusal is the hub's refusal of this connector's protocol major
-// (HTTP 426, ADR-333). Message is the hub's bounded printable text.
+// (HTTP 426, ADR-334). Message is the hub's bounded printable text.
 type HubProtocolRefusal struct{ Message string }
 
 func (e *HubProtocolRefusal) Error() string     { return "hub refused connector protocol: " + e.Message }

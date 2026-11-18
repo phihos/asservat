@@ -78,7 +78,7 @@ type recordingGroupBasisFacts struct {
 }
 
 func (p *recordingGroupFacts) owns(q *custodydb.Queries, s custodydb.PermissionStream) bool {
-	return p != nil && q == p.q && s.ID == p.stream.ID && s.Epoch == p.stream.Epoch && s.Sequence == p.stream.Sequence && s.InitialAuditID == p.stream.InitialAuditID && s.ObservedAt == p.stream.ObservedAt && s.FreshUntil == p.stream.FreshUntil && s.LeaseUntil == p.stream.LeaseUntil && s.Suspended == p.stream.Suspended && bytes.Equal(s.ProjectionDigest, p.stream.ProjectionDigest) && bytes.Equal(s.TrustDigest, p.stream.TrustDigest)
+	return p != nil && q == p.q && s.ID == p.stream.ID && s.Epoch == p.stream.Epoch && s.Sequence == p.stream.Sequence && s.ObservedAt == p.stream.ObservedAt && s.FreshUntil == p.stream.FreshUntil && s.LeaseUntil == p.stream.LeaseUntil && s.Suspended == p.stream.Suspended && bytes.Equal(s.ProjectionDigest, p.stream.ProjectionDigest) && bytes.Equal(s.TrustDigest, p.stream.TrustDigest)
 }
 func groupPolicyTarget(a authorization.AcceptedPolicyAuthority, t authorization.Target) bool {
 	return t.Valid() && t.ClusterID == a.ClusterID && t.NamespaceUID == a.NamespaceUID && t.WorkloadUID == a.WorkloadUID

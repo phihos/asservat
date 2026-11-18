@@ -4179,6 +4179,7 @@ components:
                       basis_kind:
                         enum:
                         - AccessBinding
+                        - ClusterAccessBinding
                         - PermissionSource
                       basis_uid:
                         type: string
@@ -4198,7 +4199,7 @@ components:
                 assignments_total:
                   type: integer
                   minimum: 0
-                  maximum: 256
+                  maximum: 9007199254740991
                 valid_until:
                   type: string
                   format: date-time
@@ -6037,6 +6038,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string
@@ -6076,6 +6078,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string

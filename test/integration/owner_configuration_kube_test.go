@@ -124,14 +124,14 @@ func exerciseOwnerConfiguration(t *testing.T, ctx context.Context, f fixture, ad
 		t.Fatal("owner source admission qualification", err)
 	}
 	lab := ownerConfigurationLab(t, ctx, f, observed.Configuration)
-	observer := &app.OwnerConfigurationObserver{Reader: source, Ledger: lab.writer, Audit: lab.audit, Acknowledgements: lab.ack, Now: time.Now}
-	if _, _, err = lab.writer.ObserveOwnerConfiguration(ctx, observed); err != nil {
+	observer := refreshedOwnerConfiguration{source, lab}
+	if err = lab.observe(ctx, observed); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = lab.reader.ReadOwnerConfiguration(ctx); err == nil {
-		t.Fatal("unaudited owner configuration usable")
+	if _, err = lab.reader.ReadOwnerConfiguration(ctx); err != nil {
+		t.Fatal("committed owner configuration unavailable", err)
 	}
-	routes := app.OwnerRoutes{Configurations: refreshedOwnerConfiguration{observer, lab.reader}, Endpoints: endpoints, Now: time.Now}
+	routes := app.OwnerRoutes{Configurations: observer, Endpoints: endpoints, Now: time.Now}
 	route, err := routes.CurrentOwnerRoute(ctx, b)
 	if err != nil || !route.Valid(time.Now()) || !route.Configuration.Configuration.Equal(observed.Configuration) {
 		t.Fatal("protected route composition", err)
@@ -191,7 +191,7 @@ func exerciseOwnerConfiguration(t *testing.T, ctx context.Context, f fixture, ad
 	if err = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, binding.Name, meta.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if err = observer.Observe(ctx); err == nil {
+	if _, err = observer.ReadOwnerConfiguration(ctx); err == nil {
 		t.Fatal("missing admission protection accepted")
 	}
 	if _, err = lab.reader.ReadOwnerConfiguration(ctx); err == nil {

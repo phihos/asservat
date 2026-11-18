@@ -20,7 +20,7 @@ func LiveSourceEligibility(i identity.Identity, p Projection, target Target, aud
 		return Result{Reason: "SourceUnavailable"}
 	}
 	for _, a := range audience {
-		if !validAudience(a) {
+		if !ValidAudienceAssignment(a) {
 			return Result{Reason: "SourceUnavailable"}
 		}
 	}

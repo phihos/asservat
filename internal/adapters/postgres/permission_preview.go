@@ -25,8 +25,8 @@ import (
 // It reads no catalog, evidence or group membership and writes nothing.
 func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
 	var out cfg.PreviewSnapshot
-	err := p.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := q.SharePermissionStream(ctx, id(p.root))
+	err := p.snapshot(ctx, func(q *custodydb.Queries) error {
+		s, offset, err := readPermissionStreamClock(ctx, q, p.root)
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			if !isReview(ref) {
 				continue
 			}
-			rows, err := q.SelectPreviewReviewAssignments(ctx, custodydb.SelectPreviewReviewAssignmentsParams{StreamID: s.ID, SourceUid: ref.UID, Epoch: s.Epoch, SeenSequence: s.Sequence})
+			rows, err := q.SelectPreviewReviewAssignments(ctx, custodydb.SelectPreviewReviewAssignmentsParams{StreamID: s.ID, SourceUid: ref.UID, Epoch: s.Epoch})
 			if err != nil {
 				return err
 			}
@@ -166,6 +166,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 					if err = previewReviews(ctx, q, &cell, reviewRows, reviewSource); err != nil {
 						return err
 					}
+					offset.projection(&cell.Projection)
 				case errors.Is(err, cfg.ErrUnavailable):
 					cell.Unavailable = authorization.UnmetPermissionStale
 				case errors.Is(err, cfg.ErrLimit):
@@ -194,7 +195,7 @@ func currentNamespaceObservations(ctx context.Context, q *custodydb.Queries, s c
 	if err != nil {
 		return nil, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || s.Sequence < 1 || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+	if s.Suspended || s.Sequence < 1 || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return nil, nil
 	}
 	raw, err := q.ReadPermissionChangeRecord(ctx, custodydb.ReadPermissionChangeRecordParams{StreamID: s.ID, Epoch: s.Epoch, Sequence: s.Sequence})

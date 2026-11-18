@@ -24,7 +24,7 @@ The following logical schema is normative. TASK-02 must produce migrations and q
 
 | Table family | Keys and relationships | Invariant / query index |
 | --- | --- | --- |
-| `config_projection`, `cluster` | Unique source cluster/resource UID; cluster UUID generated from the unique cluster name | Accepted digest/generation, deletion marker; cluster `revoked` flag, connection-holding replica, connection times |
+| `config_projection`, `cluster` | Unique source cluster/resource UID; cluster UUID generated from the unique cluster name | Accepted digest/generation and deletion marker. Hub Helm values own registration and revocation. Federation removes withdrawn AccessBinding deliveries and ends the old permission lease in one transaction. |
 | `operation`, `capture`, `action_attempt` | Unique caller/client/idempotency-key digest; unique source request UID/generation; unique capture/action/target/attempt | Request digest mismatch returns Conflict; immutable execution; never retry an ambiguous intrusive start as a fresh attempt |
 | `capture_history` | Unique accepted capture ID; selector/settings digests; optional repeated-from ID | Settings snapshot in the row; selector/time/capture-ID listing with cursor pagination and current and retained audience checks; expires with the capture's case-metadata retention; never cascade-delete execution state |
 | `case_record`, `occurrence` | Case UUID; unique cluster/occurrence UUID | Content-minimized signature and time/scope indexes; occurrence association does not authorize every artifact in a case |

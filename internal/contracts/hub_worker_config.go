@@ -1,8 +1,6 @@
 package contracts
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 )
@@ -18,7 +16,6 @@ const HubWorkerConfigFormat = "asservat-hub-worker-config/v1"
 // HubWorkerConfigFile is the ConfigMap key and file name under
 // HubWorkerDeploymentRoot.
 const HubWorkerConfigFile = "config.json"
-const HubWorkerConfigMaxBytes = 256 << 10
 
 // Fixed files under HubWorkerDeploymentRoot, projected by the chart.
 const (
@@ -110,17 +107,8 @@ var ErrHubWorkerConfig = errors.New("invalid hub-worker configuration")
 // fields. Helm renders it with toJson, so key order and omitted zero fields
 // are not significant.
 func DecodeHubWorkerConfig(r io.Reader) (HubWorkerConfig, error) {
-	var out HubWorkerConfig
-	if r == nil {
-		return out, ErrHubWorkerConfig
-	}
-	b, err := io.ReadAll(io.LimitReader(r, HubWorkerConfigMaxBytes+1))
-	if err != nil || len(b) == 0 || len(b) > HubWorkerConfigMaxBytes {
-		return out, ErrHubWorkerConfig
-	}
-	d := json.NewDecoder(bytes.NewReader(b))
-	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil || d.Decode(new(any)) != io.EOF || out.Format != HubWorkerConfigFormat {
+	out, err := decodeServiceConfig[HubWorkerConfig](r)
+	if err != nil || out.Format != HubWorkerConfigFormat {
 		return HubWorkerConfig{}, ErrHubWorkerConfig
 	}
 	return out, nil

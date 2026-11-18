@@ -93,7 +93,7 @@ func (s Share) Valid() bool {
 		return false
 	}
 	for _, a := range s.Management {
-		if !validAudience(a) || !sharingRole(a.Role) {
+		if !ValidAudienceAssignment(a) || !sharingRole(a.Role) {
 			return false
 		}
 	}

@@ -232,6 +232,10 @@ spec:
           command: [/asservat, {{ .command }}]
           {{- if .port }}
           ports: [{name: {{ $c }}, containerPort: {{ .port }}, protocol: TCP}]
+          {{- if eq $c "federation" }}
+          readinessProbe:
+            tcpSocket: {port: federation}
+          {{- end }}
           {{- end }}
           securityContext: {{- include "asservat.securityContext" $root | nindent 12 }}
           resources: {{- include "asservat.resources" (list $root $c) | nindent 12 }}

@@ -1,7 +1,7 @@
 # Optional connector certificates
 
 C-04 with the C-21 PKI adapter under TASK-03, S-01 and REQ-FED-001
-([ADR-334](../decisions/334-connector-workload-identity.md) item 6). The
+([ADR-334](../decisions/334-connector-workload-identity.md)). The
 connector's credential is its projected ServiceAccount token
 ([connector identity](connector-credentials.md)). Where the hub is exposed by
 TLS passthrough, a cluster's values may additionally enable a client

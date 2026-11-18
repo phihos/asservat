@@ -322,9 +322,7 @@ installation with zero peers. Existing installations do not gain the issuance
 purposes; they require a role layout migration, which is out of scope.
 
 Open risks:
-- The connector backing's `ValidUntil` needs a renewal plan. Resolved by
-  [ADR-332](332-standing-connector-identity.md): the backing is standing,
-  valid until replaced.
+- [ADR-334](334-connector-workload-identity.md) replaces the connector backing with a standing cluster registration and kubelet-rotated ServiceAccount tokens.
 - The installed owner probe list allows one catalog cluster slot (ADR-185).
 
 ## Implementation

@@ -28,7 +28,7 @@ func TestLegacyProfileAcquisitionWithRealPostgres(t *testing.T) {
 }
 
 func qualifyProfileAcquisitionFixture(t *testing.T, legacy bool) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("profile-acquisition-publication", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, f *queryLedgerFixture) {
 				if !legacy {

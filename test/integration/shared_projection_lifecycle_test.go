@@ -32,7 +32,7 @@ import (
 // The SQL native-close call models a positively joined private operation; the
 // real framed join is qualified separately by TestNativeApprovedProjection*.
 func TestSharedProjectionLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("legacy-projection-native-key-authority", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifySharedProjectionLifecycle)
 		})

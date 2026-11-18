@@ -102,8 +102,17 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if d.Decode(&back) != nil {
 		t.Fatal("offer decode")
 	}
-	if !back.Complete() || back.Owners.Address != "asservat-hub-api-native.hub.svc:9444" || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" {
+	if !back.Complete() || back.KeyService.Endpoint != "https://asservat-key-service.hub.svc:9447" || back.EvidenceStore.StoreID != runtimeID || back.EvidenceStore.Bucket != "asservat-evidence" {
 		t.Fatal("executor section", string(raw))
+	}
+	// A kept offer from before owner-directed tunnels can be read after upgrade.
+	legacy := bytes.Replace(raw, []byte(`"owners":{`), []byte(`"owners":{"address":"old-native.hub.svc:9444",`), 1)
+	if bytes.Equal(raw, legacy) {
+		t.Fatal("legacy offer missing owners")
+	}
+	legacyAPI := fake.NewSimpleClientset(&core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: o.name, Namespace: o.namespace}, Data: map[string]string{contracts.RegionalOfferFile: string(legacy)}})
+	if stored, err := o.ensure(ctx, legacyAPI); err != nil || !stored.Complete() || stored.Owners.Configuration.Service != back.Owners.Configuration.Service {
+		t.Fatal("could not reuse the stored owner pool", err)
 	}
 	cfg := regionalConfig{binding: value.PeerBinding{InstallationID: runtimeID, IssuerEpoch: runtimeID}}
 	if p, err := regionalOwnerPool(cfg, back.Owners.Configuration); err != nil || p != pool {
@@ -119,7 +128,7 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if err != nil {
 		t.Fatal("ensure", err)
 	}
-	c.Namespace, c.PermissionRootID, c.Public.Standby, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 2, 1
+	c.Namespace, c.PermissionRootID, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 1
 	local, err := localCatalogCluster(c, o, stored)
 	if err != nil {
 		t.Fatal("local cluster", err)
@@ -127,17 +136,17 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	if local.Connector.SourceUID != peer || local.ClusterID != runtimeID {
 		t.Fatal("local connector peer", local.Connector)
 	}
-	if local.Standby != 2 {
+	if local.Standby != local.Captures+1 {
 		t.Fatal("local catalog entry", local.Standby)
 	}
 	// A registered mode=cluster cluster derives the same entry for its own IDs
-	// and release namespace; no executor digest is pinned (ADR-333).
+	// and release namespace; no executor digest is pinned (ADR-334).
 	const remote = "40000000-0000-4000-8000-000000000001"
 	remotePeer, ok := contracts.RemotePeerID(runtimeID, remote)
 	if !ok || remotePeer == peer {
 		t.Fatal("remote peer", remotePeer)
 	}
-	entry, err := catalogCluster(stored, stored.Image, remote, remotePeer, "asservat-system", "asservat", 2, 1, "remote-cluster")
+	entry, err := catalogCluster(stored, stored.Image, remote, remotePeer, "asservat-system", "asservat", 1, "remote-cluster")
 	if err != nil {
 		t.Fatal("remote cluster", err)
 	}

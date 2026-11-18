@@ -2,27 +2,18 @@ package integration
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"errors"
 	"net/url"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,7 +25,7 @@ import (
 
 // Real API/admission/watch + PostgreSQL + encrypted S3 composition. The test
 // deliberately keeps key custody synthetic; no production IdP/collector exists.
-func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, s3endpoint, readerToken string) {
+func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config, reader *kube.PermissionClient, guard *kube.PermissionGuard, plan cfg.PermissionAdministration, dsn, readerToken string) {
 	t.Helper()
 	cluster, targetNS := permissionFixtureCluster, permissionFixtureTarget(t, ctx, c)
 	control := plan.ControlNamespace
@@ -96,39 +87,11 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 	if err != nil {
 		t.Fatal(err)
 	}
-	bridge := tlsBridge(t, s3endpoint)
-	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
-	s3api := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
-	bucket := "reconciler-audit"
-	if _, err = s3api.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s3api.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
-	}
-	objects, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := make([]byte, 32)
-	if _, err = rand.Read(key); err != nil {
-		t.Fatal(err)
-	}
-	block, err := aes.NewCipher(key)
-	clear(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keys := authorityTestKeys{aead}
-	writer := &objectstore.AuthorityObjects{Store: objects, Seal: keys, Open: keys}
+
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
-	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, Trust: guard, Store: store, Now: time.Now, NewID: custodyID}
+	reconciler := configapp.BindingReconciler{RootID: root, Reader: reader, Watcher: reader, WatchConfiguration: reader.WatchConfiguration, ReadSources: reader.PermissionSources, Trust: guard, Store: store, Now: time.Now, NewID: custodyID}
 	go func() { done <- reconciler.Run(runCtx) }()
 	stopped := false
 	defer func() {
@@ -163,15 +126,6 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		}
 	}
 	wait(func() bool { p, e := store.Permissions(ctx, target); return e == nil && p.DeniesComplete })
-	if p, e := store.Permissions(ctx, target); e != nil || len(p.Allows) != 0 {
-		t.Fatalf("allows activated before audit: %v", e)
-	}
-	publish := func() {
-		t.Helper()
-		if err := (auditapp.AuthorityPublisher{Ledger: store, Objects: writer}).PublishAuthority(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
 	current := func(subject string) string {
 		p, e := store.Permissions(ctx, target)
 		if e != nil {
@@ -185,7 +139,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		return ""
 	}
 	var original string
-	wait(func() bool { publish(); original = current("original-owner"); return original != "" })
+	wait(func() bool { original = current("original-owner"); return original != "" })
 	// Real native admission -> bounded reader -> journal -> SQL -> encrypted
 	// audit -> current automation projection, without a directory credential.
 	installation := custodyID()
@@ -200,7 +154,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		}
 	}
 	wait(func() bool {
-		publish()
+
 		permissions, e := store.Permissions(ctx, target)
 		if e != nil {
 			return false
@@ -231,7 +185,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 			t.Fatal(e)
 		}
 	}
-	wait(func() bool { publish(); id := current("original-owner"); return id != "" && id != original })
+	wait(func() bool { id := current("original-owner"); return id != "" && id != original })
 	var transitions int
 	if err = pool.QueryRow(ctx, "SELECT count(*) FROM permission_assignment WHERE stream_id=$1 AND subject_id='temporary-owner' AND retired_at IS NOT NULL", root).Scan(&transitions); err != nil || transitions != 1 {
 		t.Fatalf("intermediate owner lost: %d %v", transitions, err)
@@ -246,7 +200,7 @@ func testGuardedReconciliation(t *testing.T, ctx context.Context, c *rest.Config
 		case <-until.C:
 			waiting = false
 		case <-tick.C:
-			publish()
+
 		case err := <-done:
 			stopped = true
 			t.Fatalf("watch renewal stopped: %v", err)

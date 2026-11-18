@@ -29,6 +29,7 @@ type LiveClient struct {
 	Kind       identity.Kind
 	PathIDs    []string
 }
+
 // LiveLimits are per-viewer resource bounds; a watch has no lifetime or total
 // output limit (ADR-335 D9).
 type LiveLimits struct {
@@ -52,7 +53,7 @@ func liveProjection(p string) bool {
 	return p == "packetMetadata" || p == "syscallMetadata" || p == "httpHeaders"
 }
 func (l LiveRead) valid(paths map[string]bool) bool {
-	if !l.Root.Valid() || l.Projections == nil || len(l.Projections) > 3 || l.Clients == nil || len(l.Clients) > 64 || l.Ceilings == nil || len(l.Ceilings) > 128 {
+	if !l.Root.Valid() || l.Projections == nil || len(l.Projections) > 3 || l.Clients == nil || len(l.Clients) > 64 || l.Ceilings == nil {
 		return false
 	}
 	for n, p := range l.Projections {
@@ -63,15 +64,10 @@ func (l LiveRead) valid(paths map[string]bool) bool {
 	clients := map[[2]string]bool{}
 	for _, c := range l.Clients {
 		k := [2]string{c.Issuer, c.ID}
-		if clients[k] || !identity.Text(c.Issuer, 2048) || c.Issuer == "" || !identity.Text(c.ID, 256) || c.ID == "" || !identity.ValidKind(c.Kind) || c.PathIDs == nil || len(c.PathIDs) > 32 {
+		if clients[k] || !identity.Text(c.Issuer, 2048) || c.Issuer == "" || !identity.Text(c.ID, 256) || c.ID == "" || !identity.ValidKind(c.Kind) || !validClientPaths(c.PathIDs, paths) {
 			return false
 		}
 		clients[k] = true
-		for n, id := range c.PathIDs {
-			if !paths[id] || slices.Contains(c.PathIDs[:n], id) {
-				return false
-			}
-		}
 	}
 	scopes := map[[3]string]bool{}
 	for _, c := range l.Ceilings {

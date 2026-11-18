@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
+
 	app "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -76,13 +77,12 @@ func validateHubWorkerPermission(c contracts.HubWorkerConfig, control cfg.Namesp
 	return nil
 }
 
-// permissionWorker is the ADR-189 hub-worker child: the supervised permission
-// reconciler and the authority audit publisher for the permission root, with
+// permissionWorker supervises the permission reconciler together with
 // the retention source, worker configuration acceptance, context deletion and
 // browser/identity settings projections of present subsections.
 type permissionWorker struct {
-	reconciler          app.BindingReconciler
-	publisher           auditapp.AuthorityPublisher
+	reconciler app.BindingReconciler
+
 	authority           *authorityAuditTurn
 	retention           *retentionWorker
 	workerConfiguration *workerConfigurationWorker
@@ -214,10 +214,6 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	if err != nil {
 		return nil, &fixedStepError{"permission/store", err}
 	}
-	ledger, err := postgres.NewPermissions(startup, pools["permission-audit"], root)
-	if err != nil {
-		return nil, &fixedStepError{"permission/ledger", err}
-	}
 	// ADR-242: namespace inheritance observes the hub cluster's namespaces
 	// with its own client, so a large namespace LIST never spends the
 	// binding reconciler's request budget.
@@ -237,7 +233,7 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	p.closers = append(p.closers, stopListening)
 	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		Remote: &w.guards, Workloads: &w.guards, RemoteBindings: remoteBindings, RemoteBindingChanges: changes, Now: time.Now, NewID: uuid.NewString}
+		RemoteBindings: remoteBindings, RegisteredClusters: slices.Sorted(maps.Values(names)), RemoteBindingChanges: changes, WatchConfiguration: observer.WatchConfiguration, ReadSources: observer.PermissionSources, Now: time.Now, NewID: uuid.NewString}
 	if id := c.Identity; id != nil {
 		uid, e := observer.ConfigMapUID(startup, id.Settings)
 		if e != nil {
@@ -254,7 +250,6 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 		}
 		p.policyGrantSettings = &app.PolicyGrantSettingsObserver{Issuer: id.Issuer, Source: settings, Projection: grants, Now: time.Now}
 	}
-	p.publisher = auditapp.AuthorityPublisher{Ledger: oneAuthorityAudit{ledger}, Objects: &installedAuthorityAudit{root: root, audit: w.audit}}
 	var signing *permissionDeletionSigning
 	if c.ContextDeletion != nil {
 		signing = &permissionDeletionSigning{w: w}
@@ -318,15 +313,16 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			joins[i]()
 		}
 	}()
-	joins = append(joins, goJoined(func() {
-		if awaitReady(ctx, p.auditReady) {
-			p.publish(ctx)
-		}
-	}))
+
 	if p.policyGrantSettings != nil {
 		joins = append(joins, goJoined(func() { p.policyGrantSettings.Run(ctx, permissionReporter("hub-worker policy grant settings: ")) }))
 	}
 	if p.retention != nil {
+		joins = append(joins, goJoined(func() {
+			if awaitReady(ctx, p.auditReady) {
+				p.publishRetention(ctx)
+			}
+		}))
 		joins = append(joins, goJoined(func() {
 			if p.awaitCapacity(ctx) {
 				p.retention.run(ctx)
@@ -361,22 +357,11 @@ func (p *permissionWorker) run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// publish writes one pending authority record per admitted lease: a lease
-// admits exactly one provider audit invocation. With retention the leases
-// alternate between authority and retention records.
-func (p *permissionWorker) publish(ctx context.Context) {
-	turn := 0
-	last := "ok"
+func (p *permissionWorker) publishRetention(ctx context.Context) {
 	for ctx.Err() == nil {
 		if lease, release, err := p.authority.wait(ctx); err == nil {
 			if lease.Schedule() == nil {
-				if p.retention != nil && turn%2 == 1 {
-					p.retention.publish(lease.Context())
-				} else if outcome := regionalOutcome(p.publisher.PublishAuthority(lease.Context())); outcome != last && ctx.Err() == nil {
-					last = outcome
-					fmt.Fprintln(os.Stderr, "authority audit publish: "+outcome)
-				}
-				turn++
+				p.retention.publish(lease.Context())
 			}
 			release()
 		}
@@ -384,34 +369,6 @@ func (p *permissionWorker) publish(ctx context.Context) {
 			return
 		}
 	}
-}
-
-// oneAuthorityAudit limits a publisher pass to one pending record.
-type oneAuthorityAudit struct{ auditapp.AuthorityLedger }
-
-func (o oneAuthorityAudit) PendingAuthorityAudits(ctx context.Context) ([]audit.AuthorityRecord, error) {
-	rows, err := o.AuthorityLedger.PendingAuthorityAudits(ctx)
-	if len(rows) > 1 {
-		rows = rows[:1]
-	}
-	return rows, err
-}
-
-// installedAuthorityAudit writes one authority record under one provider
-// audit operation, scoped to its own stream root (ADR-189).
-type installedAuthorityAudit struct {
-	root  string
-	audit *installedConfigurationAudit
-}
-
-func (s *installedAuthorityAudit) WriteAuthorityAudit(ctx context.Context, r audit.AuthorityRecord) (audit.Receipt, error) {
-	if s == nil || s.audit == nil || ctx == nil || ctx.Err() != nil || !r.Valid() || r.RootID != s.root {
-		return audit.Receipt{}, mounts.ErrUnavailable
-	}
-	return s.audit.writeAuthorityAudit(ctx, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
-		writer := &objectstore.AuthorityObjects{Store: store, Seal: s.audit.providers.Sealer(), Open: s.audit.providers.Opener()}
-		return writer.WriteAuthorityAudit(call, r)
-	})
 }
 
 // writeAuthorityAudit runs one write under one authority audit provider

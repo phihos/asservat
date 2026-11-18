@@ -191,5 +191,5 @@ func (g *PermissionGuard) PermissionTrust(ctx context.Context) (port.PermissionT
 	if err != nil {
 		return out, err
 	}
-	return port.PermissionTrust{Digest: g.digest, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+	return port.PermissionTrust{Digest: g.digest, ObservedAt: start}, nil
 }

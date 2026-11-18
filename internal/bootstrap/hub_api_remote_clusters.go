@@ -28,7 +28,7 @@ func hubAPIRemoteClusters(h contracts.HubAPIConfig, ids hubAPIIDs) ([]hubAPIRemo
 	for _, c := range h.Clusters {
 		cluster := contracts.RemoteClusterID(ids.InstallationID, c.Name)
 		peer, ok := contracts.RemotePeerID(ids.InstallationID, cluster)
-		if !ok || seen[cluster] || len(validation.IsDNS1123Label(c.Name)) != 0 || len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.Standby < 1 || c.Captures < 1 {
+		if !ok || seen[cluster] || len(validation.IsDNS1123Label(c.Name)) != 0 || len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.Captures < 1 {
 			return nil, hubAPIInputError("clusters")
 		}
 		seen[cluster] = true

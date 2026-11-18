@@ -214,7 +214,7 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	// The key server trusts the real enrolled acquisition leaf and uses real SQL
 	// preparation/window slot resolution, not fixtureKeyAuthority.
 	keyTLS := newKeyTLSFor(t, f.worker.Binding.InstallationID, "artifact", keyAuthority, f.keyBackend, func(http.Handler) http.Handler {
-		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keyScope, Authority: keyAuthority, Backend: fixtureConfiguredKeyBackend{f.keyBackend}, Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
+		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keyScope, Authority: keyAuthority, Backend: configuredFixtureKeys(f.keyBackend), Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
 		if e != nil {
 			t.Fatal(e)
 		}

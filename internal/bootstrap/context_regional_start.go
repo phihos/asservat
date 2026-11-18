@@ -1,8 +1,10 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"context"
 	"errors"
+	"math/rand/v2"
 	"sync"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -376,146 +378,79 @@ type exchangeStepError struct {
 func (e exchangeStepError) Unwrap() error        { return e.error }
 func (e exchangeStepError) ExchangeStep() string { return e.step }
 
-// RegionalContextStartConnections supervises only outbound standby exchanges.
-// Each new conversation starts empty under fresh route/peer checks. It cannot
-// retain or resubmit a capture ID, work or human CurrentIdentity. An
-// uncertain attached conversation therefore never becomes an automatic retry.
+type regionalWorkWatch func(context.Context, func(connectorlifecycle.WorkHint)) (bool, error)
+
+// RegionalContextStartConnections opens work exchanges only when a hub owner
+// has a waiting request. The connector never replays a capture on reconnect.
 type RegionalContextStartConnections struct {
-	Candidates fleetapp.APIContextOwnerCandidatesReader
-	Client     *mtls.ContextStartClient
-	Local      contextstart.RegionalLocal
-	// Report receives closed diagnostic labels only and must not block.
-	Report func(string)
-	// ReportOpening keeps numeric timing outside the finite event-count key.
-	// It observes a joined refusal, never changes the opening's authority.
+	Watch  regionalWorkWatch
+	Client interface {
+		OpenRequested(context.Context, fleetvalue.OwnerBinding, time.Time) (*mtls.ContextStartExchange, error)
+		Close()
+	}
+	Local         contextstart.RegionalLocal
+	Concurrency   int
+	Report        func(string)
 	ReportOpening func(string, time.Duration, time.Duration, string)
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {
-	if ctx == nil || ctx.Err() != nil || s.Candidates == nil || s.Client == nil || s.Local.Now == nil {
+	if ctx == nil || s.Watch == nil || s.Client == nil || s.Local.Now == nil || s.Concurrency < 1 {
 		return execution.ErrInvalid
 	}
 	defer s.Client.Close()
-	// ADR-271: mtls.ContextStartExchangesPerOwner slots per owner. Openings
-	// are staggered (one in flight per owner): concurrent setups refused each
-	// other (installed native 65). Each slot is retried on its own.
-	type slot struct {
-		owner fleetvalue.OwnerBinding
-		n     int
-	}
-	type connection struct{ cancel context.CancelFunc }
-	active := make(map[slot]connection)
-	next := make(map[slot]time.Time)
-	opening := make(map[fleetvalue.OwnerBinding]bool)
-	type end struct {
-		key   slot
-		retry time.Duration
-	}
-	ended := make(chan end, 2*16)
-	opened := make(chan fleetvalue.OwnerBinding, 2*16)
-	defer func() {
-		for _, c := range active {
-			c.cancel()
-		}
-		for len(active) > 0 {
-			delete(active, (<-ended).key)
-		}
-	}()
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	poll := func() {
-		observed, e := s.Candidates.ReadContextStartOwners(ctx)
-		if e != nil || !observed.Valid(s.Local.Now()) || ctx.Err() != nil {
-			s.reportFailure("candidates", e)
+	var tasks sync.WaitGroup
+	defer tasks.Wait()
+	slots := make(chan struct{}, s.Concurrency)
+	receive := func(hint connectorlifecycle.WorkHint) {
+		timer := time.NewTimer(time.Until(hint.Until))
+		defer timer.Stop()
+		select {
+		case slots <- struct{}{}:
+		case <-timer.C:
+			return
+		case <-ctx.Done():
 			return
 		}
-		if len(observed.Owners) == 0 {
-			s.reportFailure("candidates-empty", nil)
-		}
-		contains := func(b fleetvalue.OwnerBinding) bool {
-			for _, candidate := range observed.Owners {
-				if b == candidate {
-					return true
-				}
+		tasks.Go(func() {
+			defer func() { <-slots }()
+			call, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			exchange, err := s.Client.OpenRequested(call, hint.Owner, hint.Until)
+			if err != nil {
+				s.reportFailure("open", err)
+				return
 			}
-			return false
-		}
-		for k, c := range active {
-			if !contains(k.owner) {
-				c.cancel()
+			if err := ServeRegionalAPIContextExchange(exchange, s.Local); err != nil {
+				s.reportFailure("exchange", err)
 			}
-		}
-		for k := range next {
-			if !contains(k.owner) {
-				delete(next, k)
-			}
-		}
-		for _, owner := range observed.Owners {
-			for n := range mtls.ContextStartExchangesPerOwner {
-				key := slot{owner, n}
-				if _, exists := active[key]; exists || opening[owner] || len(active) >= 16 || s.Local.Now().Before(next[key]) {
-					continue
-				}
-				call, cancel := context.WithTimeout(ctx, 30*time.Second)
-				active[key], opening[owner] = connection{cancel}, true
-				go func() {
-					defer cancel()
-					retry := time.Second
-					defer func() { ended <- end{key, retry} }()
-					exchange, e := s.Client.OpenDiscovered(call, owner, observed)
-					opened <- owner
-					retry = openingRetry(e)
-					if e == nil {
-						// An opened exchange passed every opening check; the hub
-						// ends a used standby by closing it, so its end is usually
-						// a read error. Either way the slot needs its next standby.
-						retry = 0
-						if e = ServeRegionalAPIContextExchange(exchange, s.Local); e != nil {
-							s.reportFailure("exchange", e)
-						}
-					} else {
-						s.reportFailure("open", e)
-					}
-				}()
-			}
-		}
+		})
 	}
-	poll()
-	for ctx.Err() == nil {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case owner := <-opened:
-			// The owner's other slot may open now.
-			delete(opening, owner)
-			poll()
-		case e := <-ended:
-			delete(active, e.key)
-			next[e.key] = s.Local.Now().Add(e.retry)
-			if e.retry == 0 {
-				// An ended exchange consumed one of the owner's standbys.
-				// Reopen now, not on the next tick: the hub's following attach
-				// (a Save's start after its history write) waits about two
-				// seconds.
-				poll()
-			}
-		case <-ticker.C:
-			poll()
-		}
-	}
-	return ctx.Err()
+	return reconnectRegional(ctx, func() (bool, error) { return s.Watch(ctx, receive) }, func(err error) { s.reportFailure("work-stream", err) })
 }
 
-// openingRetry is one second, or thirty after a TLS refusal: a registered
-// owner process the hub no longer serves (for example before a restart) is
-// refused at TLS each time, and its full setup proof shares the connector's
-// coalesced proof with the live owner's opening (installed native 66). The
-// owner set, every check and the next opening's bounds are unchanged.
-func openingRetry(err error) time.Duration {
-	var fixed interface{ FixedStep() string }
-	var refusal *mtls.HubProtocolRefusal
-	if err != nil && (errors.As(err, &fixed) && fixed.FixedStep() == "tls" || errors.As(err, &refusal)) {
-		return 30 * time.Second
+func reconnectRegional(ctx context.Context, subscribe func() (bool, error), report func(error)) error {
+	backoff := time.Second
+	for ctx.Err() == nil {
+		connected, err := subscribe()
+		if ctx.Err() != nil {
+			break
+		}
+		if err != nil {
+			report(err)
+		}
+		if connected {
+			backoff = time.Second
+		}
+		// Jitter each reconnect, including at the ceiling, to spread a fleet
+		// returning after the same hub outage. Attached work continues meanwhile.
+		timer := time.NewTimer(backoff + rand.N(backoff))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+		case <-timer.C:
+		}
+		backoff = min(30*time.Second, backoff*2)
 	}
-	return time.Second
+	return ctx.Err()
 }

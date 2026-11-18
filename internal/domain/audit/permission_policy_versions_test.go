@@ -8,13 +8,12 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 )
 
-func TestPermissionPolicyAuditRequiresImmutableVersions(t *testing.T) {
+func TestPolicyAuditRequiresImmutableVersions(t *testing.T) {
 	root, event := "20000000-0000-4000-8000-000000000001", "20000000-0000-4000-8000-000000000002"
 	for _, purpose := range []struct {
 		name, key string
 		valid     func(audit.Receipt) bool
 	}{
-		{"permission", audit.AuthorityKey(root, event), func(r audit.Receipt) bool { return r.Valid(root, event) }},
 		{"policy", audit.PolicyAcceptanceKey(root, event), func(r audit.Receipt) bool { return r.ValidPolicyAcceptance(root, event) }},
 	} {
 		for _, tc := range []struct {

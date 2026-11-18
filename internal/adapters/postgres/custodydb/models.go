@@ -942,15 +942,16 @@ type HubOwnerConfiguration struct {
 	Generation     int64
 	ObservedAt     pgtype.Timestamptz
 	FreshUntil     pgtype.Timestamptz
+	SourceVersion  string
 }
 
 type HubOwnerConfigurationRevision struct {
-	InstallationID   pgtype.UUID
-	ClusterID        pgtype.UUID
-	SourceUid        pgtype.UUID
-	Generation       int64
-	SnapshotJson     []byte
-	AuditReceiptJson []byte
+	InstallationID         pgtype.UUID
+	ClusterID              pgtype.UUID
+	SourceUid              pgtype.UUID
+	Generation             int64
+	SnapshotJson           []byte
+	LegacyAuditReceiptJson []byte
 }
 
 type HubOwnerEnrollment struct {
@@ -1030,6 +1031,7 @@ type PermissionAcceptance struct {
 	AuditID       pgtype.UUID
 	Assignments   int32
 	Retired       int32
+	LeaseUntil    pgtype.Timestamptz
 }
 
 type PermissionAssignment struct {
@@ -1067,6 +1069,23 @@ type PermissionBasis struct {
 	AutomationAuditID  pgtype.UUID
 }
 
+type PermissionBasisChange struct {
+	EventID        pgtype.UUID
+	BasisKey       string
+	Retired        bool
+	Uid            string
+	Kind           string
+	Generation     int64
+	SpecDigest     []byte
+	ScopeDigest    []byte
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUids   []string
+	Effect         string
+	NotAfter       pgtype.Timestamptz
+	AutomationJson []byte
+}
+
 type PermissionReviewAssignment struct {
 	ID                pgtype.UUID
 	StreamID          pgtype.UUID
@@ -1098,7 +1117,6 @@ type PermissionReviewSource struct {
 	StreamID        pgtype.UUID
 	Uid             string
 	Epoch           pgtype.UUID
-	SeenSequence    int64
 	Generation      int64
 	ResourceVersion string
 	SpecDigest      []byte
@@ -1110,16 +1128,16 @@ type PermissionReviewSource struct {
 }
 
 type PermissionStream struct {
-	ID               pgtype.UUID
-	Epoch            pgtype.UUID
-	Sequence         int64
-	TrustDigest      []byte
-	ProjectionDigest []byte
-	LeaseUntil       pgtype.Timestamptz
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-	Suspended        bool
-	InitialAuditID   pgtype.UUID
+	ID                  pgtype.UUID
+	Epoch               pgtype.UUID
+	Sequence            int64
+	TrustDigest         []byte
+	ProjectionDigest    []byte
+	LeaseUntil          pgtype.Timestamptz
+	ObservedAt          pgtype.Timestamptz
+	FreshUntil          pgtype.Timestamptz
+	Suspended           bool
+	UnavailableClusters []string
 }
 
 type PolicyAcceptance struct {
@@ -1422,11 +1440,13 @@ type RecordingSelectionSet struct {
 }
 
 type RemoteAccessBindingDelivery struct {
-	RootID     pgtype.UUID
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	ObservedAt  pgtype.Timestamptz
+	Digest      []byte
+	Bindings    []byte
+	Unavailable bool
+	Revision    pgtype.UUID
 }
 
 type RetentionDecision struct {

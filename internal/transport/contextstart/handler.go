@@ -3,9 +3,8 @@ package contextstart
 import (
 	"context"
 	"crypto/tls"
-	"io"
+	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -38,7 +37,7 @@ type Handler struct {
 }
 
 func NewHandler(host string, router *Router, ingress Ingress, tokens TokenVerifier, preflight int) (*Handler, error) {
-	if host == "" || strings.ContainsAny(host, "/\\ \r\n\t") || router == nil || ingress == nil || tokens == nil || preflight < 1 || preflight > 64 {
+	if host == "" || strings.ContainsAny(host, "/\\ \r\n\t") || router == nil || ingress == nil || tokens == nil || preflight < 1 {
 		return nil, fleet.ErrInvalid
 	}
 	return &Handler{host: host, router: router, ingress: ingress, tokens: tokens, preflight: make(chan struct{}, preflight)}, nil
@@ -47,12 +46,6 @@ func privateUnavailable(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.Error(w, "Unavailable", http.StatusNotFound)
-}
-
-// ConnectorProtocolRefusal is the hub's answer to a connector of another
-// protocol major (ADR-333).
-func ConnectorProtocolRefusal(sent int) string {
-	return "this hub speaks connector protocol " + strconv.Itoa(contracts.ConnectorProtocolMajor) + "; the connector sent protocol " + strconv.Itoa(sent) + " (0: none); upgrade the connector to a release within one minor version of the hub (or the hub, if the connector is newer)"
 }
 
 func (h *Handler) refuse(w http.ResponseWriter, stage string) {
@@ -117,16 +110,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	hello, e := contracts.DecodeAPIContextHello(frame.Payload)
 	clear(frame.Payload)
-	if e != nil || hello.Format != contracts.APIContextExchangeFormat || !time.Now().Before(hello.StandbyUntil) || hello.StandbyUntil.After(time.Now().Add(30*time.Second)) {
+	capabilities := contracts.NewConnectorCapabilities(hello.Capabilities)
+	if e != nil || capabilities == nil || hello.Format != contracts.APIContextExchangeFormat || !time.Now().Before(hello.StandbyUntil) || hello.StandbyUntil.After(time.Now().Add(30*time.Second)) {
 		stop()
 		release()
 		h.refuse(w, "hello")
 		return
 	}
-	// ADR-333: one protocol major; within it the announced capabilities decide
+	// ADR-334: one protocol major; within it the announced capabilities decide
 	// which operations this connector receives.
-	capabilities := contracts.NewConnectorCapabilities(hello.Capabilities)
-	if hello.Protocol != contracts.ConnectorProtocolMajor || capabilities == nil {
+	if hello.Protocol != contracts.ConnectorProtocolMajor {
 		stop()
 		release()
 		if h.Refused != nil {
@@ -138,7 +131,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusUpgradeRequired)
-		_, _ = io.WriteString(w, ConnectorProtocolRefusal(hello.Protocol))
+		_, _ = fmt.Fprintf(w, "Hub requires connector protocol major %d. Connector announced major %d (0 means unspecified). Use releases that speak the same protocol major.", contracts.ConnectorProtocolMajor, hello.Protocol)
 		return
 	}
 	// The connector started its finite conversation before dialing. Retain its
@@ -165,21 +158,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.refuse(w, "authenticate")
 		return
 	}
-	var current atomic.Pointer[frameStream]
-	attach := func(c context.Context) (fleet.APIContextReceiver, error) {
-		s := current.Load()
-		if s == nil {
-			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
-		}
-		// Failures are recorded for a caller's diagnostic context only, as
-		// for queries; they change neither the result nor the stream.
-		receiver, e := check(c)
-		if e != nil {
-			recordStreamDiagnostic(c, s, e, streamHubQueryCheck)
-		}
-		return receiver, e
-	}
-	standby, e := h.router.RegisterStandby(residence, receiver, attach)
+	standby, e := h.router.reserveStandby(residence, receiver)
 	stop()
 	release()
 	if e != nil {
@@ -204,7 +183,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Hello was read before the stream was constructed.
 	stream.frames = 1
 	stream.bytes = contracts.APIContextWorkBytes + 5 // Same ceiling as the connector.
-	current.Store(stream)
 	if controller.SetWriteDeadline(receiver.Window.Until()) != nil || !time.Now().Before(receiver.Window.Until()) {
 		return
 	}
@@ -221,6 +199,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// final results recheck the exact peer without extending that work lease.
 	idleUntil, _ := standby.Context().Deadline()
 	if controller.SetReadDeadline(idleUntil) != nil || controller.SetWriteDeadline(idleUntil) != nil {
+		return
+	}
+	if !standby.publish(func(c context.Context) (fleet.APIContextReceiver, error) {
+		observed, err := check(c)
+		if err != nil {
+			recordStreamDiagnostic(c, stream, err, streamHubQueryCheck)
+		}
+		return observed, err
+	}) {
 		return
 	}
 	_ = standby.Serve(stream, time.Now)

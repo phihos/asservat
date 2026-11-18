@@ -10,14 +10,11 @@ import (
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	privacy "asservat.local/asservat/internal/domain/privacy"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 )
 
 type retentionPolicyWatch struct {
 	client  *RetentionClient
-	decoder streaming.Decoder
+	decoder *permissionWatchEvents
 	cancel  context.CancelFunc
 }
 
@@ -29,21 +26,18 @@ func (c *RetentionClient) WatchRetentionPolicies(ctx context.Context, rv string)
 	if !identity.Text(rv, 128) {
 		return nil, value.ErrInvalid
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	r := c.client.api.Get().AbsPath("/apis/asservat.io/v1alpha1/namespaces/"+c.client.control.Name+"/evidenceretentionpolicies").MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true")
-	body, err := r.Stream(ctx)
+	stream, cancel, err := c.client.openWatch(ctx, c.client.listPath("evidenceretentionpolicies"), rv, false)
 	if err != nil {
-		cancel()
-		return nil, permissionError(ctx, err)
+		return nil, err
 	}
-	return &retentionPolicyWatch{client: c, decoder: streaming.NewDecoder(serializer.Framer.NewFrameReader(body), permissionEventDecoder{}), cancel: cancel}, nil
+	return &retentionPolicyWatch{c, stream, cancel}, nil
 }
 
 func (w *retentionPolicyWatch) Next(ctx context.Context) (port.RetentionEvent, error) {
 	stop := context.AfterFunc(ctx, w.Close)
 	defer stop()
-	var event metav1.WatchEvent
-	if _, _, err := w.decoder.Decode(nil, &event); err != nil {
+	event, err := w.decoder.next()
+	if err != nil {
 		if ctx.Err() == nil && errors.Is(err, io.EOF) {
 			return port.RetentionEvent{}, io.EOF
 		}

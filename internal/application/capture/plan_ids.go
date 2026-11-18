@@ -16,7 +16,7 @@ import (
 
 // A preview stores nothing (ADR-330 D9). The IDs of a plan come from its plan
 // scope: a preview draws random ones, a request derives them from the
-// requester, its idempotency key and the reviewed plan digest, so a retry
+// requester, idempotency key, reviewed plan digest and submitted input, so a retry
 // recomputes the same capture, case and approval binding.
 type planScope struct {
 	seed   []byte
@@ -32,8 +32,15 @@ func WithPlanScope(ctx context.Context) (context.Context, func(value.ContextPrev
 	return context.WithValue(ctx, planScopeKey{}, s), s.digest
 }
 
-func requestPlanScope(ctx context.Context, root string, actor identity.Principal, key string, plan artifact.Digest) (context.Context, *planScope) {
-	seed := sha256.Sum256(fmt.Appendf(nil, "asservat-capture-request/v1\x00%s\x00%s\x00%s\x00%s\x00%s\x00%x", root, actor.Issuer, actor.Subject, actor.ClientID, key, plan))
+func requestPlanScope(ctx context.Context, root string, actor identity.Principal, in CaptureRequest) (context.Context, *planScope) {
+	input := fmt.Appendf(nil, "asservat-capture-request/v1\x00%s\x00%s\x00%s\x00%s\x00%s\x00%x", root, actor.Issuer, actor.Subject, actor.ClientID, in.Key, in.Plan)
+	// Public requests supply normalized JSON. Internal requests have no wire
+	// submission and retain their existing deterministic IDs.
+	if len(in.Submission) > 0 {
+		input = append(input, 0)
+		input = append(input, in.Submission...)
+	}
+	seed := sha256.Sum256(input)
 	s := &planScope{seed: seed[:]}
 	return context.WithValue(ctx, planScopeKey{}, s), s
 }

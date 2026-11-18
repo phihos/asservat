@@ -29,6 +29,9 @@ func (f *permissionRestartFixture) PermissionTrust(context.Context) (app.Permiss
 func (f *permissionRestartFixture) PermissionSnapshot(context.Context) (value.Snapshot, error) {
 	return value.Snapshot{}, value.ErrUnavailable
 }
+func (f *permissionRestartFixture) ClusterAccessBindings(ctx context.Context) (value.Snapshot, error) {
+	return f.PermissionSnapshot(ctx)
+}
 func (*permissionRestartFixture) WatchBindings(context.Context, string) (app.BindingWatch, error) {
 	panic("failed LIST must not start a watch")
 }

@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -172,5 +174,103 @@ func TestNativeClientFrameCancellationJoinsActualRead(t *testing.T) {
 	}
 	if err = s.Send(ctx, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: []byte(`{}`)}); err == nil {
 		t.Fatal("cancelled stream reused")
+	}
+}
+
+func TestNativeOwnerDialUsesImplicitHTTPSPort(t *testing.T) {
+	u, err := url.Parse("https://hub.example" + contracts.NativeWorkerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var destination string
+	dial := nativeOwnerDial(u, []string{"2001:db8::5"}, time.Now().Add(time.Second),
+		func(_ context.Context, _, address string) (net.Conn, error) {
+			destination = address
+			return nil, nil
+		})
+	if _, err := dial(t.Context(), "tcp", "hub.example:443"); err != nil || destination != "[2001:db8::5]:443" {
+		t.Fatalf("owner destination %q, error %v", destination, err)
+	}
+	if _, err := dial(t.Context(), "tcp", "hub.example:8443"); !errors.Is(err, contracts.ErrNativeProtocol) {
+		t.Fatalf("unexpected authority was accepted: %v", err)
+	}
+}
+
+// Both sockets use the original mTLS identity and authority. Only an explicit
+// response to the original Hello permits the single different TCP destination.
+func TestNativeClientFollowsOnlyOneOperationOwnerHint(t *testing.T) {
+	var privateIP string
+	interfaces, err := net.InterfaceAddrs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, iface := range interfaces {
+		ip, _, err := net.ParseCIDR(iface.String())
+		if err == nil && ip.To4() != nil && ip.IsGlobalUnicast() {
+			privateIP = ip.String()
+			break
+		}
+	}
+	if privateIP == "" {
+		t.Skip("requires a non-loopback Pod-like interface")
+	}
+	hello := nativeHello()
+	hello.Reference.OperationID, hello.Reference.Fence = "", 0
+	header := func(w http.ResponseWriter, r *http.Request, disposition string) {
+		t.Helper()
+		f, err := contracts.ReadNativeFrame(r.Body)
+		if err != nil || f.Kind != contracts.NativeHelloFrame {
+			t.Errorf("expected a worker Hello: %v", err)
+			return
+		}
+		got, err := contracts.DecodeNativeHello(f.Payload)
+		if err != nil || got.Nonce != hello.Nonce || got.Reference != hello.Reference || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
+			t.Errorf("worker identity or original Hello changed")
+			return
+		}
+		w.Header().Set("Asservat-Native-Disposition", disposition)
+		w.Header().Set("Asservat-Native-Nonce", hello.Nonce)
+		w.Header().Set("Asservat-Native-Worker", hello.Reference.WorkerID)
+		w.Header().Set("Asservat-Native-Session", hello.Reference.SessionID)
+		w.Header().Set("Asservat-Native-Installation", hello.Reference.InstallationID)
+		if disposition == "operation-owner" {
+			w.Header().Set("Asservat-Native-Owner-IP", privateIP)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+	s, c := nativeStreamServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { header(w, r, "operation-owner") }), true)
+	_, port, err := net.SplitHostPort(s.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", net.JoinHostPort(privateIP, port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var called atomic.Int64
+	target := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != s.Listener.Addr().String() {
+			t.Errorf("routed request changed authority to %s", r.Host)
+		}
+		if called.Add(1) == 1 {
+			header(w, r, "finished")
+			return
+		}
+		header(w, r, "operation-owner")
+	}))
+	target.Listener.Close()
+	target.Listener = listener
+	target.TLS = s.TLS.Clone()
+	target.EnableHTTP2 = true
+	target.StartTLS()
+	defer target.Close()
+	ctx, stop := context.WithTimeout(t.Context(), 4*time.Second)
+	defer stop()
+	var finished *contracts.NativeFinished
+	if _, err := c.Open(ctx, hello); !errors.As(err, &finished) || called.Load() != 1 {
+		t.Fatalf("exact owner: %v (%d calls)", err, called.Load())
+	}
+	if _, err := c.Open(ctx, hello); !errors.Is(err, contracts.ErrNativeProtocol) || called.Load() != 2 {
+		t.Fatalf("second routing hint: %v (%d calls)", err, called.Load())
 	}
 }

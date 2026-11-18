@@ -80,11 +80,9 @@ func PublicRuntimeRetentionPurposes() []string {
 	return []string{"retention-source", "retention-lifecycle-audit"}
 }
 
-// PublicRuntimePermissionPurposes are the hub-worker's permission stream
-// logins (ADR-189): acceptance and authority audit acknowledgement. Like
-// capacity, they never enter the hub projection.
+// The hub worker commits permission acceptance and its audit with one login.
 func PublicRuntimePermissionPurposes() []string {
-	return []string{"permission-accept", "permission-audit"}
+	return []string{"permission-accept"}
 }
 
 // This projection list is deliberately independent of the installer inventory.
@@ -121,8 +119,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 71, true
 	case "permission-accept":
 		return 72, true
-	case "permission-audit":
-		return 73, true
 	case "retention-source":
 		return 78, true
 	case "retention-lifecycle-audit":

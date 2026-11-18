@@ -15,13 +15,14 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/tink"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
 	localSecretFormat = "asservat-local-keys/v1"
 	localWrapFormat   = "asservat-local-keyset/v1"
-	maxLocalSecret    = 16 << 10
-	maxLocalVersions  = 16
+	// The key file is projected from one Kubernetes Secret.
+	maxLocalSecret = corev1.MaxSecretSize
 )
 
 // LocalKeyScope is independently supplied by protected installation wiring.
@@ -81,7 +82,7 @@ func readLocalKeys(scope LocalKeyScope, source io.Reader) (localKeySecret, error
 	actualJSON, expectedJSON := jsontext.Value(b), jsontext.Value(expected)
 	valid := err == nil && actualJSON.Canonicalize() == nil && expectedJSON.Canonicalize() == nil && bytes.Equal(actualJSON, expectedJSON)
 	valid = valid && s.Format == localSecretFormat && s.InstallationID == scope.InstallationID && s.Purpose == scope.Purpose && s.KeyID == scope.KeyID &&
-		s.ActiveVersion >= 1 && s.ActiveVersion <= 2147483647 && len(s.Keys) >= 1 && len(s.Keys) <= maxLocalVersions
+		s.ActiveVersion >= 1 && s.ActiveVersion <= 2147483647 && len(s.Keys) >= 1
 	versions := make(map[int]bool, len(s.Keys))
 	materials := make(map[[32]byte]bool, len(s.Keys))
 	var zero [32]byte

@@ -2,6 +2,7 @@ package contextstart
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 	work := workFixture()
 	a := work.Work.Channel.Connector.Binding.ClusterID
 	b := "00000000-0000-4000-8000-000000000099"
-	router, e := NewRouter(RouterLimits{Standby: 2, Captures: 2, Clusters: []ClusterLimit{{a, 1, 1}, {b, 1, 1}}})
+	router, e := NewRouter([]ClusterLimit{{a, 1, 1}, {b, 1, 1}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -72,16 +73,16 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 	next.Close()
 	router.Close()
 }
-func TestContextRouterRejectsOvercommittedReservationsAndMissingOwner(t *testing.T) {
+func TestContextRouterRejectsInvalidReservationsAndMissingOwner(t *testing.T) {
 	w := workFixture()
 	cluster := w.Work.Target.ClusterID
-	if _, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 2, 1}}}); e == nil {
-		t.Fatal("overcommitted standby accepted")
+	if _, e := NewRouter([]ClusterLimit{{cluster, 2, 1}, {cluster, 2, 1}}); e == nil {
+		t.Fatal("duplicate cluster accepted")
 	}
-	if _, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 2}}}); e == nil {
-		t.Fatal("overcommitted active slots accepted")
+	if _, e := NewRouter([]ClusterLimit{{cluster, 1, 0}}); e == nil {
+		t.Fatal("zero capture reservation accepted")
 	}
-	r, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	r, e := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -98,7 +99,7 @@ func TestContextRouterRejectsOvercommittedReservationsAndMissingOwner(t *testing
 
 // ADR-185: a hub with no enrolled region builds a router that refuses starts.
 func TestRouterWithoutClustersRefusesEveryStart(t *testing.T) {
-	r, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
+	r, e := NewRouter(nil)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -107,5 +108,20 @@ func TestRouterWithoutClustersRefusesEveryStart(t *testing.T) {
 	defer end()
 	if _, e = r.Query(ctx, "00000000-0000-4000-8000-000000000001", "m", nil, nil); e == nil {
 		t.Fatal("router without clusters accepted a query")
+	}
+}
+
+func TestRouterReservesEveryRegisteredCluster(t *testing.T) {
+	var clusters []ClusterLimit
+	for i := 0; i < 65; i++ {
+		clusters = append(clusters, ClusterLimit{ClusterID: fmt.Sprintf("00000000-0000-4000-8000-%012d", i), Standby: 2, Captures: 8})
+	}
+	r, err := NewRouter(clusters)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if r.StandbyCapacity() != 130 {
+		t.Fatalf("reserved %d standby connections for 65 clusters", r.StandbyCapacity())
 	}
 }

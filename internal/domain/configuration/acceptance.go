@@ -23,8 +23,9 @@ type PermissionBatch struct {
 	// neither retired nor renewed, and grant nothing until a fresh
 	// observation is accepted. SourcesUnavailable applies this to every
 	// source because the source list itself could not be read.
-	UnavailableSources []string `json:",omitempty"`
-	SourcesUnavailable bool     `json:",omitempty"`
+	UnavailableClusters []string `json:",omitempty"`
+	UnavailableSources  []string `json:",omitempty"`
+	SourcesUnavailable  bool     `json:",omitempty"`
 	// Namespaces is the minimized namespace observation the source bases were
 	// derived from; nil while none is current.
 	Namespaces *NamespaceObservation `json:",omitempty"`
@@ -84,14 +85,42 @@ func (p PermissionBasis) Key() string {
 // Roles are the roles a binding or source may grant.
 var Roles = []string{"workload-maintainer", "evidence-reader", "evidence-owner", "action-approver"}
 
+// Permission observations held by a watch have no time-based expiry. A
+// source that supplies an independent deadline keeps it through commit.
+func PermissionObservationCurrent(observed, until, now time.Time) bool {
+	return !observed.IsZero() && !now.Before(observed) && (until.IsZero() || now.Before(until))
+}
+
+func PermissionDeadline(a, b time.Time) time.Time {
+	if a.IsZero() {
+		return b
+	}
+	if b.IsZero() {
+		return a
+	}
+	return identity.Earlier(a, b)
+}
+
+// Current verifies the original observation and every basis expiry against
+// now. SQL checks these bounds again before committing an immutable batch.
+func (b PermissionBatch) Current(now time.Time) bool {
+	return !b.FreshUntil.IsZero() && PermissionObservationCurrent(b.ObservedAt, b.FreshUntil, now) &&
+		!slices.ContainsFunc(b.Bases, func(p PermissionBasis) bool { return !p.NotAfter.IsZero() && !now.Before(p.NotAfter) })
+}
+
 // Validate checks a prepared batch. No count limits: Kubernetes object limits
 // bound each spec and the store pages its rows.
 func (b PermissionBatch) Validate(now time.Time) error {
-	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) {
+	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !b.Current(now) {
 		return ErrInvalid
 	}
 	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, len(b.UnavailableSources), 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
 		return ErrInvalid
+	}
+	for i, cluster := range b.UnavailableClusters {
+		if !authorization.UUID(cluster) || (i > 0 && b.UnavailableClusters[i-1] >= cluster) {
+			return ErrInvalid
+		}
 	}
 	if b.SourcesUnavailable && len(b.ReviewSources) > 0 {
 		return ErrInvalid
@@ -109,7 +138,7 @@ func (b PermissionBatch) Validate(now time.Time) error {
 			return ErrInvalid
 		}
 		r := p.Resource
-		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || (r.Kind != "AccessBinding" && r.Kind != "PermissionSource" && r.Kind != ClusterAccessBindingKind) || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Roles) == 0 || !identity.Strings(p.Roles, len(p.Roles), 32) {
+		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || !authorization.ValidPermissionBasisKind(r.Kind) || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Roles) == 0 || !identity.Strings(p.Roles, len(p.Roles), 32) {
 			return ErrInvalid
 		}
 		seen[p.Key()] = true
@@ -155,9 +184,6 @@ func (b PermissionBatch) Validate(now time.Time) error {
 				return ErrInvalid
 			}
 			workloads[w.Kind+"/"+w.Name] = true
-		}
-		if !p.NotAfter.IsZero() && !now.Before(p.NotAfter) {
-			return ErrInvalid
 		}
 	}
 	return nil

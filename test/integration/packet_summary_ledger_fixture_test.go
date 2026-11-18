@@ -27,7 +27,7 @@ func packetLedgerFunding(t *testing.T, f *capacitySQLFixture) {
 }
 
 func TestPacketSummaryLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("metadata-pcapng-compiled-lifecycle", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifySharedProjectionLifecycle, false, false, false, true)
 		})
@@ -85,7 +85,7 @@ func admitQueryLedgerPacket(t *testing.T, f *capacitySQLFixture, root capacityRo
 // the existing principal account. This uses actual compiled roles and the full
 // same admitted-source/enrollment/native-key lifecycle twice, not seeded rows.
 func TestPacketSummarySharedPrincipalLifecycleWithRealServices(t *testing.T) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		t.Run("same-human-two-clients", func(t *testing.T) {
 			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, f *queryLedgerFixture) {
 				qualifySharedProjectionLifecycleClient(t, f, "console", 0)

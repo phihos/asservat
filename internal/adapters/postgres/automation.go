@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -38,12 +37,13 @@ func NewAutomationAuthorities(ctx context.Context, pool *pgxpool.Pool, root, ins
 
 func (r *AutomationAuthorities) PolicyAutomationAuthority(ctx context.Context, a authorization.AcceptedPolicyAuthority, target authorization.Target) (authorization.AutomationProjection, error) {
 	var out authorization.AutomationProjection
-	err := r.permissions.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := q.SharePermissionStream(ctx, id(r.permissions.root))
+	err := r.permissions.snapshot(ctx, func(q *custodydb.Queries) error {
+		s, offset, err := readPermissionStreamClock(ctx, q, r.permissions.root)
 		if err != nil {
 			return err
 		}
 		out, err = automationProjection(ctx, q, s, r.installation, a, target)
+		offset.automation(&out)
 		return err
 	})
 	if err != nil {
@@ -52,9 +52,14 @@ func (r *AutomationAuthorities) PolicyAutomationAuthority(ctx context.Context, a
 	return out, nil
 }
 
+func (offset permissionClockOffset) automation(p *authorization.AutomationProjection) {
+	p.ObservedAt, p.FreshUntil, p.NotAfter = offset.at(p.ObservedAt), offset.at(p.FreshUntil), offset.at(p.NotAfter)
+	offset.projection(&p.Permissions)
+}
+
 // Caller holds the permission stream lock for the entire transaction. Audited
 // ordinary assignments alone do not prove an automation envelope was accepted:
-// its own current source snapshot must match the acknowledged immutable record.
+// its own current source and accepted automation envelope must match.
 func automationProjection(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, installation string, a authorization.AcceptedPolicyAuthority, target authorization.Target) (authorization.AutomationProjection, error) {
 	return automationProjectionFor(ctx, q, s, installation, a.Delegation, target, &a)
 }
@@ -131,34 +136,13 @@ func readAutomationBasis(ctx context.Context, q *custodydb.Queries, s custodydb.
 		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	b := rows[0]
-	if b.SeenSequence != s.Sequence || b.Generation != basis.Generation || !bytes.Equal(b.SpecDigest, basis.Digest[:]) || !b.AcknowledgedAt.Valid || len(b.AutomationJson) == 0 || len(b.AutomationJson) > 4096 {
+	if b.SeenSequence != s.Sequence || b.Generation != basis.Generation || !bytes.Equal(b.SpecDigest, basis.Digest[:]) || len(b.AutomationJson) == 0 || len(b.AutomationJson) > 4096 {
 		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	var envelope authorization.AutomationEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(b.AutomationJson))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&envelope) != nil || !envelope.Valid() {
-		return automationBasisFacts{}, cfg.ErrUnavailable
-	}
-	audited, err := q.ReadAuthorityAudit(ctx, b.AutomationAuditID)
-	if err != nil {
-		return automationBasisFacts{}, err
-	}
-	record, err := decodeAuthority(audited)
-	if err != nil {
-		return automationBasisFacts{}, err
-	}
-	if !currentAuthorityAudit(audited, s.ID, b.AutomationAuditID) || record.RootID != uid(s.ID) || record.Epoch != uid(s.Epoch) || record.Sequence != s.Sequence {
-		return automationBasisFacts{}, cfg.ErrUnavailable
-	}
-	matched := false
-	for _, delegation := range record.Automation {
-		if delegation.BasisKey == b.BasisKey && delegation.Revision == basis && bytes.Equal(delegation.ScopeDigest[:], b.ScopeDigest) && sameAutomationEnvelope(delegation.Envelope, envelope) {
-			matched = true
-			break
-		}
-	}
-	if !matched {
 		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	out := automationBasisFacts{Envelope: envelope}
@@ -168,21 +152,18 @@ func readAutomationBasis(ctx context.Context, q *custodydb.Queries, s custodydb.
 	return out, nil
 }
 
-func sameAutomationEnvelope(a, b authorization.AutomationEnvelope) bool {
-	return a.MaxLifetimeSeconds == b.MaxLifetimeSeconds && a.MaxExecutions == b.MaxExecutions && a.MaxBytes == b.MaxBytes && a.MaxObservedBytes == b.MaxObservedBytes && a.MaxObservedEvents == b.MaxObservedEvents && slices.Equal(a.AllowedActions, b.AllowedActions)
-}
-
 func (r *AutomationAuthorities) PolicyWorkloadAutomation(ctx context.Context, target authorization.WorkloadTarget, basis identity.Revision) (authorization.WorkloadAutomationProjection, error) {
 	if r == nil || !target.Valid() || !basis.Valid() {
 		return authorization.WorkloadAutomationProjection{}, cfg.ErrInvalid
 	}
 	var projection authorization.AutomationProjection
-	err := r.permissions.transaction(ctx, func(q *custodydb.Queries) error {
-		stream, err := q.SharePermissionStream(ctx, id(r.permissions.root))
+	err := r.permissions.snapshot(ctx, func(q *custodydb.Queries) error {
+		stream, offset, err := readPermissionStreamClock(ctx, q, r.permissions.root)
 		if err != nil {
 			return err
 		}
 		projection, err = automationProjectionFor(ctx, q, stream, r.installation, basis, authorization.Target{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID}, nil)
+		offset.automation(&projection)
 		return err
 	})
 	if err != nil {

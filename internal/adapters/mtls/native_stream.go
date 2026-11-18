@@ -3,6 +3,7 @@ package mtls
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -91,12 +92,53 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(8*time.Hour)) {
 		return nil, contracts.ErrNativeProtocol
 	}
+	setup, stopSetup := context.WithTimeout(ctx, 5*time.Second)
+	defer stopSetup()
+	stream, err := c.openAt(ctx, setup, hello, c.dial)
+	var route *contracts.NativeOwnerRoute
+	if !errors.As(err, &route) || !route.Valid() || setup.Err() != nil {
+		return stream, err
+	}
+	u, _ := url.Parse(c.endpoint)
+	if u.Path != contracts.NativeWorkerPath {
+		return nil, contracts.ErrNativeProtocol
+	}
+	// A single new opening, before any command. A second move is a refusal.
+	until, _ := setup.Deadline()
+	dial := nativeOwnerDial(u, route.Addresses, until, (&net.Dialer{KeepAlive: -1}).DialContext)
+	stream, err = c.openAt(ctx, setup, hello, dial)
+	if errors.As(err, &route) {
+		return nil, contracts.ErrNativeProtocol
+	}
+	return stream, err
+}
+
+func nativeOwnerDial(u *url.URL, addresses []string, limit time.Time, dial func(context.Context, string, string) (net.Conn, error)) func(context.Context, string, string) (net.Conn, error) {
+	port := httpsPort(u)
+	return func(ctx context.Context, network, authority string) (net.Conn, error) {
+		if authority != net.JoinHostPort(u.Hostname(), port) || network != "tcp" {
+			return nil, contracts.ErrNativeProtocol
+		}
+		var err error
+		for i, address := range addresses {
+			call, stop := context.WithTimeout(ctx, time.Until(limit)/time.Duration(len(addresses)-i))
+			var conn net.Conn
+			conn, err = dial(call, network, net.JoinHostPort(address, port))
+			stop()
+			if err == nil {
+				return conn, nil
+			}
+		}
+		return nil, err
+	}
+}
+
+func (c *NativeClient) openAt(ctx, setup context.Context, hello contracts.NativeHello, dial func(context.Context, string, string) (net.Conn, error)) (*NativeClientStream, error) {
 	work, cancel := context.WithCancel(ctx)
 	r, w := io.Pipe()
 	// The entire first handshake/header/Hello exchange shares one original
 	// setup bound. Separate per-stage HTTP timeouts must not add up or leave a
 	// peer that replied without consuming Hello blocking the writer for hours.
-	setup, stopSetup := context.WithTimeout(ctx, 5*time.Second)
 	setupJoined := make(chan struct{})
 	stopSetupCallback := context.AfterFunc(setup, func() {
 		cancel()
@@ -108,11 +150,10 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		if !stopSetupCallback() {
 			<-setupJoined
 		}
-		stopSetup()
 	}()
 	t := &http.Transport{TLSClientConfig: c.trust.Clone(), ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxResponseHeaderBytes: 4096, MaxConnsPerHost: 1, MaxIdleConns: 0, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 5 * time.Second}
-	if c.dial != nil {
-		t.DialContext = c.dial
+	if dial != nil {
+		t.DialContext = dial
 	}
 	client := &http.Client{Transport: t, CheckRedirect: func(*http.Request, []*http.Request) error { return contracts.ErrNativeProtocol }}
 	req, err := http.NewRequestWithContext(work, http.MethodPost, c.endpoint, r)
@@ -156,6 +197,12 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		r.Close()
 		resp.Body.Close()
 		t.CloseIdleConnections()
+		if single("Asservat-Native-Disposition", "operation-owner") && single("Asservat-Native-Nonce", hello.Nonce) && resp.ContentLength == 0 && written == nil && setup.Err() == nil && ctx.Err() == nil && hello.Reference.OperationID == "" && hello.Reference.Fence == 0 {
+			route := &contracts.NativeOwnerRoute{Addresses: resp.Header.Values("Asservat-Native-Owner-IP")}
+			if route.Valid() {
+				return nil, route
+			}
+		}
 		if finished && written == nil && setup.Err() == nil && ctx.Err() == nil {
 			return nil, &contracts.NativeFinished{Reference: hello.Reference, Nonce: hello.Nonce}
 		}

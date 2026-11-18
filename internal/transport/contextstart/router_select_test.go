@@ -17,7 +17,7 @@ import (
 func TestRouterSelectsStandbyThatOutlivesTheWork(t *testing.T) {
 	work := workFixture()
 	cluster := work.Work.Channel.Connector.Binding.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 2, Captures: 2, Clusters: []ClusterLimit{{cluster, 2, 2}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 2, 2}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestRouterSelectionReadsAndPruneRetiresOnlyIdleEndingStandbys(t *testing.T)
 	work := workFixture()
 	cluster := work.Work.Channel.Connector.Binding.ClusterID
 	other := "00000000-0000-4000-8000-000000000099"
-	router, err := NewRouter(RouterLimits{Standby: 4, Captures: 3, Clusters: []ClusterLimit{{cluster, 3, 2}, {other, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 3, 2}, {other, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

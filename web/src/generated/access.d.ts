@@ -68,7 +68,7 @@ export interface components {
                     /** @enum {unknown} */
                     subject_kind: "User" | "Group" | "Workload";
                     /** @enum {unknown} */
-                    basis_kind: "AccessBinding" | "PermissionSource";
+                    basis_kind: "AccessBinding" | "ClusterAccessBinding" | "PermissionSource";
                     basis_uid: string;
                     revision: string;
                 }[];

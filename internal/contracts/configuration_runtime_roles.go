@@ -15,7 +15,7 @@ const ConfigurationRuntimeRoleConnections = ConfigurationRuntimeRetainedProcesse
 // Separate credential-bootstrap inventory. None is a public hub role or a
 // capacity role, and callers cannot supply an alternative role list.
 func ConfigurationRuntimeRolePurposes() []string {
-	return []string{"configuration-fleet", "configuration-source", "configuration-audit"}
+	return []string{"configuration-fleet", "configuration-source"}
 }
 func ConfigurationRuntimeRoleOrdinal(purpose string) (int, bool) {
 	switch purpose {
@@ -23,8 +23,6 @@ func ConfigurationRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 0, true
 	case "configuration-source":
 		return 1, true
-	case "configuration-audit":
-		return 2, true
 	default:
 		return 0, false
 	}

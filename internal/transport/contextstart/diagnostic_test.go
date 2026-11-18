@@ -465,7 +465,7 @@ func TestContextStreamDiagnosticPrivateErrorAndDecoderSemantics(t *testing.T) {
 
 func TestContextStreamDiagnosticOriginalHubRunErrorAndJoinedAttachment(t *testing.T) {
 	w := workFixture()
-	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{ClusterID: w.Work.Target.ClusterID, Standby: 1, Captures: 1}}})
+	router, e := NewRouter([]ClusterLimit{{ClusterID: w.Work.Target.ClusterID, Standby: 1, Captures: 1}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -592,7 +592,7 @@ func TestContextStreamDiagnosticAdmissionAndPassiveBranches(t *testing.T) {
 				s.closed = true
 				want = streamClosed
 			case "frame-limit":
-				s.frames = contracts.APIContextMaximumFrames
+				s.frames = contracts.APIContextMaximumWorkFrames
 				want = streamBudget
 			case "busy-read":
 				read = true

@@ -118,7 +118,7 @@ func TestPermissionChildSelection(t *testing.T) {
 		t.Fatal("permission child missing with its section")
 	}
 	got := contracts.PermissionProjectionPurposes(true, true, true)
-	if len(got) != 9 || got[0] != "permission-accept" || got[len(got)-1] != "context-cleanup-finalize" {
+	if len(got) != 8 || got[0] != "permission-accept" || got[len(got)-1] != "context-cleanup-finalize" {
 		t.Fatal("unexpected permission logins", got)
 	}
 	for _, p := range got {

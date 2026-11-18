@@ -19,7 +19,7 @@ import (
 // Component ledger proof using an actually published synthetic context artifact.
 // The final helper also composes the real request/review service with SQL.
 // Raw catalog selection and installed native arguments remain separate proofs.
-func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, version artifact.Digest, nativeBytes int64, publishAuthority func() error, releasePermissionBurst func()) {
+func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, version artifact.Digest, nativeBytes int64, releasePermissionBurst func()) {
 	t.Helper()
 	var lane string
 	var good, bad bool
@@ -296,5 +296,5 @@ func qualifyRawQueryGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if err != nil || !wasReplay || !expiredReplay.RawQuery.NotAfter.Equal(expiring.RawQuery.NotAfter) {
 		t.Fatal("expired request replay renewed scope", err)
 	}
-	qualifyRawQueryService(t, ctx, s, store, e, output, nativeBytes, publishAuthority, releasePermissionBurst)
+	qualifyRawQueryService(t, ctx, s, store, e, output, nativeBytes, releasePermissionBurst)
 }

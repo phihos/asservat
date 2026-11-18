@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -64,7 +63,7 @@ type sourceSnapshotQualificationMode struct {
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
 	manual, cancellation, requireApproval, reason, groupCount := mode.manual, mode.cancellation, mode.requireApproval, mode.reason, mode.groupCount
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(f *capacitySQLFixture) {
 			if manual {
 				configureManualSourceCapacity(f)
@@ -265,11 +264,7 @@ func source107AddReader(t *testing.T, ctx context.Context, f *capacitySQLFixture
 	}
 	batch.ExpectedSequence = result.Sequence
 	f.batch = batch
-	for range 2 {
-		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: &objectstore.AuthorityObjects{Store: f.store, Seal: f.keys, Open: f.keys}}).PublishAuthority(ctx); err != nil {
-			t.Fatal("reader acceptance audit", err)
-		}
-	}
+
 }
 
 func source107RejectChangedSelections(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, authority authorization.AcceptedPolicyAuthority, a value.Admission, p value.ContextPreview) {

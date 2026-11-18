@@ -11,6 +11,7 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Only the isolated key service uses this facet, with independently enrolled
@@ -40,7 +41,9 @@ func (s *LocalKeyConfigurations) ObserveLocalKeys(ctx context.Context, c value.L
 	// Own a stable public snapshot across I/O; no plaintext key bytes exist here.
 	c.Versions = append([]value.LocalKeyVersion(nil), c.Versions...)
 	b, e := json.Marshal(c)
-	if e != nil || len(b) > 16384 {
+	// Each encoded version and its 32 JSON fingerprint integers take less
+	// than three times the bytes of a version and its base64 key in the Secret.
+	if e != nil || len(b) > 3*corev1.MaxSecretSize {
 		return time.Time{}, app.ErrKeyUnavailable
 	}
 	var until time.Time
@@ -77,31 +80,29 @@ func (s *LocalKeyConfigurations) ObserveLocalKeys(ctx context.Context, c value.L
 		if e != nil {
 			return e
 		}
-		present := make(map[int][]byte, len(c.Versions))
-		for _, v := range c.Versions {
-			present[v.Version] = v.Fingerprint[:]
+		// Retained versions are the unchanged prefix. An additive rotation can
+		// append many versions in one Secret update and one database statement.
+		if len(versions) > len(c.Versions) {
+			return app.ErrKeyUnavailable
 		}
-		last := 0
-		for _, v := range versions {
-			if !bytes.Equal(v.Fingerprint, present[int(v.Version)]) {
+		for i, saved := range versions {
+			current := c.Versions[i]
+			if int(saved.Version) != current.Version || !bytes.Equal(saved.Fingerprint, current.Fingerprint[:]) {
 				return app.ErrKeyUnavailable
-			} // No retirement without obligation qualification.
-			last = int(v.Version)
-		}
-		for _, v := range c.Versions {
-			if v.Version <= last {
-				found := false
-				for _, prior := range versions {
-					if int(prior.Version) == v.Version {
-						found = true
-					}
-				}
-				if !found {
-					return app.ErrKeyUnavailable
-				}
-				continue
 			}
-			if e = q.InsertLocalKeyVersion(ctx, custodydb.InsertLocalKeyVersionParams{InstallationID: id(s.scope.InstallationID), Purpose: s.scope.Purpose, KeyID: s.scope.KeyID, Version: int32(v.Version), Fingerprint: v.Fingerprint[:]}); e != nil {
+		}
+		added := c.Versions[len(versions):]
+		if len(added) > 0 {
+			numbers := make([]int32, len(added))
+			fingerprints := make([][]byte, len(added))
+			for i := range added {
+				numbers[i] = int32(added[i].Version)
+				fingerprints[i] = added[i].Fingerprint[:]
+			}
+			if e := q.InsertLocalKeyVersions(ctx, custodydb.InsertLocalKeyVersionsParams{
+				InstallationID: id(s.scope.InstallationID), Purpose: s.scope.Purpose, KeyID: s.scope.KeyID,
+				Versions: numbers, Fingerprints: fingerprints,
+			}); e != nil {
 				return e
 			}
 		}

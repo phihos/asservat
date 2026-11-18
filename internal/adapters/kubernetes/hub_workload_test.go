@@ -52,7 +52,7 @@ func TestHubWorkerWorkloadBoundaries(t *testing.T) {
 		}
 		got = append(got, file.Key)
 	}
-	if !reflect.DeepEqual(got, []string{"sql-fleet.json", "sql-configuration.json", "sql-audit.json", "audit-storage.json", "audit-wrap.token", "audit-unwrap.token"}) {
+	if !reflect.DeepEqual(got, []string{"sql-fleet.json", "sql-configuration.json", "audit-storage.json", "audit-wrap.token", "audit-unwrap.token"}) {
 		t.Fatal("unexpected credentials", got)
 	}
 	for i, path := range []string{"kube-observer.token", "kube-probe.token", "kube-leader.token"} {

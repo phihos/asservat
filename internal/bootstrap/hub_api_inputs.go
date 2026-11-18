@@ -45,7 +45,7 @@ func readHubAPIIDs(_ context.Context, root *os.Root) (hubAPIIDs, error) {
 }
 
 func readHubAPIConfig(ctx context.Context, root *os.Root) (contracts.HubAPIConfig, error) {
-	b, err := mounts.Read(ctx, root, contracts.HubAPIConfigFile, contracts.HubAPIConfigMaxBytes)
+	b, err := mounts.Read(ctx, root, contracts.HubAPIConfigFile, contracts.ServiceConfigMaxBytes)
 	if err != nil {
 		return contracts.HubAPIConfig{}, hubAPIInputError("config")
 	}
@@ -202,7 +202,7 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	names := providerconfig.OpenBaoNamesFor(ids.InstallationID)
 	transit := contracts.SmallOpenBaoTransitMount
 	out := &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: p.Origin, BrowserAudience: p.BrowserAudience, ProviderRoots: providerRoots,
-		SessionTransit: contracts.OwnerPublicTransit{Mount: transit, Key: names.BrowserSessionKey}, CaptureHistory: p.CaptureHistory, WorkloadRate: p.WorkloadRate, Standby: p.Standby, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: artifactKeyID(ids.InstallationID),
+		SessionTransit: contracts.OwnerPublicTransit{Mount: transit, Key: names.BrowserSessionKey}, CaptureHistory: p.CaptureHistory, WorkloadRate: p.WorkloadRate, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: artifactKeyID(ids.InstallationID),
 		DownloadPlan: p.DownloadPlan, ProxyTLS: p.ProxyTLS, Port: contracts.OwnerInstalledPublicPort, Version: p.Version, OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity,
 		DownloadConcurrency: p.DownloadConcurrency, OperationAudit: p.OperationAudit, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
 	for _, v := range []struct {

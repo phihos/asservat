@@ -11,26 +11,76 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const listRemoteAccessBindingDigests = `-- name: ListRemoteAccessBindingDigests :many
-SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE root_id=$1 ORDER BY cluster_id LIMIT 64
+const insertRemoteAccessBindings = `-- name: InsertRemoteAccessBindings :one
+INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+VALUES ($1,$2,statement_timestamp(),$3,$4,$5)
+ON CONFLICT(root_id,cluster_id) DO NOTHING RETURNING revision
 `
 
-type ListRemoteAccessBindingDigestsRow struct {
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
+type InsertRemoteAccessBindingsParams struct {
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	Digest      []byte
+	Bindings    []byte
+	Unavailable bool
 }
 
-func (q *Queries) ListRemoteAccessBindingDigests(ctx context.Context, rootID pgtype.UUID) ([]ListRemoteAccessBindingDigestsRow, error) {
-	rows, err := q.db.Query(ctx, listRemoteAccessBindingDigests, rootID)
+func (q *Queries) InsertRemoteAccessBindings(ctx context.Context, arg InsertRemoteAccessBindingsParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertRemoteAccessBindings,
+		arg.RootID,
+		arg.ClusterID,
+		arg.Digest,
+		arg.Bindings,
+		arg.Unavailable,
+	)
+	var revision pgtype.UUID
+	err := row.Scan(&revision)
+	return revision, err
+}
+
+const listRemoteAccessBindings = `-- name: ListRemoteAccessBindings :many
+WITH cached AS (
+ SELECT unnest($2::uuid[]) AS cluster_id,
+        unnest($3::bytea[]) AS digest
+)
+SELECT d.cluster_id, d.observed_at, d.digest, d.unavailable,
+       (CASE WHEN d.digest IS DISTINCT FROM c.digest THEN d.bindings END)::bytea AS bindings
+FROM remote_access_binding_delivery d LEFT JOIN cached c USING (cluster_id)
+WHERE d.root_id=$1 ORDER BY d.cluster_id
+`
+
+type ListRemoteAccessBindingsParams struct {
+	RootID     pgtype.UUID
+	ClusterIds []pgtype.UUID
+	Digests    [][]byte
+}
+
+type ListRemoteAccessBindingsRow struct {
+	ClusterID   pgtype.UUID
+	ObservedAt  pgtype.Timestamptz
+	Digest      []byte
+	Unavailable bool
+	Bindings    []byte
+}
+
+// Compare the reader's cached digests within the same database snapshot.
+// Only a missing or changed delivery returns its potentially large document.
+func (q *Queries) ListRemoteAccessBindings(ctx context.Context, arg ListRemoteAccessBindingsParams) ([]ListRemoteAccessBindingsRow, error) {
+	rows, err := q.db.Query(ctx, listRemoteAccessBindings, arg.RootID, arg.ClusterIds, arg.Digests)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRemoteAccessBindingDigestsRow{}
+	items := []ListRemoteAccessBindingsRow{}
 	for rows.Next() {
-		var i ListRemoteAccessBindingDigestsRow
-		if err := rows.Scan(&i.ClusterID, &i.ObservedAt, &i.Digest); err != nil {
+		var i ListRemoteAccessBindingsRow
+		if err := rows.Scan(
+			&i.ClusterID,
+			&i.ObservedAt,
+			&i.Digest,
+			&i.Unavailable,
+			&i.Bindings,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -42,7 +92,8 @@ func (q *Queries) ListRemoteAccessBindingDigests(ctx context.Context, rootID pgt
 }
 
 const readRemoteAccessBindingDigest = `-- name: ReadRemoteAccessBindingDigest :one
-SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
+SELECT digest, revision FROM remote_access_binding_delivery
+WHERE root_id=$1 AND cluster_id=$2
 `
 
 type ReadRemoteAccessBindingDigestParams struct {
@@ -50,64 +101,49 @@ type ReadRemoteAccessBindingDigestParams struct {
 	ClusterID pgtype.UUID
 }
 
-func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) ([]byte, error) {
+type ReadRemoteAccessBindingDigestRow struct {
+	Digest   []byte
+	Revision pgtype.UUID
+}
+
+func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) (ReadRemoteAccessBindingDigestRow, error) {
 	row := q.db.QueryRow(ctx, readRemoteAccessBindingDigest, arg.RootID, arg.ClusterID)
-	var digest []byte
-	err := row.Scan(&digest)
-	return digest, err
-}
-
-const readRemoteAccessBindings = `-- name: ReadRemoteAccessBindings :one
-SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
-`
-
-type ReadRemoteAccessBindingsParams struct {
-	RootID    pgtype.UUID
-	ClusterID pgtype.UUID
-}
-
-type ReadRemoteAccessBindingsRow struct {
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
-}
-
-func (q *Queries) ReadRemoteAccessBindings(ctx context.Context, arg ReadRemoteAccessBindingsParams) (ReadRemoteAccessBindingsRow, error) {
-	row := q.db.QueryRow(ctx, readRemoteAccessBindings, arg.RootID, arg.ClusterID)
-	var i ReadRemoteAccessBindingsRow
-	err := row.Scan(&i.ObservedAt, &i.Digest, &i.Bindings)
+	var i ReadRemoteAccessBindingDigestRow
+	err := row.Scan(&i.Digest, &i.Revision)
 	return i, err
 }
 
-const storeRemoteAccessBindings = `-- name: StoreRemoteAccessBindings :execrows
-INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
-VALUES($1,$2,$3,$4,$5)
-ON CONFLICT(root_id,cluster_id) DO UPDATE SET observed_at=excluded.observed_at,digest=excluded.digest,
- bindings=CASE WHEN remote_access_binding_delivery.digest=excluded.digest THEN remote_access_binding_delivery.bindings ELSE excluded.bindings END
-WHERE remote_access_binding_delivery.observed_at<excluded.observed_at
- OR (remote_access_binding_delivery.observed_at=excluded.observed_at AND remote_access_binding_delivery.digest<>excluded.digest)
+const replaceRemoteAccessBindings = `-- name: ReplaceRemoteAccessBindings :one
+UPDATE remote_access_binding_delivery SET
+ observed_at=statement_timestamp(),revision=DEFAULT,
+ unavailable=CASE WHEN digest=$1 THEN unavailable ELSE $2 END,
+ bindings=CASE WHEN digest=$1 THEN bindings ELSE $3 END,
+ digest=$1
+WHERE root_id=$4 AND cluster_id=$5
+ AND revision=$6 RETURNING revision
 `
 
-type StoreRemoteAccessBindingsParams struct {
-	RootID     pgtype.UUID
-	ClusterID  pgtype.UUID
-	ObservedAt pgtype.Timestamptz
-	Digest     []byte
-	Bindings   []byte
+type ReplaceRemoteAccessBindingsParams struct {
+	Digest      []byte
+	Unavailable bool
+	Bindings    []byte
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	Previous    pgtype.UUID
 }
 
-// An older delivery never replaces a newer one; unchanged bindings keep
-// their stored bytes.
-func (q *Queries) StoreRemoteAccessBindings(ctx context.Context, arg StoreRemoteAccessBindingsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storeRemoteAccessBindings,
+// Every completed exchange, including confirmation, advances the same token.
+// A deletion followed by a new observation also has a distinct revision.
+func (q *Queries) ReplaceRemoteAccessBindings(ctx context.Context, arg ReplaceRemoteAccessBindingsParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, replaceRemoteAccessBindings,
+		arg.Digest,
+		arg.Unavailable,
+		arg.Bindings,
 		arg.RootID,
 		arg.ClusterID,
-		arg.ObservedAt,
-		arg.Digest,
-		arg.Bindings,
+		arg.Previous,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var revision pgtype.UUID
+	err := row.Scan(&revision)
+	return revision, err
 }

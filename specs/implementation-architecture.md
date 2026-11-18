@@ -20,11 +20,11 @@ Given a change that adds an entity, imports a concrete adapter into an applicati
 
 ## REQ-ARC-003 — Versioned internal contracts
 
-Internal messages MUST carry purpose, operation ID, target, plan digest and deadline, and negotiate versions; authority stays on the hub and is referenced by operation ID. Unknown required fields are rejected; a negotiated version never reinterprets an accepted plan. Control messages carry references, never evidence or arbitrary command strings. Size caps apply before decompression or allocation (frame sizes: [bounds](apis.md#bounds-in-the-contracts)); evidence travels as streamed chunks. Live rows never enter the durable work outbox.
+Internal work messages MUST carry purpose, operation ID, target, plan digest and deadline. Authority stays on the hub and is referenced by operation ID. The hub and connector must agree on the wire protocol major. Peers can ignore new optional fields. A change to required behavior needs an advertised capability and preserves the meaning of accepted plans. Control messages carry references, never evidence or arbitrary command strings. Size caps apply before decompression or allocation (frame sizes: [bounds](apis.md#bounds-in-the-contracts)); evidence travels as streamed chunks. Live rows never enter the durable work outbox.
 
 ### SC-ARC-003
 
-Given an older connector, an unexpected work purpose, a live projection disguised as a capture, or an over-limit body, when decoding/negotiation occurs, then execution is rejected before side effects. A supported N/N-1 peer receives only compatible schemas and preserves operation identity across retries.
+Given a connector on a different wire protocol major, an unexpected work purpose, a live projection disguised as a capture or an over-limit body, execution is rejected before side effects. A connector on the same major receives only work it advertises and preserves operation identity across retries. Release qualification exercises adjacent minor releases in both directions.
 
 ## REQ-ARC-005 — Qualified collector and analyzer extension ports
 

@@ -16,7 +16,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -71,7 +71,7 @@ func installedSQLPoolProfile(pc *pgxpool.Config) *pgxpool.Config {
 	return pc
 }
 
-// This composes real SQL admission/capacity and encrypted authority audit. IdP,
+// This composes real SQL admission, capacity and transaction-local permission audit. IdP,
 // retained policy qualification and target observations are synthetic fixtures;
 // it does not enable the public collection path or qualify fleet execution.
 func TestContextAdmissionWithRealServices(t *testing.T) {
@@ -122,6 +122,9 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
+	t.Run("retained-local-key-versions", func(t *testing.T) {
+		qualifyRetainedLocalKeyVersions(t, ctx, admin, poolFor)
+	})
 	installedPoolFor := func(user, password string) *pgxpool.Pool {
 		t.Helper()
 		pc, err := captureAdmissionPoolConfig("postgres://"+user+":"+password+"@"+address+"/custody_test?sslmode=disable", tls)
@@ -181,7 +184,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := authorityTestKeys{aead}
-	objects := &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}
 	ledger, err := postgres.New(ctx, custodyPool)
 	if err != nil {
 		t.Fatal(err)
@@ -230,11 +232,6 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		batch.ExpectedSequence = accepted.Sequence
-		for j := 0; j < 2; j++ {
-			if err = (auditapp.AuthorityPublisher{Ledger: p, Objects: objects}).PublishAuthority(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
 		now = time.Now().UTC().Truncate(time.Microsecond)
 		target := targets.PodResolution{Request: targets.Request{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: namespaceName, UID: namespace}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: workload}, PodName: "api-123", PodUID: pod}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: namespace, Name: "api-123", UID: pod, NodeName: "worker", ControllerUID: "replicaset"}, NodeUID: "node", NodeBootID: custodyID(), PodResourceVersion: "10", WorkloadResourceVersion: "11", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		if source != nil {
@@ -338,6 +335,108 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		return
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
+	t.Run("capture-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			_, err := s.s.AdmitContext(ctx, s.a)
+			return err
+		})
+	})
+	t.Run("first-review-capture-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		target := s.a.Plan.Input.Target
+		source, reason := cfg.ReviewSourceFor(cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{8}},
+			Enabled: true, Type: cfg.SourceKubernetesExec, ClusterID: target.Request.ClusterID, Role: "workload-maintainer", IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "test"}})
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		s.batch.Bases = s.batch.Bases[1:] // the capturing principal now requires a Pod review
+		s.batch.ReviewSources = []cfg.ReviewSource{source}
+		s.batch.RequestID = custodyID()
+		s.batch.InputDigest[0]++
+		a, err := s.p.AcceptPermissions(ctx, s.batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.batch.ExpectedSequence = a.Sequence
+		reviews, err := postgres.NewAccessReviews(ctx, authorityPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor := s.a.Eligibility.VerifiedIdentity
+		decide := func() authorization.CaptureEligibility {
+			t.Helper()
+			p, err := s.p.Permissions(ctx, target.Target())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return authorization.ContextEligibility(actor, p, target.Target(), time.Now())
+		}
+		if decide().Eligible {
+			t.Fatal("capture already eligible before its first review")
+		}
+		sourceVersion := func() string {
+			t.Helper()
+			var version string
+			if err := admin.QueryRow(ctx, "SELECT xmin::text FROM permission_review_source WHERE stream_id=$1 AND uid=$2", s.a.RootID, source.Resource.UID).Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			return version
+		}
+		before := sourceVersion()
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			if err := reviews.RecordReview(ctx, authapp.ReviewDecision{Source: source, Principal: actor.Principal, Target: target.Request, Allowed: true, DecidedAt: time.Now()}); err != nil {
+				return err
+			}
+			s.a.Eligibility = decide()
+			_, err := s.s.AdmitContext(ctx, s.a)
+			return err
+		})
+		if sourceVersion() != before {
+			t.Fatal("peer publication rewrote the unchanged review source")
+		}
+		// A registration replacement can change the resolved cluster without
+		// editing the PermissionSource object itself.
+		s.batch.ExpectedSequence++
+		s.batch.RequestID = custodyID()
+		s.batch.InputDigest[0]++
+		s.batch.ReviewSources[0].ClusterID = custodyID()
+		if _, err := s.p.AcceptPermissions(ctx, s.batch); err != nil {
+			t.Fatal(err)
+		}
+		if decide().Eligible {
+			t.Fatal("old cluster retained its reviewed assignment after replacement")
+		}
+	})
+	t.Run("lease-renewal-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		f := cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, Sequence: s.batch.ExpectedSequence, TrustDigest: s.batch.TrustDigest, Initialized: true}
+		var renewed cfg.PermissionFence
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			var err error
+			renewed, err = s.p.RenewPermissions(ctx, f)
+			return err
+		})
+		var stream, recorded time.Time
+		if err := admin.QueryRow(ctx, `SELECT s.lease_until,a.lease_until FROM permission_stream s
+			JOIN permission_acceptance a ON a.stream_id=s.id AND a.epoch=s.epoch AND a.sequence=s.sequence WHERE s.id=$1`,
+			f.RootID).Scan(&stream, &recorded); err != nil || !stream.Equal(renewed.LeaseUntil) || !recorded.Equal(stream) {
+			t.Fatalf("staged publication lost the concurrent renewal: renewed %s, stream %s, receipt %s: %v", renewed.LeaseUntil, stream, recorded, err)
+		}
+	})
+	t.Run("suspension-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		f := cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}
+		withStagedPeerPermission(t, ctx, admin, s, cfg.ErrChanged, func() error {
+			return s.p.SuspendPermissions(ctx, f)
+		})
+		var sequence, events int64
+		var suspended bool
+		if err := admin.QueryRow(ctx, `SELECT sequence,suspended,(SELECT count(*) FROM authority_audit WHERE stream_id=$1)
+			FROM permission_stream WHERE id=$1`, s.batch.RootID).Scan(&sequence, &suspended, &events); err != nil || sequence != s.batch.ExpectedSequence || !suspended || events != 2 {
+			t.Fatalf("staged mutation after suspension: sequence %d, suspended %v, events %d: %v", sequence, suspended, events, err)
+		}
+	})
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextReplay(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)

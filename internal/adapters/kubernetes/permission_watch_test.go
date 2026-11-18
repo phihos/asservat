@@ -1,11 +1,16 @@
 package kubernetes
 
 import (
+	value "asservat.local/asservat/internal/domain/configuration"
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,5 +96,173 @@ func TestWatchRejectsMalformedOrExpiredHistory(t *testing.T) {
 				t.Fatal("invalid watch became continuity")
 			}
 		})
+	}
+}
+
+func TestIdlePermissionAndRetentionWatches(t *testing.T) {
+	// Each stream carries over 2 MiB in separate valid Kubernetes objects.
+	const eventCount = 20
+	padding := strings.Repeat("a", 120<<10)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v1/namespaces/asservat-system" {
+			permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
+			return
+		}
+		w.(http.Flusher).Flush()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(5500 * time.Millisecond):
+		}
+		kind := "AccessBinding"
+		if strings.HasSuffix(r.URL.Path, "/evidenceretentionpolicies") {
+			kind = "EvidenceRetentionPolicy"
+		}
+		for i := range eventCount {
+			err := json.NewEncoder(w).Encode(map[string]any{"type": "BOOKMARK", "object": map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": kind, "metadata": map[string]any{"resourceVersion": strconv.Itoa(i + 1), "annotations": map[string]string{"test": padding}}}})
+			if err != nil {
+				return
+			}
+		}
+	}))
+	t.Cleanup(server.Close)
+	c, err := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}, permissionCluster, permissionControl, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retention, err := NewRetentionClient(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	bindings, err := c.WatchBindings(ctx, "before-idle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bindings.Close()
+	policies, err := retention.WatchRetentionPolicies(ctx, "before-idle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer policies.Close()
+	for i := range eventCount {
+		want := strconv.Itoa(i + 1)
+		b, err := bindings.Next(ctx)
+		if err != nil || b.ResourceVersion != want {
+			t.Fatalf("binding stream event %s: %q %v", want, b.ResourceVersion, err)
+		}
+		p, err := policies.Next(ctx)
+		if err != nil || p.ResourceVersion != want {
+			t.Fatalf("retention stream event %s: %q %v", want, p.ResourceVersion, err)
+		}
+	}
+	if _, err := bindings.Next(ctx); !errors.Is(err, io.EOF) {
+		t.Fatalf("binding stream final EOF: %v", err)
+	}
+}
+
+func TestWatchLimitsOneOversizeEventBeforeReadingTheRest(t *testing.T) {
+	raw := `{"type":"BOOKMARK","object":{"padding":"` + strings.Repeat("a", 2*permissionPageBytes) + `"}}`
+	body := strings.NewReader(raw)
+	events := newPermissionWatchEvents(io.NopCloser(body))
+	if _, err := events.next(); !errors.Is(err, value.ErrLimit) || len(raw)-body.Len() != permissionPageBytes+1 {
+		t.Fatal("oversize watch event", err, len(raw)-body.Len())
+	}
+}
+
+func TestPermissionRequestsStillBoundOpeningAndFiniteReads(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/namespaces/asservat-system" {
+			permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
+			return
+		}
+		if r.URL.Query().Get("watch") != "true" {
+			w.Header().Set("Content-Type", "application/json")
+			w.(http.Flusher).Flush()
+		}
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+	c, err := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}, permissionCluster, permissionControl, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retention, err := NewRetentionClient(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, request := range map[string]func(context.Context) error{
+		"binding headers":        func(ctx context.Context) error { _, err := c.WatchBindings(ctx, "1"); return err },
+		"retention headers":      func(ctx context.Context) error { _, err := retention.WatchRetentionPolicies(ctx, "1"); return err },
+		"ordinary response body": func(ctx context.Context) error { _, err := c.raw(ctx, "/api/v1/namespaces/wait", nil); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(t.Context(), 12*time.Second)
+			defer cancel()
+			if err := request(ctx); err == nil || ctx.Err() != nil {
+				t.Fatalf("request overstayed its own deadline: %v %v", err, ctx.Err())
+			}
+		})
+	}
+}
+
+// A full LIST can remain blocked while the API sends multiple settings
+// changes and then invalidates the watch. Both signals must be observable.
+func TestSettingsBurstCoalescesWhileProductionSourceListIsBlocked(t *testing.T) {
+	listed, release, burst := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.HasSuffix(r.URL.Path, "/permissionsources") {
+			return false
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("watch") != "true" {
+			close(listed)
+			select {
+			case <-r.Context().Done():
+				return true
+			case <-release:
+			}
+			return false // fixture supplies the normal complete LIST
+		}
+		w.(http.Flusher).Flush()
+		select {
+		case <-r.Context().Done():
+			return true
+		case <-burst:
+		}
+		for i := range 100 {
+			_ = json.NewEncoder(w).Encode(map[string]any{"type": "MODIFIED", "object": map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadata", "metadata": map[string]string{"resourceVersion": strconv.Itoa(i + 11)}}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"type": "ERROR", "object": map[string]any{"apiVersion": "v1", "kind": "Status", "code": 410, "reason": "Expired"}})
+		return true
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+	defer cancel()
+	w, err := f.client.WatchConfiguration(ctx, "permissionsources", "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := f.client.PermissionSources(ctx); done <- err }()
+	select {
+	case <-listed:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	close(burst)
+	select {
+	case <-w.Lost:
+	case <-ctx.Done():
+		t.Fatal("watch decoder stalled behind the blocked LIST")
+	}
+	if len(w.Changed) != 1 {
+		t.Fatal("expected one pending full LIST", len(w.Changed))
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

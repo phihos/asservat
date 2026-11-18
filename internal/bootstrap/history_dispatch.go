@@ -34,25 +34,15 @@ type regionalHistorySession struct {
 	report     func(string, string)
 }
 
-// historyRetryLeft is the least time a retried attach needs for its own
-// wait and the history exchange that follows.
-const historyRetryLeft = 4 * time.Second
-
-// historyRetryPause spaces history attach retries.
-const historyRetryPause = 250 * time.Millisecond
-
-// attach takes one idle standby for at most contextstart.TryAttachLimit.
+// attach takes one idle standby for at most contextstart.HistoryAttachLimit.
 func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID string) (*contextstart.Attachment, context.Context, context.CancelFunc, time.Time, error) {
-	until := d.Now().Add(contextstart.TryAttachLimit)
+	until := d.Now().Add(contextstart.HistoryAttachLimit)
 	if bound, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, bound)
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	began := time.Now()
-	// No waiting inside the attach: its five seconds bound the exchange too,
-	// and PrepareHistory retries (native run 41212431803: a two-second wait
-	// left the exchange expired).
-	a, e := d.Router.TryAttach(call, cluster, captureID)
+	a, e := d.Router.AttachHistory(call, cluster, captureID)
 	reportHistoryDispatch(d.Report, call, "attach", began, until, e)
 	if e != nil {
 		if d.Report != nil {
@@ -73,51 +63,21 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Now == nil {
 		return nil, fleet.ErrUnavailable
 	}
-	// Retry while history's own budget (ADR-272) still leaves time for the
-	// exchange: right after a start a standby may be reopening, and the
-	// recording collect holds this capture's route and the cluster's capture
-	// slot for its short exchange (native run 41211070820), refused at once.
-	// Retries are bounded by the caller and by TryAttachLimit, so a sweep
-	// over an unreachable cluster does not spin for its whole context.
-	horizon := d.Now().Add(contextstart.TryAttachLimit)
-	if bound, ok := ctx.Deadline(); ok {
-		horizon = identity.Earlier(horizon, bound)
+	a, call, cancel, until, err := d.attach(ctx, cluster, captureID)
+	if err != nil {
+		return nil, err
 	}
-	// A receiver refused right after attach (a standby that was reopening)
-	// is retried like the attach itself, within the same horizon (native
-	// runs 41339509646: receiver/failed left the history unwritten).
-	var a *contextstart.Attachment
-	var call context.Context
-	var cancel context.CancelFunc
-	var until time.Time
-	var r fleet.APIContextReceiver
-	var e error
-	for {
-		a, call, cancel, until, e = d.attach(ctx, cluster, captureID)
-		if e == nil {
-			began := time.Now()
-			observed, diagnostics := contextstart.NewStreamDiagnosticContext(call)
-			r, e = a.Receiver(observed)
-			reportHistoryDispatch(d.Report, call, "receiver", began, until, e)
-			if e == nil {
-				break
-			}
-			if first := diagnostics.Interruption(); first.Present() && d.Report != nil {
-				d.Report("receiver-stream/"+first.Stage()+"/"+first.Reason(), "")
-			}
-			a.Close()
-			cancel()
+	began := time.Now()
+	observed, diagnostics := contextstart.NewStreamDiagnosticContext(call)
+	r, err := a.Receiver(observed)
+	reportHistoryDispatch(d.Report, call, "receiver", began, until, err)
+	if err != nil {
+		if first := diagnostics.Interruption(); first.Present() && d.Report != nil {
+			d.Report("receiver-stream/"+first.Stage()+"/"+first.Reason(), "")
 		}
-		if horizon.Sub(d.Now()) < historyRetryLeft {
-			return nil, e
-		}
-		pause := time.NewTimer(historyRetryPause)
-		select {
-		case <-ctx.Done():
-			pause.Stop()
-			return nil, e
-		case <-pause.C:
-		}
+		a.Close()
+		cancel()
+		return nil, err
 	}
 	until = identity.Earlier(until, r.Window.Until())
 	// The attachment retains call's cancellation. Its joined Close is the owner;

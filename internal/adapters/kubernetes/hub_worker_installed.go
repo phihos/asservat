@@ -42,7 +42,7 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 	})
 	add(contracts.PermissionRuntimeProjectionName(installationID), contracts.PermissionWorkerProjectionDirectory, []string{
 		contracts.PermissionDeploymentFile, contracts.PermissionCredentialManifestFile,
-		"sql-permission-accept.json", "sql-permission-audit.json",
+		"sql-permission-accept.json",
 		// The retention follower and lifecycle audit logins ride in this projection.
 		"sql-retention-source.json", "sql-retention-lifecycle-audit.json",
 		// ADR-204: the worker configuration acceptance logins, present only

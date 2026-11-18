@@ -9,7 +9,7 @@ Requirements: REQ-FED-001/002, S-02 regional context start; TASK-03 / TASK-11.
 
 [ADR-171](171-hub-run-context-execution.md) leaves only cluster-local
 operations in the region, and [ADR-172](172-delegated-owner-discovery.md)
-delegates owner discovery and authentication to the federation channel. The
+delegates owner authentication to the federation channel. The
 product `asservat connector` process still only supervised its credentials.
 Composing context start there exposed three missing inputs:
 

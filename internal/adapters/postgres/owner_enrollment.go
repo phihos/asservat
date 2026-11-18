@@ -72,8 +72,7 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 			return e
 		}
 		var config value.OwnerConfiguration
-		var receipt audit.Receipt
-		if json.Unmarshal(row.SnapshotJson, &config) != nil || !c.matches(config) || config.Revision.Generation != h.Generation || config.Suspended || json.Unmarshal(row.AuditReceiptJson, &receipt) != nil || !receipt.ValidOwnerConfiguration(config) {
+		if json.Unmarshal(row.SnapshotJson, &config) != nil || !c.matches(config) || config.Revision.Generation != h.Generation || config.Suspended {
 			return value.ErrUnavailable
 		}
 		check := func() (value.OwnerConfigurationObservation, time.Time, error) {
@@ -82,6 +81,7 @@ func (s *OwnerEnrollments) current(ctx context.Context, write bool, original tim
 				return value.OwnerConfigurationObservation{}, time.Time{}, e
 			}
 			observation := value.OwnerConfigurationObservation{Configuration: config, ObservedAt: h.ObservedAt.Time, FreshUntil: h.FreshUntil.Time}
+			observation = observation.ForOperation(original)
 			if !observation.Valid(n.Time) {
 				return observation, n.Time, value.ErrUnavailable
 			}
@@ -563,6 +563,7 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 			return value.ErrDenied
 		}
 		out = value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: certificate, Configuration: c, ObservedAt: c.ObservedAt, FreshUntil: identity.Earlier(c.FreshUntil, certificate.NotAfter)}
+		localStart := time.Now()
 		n, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
@@ -570,6 +571,9 @@ func (s *OwnerEnrollments) ReadOwnerRegistration(ctx context.Context, certificat
 		if !out.Valid(n.Time) {
 			return value.ErrUnavailable
 		}
+		offset := clockOffsetAt(localStart, n.Time)
+		out.ObservedAt, out.FreshUntil = offset.at(out.ObservedAt), offset.at(out.FreshUntil)
+		out.Configuration.ObservedAt, out.Configuration.FreshUntil = offset.at(out.Configuration.ObservedAt), offset.at(out.Configuration.FreshUntil)
 		return nil
 	})
 	if err != nil {

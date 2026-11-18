@@ -61,6 +61,7 @@ ALLOW = [
     ("maximum", 4194304, r"pid|hostPID|display_pid|value", None, "Linux PID_MAX_LIMIT"),
     ("maximum", 599, r"status|value", None, "HTTP status code range (RFC 9110)"),
     ("maximum", 4294967295, r"databaseOID", None, "PostgreSQL OID is 32 bits"),
+    ("maximum", 2147483647, r"activeVersion|version", r"local-key-secret", "PostgreSQL integer represents key versions"),
     ("maximum", 2147483647, r"restartCount", None, "Kubernetes ContainerStatus.restartCount is int32"),
     ("maximum", 10000000, r"stallMicroseconds|windowMicroseconds", None, "Linux PSI trigger window is at most 10 s"),
     ("maximum", 1, r"fraction|threshold", None, "a fraction lies in [0, 1]"),

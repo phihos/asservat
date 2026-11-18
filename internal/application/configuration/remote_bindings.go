@@ -11,33 +11,45 @@ import (
 )
 
 // refreshRemoteBindings rereads the joined clusters' AccessBinding
-// deliveries (ADR-329) within three seconds. A failed read, the hub
-// cluster's own row and an invalid delivery keep the previous state.
-func (s *bindingRun) refreshRemoteBindings(ctx context.Context) {
+// deliveries (ADR-329) within the active writer lease. A read failure stops this epoch
+// before another acceptance. The supervisor retries with a full baseline.
+func (s *bindingRun) refreshRemoteBindings(ctx context.Context) (bool, error) {
 	if s.r.RemoteBindings == nil {
-		return
+		return false, nil
 	}
-	call, cancel := context.WithTimeout(ctx, 3*time.Second)
+	call, cancel := s.listContext(ctx)
 	defer cancel()
 	deliveries, err := s.r.RemoteBindings.RemoteBindings(call)
 	if err != nil {
-		return
+		return false, reconcileStep("remote-bindings", err)
 	}
-	if s.remoteBindings == nil {
-		s.remoteBindings = map[string]value.RemoteBindings{}
-	}
-	now := s.r.Now()
+	next := make(map[string]value.RemoteBindings, len(deliveries))
+	changed := false
 	for _, d := range deliveries {
-		if d.ClusterID == s.r.NamespaceClusterID || !d.Valid() || d.ObservedAt.After(now.Add(time.Second)) {
+		if d.ClusterID == s.r.NamespaceClusterID {
 			continue
 		}
-		if old, ok := s.remoteBindings[d.ClusterID]; ok && !d.ObservedAt.After(old.ObservedAt) {
+		if !d.Valid() {
+			if old, ok := s.remoteBindings[d.ClusterID]; ok {
+				next[d.ClusterID] = old
+			}
 			continue
 		}
+		if old, ok := s.remoteBindings[d.ClusterID]; ok {
+			if old.Digest == d.Digest && (d.Digest != ([32]byte{}) || d.ObservedAt.Equal(old.ObservedAt)) {
+				old.ObservedAt = d.ObservedAt
+				next[d.ClusterID] = old
+				continue
+			}
+		}
+		changed = true
 		d.Bindings = slices.Clone(d.Bindings)
 		slices.SortFunc(d.Bindings, func(a, b value.Binding) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
-		s.remoteBindings[d.ClusterID] = d
+		next[d.ClusterID] = d
 	}
+	changed = changed || len(next) != len(s.remoteBindings)
+	s.remoteBindings = next
+	return changed, nil
 }
 
 // remoteBindingBases adds the joined clusters' AccessBindings to the batch
@@ -46,11 +58,20 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) {
 // is a health signal, not authority, and new remote actions need the
 // connector anyway.
 func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState) {
-	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
-		for _, b := range s.remoteBindings[cluster].Bindings {
-			if p, ok := bindingBasis(b, now); ok {
-				out.Bases = append(out.Bases, p)
-			}
+	for _, cluster := range s.r.RegisteredClusters {
+		if _, delivered := s.remoteBindings[cluster]; !delivered {
+			out.UnavailableClusters = append(out.UnavailableClusters, cluster)
 		}
 	}
+	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
+		delivery := s.remoteBindings[cluster]
+		if delivery.Unavailable {
+			out.UnavailableClusters = append(out.UnavailableClusters, cluster)
+			continue
+		}
+		for _, b := range delivery.Bindings {
+			s.appendBindingBasis(out, b, now)
+		}
+	}
+	slices.Sort(out.UnavailableClusters)
 }

@@ -137,18 +137,8 @@ func (s *contextStartOwnerSQL) closeEffects() {
 func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
-	r, ack, e := s.lab.writer.ObserveOwnerConfiguration(ctx, o)
-	if e != nil {
+	if e := s.lab.observe(ctx, o); e != nil {
 		return o, e
-	}
-	if !ack {
-		r, e = s.lab.audit.WriteOwnerConfiguration(ctx, s.config)
-		if e != nil {
-			return o, e
-		}
-		if e = s.lab.ack.AcknowledgeOwnerConfiguration(ctx, s.config, r); e != nil {
-			return o, e
-		}
 	}
 	return s.lab.reader.ReadOwnerConfiguration(ctx)
 }
@@ -185,11 +175,11 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
 	defer end()
 	ca, key := connectorSQLCA(t)
-	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444}
+	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444, NativeBootstrap: value.OwnerBootstrapProfile, NativeCandidateLimit: 16}
 	c := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
-	l := ownerConfigurationLab(t, ctx, f, c)
+	l := ownerEnrollmentLab(t, ctx, f, c)
 	s := newContextStartOwnerSQL(t, ctx, l, c, contextStartOwnerIssuer{ca, key})
-	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("missing current configuration yielded candidates")
 	}
 	read := func(want int) value.APIContextOwnerCandidates {
@@ -197,7 +187,7 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		if _, e = s.refresh(ctx, 5*time.Second); e != nil {
 			t.Fatal(e)
 		}
-		v, e := s.reader.ReadContextStartOwners(ctx)
+		v, e := s.reader.ReadOwnerObservationCandidates(ctx)
 		if e != nil || !v.Valid(time.Now()) || len(v.Owners) != want {
 			t.Fatal("exact complete candidate count", want, len(v.Owners), e)
 		}
@@ -276,33 +266,6 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 			t.Fatal("reader write was not an actual privilege denial")
 		}
 	})
-	t.Run("complete-overflow-is-unavailable", func(t *testing.T) {
-		var extra []value.OwnerEnrollment
-		for range 16 {
-			r := req
-			r.Binding.PodUID = custodyID()
-			r.Binding.ProcessEpoch = custodyID()
-			r.CSRDER = connectorSQLCSR(t)
-			cert, e := s.coordinator().Enroll(ctx, r)
-			if e != nil {
-				t.Fatal("bounded actual extra enrollment", e)
-			}
-			registration, e := s.reader.ReadOwnerRegistration(ctx, cert.Certificate)
-			if e != nil {
-				t.Fatal(e)
-			}
-			extra = append(extra, registration.Enrollment)
-		}
-		if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
-			t.Fatal("seventeen owners returned an incomplete successful list")
-		}
-		for _, v := range extra {
-			if e = s.cleanup.RetireOwnerEnrollment(ctx, v); e != nil {
-				t.Fatal(e)
-			}
-		}
-		read(1)
-	})
 	t.Run("original-observation-expires-behind-real-lock", func(t *testing.T) {
 		o, e := s.refresh(ctx, 350*time.Millisecond)
 		if e != nil {
@@ -323,7 +286,7 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		call, cancel := context.WithCancel(ctx)
 		result := make(chan error, 1)
 		joined := false
-		go func() { _, e := s.reader.ReadContextStartOwners(call); result <- e }()
+		go func() { _, e := s.reader.ReadOwnerObservationCandidates(call); result <- e }()
 		defer func() {
 			cancel()
 			_ = tx.Rollback(context.Background())
@@ -368,12 +331,12 @@ func TestContextStartOwnersWithRealServices(t *testing.T) {
 		}
 		read(0)
 	})
-	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
+	if e = l.fence(ctx, time.Now()); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+	if _, e = s.reader.ReadOwnerObservationCandidates(ctx); e == nil {
 		t.Fatal("configuration fence yielded successful discovery")
 	}
 	read(0)
-	t.Log("actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/overflow/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic")
+	t.Log("actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic")
 }

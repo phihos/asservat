@@ -113,7 +113,7 @@ workload storm limits, finite expiry, encrypted audit, every authorization check
 9. Cost per active policy: one regional Pod LIST (plus one ReplicaSet GET per owning ReplicaSet)
    and two hub API GETs per 15 s; one SQL transaction; bounded rows (watermarks ≤ Pods,
    occurrences ≤ admitted, suppressions ≤ 6). At 16 policies per cluster that is about one query
-   per second per cluster on the standby budget of eight queries per exchange.
+   per second per cluster in this estimate.
 10. Additive migration (floor stays 81); disabling is deleting or suspending the DebugPolicy.
 11. A smaller fix (manual captures only) does not meet S-03.
 

@@ -7,8 +7,7 @@ import (
 )
 
 // AccessBindingDeliveryMaxBytes bounds one connector's AccessBinding delivery
-// on the lifecycle channel, the same byte budget as the hub cluster's LIST
-// (ADR-329).
+// on the lifecycle channel across both collections (ADR-329).
 const AccessBindingDeliveryMaxBytes = 8 << 20
 
 // AccessBindingDelivery is a connector's complete AccessBinding LIST of its
@@ -16,11 +15,14 @@ const AccessBindingDeliveryMaxBytes = 8 << 20
 // raw spec. It names no cluster: the hub attributes it to the connector's
 // authenticated cluster and validates every spec itself.
 type AccessBindingDelivery struct {
-	ResourceVersion string                   `json:"resourceVersion"`
-	Items           []DeliveredAccessBinding `json:"items"`
+	Unavailable            bool                     `json:"unavailable,omitempty"`
+	ResourceVersion        string                   `json:"resourceVersion"`
+	ClusterResourceVersion string                   `json:"-"` // Local cursor for the ClusterAccessBinding watch.
+	Items                  []DeliveredAccessBinding `json:"items"`
 }
 
 type DeliveredAccessBinding struct {
+	Kind            string          `json:"kind,omitempty"` // Empty denotes the namespaced AccessBinding.
 	Namespace       string          `json:"namespace"`
 	NamespaceUID    string          `json:"namespaceUID"`
 	Name            string          `json:"name"`
@@ -34,7 +36,21 @@ type DeliveredAccessBinding struct {
 // Digest identifies a delivery's content for the hub's stored copy: the
 // items only, since the LIST resource version changes with any write.
 func (d AccessBindingDelivery) Digest() string {
+	if d.Unavailable {
+		return deliveryDigest("unavailable")
+	}
 	return deliveryDigest(d.Items)
+}
+
+// Bounded replaces a list that cannot fit the authenticated conversation
+// with an explicit unavailable observation. A disconnected exchange still
+// leaves the previous observation intact.
+func (d AccessBindingDelivery) Bounded() AccessBindingDelivery {
+	encoded, err := json.Marshal(d)
+	if err != nil || len(encoded) > AccessBindingDeliveryMaxBytes {
+		return AccessBindingDelivery{Unavailable: true}
+	}
+	return d
 }
 
 func deliveryDigest(v any) string {

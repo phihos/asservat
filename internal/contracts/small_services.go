@@ -41,7 +41,7 @@ type SecretsPlan struct {
 }
 
 // RemoteObjectStorePrincipals are a joined cluster's regional executor
-// capabilities (ADR-331), each scoped to that cluster's ID.
+// capabilities (ADR-334), each scoped to that cluster's ID.
 func RemoteObjectStorePrincipals() []string { return []string{"regional-write", "regional-history"} }
 
 // RemoteObjectStoreSecret is the Secret (key credentials.json) of one
@@ -145,7 +145,7 @@ type SmallKeycloakDatabase struct {
 }
 
 func DecodeSecretsPlan(r io.Reader) (SecretsPlan, error) {
-	return decodeClosedRPC[SecretsPlan](r, SecretsMaxBytes)
+	return decodeClosedRPC[SecretsPlan](r, ServiceConfigMaxBytes)
 }
 
 func DecodeSmallKeycloakSettings(r io.Reader) (SmallKeycloakSettings, error) {

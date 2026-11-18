@@ -123,6 +123,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			idle = nil
 		}
 	}
+	var owner *contracts.NativeOwnerRoute
+	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &owner) && owner.Valid() && ctx.Err() == nil {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Asservat-Native-Disposition", "operation-owner")
+		w.Header().Set("Asservat-Native-Nonce", hello.Nonce)
+		for _, address := range owner.Addresses {
+			w.Header().Add("Asservat-Native-Owner-IP", address)
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &idle) && idle.Valid(time.Now()) && idle.Worker.Worker.Intent.ID == hello.Reference.WorkerID && idle.Worker.Worker.Intent.Parent == value.AcquisitionParentFor(hello.Reference.SessionID, hello.Reference.QueryID) && idle.Proof.Binding.InstallationID == hello.Reference.InstallationID && ctx.Err() == nil {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")

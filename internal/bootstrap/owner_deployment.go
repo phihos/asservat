@@ -212,7 +212,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if in.offer != nil && in.offer.ownersAddress != "" {
+	if in.offer != nil && in.offer.offer.KeyService != nil {
 		// The combined-mode regional executor dials the accepted owner pool.
 		if err = in.offer.setOwners(parts.pool, parts.revision, parts.issuerRoots); err != nil {
 			return nil, &fixedStepError{"regional-offer-owners", err}
@@ -236,7 +236,7 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		// own IDs and namespace. Their connectors receive the stored offer
 		// from the federation on connect.
 		for _, r := range in.remote {
-			entry, e := catalogCluster(stored, in.offer.offer.Image, r.clusterID, r.peerID, r.Namespace, in.release, r.Standby, r.Captures, "remote-cluster")
+			entry, e := catalogCluster(stored, in.offer.offer.Image, r.clusterID, r.peerID, r.Namespace, in.release, r.Captures, "remote-cluster")
 			if e != nil {
 				return nil, e
 			}
@@ -625,12 +625,12 @@ func legacyOwnerIdentity(startup context.Context, d *OwnerDeployment, in *ownerI
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	current, err := configs.ReadOwnerConfiguration(startup)
-	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
+	current, err := app.StartupOwnerConfiguration(startup, configs, c.Namespace.Name)
+	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	pool := current.Configuration.Pool
-	roots, _, err := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+	pool := current.Pool
+	roots, _, err := mtls.OwnerTrustRoots(current.IssuerRoots, time.Now())
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

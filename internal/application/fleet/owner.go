@@ -18,6 +18,16 @@ type OwnerEndpointReader interface {
 type OwnerConfigurationReader interface {
 	ReadOwnerConfiguration(context.Context) (value.OwnerConfigurationObservation, error)
 }
+
+// StartupOwnerConfiguration is the common hub API and federation bootstrap read.
+func StartupOwnerConfiguration(ctx context.Context, r OwnerConfigurationReader, namespace string) (value.OwnerConfiguration, error) {
+	o, err := r.ReadOwnerConfiguration(ctx)
+	if err != nil || !o.Valid(time.Now()) || o.Configuration.Suspended || o.Configuration.Pool.Namespace != namespace {
+		return value.OwnerConfiguration{}, value.ErrUnavailable
+	}
+	return o.Configuration, nil
+}
+
 type OwnerRouteReader interface {
 	CurrentOwnerRoute(context.Context, value.OwnerBinding) (value.OwnerRoute, error)
 }

@@ -112,7 +112,6 @@ clusters: []
 #   # connector: asservat-system/asservat-connector  # default <namespace>/<name>-connector
 #   # revoked: true          # refuse its tokens
 #   namespace: ""            # its release namespace; default: this one
-#   standby: 2               # context-start standby connections
 
 # Evidence capacity (specs/capacity.md). Every field is optional and
 # changes apply on helm upgrade; an external object store needs
@@ -217,7 +216,6 @@ hub:
     # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
     peers: []
     public:
-      standby: 2
       previewSeconds: 120
       operationConcurrency: 8
       mcpPerIdentity: 2

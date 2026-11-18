@@ -1,10 +1,12 @@
 package presentation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +30,24 @@ func TestApprovedSubmissionReplaysRequestCaptureInput(t *testing.T) {
 	f.i.Scopes = []string{"evidence:read"}
 	if _, err = s.SubmitApproved(t.Context(), f, stored); !errors.Is(err, value.ErrDenied) || f.requests != 2 {
 		t.Fatal("submission without evidence:capture", err)
+	}
+}
+
+// A jsonb round trip or another transport may reorder raw profile override
+// members. The stored approval and exact retry must produce identical bytes.
+func TestReviewedSubmissionNormalizesProfileOverrideOrder(t *testing.T) {
+	s, f := operationFixture(t, true)
+	request := strings.Replace(wireRequest, wirePreview, wireComposition, 1)
+	if reply, err := s.Call(t.Context(), f, "request_capture", []byte(request)); err != nil || f.requests != 1 {
+		t.Fatalf("public submission: %v %s", err, reply.Body)
+	}
+	first := f.submission
+	reordered := strings.Replace(request, `"maxAge":"40s","maxBytes":16777216,"segments":4`, `"segments":4,"maxAge":"40s","maxBytes":16777216`, 1)
+	if reordered == request {
+		t.Fatal("fixture did not reorder the raw override")
+	}
+	if _, err := s.SubmitApproved(t.Context(), f, []byte(reordered)); err != nil || !bytes.Equal(first, f.submission) {
+		t.Fatalf("reordered approval submission differs: %v", err)
 	}
 }
 

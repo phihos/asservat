@@ -11,26 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acknowledgeOwnerConfiguration = `-- name: AcknowledgeOwnerConfiguration :execrows
-UPDATE hub_owner_configuration_revision SET audit_receipt_json=$5
-WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4 AND audit_receipt_json IS NULL
+const fenceOwnerConfiguration = `-- name: FenceOwnerConfiguration :execrows
+UPDATE hub_owner_configuration SET source_version=$4,observed_at=statement_timestamp(),fresh_until=statement_timestamp()
+WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
 `
 
-type AcknowledgeOwnerConfigurationParams struct {
-	InstallationID   pgtype.UUID
-	ClusterID        pgtype.UUID
-	SourceUid        pgtype.UUID
-	Generation       int64
-	AuditReceiptJson []byte
+type FenceOwnerConfigurationParams struct {
+	InstallationID pgtype.UUID
+	ClusterID      pgtype.UUID
+	SourceUid      pgtype.UUID
+	SourceVersion  string
 }
 
-func (q *Queries) AcknowledgeOwnerConfiguration(ctx context.Context, arg AcknowledgeOwnerConfigurationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, acknowledgeOwnerConfiguration,
+func (q *Queries) FenceOwnerConfiguration(ctx context.Context, arg FenceOwnerConfigurationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, fenceOwnerConfiguration,
 		arg.InstallationID,
 		arg.ClusterID,
 		arg.SourceUid,
-		arg.Generation,
-		arg.AuditReceiptJson,
+		arg.SourceVersion,
 	)
 	if err != nil {
 		return 0, err
@@ -38,64 +36,19 @@ func (q *Queries) AcknowledgeOwnerConfiguration(ctx context.Context, arg Acknowl
 	return result.RowsAffected(), nil
 }
 
-const countOwnerConfigurationRevisions = `-- name: CountOwnerConfigurationRevisions :one
-SELECT count(*) FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
-`
-
-type CountOwnerConfigurationRevisionsParams struct {
-	InstallationID pgtype.UUID
-	ClusterID      pgtype.UUID
-	SourceUid      pgtype.UUID
-}
-
-func (q *Queries) CountOwnerConfigurationRevisions(ctx context.Context, arg CountOwnerConfigurationRevisionsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countOwnerConfigurationRevisions, arg.InstallationID, arg.ClusterID, arg.SourceUid)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const fenceOwnerConfiguration = `-- name: FenceOwnerConfiguration :exec
-UPDATE hub_owner_configuration SET observed_at=$4,fresh_until=least(fresh_until,$4::timestamptz)
-WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND observed_at<=$4
-`
-
-type FenceOwnerConfigurationParams struct {
-	InstallationID pgtype.UUID
-	ClusterID      pgtype.UUID
-	SourceUid      pgtype.UUID
-	ObservedAt     pgtype.Timestamptz
-}
-
-func (q *Queries) FenceOwnerConfiguration(ctx context.Context, arg FenceOwnerConfigurationParams) error {
-	_, err := q.db.Exec(ctx, fenceOwnerConfiguration,
-		arg.InstallationID,
-		arg.ClusterID,
-		arg.SourceUid,
-		arg.ObservedAt,
-	)
-	return err
-}
-
 const insertOwnerConfiguration = `-- name: InsertOwnerConfiguration :execrows
 INSERT INTO hub_owner_configuration(installation_id,cluster_id,source_uid,generation,observed_at,fresh_until)
-VALUES($1,$2,$3,0,$4,$4) ON CONFLICT DO NOTHING
+VALUES($1,$2,$3,0,statement_timestamp(),statement_timestamp()) ON CONFLICT DO NOTHING
 `
 
 type InsertOwnerConfigurationParams struct {
 	InstallationID pgtype.UUID
 	ClusterID      pgtype.UUID
 	SourceUid      pgtype.UUID
-	ObservedAt     pgtype.Timestamptz
 }
 
 func (q *Queries) InsertOwnerConfiguration(ctx context.Context, arg InsertOwnerConfigurationParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertOwnerConfiguration,
-		arg.InstallationID,
-		arg.ClusterID,
-		arg.SourceUid,
-		arg.ObservedAt,
-	)
+	result, err := q.db.Exec(ctx, insertOwnerConfiguration, arg.InstallationID, arg.ClusterID, arg.SourceUid)
 	if err != nil {
 		return 0, err
 	}
@@ -127,7 +80,7 @@ func (q *Queries) InsertOwnerConfigurationRevision(ctx context.Context, arg Inse
 }
 
 const lockOwnerConfiguration = `-- name: LockOwnerConfiguration :one
-SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE
+SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until, source_version FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE
 `
 
 type LockOwnerConfigurationParams struct {
@@ -145,12 +98,13 @@ func (q *Queries) LockOwnerConfiguration(ctx context.Context, arg LockOwnerConfi
 		&i.Generation,
 		&i.ObservedAt,
 		&i.FreshUntil,
+		&i.SourceVersion,
 	)
 	return i, err
 }
 
 const observeOwnerConfiguration = `-- name: ObserveOwnerConfiguration :exec
-UPDATE hub_owner_configuration SET generation=$4,observed_at=$5,fresh_until=$6
+UPDATE hub_owner_configuration SET source_version=$4,generation=$5,observed_at=clock_timestamp(),fresh_until=$6
 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3
 `
 
@@ -158,8 +112,8 @@ type ObserveOwnerConfigurationParams struct {
 	InstallationID pgtype.UUID
 	ClusterID      pgtype.UUID
 	SourceUid      pgtype.UUID
+	SourceVersion  string
 	Generation     int64
-	ObservedAt     pgtype.Timestamptz
 	FreshUntil     pgtype.Timestamptz
 }
 
@@ -168,15 +122,15 @@ func (q *Queries) ObserveOwnerConfiguration(ctx context.Context, arg ObserveOwne
 		arg.InstallationID,
 		arg.ClusterID,
 		arg.SourceUid,
+		arg.SourceVersion,
 		arg.Generation,
-		arg.ObservedAt,
 		arg.FreshUntil,
 	)
 	return err
 }
 
 const readOwnerConfigurationRevision = `-- name: ReadOwnerConfigurationRevision :one
-SELECT installation_id, cluster_id, source_uid, generation, snapshot_json, audit_receipt_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
+SELECT installation_id,cluster_id,source_uid,generation,snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4
 `
 
 type ReadOwnerConfigurationRevisionParams struct {
@@ -186,27 +140,34 @@ type ReadOwnerConfigurationRevisionParams struct {
 	Generation     int64
 }
 
-func (q *Queries) ReadOwnerConfigurationRevision(ctx context.Context, arg ReadOwnerConfigurationRevisionParams) (HubOwnerConfigurationRevision, error) {
+type ReadOwnerConfigurationRevisionRow struct {
+	InstallationID pgtype.UUID
+	ClusterID      pgtype.UUID
+	SourceUid      pgtype.UUID
+	Generation     int64
+	SnapshotJson   []byte
+}
+
+func (q *Queries) ReadOwnerConfigurationRevision(ctx context.Context, arg ReadOwnerConfigurationRevisionParams) (ReadOwnerConfigurationRevisionRow, error) {
 	row := q.db.QueryRow(ctx, readOwnerConfigurationRevision,
 		arg.InstallationID,
 		arg.ClusterID,
 		arg.SourceUid,
 		arg.Generation,
 	)
-	var i HubOwnerConfigurationRevision
+	var i ReadOwnerConfigurationRevisionRow
 	err := row.Scan(
 		&i.InstallationID,
 		&i.ClusterID,
 		&i.SourceUid,
 		&i.Generation,
 		&i.SnapshotJson,
-		&i.AuditReceiptJson,
 	)
 	return i, err
 }
 
 const shareOwnerConfiguration = `-- name: ShareOwnerConfiguration :one
-SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR SHARE
+SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until, source_version FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR SHARE
 `
 
 type ShareOwnerConfigurationParams struct {
@@ -224,6 +185,7 @@ func (q *Queries) ShareOwnerConfiguration(ctx context.Context, arg ShareOwnerCon
 		&i.Generation,
 		&i.ObservedAt,
 		&i.FreshUntil,
+		&i.SourceVersion,
 	)
 	return i, err
 }

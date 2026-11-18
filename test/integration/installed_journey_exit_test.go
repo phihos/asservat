@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -78,11 +79,21 @@ func installedJourneyIdempotency(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return code
 	}
-	if code := submit(map[string]any{"preview_id": original["preview_id"], "idempotency_key": original["idempotency_key"]}); code != "" {
+	if code := submit(original); code != "" {
 		t.Fatal("installed duplicate request_capture did not replay the original operation", code)
 	}
-	if code := submit(map[string]any{"preview_id": uuid.NewString(), "idempotency_key": original["idempotency_key"]}); code != "Conflict" {
+	changed := installedJourneyReviewedRequest(original["preview"].(map[string]any), strings.Repeat("f", 64), original["idempotency_key"].(string))
+	// The admission already exists under this key; a different reviewed
+	// digest must conflict before the hub can admit anything else.
+	if code := submit(changed); code != "Conflict" {
 		t.Fatal("installed request_capture reusing the key with different content was not Conflict", code)
+	}
+	changedPreview := maps.Clone(original["preview"].(map[string]any))
+	changedPreview["requested_retention_seconds"] = installedJourneyRetentionSeconds() + 1
+	changed = maps.Clone(original)
+	changed["preview"] = changedPreview
+	if code := submit(changed); code != "Conflict" {
+		t.Fatal("installed request_capture with changed retention under original key and digest was not Conflict", code)
 	}
 	if after := installedJourneyCaptures(t, ctx, admin, root, captureID); after != before {
 		t.Fatal("installed duplicate/conflicting request changed the admitted captures", before, after)
@@ -190,7 +201,7 @@ func installedJourneyResumeSpent(t *testing.T, ctx context.Context, admin *pgxpo
 // schema-valid error identical to the same call about an absent counterpart,
 // so the reply discloses neither existence nor detail (specs/mcp.md: uniform
 // not-found/not-authorized projection before access is established).
-func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, outsider *installedIdentity, transport http.RoundTripper, origin string, target map[string]string, previewID, caseID, artifactID string) {
+func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, outsider *installedIdentity, transport http.RoundTripper, origin string, target map[string]string, planDigest, caseID, artifactID string) {
 	t.Helper()
 	client := sdk.NewClient(&sdk.Implementation{Name: "installed-unrelated", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
 	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, outsider.mcpTokenSource(origin).Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
@@ -219,13 +230,16 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 	absent := map[string]string{"cluster_id": target["cluster_id"], "namespace": target["namespace"], "kind": target["kind"], "name": "absent-" + uuid.NewString()[:8]}
 	preset := map[string]string{"name": "pod-status", "version": "v1"}
 	key := "installed-unrelated-" + uuid.NewString()
+	previewFor := func(target map[string]string) map[string]any {
+		return map[string]any{"target_ref": target, "preset_ref": preset, "requested_retention_seconds": installedJourneyRetentionSeconds()}
+	}
 	for _, c := range []struct {
 		name        string
 		real, other any
 	}{
 		{"list_diagnostics", map[string]any{"target_ref": target}, map[string]any{"target_ref": absent}},
-		{"preview_capture", map[string]any{"target_ref": target, "preset_ref": preset, "requested_retention_seconds": installedJourneyRetention}, map[string]any{"target_ref": absent, "preset_ref": preset, "requested_retention_seconds": installedJourneyRetention}},
-		{"request_capture", map[string]string{"preview_id": previewID, "idempotency_key": key}, map[string]string{"preview_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
+		{"preview_capture", previewFor(target), previewFor(absent)},
+		{"request_capture", installedJourneyReviewedRequest(previewFor(target), planDigest, key), installedJourneyReviewedRequest(previewFor(absent), planDigest, key+"-absent")},
 		{"get_case", map[string]string{"case_id": caseID}, map[string]string{"case_id": uuid.NewString()}},
 		{"prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key}, map[string]string{"artifact_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
 	} {

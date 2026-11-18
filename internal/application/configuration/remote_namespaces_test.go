@@ -109,3 +109,21 @@ func TestRemoteClusterBindingSelectorFollowsJournal(t *testing.T) {
 	}
 	unknown(now.Add(authorization.PermissionObservationInterval), "lapsed journal")
 }
+
+func TestConfigurationChangeReadsNewRemoteMetadataSource(t *testing.T) {
+	f, _, s, ctx := inheritanceRun(t)
+	source := inheritanceSource()
+	source.ClusterID = remoteCluster
+	f.snapshot.Sources = []value.Source{source}
+	f.snapshot.ObservedAt = s.r.Now()
+	r := &remoteFixture{list: value.NamespaceList{ResourceVersion: "joined", ObservedAt: f.snapshot.ObservedAt, Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "joined:0", "payments")}}}
+	s.r.Remote = r
+	if err := s.sourceSnapshot(ctx, f.snapshot); err != nil {
+		t.Fatal(err)
+	}
+	latest := f.accepted[len(f.accepted)-1]
+	owners, _ := inheritedOwners(latest)
+	if r.calls != 1 || len(owners) != 2 || len(latest.RemoteNamespaces) != 1 || latest.RemoteNamespaces[0].ClusterID != remoteCluster {
+		t.Fatal("new source was not observed and accepted on the configuration event", r.calls, owners)
+	}
+}

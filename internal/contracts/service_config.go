@@ -14,9 +14,10 @@ import (
 // projected files. Kubernetes UIDs are read by name at startup; nothing here
 // carries a UID, guard pin, recipe digest or activation record.
 const (
-	IDsRoot               = "/run/asservat/ids"
-	ServiceConfigFile     = "config.json"
-	ServiceConfigMaxBytes = 64 << 10
+	IDsRoot           = "/run/asservat/ids"
+	ServiceConfigFile = "config.json"
+	// Kubernetes limits the ConfigMap containing config.json to 1 MiB.
+	ServiceConfigMaxBytes = 1 << 20
 
 	// PEM CA bundles of the providers each component dials.
 	PostgresRootsFile    = "postgres-ca.crt"

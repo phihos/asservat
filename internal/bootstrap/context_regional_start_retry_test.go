@@ -43,7 +43,7 @@ func TestRegionalStartRepeatsNotStartedAttemptOnNextStandby(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	router, err := contextstart.NewRouter(contextstart.RouterLimits{Standby: 2, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: f.work.Target.ClusterID, Standby: 2, Captures: 1}}})
+	router, err := contextstart.NewRouter([]contextstart.ClusterLimit{{ClusterID: f.work.Target.ClusterID, Standby: 2, Captures: 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

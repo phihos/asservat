@@ -177,7 +177,7 @@ func (s *frameStream) nextQuery() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next := s.querySeq + 1
-	if s.closed || next > contracts.APIContextMaximumQueries {
+	if s.closed {
 		return 0, contracts.ErrAPIContextProtocol
 	}
 	s.querySeq = next
@@ -193,7 +193,7 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	if s == nil || ctx == nil {
 		return time.Time{}, fleet.ErrInvalid
 	}
-	// ADR-333: an unannounced query is answered here, before any I/O, so the
+	// ADR-334: an unannounced query is answered here, before any I/O, so the
 	// standby stays waiting for work.
 	if e := requireCapability(s, queryCapability(method), errQueryClass); e != nil {
 		return time.Time{}, errQueryAnswer{e}

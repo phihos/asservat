@@ -59,14 +59,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	pod := s.a.Plan.Input.Target.Target()
 	workload := authorization.WorkloadScope(pod.ClusterID, pod.NamespaceUID, pod.WorkloadUID)
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-	publishAuthority := func() {
-		t.Helper()
-		for range 2 {
-			if err := (auditapp.AuthorityPublisher{Ledger: s.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
 	refresh := func() {
 		t.Helper()
 		// The 100-publication measurement outlives one synthetic source
@@ -105,7 +97,6 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Fatal("automation binding", err)
 	}
 	s.batch.ExpectedSequence = accepted.Sequence
-	publishAuthority()
 	projection, err := s.p.Permissions(ctx, workload)
 	if err != nil {
 		t.Fatal(err)

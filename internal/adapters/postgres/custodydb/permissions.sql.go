@@ -11,45 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acknowledgeAuthorityAudit = `-- name: AcknowledgeAuthorityAudit :execrows
-UPDATE authority_audit SET acknowledged_at=clock_timestamp(),object_key=$2,object_version=$3,object_etag=$4,object_bytes=$5,object_sha256=$6 WHERE id=$1 AND acknowledged_at IS NULL
+const checkPermissionConstraints = `-- name: CheckPermissionConstraints :exec
+SET CONSTRAINTS ALL IMMEDIATE
 `
 
-type AcknowledgeAuthorityAuditParams struct {
-	ID            pgtype.UUID
-	ObjectKey     pgtype.Text
-	ObjectVersion pgtype.Text
-	ObjectEtag    pgtype.Text
-	ObjectBytes   pgtype.Int8
-	ObjectSha256  []byte
-}
-
-func (q *Queries) AcknowledgeAuthorityAudit(ctx context.Context, arg AcknowledgeAuthorityAuditParams) (int64, error) {
-	result, err := q.db.Exec(ctx, acknowledgeAuthorityAudit,
-		arg.ID,
-		arg.ObjectKey,
-		arg.ObjectVersion,
-		arg.ObjectEtag,
-		arg.ObjectBytes,
-		arg.ObjectSha256,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const initializePermissionStream = `-- name: InitializePermissionStream :exec
-UPDATE permission_stream SET initial_audit_id=$2 WHERE id=$1 AND initial_audit_id IS NULL
-`
-
-type InitializePermissionStreamParams struct {
-	ID             pgtype.UUID
-	InitialAuditID pgtype.UUID
-}
-
-func (q *Queries) InitializePermissionStream(ctx context.Context, arg InitializePermissionStreamParams) error {
-	_, err := q.db.Exec(ctx, initializePermissionStream, arg.ID, arg.InitialAuditID)
+func (q *Queries) CheckPermissionConstraints(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, checkPermissionConstraints)
 	return err
 }
 
@@ -81,7 +48,7 @@ func (q *Queries) InsertAuthorityAudit(ctx context.Context, arg InsertAuthorityA
 }
 
 const insertPermissionAcceptance = `-- name: InsertPermissionAcceptance :exec
-INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired,lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
 
 type InsertPermissionAcceptanceParams struct {
@@ -93,6 +60,7 @@ type InsertPermissionAcceptanceParams struct {
 	AuditID       pgtype.UUID
 	Assignments   int32
 	Retired       int32
+	LeaseUntil    pgtype.Timestamptz
 }
 
 func (q *Queries) InsertPermissionAcceptance(ctx context.Context, arg InsertPermissionAcceptanceParams) error {
@@ -105,53 +73,39 @@ func (q *Queries) InsertPermissionAcceptance(ctx context.Context, arg InsertPerm
 		arg.AuditID,
 		arg.Assignments,
 		arg.Retired,
+		arg.LeaseUntil,
 	)
 	return err
 }
 
-const insertPermissionAssignment = `-- name: InsertPermissionAssignment :one
+const insertPermissionAssignments = `-- name: InsertPermissionAssignments :exec
 INSERT INTO permission_assignment(id,stream_id,basis_key,subject_kind,issuer,subject_id,role,basis_digest,activation_audit_id)
-VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, stream_id, basis_key, subject_kind, issuer, subject_id, role, basis_digest, created_at, retired_at, activation_audit_id, retirement_audit_id
+SELECT gen_random_uuid(),b.stream_id,b.basis_key,m.kind,m.issuer,m.subject,m.role,b.spec_digest,$1
+FROM (SELECT unnest($2::text[]) AS basis,unnest($3::text[]) AS kind,unnest($4::text[]) AS issuer,unnest($5::text[]) AS subject,unnest($6::text[]) AS role) m
+JOIN permission_basis b ON b.stream_id=$7 AND b.basis_key=m.basis
 `
 
-type InsertPermissionAssignmentParams struct {
-	StreamID          pgtype.UUID
-	BasisKey          string
-	SubjectKind       string
-	Issuer            string
-	SubjectID         string
-	Role              string
-	BasisDigest       []byte
-	ActivationAuditID pgtype.UUID
+type InsertPermissionAssignmentsParams struct {
+	EventID  pgtype.UUID
+	Bases    []string
+	Kinds    []string
+	Issuers  []string
+	Subjects []string
+	Roles    []string
+	StreamID pgtype.UUID
 }
 
-func (q *Queries) InsertPermissionAssignment(ctx context.Context, arg InsertPermissionAssignmentParams) (PermissionAssignment, error) {
-	row := q.db.QueryRow(ctx, insertPermissionAssignment,
+func (q *Queries) InsertPermissionAssignments(ctx context.Context, arg InsertPermissionAssignmentsParams) error {
+	_, err := q.db.Exec(ctx, insertPermissionAssignments,
+		arg.EventID,
+		arg.Bases,
+		arg.Kinds,
+		arg.Issuers,
+		arg.Subjects,
+		arg.Roles,
 		arg.StreamID,
-		arg.BasisKey,
-		arg.SubjectKind,
-		arg.Issuer,
-		arg.SubjectID,
-		arg.Role,
-		arg.BasisDigest,
-		arg.ActivationAuditID,
 	)
-	var i PermissionAssignment
-	err := row.Scan(
-		&i.ID,
-		&i.StreamID,
-		&i.BasisKey,
-		&i.SubjectKind,
-		&i.Issuer,
-		&i.SubjectID,
-		&i.Role,
-		&i.BasisDigest,
-		&i.CreatedAt,
-		&i.RetiredAt,
-		&i.ActivationAuditID,
-		&i.RetirementAuditID,
-	)
-	return i, err
+	return err
 }
 
 const insertPermissionStream = `-- name: InsertPermissionStream :exec
@@ -168,45 +122,6 @@ type InsertPermissionStreamParams struct {
 func (q *Queries) InsertPermissionStream(ctx context.Context, arg InsertPermissionStreamParams) error {
 	_, err := q.db.Exec(ctx, insertPermissionStream, arg.ID, arg.Epoch, arg.TrustDigest)
 	return err
-}
-
-const listAuthorityAudit = `-- name: ListAuthorityAudit :many
-SELECT id, stream_id, epoch, sequence, event_kind, event_digest, created_at, record, acknowledged_at, object_key, object_version, object_etag, object_bytes, object_sha256 FROM authority_audit WHERE stream_id=$1 AND acknowledged_at IS NULL ORDER BY created_at,id LIMIT 2
-`
-
-func (q *Queries) ListAuthorityAudit(ctx context.Context, streamID pgtype.UUID) ([]AuthorityAudit, error) {
-	rows, err := q.db.Query(ctx, listAuthorityAudit, streamID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AuthorityAudit{}
-	for rows.Next() {
-		var i AuthorityAudit
-		if err := rows.Scan(
-			&i.ID,
-			&i.StreamID,
-			&i.Epoch,
-			&i.Sequence,
-			&i.EventKind,
-			&i.EventDigest,
-			&i.CreatedAt,
-			&i.Record,
-			&i.AcknowledgedAt,
-			&i.ObjectKey,
-			&i.ObjectVersion,
-			&i.ObjectEtag,
-			&i.ObjectBytes,
-			&i.ObjectSha256,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listCurrentPermissionAssignments = `-- name: ListCurrentPermissionAssignments :many
@@ -247,9 +162,14 @@ func (q *Queries) ListCurrentPermissionAssignments(ctx context.Context, streamID
 }
 
 const listPermissionBases = `-- name: ListPermissionBases :many
-SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id FROM permission_basis b WHERE b.stream_id=$1 AND EXISTS (SELECT 1 FROM permission_assignment a WHERE a.stream_id=b.stream_id AND a.basis_key=b.basis_key AND a.retired_at IS NULL) ORDER BY b.basis_key
+SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id FROM (SELECT DISTINCT a.basis_key FROM permission_assignment a
+ WHERE a.stream_id=$1 AND a.retired_at IS NULL) current_keys
+CROSS JOIN LATERAL (SELECT stream_id, basis_key, uid, kind, generation, resource_version, observation_version, spec_digest, scope_digest, cluster_id, namespace_uid, workload_uids, effect, not_after, seen_sequence, automation_json, automation_audit_id FROM permission_basis b
+ WHERE b.stream_id=$1 AND b.basis_key=current_keys.basis_key LIMIT 1) b
 `
 
+// Select each current basis key once. Looking for a matching assignment for
+// every basis can repeatedly scan the same assignment set on stale statistics.
 func (q *Queries) ListPermissionBases(ctx context.Context, streamID pgtype.UUID) ([]PermissionBasis, error) {
 	rows, err := q.db.Query(ctx, listPermissionBases, streamID)
 	if err != nil {
@@ -288,34 +208,8 @@ func (q *Queries) ListPermissionBases(ctx context.Context, streamID pgtype.UUID)
 	return items, nil
 }
 
-const lockAuthorityAudit = `-- name: LockAuthorityAudit :one
-SELECT id, stream_id, epoch, sequence, event_kind, event_digest, created_at, record, acknowledged_at, object_key, object_version, object_etag, object_bytes, object_sha256 FROM authority_audit WHERE id=$1 FOR UPDATE
-`
-
-func (q *Queries) LockAuthorityAudit(ctx context.Context, id pgtype.UUID) (AuthorityAudit, error) {
-	row := q.db.QueryRow(ctx, lockAuthorityAudit, id)
-	var i AuthorityAudit
-	err := row.Scan(
-		&i.ID,
-		&i.StreamID,
-		&i.Epoch,
-		&i.Sequence,
-		&i.EventKind,
-		&i.EventDigest,
-		&i.CreatedAt,
-		&i.Record,
-		&i.AcknowledgedAt,
-		&i.ObjectKey,
-		&i.ObjectVersion,
-		&i.ObjectEtag,
-		&i.ObjectBytes,
-		&i.ObjectSha256,
-	)
-	return i, err
-}
-
 const lockPermissionStream = `-- name: LockPermissionStream :one
-SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id FROM permission_stream WHERE id=$1 FOR UPDATE
+SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, unavailable_clusters FROM permission_stream WHERE id=$1 FOR NO KEY UPDATE
 `
 
 func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (PermissionStream, error) {
@@ -331,9 +225,18 @@ func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (Per
 		&i.ObservedAt,
 		&i.FreshUntil,
 		&i.Suspended,
-		&i.InitialAuditID,
+		&i.UnavailableClusters,
 	)
 	return i, err
+}
+
+const lockPermissionWriter = `-- name: LockPermissionWriter :exec
+SELECT pg_advisory_xact_lock(hashtextextended('asservat.permissions/' || $1::uuid::text, 0))
+`
+
+func (q *Queries) LockPermissionWriter(ctx context.Context, streamID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, lockPermissionWriter, streamID)
+	return err
 }
 
 const readAuthorityAudit = `-- name: ReadAuthorityAudit :one
@@ -363,7 +266,7 @@ func (q *Queries) ReadAuthorityAudit(ctx context.Context, id pgtype.UUID) (Autho
 }
 
 const readPermissionAcceptance = `-- name: ReadPermissionAcceptance :one
-SELECT request_id, stream_id, epoch, sequence, request_digest, audit_id, assignments, retired FROM permission_acceptance WHERE request_id=$1
+SELECT request_id, stream_id, epoch, sequence, request_digest, audit_id, assignments, retired, lease_until FROM permission_acceptance WHERE request_id=$1
 `
 
 func (q *Queries) ReadPermissionAcceptance(ctx context.Context, requestID pgtype.UUID) (PermissionAcceptance, error) {
@@ -378,6 +281,7 @@ func (q *Queries) ReadPermissionAcceptance(ctx context.Context, requestID pgtype
 		&i.AuditID,
 		&i.Assignments,
 		&i.Retired,
+		&i.LeaseUntil,
 	)
 	return i, err
 }
@@ -401,6 +305,58 @@ func (q *Queries) ReadPermissionChangeRecord(ctx context.Context, arg ReadPermis
 	return record, err
 }
 
+const readPermissionStreamClock = `-- name: ReadPermissionStreamClock :one
+SELECT permission_stream.id, permission_stream.epoch, permission_stream.sequence, permission_stream.trust_digest, permission_stream.projection_digest, permission_stream.lease_until, permission_stream.observed_at, permission_stream.fresh_until, permission_stream.suspended, permission_stream.unavailable_clusters,clock_timestamp()::timestamptz AS read_at
+FROM permission_stream WHERE id=$1
+`
+
+type ReadPermissionStreamClockRow struct {
+	PermissionStream PermissionStream
+	ReadAt           pgtype.Timestamptz
+}
+
+func (q *Queries) ReadPermissionStreamClock(ctx context.Context, id pgtype.UUID) (ReadPermissionStreamClockRow, error) {
+	row := q.db.QueryRow(ctx, readPermissionStreamClock, id)
+	var i ReadPermissionStreamClockRow
+	err := row.Scan(
+		&i.PermissionStream.ID,
+		&i.PermissionStream.Epoch,
+		&i.PermissionStream.Sequence,
+		&i.PermissionStream.TrustDigest,
+		&i.PermissionStream.ProjectionDigest,
+		&i.PermissionStream.LeaseUntil,
+		&i.PermissionStream.ObservedAt,
+		&i.PermissionStream.FreshUntil,
+		&i.PermissionStream.Suspended,
+		&i.PermissionStream.UnavailableClusters,
+		&i.ReadAt,
+	)
+	return i, err
+}
+
+const recordPermissionBasisChanges = `-- name: RecordPermissionBasisChanges :exec
+INSERT INTO permission_basis_change(event_id,basis_key,retired,uid,kind,generation,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,automation_json)
+SELECT $1,basis_key,$2,uid,kind,generation,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,automation_json
+FROM permission_basis WHERE stream_id=$3 AND basis_key=ANY($4::text[])
+`
+
+type RecordPermissionBasisChangesParams struct {
+	EventID  pgtype.UUID
+	Retired  bool
+	StreamID pgtype.UUID
+	Keys     []string
+}
+
+func (q *Queries) RecordPermissionBasisChanges(ctx context.Context, arg RecordPermissionBasisChangesParams) error {
+	_, err := q.db.Exec(ctx, recordPermissionBasisChanges,
+		arg.EventID,
+		arg.Retired,
+		arg.StreamID,
+		arg.Keys,
+	)
+	return err
+}
+
 const rememberWorkloadName = `-- name: RememberWorkloadName :exec
 INSERT INTO workload_name(cluster_id,workload_uid,ref) VALUES($1,$2,$3) ON CONFLICT DO NOTHING
 `
@@ -418,23 +374,35 @@ func (q *Queries) RememberWorkloadName(ctx context.Context, arg RememberWorkload
 }
 
 const renewPermissionStream = `-- name: RenewPermissionStream :one
-UPDATE permission_stream SET lease_until=clock_timestamp()+interval '30 seconds' WHERE id=$1 AND epoch=$2 AND lease_until>clock_timestamp() RETURNING lease_until
+UPDATE permission_stream SET lease_until=statement_timestamp()+interval '30 seconds',
+ observed_at=CASE WHEN $1::boolean THEN statement_timestamp() ELSE observed_at END,
+ fresh_until=CASE WHEN $1::boolean THEN statement_timestamp()+interval '30 seconds' ELSE fresh_until END
+WHERE id=$2 AND epoch=$3 AND lease_until>clock_timestamp()
+ AND (NOT $1::boolean OR (NOT suspended AND sequence=$4))
+RETURNING lease_until
 `
 
 type RenewPermissionStreamParams struct {
-	ID    pgtype.UUID
-	Epoch pgtype.UUID
+	Observing bool
+	ID        pgtype.UUID
+	Epoch     pgtype.UUID
+	Sequence  int64
 }
 
 func (q *Queries) RenewPermissionStream(ctx context.Context, arg RenewPermissionStreamParams) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, renewPermissionStream, arg.ID, arg.Epoch)
+	row := q.db.QueryRow(ctx, renewPermissionStream,
+		arg.Observing,
+		arg.ID,
+		arg.Epoch,
+		arg.Sequence,
+	)
 	var lease_until pgtype.Timestamptz
 	err := row.Scan(&lease_until)
 	return lease_until, err
 }
 
 const resetPermissionStream = `-- name: ResetPermissionStream :exec
-UPDATE permission_stream SET epoch=$2,sequence=0,initial_audit_id=CASE WHEN trust_digest=$3 THEN initial_audit_id ELSE NULL END,trust_digest=$3,projection_digest=NULL,lease_until=clock_timestamp()+interval '30 seconds',observed_at=NULL,fresh_until=NULL,suspended=true WHERE id=$1
+UPDATE permission_stream SET epoch=$2,sequence=0,trust_digest=$3,projection_digest=NULL,lease_until=clock_timestamp()+interval '30 seconds',observed_at=NULL,fresh_until=NULL,suspended=true WHERE id=$1
 `
 
 type ResetPermissionStreamParams struct {
@@ -448,17 +416,17 @@ func (q *Queries) ResetPermissionStream(ctx context.Context, arg ResetPermission
 	return err
 }
 
-const retirePermissionAssignment = `-- name: RetirePermissionAssignment :exec
-UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$2 WHERE id=$1 AND retired_at IS NULL
+const retirePermissionAssignments = `-- name: RetirePermissionAssignments :exec
+UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$1 WHERE id=ANY($2::uuid[]) AND retired_at IS NULL
 `
 
-type RetirePermissionAssignmentParams struct {
-	ID                pgtype.UUID
-	RetirementAuditID pgtype.UUID
+type RetirePermissionAssignmentsParams struct {
+	AuditID pgtype.UUID
+	Ids     []pgtype.UUID
 }
 
-func (q *Queries) RetirePermissionAssignment(ctx context.Context, arg RetirePermissionAssignmentParams) error {
-	_, err := q.db.Exec(ctx, retirePermissionAssignment, arg.ID, arg.RetirementAuditID)
+func (q *Queries) RetirePermissionAssignments(ctx context.Context, arg RetirePermissionAssignmentsParams) error {
+	_, err := q.db.Exec(ctx, retirePermissionAssignments, arg.AuditID, arg.Ids)
 	return err
 }
 
@@ -480,8 +448,8 @@ func (q *Queries) RetirePermissionStream(ctx context.Context, arg RetirePermissi
 }
 
 const selectAutomationBasis = `-- name: SelectAutomationBasis :many
-SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id, a.acknowledged_at FROM permission_basis b
-JOIN authority_audit a ON a.id=b.automation_audit_id
+SELECT b.stream_id, b.basis_key, b.uid, b.kind, b.generation, b.resource_version, b.observation_version, b.spec_digest, b.scope_digest, b.cluster_id, b.namespace_uid, b.workload_uids, b.effect, b.not_after, b.seen_sequence, b.automation_json, b.automation_audit_id FROM permission_basis b
+JOIN authority_audit a ON a.id=b.automation_audit_id AND a.stream_id=b.stream_id AND a.sequence=b.seen_sequence
 WHERE b.stream_id=$1 AND b.uid=$2 AND b.kind='AccessBinding'
 AND b.cluster_id=$3 AND b.namespace_uid=$4 AND b.effect='Allow'
 AND (cardinality(b.workload_uids)=0 OR $5::text=ANY(b.workload_uids) OR EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=b.cluster_id AND w.workload_uid=$5::text AND w.ref=ANY(b.workload_uids)))
@@ -496,28 +464,7 @@ type SelectAutomationBasisParams struct {
 	Column5      string
 }
 
-type SelectAutomationBasisRow struct {
-	StreamID           pgtype.UUID
-	BasisKey           string
-	Uid                string
-	Kind               string
-	Generation         int64
-	ResourceVersion    string
-	ObservationVersion string
-	SpecDigest         []byte
-	ScopeDigest        []byte
-	ClusterID          pgtype.UUID
-	NamespaceUid       string
-	WorkloadUids       []string
-	Effect             string
-	NotAfter           pgtype.Timestamptz
-	SeenSequence       int64
-	AutomationJson     []byte
-	AutomationAuditID  pgtype.UUID
-	AcknowledgedAt     pgtype.Timestamptz
-}
-
-func (q *Queries) SelectAutomationBasis(ctx context.Context, arg SelectAutomationBasisParams) ([]SelectAutomationBasisRow, error) {
+func (q *Queries) SelectAutomationBasis(ctx context.Context, arg SelectAutomationBasisParams) ([]PermissionBasis, error) {
 	rows, err := q.db.Query(ctx, selectAutomationBasis,
 		arg.StreamID,
 		arg.Uid,
@@ -529,9 +476,9 @@ func (q *Queries) SelectAutomationBasis(ctx context.Context, arg SelectAutomatio
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SelectAutomationBasisRow{}
+	items := []PermissionBasis{}
 	for rows.Next() {
-		var i SelectAutomationBasisRow
+		var i PermissionBasis
 		if err := rows.Scan(
 			&i.StreamID,
 			&i.BasisKey,
@@ -550,7 +497,6 @@ func (q *Queries) SelectAutomationBasis(ctx context.Context, arg SelectAutomatio
 			&i.SeenSequence,
 			&i.AutomationJson,
 			&i.AutomationAuditID,
-			&i.AcknowledgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -563,10 +509,8 @@ func (q *Queries) SelectAutomationBasis(ctx context.Context, arg SelectAutomatio
 }
 
 const selectPermissionAssignments = `-- name: SelectPermissionAssignments :many
-SELECT a.id, a.stream_id, a.basis_key, a.subject_kind, a.issuer, a.subject_id, a.role, a.basis_digest, a.created_at, a.retired_at, a.activation_audit_id, a.retirement_audit_id, b.uid AS source_uid,b.kind AS source_kind,b.effect,b.not_after,b.seen_sequence, au.acknowledged_at,
-au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
+SELECT a.id, a.stream_id, a.basis_key, a.subject_kind, a.issuer, a.subject_id, a.role, a.basis_digest, a.created_at, a.retired_at, a.activation_audit_id, a.retirement_audit_id, b.uid AS source_uid,b.kind AS source_kind,b.effect,b.not_after,b.seen_sequence
 FROM permission_assignment a JOIN permission_basis b ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
-LEFT JOIN authority_audit au ON au.id=a.activation_audit_id AND au.stream_id=a.stream_id
 WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.cluster_id=$2 AND b.namespace_uid IN ($3,'*')
 AND (cardinality(b.workload_uids)=0 OR $4::text=ANY(b.workload_uids) OR EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=b.cluster_id AND w.workload_uid=$4::text AND w.ref=ANY(b.workload_uids))) ORDER BY a.id
 `
@@ -596,12 +540,6 @@ type SelectPermissionAssignmentsRow struct {
 	Effect            string
 	NotAfter          pgtype.Timestamptz
 	SeenSequence      int64
-	AcknowledgedAt    pgtype.Timestamptz
-	ObjectKey         pgtype.Text
-	ObjectVersion     pgtype.Text
-	ObjectEtag        pgtype.Text
-	ObjectBytes       pgtype.Int8
-	ObjectSha256      []byte
 }
 
 func (q *Queries) SelectPermissionAssignments(ctx context.Context, arg SelectPermissionAssignmentsParams) ([]SelectPermissionAssignmentsRow, error) {
@@ -636,12 +574,6 @@ func (q *Queries) SelectPermissionAssignments(ctx context.Context, arg SelectPer
 			&i.Effect,
 			&i.NotAfter,
 			&i.SeenSequence,
-			&i.AcknowledgedAt,
-			&i.ObjectKey,
-			&i.ObjectVersion,
-			&i.ObjectEtag,
-			&i.ObjectBytes,
-			&i.ObjectSha256,
 		); err != nil {
 			return nil, err
 		}
@@ -654,7 +586,7 @@ func (q *Queries) SelectPermissionAssignments(ctx context.Context, arg SelectPer
 }
 
 const sharePermissionStream = `-- name: SharePermissionStream :one
-SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, initial_audit_id FROM permission_stream WHERE id=$1 FOR SHARE
+SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, unavailable_clusters FROM permission_stream WHERE id=$1 FOR SHARE
 `
 
 func (q *Queries) SharePermissionStream(ctx context.Context, id pgtype.UUID) (PermissionStream, error) {
@@ -670,7 +602,7 @@ func (q *Queries) SharePermissionStream(ctx context.Context, id pgtype.UUID) (Pe
 		&i.ObservedAt,
 		&i.FreshUntil,
 		&i.Suspended,
-		&i.InitialAuditID,
+		&i.UnavailableClusters,
 	)
 	return i, err
 }
@@ -684,76 +616,56 @@ func (q *Queries) SuspendPermissionStream(ctx context.Context, id pgtype.UUID) e
 	return err
 }
 
-const updatePermissionStream = `-- name: UpdatePermissionStream :exec
-UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1
+const updatePermissionStream = `-- name: UpdatePermissionStream :one
+UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,unavailable_clusters=COALESCE($6::text[], '{}'),lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1 RETURNING lease_until
 `
 
 type UpdatePermissionStreamParams struct {
-	ID               pgtype.UUID
-	Sequence         int64
-	ProjectionDigest []byte
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Sequence            int64
+	ProjectionDigest    []byte
+	ObservedAt          pgtype.Timestamptz
+	FreshUntil          pgtype.Timestamptz
+	UnavailableClusters []string
 }
 
 // ADR-200 revision (2026-10-23): the live lease holder's accepted observation
 // also keeps the lease at least until that observation's 30-second lifetime.
-func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissionStreamParams) error {
-	_, err := q.db.Exec(ctx, updatePermissionStream,
+func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissionStreamParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, updatePermissionStream,
 		arg.ID,
 		arg.Sequence,
 		arg.ProjectionDigest,
 		arg.ObservedAt,
 		arg.FreshUntil,
+		arg.UnavailableClusters,
 	)
-	return err
+	var lease_until pgtype.Timestamptz
+	err := row.Scan(&lease_until)
+	return lease_until, err
 }
 
-const upsertPermissionBasis = `-- name: UpsertPermissionBasis :exec
+const upsertPermissionBases = `-- name: UpsertPermissionBases :exec
 INSERT INTO permission_basis(stream_id,basis_key,uid,kind,generation,resource_version,spec_digest,scope_digest,cluster_id,namespace_uid,workload_uids,effect,not_after,seen_sequence,observation_version,automation_json,automation_audit_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+SELECT $1,r.key,r.uid,r.kind,r.generation,r.rv,decode(r.spec,'hex'),decode(r.scope,'hex'),r.cluster,r.namespace,coalesce(r.workloads,'{}'),r.effect,r.expiry,$2,r.observation,r.automation,
+ CASE WHEN r.automation IS NOT NULL THEN $3::uuid END
+FROM jsonb_to_recordset($4::jsonb) AS r(key text, uid text, kind text, generation bigint, rv text, spec text, scope text, cluster uuid, namespace text, workloads text[], effect text, expiry timestamptz, observation text, automation jsonb)
 ON CONFLICT(stream_id,basis_key) DO UPDATE SET generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,scope_digest=EXCLUDED.scope_digest,workload_uids=EXCLUDED.workload_uids,effect=EXCLUDED.effect,not_after=EXCLUDED.not_after,seen_sequence=EXCLUDED.seen_sequence,observation_version=EXCLUDED.observation_version,automation_json=EXCLUDED.automation_json,automation_audit_id=EXCLUDED.automation_audit_id
 `
 
-type UpsertPermissionBasisParams struct {
-	StreamID           pgtype.UUID
-	BasisKey           string
-	Uid                string
-	Kind               string
-	Generation         int64
-	ResourceVersion    string
-	SpecDigest         []byte
-	ScopeDigest        []byte
-	ClusterID          pgtype.UUID
-	NamespaceUid       string
-	WorkloadUids       []string
-	Effect             string
-	NotAfter           pgtype.Timestamptz
-	SeenSequence       int64
-	ObservationVersion string
-	AutomationJson     []byte
-	AutomationAuditID  pgtype.UUID
+type UpsertPermissionBasesParams struct {
+	StreamID pgtype.UUID
+	Sequence int64
+	EventID  pgtype.UUID
+	Bases    []byte
 }
 
-func (q *Queries) UpsertPermissionBasis(ctx context.Context, arg UpsertPermissionBasisParams) error {
-	_, err := q.db.Exec(ctx, upsertPermissionBasis,
+func (q *Queries) UpsertPermissionBases(ctx context.Context, arg UpsertPermissionBasesParams) error {
+	_, err := q.db.Exec(ctx, upsertPermissionBases,
 		arg.StreamID,
-		arg.BasisKey,
-		arg.Uid,
-		arg.Kind,
-		arg.Generation,
-		arg.ResourceVersion,
-		arg.SpecDigest,
-		arg.ScopeDigest,
-		arg.ClusterID,
-		arg.NamespaceUid,
-		arg.WorkloadUids,
-		arg.Effect,
-		arg.NotAfter,
-		arg.SeenSequence,
-		arg.ObservationVersion,
-		arg.AutomationJson,
-		arg.AutomationAuditID,
+		arg.Sequence,
+		arg.EventID,
+		arg.Bases,
 	)
 	return err
 }

@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -43,6 +45,12 @@ func tunnelFixture(t *testing.T) (*Client, string, *httptest.Server, *x509.CertP
 	allowed := echo.Addr().String()
 	tokens := &tunnelTokens{until: time.Now().Add(time.Minute)}
 	h := &TunnelHandler{Tokens: tokens, Allowed: func(_ context.Context, target string) bool { return target == allowed }, Dial: (&net.Dialer{}).DialContext}
+	client, server, roots := serveTunnel(t, h)
+	return client, allowed, server, roots, tokens
+}
+
+func serveTunnel(t *testing.T, h *TunnelHandler) (*Client, *httptest.Server, *x509.CertPool) {
+	t.Helper()
 	server := httptest.NewUnstartedServer(h)
 	server.EnableHTTP2 = true
 	server.StartTLS()
@@ -54,7 +62,7 @@ func tunnelFixture(t *testing.T) (*Client, string, *httptest.Server, *x509.CertP
 		t.Fatal(err)
 	}
 	t.Cleanup(client.Close)
-	return client, allowed, server, roots, tokens
+	return client, server, roots
 }
 
 func echoOnce(t *testing.T, conn net.Conn, msg string) {
@@ -158,4 +166,87 @@ func TestTunnelCloseStopsDeadlines(t *testing.T) {
 	if err = tc.Conn.SetDeadline(time.Now()); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatal("deadline after close", err)
 	}
+}
+
+// Both replicas sit behind the same native Service. Only the hub's endpoint
+// lookup can choose a Pod IP. The connector supplies the waiting binding.
+func TestOwnerTunnelReachesTheRequestedReplica(t *testing.T) {
+	id := func(n string) string { return "10000000-0000-4000-8000-0000000000" + n }
+	first := value.OwnerBinding{InstallationID: id("01"), ClusterID: id("02"), IssuerEpoch: id("03"), PodUID: id("04"), ProcessEpoch: id("05")}
+	second := first
+	second.PodUID, second.ProcessEpoch = id("06"), id("07")
+	routes := map[value.OwnerBinding]string{first: "10.0.0.11", second: "10.0.0.12"}
+	tokens := &tunnelTokens{until: time.Now().Add(time.Minute)}
+	dials := make(chan string, 2)
+	h := &TunnelHandler{Tokens: tokens, Owners: func(_ context.Context, owner value.OwnerBinding) ([]string, error) {
+		ip, ok := routes[owner]
+		if !ok {
+			return nil, value.ErrUnavailable
+		}
+		return []string{net.JoinHostPort(ip, "9444")}, nil
+	}, Allowed: func(context.Context, string) bool { return false },
+		Dial: func(_ context.Context, _, address string) (net.Conn, error) {
+			dials <- address
+			local, remote := net.Pipe()
+			go func() { _, _ = io.Copy(remote, remote); remote.Close() }()
+			return local, nil
+		},
+	}
+	client, _, _ := serveTunnel(t, h)
+	for _, owner := range []value.OwnerBinding{first, second} {
+		conn, err := client.DialOwner(t.Context(), owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		echoOnce(t, conn, owner.PodUID)
+		conn.Close()
+		if got, want := <-dials, net.JoinHostPort(routes[owner], "9444"); got != want {
+			t.Fatalf("tunnel to %s dialed %s, want %s", owner.PodUID, got, want)
+		}
+	}
+	unknown := second
+	unknown.PodUID = id("08")
+	if conn, err := client.DialOwner(t.Context(), unknown); err == nil {
+		conn.Close()
+		t.Fatal("opened for an unknown owner binding")
+	}
+	if conn, err := client.DialTunnel(t.Context(), "tcp", "10.0.0.12:9444"); err == nil {
+		conn.Close()
+		t.Fatal("opened directly to a caller-supplied Pod address")
+	}
+	if len(dials) != 0 {
+		t.Fatal("refused owner or address reached a backend")
+	}
+}
+
+func TestTunnelFallsBackAcrossFamiliesWithinOriginalDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, end := context.WithTimeout(t.Context(), 5*time.Second)
+		defer end()
+		until, _ := ctx.Deadline()
+		addresses := []string{"10.1.0.11:9444", "[fd00::11]:9444"}
+		var tried []string
+		local, remote := net.Pipe()
+		defer remote.Close()
+		h := TunnelHandler{Dial: func(call context.Context, network, address string) (net.Conn, error) {
+			tried = append(tried, address)
+			deadline, _ := call.Deadline()
+			if network != "tcp" || deadline.After(until) {
+				t.Fatal("dial exceeded the original deadline", deadline)
+			}
+			if address == addresses[0] {
+				<-call.Done() // The first address family is unreachable until its deadline.
+				return nil, call.Err()
+			}
+			if call.Err() != nil || !time.Now().Before(until) {
+				t.Fatal("no time for the second family")
+			}
+			return local, nil
+		}}
+		conn, err := h.dialEndpoints(ctx, addresses)
+		if err != nil || conn != local || !slices.Equal(tried, addresses) {
+			t.Fatal("dual-stack fallback", tried, err)
+		}
+		conn.Close()
+	})
 }

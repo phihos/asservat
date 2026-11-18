@@ -2,12 +2,10 @@ package configuration
 
 import (
 	"cmp"
-	"crypto/sha256"
 	"encoding/json"
 	"slices"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -18,7 +16,6 @@ import (
 // PermissionStore acceptance are still required. Use one serial coordinator.
 type BindingJournal struct {
 	cluster         string
-	control         value.NamespaceRef
 	byUID           map[string]value.Binding
 	names           map[string]string
 	cursor          string
@@ -53,10 +50,10 @@ func journalIdentity(b value.Binding, cluster string) bool {
 // bindingName keys a binding by namespace and name.
 func bindingName(r value.Resource) string { return r.Namespace + "/" + r.Name }
 func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error) {
-	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || len(s.Bindings) > 1024 {
+	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !value.PermissionObservationCurrent(s.ObservedAt, s.FreshUntil, now) {
 		return nil, value.ErrInvalid
 	}
-	j := &BindingJournal{cluster: s.ClusterID, control: s.ControlNamespace, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
+	j := &BindingJournal{cluster: s.ClusterID, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
 	for _, b := range s.Bindings {
 		if !journalIdentity(b, j.cluster) || j.names[bindingName(b.Resource)] != "" {
 			return nil, value.ErrInvalid
@@ -72,15 +69,6 @@ func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error)
 
 func (j *BindingJournal) Cursor() string { return j.cursor }
 
-// Constrain preserves the original list deadline while also bounding it by the
-// guard/review observation. It never makes an old source observation fresh.
-func (j *BindingJournal) Constrain(until time.Time) error {
-	if j.pending != nil || !until.After(j.observed) {
-		return value.ErrChanged
-	}
-	j.until = identity.Earlier(j.until, until)
-	return nil
-}
 func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	if j.poisoned || !j.accepted || j.pending != nil {
 		return value.ErrChanged
@@ -88,6 +76,18 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	fail := func() error { j.poisoned = true; return value.ErrChanged }
 	if !identity.Text(e.ResourceVersion, 128) {
 		return fail()
+	}
+	if e.UnplacedUID != "" {
+		if e.Binding != nil || !identity.Text(e.UnplacedUID, 64) || (e.Type != "ADDED" && e.Type != "MODIFIED" && e.Type != "DELETED") {
+			return fail()
+		}
+		if old, ok := j.byUID[e.UnplacedUID]; ok {
+			delete(j.byUID, e.UnplacedUID)
+			delete(j.names, bindingName(old.Resource))
+			j.accepted = false
+		}
+		j.cursor = e.ResourceVersion
+		return nil
 	}
 	if e.Type == "BOOKMARK" {
 		if e.Binding != nil {
@@ -103,7 +103,7 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 	old, exists := j.byUID[b.Resource.UID]
 	switch e.Type {
 	case "ADDED":
-		if exists || j.names[bindingName(b.Resource)] != "" || len(j.byUID) >= 1024 {
+		if exists || j.names[bindingName(b.Resource)] != "" {
 			return fail()
 		}
 		j.byUID[b.Resource.UID] = cloneBinding(b)
@@ -140,27 +140,8 @@ func equalBinding(a, b value.Binding) bool {
 	return string(x) == string(y)
 }
 
-// Confirm refreshes completeness only when a current full LIST exactly agrees
-// with the processed watch state. A bookmark or a successful unrelated GET is
-// not evidence that the complete deny set is fresh. Mismatch means catch up or
-// start a new baseline; never replace the journal and claim continuity.
-func (j *BindingJournal) Confirm(s value.Snapshot, now time.Time) error {
-	if j.poisoned || j.pending != nil || !j.accepted || s.ClusterID != j.cluster || s.ControlNamespace != j.control || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || !s.ObservedAt.After(j.observed) || len(s.Bindings) != len(j.byUID) {
-		return value.ErrChanged
-	}
-	seen := map[string]bool{}
-	for _, b := range s.Bindings {
-		old, exists := j.byUID[b.Resource.UID]
-		if !exists || seen[b.Resource.UID] || !equalBinding(old, b) {
-			return value.ErrChanged
-		}
-		seen[b.Resource.UID] = true
-	}
-	j.observed = s.ObservedAt
-	j.until = s.FreshUntil
-	return nil
-}
 func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
+	b.UnavailableClusters = slices.Clone(b.UnavailableClusters)
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)
 	b.ReviewSources = slices.Clone(b.ReviewSources)
 	b.Bases = slices.Clone(b.Bases)
@@ -178,12 +159,6 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 	return b
 }
 
-// Ready reports whether a batch can be prepared at now without failing: the
-// last transition is accepted and the complete binding list is still current.
-func (j *BindingJournal) Ready(now time.Time) bool {
-	return !j.poisoned && j.pending == nil && j.accepted && identity.Fresh(j.observed, j.until, now, 5*time.Second)
-}
-
 // Prepare builds the next batch from the processed bindings and the
 // separately derived inheritance (ADR-242).
 func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now time.Time, inherited Inheritance) (value.PermissionBatch, error) {
@@ -196,7 +171,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		}
 		return cloneBatch(*j.pending), nil
 	}
-	if !identity.Fresh(j.observed, j.until, now, 5*time.Second) {
+	if !value.PermissionObservationCurrent(j.observed, j.until, now) {
 		return value.PermissionBatch{}, value.ErrChanged
 	}
 	if j.sequence != 0 && (f.Sequence != j.sequence || f.RootID != j.acceptedFence.RootID || f.Epoch != j.acceptedFence.Epoch || f.TrustDigest != j.acceptedFence.TrustDigest) {
@@ -209,20 +184,20 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	slices.SortFunc(bindings, func(a, b value.Binding) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
 	// The input digest covers the explicit bindings and the derived
 	// inheritance; continuity flags never change what is accepted.
-	derived := inherited
-	derived.Bases = slices.Clone(inherited.Bases)
-	for n := range derived.Bases {
-		derived.Bases[n].Continuous = false
-	}
-	encoded, err := json.Marshal(struct {
+	input, err := permissionInputDigest(struct {
 		Bindings  []value.Binding
 		Inherited Inheritance `json:",omitzero"`
-	}{bindings, derived})
-	if err != nil || len(encoded) > 8<<20 {
-		return value.PermissionBatch{}, value.ErrLimit
+	}{bindings, inherited.withoutContinuity()})
+	if err != nil {
+		return value.PermissionBatch{}, value.ErrInvalid
 	}
-	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: artifact.Digest(sha256.Sum256(encoded)), ObservedAt: now, FreshUntil: j.until}
+	batch := value.PermissionBatch{RootID: f.RootID, Epoch: f.Epoch, RequestID: request, ExpectedSequence: f.Sequence, TrustDigest: f.TrustDigest, InputDigest: input, ObservedAt: now, FreshUntil: value.PermissionDeadline(j.until, f.LeaseUntil)}
+	batch.UnavailableClusters = slices.Clone(inherited.UnavailableClusters)
 	for _, b := range bindings {
+		if b.UnavailableDeny {
+			batch.UnavailableClusters = append(batch.UnavailableClusters, b.Scope.ClusterID)
+			continue
+		}
 		if p, ok := bindingBasis(b, now); ok {
 			p.Continuous = j.sequence > 0
 			batch.Bases = append(batch.Bases, p)
@@ -230,6 +205,8 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	}
 	batch.Bases = append(batch.Bases, inherited.Bases...)
 	batch.Bases = withIssuer(batch.Bases, j.Issuer)
+	slices.Sort(batch.UnavailableClusters)
+	batch.UnavailableClusters = slices.Compact(batch.UnavailableClusters)
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces
@@ -257,16 +234,6 @@ func (j *BindingJournal) Accepted(r value.PermissionAcceptance) error {
 	return nil
 }
 
-// Refreshed follows only a successful identical-projection refresh. It cannot
-// acknowledge a changed watch transition or initialize an unaccepted baseline.
-func (j *BindingJournal) Refreshed(request string) error {
-	if j.pending == nil || !j.accepted || j.sequence == 0 || j.pending.RequestID != request || j.pending.ExpectedSequence != j.sequence {
-		return value.ErrChanged
-	}
-	j.pending = nil
-	return nil
-}
-
 // bindingBasis is the accepted basis of an active binding.
 func bindingBasis(b value.Binding, now time.Time) (value.PermissionBasis, bool) {
 	if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
@@ -284,12 +251,14 @@ func bindingBasis(b value.Binding, now time.Time) (value.PermissionBasis, bool) 
 func withIssuer(bases []value.PermissionBasis, issuer string) []value.PermissionBasis {
 	out := bases[:0]
 	for _, p := range bases {
-		var subjects []value.Subject
+		seen := make(map[value.Subject]bool, len(p.Subjects))
+		subjects := make([]value.Subject, 0, len(p.Subjects))
 		for _, s := range p.Subjects {
 			if s.Issuer == "" {
 				s.Issuer = issuer
 			}
-			if s.Issuer != "" && !slices.Contains(subjects, s) {
+			if s.Issuer != "" && !seen[s] {
+				seen[s] = true
 				subjects = append(subjects, s)
 			}
 		}
