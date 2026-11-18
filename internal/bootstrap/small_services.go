@@ -110,7 +110,7 @@ func clearData(d map[string][]byte) {
 
 // ensure returns the Secret's data after creating it with want, or after
 // adding the keys of want it lacks. Existing values are never changed.
-func (s secretStore) ensure(ctx context.Context, name string, want map[string][]byte) (map[string][]byte, error) {
+func (s secretStore) ensure(ctx context.Context, name string, want map[string][]byte, retired ...string) (map[string][]byte, error) {
 	current, err := s.api.Get(ctx, name, meta.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		object := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: s.namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "asservat", "app.kubernetes.io/created-by": "asservat-secrets"}}, Type: core.SecretTypeOpaque, Data: want}
@@ -123,16 +123,21 @@ func (s secretStore) ensure(ctx context.Context, name string, want map[string][]
 	if err != nil {
 		return nil, secretsFailure("SecretUnavailable " + name)
 	}
-	missing := map[string][]byte{}
+	changes := map[string][]byte{}
 	for k, v := range want {
 		if _, ok := current.Data[k]; !ok {
-			missing[k] = v
+			changes[k] = v
 		}
 	}
-	if len(missing) == 0 {
+	for _, key := range retired {
+		if _, ok := current.Data[key]; ok {
+			changes[key] = nil // JSON merge patch removes the key.
+		}
+	}
+	if len(changes) == 0 {
 		return current.Data, nil
 	}
-	return s.patch(ctx, name, missing)
+	return s.patch(ctx, name, changes)
 }
 
 func (s secretStore) patch(ctx context.Context, name string, data map[string][]byte) (map[string][]byte, error) {
@@ -213,7 +218,11 @@ func (s secretStore) sql(ctx context.Context, installation string, entry contrac
 		}
 		want["sql-"+purpose+".json"], _ = json.Marshal(contracts.OwnerSQLCredential{Username: name, Password: password})
 	}
-	data, err := s.ensure(ctx, entry.Secret, want)
+	var retired []string
+	if entry.Component == "hub-worker" {
+		retired = []string{"sql-permission-audit.json", "sql-configuration-audit.json"}
+	}
+	data, err := s.ensure(ctx, entry.Secret, want, retired...)
 	if err != nil {
 		return err
 	}

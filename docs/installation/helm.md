@@ -208,6 +208,17 @@ Choose how the logins are created:
   README lists, and reference their Secrets under
   `services.postgres.external.logins`. No administrator credential is stored.
 
+When upgrading an older development installation, setup disables the former
+permission and owner audit publishers, clears their passwords and revokes
+their grants. The generated hub-worker SQL Secret loses its two obsolete
+credential files. If you manage those logins or Secrets, retire the roles
+`as_<installation UUID without hyphens>_pub_73` and
+`as_<installation UUID without hyphens>_cfg_02` and remove
+`sql-permission-audit.json` and `sql-configuration-audit.json` from the worker
+Secret. PostgreSQL propagates a table-level revocation to its column privileges.
+[PostgreSQL ALTER ROLE](https://www.postgresql.org/docs/current/sql-alterrole.html)
+and [REVOKE](https://www.postgresql.org/docs/current/sql-revoke.html).
+
 When you manage PostgreSQL logins yourself, budget one query connection per
 federation replica for each of its two purposes. The owner-read login also
 needs one persistent notification connection per replica. Include Pods running

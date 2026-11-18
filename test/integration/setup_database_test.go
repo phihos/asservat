@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,11 +49,21 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	rolePrefix := "as_" + strings.ReplaceAll(installation, "-", "")
+	retiredRoles := []struct{ name, grant, write string }{
+		{rolePrefix + "_pub_73", "UPDATE(acknowledged_at) ON authority_audit", "UPDATE authority_audit SET acknowledged_at=now() WHERE false"},
+		{rolePrefix + "_cfg_02", "UPDATE(source_uid) ON hub_owner_configuration", "UPDATE hub_owner_configuration SET source_uid=gen_random_uuid() WHERE false"},
+	}
 	t.Cleanup(func() {
 		bounded, stop := context.WithTimeout(context.Background(), 20*time.Second)
 		defer stop()
 		if _, e := admin.Exec(bounded, "DROP DATABASE "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); e != nil {
 			t.Error("owned database cleanup failed", e)
+		}
+		for _, role := range retiredRoles {
+			if _, err := admin.Exec(bounded, "DROP ROLE IF EXISTS "+pgx.Identifier{role.name}.Sanitize()); err != nil {
+				t.Error("retired role cleanup", err)
+			}
 		}
 		for _, r := range roles {
 			if _, e := admin.Exec(bounded, "DROP ROLE IF EXISTS "+pgx.Identifier{r.Name}.Sanitize()); e != nil {
@@ -146,8 +157,38 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	logins[hub] = strings.Repeat("Rotate-1", 6)
+	retiredSessions := make([]*pgx.Conn, 0, len(retiredRoles))
+	for _, role := range retiredRoles {
+		name := pgx.Identifier{role.name}.Sanitize()
+		if _, err := owned.Exec(ctx, "CREATE ROLE "+name+" LOGIN PASSWORD 'synthetic-retired'; GRANT USAGE ON SCHEMA public TO "+name+"; GRANT "+role.grant+" TO "+name); err != nil {
+			t.Fatal(err)
+		}
+		old := config.Copy()
+		old.User, old.Password = role.name, "synthetic-retired"
+		session, err := pgx.ConnectConfig(ctx, old)
+		if err != nil {
+			t.Fatal("original login", err)
+		}
+		defer session.Close(context.Background())
+		if _, err := session.Exec(ctx, role.write); err != nil {
+			t.Fatal("original column grant", err)
+		}
+		retiredSessions = append(retiredSessions, session)
+	}
 	if report, e = postgres.EnsureRuntimeRoles(ctx, config, installation, logins); e != nil || len(report.Created) != 0 || len(report.Updated) != 3 {
 		t.Fatal("second role reconciliation", report, e)
+	}
+	for i, session := range retiredSessions {
+		var denied *pgconn.PgError
+		if _, err := session.Exec(ctx, retiredRoles[i].write); !errors.As(err, &denied) || denied.Code != "42501" {
+			t.Fatal("expected permission denied for previously authenticated publisher", err)
+		}
+		if retry, err := pgx.ConnectConfig(ctx, session.Config()); err == nil {
+			retry.Close(ctx)
+			t.Fatal("retired publisher password still accepted")
+		} else if !errors.As(err, &denied) || (denied.Code != "28P01" && denied.Code != "28000") {
+			t.Fatal("expected authentication refusal for retired publisher", err)
+		}
 	}
 	var extra bool
 	if e = owned.QueryRow(ctx, "SELECT has_table_privilege($1,'public.fleet_trust','DELETE')", hub).Scan(&extra); e != nil || extra {
