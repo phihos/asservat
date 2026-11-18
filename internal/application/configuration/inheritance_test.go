@@ -241,7 +241,7 @@ func TestReconcilerRechecksTrustForALaterWatchEvent(t *testing.T) {
 	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); err != nil {
 		t.Fatal(err)
 	}
-	s.journal.until = time.Time{}
+	s.journal.until = s.r.Now()
 	f.drift = true
 	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); !errors.Is(err, value.ErrChanged) || len(f.accepted) != 2 {
 		t.Fatal("watch event accepted after trust changed", err, len(f.accepted))

@@ -11,6 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkPermissionConstraints = `-- name: CheckPermissionConstraints :exec
+SET CONSTRAINTS ALL IMMEDIATE
+`
+
+func (q *Queries) CheckPermissionConstraints(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, checkPermissionConstraints)
+	return err
+}
+
 const insertAuthorityAudit = `-- name: InsertAuthorityAudit :exec
 INSERT INTO authority_audit(id,stream_id,epoch,sequence,event_kind,event_digest,record) VALUES($1,$2,$3,$4,$5,$6,$7)
 `
@@ -39,7 +48,7 @@ func (q *Queries) InsertAuthorityAudit(ctx context.Context, arg InsertAuthorityA
 }
 
 const insertPermissionAcceptance = `-- name: InsertPermissionAcceptance :exec
-INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired,lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
 
 type InsertPermissionAcceptanceParams struct {
@@ -51,6 +60,7 @@ type InsertPermissionAcceptanceParams struct {
 	AuditID       pgtype.UUID
 	Assignments   int32
 	Retired       int32
+	LeaseUntil    pgtype.Timestamptz
 }
 
 func (q *Queries) InsertPermissionAcceptance(ctx context.Context, arg InsertPermissionAcceptanceParams) error {
@@ -63,6 +73,7 @@ func (q *Queries) InsertPermissionAcceptance(ctx context.Context, arg InsertPerm
 		arg.AuditID,
 		arg.Assignments,
 		arg.Retired,
+		arg.LeaseUntil,
 	)
 	return err
 }
@@ -198,7 +209,7 @@ func (q *Queries) ListPermissionBases(ctx context.Context, streamID pgtype.UUID)
 }
 
 const lockPermissionStream = `-- name: LockPermissionStream :one
-SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, unavailable_clusters FROM permission_stream WHERE id=$1 FOR UPDATE
+SELECT id, epoch, sequence, trust_digest, projection_digest, lease_until, observed_at, fresh_until, suspended, unavailable_clusters FROM permission_stream WHERE id=$1 FOR NO KEY UPDATE
 `
 
 func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (PermissionStream, error) {
@@ -217,6 +228,15 @@ func (q *Queries) LockPermissionStream(ctx context.Context, id pgtype.UUID) (Per
 		&i.UnavailableClusters,
 	)
 	return i, err
+}
+
+const lockPermissionWriter = `-- name: LockPermissionWriter :exec
+SELECT pg_advisory_xact_lock(hashtextextended('asservat.permissions/' || $1::uuid::text, 0))
+`
+
+func (q *Queries) LockPermissionWriter(ctx context.Context, streamID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, lockPermissionWriter, streamID)
+	return err
 }
 
 const readAuthorityAudit = `-- name: ReadAuthorityAudit :one
@@ -246,7 +266,7 @@ func (q *Queries) ReadAuthorityAudit(ctx context.Context, id pgtype.UUID) (Autho
 }
 
 const readPermissionAcceptance = `-- name: ReadPermissionAcceptance :one
-SELECT request_id, stream_id, epoch, sequence, request_digest, audit_id, assignments, retired FROM permission_acceptance WHERE request_id=$1
+SELECT request_id, stream_id, epoch, sequence, request_digest, audit_id, assignments, retired, lease_until FROM permission_acceptance WHERE request_id=$1
 `
 
 func (q *Queries) ReadPermissionAcceptance(ctx context.Context, requestID pgtype.UUID) (PermissionAcceptance, error) {
@@ -261,6 +281,7 @@ func (q *Queries) ReadPermissionAcceptance(ctx context.Context, requestID pgtype
 		&i.AuditID,
 		&i.Assignments,
 		&i.Retired,
+		&i.LeaseUntil,
 	)
 	return i, err
 }

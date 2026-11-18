@@ -108,6 +108,7 @@ type remoteNamespaces struct {
 type bindingRun struct {
 	r                               BindingReconciler
 	fence                           value.PermissionFence
+	trust                           PermissionTrust
 	journal                         *BindingJournal
 	nextExpiry                      time.Time
 	clusterSettings, sourceSettings SettingsWatch
@@ -291,6 +292,7 @@ func (s *bindingRun) checkTrust(ctx context.Context) (PermissionTrust, error) {
 	if t.Digest != s.fence.TrustDigest {
 		return PermissionTrust{}, value.ErrChanged
 	}
+	s.trust = t
 	return t, nil
 }
 
@@ -311,13 +313,14 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context) (value.Snapshot, error
 		// The mandatory snapshot joins the latest independent source state.
 		snapshot.Sources, snapshot.SourcesComplete = s.sources, s.sourcesComplete
 	}
-	// The initial epoch establishes the trust digest; each mandatory LIST
-	// retains its own observation deadline and checks that digest on return.
-	t, err := s.checkTrust(ctx)
-	if err != nil {
-		return value.Snapshot{}, err
+	// A finite trust observation is checked again after a blocking LIST.
+	// Platform trust without an expiry is established once per epoch.
+	if !s.trust.FreshUntil.IsZero() {
+		if _, err := s.checkTrust(ctx); err != nil {
+			return value.Snapshot{}, err
+		}
 	}
-	snapshot.FreshUntil = value.PermissionDeadline(snapshot.FreshUntil, t.FreshUntil)
+	snapshot.FreshUntil = value.PermissionDeadline(snapshot.FreshUntil, s.trust.FreshUntil)
 	return snapshot, nil
 }
 func (s *bindingRun) accept(ctx context.Context, onlyChangedInheritance bool) error {
@@ -327,7 +330,11 @@ func (s *bindingRun) accept(ctx context.Context, onlyChangedInheritance bool) er
 	return s.commit(ctx, onlyChangedInheritance)
 }
 func (s *bindingRun) observeTrust(ctx context.Context) error {
-	if !s.r.Now().Before(s.journal.until) {
+	if !s.journal.until.IsZero() && !s.r.Now().Before(s.journal.until) {
+		if s.trust.FreshUntil.IsZero() {
+			// The finite bound came from the source itself. Relist it.
+			return value.ErrChanged
+		}
 		t, err := s.checkTrust(ctx)
 		if err != nil {
 			return err
@@ -384,6 +391,7 @@ func (s *bindingRun) start(ctx context.Context) error {
 	if err != nil {
 		return reconcileStep("trust", err)
 	}
+	s.trust = first
 	s.fence, err = s.r.Store.BeginPermissions(ctx, s.r.RootID, s.r.NewID(), first.Digest)
 	if err != nil {
 		return reconcileStep("begin", err)

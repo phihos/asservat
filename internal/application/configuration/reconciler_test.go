@@ -184,6 +184,30 @@ func TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner(t *testing.T) {
 		}
 	}
 }
+func TestBindingReconcilerReadsPlatformTrustOncePerEpoch(t *testing.T) {
+	f, r := reconciliationTest(t)
+	f.trust.FreshUntil, f.snapshot.FreshUntil = time.Time{}, time.Time{}
+	for epoch := 1; epoch <= 2; epoch++ {
+		s := &bindingRun{r: r}
+		f.storeFence.Sequence = 0
+		if err := s.start(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		for range 3 {
+			if err := s.refreshClusterBindings(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.accept(t.Context(), true); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.firstWatch.Close()
+		if f.trustCalls != epoch {
+			t.Fatalf("after %d epochs: %d trust reads", epoch, f.trustCalls)
+		}
+	}
+}
+
 func TestBindingReconcilerIndependentBindingChangesAfterIdle(t *testing.T) {
 	for _, clusterFirst := range []bool{true, false} {
 		t.Run(fmt.Sprintf("cluster-first-%t", clusterFirst), func(t *testing.T) {

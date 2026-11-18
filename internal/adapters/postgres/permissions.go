@@ -138,6 +138,9 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 		return out, cfg.ErrInvalid
 	}
 	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+		if err := q.LockPermissionWriter(ctx, id(root)); err != nil {
+			return err
+		}
 		if err := q.InsertPermissionStream(ctx, custodydb.InsertPermissionStreamParams{ID: id(root), Epoch: id(epoch), TrustDigest: trust[:]}); err != nil {
 			return err
 		}
@@ -378,8 +381,10 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 	projected := projectionDigest(b)
 	// The projection covers every normalized field except the request envelope
 	// and continuity flags. Hash those alongside it for idempotent retry.
+	until := b.FreshUntil
 	continuity := make([]bool, len(b.Bases))
 	for i, basis := range b.Bases {
+		until = cfg.PermissionDeadline(until, basis.NotAfter)
 		continuity[i] = basis.Continuous
 	}
 	requestDigest := digest(struct {
@@ -390,25 +395,31 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		Continuous           []bool
 	}{projected, b.RootID, b.Epoch, b.RequestID, b.ExpectedSequence, b.ObservedAt, b.FreshUntil, continuity})
 	// An expired request may still resolve the outcome of its original commit.
-	expired := !time.Now().Before(b.FreshUntil)
+	expired := !time.Now().Before(until)
 	var cancel context.CancelFunc
 	if expired {
 		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
 	} else {
-		ctx, cancel = context.WithDeadline(ctx, b.FreshUntil)
+		ctx, cancel = context.WithDeadline(ctx, until)
 	}
 	defer cancel()
 	err := permissionError(p.ledger.runTransaction(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(q *custodydb.Queries) error {
-		s, err := q.LockPermissionStream(ctx, id(p.root))
+		// Only competing writers serialize while staging. Public operations can
+		// use the committed projection until the final stream-row update.
+		if err := q.LockPermissionWriter(ctx, id(p.root)); err != nil {
+			return err
+		}
+		state, err := q.ReadPermissionStreamClock(ctx, id(p.root))
 		if err != nil {
 			return err
 		}
+		s := state.PermissionStream
 		previous, e := q.ReadPermissionAcceptance(ctx, id(b.RequestID))
 		if e == nil {
 			if previous.StreamID != s.ID || previous.Epoch != id(b.Epoch) || (!bytes.Equal(previous.RequestDigest, requestDigest) && !bytes.Equal(previous.RequestDigest, digest(b))) {
 				return cfg.ErrChanged
 			}
-			out = cfg.PermissionAcceptance{PermissionFence: cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, Sequence: previous.Sequence, TrustDigest: b.TrustDigest, Initialized: true}, AuditID: uid(previous.AuditID), Assignments: int(previous.Assignments), Retired: int(previous.Retired)}
+			out = cfg.PermissionAcceptance{PermissionFence: cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, Sequence: previous.Sequence, TrustDigest: b.TrustDigest, Initialized: true, LeaseUntil: previous.LeaseUntil.Time}, AuditID: uid(previous.AuditID), Assignments: int(previous.Assignments), Retired: int(previous.Retired)}
 			return nil
 		}
 		if !errors.Is(e, pgx.ErrNoRows) {
@@ -418,19 +429,11 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 			return cfg.ErrInvalid
 		}
 		requested := cfg.PermissionFence{RootID: b.RootID, Epoch: b.Epoch, TrustDigest: b.TrustDigest}
-		if err = liveStream(ctx, q, s, requested); err != nil {
-			return err
-		}
-		// The epoch and expected sequence order changes. Idle renewal and
-		// the worker can observe different wall clocks.
-		if s.Sequence != b.ExpectedSequence {
+		n := state.ReadAt
+		if !sameFence(s, requested) || !n.Time.Before(s.LeaseUntil.Time) || s.Sequence != b.ExpectedSequence {
 			return cfg.ErrChanged
 		}
-		n, err := q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		if !b.Current(n.Time) {
+		if !cfg.PermissionObservationCurrent(b.ObservedAt, until, n.Time) {
 			return cfg.ErrInvalid
 		}
 		bases, rows, err := currentPermissionRows(ctx, q, p.root)
@@ -549,20 +552,30 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = insertAuthority(ctx, q, record); err != nil {
 			return err
 		}
-		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired))}); err != nil {
+		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(len(retired)), LeaseUntil: s.LeaseUntil}); err != nil {
 			return err
+		}
+		if err = q.CheckPermissionConstraints(ctx); err != nil {
+			return err
+		}
+		current, err := q.LockPermissionStream(ctx, s.ID)
+		if err != nil {
+			return err
+		}
+		if current.Sequence != s.Sequence || current.Suspended != s.Suspended || !sameFence(current, requested) {
+			return cfg.ErrChanged
 		}
 		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, UnavailableClusters: b.UnavailableClusters, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
-			return err
-		}
-		if err = liveStream(ctx, q, s, requested); err != nil {
 			return err
 		}
 		n, err = q.CurrentTime(ctx)
 		if err != nil {
 			return err
 		}
-		if !b.Current(n.Time) {
+		if !n.Time.Before(current.LeaseUntil.Time) || !n.Time.Before(s.LeaseUntil.Time) {
+			return cfg.ErrChanged
+		}
+		if !cfg.PermissionObservationCurrent(b.ObservedAt, until, n.Time) {
 			return cfg.ErrInvalid
 		}
 		s.Sequence = record.Sequence

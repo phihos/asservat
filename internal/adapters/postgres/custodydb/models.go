@@ -1030,6 +1030,7 @@ type PermissionAcceptance struct {
 	AuditID       pgtype.UUID
 	Assignments   int32
 	Retired       int32
+	LeaseUntil    pgtype.Timestamptz
 }
 
 type PermissionAssignment struct {

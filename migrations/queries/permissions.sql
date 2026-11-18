@@ -1,9 +1,15 @@
+-- name: LockPermissionWriter :exec
+SELECT pg_advisory_xact_lock(hashtextextended('asservat.permissions/' || sqlc.arg(stream_id)::uuid::text, 0));
+
+-- name: CheckPermissionConstraints :exec
+SET CONSTRAINTS ALL IMMEDIATE;
+
 -- name: InsertPermissionStream :exec
 INSERT INTO permission_stream(id,epoch,trust_digest,lease_until)
 VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds') ON CONFLICT(id) DO NOTHING;
 
 -- name: LockPermissionStream :one
-SELECT * FROM permission_stream WHERE id=$1 FOR UPDATE;
+SELECT * FROM permission_stream WHERE id=$1 FOR NO KEY UPDATE;
 
 -- name: SharePermissionStream :one
 SELECT * FROM permission_stream WHERE id=$1 FOR SHARE;
@@ -35,7 +41,7 @@ UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fre
 SELECT * FROM permission_acceptance WHERE request_id=$1;
 
 -- name: InsertPermissionAcceptance :exec
-INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired) VALUES($1,$2,$3,$4,$5,$6,$7,$8);
+INSERT INTO permission_acceptance(request_id,stream_id,epoch,sequence,request_digest,audit_id,assignments,retired,lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
 -- name: ListPermissionBases :many
 -- Select each current basis key once. Looking for a matching assignment for

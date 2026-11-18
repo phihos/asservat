@@ -334,6 +334,26 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		return
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
+	t.Run("capture-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		withStagedPeerPermission(t, ctx, admin, s, nil, func() error {
+			_, err := s.s.AdmitContext(ctx, s.a)
+			return err
+		})
+	})
+	t.Run("suspension-during-peer-permission-publication", func(t *testing.T) {
+		s := create(t, 1)
+		f := cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}
+		withStagedPeerPermission(t, ctx, admin, s, cfg.ErrChanged, func() error {
+			return s.p.SuspendPermissions(ctx, f)
+		})
+		var sequence, events int64
+		var suspended bool
+		if err := admin.QueryRow(ctx, `SELECT sequence,suspended,(SELECT count(*) FROM authority_audit WHERE stream_id=$1)
+			FROM permission_stream WHERE id=$1`, s.batch.RootID).Scan(&sequence, &suspended, &events); err != nil || sequence != s.batch.ExpectedSequence || !suspended || events != 2 {
+			t.Fatalf("staged mutation after suspension: sequence %d, suspended %v, events %d: %v", sequence, suspended, events, err)
+		}
+	})
 	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextReplay(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)

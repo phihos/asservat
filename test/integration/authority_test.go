@@ -640,6 +640,34 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatalf("new trust reused old review: %v", err)
 		}
 	})
+	t.Run("replay-preserves-original-controller-lease", func(t *testing.T) {
+		s := create(t)
+		accepted, err := s.p.AcceptPermissions(ctx, s.b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		renewed, err := s.p.RenewPermissions(ctx, accepted.PermissionFence)
+		if err != nil || !renewed.LeaseUntil.After(accepted.LeaseUntil) {
+			t.Fatalf("extend active controller lease: %v", err)
+		}
+		replay, err := s.p.AcceptPermissions(ctx, s.b)
+		if err != nil || replay != accepted {
+			t.Fatalf("acceptance changed after renewal and replay: %v", err)
+		}
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		journal, err := configapp.NewBindingJournal(cfg.Snapshot{ClusterID: s.target.ClusterID, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: custodyID()}, BindingResourceVersion: "2", ObservedAt: now}, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		batch, err := journal.Prepare(replay.PermissionFence, custodyID(), now, configapp.Inheritance{})
+		if err != nil || !batch.FreshUntil.Equal(accepted.LeaseUntil) {
+			t.Fatalf("next watched change lost original lease: %v", err)
+		}
+		next, err := s.p.AcceptPermissions(ctx, batch)
+		if err != nil || next.Sequence != accepted.Sequence+1 {
+			t.Fatalf("next watched change: %v", err)
+		}
+	})
 	t.Run("atomic-grants-and-idempotent-audit", func(t *testing.T) {
 		s := create(t)
 		s.b.FreshUntil = s.b.ObservedAt.Add(time.Second)
