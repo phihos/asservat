@@ -31,6 +31,14 @@ first remote capture then published and downloaded the expected 353-byte
 pod-status file. Exact replay returned the original capture and altered input
 returned Conflict. The installed test took 15.82 seconds and cleanup exited 0.
 
+A two-owner installation exposed a native download opening routed to the other
+replica. The diagnostic at `30925e72f` completed the authenticated capture
+and download through each public listener after correction. The worker keeps
+the original operation and deadline when reaching its SQL-recorded owner.
+The reviewed candidate also batches permission changes in the same transaction,
+hashes the aggregate fleet input without buffering it in one document, and
+issues fresh storage keys after a registration has been withdrawn.
+
 ## Processing cleanup (2026-11-17)
 
 Branch `codex/processing-cleanup`. Removed the dead manual processing
