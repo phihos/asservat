@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
-import { requestablePreview, type Investigation, type State } from './investigation';
+import { requestablePreview, type Investigation, type PreviewRequest, type State } from './investigation';
 import type { Input, Preview } from './http';
 
 type AccessOperation = NonNullable<Preview['result_access_actions']>[number]['operations'][number];
@@ -40,7 +40,7 @@ export function CaptureSubmission({ preview, state, controller }: Props) {
   };
   const submit = () => {
     if (invalid) return;
-    const access: Input<'request_capture'>['result_access'] = include ? {
+    const access: PreviewRequest['result_access'] = include ? {
       actionIds: chosen.map(choice => choice.action_id), operations, maxArtifacts: chosen.length,
       maxBytes, maxOperations, notAfter: new Date(Date.now() + seconds * 1000).toISOString(),
     } : undefined;

@@ -22,12 +22,13 @@ const (
 
 // Unmet names the evaluator condition that decided a refusal.
 const (
-	UnmetNoMatchingAllow    = "NoMatchingAllow"
-	UnmetExplicitDeny       = "ExplicitDeny"
-	UnmetClientScope        = "ClientScopeMissing"
-	UnmetPermissionStale    = "PermissionObservationStale"
+	UnmetNoMatchingAllow = "NoMatchingAllow"
+	UnmetExplicitDeny    = "ExplicitDeny"
+	UnmetClientScope     = "ClientScopeMissing"
+	// UnmetClusterNotObserved: the cluster's permission state has not
+	// reached the hub (ADR-330), so the decision is Indeterminate.
+	UnmetClusterNotObserved = "ClusterNotObserved"
 	UnmetIdentity           = "IdentityUnavailable"
-	UnmetAudienceOverflow   = "AudienceOverflow"
 	UnmetServiceUnavailable = "ServiceUnavailable"
 )
 
@@ -132,13 +133,11 @@ func decide(r Result, d evaluationDetail) (Decision, string, string) {
 		return Deny, UnmetClientScope, d.missingScope
 	case "NoEntitlement":
 		if d.staleAllow {
-			return Indeterminate, UnmetPermissionStale, ""
+			return Indeterminate, UnmetClusterNotObserved, ""
 		}
 		return Deny, UnmetNoMatchingAllow, ""
-	case "AudienceOverflow":
-		return Deny, UnmetAudienceOverflow, ""
 	case "PermissionUnavailable":
-		return Indeterminate, UnmetPermissionStale, ""
+		return Indeterminate, UnmetClusterNotObserved, ""
 	case "IdentityUnavailable":
 		return Indeterminate, UnmetIdentity, ""
 	}

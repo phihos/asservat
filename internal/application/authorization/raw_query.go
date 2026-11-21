@@ -36,8 +36,73 @@ type RawQuerySelection struct {
 	Review     []RawQueryReviewArtifact
 	ValidUntil time.Time
 }
+
+// RawArtifactSelection names existing artifacts by ID, by verified version
+// digest, or both; digests given with IDs pin the exact selected versions.
+type RawArtifactSelection struct {
+	IDs     []string
+	Digests []artifact.Digest
+}
+
+// Valid: at least one name, no empty or repeated entry, and with both lists
+// one digest per ID.
+func (r RawArtifactSelection) Valid() bool {
+	if len(r.IDs) == 0 && len(r.Digests) == 0 || len(r.IDs) > 0 && len(r.Digests) > 0 && len(r.IDs) != len(r.Digests) {
+		return false
+	}
+	ids := map[string]bool{}
+	for _, id := range r.IDs {
+		if !value.UUID(id) || ids[id] {
+			return false
+		}
+		ids[id] = true
+	}
+	digests := map[artifact.Digest]bool{}
+	for _, d := range r.Digests {
+		if d == (artifact.Digest{}) || digests[d] {
+			return false
+		}
+		digests[d] = true
+	}
+	return true
+}
+
+// Select returns exactly one candidate per named artifact, or false.
+func Select[T any](r RawArtifactSelection, candidates []T, key func(T) (string, artifact.Digest)) ([]T, bool) {
+	var out []T
+	pick := func(match func(string, artifact.Digest) bool) bool {
+		var found []T
+		for _, c := range candidates {
+			if match(key(c)) {
+				found = append(found, c)
+			}
+		}
+		if len(found) != 1 {
+			return false
+		}
+		out = append(out, found[0])
+		return true
+	}
+	if len(r.IDs) == 0 {
+		for _, d := range r.Digests {
+			if !pick(func(_ string, v artifact.Digest) bool { return v == d }) {
+				return nil, false
+			}
+		}
+		return out, true
+	}
+	for _, id := range r.IDs {
+		if !pick(func(a string, v artifact.Digest) bool {
+			return a == id && (len(r.Digests) == 0 || slices.Contains(r.Digests, v))
+		}) {
+			return nil, false
+		}
+	}
+	return out, true
+}
+
 type RawQuerySelectionReader interface {
-	ResolveRawQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+	ResolveRawQuery(context.Context, identities.CurrentIdentity, string, RawArtifactSelection) (RawQuerySelection, error)
 }
 
 // RawQueryGrantStore adds only reads of the existing grant/child/use ledger.
@@ -51,45 +116,48 @@ type RawQueryGrantStore interface {
 	CountRegisteredGrantArtifacts(context.Context, string, []string) (int, error)
 }
 type RawPacketQuerySelectionReader interface {
-	ResolveRawPacketQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+	ResolveRawPacketQuery(context.Context, identities.CurrentIdentity, string, RawArtifactSelection) (RawQuerySelection, error)
 }
 
 type RawSyscallQuerySelectionReader interface {
-	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, RawArtifactSelection) (RawQuerySelection, error)
 }
 
 type RawLogQuerySelectionReader interface {
-	ResolveRawLogQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+	ResolveRawLogQuery(context.Context, identities.CurrentIdentity, string, RawArtifactSelection) (RawQuerySelection, error)
 }
 
+// RawQueryRequestInput: MaxBytes 0 defaults to the selected verified sizes
+// (download) or the query allowance; Lifetime 0 defaults to the earliest
+// selected artifact access end.
 type RawQueryRequestInput struct {
-	CaseID          string
-	ArtifactDigests []artifact.Digest
-	Operations      []string
-	Reason          string
-	MaxBytes        int64
-	Lifetime        time.Duration
-	IdempotencyKey  string
+	CaseID         string
+	Artifacts      RawArtifactSelection
+	Operations     []string
+	Reason         string
+	MaxBytes       int64
+	Lifetime       time.Duration
+	IdempotencyKey string
 }
 
 func normalizeRawQueryRequest(in RawQueryRequestInput) (RawQueryRequestInput, error) {
-	in.ArtifactDigests = slices.Clone(in.ArtifactDigests)
-	slices.SortFunc(in.ArtifactDigests, func(a, b artifact.Digest) int { return bytes.Compare(a[:], b[:]) })
+	in.Artifacts.IDs = slices.Clone(in.Artifacts.IDs)
+	slices.Sort(in.Artifacts.IDs)
+	in.Artifacts.Digests = slices.Clone(in.Artifacts.Digests)
+	slices.SortFunc(in.Artifacts.Digests, func(a, b artifact.Digest) int { return bytes.Compare(a[:], b[:]) })
 	in.Operations = slices.Clone(in.Operations)
 	slices.Sort(in.Operations)
-	if !value.UUID(in.CaseID) || len(in.ArtifactDigests) < 1 || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || in.MaxBytes < 1 || in.Lifetime < time.Second || in.Lifetime%time.Second != 0 {
+	if !value.UUID(in.CaseID) || !in.Artifacts.Valid() || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || in.MaxBytes < 0 || in.Lifetime < 0 || in.Lifetime%time.Second != 0 {
 		return in, value.ErrGrantInvalid
 	}
 	if !value.ValidResultOperations(in.Operations) {
 		return in, ErrRawQueryOperationUnsupported
 	}
-	for n, d := range in.ArtifactDigests {
-		if d == (artifact.Digest{}) || n > 0 && d == in.ArtifactDigests[n-1] {
-			return in, value.ErrGrantInvalid
-		}
-	}
 	return in, nil
 }
+
+// rawQueryPageCharge is the most one returned query page is charged.
+const rawQueryPageCharge = 24 << 10
 
 var ErrRawQueryOperationUnsupported = errors.New("raw operation is not implemented")
 
@@ -151,23 +219,23 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		if !ok {
 			return zero, false, ErrGrantUnavailable
 		}
-		selected, err = selector.ResolveRawLogQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+		selected, err = selector.ResolveRawLogQuery(ctx, current, in.CaseID, in.Artifacts)
 	} else if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
 		selector, ok := s.RawSelections.(RawSyscallQuerySelectionReader)
 		if !ok {
 			return zero, false, ErrGrantUnavailable
 		}
-		selected, err = selector.ResolveRawSyscallQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+		selected, err = selector.ResolveRawSyscallQuery(ctx, current, in.CaseID, in.Artifacts)
 	} else if slices.Contains(in.Operations, value.GrantPacketQueryOperation) {
 		selector, ok := s.RawSelections.(RawPacketQuerySelectionReader)
 		if !ok {
 			return zero, false, ErrGrantUnavailable
 		}
-		selected, err = selector.ResolveRawPacketQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+		selected, err = selector.ResolveRawPacketQuery(ctx, current, in.CaseID, in.Artifacts)
 	} else {
-		selected, err = s.RawSelections.ResolveRawQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+		selected, err = s.RawSelections.ResolveRawQuery(ctx, current, in.CaseID, in.Artifacts)
 	}
-	if err != nil || !s.Now().Before(selected.ValidUntil) || len(selected.Artifacts) != len(in.ArtifactDigests) || len(selected.Review) != len(selected.Artifacts) {
+	if err != nil || !s.Now().Before(selected.ValidUntil) || len(selected.Artifacts) != max(len(in.Artifacts.IDs), len(in.Artifacts.Digests)) || len(selected.Review) != len(selected.Artifacts) {
 		return zero, false, ErrGrantUnavailable
 	}
 	for _, entry := range selected.Review {
@@ -186,11 +254,29 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		return 0
 	})
 	now := s.Now().UTC().Truncate(time.Microsecond)
-	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: now.Add(in.Lifetime)}
+	maxBytes, lifetime := in.MaxBytes, in.Lifetime
+	if maxBytes == 0 {
+		maxBytes = value.RawQueryDefaultOperations * rawQueryPageCharge
+		if slices.Contains(in.Operations, value.GrantDownloadOperation) {
+			maxBytes = 0
+			for _, a := range artifacts {
+				maxBytes += a.NativeBytes
+			}
+			maxBytes = max(maxBytes, 1)
+		}
+	}
+	if lifetime == 0 {
+		end := artifacts[0].ExpiresAt
+		for _, a := range artifacts {
+			end = identity.Earlier(end, a.ExpiresAt)
+		}
+		lifetime = end.Sub(now).Truncate(time.Second)
+	}
+	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: maxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: now.Add(lifetime)}
 	if !scope.Valid(now) {
 		return zero, false, value.ErrGrantInvalid
 	}
-	review := RawQueryReview{CaseID: in.CaseID, Artifacts: slices.Clone(selected.Review), Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: scope.NotAfter}
+	review := RawQueryReview{CaseID: in.CaseID, Artifacts: slices.Clone(selected.Review), Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: maxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: scope.NotAfter}
 	slices.SortFunc(review.Artifacts, func(a, b RawQueryReviewArtifact) int {
 		if a.Output.ArtifactID < b.Output.ArtifactID {
 			return -1
@@ -203,12 +289,12 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	selectedVersions := map[artifact.Digest]bool{}
 	for n, a := range artifacts {
 		r := review.Artifacts[n]
-		if selectedVersions[a.Output.ArtifactDigest] || r.Output != a.Output || r.NativeBytes != a.NativeBytes || !r.ExpiresAt.Equal(a.ExpiresAt) || len(r.Namespace) > 253 || !identity.Text(r.NativeType, 128) || len(r.WorkloadKind) > 64 || len(r.WorkloadName) > 253 || len(r.PodName) > 253 || !slices.Contains(in.ArtifactDigests, a.Output.ArtifactDigest) {
+		if selectedVersions[a.Output.ArtifactDigest] || r.Output != a.Output || r.NativeBytes != a.NativeBytes || !r.ExpiresAt.Equal(a.ExpiresAt) || len(r.Namespace) > 253 || !identity.Text(r.NativeType, 128) || len(r.WorkloadKind) > 64 || len(r.WorkloadName) > 253 || len(r.PodName) > 253 || len(in.Artifacts.Digests) > 0 && !slices.Contains(in.Artifacts.Digests, a.Output.ArtifactDigest) || len(in.Artifacts.IDs) > 0 && !slices.Contains(in.Artifacts.IDs, a.Output.ArtifactID) {
 			return zero, false, value.ErrGrantInvalid
 		}
 		selectedVersions[a.Output.ArtifactDigest] = true
 	}
-	g := value.Grant{ID: s.NewID(), RootID: s.RootID, Kind: value.GrantRawQuery, DataClass: "raw", Requester: i.Principal, RawQuery: &scope, Lifetime: in.Lifetime, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: "download_artifact", Code: "rawDisclosure"}}}
+	g := value.Grant{ID: s.NewID(), RootID: s.RootID, Kind: value.GrantRawQuery, DataClass: "raw", Requester: i.Principal, RawQuery: &scope, Lifetime: lifetime, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: "download_artifact", Code: "rawDisclosure"}}}
 	g.Scope, g.ExecutionDigest = RawQueryScopeBytes(scope)
 	g.Review, err = json.Marshal(GrantReview{RawQuery: &review, Deadline: scope.NotAfter})
 	if err != nil || len(g.Review) > value.GrantReviewBytesLimit(g.Kind) {

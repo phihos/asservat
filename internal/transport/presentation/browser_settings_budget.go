@@ -14,8 +14,8 @@ type authenticatedBrowserSettingsMarker struct{}
 func AuthenticatedBrowserSettingsView(ctx context.Context) context.Context {
 	return context.WithValue(ctx, authenticatedBrowserSettingsKey{}, authenticatedBrowserSettingsMarker{})
 }
-func browserSettingsView(ctx context.Context, name string) bool {
-	if ctx == nil || name != "get_capture_settings" {
+func browserSettingsView(ctx context.Context) bool {
+	if ctx == nil {
 		return false
 	}
 	_, ok := ctx.Value(authenticatedBrowserSettingsKey{}).(authenticatedBrowserSettingsMarker)
@@ -25,11 +25,11 @@ func (r OperationReply) preparedOutputLimit(name string) int {
 	if name == "get_grant" {
 		return contracts.InvestigationGrantReviewOutputLimit
 	}
-	if name == "preview_recording_save" {
-		return contracts.InvestigationRecordingSavePreviewOutputLimit
-	}
-	if name == "get_capture_settings" && r.browserSettings {
+	if name == "get_capture" && r.browserSettings {
 		return contracts.InvestigationBrowserSettingsOutputLimit
+	}
+	if name == "get_capture" || name == "preview_capture" {
+		return contracts.InvestigationResultBound
 	}
 	return contracts.InvestigationOutputLimit
 }

@@ -29,6 +29,7 @@ type ContextDownloadControlLedger interface {
 	LookupDownload(context.Context, string, identity.Principal) (artifact.DownloadSession, error)
 	ReserveDownload(context.Context, DownloadReservation) (artifact.DownloadSession, error)
 	ObserveDownload(context.Context, string, artifact.DownloadAuthority, *artifact.DownloadPreparation) (artifact.DownloadObservation, error)
+	RecordDownloadNativeFacts(context.Context, string, int64, artifact.Digest) error
 }
 type ContextDownloadSource struct {
 	Scope                  artifact.DownloadScope
@@ -281,41 +282,52 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 		return zero, collapsed("session", artifact.ErrDownloadUnavailable, nil)
 	}
 	pending := false
-	if session.State == artifact.DownloadPreparing {
-		if !s.Now().Before(session.Deadline) {
-			return s.viewAuthority(ctx, current, i, session, until, false, &a)
+	if session.State == artifact.DownloadPreparing && s.Now().Before(session.Deadline) {
+		if pending, err = s.continuePreparing(ctx, current, session, scope, &until, &a, source, !lookup.Found); err != nil {
+			return zero, err
 		}
-		workUntil := identity.Earlier(until, session.Deadline)
-		workCtx, stop := context.WithDeadline(ctx, workUntil)
-		defer stop()
-		var e error
-		if lookup.Found {
-			source, e = s.Sources.ReadContextDownloadSource(workCtx, a)
-		}
-		if e != nil || !source.Valid(s.Now()) || source.Scope != scope {
-			return zero, collapsed("source", artifact.ErrDownloadUnavailable, e)
-		}
-		until = identity.Earlier(until, source.ValidUntil)
-		workUntil = identity.Earlier(workUntil, source.ValidUntil)
-		if workCtx.Err() != nil || !s.Now().Before(workUntil) {
-			return zero, collapsed("source-expired", artifact.ErrDownloadUnavailable, workCtx.Err())
-		}
-		continuationCtx, finish := context.WithDeadline(workCtx, workUntil)
-		var continuation ContextDownloadContinuation
-		if native, ok := s.Runtime.(*ContextNativeRuntime); ok {
-			// The installed runtime consumes this request's exact initial proof.
-			// Standalone runtime calls still construct their own observation.
-			continuation, e = native.continueContextDownloadAuthority(continuationCtx, current, session, source, &a)
-		} else {
-			continuation, e = s.Runtime.ContinueContextDownload(continuationCtx, current, session, source)
-		}
-		finish()
-		if e != nil {
-			return zero, stepped("continue", e)
-		} // uncertain effects never become acknowledged Pending
-		pending = continuation.Pending
 	}
 	return s.viewAuthority(ctx, current, i, session, until, pending, &a)
+}
+
+// continuePreparing runs the next bounded step of an admitted Preparing
+// session under the caller's current authority: prepare and status both drive
+// it, so a status read that waits for the next revision resumes preparation
+// when the worker advances (ADR-330 D1). haveSource reports that source was
+// already read for this request.
+func (s ContextDownloadCoordinator) continuePreparing(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, scope artifact.DownloadScope, until *time.Time, a *artifact.DownloadAuthority, source ContextDownloadSource, haveSource bool) (bool, error) {
+	if s.Runtime == nil {
+		return false, collapsed("runtime-missing", artifact.ErrDownloadUnavailable, nil)
+	}
+	workUntil := identity.Earlier(*until, session.Deadline)
+	workCtx, stop := context.WithDeadline(ctx, workUntil)
+	defer stop()
+	var e error
+	if !haveSource {
+		source, e = s.Sources.ReadContextDownloadSource(workCtx, *a)
+	}
+	if e != nil || !source.Valid(s.Now()) || source.Scope != scope {
+		return false, collapsed("source", artifact.ErrDownloadUnavailable, e)
+	}
+	*until = identity.Earlier(*until, source.ValidUntil)
+	workUntil = identity.Earlier(workUntil, source.ValidUntil)
+	if workCtx.Err() != nil || !s.Now().Before(workUntil) {
+		return false, collapsed("source-expired", artifact.ErrDownloadUnavailable, workCtx.Err())
+	}
+	continuationCtx, finish := context.WithDeadline(workCtx, workUntil)
+	defer finish()
+	var continuation ContextDownloadContinuation
+	if native, ok := s.Runtime.(*ContextNativeRuntime); ok {
+		// The installed runtime consumes this request's exact initial proof.
+		// Standalone runtime calls still construct their own observation.
+		continuation, e = native.continueContextDownloadAuthority(continuationCtx, current, session, source, a)
+	} else {
+		continuation, e = s.Runtime.ContinueContextDownload(continuationCtx, current, session, source)
+	}
+	if e != nil {
+		return false, stepped("continue", e)
+	} // uncertain effects never become acknowledged Pending
+	return continuation.Pending, nil
 }
 func (s ContextDownloadCoordinator) GetContextDownload(ctx context.Context, current identities.CurrentIdentity, downloadID string) (ContextDownloadView, error) {
 	view, err := s.get(ctx, current, downloadID)
@@ -336,7 +348,18 @@ func (s ContextDownloadCoordinator) get(ctx context.Context, current identities.
 	if err != nil || !session.Valid() || session.ID != downloadID || session.Scope.RootID != s.RootID || session.Scope.Principal != i.Principal {
 		return ContextDownloadView{}, collapsed("lookup", artifact.ErrDownloadUnavailable, err)
 	}
-	return s.view(ctx, current, i, session, until, false)
+	if session.State != artifact.DownloadPreparing || !s.Now().Before(session.Deadline) {
+		return s.view(ctx, current, i, session, until, false)
+	}
+	a, err := s.authority(ctx, current, session.Scope, &until)
+	if err != nil {
+		return ContextDownloadView{}, err
+	}
+	pending, err := s.continuePreparing(ctx, current, session, session.Scope, &until, &a, ContextDownloadSource{}, false)
+	if err != nil {
+		return ContextDownloadView{}, err
+	}
+	return s.viewAuthority(ctx, current, i, session, until, pending, &a)
 }
 func (s ContextDownloadCoordinator) view(ctx context.Context, current identities.CurrentIdentity, initial identity.Identity, session artifact.DownloadSession, until time.Time, pending bool) (ContextDownloadView, error) {
 	return s.viewAuthority(ctx, current, initial, session, until, pending, nil)
@@ -418,6 +441,15 @@ func (s ContextDownloadCoordinator) viewChecked(ctx context.Context, current ide
 		m.ReadUntil = a.AccessUntil
 		m.DeleteBy = a.DeleteBy
 		out.Metadata = &m
+		// Later terminal statuses report the verified facts from the session.
+		if out.Session.NativeSHA256 == (artifact.Digest{}) {
+			if err = s.Sessions.RecordDownloadNativeFacts(ctx, session.ID, m.Size, m.SHA256); err != nil {
+				return zero, collapsed("native-facts", artifact.ErrDownloadUnavailable, err)
+			}
+			out.Session.NativeSize, out.Session.NativeSHA256 = m.Size, m.SHA256
+		} else if out.Session.NativeSize != m.Size || out.Session.NativeSHA256 != m.SHA256 {
+			return zero, collapsed("native-facts", artifact.ErrDownloadUnavailable, nil)
+		}
 	case artifact.DownloadPreparing:
 		out.ContinuePreparation = pending
 	}

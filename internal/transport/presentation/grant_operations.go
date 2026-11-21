@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -84,7 +86,7 @@ type recorderApprovalView struct{ reasons []string }
 // GrantUseCase is the C-03 grant service.
 type GrantUseCase interface {
 	Get(context.Context, identities.CurrentIdentity, string) (authapp.GrantView, time.Time, error)
-	List(context.Context, identities.CurrentIdentity, string, int) ([]authapp.GrantView, time.Time, error)
+	List(context.Context, identities.CurrentIdentity, string, authapp.GrantCursor, int) ([]authapp.GrantView, authapp.GrantCursor, time.Time, error)
 	Decide(context.Context, identities.CurrentIdentity, string, bool, string, string) (authorization.Grant, bool, error)
 	Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Grant, bool, error)
 }
@@ -132,7 +134,8 @@ func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) 
 	return s.contracts.Tool(name)
 }
 
-// GrantOperationInput is the closed union of the four inputs.
+// request_policy_grant (legacy contract) remains until hub-side acceptance
+// (specs/policy-automation.md) opens policy reviews itself.
 type policyGrantRequestLimits struct {
 	MaxObservedEvents int64 `json:"max_observed_events,omitempty"`
 	MaxExecutions     int64 `json:"max_executions"`
@@ -146,24 +149,65 @@ type policyGrantObservationInput struct {
 	MaxConcurrentSessions int64 `json:"max_concurrent_sessions"`
 	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
 }
+
+// GrantOperationInput is the closed union of the six inputs. after_revision
+// is accepted; the shared wait wrapper serves it.
 type GrantOperationInput struct {
-	CaseID           string                       `json:"case_id,omitempty"`
-	ArtifactDigests  []string                     `json:"artifact_digests,omitempty"`
-	Operations       []string                     `json:"operations,omitempty"`
-	MaxBytes         int64                        `json:"max_bytes,omitempty"`
-	ExpiresInSeconds int64                        `json:"expires_in_seconds,omitempty"`
 	PolicyName       string                       `json:"policy_name,omitempty"`
 	PolicyUID        string                       `json:"policy_uid,omitempty"`
 	LifetimeSeconds  int64                        `json:"lifetime_seconds,omitempty"`
 	Limits           *policyGrantRequestLimits    `json:"limits,omitempty"`
 	Observation      *policyGrantObservationInput `json:"observation_limits,omitempty"`
+	CaseID           string                       `json:"case_id,omitempty"`
+	ArtifactIDs      []string                     `json:"artifact_ids,omitempty"`
+	ArtifactDigests  []string                     `json:"artifact_digests,omitempty"`
+	Operations       []string                     `json:"operations,omitempty"`
+	MaxBytes         int64                        `json:"max_bytes,omitempty"`
+	ExpiresInSeconds int64                        `json:"expires_in_seconds,omitempty"`
 	GrantID          string                       `json:"grant_id,omitempty"`
+	AfterRevision    int64                        `json:"after_revision,omitempty"`
 	View             string                       `json:"view,omitempty"`
 	Limit            int                          `json:"limit,omitempty"`
+	Cursor           string                       `json:"cursor,omitempty"`
 	Decision         string                       `json:"decision,omitempty"`
 	Reason           string                       `json:"reason,omitempty"`
 	ExpectedRevision int64                        `json:"expected_revision,omitempty"`
 	IdempotencyKey   string                       `json:"idempotency_key,omitempty"`
+}
+
+// grantListPage is the most rows one list_reviews store read examines; a
+// page also ends before its rows exceed grantListBytes, the result bound of
+// list_reviews less the envelope.
+const (
+	grantListPage  = 100
+	grantListBytes = audit.OperationOutputLimit - 4<<10
+)
+
+type grantCursorWire struct {
+	At time.Time `json:"at"`
+	ID string    `json:"id"`
+}
+
+// The cursor is only a list position: every row is authorized again.
+func encodeGrantCursor(c authapp.GrantCursor) *string {
+	if c.ID == "" {
+		return nil
+	}
+	b, _ := json.Marshal(grantCursorWire{c.RequestedAt, c.ID})
+	out := base64.RawURLEncoding.EncodeToString(b)
+	return &out
+}
+
+func decodeGrantCursor(s string) (authapp.GrantCursor, bool) {
+	if s == "" {
+		return authapp.GrantCursor{}, true
+	}
+	var c grantCursorWire
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil || json.Unmarshal(b, &c) != nil || c.At.IsZero() || !authorization.UUID(c.ID) {
+		return authapp.GrantCursor{}, false
+	}
+	return authapp.GrantCursor{RequestedAt: c.At, ID: c.ID}, true
 }
 
 type grantPrincipal struct {
@@ -229,11 +273,12 @@ type grantProfile struct {
 }
 
 type grantLimits struct {
+	MaxBytesPerSecond int64 `json:"max_bytes_per_second"`
+	// The legacy request_policy_grant reply also carries these.
+	MaxSessionSeconds     int64 `json:"max_session_seconds,omitempty"`
+	MaxObservedBytes      int64 `json:"max_observed_bytes,omitempty"`
+	MaxConcurrentSessions int64 `json:"max_concurrent_sessions,omitempty"`
 	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
-	MaxSessionSeconds     int64 `json:"max_session_seconds"`
-	MaxObservedBytes      int64 `json:"max_observed_bytes"`
-	MaxBytesPerSecond     int64 `json:"max_bytes_per_second"`
-	MaxConcurrentSessions int64 `json:"max_concurrent_sessions"`
 }
 
 type grantAuthentication struct {
@@ -262,21 +307,38 @@ type grantResultAccess struct {
 }
 
 type grantPolicyData struct {
-	MaxObservedEvents  int64           `json:"max_observed_events,omitempty"`
-	ObservedEventsUsed int64           `json:"observed_events_used,omitempty"`
 	UID                string          `json:"uid"`
 	Executor           *grantPrincipal `json:"executor"`
 	AuthorityIssuedAt  time.Time       `json:"authority_issued_at"`
 	AuthorityNotAfter  time.Time       `json:"authority_not_after"`
-	MaxExecutions      int64           `json:"max_executions"`
 	MaxCollectedBytes  int64           `json:"max_collected_bytes"`
-	MaxObservedBytes   int64           `json:"max_observed_bytes"`
 	ExecutionsUsed     int64           `json:"executions_used"`
 	CollectedBytesUsed int64           `json:"collected_bytes_used"`
-	ObservedBytesUsed  int64           `json:"observed_bytes_used"`
+	// The legacy request_policy_grant reply also carries these.
+	MaxExecutions      *int64 `json:"max_executions,omitempty"`
+	MaxObservedBytes   *int64 `json:"max_observed_bytes,omitempty"`
+	ObservedBytesUsed  *int64 `json:"observed_bytes_used,omitempty"`
+	MaxObservedEvents  int64  `json:"max_observed_events,omitempty"`
+	ObservedEventsUsed int64  `json:"observed_events_used,omitempty"`
 }
 
-// grantData is get_grant's reply; list rows omit actions and result access.
+// legacyPolicyGrant adds the fields of the legacy request_policy_grant
+// reply, which remains until hub-side acceptance replaces it.
+func legacyPolicyGrant(d grantData, v authapp.GrantView) grantData {
+	g := v.Grant
+	if p := d.Policy; p != nil && g.Policy != nil {
+		l := g.Policy.Limits
+		p.MaxExecutions, p.MaxObservedBytes, p.ObservedBytesUsed = &l.MaxExecutions, &l.MaxObservedBytes, &g.PolicySpend.ObservedBytes
+		p.MaxObservedEvents, p.ObservedEventsUsed = l.MaxObservedEvents, g.PolicySpend.ObservedEvents
+	}
+	if l := v.Review.ObservationLimits; l != nil && d.ObservationLimits != nil {
+		d.ObservationLimits.MaxSessionSeconds, d.ObservationLimits.MaxObservedBytes, d.ObservationLimits.MaxConcurrentSessions, d.ObservationLimits.MaxObservedEvents = l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxConcurrentSessions, l.MaxObservedEvents
+	}
+	return d
+}
+
+// grantData is get_grant's reply; list rows omit actions, result access and
+// raw artifacts.
 type grantData struct {
 	GrantID              string              `json:"grant_id"`
 	Phase                string              `json:"phase"`
@@ -294,7 +356,7 @@ type grantData struct {
 	ObservationLimits    *grantLimits        `json:"observation_limits,omitempty"`
 	RequestedBy          *grantPrincipal     `json:"requested_by"`
 	RequestedAt          time.Time           `json:"requested_at"`
-	ReviewUntil          *time.Time          `json:"review_until,omitempty"`
+	ReviewUntil          time.Time           `json:"review_until"`
 	PreviewDeadline      *time.Time          `json:"preview_deadline,omitempty"`
 	CaptureDeadlineRule  string              `json:"capture_deadline_rule,omitempty"`
 	CaptureWindowSeconds int64               `json:"capture_window_seconds,omitempty"`
@@ -313,21 +375,27 @@ type grantData struct {
 
 func digestText(d artifact.Digest) string { return hash(d) }
 
-func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, full bool, now time.Time) grantData {
+// withoutRecordingApproval drops the planner's internal sibling marker, which
+// is not a public review reason.
+func withoutRecordingApproval(codes []string) []string {
+	return slices.DeleteFunc(slices.Clone(codes), func(c string) bool { return c == "recordingApprovalRequired" })
+}
+
+func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, full bool) grantData {
 	g, r := v.Grant, v.Review
 	requester := g.Requester.Issuer == caller.Issuer && g.Requester.Subject == caller.Subject
 	d := grantData{GrantID: g.ID, Phase: string(v.Phase), Revision: g.Revision, Kind: g.Kind, CaptureID: g.CaptureID, ExecutionDigest: digestText(g.ExecutionDigest), ReviewDigest: digestText(g.ReviewDigest),
 		Target: &grantTarget{ClusterID: g.Target.ClusterID, Namespace: r.Namespace, WorkloadKind: r.WorkloadKind, WorkloadName: r.WorkloadName, PodName: r.PodName}, DataClass: g.DataClass, Reasons: []grantReason{}, RequestedBy: principalView(g.Requester),
 		RequestedAt: g.RequestedAt.UTC(), CaptureDeadlineRule: "previewDeadline", LifetimeSeconds: int64(g.Lifetime / time.Second),
 		CanDecide: v.Approver && v.Phase == authorization.GrantPending, CanRevoke: g.RevokedAt.IsZero() && (requester || v.Approver), NavigationURI: s.origin + "/approvals/" + g.ID}
-	if until := g.PendingUntil(); !until.IsZero() {
-		until = until.UTC()
-		d.ReviewUntil = &until
+	d.ReviewUntil = g.PendingUntil().UTC()
+	if d.ReviewUntil.IsZero() {
+		d.ReviewUntil = r.Deadline.UTC()
 	}
 	if g.Kind == authorization.GrantPolicy && g.Policy != nil {
 		p := g.Policy
 		d.Target.ClusterID, d.Target.NamespaceUID, d.Target.WorkloadUID, d.Target.PodName = p.Authority.ClusterID, p.Authority.NamespaceUID, p.Authority.WorkloadUID, ""
-		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxExecutions: p.Limits.MaxExecutions, MaxCollectedBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, MaxObservedEvents: p.Limits.MaxObservedEvents, ObservedEventsUsed: g.PolicySpend.ObservedEvents, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes, ObservedBytesUsed: g.PolicySpend.ObservedBytes}
+		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxCollectedBytes: p.Limits.MaxBytes, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes}
 		end := g.PolicyNotAfter.UTC()
 		d.NotAfter = &end
 		d.CaptureDeadlineRule = "policyAuthority"
@@ -337,11 +405,12 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 		d.CaptureID = ""
 		if q := r.RawQuery; q != nil {
 			d.RawAccess = &grantRawAccessData{CaseID: q.CaseID, Reason: q.Reason, Operations: slices.Clone(q.Operations), MaxBytes: q.MaxBytes, MaxOperations: q.MaxOperations, NotAfter: q.NotAfter.UTC(), ArtifactCount: len(q.Artifacts), BytesUsed: g.Spent.Bytes, OperationsUsed: g.Spent.Operations}
-			if full {
-				for _, a := range q.Artifacts {
-					o := a.Output
-					d.RawAccess.Artifacts = append(d.RawAccess.Artifacts, grantRawArtifact{ArtifactID: o.ArtifactID, CaptureID: o.CaptureID, ActionID: o.ActionID, Digest: hash(o.ArtifactDigest), ExecutionDigest: hash(o.ExecutionDigest), NativeType: a.NativeType, NativeBytes: a.NativeBytes, ExpiresAt: a.ExpiresAt.UTC(), Target: grantRawTarget{ClusterID: o.Target.ClusterID, NamespaceUID: o.Target.NamespaceUID, WorkloadUID: o.Target.WorkloadUID, PodUID: o.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}})
+			for _, a := range q.Artifacts {
+				if !full {
+					break
 				}
+				o := a.Output
+				d.RawAccess.Artifacts = append(d.RawAccess.Artifacts, grantRawArtifact{ArtifactID: o.ArtifactID, CaptureID: o.CaptureID, ActionID: o.ActionID, Digest: hash(o.ArtifactDigest), ExecutionDigest: hash(o.ExecutionDigest), NativeType: a.NativeType, NativeBytes: a.NativeBytes, ExpiresAt: a.ExpiresAt.UTC(), Target: grantRawTarget{ClusterID: o.Target.ClusterID, NamespaceUID: o.Target.NamespaceUID, WorkloadUID: o.Target.WorkloadUID, PodUID: o.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}})
 			}
 		}
 	} else {
@@ -356,11 +425,22 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	}
 	if g.Kind != authorization.GrantRawQuery {
 		for _, x := range g.Reasons {
-			d.Reasons = append(d.Reasons, grantReason{x.ActionID, x.Code})
+			// The planner's recordingApprovalRequired marker is the policy
+			// collection reason of a policy grant and no public reason otherwise.
+			r := grantReason{x.ActionID, x.Code}
+			if r.Code == "recordingApprovalRequired" {
+				if g.Kind != authorization.GrantPolicy {
+					continue
+				}
+				r.Code = "policyCollection"
+			}
+			if !slices.Contains(d.Reasons, r) {
+				d.Reasons = append(d.Reasons, r)
+			}
 		}
 	}
 	if l := r.ObservationLimits; l != nil {
-		d.ObservationLimits = &grantLimits{MaxObservedEvents: l.MaxObservedEvents, MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+		d.ObservationLimits = &grantLimits{MaxBytesPerSecond: l.MaxBytesPerSecond}
 	}
 	if x := g.Decision; x != nil {
 		decision := "denied"
@@ -383,7 +463,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	}
 	d.CanResume = &v.CanResume
 	for _, a := range r.Actions {
-		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: slices.Clone(a.Sensitive)}
+		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: withoutRecordingApproval(a.Sensitive)}
 		if p := a.Profile; p != nil {
 			x.Profile = &grantProfile{Runtime: p.Runtime, Type: p.Type, Mode: p.Mode, Source: p.Source, Duration: p.Duration, Timeout: p.Timeout, ForceGC: p.ForceGC, SourceRef: p.SourceRef, SourceName: p.SourceName, AddressMode: p.AddressMode, Port: p.Port, PathPolicy: p.PathPolicy, EndpointDigest: p.EndpointDigest, SourceKind: p.SourceKind, DefinitionDigest: p.DefinitionDigest, DeclaredPortName: p.DeclaredPortName, MinimumPort: p.MinimumPort, MaximumPort: p.MaximumPort}
 		}
@@ -414,8 +494,20 @@ type grantDecisionData struct {
 	NotAfter *time.Time `json:"not_after,omitempty"`
 }
 
+var errInvalidGrantCursor = errors.New("invalid list cursor")
+
+// rawRuntimeOperations are the raw operations this release can grant; the
+// canonical contract names more (memory and debugger operations).
+var rawRuntimeOperations = []string{authorization.GrantDownloadOperation, authorization.GrantPacketQueryOperation, authorization.GrantSyscallQueryOperation, authorization.GrantLogQueryOperation}
+
+var errRawCapability = errors.New("raw operation unavailable")
+
 func publicGrantFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, errRawCapability):
+		return OperationFailure{"CapabilityUnavailable", "Memory and debugger operations are not available in this release. Request download_artifact, pcap_query, syscall_query or get_logs.", false}
+	case errors.Is(err, errInvalidGrantCursor):
+		return OperationFailure{"InvalidCursor", "Refresh this view to continue with current access.", false}
 	case errors.Is(err, authapp.ErrRawQueryOperationUnsupported):
 		return OperationFailure{"UnsupportedOperation", "Only download_artifact and bounded pcap_query approval are currently available for existing raw evidence. No collection or disclosure was started.", false}
 	case errors.Is(err, authorization.ErrGrantInvalid), errors.Is(err, authorization.ErrGrantScope):
@@ -479,16 +571,18 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 			operationErr = authapp.ErrGrantUnavailable
 			break
 		}
-		request := authapp.RawQueryRequestInput{CaseID: in.CaseID, Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, Lifetime: time.Duration(in.ExpiresInSeconds) * time.Second, IdempotencyKey: in.IdempotencyKey}
+		if slices.ContainsFunc(in.Operations, func(op string) bool { return !slices.Contains(rawRuntimeOperations, op) }) {
+			operationErr = errRawCapability
+			break
+		}
+		request := authapp.RawQueryRequestInput{CaseID: in.CaseID, Artifacts: authapp.RawArtifactSelection{IDs: in.ArtifactIDs}, Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, Lifetime: time.Duration(in.ExpiresInSeconds) * time.Second, IdempotencyKey: in.IdempotencyKey}
 		for _, d := range in.ArtifactDigests {
 			b, err := hex.DecodeString(d)
 			if err != nil || len(b) != len(artifact.Digest{}) {
 				operationErr = authorization.ErrGrantInvalid
 				break
 			}
-			var digest artifact.Digest
-			copy(digest[:], b)
-			request.ArtifactDigests = append(request.ArtifactDigests, digest)
+			request.Artifacts.Digests = append(request.Artifacts.Digests, artifact.Digest(b))
 		}
 		if operationErr != nil {
 			break
@@ -520,7 +614,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 			var valid time.Time
 			if v, valid, operationErr = s.grants.Get(ctx, current, g.ID); operationErr == nil {
 				until = identity.Earlier(until, valid)
-				out.Data = s.view(v, i.Principal, true, s.now())
+				out.Data = legacyPolicyGrant(s.view(v, i.Principal, true), v)
 			}
 		}
 	case "get_grant":
@@ -528,21 +622,37 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 		var valid time.Time
 		if v, valid, operationErr = s.grants.Get(ctx, current, in.GrantID); operationErr == nil {
 			until = identity.Earlier(until, valid)
-			out.Data = s.view(v, i.Principal, true, s.now())
+			out.Data = s.view(v, i.Principal, true)
 		}
 	case "list_reviews":
-		limit := in.Limit
+		limit := min(in.Limit, grantListPage)
 		if limit == 0 {
 			limit = 20
 		}
+		after, ok := decodeGrantCursor(in.Cursor)
+		if !ok {
+			operationErr = errInvalidGrantCursor
+			break
+		}
 		var views []authapp.GrantView
+		var next authapp.GrantCursor
 		var valid time.Time
-		if views, valid, operationErr = s.grants.List(ctx, current, in.View, limit); operationErr == nil {
+		if views, next, valid, operationErr = s.grants.List(ctx, current, in.View, after, limit); operationErr == nil {
 			until = identity.Earlier(until, valid)
 			data := grantListData{Approvals: []grantData{}}
 			for _, v := range views {
-				data.Approvals = append(data.Approvals, s.view(v, i.Principal, false, s.now()))
+				data.Approvals = append(data.Approvals, s.view(v, i.Principal, false))
 			}
+			// A page ends early when its rows would exceed the result bound.
+			for len(data.Approvals) > 1 {
+				if b, err := json.Marshal(data); err == nil && len(b) <= grantListBytes {
+					break
+				}
+				data.Approvals = data.Approvals[:len(data.Approvals)-1]
+				last := views[len(data.Approvals)-1].Grant
+				next = authapp.GrantCursor{RequestedAt: last.RequestedAt, ID: last.ID}
+			}
+			out.NextCursor = encodeGrantCursor(next)
 			out.Data = data
 		}
 	case "decide_review":
@@ -584,7 +694,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 	// requester is forbidden to decide through every client. This definite
 	// refusal differs from an unavailable/withdrawn-rights retry whose earlier
 	// logical mutation may already have committed.
-	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval)
+	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval) || errors.Is(operationErr, errRawCapability)
 	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch, grantReview: name == "get_grant"}, nil
 }
 

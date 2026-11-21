@@ -16,6 +16,7 @@ import (
 	compiler "asservat.local/asservat/internal/application/planning"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // RecorderPreviewUseCase is the ADR-243 composition preview. The concrete
@@ -132,7 +133,7 @@ func RecorderAssessment(a planning.RecorderAssessment) CaptureAssessment {
 	basis := AssessmentBasis{RulesDigest: hash(a.RulesDigest), CapabilityDigest: hash(a.CapabilityDigest)}
 	basis.Metrics.State = "unavailable"
 	out := CaptureAssessment{
-		SchemaVersion: "capture-assessment/v1", AssessmentID: a.ID, PlanDigest: hash(a.PlanDigest), GeneratedAt: a.GeneratedAt, ValidUntil: a.ValidUntil,
+		SchemaVersion: "capture-assessment/v1", AssessmentID: a.ID, PlanDigest: hash(a.PlanDigest), GeneratedAt: a.GeneratedAt,
 		Basis: basis, Scope: AssessmentScope{ObservationPods: a.ObservationPods, IncidentPods: a.IncidentPods},
 		CombinedImpact:     Impact{a.Combined.Level, a.Combined.HasUnknowns, slices.Clone(a.Combined.Effects), a.Combined.Explanation},
 		CombinedQuantities: quantities(a.CombinedQuantities),
@@ -163,7 +164,7 @@ func RecorderAssessment(a planning.RecorderAssessment) CaptureAssessment {
 	return out
 }
 
-func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResult, target WorkloadReference) (RecorderPreviewData, time.Time, error) {
+func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResult, target targets.WorkloadRequest) (RecorderPreviewData, time.Time, error) {
 	provenance, err := compiler.CompositionProvenance(result.Plan)
 	if err != nil {
 		return RecorderPreviewData{}, time.Time{}, value.ErrUnavailable
@@ -228,8 +229,8 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
 	return RecorderPreviewData{ResultAccessActions: recorderResultAccessActions(result.Plan), ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
-		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: target,
-		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
+		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: targetOutput(target),
+		SelectedPods: []SelectedPod{selectedPod(p)}}, result.ValidUntil, nil
 }
 
 // This is a display of actual compiled raw output actions, never authority.

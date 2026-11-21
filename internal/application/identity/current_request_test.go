@@ -269,8 +269,8 @@ func TestBrowserRequestWithinMatchesEvidenceReadWindow(t *testing.T) {
 	if err != nil || !v.Identity.ValidUntil.Equal(now.Add(5*time.Second)) {
 		t.Fatal("ordinary browser request not five seconds", err)
 	}
-	if _, _, err = NewBrowserRequestWithin(context.Background(), s, "synthetic-cookie", false, clock, value.EvidenceReadRequestWindow+time.Second); !errors.Is(err, value.ErrUnavailable) {
-		t.Fatal("browser window beyond the evidence-read maximum accepted")
+	if _, _, err = NewBrowserRequestWithin(context.Background(), s, "synthetic-cookie", false, clock, value.StatusReadRequestWindow+time.Second); !errors.Is(err, value.ErrUnavailable) {
+		t.Fatal("browser window beyond the status-read maximum accepted")
 	}
 }
 

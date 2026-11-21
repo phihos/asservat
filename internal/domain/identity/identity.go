@@ -19,14 +19,24 @@ var (
 )
 
 // EvidenceReadRequestWindow bounds one public evidence-read request
-// (get_file_excerpt, get_http_headers, get_query_result, prepare_artifact_download,
-// get_artifact_download); ordinary public requests keep five seconds except
+// (get_extract, query_artifact, get_query_result, download_artifact prepare
+// and status); ordinary public requests keep five seconds except
 // RecordingSaveRequestWindow or CapturePreviewRequestWindow composition. Installed
 // native78-80 showed the approved read's audit, authorization, SQL fences,
 // worker wake-up, three key unwraps and the object read cannot complete within
 // five seconds. It bounds only the request itself: every identity, authority,
 // observation and lease inside it keeps its own shorter ValidUntil.
 const EvidenceReadRequestWindow = 20 * time.Second
+
+// StatusWaitRequestWindow bounds one HTTP request of a status read with
+// after_revision: the 30-second server-side wait (mcp-tools.json) and two
+// ordinary five-second reads. Each read keeps its own operation window.
+const StatusWaitRequestWindow = 40 * time.Second
+
+// StatusReadRequestWindow bounds one status-read request with after_revision:
+// the 30-second server-side wait (mcp-tools.json) plus two ordinary reads.
+// Each read keeps its own ordinary window.
+const StatusReadRequestWindow = 40 * time.Second
 
 // AuthorityRecheckInterval bounds how long one operation's authority snapshot
 // (identity, eligibility, recovery) may be used before it is checked again

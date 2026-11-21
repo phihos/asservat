@@ -456,7 +456,7 @@ func typedQueryFraming(t *testing.T, mode string) {
 		f.a.ValidUntil = time.Now().Add(300 * time.Millisecond)
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 		defer cancel()
-		reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
+		reply, err := s.Call(ctx, f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 		if err != nil {
 			written <- err
 			return

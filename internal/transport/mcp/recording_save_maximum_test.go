@@ -59,7 +59,7 @@ func (o *recordingFrameObserver) RoundTrip(r *http.Request) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, MaxRecordingSavePreviewResponseBytes+1))
+	body, err := io.ReadAll(io.LimitReader(response.Body, MaxResultBoundResponseBytes+1))
 	response.Body.Close()
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func TestMaximumRecordingSaveUsesActualSDKTextAndStructuredFrame(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	ordinary := &mcpCaptureFixture{}
-	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, ordinary)
+	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, ordinary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,8 +117,8 @@ func TestMaximumRecordingSaveUsesActualSDKTextAndStructuredFrame(t *testing.T) {
 	for i := 0; i < 16; i++ {
 		handles = append(handles, strings.Repeat("h", 125)+fmt.Sprintf("%03d", i))
 	}
-	called, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "preview_recording_save", Arguments: map[string]any{"recording_handles": handles}})
-	if err != nil || called.IsError || len(called.Content) != 1 || called.StructuredContent == nil {
+	called, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "preview_capture", Arguments: map[string]any{"recording_handles": handles, "before": "30s"}})
+	if err != nil || len(called.Content) != 1 || called.StructuredContent == nil {
 		t.Fatal("actual maximum SDK call", err, called)
 	}
 	text, ok := called.Content[0].(*sdk.TextContent)
@@ -134,33 +134,40 @@ func TestMaximumRecordingSaveUsesActualSDKTextAndStructuredFrame(t *testing.T) {
 	if json.Unmarshal(structured, &fromStructured) != nil || !reflect.DeepEqual(fromText, fromStructured) {
 		t.Fatal("SDK structured/text results differ")
 	}
-	if fromText["status"] != "ok" {
-		t.Fatal("maximum preview rejected", text.Text)
-	}
 	data := fromText["data"].(map[string]any)
-	actions := data["capture_assessment"].(map[string]any)["actions"].([]any)
-	if len(actions) != 16 || len(data["selected_recordings"].([]any)) != 16 || len(data["windows"].([]any)) != 16 {
-		t.Fatal("maximum preview lost sources")
-	}
-	for _, a := range actions {
-		row := a.(map[string]any)
-		if len(row["recording_handle"].(string)) != 128 || len(row["retention"].(map[string]any)["policyDigests"].([]any)) != 64 {
-			t.Fatal("source disclosures were truncated")
+	switch fromText["status"] {
+	case "ok":
+		actions := data["capture_assessment"].(map[string]any)["actions"].([]any)
+		if len(actions) != 16 || data["max_process_starts"] != float64(0) || data["approval_required"] != false {
+			t.Fatal("maximum preview lost sources")
 		}
+		for _, a := range actions {
+			row := a.(map[string]any)
+			if len(row["recording_handle"].(string)) != 128 || len(row["retention"].(map[string]any)["policyDigests"].([]any)) != 64 {
+				t.Fatal("source disclosures were truncated")
+			}
+		}
+	case "error":
+		// Above the MCP result bound the plan is reviewed in the browser.
+		if data["code"] != "PlanTooLarge" || data["navigation_uri"] == nil {
+			t.Fatal("maximum preview rejected", text.Text)
+		}
+	default:
+		t.Fatal("maximum preview status", text.Text)
 	}
-	if observer.maximum.Load() > MaxRecordingSavePreviewResponseBytes {
-		t.Fatal("SDK frame exceeded dedicated bound")
+	if observer.maximum.Load() > MaxResultBoundResponseBytes {
+		t.Fatal("SDK frame exceeded result bound")
 	}
-	t.Logf("actualSDK maximum16-source canonical bytes=%d full duplicated SDK frame=%d; no collector measurement", len(text.Text), observer.maximum.Load())
+	t.Logf("status=%v canonical bytes=%d SDK frame=%d", fromText["status"], len(text.Text), observer.maximum.Load())
 }
-func TestRecordingSaveFrameBudgetDoesNotWidenOtherOperations(t *testing.T) {
+func TestResultBoundFrameDoesNotWidenOtherOperations(t *testing.T) {
 	ordinary := newBoundedResponse()
 	if _, err := ordinary.Write(make([]byte, MaxResponseBytes+1)); err == nil {
 		t.Fatal("ordinary response cap widened")
 	}
 	preview := newBoundedResponse()
-	preview.limit = MaxRecordingSavePreviewResponseBytes
-	if _, err := preview.Write(make([]byte, MaxRecordingSavePreviewResponseBytes)); err != nil {
+	preview.limit = MaxResultBoundResponseBytes
+	if _, err := preview.Write(make([]byte, MaxResultBoundResponseBytes)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := preview.Write([]byte{0}); err == nil {

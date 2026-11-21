@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"time"
 
@@ -27,10 +28,11 @@ type ProcessingDiscoveryOperations struct {
 	reader        privacy.ProcessingEvidenceDiscovery
 	erasureStatus *privacy.ProcessingErasureStatus
 	report        *privacy.ProcessingReport
+	clusters      ClusterNames
 	contracts     *contracts.InvestigationContracts
 }
 
-func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID func() string, reader privacy.ProcessingEvidenceDiscovery, erasureStatus *privacy.ProcessingErasureStatus, report *privacy.ProcessingReport) (*ProcessingDiscoveryOperations, error) {
+func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID func() string, clusters ClusterNames, reader privacy.ProcessingEvidenceDiscovery, erasureStatus *privacy.ProcessingErasureStatus, report *privacy.ProcessingReport) (*ProcessingDiscoveryOperations, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || now == nil || newID == nil || reader.Discovery == nil {
 		return nil, ErrOperationsConfiguration
@@ -39,7 +41,7 @@ func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID
 	if err != nil {
 		return nil, err
 	}
-	return &ProcessingDiscoveryOperations{origin: origin, now: now, newID: newID, reader: reader, erasureStatus: erasureStatus, report: report, contracts: wire}, nil
+	return &ProcessingDiscoveryOperations{origin: origin, now: now, newID: newID, reader: reader, erasureStatus: erasureStatus, report: report, clusters: clusters, contracts: wire}, nil
 }
 
 func (s *ProcessingDiscoveryOperations) PublicOrigin() string { return s.origin }
@@ -62,7 +64,12 @@ func (s *ProcessingDiscoveryOperations) Tool(name string) (contracts.Investigati
 
 func processingReportQuery(raw []byte) (value.ProcessingReportQuery, error) {
 	var query value.ProcessingReportQuery
-	if json.Unmarshal(raw, &query) != nil || !query.Valid() {
+	if json.Unmarshal(raw, &query) != nil {
+		return value.ProcessingReportQuery{}, contracts.ErrInvestigationWire
+	}
+	// A page ends at ProcessingReportLimit rows (the reply size target).
+	query.Limit = min(query.Limit, value.ProcessingReportLimit)
+	if !query.Valid() {
 		return value.ProcessingReportQuery{}, contracts.ErrInvestigationWire
 	}
 	query = query.Normalized()
@@ -71,9 +78,26 @@ func processingReportQuery(raw []byte) (value.ProcessingReportQuery, error) {
 	return query, nil
 }
 
-func processingDiscoveryQuery(raw []byte) (value.ProcessingDiscoveryQuery, error) {
+// errProcessingUnknownCluster is a search naming no configured cluster.
+var errProcessingUnknownCluster = errors.New("unknown cluster")
+
+func (s *ProcessingDiscoveryOperations) processingDiscoveryQuery(raw []byte) (value.ProcessingDiscoveryQuery, error) {
 	q := value.ProcessingDiscoveryQuery{Limit: value.ProcessingDiscoveryLimit}
-	if json.Unmarshal(raw, &q) != nil || !q.Valid() {
+	var named struct {
+		Cluster string `json:"cluster"`
+	}
+	if json.Unmarshal(raw, &q) != nil || json.Unmarshal(raw, &named) != nil {
+		return value.ProcessingDiscoveryQuery{}, contracts.ErrInvestigationWire
+	}
+	if named.Cluster != "" {
+		id, ok := s.clusters.ID(named.Cluster)
+		if !ok {
+			return value.ProcessingDiscoveryQuery{}, errProcessingUnknownCluster
+		}
+		q.ClusterID = id
+	}
+	q.Limit = min(q.Limit, value.ProcessingDiscoveryLimit)
+	if !q.Valid() {
 		return value.ProcessingDiscoveryQuery{}, contracts.ErrInvestigationWire
 	}
 	q.AcquiredFrom = q.AcquiredFrom.UTC()
@@ -113,7 +137,11 @@ func (s *ProcessingDiscoveryOperations) CallWithContext(ctx context.Context, cur
 		}
 		data, validUntil = status, status.ValidUntil
 	} else {
-		q, err := processingDiscoveryQuery(raw)
+		q, err := s.processingDiscoveryQuery(raw)
+		if errors.Is(err, errProcessingUnknownCluster) {
+			return s.encode(ctx, name, OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "error",
+				Data: OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}, Warnings: []string{}, Provenance: []any{}}, s.now().Add(time.Second))
+		}
 		if err != nil {
 			return OperationReply{}, err
 		}
@@ -127,7 +155,10 @@ func (s *ProcessingDiscoveryOperations) CallWithContext(ctx context.Context, cur
 		}{page.Candidates, page.Next}
 		validUntil = page.ValidUntil
 	}
-	out := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "ok", Data: data, Warnings: []string{}, Provenance: []any{}}
+	return s.encode(ctx, name, OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "ok", Data: data, Warnings: []string{}, Provenance: []any{}}, validUntil)
+}
+
+func (s *ProcessingDiscoveryOperations) encode(ctx context.Context, name string, out OperationEnvelope, validUntil time.Time) (OperationReply, error) {
 	var body bytes.Buffer
 	encoder := json.NewEncoder(&body)
 	encoder.SetEscapeHTML(false)

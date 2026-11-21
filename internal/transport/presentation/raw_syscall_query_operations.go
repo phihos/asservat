@@ -3,7 +3,6 @@ package presentation
 import (
 	"context"
 	"encoding/json"
-	"slices"
 
 	analysisapp "asservat.local/asservat/internal/application/analysis"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -14,32 +13,6 @@ import (
 
 type RawSyscallQueryService interface {
 	Begin(context.Context, identities.CurrentIdentity, string, value.RawSyscallQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
-}
-
-type RawSyscallQueryOperationInput struct {
-	CaseID         string   `json:"case_id"`
-	ArtifactID     string   `json:"artifact_id"`
-	GrantID        string   `json:"grant_id,omitempty"`
-	IdempotencyKey string   `json:"idempotency_key"`
-	Cursor         string   `json:"cursor,omitempty"`
-	Limit          int      `json:"limit,omitempty"`
-	Names          []string `json:"syscall_names,omitempty"`
-	ErrorsOnly     bool     `json:"errors_only,omitempty"`
-}
-
-func normalizeRawSyscallInput(in RawSyscallQueryOperationInput) RawSyscallQueryOperationInput {
-	if in.Limit == 0 {
-		in.Limit = value.SyscallPageRecords
-	}
-	in.Names = slices.Clone(in.Names)
-	slices.Sort(in.Names)
-	return in
-}
-
-func (in RawSyscallQueryOperationInput) request() (value.RawSyscallQueryRequest, error) {
-	in = normalizeRawSyscallInput(in)
-	s, err := value.NormalizeSyscallSelection(in.CaseID, in.ArtifactID, value.SyscallQueryView, in.Cursor, in.Limit, in.Names, in.ErrorsOnly)
-	return value.RawSyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, GrantID: in.GrantID, IdempotencyKey: in.IdempotencyKey, Selection: s.Window()}, err
 }
 
 const rawSyscallHandling = "SensitiveDataHandling: Recorded syscall arguments may contain sensitive user data. Values are recorded decimal scalars, base64 bytes or unavailable:fault; acquisition truncation is separate from pagination. Managed deletion does not recall delivered copies."

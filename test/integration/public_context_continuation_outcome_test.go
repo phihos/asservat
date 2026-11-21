@@ -30,13 +30,13 @@ func recordPublicJourneyContinuation(ctx context.Context, call func() (presentat
 
 // Closed labels only. Never render arbitrary error strings, response fields,
 // identifiers, evidence, tokens or deadlines. This is not a schema validator.
-func (o publicJourneyContinuationOutcome) labels() (reason, status, state string, continued bool) {
+// preparing marks the ok reply of a session still Preparing.
+func (o publicJourneyContinuationOutcome) labels() (reason, status, state string, preparing bool) {
 	reason, status, state = journeyDownloadReasonName(journeyDownloadReason(o.err)), "unknown", "unknown"
 	var envelope struct {
 		Status string `json:"status"`
 		Data   struct {
-			State    artifact.DownloadState `json:"state"`
-			Continue bool                   `json:"continue_preparation"`
+			State string `json:"state"`
 		} `json:"data"`
 	}
 	if len(o.reply.Body) > 64<<10 || json.Unmarshal(o.reply.Body, &envelope) != nil {
@@ -46,26 +46,23 @@ func (o publicJourneyContinuationOutcome) labels() (reason, status, state string
 	case "ok", "error":
 		status = envelope.Status
 	}
-	switch envelope.Data.State {
-	case artifact.DownloadPreparing, artifact.DownloadReady, artifact.DownloadStreaming,
-		artifact.DownloadInterrupted, artifact.DownloadCompleted, artifact.DownloadCancelled,
-		artifact.DownloadExpired, artifact.DownloadDenied, artifact.DownloadFailed:
-		state = string(envelope.Data.State)
+	if envelope.Data.State == "Ready" {
+		state = envelope.Data.State
 	}
-	continued = envelope.Data.Continue
+	preparing = envelope.Status == "ok" && envelope.Data.State == "Preparing"
 	return
 }
 
 func (o publicJourneyContinuationOutcome) report(t *testing.T, cleanupStarted time.Time) {
 	t.Helper()
-	reason, status, state, continued := o.labels()
-	t.Logf("journey original continuation reason=%s reply-status=%s state=%s continue-preparation=%t caller-done-at-return=%t completed-before-cleanup=%t call-elapsed=%s cleanup-cancel-after=%s", reason, status, state, continued, o.callerDone, o.completed.Before(cleanupStarted), o.completed.Sub(o.started), cleanupStarted.Sub(o.started))
+	reason, status, state, preparing := o.labels()
+	t.Logf("journey original continuation reason=%s reply-status=%s state=%s preparing=%t caller-done-at-return=%t completed-before-cleanup=%t call-elapsed=%s cleanup-cancel-after=%s", reason, status, state, preparing, o.callerDone, o.completed.Before(cleanupStarted), o.completed.Sub(o.started), cleanupStarted.Sub(o.started))
 }
 
 func TestPublicJourneyContinuationOutcomePreservesOriginalResult(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	want := presentation.OperationReply{Body: []byte(`{"status":"ok","data":{"state":"Preparing","continue_preparation":true}}`), ValidUntil: time.Now().Add(time.Second)}
+	want := presentation.OperationReply{Body: []byte(`{"status":"ok","data":{"state":"Preparing"}}`), ValidUntil: time.Now().Add(time.Second)}
 	cause := &journeyDownloadPrivateError{} // Error/Unwrap must never be called.
 	calls := 0
 	got := recordPublicJourneyContinuation(ctx, func() (presentation.OperationReply, error) {
@@ -75,9 +72,13 @@ func TestPublicJourneyContinuationOutcomePreservesOriginalResult(t *testing.T) {
 	if calls != 1 || got.err != cause || &got.reply.Body[0] != &want.Body[0] || got.reply.ValidUntil != want.ValidUntil || got.callerDone || got.completed.Before(got.started) {
 		t.Fatal("original result, body ownership, call count or timing changed")
 	}
-	reason, status, state, continued := got.labels()
-	if reason != "other" || status != "ok" || state != "Preparing" || !continued {
+	reason, status, state, preparing := got.labels()
+	if reason != "other" || status != "ok" || state != "unknown" || !preparing {
 		t.Fatal("closed result classification differs")
+	}
+	got.reply.Body = []byte(`{"status":"ok","data":{"state":"Ready"}}`)
+	if _, status, state, preparing = got.labels(); status != "ok" || state != "Ready" || preparing {
+		t.Fatal("closed Ready classification differs")
 	}
 	for _, raw := range []string{`{"status":"secret","data":{"state":"secret"}}`, `{"status":`, strings.Repeat("secret", 12<<10)} {
 		got.reply.Body = []byte(raw)

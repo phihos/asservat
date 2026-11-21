@@ -195,7 +195,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary" || mode == "packet" && name != "get_pcap_summary" || mode == "packet-query" && name != "pcap_query") {
+		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_extract" || mode == "packet" && name != "get_extract" || mode == "packet-query" && name != "query_artifact") {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -219,7 +219,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 		if encodeErr != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil {
 			fail("canonical request unavailable")
 		}
-		if mode == "packet-query" && name == "pcap_query" {
+		if mode == "packet-query" && name == "query_artifact" {
 			a, aok := actual.(map[string]any)
 			w, wok := wanted.(map[string]any)
 			key, kok := a["idempotency_key"].(string)
@@ -247,6 +247,7 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 		var original, key string
 		var deadline time.Time
 		var ready installedJourneyDownload
+		retry := false
 		for {
 			e := read()
 			if e.Kind == "native" {
@@ -264,35 +265,62 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 				native, readErr := io.ReadAll(io.LimitReader(f, artifact.MaxPprofBytes+1))
 				_ = f.Close()
 				digest := sha256.Sum256(native)
-				if readErr != nil || ready.SizeBytes == nil || int64(len(native)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 {
+				if readErr != nil || int64(len(native)) != ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 {
 					fail("native metadata/bytes mismatch")
 				}
 				return native, ready
 			}
-			if e.Kind != "operation" || e.Name != "prepare_artifact_download" && e.Name != "get_artifact_download" || !e.Transport.Post || !e.Transport.SameOrigin || !e.Transport.CSRF || !e.Transport.NoBearer || browser.wire.ValidateOutput(e.Name, e.Reply) != nil {
+			if e.Kind != "operation" || e.Name != "download_artifact" || !e.Transport.Post || !e.Transport.SameOrigin || !e.Transport.CSRF || !e.Transport.NoBearer || browser.wire.ValidateOutput(e.Name, e.Reply) != nil {
 				fail("native operation contract")
 			}
 			var reply installedComparisonReply
-			var args map[string]string
-			var current installedJourneyDownload
-			if json.Unmarshal(e.Reply, &reply) != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || json.Unmarshal(e.Input, &args) != nil || current.ArtifactID != source.ArtifactID {
+			var args map[string]any
+			if json.Unmarshal(e.Reply, &reply) != nil || json.Unmarshal(e.Input, &args) != nil {
 				fail("native operation association")
 			}
-			if e.Name == "prepare_artifact_download" {
-				if args["artifact_id"] != source.ArtifactID || args["idempotency_key"] == "" || key != "" && (key != args["idempotency_key"] || !ready.ContinuePreparation) {
+			arg := func(name string) string { value, _ := args[name].(string); return value }
+			switch arg("action") {
+			case "prepare":
+				// Only an acknowledged Preparing reply permits another same-key prepare.
+				if arg("artifact_id") != source.ArtifactID || arg("idempotency_key") == "" || key != "" && (key != arg("idempotency_key") || !retry) {
 					fail("native preparation key changed")
 				}
-				key = args["idempotency_key"]
-			} else if original == "" || args["download_id"] != original {
-				fail("native status identity changed")
+				key = arg("idempotency_key")
+			case "status":
+				// The console follows a Preparing session by its download_id
+				// and the revision it last saw.
+				if original == "" || arg("download_id") != original || !retry {
+					fail("native status identity changed")
+				}
+				if _, ok := args["after_revision"].(float64); !ok {
+					fail("native status lacks after_revision")
+				}
+			default:
+				fail("native operation action")
+			}
+			retry = false
+			var current installedJourneyDownload
+			if reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || current.ArtifactID != source.ArtifactID {
+				fail("native operation association")
 			}
 			if original == "" {
-				original, deadline = current.DownloadID, current.ExpiresAt
+				original, deadline = current.DownloadID, current.AccessUntil
 			}
-			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.ExpiresAt.Equal(deadline) || deadline.After(source.Expires) || current.State != "Preparing" && current.State != "Ready" {
-				fail("native original identity/deadline/state")
+			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.AccessUntil.Equal(deadline) || deadline.After(source.Expires) {
+				fail("native original identity/deadline")
 			}
-			if current.State == "Ready" && (current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes == nil || *current.SizeBytes < 1 || *current.SizeBytes > artifact.MaxPprofBytes) {
+			if current.State == "Preparing" {
+				// A session still Preparing carries no native delivery facts.
+				if current.ContentPath != "" || current.SHA256 != "" {
+					fail("native preparing metadata")
+				}
+				retry = true
+				continue
+			}
+			if current.State != "Ready" {
+				fail("native original state")
+			}
+			if current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes < 1 || current.SizeBytes > artifact.MaxPprofBytes {
 				fail("native ready metadata")
 			}
 			ready = current

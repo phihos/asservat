@@ -1,11 +1,12 @@
 import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage, type Target } from '../capture/http';
+import { listTarget } from '../live/http';
 import { operations, type Operations, type Operation, type Input, type Output, type Data, type Recording, type SavePreview } from './http';
 
 export type Repeat = { policyUID: string; captureID: string; before?: string };
 export type State = {
   busy: boolean; rows?: Recording[]; selected: Recording[]; cursor?: string; expiresAt?: string;
-  captureEnabled: boolean; before: string; reason?: string; preview?: SavePreview; previewInput?: Input<'preview_recording_save'>; expired?: boolean; error?: string;
+  captureEnabled: boolean; before: string; reason?: string; preview?: SavePreview; previewInput?: Input<'preview_capture'>; expired?: boolean; error?: string;
 };
 export function durationMilliseconds(value: string): number | undefined {
   const match = /^([1-9][0-9]*)(ms|s|m|h|d)$/.exec(value);
@@ -67,20 +68,21 @@ export class Recordings {
   load = async (cursor?: string) => {
     if (!this.target || this.state.busy || cursor && this.state.selected.length > 0) return;
     clearTimeout(this.expiry);
-    const input: Input<'list_recordings'> = { target_ref: structuredClone(this.target), limit: 20, ...(this.repeat && { policy_uid: this.repeat.policyUID }), ...(cursor && { cursor }) };
+    const input: Input<'list_recordings'> = { target_ref: listTarget(this.target), limit: 16, ...(cursor && { cursor }) };
     this.publish({ rows: undefined, selected: [], preview: undefined, expired: false });
     const response = await this.run('list_recordings', input);
     if (!response || response.status !== 'ok') return;
     const page = response.data;
     if (!Number.isFinite(Date.parse(page.expires_at)) || Date.parse(page.expires_at) <= Date.now()) { this.publish({ expired: true }); return; }
-    this.publish({ rows: page.recordings, cursor: response.next_cursor ?? undefined, expiresAt: page.expires_at, captureEnabled: page.capture_enabled });
+    const repeat = this.repeat;
+    this.publish({ rows: repeat ? page.recordings.filter(row => row.policy_uid === repeat.policyUID) : page.recordings, cursor: response.next_cursor ?? undefined, expiresAt: page.expires_at, captureEnabled: page.capture_enabled });
     this.expire(page.expires_at);
   };
   select = (row: Recording, checked: boolean) => {
     if (this.state.busy || !row.recording_handle || this.state.expired) return;
     const selected = this.state.selected.filter(old => old.recording_handle !== row.recording_handle);
     if (checked) {
-      if (!row.save_eligible || row.blockers.length > 0 || durationMilliseconds(row.maximum_before) === undefined) return;
+      if (!row.save_eligible || durationMilliseconds(row.maximum_before) === undefined) return;
       if (selected.some(old => old.policy_uid !== row.policy_uid)) { this.publish({ error: 'Choose recordings from one policy. Clear the current selection before changing policies.' }); return; }
       const cap = Math.min(row.incident_pod_cap, ...selected.map(old => old.incident_pod_cap));
       if (selected.length >= 16 || new Set([...selected.map(old => old.pod_uid), row.pod_uid]).size > cap) { this.publish({ error: `This save supports at most ${cap} ${cap === 1 ? 'pod' : 'pods'} and 16 sources. Remove a selection before adding another.` }); return; }
@@ -102,26 +104,21 @@ export class Recordings {
       if (!milliseconds || selected.some(row => milliseconds > (durationMilliseconds(row.maximum_before) ?? 0))) { this.publish({ error: 'Lookback must be positive and no longer than each selected recording’s configured maximum, such as 10s.' }); return; }
     }
     this.publish({ preview: undefined });
-    const input: Input<'preview_recording_save'> = { recording_handles: selected.map(row => row.recording_handle!), ...(before && { before }), ...(reason !== '' && { reason }), ...(this.repeat && { repeated_from_capture_id: this.repeat.captureID }) };
-    const response = await this.run('preview_recording_save', input);
+    const handles = selected.map(row => row.recording_handle!);
+    const input: Input<'preview_capture'> = { recording_handles: handles, ...(before && { before }), ...(reason !== '' && { reason }), ...(this.repeat && { repeated_from_capture_id: this.repeat.captureID }) };
+    const response = await this.run('preview_capture', input);
     if (!response || response.status !== 'ok') return;
     const preview = response.data;
-    const handles = selected.map(row => row.recording_handle!);
-    const previewHandles = preview.selected_recordings.map(row => row.recording_handle);
-    if (preview.selected_recordings.length !== selected.length ||
-      new Set(previewHandles).size !== handles.length || previewHandles.some(handle => !handle || !handles.includes(handle)) ||
-      preview.windows.length !== handles.length || new Set(preview.windows.map(window => window.recording_handle)).size !== handles.length ||
-      preview.windows.some(window => !handles.includes(window.recording_handle) || window.after !== '0s' || !durationMilliseconds(window.before) || (durationMilliseconds(window.before) ?? Infinity) > (durationMilliseconds(selected.find(row => row.recording_handle === window.recording_handle)?.maximum_before ?? '') ?? 0) || (before !== '' && durationMilliseconds(window.before) !== durationMilliseconds(before))) ||
-      preview.selected_recordings.some(row => !selected.some(old => old.recording_handle === row.recording_handle && old.policy_uid === row.policy_uid && old.pod_uid === row.pod_uid && old.action_id === row.action_id)) ||
-      new Set(preview.selected_recordings.map(row => row.pod_uid)).size > preview.incident_pod_cap ||
-      preview.capture_assessment.actions.some(action => action.retention.anchorRule !== 'firstAcquisitionOrEarlierSource')) {
+    if (preview.pod_count > new Set(selected.map(row => row.pod_uid)).size ||
+      preview.lifecycle_plan.actions.some(action => (durationMilliseconds(action.requestedBefore ?? '') ?? Infinity) > Math.max(...selected.map(row => durationMilliseconds(row.maximum_before) ?? 0)) || (before !== '' && durationMilliseconds(action.requestedBefore ?? '') !== durationMilliseconds(before))) ||
+      preview.capture_assessment.actions.some(action => action.recording_handle !== undefined && !handles.includes(action.recording_handle))) {
       this.publish({ error: 'The recording selection or window changed. Refresh recordings and prepare a new preview.' }); return;
     }
     this.publish({ preview, previewInput: input });
   };
   // The server recomputes the plan from the same input and refuses a changed
   // one (ReviewChanged), so no fresh preview is needed before saving.
-  save = async (submit: (preview: Input<'preview_recording_save'>, digest: string) => Promise<void>) => {
+  save = async (submit: (preview: Input<'preview_capture'>, digest: string) => Promise<void>) => {
     const { preview, previewInput } = this.state;
     if (preview && previewInput && this.submittable) await submit(structuredClone(previewInput), preview.plan_digest);
   };

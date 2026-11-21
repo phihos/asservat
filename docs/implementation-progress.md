@@ -79,6 +79,43 @@ baseline have identical catalogs (functions, triggers, columns, constraints,
 indexes, privileges, no seed rows); four CHECK constraints differ only in
 PostgreSQL's flattening of nested `AND`.
 
+## Grants and policies on the canonical contract (ADR-335, 2026-11-17)
+
+Branch `clean/api-grants`. `request_raw_access`, `get_grant`, `list_reviews`,
+`decide_review`, `revoke_grant`, `get_policy_status` and `deactivate_policy`
+validate against the canonical schemas. Raw access selects by `artifact_ids`
+or `artifact_digests`; size and expiry default to the verified sizes and the
+earliest access end; memory and debugger operations return
+`CapabilityUnavailable`. `list_reviews` pages with a keyset cursor. Policies
+are named by cluster, namespace and name. `activate_policy` and
+`request_policy_grant` keep their legacy contract (legacy-tools.txt) until
+hub-side acceptance of observed DebugPolicy generations replaces them; that
+is a separate slice, together with the missing `ApprovalRequired` status.
+Gaps: no `renewal_due`; the planner still emits `recordingApprovalRequired`,
+which the review shows as `policyCollection` on policy grants and drops
+otherwise.
+
+## Capture tools on the canonical contract (ADR-335 D4, 2026-11-17)
+
+Branch `clean/api-capture`. `list_diagnostics`, `preview_capture`,
+`request_capture`, `get_capture`, `cancel_capture`, `list_capture_history`
+and `get_capture_profile` validate against the canonical schemas.
+`target_ref` names its cluster (`local` for the hub's own); an unknown name
+is `UnknownCluster`. Packet peers lost `maxEndpoints`/`maxStaleness` (the
+planner defaults the regional member bound and five seconds). Retired names:
+`get_capture_settings` (now `get_capture` `view=settings`),
+`list_capture_profiles` (rows of `list_diagnostics`) and
+`preview_recording_save` (the `recording_handles` branch of
+`preview_capture`). `get_capture` and `preview_capture` may use the 96 KiB
+MCP result bound. Gaps, refused with `CapabilityUnavailable`: `target_handle`,
+`diagnostic_handle`, the `incident-context` preset, ranked recommendations
+(`goal`), recipe and discovery rows, the explicit `request_capture` shape,
+sharing `outputSelection`/`management`/`reason`, sharing with a
+`profile_composition`, `result_access` without `notAfter` or with
+`read_memory`/`debugger_command`, pod selectors and UID pins. Sixteen
+worst-case recording-save sources exceed 96 KiB and return `PlanTooLarge`.
+A regional profile LIST still stops at 100 versions.
+
 ## Stateless previews (ADR-330 D9, 2026-11-17)
 
 Branch `clean/previews-api`. A preview stores nothing: `preview_capture` and
@@ -284,18 +321,36 @@ per workload and two per principal caps. Removed: the worker-room check,
 principal key and index (migration 00186). Query units and the capacity
 concurrency limit bound expensive work.
 
+## list_recordings and watch_live (2026-11-17)
+
+Branch `clean/api-live`. `watch_live(action)` replaces the five live tools.
+`list_recordings` takes cluster and policy names and lists policy and
+manual sources with `owner_kind`, `save_via`, `live_projections` and
+`hard_end`; an unknown cluster name returns `UnknownCluster`; without live viewing it lists save rows only. A policy row's
+handle joins the save handle and the live handle (`~`); preview and
+`watch_live` each read their part. Pages hold 16 rows (24 KiB envelope).
+`recordingSaves` defaults to true for a policy with an ongoing recording;
+`NoCurrentSource` replaces `RecordingSelectionRequired`. The console's live view uses
+`GET /api/v1/live/watches/{watch_id}/events`: each batch is one audited
+`watch_live` read (10 s wait); event IDs `<cursor>!<n>` let Last-Event-ID
+reread the cursor; a `head` cursor returns the position without rows; a
+paused read waits for the next update. The implemented
+`live-watch.schema.json` is gone. Gaps: save handles still expire with
+their one-minute SQL selection set (`page.expires_at`); removing that needs
+the preview's handle resolution and the `recording_selections` table to
+change. `recordingSaves` still enters the policy scope digest.
+
 ## Live watch without lifetime (ADR-335 D9, 2026-11-15)
 
 A live watch ends with its sources or after 10 idle minutes; it has no
-duration or total output cap (migration 00182). `read_live_watch` waits up
+duration or total output cap (migration 00182). `watch_live(action=read)` waits up
 to 30 s (`wait_ms`) instead of returning `retry_after_ms`. Rows expire at
 their privacy or watch end; source handles stay valid while the source is
 unchanged. The 16-source, 16-predicate and 5-minute manual source caps are
 gone. Per-viewer rate, rows, buffer and the batch envelope stay.
 
 Verified: `go build`, `go vet`, `make go-check pcap-check`, the CI gate set,
-`make console-check`, focused live custody tests (real PostgreSQL). Gaps:
-the five live tools are not yet the single `watch_live` tool.
+`make console-check`, focused live custody tests (real PostgreSQL).
 
 ## Limits without a reason removed (2026-11-15)
 
@@ -556,6 +611,24 @@ verifiers, hub-held and connector work trust (sources, guards, catalog
 the key service's `sign` operation, `policy-submission` purpose and request
 `version`. Hub authorization and SQL checks before sending work are unchanged.
 
+## Shares, access, retention preview and processing on the canonical contract (2026-11-17)
+
+Branch `clean/api-shares`. The eleven tools of this group validate inputs and
+outputs against the canonical schemas. `create_share` takes recipients by name
+(the caller's issuer), optional reason and expiry; multiple artifacts,
+extract/raw classes and operations other than `get_case`/`download_artifact`,
+`list_shares(include_intents)` and intent `transfer_share` return
+`CapabilityUnavailable`. `explain_access` names the cluster and reports
+`ClusterNotObserved`; `preview_access_change` pages every row (no object,
+target, delta, 256 KiB or basis caps); `preview_retention_change` pages groups
+with a cursor; `search_processing_evidence` takes cluster, namespace and
+workload names (the namespace name from the capture record, the workload
+through `workload_name`, which target resolution fills). Gaps: processing
+restrictions still name workload UIDs (the console offers one when a search
+page names one instance); the evaluator's 32-assignment audience cap reports
+`ServiceUnavailable`; Pod and DaemonSet names do not match (only
+Deployments/StatefulSets are recorded).
+
 ## ADR-330 contract divergence (2026-11-14)
 
 The canonical contracts in `specs/contracts/` and `docs/interfaces/` follow
@@ -571,10 +644,7 @@ implement the canonical contract.
 
 | Contract | Canonical change | Runtime still implements (code) |
 | --- | --- | --- |
-| `mcp-tools.json`, `browser-openapi.yaml` | Pending results carry `revision`; `get_capture`/`get_grant`/`get_query_result`/`get_artifact_download` take `after_revision` and wait ≤30 s; `get_capture` has no poll advice | No `after_revision` wait (the request-scoped identity and audit windows end after 5–20 s); query results keep `retry_after_seconds`: `internal/transport/presentation/context_projection_operations.go` |
-| `browser-openapi.yaml` | SSE: `GET /api/v1/events` (`StatusEvent`), `GET /api/v1/live/watches/{watch_id}/events` (`live-watch.schema.json#/$defs/event`) | `/api/v1/events` serves `capture_id` only (`internal/transport/browser/events.go`); grant, download and query events and the live-watch stream are missing; console still polls queries and live watches |
-| `mcp-tools.json` | `explain_access`/`preview_access_change`: `ClusterNotObserved` replaces `PermissionObservationStale`; no `valid_until` | `internal/domain/authorization/explain.go`, `internal/transport/presentation/access_preview_operations.go` |
-| `live-watch.schema.json`, `read_live_watch` | `wait_ms` ≤30000; no `retry_after_ms`, `row_max_age_seconds`, `managed_row_max_age_seconds`, source `handle_expires_at`; row expiry is min(privacy, watch deadline) | `internal/domain/live/watch.go`, `internal/domain/live/source.go`, `internal/application/live/service.go` |
+| `mcp-tools.json`, `browser-openapi.yaml` | `get_query_result` waits with `after_revision`; SSE query events | Query readiness is observed from the regional worker, not stored in SQL, so there is no event source: `get_query_result` returns at once |
 | `capture-assessment.schema.json` | No `validUntil` | `internal/application/planning/context_assessment.go`, `recorder_assessment.go` |
 | `packet-capture.schema.json` | No `peers.maxStaleness` (peers follow watch events) | `internal/application/planning/peers.go`, `recorder.go`, builtin profiles `internal/application/planning/profiles/*.json`, `internal/bootstrap/regional_peer_verifier.go`; DebugPolicy/CaptureProfile CRDs |
 | `local-key-service.schema.json`, `local-key-secret.schema.json` | No `validUntil`; purposes `artifact`, `browser-credentials` | Response `validUntil` and the `audit` purpose: `internal/contracts/key_service.go`, `internal/adapters/kms/local_keys.go`, `internal/domain/authorization/key_service.go` |
@@ -596,13 +666,11 @@ examples go through `readImplementedExample` or the console equivalent.
 
 | Contract | Canonical change | Runtime still implements (code) |
 | --- | --- | --- |
-| `mcp-tools.json`, `browser-openapi.yaml`, `operations.yaml` | 33 MCP tools: `get_extract(view)`, `query_artifact(operation)`, `download_artifact(action)`, `watch_live(action)`; recording-save preview in `preview_capture`; live sources in `list_recordings`; capture profiles in `list_diagnostics`; no `activate_policy`/`request_policy_grant`; every tool enabled by default | `internal/contracts/investigation_schema.go`, `investigation-schemas/*.json`; `internal/domain/audit/operation.go`, `connector_operation.go`; `internal/bootstrap/public_context.go`, `public_http.go`; `internal/application/authorization/policy_grant_attachment.go`; `internal/adapters/postgres/policy_grant_attachment.go` |
-| `mcp-tools.json` | Names instead of IDs (`cluster`, workload, `policy`, recipe); reasons optional except `request_raw_access`; raw access by `artifact_ids` with defaulted size/expiry | `internal/transport/presentation/*_operations.go` |
-| `artifact-download.schema.json` | Preparing/Ready/Completed/Failed/Cancelled; size and SHA-256 on every status; `content_path`, `browser_url`, `access_until`, bundle `representation`; no `continue_preparation`/`expires_at`/`resume_available` | `internal/transport/presentation/context_download.go`; console `web/src/evidence/evidence.ts` |
-| `live-watch.schema.json`, `watch_live` | One `watch_live` tool; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
-| `recording-save.schema.json`, `errors.yaml` | Rows with `owner_kind`/`save_via`/`live_projections`; `recordingSaves` default true; `NoCurrentSource` replaces `RecordingSelectionRequired` | `internal/transport/presentation/recording_save_history.go`, `recording_save_operations.go` |
+| `mcp-tools.json` | No `activate_policy`/`request_policy_grant`: the hub accepts each observed policy generation and opens its review (specs/policy-automation.md) | Both tools stay on their old contract (`legacy-tools.txt`) until hub-side acceptance exists; acceptance is built on a human submitter in domain, application and `postgres/policy.go` |
+| `artifact-download.schema.json` | Core bundle; `navigation_uri` on `RawApprovalRequired` | No core artifacts, so `representation` is accepted and the file is served; `RawApprovalRequired` names no review link: `internal/transport/presentation/context_download.go` |
+| `mcp-tools.json` (`get_extract`, `query_artifact`, `download_artifact`) | Without `grant_id`, the equivalent Kubernetes right on the workload (`pods/exec`) admits a raw read (ADR-335 D5, REQ-MCP-003, SC-AUT-002) | Only a current covering grant is reused; no path admits by Kubernetes right. Needs its own slice: a connector SubjectAccessReview against a current Pod of the recorded workload and a grantless SQL query/download scope without a pool charge |
 | `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |
-| `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration`, `profileRef.version` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
+| `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
 | `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |
 | `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
 | `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |

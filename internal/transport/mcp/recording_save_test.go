@@ -8,7 +8,6 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/presentation"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,6 +22,9 @@ func (f *mcpRecordingFixture) List(context.Context, identities.CurrentIdentity, 
 	now := time.Now()
 	return app.RecordingPage{ExpiresAt: now.Add(time.Minute), ValidUntil: now.Add(time.Second)}, nil
 }
+func (f *mcpRecordingFixture) Select(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, ids []string) (app.RecordingPage, error) {
+	return f.List(ctx, current, target, "", "", len(ids))
+}
 func (*mcpRecordingFixture) Preview(context.Context, identities.CurrentIdentity, app.RecordingSavePreviewRequest) (app.ContextPreviewResult, error) {
 	return app.ContextPreviewResult{}, value.ErrUnavailable
 }
@@ -31,7 +33,7 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	ordinary := &mcpCaptureFixture{}
-	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, mcpGroupedProgress{})
+	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, mcpGroupedProgress{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +50,13 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	list, err := presentation.NewLiveOperations(presentation.LiveOperationsConfig{PublicOrigin: server.URL, Recordings: f, Clusters: presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000010"}), Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000098" }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if composed, err = presentation.NewInvestigationLiveOperations(composed, list); err != nil {
+		t.Fatal(err)
+	}
 	handler, err = NewContextHandler(Config{PublicOrigin: server.URL, Issuer: "https://id.example.invalid/realm", Version: "test", MaxConcurrent: 4, MaxPerIdentity: 2}, resolverFunc(func(context.Context, string) (identity.Identity, error) {
 		i := testIdentity()
 		i.Scopes = append(i.Scopes, "evidence:capture")
@@ -56,47 +65,12 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := map[string]bool{}
-	var cursor string
-	var response *http.Response
-	var b []byte
-	for page := 0; ; page++ {
-		if page > len(composed.ToolNames()) {
-			t.Fatal("tool discovery did not finish")
-		}
-		var params any
-		if cursor != "" {
-			params = map[string]any{"cursor": cursor}
-		}
-		response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/list", params))
-		if response.StatusCode != 200 {
-			t.Fatal(response.StatusCode, string(b))
-		}
-		var listed struct {
-			Result struct {
-				Tools      []struct{ Name string }
-				NextCursor string `json:"nextCursor"`
-			}
-		}
-		if json.Unmarshal(b, &listed) != nil || strings.Contains(string(b), `"target_handle"`) {
-			t.Fatal("invalid discovery page", string(b))
-		}
-		for _, tool := range listed.Result.Tools {
-			if names[tool.Name] {
-				t.Fatal("duplicate discovery tool", tool.Name)
-			}
-			names[tool.Name] = true
-		}
-		if listed.Result.NextCursor == "" {
-			break
-		}
-		cursor = listed.Result.NextCursor
-	}
-	if !names["list_recordings"] || !names["preview_recording_save"] || names["request_capture"] || names["cancel_capture"] {
+	names := discoveredTools(t, server, "2025-11-25")
+	if !names["list_recordings"] || !names["preview_capture"] || names["request_capture"] || names["cancel_capture"] {
 		t.Fatal("wrong source tool set", names)
 	}
-	args := map[string]any{"target_ref": map[string]any{"cluster_id": "00000000-0000-4000-8000-000000000010", "namespace": "apps", "kind": "Deployment", "name": "api"}}
-	response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "list_recordings", "arguments": args}))
+	args := map[string]any{"target_ref": map[string]any{"cluster": "local", "namespace": "apps", "kind": "Deployment", "name": "api"}}
+	response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "list_recordings", "arguments": args}))
 	if response.StatusCode != 200 || !strings.Contains(string(b), `"capture_enabled":false`) || !strings.Contains(string(b), `"recordings":[]`) || f.calls != 1 {
 		t.Fatal(response.StatusCode, string(b), f.calls)
 	}

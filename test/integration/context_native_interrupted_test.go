@@ -243,20 +243,27 @@ func qualifyContextNativeInterrupted(t *testing.T, ctx context.Context, f native
 	// One explicit public operation admits a new session using existing remaining
 	// allocation/worker/window/key/audit backing. It is not implicit GET behavior.
 	key := custodyID()
-	raw, _ := json.Marshal(presentation.ContextDownloadInput{ArtifactID: session.Scope.ArtifactID, Key: key})
+	raw, _ := json.Marshal(presentation.ContextDownloadInput{Action: "prepare", ArtifactID: session.Scope.ArtifactID, Key: key})
 	current, _ = browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
-	reply, e := state.shared.Call(ctx, current, "prepare_artifact_download", raw)
+	reply, e := state.shared.Call(ctx, current, "download_artifact", raw)
 	if e != nil {
 		t.Fatal("fresh audited preparation", e)
 	}
+	// A session still Preparing returns an ok reply in that state; the caller
+	// follows it with status (or repeats prepare with the same key). The new
+	// session ID is also read from SQL to prove it is a separate session.
 	var envelope struct {
 		Status string                           `json:"status"`
 		Data   presentation.ContextDownloadData `json:"data"`
 	}
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.DownloadID == "" || envelope.Data.DownloadID == session.ID || envelope.Data.State != artifact.DownloadPreparing {
-		t.Fatal("fresh explicit preparation not acknowledged")
+	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.State != "Preparing" || envelope.Data.DownloadID == "" {
+		t.Fatal("fresh explicit preparation not acknowledged", string(reply.Body))
 	}
-	attachment, e := f.content.workers.ReadContextDownloadAttachment(ctx, envelope.Data.DownloadID, f.authority())
+	var freshID string
+	if e = f.admin.QueryRow(ctx, "SELECT id FROM artifact_download WHERE allocation_id=$1 AND id<>$2", f.allocation.ID, session.ID).Scan(&freshID); e != nil || freshID == "" || freshID != envelope.Data.DownloadID {
+		t.Fatal("fresh explicit preparation did not admit its own session", e)
+	}
+	attachment, e := f.content.workers.ReadContextDownloadAttachment(ctx, freshID, f.authority())
 	if e != nil || attachment.Worker == nil || attachment.Worker.Intent.ID == f.worker.Intent.ID {
 		t.Fatal("fresh preparation did not produce its own audited worker", e)
 	}

@@ -72,15 +72,37 @@ func installedJourneyRetentionSeconds() int64 {
 }
 
 type installedJourneyDownload struct {
-	DownloadID          string    `json:"download_id"`
-	ArtifactID          string    `json:"artifact_id"`
-	State               string    `json:"state"`
-	SizeBytes           *int64    `json:"size_bytes"`
-	SHA256              string    `json:"sha256"`
-	ETag                string    `json:"etag"`
-	ContentPath         string    `json:"content_path"`
-	ContinuePreparation bool      `json:"continue_preparation"`
-	ExpiresAt           time.Time `json:"expires_at"`
+	DownloadID  string    `json:"download_id"`
+	ArtifactID  string    `json:"artifact_id"`
+	State       string    `json:"state"`
+	SizeBytes   int64     `json:"size_bytes"`
+	SHA256      string    `json:"sha256"`
+	ETag        string    `json:"etag"`
+	ContentPath string    `json:"content_path"`
+	AccessUntil time.Time `json:"access_until"`
+}
+
+// installedJourneyFailure is the public error data of an operation.
+type installedJourneyFailure struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable"`
+}
+
+// installedJourneyPreparing reports whether a download_artifact reply is the
+// ok reply of a session still Preparing: the caller repeats prepare with the
+// same idempotency key (or follows it with status).
+func installedJourneyPreparing(reply installedJourneyEnvelope) bool {
+	var download installedJourneyDownload
+	return reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil && download.State == "Preparing" && download.DownloadID != ""
+}
+
+// installedJourneyEnded decodes a download_artifact status reply of a session
+// that ended in state: an ok reply naming that state without native links.
+func installedJourneyEnded(reply installedJourneyEnvelope, state string) (installedJourneyDownload, bool) {
+	var download installedJourneyDownload
+	ok := reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil && download.State == state && download.ContentPath == ""
+	return download, ok
 }
 
 // installedJourney returns the installed S-02 journey for one regional
@@ -141,8 +163,8 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		defer session.Close()
 		// Discovery/status calls may retry, and capture requests retain their
 		// original preview and idempotency key. An uncertain download prepare
-		// never retries automatically: only its acknowledged continuation flag
-		// below permits another call under the exact original key.
+		// or cancel never retries automatically: only an acknowledged
+		// Preparing reply below permits another prepare under the exact original key.
 		readReply := func(callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
 			result, err := session.CallTool(callCtx, &sdk.CallToolParams{Name: name, Arguments: arguments})
 			if err != nil {
@@ -158,7 +180,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		call := func(callCtx context.Context, name string, arguments any, data any) {
 			t.Helper()
 			tries := 4
-			if name == "prepare_artifact_download" {
+			if args, ok := arguments.(map[string]string); name == "download_artifact" && (!ok || args["action"] != "status") {
 				tries = 1
 			}
 			var failure error
@@ -192,7 +214,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatalf("installed %s: %v", name, failure)
 		}
-		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
+		target := map[string]string{"cluster": "local", "namespace": namespace, "kind": "Deployment", "name": workload}
 		previewArguments := map[string]any{"target_ref": target,
 			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetentionSeconds()}
 		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" && !short {
@@ -369,36 +391,43 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
+		// prepareReady repeats prepare under the exact key while the session is
+		// still Preparing and decodes the Ready reply.
+		prepareReady := func(what string, args map[string]string, download *installedJourneyDownload) {
+			t.Helper()
+			wait(what, time.Now().Add(5*time.Minute), func(poll context.Context) bool {
+				reply, err := readReply(poll, "download_artifact", args)
+				if err == nil && installedJourneyPreparing(reply) {
+					return false
+				}
+				if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, download) != nil {
+					diagnose()
+					t.Fatal("installed download preparation", what, reply.RequestID, err)
+				}
+				return true
+			})
+		}
 		var download installedJourneyDownload
-		prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-download"}
-		call(ctx, "prepare_artifact_download", prepare, &download)
-		originalDownload, downloadUntil := download.DownloadID, download.ExpiresAt
+		prepare := map[string]string{"action": "prepare", "artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-download"}
+		prepareReady("a prepared download", prepare, &download)
+		originalDownload, downloadUntil := download.DownloadID, download.AccessUntil
 		if originalDownload == "" || downloadUntil.IsZero() || downloadUntil.After(expires) {
 			t.Fatal("installed download deadline", downloadUntil)
 		}
-		wait("a prepared download", installedJourneyEarlier(downloadUntil, time.Now().Add(5*time.Minute)), func(poll context.Context) bool {
-			if download.State == "Preparing" {
-				// GET cannot start or continue a worker. Only an acknowledged
-				// prepare with this flag permits another same-key prepare.
-				name, args := "get_artifact_download", map[string]string{"download_id": originalDownload}
-				if download.ContinuePreparation {
-					name, args = "prepare_artifact_download", prepare
-				}
-				call(poll, name, args, &download)
-			}
-			if download.DownloadID != originalDownload || !download.ExpiresAt.Equal(downloadUntil) {
-				t.Fatal("installed download changed its original identity/deadline")
-			}
-			return download.State != "Preparing"
-		})
-		if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > artifact.MaxContextBytes || download.SHA256 == "" {
+		// A status read returns the same session identity and deadline.
+		var status installedJourneyDownload
+		call(ctx, "download_artifact", map[string]string{"action": "status", "download_id": originalDownload}, &status)
+		if status.DownloadID != originalDownload || !status.AccessUntil.Equal(downloadUntil) {
+			t.Fatal("installed download changed its original identity/deadline")
+		}
+		if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes < 1 || download.SizeBytes > artifact.MaxContextBytes || download.SHA256 == "" {
 			diagnose()
 			t.Fatal("installed download was not prepared", download.State, download.ContentPath)
 		}
 		contentURL, contentClient := strings.TrimSuffix(origin, "/")+download.ContentPath, &http.Client{Transport: transport, Timeout: 2 * time.Minute}
 		var head, tail []byte
 		if !short {
-			head, tail = installedJourneyResume(t, ctx, contentClient, contentURL, identity.downloadToken(), *download.SizeBytes)
+			head, tail = installedJourneyResume(t, ctx, contentClient, contentURL, identity.downloadToken(), download.SizeBytes)
 		}
 		response := installedJourneyContent(t, ctx, contentClient, contentURL, identity.downloadToken(), nil)
 		native, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
@@ -410,7 +439,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			NamespaceUID string `json:"namespaceUID"`
 			PodUID       string `json:"podUID"`
 		}
-		if err != nil || response.StatusCode != http.StatusOK || size != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 ||
+		if err != nil || response.StatusCode != http.StatusOK || size != download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 ||
 			json.Unmarshal(native, &projected) != nil || projected.Format != artifact.ContextFormat || projected.PodUID != preview.SelectedPods[0].UID {
 			diagnose()
 			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
@@ -495,7 +524,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		refused := func(key string) {
 			t.Helper()
-			reply, err := readReply(ctx, "prepare_artifact_download", map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": key})
+			reply, err := readReply(ctx, "download_artifact", map[string]string{"action": "prepare", "artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": key})
 			if err != nil || reply.Status != "error" {
 				t.Fatal("installed journey: new preparation was not refused", key, err)
 			}
@@ -517,23 +546,21 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		// sessions without refunding completed ones: 24 KiB output and 48 MiB
 		// read fit its 32 KiB/48 MiB allocation. Stop needs a nonterminal
 		// session; stopping the completed first download proves AlreadyTerminal.
-		stopReply, err := readReply(ctx, "prepare_artifact_download", map[string]string{
-			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-stop-download",
-		})
 		var stopDownload installedJourneyDownload
-		if err != nil || stopReply.Status != "ok" || installedJourneyDecode(stopReply.Data, &stopDownload) != nil ||
-			stopDownload.DownloadID == "" || stopDownload.DownloadID == originalDownload || stopDownload.ArtifactID != investigation.Artifacts[0].ArtifactID ||
-			(stopDownload.State != "Preparing" && stopDownload.State != "Ready") || !time.Now().Before(stopDownload.ExpiresAt) || stopDownload.ExpiresAt.After(expires) {
+		prepareReady("a download to stop", map[string]string{
+			"action": "prepare", "artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-stop-download",
+		}, &stopDownload)
+		if stopDownload.DownloadID == "" || stopDownload.DownloadID == originalDownload || stopDownload.ArtifactID != investigation.Artifacts[0].ArtifactID ||
+			stopDownload.State != "Ready" || !time.Now().Before(stopDownload.AccessUntil) || stopDownload.AccessUntil.After(expires) {
 			diagnose()
-			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download", stopReply.RequestID, err)
+			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download")
 		}
 		if checkQueryRetired != nil {
 			checkQueryRetired()
 		}
-		// Preparing need not advertise a content link. Retain the public route
-		// for this acknowledged ID; no second readiness/worker wait is needed.
+		// Retain the public route for this acknowledged ID.
 		stopContentPath := "/api/v1/downloads/" + stopDownload.DownloadID + "/content"
-		if stopDownload.ContentPath != "" && stopDownload.ContentPath != stopContentPath {
+		if stopDownload.ContentPath != stopContentPath {
 			t.Fatal("installed Stop preparation changed its content route")
 		}
 		// The operator closure waits for a fresh accepted SQL Deny projection.
@@ -543,7 +570,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		deny(true)
 		until("the revocation", 2*time.Minute, false)
 		refused(keys + "-revoked")
-		stopCtx, stopEnd := context.WithDeadline(ctx, stopDownload.ExpiresAt)
+		stopCtx, stopEnd := context.WithDeadline(ctx, stopDownload.AccessUntil)
 		stopReceipts, err := installedJourneyStopTwice(stopCtx, readReply, stopDownload.DownloadID, keys+"-stop")
 		stopEnd()
 		for attempt, receipt := range stopReceipts {
@@ -558,11 +585,12 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		deny(false)
 		until("the restored access", 2*time.Minute, true)
 		healthy()
-		var stopped installedJourneyDownload
-		call(ctx, "get_artifact_download", map[string]string{"download_id": stopDownload.DownloadID}, &stopped)
-		if stopped.DownloadID != stopDownload.DownloadID || stopped.ArtifactID != stopDownload.ArtifactID || stopped.State != "Cancelled" ||
-			!stopped.ExpiresAt.Equal(stopDownload.ExpiresAt) || stopped.ContentPath != "" || stopped.SizeBytes != nil || stopped.SHA256 != "" || stopped.ContinuePreparation {
-			t.Fatal("installed Stop changed identity/deadline or regained native delivery")
+		// A stopped session reports Cancelled with the size and digest it had
+		// when Ready, and no native delivery links.
+		stopped, err := readReply(ctx, "download_artifact", map[string]string{"action": "status", "download_id": stopDownload.DownloadID})
+		ended, cancelled := installedJourneyEnded(stopped, "Cancelled")
+		if err != nil || !cancelled || ended.SizeBytes != stopDownload.SizeBytes || ended.SHA256 != stopDownload.SHA256 {
+			t.Fatal("installed Stop did not end the session as Cancelled or regained native delivery", stopped.RequestID, err)
 		}
 		stoppedGet, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+stopContentPath, nil)
 		if err != nil {
@@ -635,7 +663,7 @@ func installedJourneyStopTwice(ctx context.Context, read func(context.Context, s
 		if err := ctx.Err(); err != nil {
 			return receipts, err
 		}
-		reply, err := read(ctx, "cancel_artifact_download", map[string]string{"download_id": downloadID, "idempotency_key": key})
+		reply, err := read(ctx, "download_artifact", map[string]string{"action": "cancel", "download_id": downloadID, "idempotency_key": key})
 		if err != nil {
 			return receipts, err
 		}
@@ -807,7 +835,7 @@ func TestInstalledJourneyRetriesReviewedCapture(t *testing.T) {
 	}
 	const id = "00000000-0000-4000-8000-000000000001"
 	preview := map[string]any{
-		"target_ref":                  map[string]string{"cluster_id": id, "namespace": "payments", "kind": "Deployment", "name": "api"},
+		"target_ref":                  map[string]string{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"},
 		"preset_ref":                  map[string]string{"name": "pod-status", "version": "v1"},
 		"requested_retention_seconds": installedJourneyRetention,
 	}
@@ -917,7 +945,8 @@ func installedJourneyReply(wire *contracts.InvestigationContracts, name string, 
 		var failure struct {
 			Code string `json:"code"`
 		}
-		if json.Unmarshal(out.Data, &failure) != nil || failure.Code != "NotAvailable" {
+		decoded := json.Unmarshal(out.Data, &failure) == nil
+		if !decoded || failure.Code != "NotAvailable" {
 			// The schema-validated public code is a closed enum, never input.
 			return installedJourneyEnvelope{}, fmt.Errorf("unexpected installed operation failure %q", failure.Code)
 		}

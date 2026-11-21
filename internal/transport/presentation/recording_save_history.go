@@ -30,6 +30,7 @@ type RecordingSaveSettingsRecord struct {
 	Operation       string                `json:"operation"`
 	CaptureID       string                `json:"capture_id"`
 	ClusterID       string                `json:"cluster_id"`
+	Cluster         string                `json:"cluster,omitempty"`
 	NamespaceUID    string                `json:"namespace_uid"`
 	AcceptedAt      time.Time             `json:"accepted_at"`
 	ExpiresAt       time.Time             `json:"expires_at"`
@@ -39,10 +40,10 @@ type RecordingSaveSettingsRecord struct {
 	NavigationURI   string                `json:"navigation_uri"`
 }
 
-func (s *ContextOperations) recordingSaveSettings(settings value.CaptureSettings) (any, *string, time.Time, error) {
+func (s *ContextOperations) recordingSaveSettings(settings value.CaptureSettings) (any, time.Time, error) {
 	saved := settings.RecordingSave
 	if !saved.Valid() {
-		return nil, nil, time.Time{}, value.ErrUnavailable
+		return nil, time.Time{}, value.ErrUnavailable
 	}
 	view := RecordingSaveSettings{Target: append(json.RawMessage(nil), settings.TargetJSON...), Policy: RecordingSavePolicyRef{settings.ClusterID, settings.NamespaceUID, saved.PolicyUID, hash(saved.PolicyExecutionDigest)}, Windows: make([]RecordingSavePreference, 0, len(saved.Windows))}
 	for _, w := range saved.Windows {
@@ -50,21 +51,22 @@ func (s *ContextOperations) recordingSaveSettings(settings value.CaptureSettings
 	}
 	raw, err := json.Marshal(view)
 	if err != nil {
-		return nil, nil, time.Time{}, value.ErrUnavailable
+		return nil, time.Time{}, value.ErrUnavailable
 	}
 	canonical := jsontext.Value(raw)
 	if canonical.Canonicalize() != nil {
-		return nil, nil, time.Time{}, value.ErrUnavailable
+		return nil, time.Time{}, value.ErrUnavailable
 	}
 	digest := artifact.Digest(sha256.Sum256(canonical))
 	if settings.SettingsKey != (artifact.Digest{}) {
 		digest = settings.SettingsKey
 	}
-	return RecordingSaveSettingsRecord{Kind: "recordingSaveSettings", Operation: "recordingSave", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt.UTC(), ExpiresAt: settings.ExpiresAt.UTC(), SettingsDigest: hash(digest), ExecutionDigest: hash(settings.ExecutionDigest), Settings: view, NavigationURI: s.config.PublicOrigin + "/captures/new"}, nil, settings.ValidUntil, nil
+	cluster, _ := s.config.Clusters.Name(settings.ClusterID)
+	return RecordingSaveSettingsRecord{Kind: "recordingSaveSettings", Operation: "recordingSave", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, Cluster: cluster, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt.UTC(), ExpiresAt: settings.ExpiresAt.UTC(), SettingsDigest: hash(digest), ExecutionDigest: hash(settings.ExecutionDigest), Settings: view, NavigationURI: s.config.PublicOrigin + "/captures/new"}, settings.ValidUntil, nil
 }
 func recordingSelectionFailure(origin string) any {
 	return struct {
 		OperationFailure
 		NavigationURI string `json:"navigation_uri"`
-	}{OperationFailure{"RecordingSelectionRequired", "Choose current recordings to repeat this saved window. Previous sources and grants are not reused.", false}, origin + "/captures/new"}
+	}{OperationFailure{"NoCurrentSource", "No matching recording runs on the workload now; choose a current recording to save.", false}, origin + "/captures/new"}
 }

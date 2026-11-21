@@ -42,7 +42,7 @@ type PublicContextServices struct {
 	Processing      browser.ProcessingChangeService
 	ProcessingRules browser.ProcessingInventoryService
 	// CaptureChanges feeds the console status stream; nil serves none.
-	CaptureChanges *browser.Changes
+	CaptureChanges *presentation.Changes
 }
 
 // NewPublicContextHandler composes the original HTTP handlers directly. It
@@ -57,7 +57,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	// No missing case or download service may be hidden behind an app-shell
 	// fallback. Capture enablement remains the existing operation set's decision;
 	// a deliberately disabled capture service may still expose retained evidence.
-	for _, name := range []string{"list_diagnostics", "preview_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"} {
+	for _, name := range []string{"list_diagnostics", "preview_capture", "get_capture", "get_case", "download_artifact"} {
 		if _, available := s.Operations.Tool(name); !available {
 			return nil, &fixedStepError{"tools", presentation.ErrOperationsConfiguration}
 		}
@@ -117,8 +117,13 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		handler.Report = eventLog(os.Stderr, "status event unavailable")
 		events = handler
 	}
+	live, e := browser.NewLiveEventsHandler(sessions, audited)
+	if e != nil {
+		return nil, &fixedStepError{"live-events", e}
+	}
+	live.Report = eventLog(os.Stderr, "live event unavailable")
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules, events: events,
+		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules, events: events, liveEvents: live,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,

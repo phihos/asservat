@@ -24,11 +24,9 @@ function crdValidator() {
 function canonicalValidator() {
   const ajv = new Ajv2020({ strict: false });
   addFormats(ajv);
-  // The console admits what the runtime implements (scripts/implemented_contracts.py).
-  const dir = 'specs/contracts/', implemented = dir + 'implemented/';
-  const current = new Set(readdirSync(repo(implemented)));
-  const files = new Set([...readdirSync(repo(dir)), ...current]);
-  for (const file of [...files].filter(f => f.endsWith('.schema.json'))) ajv.addSchema(JSON.parse(readFileSync(repo((current.has(file) ? implemented : dir) + file), 'utf8')));
+  // get_capture_profile implements the canonical contract.
+  const dir = 'specs/contracts/';
+  for (const file of readdirSync(repo(dir)).filter(f => f.endsWith('.schema.json'))) ajv.addSchema(JSON.parse(readFileSync(repo(dir + file), 'utf8')));
   return ajv.getSchema('https://asservat.io/spec/v1/capture-profile.schema.json')!;
 }
 
@@ -68,7 +66,6 @@ describe('profileManifest (REQ-CPR-005 Save as profile)', () => {
     expect(m.spec.definition.editableFields).toEqual(source.editableFields);
     expect(m.spec.definition.recipe).toMatchObject({ maxTotalBytes: 8 << 20, maxDuration: '15s' });
     expect(m.spec.definition.displayName).toBe('TLS port traffic');
-    expect(m.spec.definition.origins).toEqual([{ componentID: 'net', profileRef: { catalog: 'builtin', name: 'network-connections', version: 'v1' }, definitionDigest: 'a'.repeat(64) }]);
     // The source definition is not mutated.
     expect((source.recipe.actions[0] as unknown as { executionMode: string }).executionMode).toBe('ongoing');
     // Nothing beyond the definition contract: no grants, owners, recipients, sharing or approvals.

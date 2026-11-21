@@ -60,40 +60,49 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 	return &out, nil
 }
 
-// serves reports whether name is one of this composition's operations.
+// serves reports whether name is one of this composition's public tools.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_logs" || s.rawLogs != nil) && (name != "syscall_query" || s.rawSyscalls != nil) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "query_artifact" || s.packetQueries != nil || s.rawSyscalls != nil) && (name != "compare_profiles" || s.comparisons != nil)
 }
 
-// toolNames are the operations this composition advertises.
+// toolNames are the public tools this composition advertises.
 func (s *ContextProjectionOperations) toolNames() []string {
-	names := []string{"get_file_excerpt", "get_query_result"}
-	if s.rawLogs != nil {
-		names = append(names, "get_logs")
-	}
-	if s.rawSyscalls != nil {
-		names = append(names, "syscall_query")
-	}
-	if s.packetQueries != nil {
-		names = append(names, "pcap_query")
-	}
-	if s.headers != nil {
-		names = append(names, "get_http_headers")
+	names := []string{"get_extract", "get_query_result"}
+	if s.packetQueries != nil || s.rawSyscalls != nil {
+		names = append(names, "query_artifact")
 	}
 	if s.comparisons != nil {
 		names = append(names, "compare_profiles")
 	}
-	if s.profiles != nil {
-		names = append(names, "get_profile_summary")
-	}
-	if s.packets != nil {
-		names = append(names, "get_pcap_summary")
-	}
-	if s.syscalls != nil {
-		names = append(names, "get_syscall_summary", "get_syscall_events")
-	}
 	return names
 }
+
+// available reports whether the internal operation's facet is composed.
+func (s *ContextProjectionOperations) available(op string) bool {
+	switch op {
+	case "get_logs":
+		return s.rawLogs != nil
+	case "syscall_query":
+		return s.rawSyscalls != nil
+	case "pcap_query":
+		return s.packetQueries != nil
+	case "get_http_headers":
+		return s.headers != nil
+	case "get_profile_summary":
+		return s.profiles != nil
+	case "get_pcap_summary":
+		return s.packets != nil
+	case "compare_profiles":
+		return s.comparisons != nil
+	case "get_syscall_summary", "get_syscall_events":
+		return s.syscalls != nil
+	}
+	return op == "get_file_excerpt" || op == "get_query_result"
+}
+
+var capabilityUnavailable = OperationFailure{Code: "CapabilityUnavailable", Message: "This view or operation is not available in this installation.", Retryable: false}
+var invalidCursor = OperationFailure{Code: "InvalidCursor", Message: "The cursor is not valid for this saved evidence view. Start again without a cursor.", Retryable: false}
+var packetQueryInvalid = OperationFailure{Code: "InvalidInput", Message: "Use the supported bounded tcpdump/libpcap packet-filter subset, fields and frame-prefix range. Names, protocol-offset predicates and unsupported instructions are unavailable.", Retryable: false}
 
 func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	noDispatch := OperationReply{auditNoDispatch: true, auditEffect: operationEffectNone}
@@ -107,138 +116,78 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		return noDispatch, stopped("query-call", ErrOperationDelivery)
 	}
 	requestID := call.requestID
-	var input analysisapp.ContextQueryInput
-	switch name {
+	op, in, err := decodeProjection(name, raw)
+	if err != nil {
+		return noDispatch, ErrOperationDelivery
+	}
+	if !s.available(op) {
+		return s.refusal(requestID, name, until, capabilityUnavailable, operationAuditUnspecified, operationEffectNone, true)
+	}
+	refuse := func(e error, other OperationFailure) (OperationReply, error) {
+		if errors.Is(e, value.ErrInvalidCursor) {
+			return s.refusal(requestID, name, until, invalidCursor, operationAuditInvalid, operationEffectNone, true)
+		}
+		return s.refusal(requestID, name, until, other, operationAuditDenied, operationEffectNone, true)
+	}
+	var d *analysisapp.ContextProjectionDelivery
+	switch op {
 	case "get_logs":
-		var in RawLogQueryOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		r, e := in.request()
+		sel, e := value.NormalizeLogSelection(in.CaseID, in.ArtifactID, in.Cursor, in.Limit)
 		if e != nil {
-			return s.refusal(requestID, name, until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
+			return refuse(value.ErrInvalidCursor, invalidCursor)
 		}
-		input.RawLogs = r
-	case "syscall_query":
-		var in RawSyscallQueryOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		r, e := in.request()
+		d, err = s.rawLogs.Begin(ctx, current, requestID, value.RawLogQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, GrantID: in.GrantID, IdempotencyKey: in.IdempotencyKey, Selection: sel.LogWindow})
+	case "syscall_query", "get_syscall_summary", "get_syscall_events":
+		view := map[string]value.SyscallView{"syscall_query": value.SyscallQueryView, "get_syscall_summary": value.SyscallSummaryView, "get_syscall_events": value.SyscallEventsView}[op]
+		sel, e := value.NormalizeSyscallSelection(in.CaseID, in.ArtifactID, view, in.Cursor, in.Limit, in.Names, in.ErrorsOnly)
 		if e != nil {
-			return s.refusal(requestID, name, until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
+			return refuse(e, syscallNotAvailable)
 		}
-		input.RawSyscalls = r
+		if op == "syscall_query" {
+			d, err = s.rawSyscalls.Begin(ctx, current, requestID, value.RawSyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, GrantID: in.GrantID, IdempotencyKey: in.IdempotencyKey, Selection: sel.Window()})
+		} else {
+			d, err = s.syscalls.Begin(ctx, current, requestID, value.SyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: sel.Window()})
+		}
 	case "pcap_query":
-		var in PacketQueryOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
+		// Packet results are one bounded page; no cursor is ever issued.
+		if in.Cursor != "" {
+			return refuse(value.ErrInvalidCursor, invalidCursor)
 		}
-		input.PacketQuery = in.request()
+		r := in.packetQuery()
+		if !r.Valid() {
+			return s.refusal(requestID, name, until, packetQueryInvalid, operationAuditInvalid, operationEffectNone, true)
+		}
+		d, err = s.packetQueries.Begin(ctx, current, requestID, r)
 	case "get_pcap_summary":
-		var in PacketSummaryOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		input.Packet = value.PacketSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID}
-	case "get_syscall_summary", "get_syscall_events":
-		var in SyscallOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		selection, e := value.NormalizeSyscallSelection(in.CaseID, in.ArtifactID, syscallView(name), in.Cursor, in.Limit, in.Names, in.ErrorsOnly)
-		if e != nil {
-			failure, decision := syscallNotAvailable, operationAuditDenied
-			if errors.Is(e, value.ErrInvalidCursor) {
-				failure, decision = syscallInvalidCursor, operationAuditInvalid
-			}
-			return s.refusal(requestID, name, until, failure, decision, operationEffectNone, true)
-		}
-		input.Syscalls = value.SyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection.Window()}
+		d, err = s.packets.Begin(ctx, current, requestID, value.PacketSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID})
 	case "compare_profiles":
-		var in ProfileComparisonOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		selection, e := value.NormalizeProfileComparisonSelection(in.SampleType, in.Normalization, in.TopN)
+		sel, e := value.NormalizeProfileComparisonSelection(in.SampleType, in.Normalization, in.Limit)
 		if e != nil {
 			return noDispatch, ErrOperationDelivery
 		}
-		input.Comparison = value.ProfileComparisonRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, BaselineCaseID: in.BaselineCaseID, BaselineArtifactID: in.BaselineArtifactID, Selection: selection}
-
+		d, err = s.comparisons.Begin(ctx, current, requestID, value.ProfileComparisonRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, BaselineCaseID: in.BaselineCaseID, BaselineArtifactID: in.BaselineArtifactID, Selection: sel})
 	case "get_profile_summary":
-		var in ProfileSummaryOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		selection, e := value.NormalizeProfileSummarySelection(in.SampleType, in.TopN)
+		sel, e := value.NormalizeProfileSummarySelection(in.SampleType, in.Limit)
 		if e != nil {
-			return noDispatch, ErrOperationDelivery
+			return s.refusal(requestID, name, until, profileSummaryNotAvailable, operationAuditDenied, operationEffectNone, true)
 		}
-		input.Profile = value.ProfileSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection}
+		d, err = s.profiles.Begin(ctx, current, requestID, value.ProfileSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: sel})
 	case "get_http_headers":
-		var in HTTPHeaderOperationInput
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
 		sel, e := value.NormalizeHTTPHeaderSelection(in.CaseID, in.ArtifactID, in.Cursor, in.Limit)
 		if e != nil {
 			// A malformed cursor is judged before any lookup and names no
 			// artifact fact; any other input refusal is the shared outcome.
-			failure, decision := httpHeaderNotAvailable, operationAuditDenied
-			if errors.Is(e, value.ErrInvalidCursor) {
-				failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
-			}
-			return s.refusal(requestID, name, until, failure, decision, operationEffectNone, true)
+			return refuse(e, httpHeaderNotAvailable)
 		}
-		input.Headers = sel
+		d, err = s.headers.Begin(ctx, current, requestID, sel)
 	case "get_file_excerpt":
-		var in struct {
-			CaseID     string `json:"case_id"`
-			ArtifactID string `json:"artifact_id"`
-			LineStart  int    `json:"line_start"`
-			MaxLines   int    `json:"max_lines"`
-		}
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		selection, e := value.NormalizeLineSelection(in.LineStart, in.MaxLines)
+		sel, e := value.NormalizeLineSelection(in.LineStart, in.Limit)
 		if e != nil {
 			return noDispatch, ErrOperationDelivery
 		}
-		input.Selection = value.ContextExcerptSelection{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection}
+		d, err = s.excerpts.BeginExcerpt(ctx, current, requestID, value.ContextExcerptSelection{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: sel})
 	default:
-		var in struct {
-			QueryHandle string `json:"query_handle"`
-		}
-		if json.Unmarshal(raw, &in) != nil {
-			return noDispatch, ErrOperationDelivery
-		}
-		input.QueryID = in.QueryHandle
-	}
-	var d *analysisapp.ContextProjectionDelivery
-	var err error
-	switch name {
-	case "get_logs":
-		d, err = s.rawLogs.Begin(ctx, current, requestID, input.RawLogs)
-	case "syscall_query":
-		d, err = s.rawSyscalls.Begin(ctx, current, requestID, input.RawSyscalls)
-	case "pcap_query":
-		d, err = s.packetQueries.Begin(ctx, current, requestID, input.PacketQuery)
-	case "get_pcap_summary":
-		d, err = s.packets.Begin(ctx, current, requestID, input.Packet)
-	case "get_syscall_summary", "get_syscall_events":
-		d, err = s.syscalls.Begin(ctx, current, requestID, input.Syscalls)
-	case "compare_profiles":
-		d, err = s.comparisons.Begin(ctx, current, requestID, input.Comparison)
-	case "get_profile_summary":
-		d, err = s.profiles.Begin(ctx, current, requestID, input.Profile)
-	case "get_file_excerpt":
-		d, err = s.excerpts.BeginExcerpt(ctx, current, requestID, input.Selection)
-	case "get_http_headers":
-		d, err = s.headers.Begin(ctx, current, requestID, input.Headers)
-	default:
-		d, err = s.results.GetQueryResult(ctx, current, requestID, input.QueryID)
+		d, err = s.results.GetQueryResult(ctx, current, requestID, in.QueryHandle)
 	}
 	// Any dispatched error may have spent query/read/control capacity. Closing
 	// an accompanying handle is mandatory and never establishes no effect.
@@ -252,30 +201,30 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
-	if d == nil && name == "get_logs" && analysisapp.RawLogQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover get_logs for this saved log artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+	if d == nil && op == "get_logs" && analysisapp.RawLogQueryApprovalRequiredBeforeAdmission(err) {
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover log queries for this saved log artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
-	if d == nil && name == "syscall_query" && analysisapp.RawSyscallQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover syscall_query for this saved argument artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+	if d == nil && op == "syscall_query" && analysisapp.RawSyscallQueryApprovalRequiredBeforeAdmission(err) {
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover syscall argument queries for this saved artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
-	if d == nil && name == "pcap_query" && analysisapp.PacketQueryApprovalRequiredBeforeAdmission(err) {
-		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover pcap_query for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+	if d == nil && op == "pcap_query" && analysisapp.PacketQueryApprovalRequiredBeforeAdmission(err) {
+		return s.refusal(requestID, name, until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover packet queries for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
-	if d == nil && name == "pcap_query" {
+	if d == nil && op == "pcap_query" {
 		if invalid, known := analysisapp.PacketQueryFilterRefusedBeforeAdmission(err); known {
 			failure := OperationFailure{Code: "NotAvailable", Message: "Packet filtering is not available with the current service conditions. Retry later.", Retryable: true}
 			status := operationAuditUnspecified
 			if invalid {
-				failure = OperationFailure{Code: "InvalidInput", Message: "Use the supported bounded tcpdump/libpcap packet-filter subset. Names, protocol-offset predicates and unsupported instructions are unavailable.", Retryable: false}
+				failure = packetQueryInvalid
 				status = operationAuditInvalid
 			}
 			return s.refusal(requestID, name, until, failure, status, operationEffectNone, true)
 		}
 	}
-	if d == nil && name == "get_pcap_summary" && analysisapp.PacketSummaryUnavailableBeforeAdmission(err) {
+	if d == nil && op == "get_pcap_summary" && analysisapp.PacketSummaryUnavailableBeforeAdmission(err) {
 		return s.refusal(requestID, name, until, packetSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
 	}
-	if d == nil && name == "get_profile_summary" && analysisapp.ProfileSummaryUnavailableBeforeAdmission(err) {
+	if d == nil && op == "get_profile_summary" && analysisapp.ProfileSummaryUnavailableBeforeAdmission(err) {
 		// C18 proved no query admission was attempted. Access, missing/unsupported
 		// source and provider failures share one nondisclosing result; audit and the
 		// original final identity/deadline checks still precede delivery.
@@ -323,54 +272,32 @@ type queryViewTimes struct {
 
 func (s *ContextProjectionOperations) serialize(requestID, name string, d *analysisapp.ContextProjectionDelivery) ([]byte, error) {
 	times := queryViewTimes{ObservedAt: d.ObservedAt(), ExpiresAt: d.QueryDeadline()}
-	if !d.Pending() && d.Tool() == "get_logs" {
-		body, err := renderRawLogResult(requestID, name, d, times)
-		if err != nil {
-			return nil, err
+	if !d.Pending() {
+		render := map[string]func(string, string, *analysisapp.ContextProjectionDelivery, queryViewTimes) ([]byte, error){
+			"get_logs": renderRawLogResult, "syscall_query": renderRawSyscallResult, "get_syscall_summary": renderSyscallResult, "get_syscall_events": renderSyscallResult,
+		}[d.Tool()]
+		if render != nil {
+			body, err := render(requestID, name, d, times)
+			if err != nil {
+				return nil, err
+			}
+			if s.contracts.ValidateOutput(name, body) != nil {
+				clear(body)
+				return nil, ErrOperationDelivery
+			}
+			return body, nil
 		}
-		if s.contracts.ValidateOutput(name, body) != nil {
-			clear(body)
-			return nil, ErrOperationDelivery
-		}
-		return body, nil
-	}
-	if !d.Pending() && d.Tool() == "syscall_query" {
-		body, err := renderRawSyscallResult(requestID, name, d, times)
-		if err != nil {
-			return nil, err
-		}
-		if s.contracts.ValidateOutput(name, body) != nil {
-			clear(body)
-			return nil, ErrOperationDelivery
-		}
-		return body, nil
-	}
-	if !d.Pending() && syscallQueryOperation(d.Tool()) {
-		body, err := renderSyscallResult(requestID, name, d, times)
-		if err != nil {
-			return nil, err
-		}
-		if s.contracts.ValidateOutput(name, body) != nil {
-			clear(body)
-			return nil, ErrOperationDelivery
-		}
-		return body, nil
 	}
 	envelope := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID,
 		DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	switch {
-	case d.Pending() && name == "get_http_headers":
-		// The canonical get_http_headers pending branch carries the handle only.
-		envelope.Status = "pending"
-		envelope.Data = struct {
-			QueryHandle string `json:"query_handle"`
-			RetryAfter  int    `json:"retry_after_seconds"`
-		}{d.Association().QueryID, 1}
 	case d.Pending():
+		// The coordinator's after_revision wait sees one pending revision
+		// until the result is ready.
 		envelope.Status = "pending"
 		envelope.Data = struct {
 			QueryHandle string `json:"query_handle"`
-			RetryAfter  int    `json:"retry_after_seconds"`
+			Revision    int    `json:"revision"`
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
 
@@ -507,7 +434,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			queryViewTimes
 		}{excerpt, times}
 		if name == "get_query_result" {
-			envelope.Data = queryResult(d.Association().QueryID, "get_file_excerpt", envelope, times)
+			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
 		}
 	}
 	body, err := json.Marshal(envelope)
@@ -528,33 +455,15 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 	failure, decision := httpHeaderTooLarge, operationAuditDenied
 	switch d.Refusal() {
 	case analysisapp.ContextProjectionInvalidCursor:
-		failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
-		if d.Tool() == "get_logs" {
-			failure = OperationFailure{Code: "InvalidCursor", Message: "The cursor does not match this saved log view. Start again without a cursor.", Retryable: false}
-		}
-		if name == "get_query_result" {
-			failure.Message = "The cursor is not valid for this saved evidence view. Start again without a cursor."
-		}
-		if syscallQueryOperation(name) || d.Tool() == "syscall_query" {
-			failure = syscallInvalidCursor
-		}
+		failure, decision = invalidCursor, operationAuditInvalid
 	case analysisapp.ContextProjectionIncompatibleProfiles:
 		failure = profileComparisonIncompatible
 	case analysisapp.ContextProjectionRecordTooLarge:
-		if d.Tool() == "get_logs" {
-			failure = OperationFailure{Code: "NotAvailable", Message: "This saved log fragment does not fit the response limit.", Retryable: false}
-		}
-		if name == "get_query_result" {
-			failure.Message = "This saved evidence record does not fit the response limit."
-		}
-		if syscallQueryOperation(name) || d.Tool() == "syscall_query" {
-			failure = syscallTooLarge
-		}
-		if d.Tool() == "get_profile_summary" {
-			failure = profileSummaryTooLarge
-		}
-		if d.Tool() == "compare_profiles" {
-			failure = profileComparisonTooLarge
+		failure = map[string]OperationFailure{"get_logs": {Code: "NotAvailable", Message: "This saved log fragment does not fit the response limit.", Retryable: false},
+			"syscall_query": syscallTooLarge, "get_syscall_summary": syscallTooLarge, "get_syscall_events": syscallTooLarge,
+			"get_profile_summary": profileSummaryTooLarge, "compare_profiles": profileComparisonTooLarge}[d.Tool()]
+		if failure.Code == "" {
+			failure = httpHeaderTooLarge
 		}
 	default:
 		return OperationReply{}, ErrOperationDelivery
@@ -568,7 +477,7 @@ func queryResult(queryID, tool string, inner OperationEnvelope, times queryViewT
 		ToolName    string            `json:"tool_name"`
 		Result      OperationEnvelope `json:"result"`
 		queryViewTimes
-	}{queryID, tool, inner, times}
+	}{queryID, publicTool(tool), inner, times}
 }
 
 // refusal is a fixed error reply without a delivery. noDispatch marks a

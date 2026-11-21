@@ -112,6 +112,9 @@ func (s PacketQueryReads) Begin(ctx context.Context, current identities.CurrentI
 		}
 		c.PacketQuery, e = selection.Window()
 		c.RawGrantID = r.GrantID
+		if e == nil && c.NativeType == artifact.RawPCAPNGArtifact {
+			c.RawGrantID, e = s.Service.rawGrant(ctx, i, c, r.GrantID, "pcap_query")
+		}
 		if e != nil || !c.Valid() {
 			return value.ContextProjectionCandidate{}, value.ErrInvalid
 		}

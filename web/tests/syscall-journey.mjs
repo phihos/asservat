@@ -10,15 +10,14 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
   artifact.kind = 'syscallTrace'; artifact.data_class = 'raw'; artifact.native_format = 'asservat-syscall-arguments/v1';
   const caseID = sourceCase.data.case.case_id;
   const caseRoute = origin + '/api/v1/operations/get_case';
-  const summaryRoute = origin + '/api/v1/operations/get_syscall_summary';
-  const eventsRoute = origin + '/api/v1/operations/get_syscall_events';
+  const extractRoute = origin + '/api/v1/operations/get_extract';
   const pollRoute = origin + '/api/v1/operations/get_query_result';
   const handle = 'synthetic-saved-syscall-query';
   const summaryCursor = '1:' + 'a'.repeat(32), eventCursor = '1:' + 'b'.repeat(32);
   const calls = [], unrelated = [];
   const requestListener = request => {
     const path = new URL(request.url()).pathname;
-    if (/\/api\/v1\/operations\/(?:request_raw_access|prepare_artifact_download|request_capture|preview_capture|syscall_query)$/.test(path) || /\/api\/v1\/downloads\//.test(path)) unrelated.push(path);
+    if (/\/api\/v1\/operations\/(?:request_raw_access|download_artifact|request_capture|preview_capture|query_artifact)$/.test(path) || /\/api\/v1\/downloads\//.test(path)) unrelated.push(path);
   };
   const times = () => { const now = Date.now(); return { query_observed_at: new Date(now).toISOString(), query_expires_at: new Date(now + 10000).toISOString() }; };
   const envelope = (data, timing, nextCursor = null) => ({ schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000092', data_class: 'extract', status: 'ok', data: { ...data, ...timing }, next_cursor: nextCursor, truncated: false, narrowing_hint: null, warnings: [], provenance: [{ artifactID: artifact.artifact_id, digest: artifact.digest }] });
@@ -34,25 +33,28 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
     return input;
   };
   await page.route(caseRoute, route => route.fulfill({ json: sourceCase }));
-  await page.route(summaryRoute, route => {
-    const input = checkRequest(route);
+  const summaryRoute = (route, input) => {
     const timing = times();
-    assert.deepEqual(input, { case_id: caseID, artifact_id: artifact.artifact_id, limit: 100, ...(summaryCalls === 1 ? { cursor: summaryCursor } : {}) });
+    assert.deepEqual(input, { view: 'syscallSummary', case_id: caseID, artifact_id: artifact.artifact_id, limit: 100, ...(summaryCalls === 1 ? { cursor: summaryCursor } : {}) });
     if (summaryCalls++ === 0) {
       pendingTiming = timing;
-      return route.fulfill({ json: { ...envelope({}, timing), status: 'pending', data_class: 'metadata', provenance: [], data: { query_handle: handle, retry_after_seconds: 1, ...timing } } });
+      return route.fulfill({ json: { ...envelope({}, timing), status: 'pending', data_class: 'metadata', provenance: [], data: { query_handle: handle, revision: 1, ...timing } } });
     }
     return route.fulfill({ json: summary('write', timing) });
-  });
+  };
   await page.route(pollRoute, route => {
-    assert.deepEqual(checkRequest(route), { query_handle: handle });
+    assert.deepEqual(checkRequest(route), { query_handle: handle, after_revision: 1 });
     const timing = { query_observed_at: new Date().toISOString(), query_expires_at: pendingTiming.query_expires_at }, inner = summary('read', timing, summaryCursor);
-    return route.fulfill({ json: { ...inner, next_cursor: null, provenance: [], data: { query_handle: handle, tool_name: 'get_syscall_summary', result: inner, ...timing } } });
+    return route.fulfill({ json: { ...inner, next_cursor: null, provenance: [], data: { query_handle: handle, tool_name: 'get_extract', result: inner, ...timing } } });
   });
-  await page.route(eventsRoute, route => {
-    const input = checkRequest(route), next = input.cursor === eventCursor;
-    assert.deepEqual(input, { case_id: caseID, artifact_id: artifact.artifact_id, limit: 2, errors_only: true, syscall_names: ['write'], ...(next ? { cursor: eventCursor } : {}) });
+  const eventsRoute = (route, input) => {
+    const next = input.cursor === eventCursor;
+    assert.deepEqual(input, { view: 'syscallEvents', case_id: caseID, artifact_id: artifact.artifact_id, limit: 2, errors_only: true, syscall_names: ['write'], ...(next ? { cursor: eventCursor } : {}) });
     return route.fulfill({ json: envelope({ kind: 'syscallEvents', events: [record(next ? 'thread-second' : 'thread-first')], coverage: coverage() }, times(), next ? null : eventCursor) });
+  };
+  await page.route(extractRoute, route => {
+    const input = checkRequest(route);
+    return (input.view === 'syscallSummary' ? summaryRoute : eventsRoute)(route, input);
   });
   page.on('request', requestListener);
   try {
@@ -63,7 +65,6 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
     assert.deepEqual(await view.locator('option').evaluateAll(options => options.map(option => option.value)), ['summary', 'events']);
     await expect(view.getByLabel(/arguments|buffers|paths|pointers/i)).toHaveCount(0);
     await view.getByRole('button', { name: 'Inspect saved syscalls', exact: true }).click();
-    await expect(view.getByRole('button', { name: 'Check result', exact: true })).toBeDisabled();
     await expect(view.getByRole('button', { name: 'Check result', exact: true })).toBeEnabled();
     assert.equal(calls.length, 1, 'pending must not poll automatically');
     await view.getByRole('button', { name: 'Check result', exact: true }).click();
@@ -101,7 +102,7 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
     checks.push('synthetic saved syscall wires in built UI: raw/metadata actions under ordinary read, fixed extract only, original pending handle, exact filtered paging, full counts/unknown coverage, text-only identities, mobile/a11y/close and no acquisition/raw query/download');
   } finally {
     page.off('request', requestListener);
-    await page.unroute(caseRoute); await page.unroute(summaryRoute); await page.unroute(eventsRoute); await page.unroute(pollRoute);
+    await page.unroute(caseRoute); await page.unroute(extractRoute); await page.unroute(pollRoute);
     await page.setViewportSize({ width: 1440, height: 1080 }); await page.reload();
     await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();
   }

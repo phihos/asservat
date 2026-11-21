@@ -3,21 +3,22 @@ import { operations as grantOperations, type Operations as GrantOperations } fro
 import type { Session } from '../auth/session';
 import type { Recipient } from '../sharing/shares';
 import { planFromPreview, planFromSettings, type PlanSnapshot, type PreviousPlan } from './plan-diff';
-import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type HistoryEntry, type Input, type Output, type Operation, type Data } from './http';
+import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type Settings, catalogRows, isSettings, type HistoryEntry, type Input, type Output, type Operation, type Data } from './http';
 
 // sharing/shareHours: the optional capture-time share of the result (ADR-235);
 // no hours means the server default (24 hours after publication).
+// target.cluster is the cluster name ("local" for the hub's own).
 export type Draft = { target: Target; retention: string; sharing?: Recipient[]; shareHours?: number };
 export type State = {
   stage: 'target' | 'diagnostics' | 'recordings' | 'review' | 'reviewed' | 'uncertain' | 'progress' | 'approval';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
-  cancellationStatus?: 'requested' | 'unconfirmed'; progress?: Progress; captureID?: string; approvalURI?: string; error?: string; stale?: boolean;
+  cancellationStatus?: 'requested' | 'unconfirmed'; progress?: Progress; captureID?: string; approvalURI?: string; error?: string;
   // ADR-335 D5: resubmit only when approval came after the requester's sign-in ended.
   resubmit?: boolean;
   // ADR-236: recent captures of the draft target and the capture a review repeats.
   history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
   recordingRepeat?: { policyUID: string; captureID: string; before?: string };
-  historyOrigin?: 'manual' | 'policy' | 'discovery' | 'all'; historyCursor?: string; settings?: Data<'get_capture_settings'>;
+  historyOrigin?: 'manual' | 'policy' | 'discovery' | 'all'; historyCursor?: string; settings?: Settings;
   // REQ-CPR-005: the plan an edited composition preview is compared with.
   previousPlan?: PreviousPlan;
 };
@@ -28,7 +29,7 @@ export type PreviewRequest = NonNullable<Input<'request_capture'>['preview']>;
 type Reviewed = { preview: PreviewRequest; expected_plan_digest: string };
 // The submission keeps its idempotency key so a retry never recollects.
 type Receipt = { submission?: Input<'request_capture'>; operation?: 'recordingSave'; captureID?: string; revision?: number; approvalURI?: string };
-const emptyDraft = (): Draft => ({ target: { cluster_id: '', namespace: '', kind: 'Deployment', name: '' }, retention: '' });
+const emptyDraft = (): Draft => ({ target: { cluster: 'local', namespace: '', kind: 'Deployment', name: '' }, retention: '' });
 const terminal = new Set(['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate']);
 
 // UI coordination is not authority. The server rechecks every operation. Only
@@ -42,7 +43,6 @@ export class Investigation {
   private scope?: AbortSignal;
   private request?: AbortController;
   private generation = 0;
-  private timer?: ReturnType<typeof setTimeout>;
   private events?: EventSource;
   private receipt?: Receipt;
   private cancellation?: Input<'cancel_capture'>;
@@ -72,7 +72,7 @@ export class Investigation {
     this.state = { ...this.state, ...patch };
     for (const listener of this.listeners) listener();
   }
-  private invalidate() { ++this.generation; this.request?.abort(); clearTimeout(this.timer); this.closeEvents(); clearTimeout(this.settingsExpiry); this.state = { ...this.state, settings: undefined }; }
+  private invalidate() { ++this.generation; this.request?.abort(); this.closeEvents(); clearTimeout(this.settingsExpiry); this.state = { ...this.state, settings: undefined }; }
   private receiptStage(): State['stage'] { return this.receipt?.captureID ? 'progress' : this.receipt?.approvalURI ? 'approval' : 'uncertain'; }
 
   attach(session: Session, scope: AbortSignal, captureID?: string) {
@@ -173,20 +173,26 @@ export class Investigation {
     this.receipt = { operation: 'recordingSave', submission: { preview: structuredClone(preview), expected_plan_digest: digest, idempotency_key: this.newID() } };
     await this.retrySubmission();
   };
-  selectRecordingsAgain = (settings: Data<'get_capture_settings'>) => {
+  // A repeat addresses the cluster the saved capture names; without a
+  // configured name (cluster removed) the draft's stays and current checks decide.
+  private savedTarget(settings: Settings, workload: { kind: Target['kind']; name: string }): Pick<Draft, 'target'> {
+    return { target: { cluster: settings.cluster ?? (this.state.draft.target.cluster || 'local'), namespace: settings.settings.target.namespace ?? this.state.draft.target.namespace, kind: workload.kind, name: workload.name } };
+  }
+  selectRecordingsAgain = (settings: Settings) => {
     if (this.state.busy || settings.kind !== 'recordingSaveSettings' || Date.parse(settings.expires_at) <= Date.now()) return;
     const workload = settings.settings.target.workloadRef;
     if (!workload || this.receipt && this.receipt.captureID !== settings.capture_id) return;
     this.invalidate(); this.receipt = undefined; this.cancellation = undefined; this.reviewed = undefined;
-    this.publish({ stage: 'recordings', draft: { target: { cluster_id: settings.cluster_id, namespace: settings.settings.target.namespace, kind: workload.kind, name: workload.name }, retention: '' },
-      recordingRepeat: { policyUID: settings.settings.policy.policyUID, captureID: settings.capture_id, ...(settings.settings.action_windows.length === 1 && { before: settings.settings.action_windows[0].before }) },
+    this.publish({ stage: 'recordings', draft: { ...this.savedTarget(settings, workload), retention: '' },
+      recordingRepeat: { policyUID: settings.settings.policy.policyUID, captureID: settings.capture_id, ...(settings.settings.action_windows.length === 1 && settings.settings.action_windows[0].before !== undefined && { before: settings.settings.action_windows[0].before }) },
       captureID: undefined, progress: undefined, settings: undefined, preview: undefined, diagnostics: undefined, error: undefined });
   };
   discover = async () => {
     if (this.receipt || this.state.busy) return;
-    const data = await this.run('list_diagnostics', { target_ref: structuredClone(this.state.draft.target) });
-    if (!data) return;
-    this.publish({ stage: 'diagnostics', diagnostics: data.diagnostics, history: undefined, historyMessage: undefined });
+    const data = await this.run('list_diagnostics', { target_ref: structuredClone(this.state.draft.target), kind: 'preset' });
+    const diagnostics = data && catalogRows(data);
+    if (!diagnostics) return;
+    this.publish({ stage: 'diagnostics', diagnostics, history: undefined, historyMessage: undefined });
     await this.loadHistory();
   };
   // Recent captures of the draft target (ADR-236). Its own failure leaves the
@@ -210,9 +216,9 @@ export class Investigation {
   showSettings = async (captureID: string) => {
     if (this.state.busy || (this.receipt && this.receipt.captureID !== captureID)) return;
     this.publish({ settings: undefined });
-    const data = await this.run('get_capture_settings', { capture_id: captureID });
+    const data = await this.run('get_capture', { capture_id: captureID, view: 'settings' });
     if (!data) return;
-    if (data.capture_id !== captureID || (!this.receipt && data.cluster_id !== this.state.draft.target.cluster_id) || Date.parse(data.expires_at) <= Date.now()) {
+    if (!isSettings(data) || data.capture_id !== captureID || Date.parse(data.expires_at) <= Date.now()) {
       this.publish({ error: 'The saved settings could not be verified. Refresh the history before continuing.' }); return;
     }
     this.publish({ settings: data });
@@ -229,9 +235,9 @@ export class Investigation {
     // Only this explicit review action leaves the original progress view.
     // Current selection/approval happen on the server; the old request continues
     // independently and its retry receipt/grant/sharing is never reused.
-    const target: Target = { cluster_id: saved.cluster_id, namespace: saved.settings.target.namespace, kind: workload.kind, name: workload.name };
+    const target = this.savedTarget(saved, workload);
     this.invalidate(); this.receipt = undefined;
-    this.publish({ draft: { target, retention: '' }, captureID: undefined, progress: undefined, approvalURI: undefined, history: undefined, stage: 'diagnostics' });
+    this.publish({ draft: { ...target, retention: '' }, captureID: undefined, progress: undefined, approvalURI: undefined, history: undefined, stage: 'diagnostics' });
     return true;
   }
   historyOrigin = async (origin: 'manual' | 'policy' | 'discovery' | 'all') => {
@@ -285,8 +291,8 @@ export class Investigation {
     const retention = this.state.draft.retention;
     if (retention !== '') {
       const seconds = Number(retention);
-      if (!/^[1-9][0-9]*$/.test(retention) || !Number.isSafeInteger(seconds) || seconds > 315360000) {
-        this.publish({ error: 'Retention must be a whole number of seconds between 1 and 315360000.' }); return;
+      if (!/^[1-9][0-9]*$/.test(retention) || !Number.isSafeInteger(seconds)) {
+        this.publish({ error: 'Retention must be a positive whole number of seconds.' }); return;
       }
       input.requested_retention_seconds = seconds;
     }
@@ -330,8 +336,8 @@ export class Investigation {
     let requestedSeconds: number | undefined;
     if (retention !== '') {
       const seconds = Number(retention);
-      if (!/^[1-9][0-9]*$/.test(retention) || !Number.isSafeInteger(seconds) || seconds > 315360000) {
-        this.publish({ error: 'Retention must be a whole number of seconds between 1 and 315360000.' }); return;
+      if (!/^[1-9][0-9]*$/.test(retention) || !Number.isSafeInteger(seconds)) {
+        this.publish({ error: 'Retention must be a positive whole number of seconds.' }); return;
       }
       requestedSeconds = seconds;
     }
@@ -361,23 +367,24 @@ export class Investigation {
     if ((!recording && data.preset_ref?.name !== 'pod-status') || data.selected_pods?.length !== 1 ||
         data.capture_assessment.planDigest !== data.execution_digest || !data.target_ref ||
         data.capture_assessment.actions.some(action => action.retention.anchorRule !== 'submissionPreparation') ||
-        !(['cluster_id', 'namespace', 'kind', 'name'] as const).every(key => data.target_ref![key] === requested[key]) ||
-        pod?.cluster_id !== requested.cluster_id || pod.namespace !== requested.namespace ||
+        !(['namespace', 'kind', 'name'] as const).every(key => data.target_ref![key] === requested[key]) ||
+        pod?.cluster_id !== data.target_ref.cluster_id || pod.namespace !== requested.namespace ||
         (requested.kind === 'Pod' ? pod.name !== requested.name || (!recording || data.pod_selection !== undefined) && data.pod_selection !== 'explicitPod' :
           pod.workload.kind !== requested.kind || pod.workload.name !== requested.name || (!recording || data.pod_selection !== undefined) && data.pod_selection !== 'lexicalEligiblePod')) {
       this.publish({ error: 'The review response could not be verified. Refresh the review before continuing.' }); return;
     }
-    const remaining = Math.min(5_000, Date.parse(data.capture_assessment.validUntil) - Date.now());
     if (requestablePreview(data)) this.reviewed = { preview: structuredClone(input) as PreviewRequest, expected_plan_digest: data.plan_digest };
-    this.publish({ stage: 'review', preview: data, previousPlan, repeatedFrom: data.repeated_from_capture_id, stale: remaining <= 0 });
-    this.timer = setTimeout(() => this.publish({ stale: true }), Math.max(0, remaining));
+    this.publish({ stage: 'review', preview: data, previousPlan, repeatedFrom: data.repeated_from_capture_id });
   }
-  submit = async (resultAccess?: Input<'request_capture'>['result_access']) => {
+  submit = async (resultAccess?: PreviewRequest['result_access']) => {
     if (this.receipt || this.state.busy) return;
     const preview = this.state.preview;
     const reviewed = this.reviewed;
     if (!reviewed || (this.state.stage !== 'reviewed' && (!preview || !requestablePreview(preview)))) return;
-    this.receipt = { submission: { ...structuredClone(reviewed), idempotency_key: this.newID(), ...(resultAccess && { result_access: structuredClone(resultAccess) }) } };
+    // Follow-up access is part of the reviewed preview request (canonical request_capture).
+    const submission = structuredClone(reviewed);
+    if (resultAccess) submission.preview = { ...submission.preview, result_access: structuredClone(resultAccess) };
+    this.receipt = { submission: { ...submission, idempotency_key: this.newID() } };
     this.reviewed = undefined;
     await this.retrySubmission();
   };
@@ -460,7 +467,7 @@ export class Investigation {
     const id = this.receipt?.captureID;
     if (!id || this.state.busy) return;
     const data = await this.run('get_capture', { capture_id: id });
-    if (!data) { this.publish({ progress: undefined }); return; }
+    if (!data || isSettings(data)) { this.publish({ progress: undefined }); return; }
     if (this.applyProgress(id, data) && !this.events) this.follow(id);
   };
   // Server-Sent Events push each committed progress change (REQ-INT-003);
@@ -470,7 +477,7 @@ export class Investigation {
     this.events = events;
     events.addEventListener('capture', message => {
       if (this.events !== events) return;
-      let envelope: { status: string; data: Data<'get_capture'> } | undefined;
+      let envelope: { status: string; data: Progress } | undefined;
       try { envelope = JSON.parse((message as MessageEvent<string>).data).result; } catch { envelope = undefined; }
       if (!envelope || envelope.status !== 'ok' || !this.applyProgress(id, envelope.data)) this.closeEvents();
     });
@@ -490,12 +497,12 @@ export class Investigation {
   private async resync(id: string) {
     const data = this.receipt?.captureID === id ? await this.run('get_capture', { capture_id: id }) : undefined;
     if (this.receipt?.captureID !== id) return;
-    if (!data) { this.publish({ error: 'Collection status updates stopped. Check status again to resume them.' }); return; }
+    if (!data || isSettings(data)) { this.publish({ error: 'Collection status updates stopped. Check status again to resume them.' }); return; }
     if (this.applyProgress(id, data) && !this.events) this.follow(id);
   }
   private closeEvents() { this.events?.close(); this.events = undefined; }
   // Applies one verified status; true while the capture is still running.
-  private applyProgress(id: string, data: Data<'get_capture'>): boolean {
+  private applyProgress(id: string, data: Progress): boolean {
     if (!validActionInstances(data) || data.capture_id !== id || this.receipt?.operation && data.operation !== this.receipt.operation || data.revision < (this.receipt?.revision ?? 0)) {
       this.publish({ progress: undefined, error: 'The collection status could not be verified. Try checking it again.' }); return false;
     }

@@ -208,14 +208,14 @@ func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *te
 	// A maintainer of another binding cannot stop the team's policy.
 	stranger := *f
 	stranger.author.Groups = []string{"team-b"}
-	if _, err := stranger.deactivation().Deactivate(context.Background(), &stranger, "restarts"); !errors.Is(err, ErrPolicyDelegation) || stranger.status.ActiveID == "" {
+	if _, err := stranger.deactivation().Deactivate(context.Background(), &stranger, activationCluster, "apps", "restarts"); !errors.Is(err, ErrPolicyDelegation) || stranger.status.ActiveID == "" {
 		t.Fatal("a non-sponsor deactivated the policy", err)
 	}
-	d, err := f.deactivation().Deactivate(context.Background(), f, "restarts")
+	d, err := f.deactivation().Deactivate(context.Background(), f, activationCluster, "apps", "restarts")
 	if err != nil || d.Replay || d.AcceptanceID != r.AcceptanceID || f.status.ActiveID != "" || f.status.ExecutionsSpent != 3 {
 		t.Fatal("deactivation", d, err)
 	}
-	again, err := f.deactivation().Deactivate(context.Background(), f, "restarts")
+	again, err := f.deactivation().Deactivate(context.Background(), f, activationCluster, "apps", "restarts")
 	if err != nil || !again.Replay || again.AcceptanceID != r.AcceptanceID {
 		t.Fatal("repeated deactivation is not a replay", again, err)
 	}
@@ -230,11 +230,11 @@ func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *te
 	}
 	// A workload identity, or a never-accepted policy, cannot be deactivated.
 	f.author.Principal.Kind = identity.Workload
-	if _, err := f.deactivation().Deactivate(context.Background(), f, "restarts"); !errors.Is(err, value.ErrDenied) {
+	if _, err := f.deactivation().Deactivate(context.Background(), f, activationCluster, "apps", "restarts"); !errors.Is(err, value.ErrDenied) {
 		t.Fatal("workload identity deactivated", err)
 	}
 	g := newActivationFixture(t)
-	if _, err := g.deactivation().Deactivate(context.Background(), g, "restarts"); !errors.Is(err, value.ErrUnavailable) {
+	if _, err := g.deactivation().Deactivate(context.Background(), g, activationCluster, "apps", "restarts"); !errors.Is(err, value.ErrUnavailable) {
 		t.Fatal("never-accepted policy deactivated", err)
 	}
 }

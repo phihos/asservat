@@ -28,7 +28,7 @@ func (s *shortSession) Resolve(ctx context.Context, cookie string, refresh bool)
 }
 
 func TestChangesDeliverOnlyWatchedIDsAndAnyChange(t *testing.T) {
-	changes := NewChanges()
+	changes := presentation.NewChanges()
 	s := changes.Subscribe([]string{"a"})
 	defer s.Close()
 	changes.Publish("b")
@@ -50,11 +50,11 @@ func TestEventsStreamEndsAtSessionDeadline(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	calls := &investigationCalls{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &shortSession{expiresAt: time.Now().Add(time.Second)}}, ops, NewChanges())
+	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &shortSession{expiresAt: time.Now().Add(time.Second)}}, ops, presentation.NewChanges())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,11 +85,11 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	calls := &investigationCalls{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if err != nil {
 		t.Fatal(err)
 	}
-	changes := NewChanges()
+	changes := presentation.NewChanges()
 	handler, err = NewEventsHandler(SessionHandler{Origin: server.URL, Sessions: &investigationSession{}}, ops, changes)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 		}
 		return response
 	}
-	for _, query := range []string{"", "?capture_id=x", "?grant_id=00000000-0000-4000-8000-000000000030", "?capture_id=00000000-0000-4000-8000-000000000030&capture_id=00000000-0000-4000-8000-000000000030"} {
+	for _, query := range []string{"", "?capture_id=x", "?other_id=00000000-0000-4000-8000-000000000030", "?capture_id=00000000-0000-4000-8000-000000000030&capture_id=00000000-0000-4000-8000-000000000030"} {
 		if response := get(query); response.StatusCode != 400 {
 			t.Fatal("accepted invalid query", query, response.StatusCode)
 		}
@@ -164,5 +164,14 @@ func TestEventsStreamPushesCaptureProgress(t *testing.T) {
 	changes.Publish("00000000-0000-4000-8000-000000000030")
 	if e := next(); e.Type != "accessLost" {
 		t.Fatal("decision without a capture", e)
+	}
+}
+
+func TestEventReadNamesTheStatusOperation(t *testing.T) {
+	id := "00000000-0000-4000-8000-000000000030"
+	for kind, want := range map[string]string{"capture": `get_capture {"capture_id":"` + id + `"}`, "grant": `get_grant {"grant_id":"` + id + `"}`, "download": `download_artifact {"action":"status","download_id":"` + id + `"}`} {
+		if name, input := eventRead(kind, id); name+" "+string(input) != want {
+			t.Errorf("%s: %s %s", kind, name, input)
+		}
 	}
 }

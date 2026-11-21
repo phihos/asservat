@@ -1,10 +1,10 @@
 package presentation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
@@ -44,17 +44,26 @@ func syscallBridge(t *testing.T, kind string, view value.SyscallView) (*AuditedO
 	}
 	return s, f, g, p
 }
-func syscallInput(cursor string) []byte {
-	b, _ := json.Marshal(SyscallOperationInput{CaseID: bridgeID, ArtifactID: bridgeID, Cursor: cursor, Limit: 2})
+func syscallInput(view, cursor string) []byte {
+	b, _ := json.Marshal(projectionInput{View: view, CaseID: bridgeID, ArtifactID: bridgeID, Cursor: cursor, Limit: 2})
 	return b
 }
 
-func TestSavedSyscallToolsAreOptIn(t *testing.T) {
-	_, f, _, p := bridgeAuditFixture(t)
-	for _, name := range []string{"get_syscall_summary", "get_syscall_events"} {
-		if p.adapter.serves(name) || slices.Contains(p.adapter.toolNames(), name) {
-			t.Fatal("uncomposed syscall tool enabled")
+func TestSavedSyscallViewsAreOptIn(t *testing.T) {
+	s, f, _, p := bridgeAuditFixture(t)
+	for _, op := range []string{"get_syscall_summary", "get_syscall_events"} {
+		if p.adapter.available(op) {
+			t.Fatal("uncomposed syscall view enabled")
 		}
+	}
+	reply, err := s.Call(t.Context(), f, "get_extract", syscallInput("syscallSummary", ""))
+	if err != nil || !bytes.Contains(reply.Body, []byte(`"CapabilityUnavailable"`)) {
+		t.Fatalf("uncomposed view: %v %s", err, reply.Body)
+	}
+	_ = reply.Close(t.Context())
+	reply, err = s.Call(t.Context(), f, "get_extract", []byte(`{"view":"runtimeSummary","case_id":"`+bridgeID+`","artifact_id":"`+bridgeID+`"}`))
+	if err != nil || !bytes.Contains(reply.Body, []byte(`"CapabilityUnavailable"`)) {
+		t.Fatalf("unimplemented view: %v %s", err, reply.Body)
 	}
 	if _, ok := f.s.SyscallQueries(); ok {
 		t.Fatal("route implicitly enabled")
@@ -65,13 +74,13 @@ func TestSavedSyscallAuditedPendingAndPollBothSourcesAndViews(t *testing.T) {
 		for _, view := range []value.SyscallView{value.SyscallSummaryView, value.SyscallEventsView} {
 			t.Run(kind+"/"+string(view), func(t *testing.T) {
 				s, f, _, p := syscallBridge(t, kind, view)
-				tool := "get_syscall_" + string(view)
+				op := "get_syscall_" + string(view)
 				f.ready = false
-				pending, e := s.Call(t.Context(), f, tool, syscallInput(""))
+				pending, e := s.Call(t.Context(), f, "get_extract", syscallInput(map[string]string{"summary": "syscallSummary", "events": "syscallEvents"}[string(view)], ""))
 				if e != nil {
 					t.Fatal("pending", e)
 				}
-				if s.contracts.ValidateOutput(tool, pending.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
+				if s.contracts.ValidateOutput("get_extract", pending.Body) != nil || f.admissions != 1 || f.starts != 1 || f.reads != 0 {
 					t.Fatal("pending binding")
 				}
 				if e = pending.Close(context.Background()); e != nil {
@@ -105,10 +114,10 @@ func TestSavedSyscallAuditedPendingAndPollBothSourcesAndViews(t *testing.T) {
 						} `json:"result"`
 					} `json:"data"`
 				}
-				if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != tool || out.Data.Result.DataClass != "extract" || out.Data.Result.Next == nil || out.Data.Result.Data.Coverage.Dropped != nil || out.Data.Result.Data.Coverage.Unknown != 1 || out.Data.Result.Data.Coverage.Records != 3 {
+				if json.Unmarshal(ready.Body, &out) != nil || out.DataClass != "extract" || out.Data.Tool != "get_extract" || out.Data.Result.DataClass != "extract" || out.Data.Result.Next == nil || out.Data.Result.Data.Coverage.Dropped != nil || out.Data.Result.Data.Coverage.Unknown != 1 || out.Data.Result.Data.Coverage.Records != 3 {
 					t.Fatalf("bounded syscall envelope: %s", ready.Body)
 				}
-				if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != tool || p.last.Association().Syscalls != f.q.Scope.Syscalls || ready.CheckDisclosure(t.Context()) != nil {
+				if s.contracts.ValidateOutput("get_query_result", ready.Body) != nil || f.reads != 1 || f.starts != 1 || p.last.Tool() != op || p.last.Association().Syscalls != f.q.Scope.Syscalls || ready.CheckDisclosure(t.Context()) != nil {
 					t.Fatal("poll lost ownership")
 				}
 			})
@@ -135,8 +144,8 @@ func TestSavedSyscallPublicResponseBoundsPrefixAndCursor(t *testing.T) {
 		}
 		f.result.SyscallEvents.Events = f.result.SyscallEvents.Events[:len(f.result.SyscallEvents.Events)-1]
 	}
-	input, _ := json.Marshal(SyscallOperationInput{CaseID: bridgeID, ArtifactID: bridgeID, Limit: 100})
-	out, err := s.Call(t.Context(), f, "get_syscall_events", input)
+	input, _ := json.Marshal(projectionInput{View: "syscallEvents", CaseID: bridgeID, ArtifactID: bridgeID, Limit: 100})
+	out, err := s.Call(t.Context(), f, "get_extract", input)
 	if err != nil {
 		var stage interface{ FixedStep() string }
 		if errors.As(err, &stage) {
@@ -165,8 +174,8 @@ func TestSavedSyscallEmptyFilterKeepsRecordedCountsAndUnknownCoverage(t *testing
 	f.a.Scope.Syscalls.Names[0], f.a.Scope.Syscalls.NameCount = "write", 1
 	f.result.SyscallEvents.Events = []artifact.SyscallMetadataEvent{}
 	f.result.SyscallEvents.TotalMatching = 0
-	input, _ := json.Marshal(SyscallOperationInput{CaseID: bridgeID, ArtifactID: bridgeID, Limit: 2, Names: []string{"write"}})
-	out, err := s.Call(t.Context(), f, "get_syscall_events", input)
+	input, _ := json.Marshal(projectionInput{View: "syscallEvents", CaseID: bridgeID, ArtifactID: bridgeID, Limit: 2, Names: []string{"write"}})
+	out, err := s.Call(t.Context(), f, "get_extract", input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +199,7 @@ func TestSavedSyscallEmptyFilterKeepsRecordedCountsAndUnknownCoverage(t *testing
 
 func TestSavedSyscallMalformedCursorRefusesBeforeEvidence(t *testing.T) {
 	s, f, g, _ := syscallBridge(t, artifact.SyscallRecordsArtifact, value.SyscallSummaryView)
-	out, err := s.Call(t.Context(), f, "get_syscall_summary", syscallInput("malformed"))
+	out, err := s.Call(t.Context(), f, "get_extract", syscallInput("syscallSummary", "malformed"))
 	if err != nil {
 		t.Fatal(err)
 	}

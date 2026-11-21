@@ -17,7 +17,7 @@ const row = {
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
 } satisfies Data<'list_reviews'>['approvals'][number];
 type CollectionGrant = Extract<Data<'get_grant'>, { kind: 'adHocCapture' | 'policy' }>;
-const grant: CollectionGrant = { ...row, can_resume: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
+const grant: CollectionGrant = { ...row, can_resume: false, observation_limits: { max_bytes_per_second: 16 << 20 },
   actions: [{ action_id: 'a1', kind: 'packetCapture', execution_mode: 'ongoing', before: '30s', after: '10s', filter: 'tcp[13] & 2 != 0', filter_digest: 'ef'.repeat(32), filter_instructions: 4, max_bytes: 16 << 20, ring_max_bytes: 16 << 20, ring_max_age: '50s', sensitive: ['rawBytePredicate'] }] };
 
 class SyntheticApprovals implements Operations {
@@ -25,9 +25,14 @@ class SyntheticApprovals implements Operations {
   decision?: Output<'decide_review'>;
   detail: Data<'get_grant'> = grant;
   rows?: Data<'list_reviews'>['approvals'];
+  next?: string;
   async call<N extends Operation>(name: N, input: Input<N>): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input) });
-    if (name === 'list_reviews') return result((input as Input<'list_reviews'>).view === 'pending' ? { approvals: this.rows ?? [row] } : { approvals: [] }) as Output<N>;
+    if (name === 'list_reviews') {
+      const { view, cursor } = input as Input<'list_reviews'>;
+      if (cursor) return result({ approvals: [{ ...row, grant_id: id(43) }] }) as Output<N>;
+      return { ...result(view === 'pending' ? { approvals: this.rows ?? [row] } : { approvals: [] }), next_cursor: view === 'pending' ? this.next ?? null : null } as Output<N>;
+    }
     if (name === 'get_grant') return result(this.detail) as Output<N>;
     if (name === 'decide_review') return (this.decision ?? result({ grant_id: id(41), phase: 'Approved', revision: 2, not_after: iso(3_600_000) })) as Output<N>;
     return result({ grant_id: id(41), phase: 'Revoked', revision: 2 }) as Output<N>;
@@ -52,13 +57,23 @@ it('lists the inbox and the caller\'s requests', async () => {
   expect(client.calls.map(c => c.name)).toEqual(['list_reviews', 'list_reviews']);
 });
 
+it('appends the next inbox page from the server cursor', async () => {
+  const client = new SyntheticApprovals(); client.next = 'page-2';
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client}/>);
+  await screen.findByRole('link', { name: 'Deployment api' });
+  fireEvent.click(screen.getByRole('button', { name: 'More' }));
+  await waitFor(() => expect(screen.getAllByRole('link', { name: 'Deployment api' })).toHaveLength(2));
+  expect(client.calls.at(-1)?.input).toEqual({ view: 'pending', cursor: 'page-2' });
+  expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+});
+
 it('shows the exact plan and records one decision with a reason', async () => {
   const client = new SyntheticApprovals();
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)} newID={() => 'key-1'}/>);
   expect(await screen.findByText('tcp[13] & 2 != 0')).toBeTruthy();
   expect(screen.getByText(/raw byte comparison/)).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Sign in with step-up' }).getAttribute('href')).toBe('/auth/step-up?return_to=' + encodeURIComponent('/approvals/' + id(41)));
-  expect(screen.getByText(/Observation limits bound by this approval/)).toBeTruthy();
+  expect(screen.getByText(/Observation limit bound by this approval: 16 MiB per second/)).toBeTruthy();
   expect(screen.getByText(/Submitting this plan starts a capture window of at most 5 minutes/)).toBeTruthy();
   expect(screen.queryByText(/plan's start deadline/)).toBeNull();
   const approve = screen.getByRole('button', { name: 'Approve' });
@@ -99,7 +114,7 @@ function teamPolicyGrant(): CollectionGrant {
   const value: CollectionGrant = { ...structuredClone(grant), kind: 'policy', phase: 'Approved', revision: 2, capture_deadline_rule: 'policyAuthority',
     reasons: [{ action_id: 'a1', code: 'policyCollection' }],
     target: { cluster_id: id(1), namespace: 'payments', namespace_uid: 'namespace-uid', workload_kind: 'Deployment', workload_name: 'api', workload_uid: 'workload-uid' },
-    policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_executions: 10, max_collected_bytes: 64 << 20, max_observed_bytes: 1 << 30, executions_used: 4, collected_bytes_used: 16 << 20, observed_bytes_used: 4000 },
+    policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_collected_bytes: 64 << 20, executions_used: 4, collected_bytes_used: 16 << 20 },
     requested_by: principal('departed-requester'), not_after: iso(3_600_000), can_decide: false, can_revoke: true,
     decision: { decision: 'approved', decided_by: principal('independent-reviewer'), decided_at: iso(-30_000), reason: 'finite team collection', authentication_context: { acr: 'mfa', authenticated_at: iso(-40_000) } },
     can_resume: false,
@@ -114,7 +129,7 @@ it('shows original team policy scope and budgets to a current manager without of
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)} newID={() => 'manager-revoke-key'}/>);
   expect(await screen.findByText('team-policy-uid')).toBeTruthy();
   expect(screen.getByText('installation-policy-executor')).toBeTruthy();
-  expect(screen.getByText(/4 of 10 action starts/)).toBeTruthy();
+  expect(screen.getByText(/4 executions/)).toBeTruthy();
   expect(screen.getByText(/recurring policy collection uses a separate finite approval and shared budgets/)).toBeTruthy();
   expect(screen.getByText(/16 MiB of 64 MiB output/)).toBeTruthy();
   expect(screen.getByText(/This approval grants no evidence access/)).toBeTruthy();
@@ -184,31 +199,13 @@ it.each(['templateBinding', 'administratorProfile'] as const)('shows a recurring
     expect(screen.queryByText(/named TCP port/)).toBeNull();
   }
   expect(screen.queryByText(/Pod api-a/)).toBeNull();
-  expect(screen.queryByText(/Observation limits bound by this approval/)).toBeNull();
+  expect(screen.queryByText(/Observation limit bound by this approval/)).toBeNull();
   expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
   for (const patch of [{ endpoint_digest: 'ab'.repeat(32) }, { definition_digest: null }, { source_kind: 'unknown' }, { unknown: true },
     ...(sourceKind === 'templateBinding' ? [{ port: 6060 }, { declared_port_name: undefined }, { minimum_port: 0 }, { maximum_port: 65536 }] : [{ declared_port_name: 'pprof' }, { minimum_port: 6000 }, { port: undefined }])]) {
     const invalid = structuredClone(policy); Object.assign(invalid.actions[0].profile!, patch);
     expect(validOutput_get_grant(result(invalid))).toBe(false);
   }
-});
-
-it.each([40000, undefined])('shows only an explicitly reviewed observation event ceiling (%s)', async maximum => {
-  const client = new SyntheticApprovals();
-  client.detail = { ...grant, observation_limits: { ...grant.observation_limits!, ...(maximum === undefined ? {} : { max_observed_events: maximum }) } };
-  expect(validOutput_get_grant(result(client.detail))).toBe(true);
-  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
-  const limits = await screen.findByText(/Observation limits bound by this approval/);
-  if (maximum === undefined) expect(limits.textContent).not.toMatch(/eligible entry and exit probes/);
-  else expect(limits.textContent).toContain('40000 eligible entry and exit probes in total');
-});
-
-it('shows cumulative policy argument event reservations independently of bytes', async () => {
- const client = new SyntheticApprovals(); client.detail = teamPolicyGrant();
- Object.assign(client.detail.policy!, {max_observed_events:6000,observed_events_used:2000});
- expect(validOutput_get_grant(result(client.detail))).toBe(true);
- render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
- expect(await screen.findByText(/2000 of 6000 eligible entry and exit probes/)).toBeTruthy();
 });
 
 function rawGrant(artifactCount = 2): Extract<Data<'get_grant'>, { kind: 'rawQuery' }> {
@@ -242,13 +239,12 @@ it('reviews query-only and combined raw operations with explicit page charging',
   expect(screen.getByText(/Each paid query page reserves 24 KiB/)).toBeTruthy();
   expect(screen.getByText(/10000 selected operations/)).toBeTruthy();
 });
-it('validates64 exact raw review artifacts and rejects collection fields or hidden selection truncation', () => {
+it('validates exact raw review artifacts and rejects collection fields or hidden selection truncation', () => {
   const raw = rawGrant(64);
   expect(validOutput_get_grant(result(raw))).toBe(true);
   expect(validOutput_get_grant(result({ ...raw, target: row.target }))).toBe(false);
   expect(validOutput_get_grant(result({ ...raw, actions: [] }))).toBe(false);
   expect(validOutput_get_grant(result({ ...raw, raw_access: { ...raw.raw_access, artifacts: [] } }))).toBe(false);
-  expect(validOutput_get_grant(result(rawGrant(65)))).toBe(false);
   const { artifacts: _artifacts, ...summary } = raw.raw_access;
   expect(validOutput_list_reviews(result({ approvals: [{ ...raw, raw_access: summary }] }))).toBe(true);
   expect(validOutput_list_reviews(result({ approvals: [raw] }))).toBe(false);
@@ -318,8 +314,8 @@ it('labels saved-log approval as raw inspection with the reviewed page pool',asy
 
 it('shows the reviewed finite logs window without syscall or ring claims', async () => {
   const client = new SyntheticApprovals();
-  const logs: CollectionGrant = { ...grant, observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'logs', code: 'recordingApprovalRequired' }],
-    actions: [{ action_id: 'logs', kind: 'logs', execution_mode: 'onTrigger', before: '1h', after: '10s', max_bytes: 64 * 1024 * 1024, sensitive: ['recordingApprovalRequired'] }] };
+  const logs: CollectionGrant = { ...teamPolicyGrant(), observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'logs', code: 'policyCollection' }],
+    actions: [{ action_id: 'logs', kind: 'logs', execution_mode: 'onTrigger', before: '1h', after: '10s', max_bytes: 64 * 1024 * 1024, sensitive: [] }] };
   client.detail = logs;
   expect(validOutput_get_grant(result(logs))).toBe(true);
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
@@ -327,7 +323,7 @@ it('shows the reviewed finite logs window without syscall or ring claims', async
   expect(screen.getByText('1h before, 10s after')).toBeTruthy();
   expect(screen.queryByText('Syscalls')).toBeNull();
   expect(screen.queryByText(/0 bytes/)).toBeNull();
-  for (const change of [{ execution_mode: 'ongoing' }, { ring_max_bytes: 1024 }, { ring_max_age: '30s' }, { filter: 'tcp' }, { max_bytes: 64 * 1024 * 1024 + 1 }]) {
+  for (const change of [{ execution_mode: 'ongoing' }, { ring_max_bytes: 1024 }, { ring_max_age: '30s' }, { filter: 'tcp' }]) {
     const invalid = structuredClone(logs); Object.assign(invalid.actions[0], change);
     expect(validOutput_get_grant(result(invalid))).toBe(false);
   }

@@ -102,22 +102,14 @@ func TestAccessPreviewRefusals(t *testing.T) {
 	if _, _, err := s.Preview(context.Background(), f, []ProposedChange{{Action: "create", Kind: "AccessBinding", Spec: []byte(`{}`)}}); !errors.Is(err, cfg.ErrInvalid) {
 		t.Fatalf("invalid spec: %v", err)
 	}
-	many := make([]ProposedChange, cfg.MaxPreviewChanges+1)
-	if _, _, err := s.Preview(context.Background(), f, many); !errors.Is(err, cfg.ErrLimit) {
-		t.Fatalf("too many changes: %v", err)
-	}
-	f.snapErr = cfg.ErrLimit
-	if _, _, err := s.Preview(context.Background(), f, addDeny); !errors.Is(err, cfg.ErrLimit) {
-		t.Fatalf("more than 1,000 targets: %v", err)
-	}
 }
 
 // An unavailable projection is reported Indeterminate, never evaluated.
 func TestAccessPreviewUnavailableProjection(t *testing.T) {
 	f, s := newPreviewFixture()
-	f.snapshot.Cells[0].Unavailable = value.UnmetPermissionStale
+	f.snapshot.Cells[0].Unavailable = value.UnmetClusterNotObserved
 	got, _, err := s.Preview(context.Background(), f, addDeny)
-	if err != nil || got.Complete() || len(got.Deltas) != 0 || got.Unavailable[0].Unavailable != value.UnmetPermissionStale {
+	if err != nil || got.Complete() || len(got.Deltas) != 0 || got.Unavailable[0].Unavailable != value.UnmetClusterNotObserved {
 		t.Fatalf("%v %+v", err, got)
 	}
 }

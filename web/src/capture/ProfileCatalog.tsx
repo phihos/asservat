@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import { operations, operationMessage, OperationFailure, type Data, type Input, type Operations, type Target } from './http';
+import { operations, operationMessage, OperationFailure, catalogRows, type Data, type Diagnostic, type Input, type Operations, type Target } from './http';
 
 export type Composition = NonNullable<Input<'preview_capture'>['profile_composition']>;
-type Listed = Data<'list_capture_profiles'>['profiles'][number];
+export type Listed = Diagnostic & { profile_ref: NonNullable<Diagnostic['profile_ref']> };
 type Definition = Data<'get_capture_profile'>['definition'];
 type Ref = Listed['profile_ref'];
 type Field = NonNullable<Definition['editableFields']>[number];
@@ -83,6 +83,19 @@ export function composition(added: Added[], bytes: number, duration: string): Co
   } as Composition;
 }
 
+// Every captureProfile row list_diagnostics returns for the target, all pages.
+export async function listProfiles(client: Operations, target: Target, csrf: string, signal: AbortSignal, catalog?: Input<'list_diagnostics'>['catalog']): Promise<Listed[]> {
+  const rows: Listed[] = [];
+  let cursor: string | undefined;
+  do {
+    const result = await client.call('list_diagnostics', { target_ref: structuredClone(target), kind: 'captureProfile', ...(catalog && { catalog }), ...(cursor && { cursor }) }, csrf, signal);
+    if (result.status !== 'ok') throw new OperationFailure(503, result.status === 'error' ? result.data.code : 'Pending', result.status === 'error' ? result.data.message : 'The catalog is not ready yet.');
+    rows.push(...(catalogRows(result.data) ?? []).filter((row): row is Listed => row.kind === 'captureProfile' && row.profile_ref !== undefined));
+    cursor = result.next_cursor ?? undefined;
+  } while (cursor);
+  return rows;
+}
+
 export function ProfileCatalog({ session, scope, target, busy, onPreview, client = operations, initial, onDraft }: { session: Session; scope: AbortSignal; target: Target; busy: boolean; onPreview: (c: Composition) => void; client?: Operations; initial?: CatalogDraft; onDraft?: (draft: CatalogDraft) => void }) {
   const [profiles, setProfiles] = useState<Listed[]>();
   const [added, setAdded] = useState<Added[]>(initial?.added ?? []);
@@ -90,14 +103,10 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
   useEffect(() => { onDraft?.({ added, bounds }); }, [added, bounds]); // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
-  const call = async <N extends 'list_capture_profiles' | 'get_capture_profile'>(name: N, input: Input<N>): Promise<Data<N> | undefined> => {
-    try {
-      const result = await client.call(name, input, session.csrf_token, scope);
-      if (result.status === 'ok') return result.data as Data<N>;
-      throw new OperationFailure(503, result.status === 'error' ? result.data.code : 'Pending', result.status === 'error' ? result.data.message : 'The catalog is not ready yet.');
-    } catch (e) { if (!scope.aborted) setError(operationMessage(e)); }
+  const call = async <T,>(request: () => Promise<T>): Promise<T | undefined> => {
+    try { return await request(); } catch (e) { if (!scope.aborted) setError(operationMessage(e)); }
   };
-  useEffect(() => { void call('list_capture_profiles', { target_ref: structuredClone(target) }).then(data => data && setProfiles(data.profiles)); }, [JSON.stringify(target)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void call(() => listProfiles(client, target, session.csrf_token, scope)).then(rows => rows && setProfiles(rows)); }, [JSON.stringify(target)]); // eslint-disable-line react-hooks/exhaustive-deps
   // Functional updates: a definition fetched for add() must not overwrite
   // edits or removals made while it was loading.
   const update = (change: (previous: Added[]) => Added[]) => setAdded(previous => {
@@ -108,7 +117,11 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
   });
   const add = async (profile: Listed) => {
     setLoading(true); setError(undefined);
-    const data = await call('get_capture_profile', { target_ref: structuredClone(target), profile_ref: structuredClone(profile.profile_ref) });
+    const data = await call(async () => {
+      const result = await client.call('get_capture_profile', { target_ref: structuredClone(target), profile_ref: structuredClone(profile.profile_ref) }, session.csrf_token, scope);
+      if (result.status === 'ok') return result.data as Data<'get_capture_profile'>;
+      throw new OperationFailure(503, result.status === 'error' ? result.data.code : 'Pending', result.status === 'error' ? result.data.message : 'The catalog is not ready yet.');
+    });
     setLoading(false);
     if (data) update(previous => previous.length >= 8 ? previous : [...previous, { id: componentID(profile.profile_ref.name, previous.map(a => a.id)), ref: data.profile_ref, definition: data.definition, values: {} }]);
   };
@@ -134,10 +147,10 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
     <p className="field-help">Combine profiles into one reviewed recording. Each profile supplies reviewed defaults; change only what you need. Nothing is collected until you confirm the review.</p>
     {error && <p role="status" className="notice">{error}</p>}
     {profiles?.length === 0 && <p>No capture profiles are available for this target.</p>}
-    {profiles?.map(profile => <article className="diagnostic" key={profile.profile_ref.catalog + '/' + profile.profile_ref.name + '/' + profile.profile_ref.version}>
-      <h3>{profile.display_name}</h3>
+    {profiles?.map(profile => <article className="diagnostic" key={profile.profile_ref.catalog + '/' + profile.profile_ref.name + '/' + profile.version}>
+      <h3>{profile.display_name ?? profile.name}</h3>
       <p>{profile.description}</p>
-      <p className="field-help">{profile.profile_ref.catalog} catalog · {profile.profile_ref.name} {profile.profile_ref.version} · {profile.execution_modes.map(m => m === 'onTrigger' ? 'on trigger' : 'ongoing').join(', ')}{profile.approval_required ? ' · needs approval' : ''}{profile.deprecated ? ' · deprecated' : ''}</p>
+      <p className="field-help">{profile.profile_ref.catalog} catalog · {profile.profile_ref.name} {profile.version} · {profile.execution_modes.map(m => m === 'onTrigger' ? 'on trigger' : 'ongoing').join(', ')}{profile.approval_required ? ' · needs approval' : ''}{profile.deprecated ? ' · deprecated' : ''}</p>
       {profile.blockers.map((b, i) => <p className="notice" key={i}>{b.message}</p>)}
       <Button className="button secondary" isDisabled={busy || loading || !profile.available || added.length >= 8} onPress={() => void add(profile)}>Add profile</Button>
     </article>)}

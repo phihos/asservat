@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ type bridgeFixture struct {
 	admissions, starts, polls, observations, batches, claims, reads, completions int
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
+	readyMu                                                                      sync.Mutex
 	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
@@ -170,11 +172,12 @@ func (f *bridgeFixture) ObserveProjectionWorker(_ context.Context, q value.Conte
 	if f.observeHook != nil {
 		f.observeHook()
 	}
-	o := analysisapp.ContextProjectionWorkerObservation{Ready: f.ready, ObservedAt: f.now, ValidUntil: f.now.Add(4 * time.Second)}
+	ready := f.isReady()
+	o := analysisapp.ContextProjectionWorkerObservation{Ready: ready, ObservedAt: f.now, ValidUntil: f.now.Add(4 * time.Second)}
 	if !f.workerUntil.IsZero() {
 		o.ValidUntil = f.workerUntil
 	}
-	if f.ready {
+	if ready {
 		o.Worker = value.ContextQueryWorker{QueryID: q.ID, WorkerID: q.WorkerID, PeerID: bridgeID, PodUID: bridgeID, ProcessEpoch: bridgeID,
 			Certificate: artifact.Digest{1}, Configuration: q.Plan.Profile.Path.WorkerConfiguration}
 	}
@@ -223,4 +226,17 @@ func bridgeProjection(now time.Time) value.PodStatusProjection {
 	return value.PodStatusProjection{Format: artifact.ContextFormat, NamespaceUID: "namespace", PodUID: "pod",
 		ResourceVersion: "7", ObservedAt: now, Phase: "Running", Ready: "True", Initialized: "True",
 		Scheduled: "True", RuntimeInstances: 1, Running: 1}
+}
+
+// isReady and setReady let a test flip worker readiness from another goroutine.
+func (f *bridgeFixture) isReady() bool {
+	f.readyMu.Lock()
+	defer f.readyMu.Unlock()
+	return f.ready
+}
+
+func (f *bridgeFixture) setReady(ready bool) {
+	f.readyMu.Lock()
+	defer f.readyMu.Unlock()
+	f.ready = ready
 }

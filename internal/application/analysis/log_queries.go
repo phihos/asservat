@@ -55,7 +55,10 @@ func (s RawLogReads) Begin(ctx context.Context, current identities.CurrentIdenti
 		if c.NativeType != artifact.LogsArtifact || c.CaseID != r.CaseID || c.ArtifactID != r.ArtifactID || c.Logs != (value.LogWindow{}) {
 			return value.ContextProjectionCandidate{}, value.ErrUnavailable
 		}
-		c.Logs, c.RawGrantID = r.Selection, r.GrantID
+		c.Logs = r.Selection
+		if c.RawGrantID, e = s.Service.rawGrant(ctx, i, c, r.GrantID, "get_logs"); e != nil {
+			return value.ContextProjectionCandidate{}, e
+		}
 		if !c.Valid() {
 			return value.ContextProjectionCandidate{}, value.ErrInvalid
 		}

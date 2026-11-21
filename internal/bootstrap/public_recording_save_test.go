@@ -21,7 +21,7 @@ func TestPublicRecordingServicesRemainPassiveUnderOrdinaryCollectionGate(t *test
 		t.Fatal(err)
 	}
 	names := operations.ToolNames()
-	for _, name := range []string{"request_capture", "list_recordings", "preview_recording_save", "cancel_capture"} {
+	for _, name := range []string{"request_capture", "preview_capture", "cancel_capture"} {
 		if !slices.Contains(names, name) {
 			t.Fatal("passive discovery or restrictive cancellation lost", name, names)
 		}
@@ -35,7 +35,7 @@ func TestPublicRecordingServicesRemainPassiveUnderOrdinaryCollectionGate(t *test
 		t.Fatal(err)
 	}
 	names = operations.ToolNames()
-	if slices.Contains(names, "request_capture") || slices.Contains(names, "cancel_capture") || !slices.Contains(names, "list_recordings") || !slices.Contains(names, "preview_recording_save") {
+	if slices.Contains(names, "request_capture") || slices.Contains(names, "cancel_capture") || !slices.Contains(names, "preview_capture") {
 		t.Fatal("ordinary disabled capture gate was bypassed", names)
 	}
 }

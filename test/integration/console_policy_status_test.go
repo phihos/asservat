@@ -18,7 +18,10 @@ import (
 
 // Only synthetic persistence/source/projection facts; the ordinary status
 // service and canonical HTTPS/browser route perform real viewer authorization.
-type consolePolicyStatus struct{ grants *consoleManagerGrants }
+type consolePolicyStatus struct {
+	grants *consoleManagerGrants
+	spec   []byte
+}
 
 func (s consolePolicyStatus) ReadPolicy(_ context.Context, name, uid string) (value.PolicySource, []byte, error) {
 	s.grants.mu.Lock()
@@ -28,7 +31,7 @@ func (s consolePolicyStatus) ReadPolicy(_ context.Context, name, uid string) (va
 		return value.PolicySource{}, nil, value.ErrUnavailable
 	}
 	now := time.Now().UTC()
-	return value.PolicySource{InstallationID: a.InstallationID, ClusterID: a.ClusterID, NamespaceUID: "control-namespace-uid", Name: name, Revision: identity.Revision{UID: a.PolicyUID, Generation: 1, Digest: artifact.Digest{1}}, ResourceVersion: "fixture-policy-v1", CollectionDigest: artifact.Digest{2}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil, nil
+	return value.PolicySource{InstallationID: a.InstallationID, ClusterID: a.ClusterID, NamespaceUID: "control-namespace-uid", Name: name, Revision: identity.Revision{UID: a.PolicyUID, Generation: 1, Digest: artifact.Digest{1}}, ResourceVersion: "fixture-policy-v1", CollectionDigest: artifact.Digest{2}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, s.spec, nil
 }
 
 func (s consolePolicyStatus) Status(context.Context, string) (value.PolicyStatus, error) {
@@ -50,15 +53,17 @@ func (s consolePolicyStatus) Permissions(_ context.Context, target authorization
 func (s consolePolicyStatus) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
 	return app.PolicyActivationResult{}, value.ErrUnavailable
 }
-func (s consolePolicyStatus) Deactivate(context.Context, identities.CurrentIdentity, string) (app.PolicyDeactivationResult, error) {
+func (s consolePolicyStatus) Deactivate(context.Context, identities.CurrentIdentity, string, string, string) (app.PolicyDeactivationResult, error) {
 	return app.PolicyDeactivationResult{}, value.ErrUnavailable
 }
 func newConsolePolicyStatus(t *testing.T, origin string, grants *consoleManagerGrants) *presentation.PolicyOperations {
 	t.Helper()
-	f := consolePolicyStatus{grants: grants}
+	// The policy targets namespace "app" of the hub's own cluster ("local").
+	f := consolePolicyStatus{grants: grants, spec: publicPolicySpec(t, grants.g.Policy.Authority)}
 	service := app.PolicyStatusService{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Ledger: f, Permissions: f, Now: time.Now}
 	activation := app.PolicyActivation{RootID: grants.g.RootID, InstallationID: grants.g.RootID, Documents: f, Sources: f, Ledger: f, GrantAttachments: f, Now: time.Now}
-	operations, err := presentation.NewPolicyOperations(origin, time.Now, func() string { return consoleCaptureID(704) }, activation, service, f)
+	clusters := presentation.NewClusterNames(map[string]string{presentation.LocalClusterName: grants.g.Policy.Authority.ClusterID})
+	operations, err := presentation.NewPolicyOperations(origin, time.Now, func() string { return consoleCaptureID(704) }, clusters, activation, service, f)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,9 @@ type AuditedOperationsConfig struct {
 	RootID string
 	Now    func() time.Time
 	NewID  func() string
+	// Changes signals committed status changes by ID; nil serves
+	// after_revision without waiting.
+	Changes *Changes
 }
 type auditTarget interface {
 	Operations
@@ -151,8 +155,86 @@ func (s *AuditedOperations) RejectBeforeDispatch(ctx context.Context, current id
 	return time.Time{}, auditapp.ErrUnavailable
 }
 
+// Call serves one operation. A status read with after_revision whose state
+// still has that revision waits for a committed change of its ID (LISTEN/
+// NOTIFY through Changes) or audit.StatusWait, then reads again; each read
+// is its own audited call (REQ-INT-003, no polling).
 func (s *AuditedOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
-	return s.call(ctx, current, name, raw, 0)
+	id, after := statusWait(name, raw)
+	if s == nil || s.config.Changes == nil || id == "" {
+		return s.call(ctx, current, name, raw, 0)
+	}
+	// Each read keeps its operation's own window; only the wait is longer.
+	read := func() (OperationReply, error) {
+		return s.call(ctx, identities.ShortenRequest(current, s.config.Now().Add(audit.OperationRequestWindow(name)), s.config.Now), name, raw, 0)
+	}
+	// Subscribe before the first read so no change between them is lost.
+	changes := s.config.Changes.Subscribe([]string{id})
+	defer changes.Close()
+	reply, err := read()
+	if err != nil || replyRevision(reply.Body) != after {
+		return reply, err
+	}
+	wait := time.NewTimer(audit.StatusWait)
+	defer wait.Stop()
+	select {
+	case <-changes.Ready():
+	case <-wait.C:
+	case <-ctx.Done():
+		return reply, err
+	}
+	if ctx.Err() != nil {
+		return reply, err
+	}
+	_ = reply.Close(ctx)
+	clear(reply.Body)
+	return read()
+}
+
+// statusWait returns the ID and after_revision of a status read that asks to
+// wait; "" otherwise.
+func statusWait(name string, raw json.RawMessage) (string, int64) {
+	var in struct {
+		CaptureID     string `json:"capture_id"`
+		GrantID       string `json:"grant_id"`
+		DownloadID    string `json:"download_id"`
+		QueryHandle   string `json:"query_handle"`
+		Action        string `json:"action"`
+		AfterRevision int64  `json:"after_revision"`
+	}
+	if json.Unmarshal(raw, &in) != nil || in.AfterRevision < 1 {
+		return "", 0
+	}
+	id := ""
+	switch {
+	case name == "get_capture":
+		id = in.CaptureID
+	case name == "get_grant":
+		id = in.GrantID
+	case name == "download_artifact" && in.Action == "status":
+		id = in.DownloadID
+	case name == "get_query_result":
+		// A query worker's readiness notifies the query ID (migration 00011).
+		id = in.QueryHandle
+	}
+	if !authorization.UUID(id) {
+		return "", 0
+	}
+	return id, in.AfterRevision
+}
+
+// replyRevision is the data.revision of an ok or pending result, else 0.
+func replyRevision(body []byte) int64 {
+	var out struct {
+		Status string `json:"status"`
+		Data   struct {
+			Revision int64 `json:"revision"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &out) != nil || out.Status == "error" {
+		return 0
+	}
+	return out.Data.Revision
 }
 
 func (s *AuditedOperations) call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, rejection IngressRejectionKind) (OperationReply, error) {
@@ -178,7 +260,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		return OperationReply{}, stopped("identity", identity.ErrDenied)
 	}
 	// A download stop runs without the evidence-read scope check below.
-	if rejection == 0 && name == "cancel_artifact_download" {
+	if rejection == 0 && name == downloadTool && DownloadAction(raw) == "cancel" {
 		if _, ok := s.inner.Tool(name); ok && s.contracts.ValidateInput(name, raw) == nil {
 			select {
 			case s.stopSlots <- struct{}{}:
@@ -221,7 +303,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			rejection = IngressInvalid
 		} else if name != processingDiscoveryOperation && name != processingErasureStatusOperation && name != processingReportOperation && !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
-		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+		} else if name == downloadTool && !slices.Contains(initial.Scopes, "evidence:download") {
 			rejection, downloadScopeDenied = IngressDenied, true
 		}
 	}
@@ -288,7 +370,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		timing.call = time.Now()
 		reply.boundCleanup(intent.WriteUntil)
 		// Only a proven pre-dispatch rejection rules out an effect.
-		effectPossible = !reply.auditNoDispatch
+		effectPossible = !reply.auditNoDispatch && (name != downloadTool || DownloadAction(raw) == "prepare")
 	}
 	out, e := s.result(intent, reply, callErr, effectPossible)
 	if e != nil {
@@ -388,7 +470,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 	if queryOperation(name) {
 		return normalizeQueryInput(name, raw)
 	}
-	if name == "prepare_artifact_download" || name == "get_artifact_download" {
+	if name == downloadTool {
 		var in ContextDownloadInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -445,11 +527,14 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		return json.Marshal(input)
 	}
 	if name == processingDiscoveryOperation {
-		query, err := processingDiscoveryQuery(raw)
-		if err != nil {
-			return nil, err
+		var in struct {
+			privacy.ProcessingDiscoveryQuery
+			Cluster string `json:"cluster,omitempty"`
 		}
-		return json.Marshal(query)
+		if json.Unmarshal(raw, &in) != nil {
+			return nil, contracts.ErrInvestigationWire
+		}
+		return json.Marshal(in)
 	}
 	if name == "preview_retention_change" {
 		var in RetentionPreviewInput
@@ -478,7 +563,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_live_sources" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == downloadTool || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || in.Name == "request_raw_access" || liveOperation(in.Name) && in.Name != "list_recordings" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -538,7 +623,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 		}
 		if envelope.Status == "ok" {
-			if liveOperation(in.Name) && in.Name != "list_live_sources" {
+			if liveOperation(in.Name) && in.Name != "list_recordings" {
 				out.Effect = "accepted"
 			}
 			out.Status = "success"
@@ -590,7 +675,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"
 			}
-			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
+			if in.Name == downloadTool && out.Effect == "unknown" && refs.DownloadID != "" {
 				out.Effect = "accepted"
 			}
 			if in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" {
@@ -618,17 +703,19 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 					}
 				}
 			}
-			if in.Name == "get_http_headers" || in.Name == "get_profile_summary" || in.Name == "get_pcap_summary" || in.Name == "pcap_query" || in.Name == "compare_profiles" || syscallQueryOperation(in.Name) {
-				// ADR-282: the disclosed page names its one artifact as provenance.
+			if queryOperation(in.Name) && in.Name != "get_query_result" {
+				// ADR-282: a disclosed page names its source artifacts as provenance.
 				var page struct {
 					Provenance []struct {
 						ArtifactID string `json:"artifactID"`
 					} `json:"provenance"`
 				}
-				if json.Unmarshal(reply.Body, &page) != nil || len(page.Provenance) != 1 {
+				if json.Unmarshal(reply.Body, &page) != nil {
 					return out, auditapp.ErrUnavailable
 				}
-				out.ArtifactIDs = append(out.ArtifactIDs, page.Provenance[0].ArtifactID)
+				for _, p := range page.Provenance {
+					out.ArtifactIDs = append(out.ArtifactIDs, p.ArtifactID)
+				}
 			}
 			if in.Name == "request_capture" && refs.CaptureID != "" {
 				out.Effect = "accepted"
@@ -637,9 +724,9 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 	}
 	var d artifact.Digest
 	var err error
-	if callErr == nil && in.Name == "preview_recording_save" {
-		d, err = s.mac.RecordingSavePreviewResultDigest(body)
-	} else if callErr == nil && in.Name == "get_capture_settings" && reply.browserSettings {
+	if callErr == nil && reply.resultBound && !reply.browserSettings {
+		d, err = s.mac.ResultBoundDigest(body)
+	} else if callErr == nil && in.Name == "get_capture" && reply.browserSettings {
 		d, err = s.mac.BrowserSettingsResultDigest(body)
 	} else {
 		d, err = s.mac.Digest(domain, body)

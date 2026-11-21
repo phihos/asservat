@@ -62,10 +62,9 @@ func (m *OperationMAC) BrowserSettingsResultDigest(b []byte) (artifact.Digest, e
 	return m.digest("mcp-result/v1", b, auditvalue.OperationCaptureSettingsOutputLimit)
 }
 
-// RecordingSavePreviewResultDigest keeps the existing result MAC domain/key.
-// Its larger input bound is consumed only by the named passive preview outcome.
-func (m *OperationMAC) RecordingSavePreviewResultDigest(b []byte) (artifact.Digest, error) {
-	return m.digest("mcp-result/v1", b, auditvalue.OperationRecordingSavePreviewOutputLimit)
+// ResultBoundDigest hashes a result up to the MCP result bound.
+func (m *OperationMAC) ResultBoundDigest(b []byte) (artifact.Digest, error) {
+	return m.digest("mcp-result/v1", b, auditvalue.OperationResultBound)
 }
 
 func (m *OperationMAC) digest(domain string, b []byte, limit int) (artifact.Digest, error) {

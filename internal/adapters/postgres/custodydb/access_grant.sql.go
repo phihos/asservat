@@ -663,20 +663,29 @@ func (q *Queries) InsertRawQueryGrant(ctx context.Context, arg InsertRawQueryGra
 }
 
 const listPendingGrants = `-- name: ListPendingGrants :many
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query, submission FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query, submission FROM access_grant WHERE root_id=$1::uuid AND decision IS NULL AND revoked_at IS NULL
  AND (kind<>'policy' OR policy_not_after>clock_timestamp()) AND (not_after IS NULL OR not_after>clock_timestamp())
-ORDER BY requested_at DESC, id LIMIT $2
+ AND ($2::timestamptz IS NULL OR requested_at<$2::timestamptz OR (requested_at=$2::timestamptz AND id>$3::uuid))
+ORDER BY requested_at DESC, id LIMIT $4
 `
 
 type ListPendingGrantsParams struct {
 	RootID   pgtype.UUID
+	AfterAt  pgtype.Timestamptz
+	AfterID  pgtype.UUID
 	RowLimit int32
 }
 
 // The approver inbox: reviewable requests newest first. Candidates only; the
 // service lists a row only while the caller is a current approver for it.
+// after_at/after_id continue after the last row of the previous page.
 func (q *Queries) ListPendingGrants(ctx context.Context, arg ListPendingGrantsParams) ([]AccessGrant, error) {
-	rows, err := q.db.Query(ctx, listPendingGrants, arg.RootID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listPendingGrants,
+		arg.RootID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -764,7 +773,8 @@ const listRequestedGrants = `-- name: ListRequestedGrants :many
 SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query, submission FROM access_grant WHERE root_id=$1::uuid AND requester_issuer=$2::text AND requester_subject=$3::text
  AND requester_kind=$4::text
  AND (requester_kind='human' OR requester_client=$5::text)
-ORDER BY requested_at DESC, id LIMIT $6
+ AND ($6::timestamptz IS NULL OR requested_at<$6::timestamptz OR (requested_at=$6::timestamptz AND id>$7::uuid))
+ORDER BY requested_at DESC, id LIMIT $8
 `
 
 type ListRequestedGrantsParams struct {
@@ -773,6 +783,8 @@ type ListRequestedGrantsParams struct {
 	RequesterSubject string
 	RequesterKind    string
 	RequesterClient  string
+	AfterAt          pgtype.Timestamptz
+	AfterID          pgtype.UUID
 	RowLimit         int32
 }
 
@@ -783,6 +795,8 @@ func (q *Queries) ListRequestedGrants(ctx context.Context, arg ListRequestedGran
 		arg.RequesterSubject,
 		arg.RequesterKind,
 		arg.RequesterClient,
+		arg.AfterAt,
+		arg.AfterID,
 		arg.RowLimit,
 	)
 	if err != nil {

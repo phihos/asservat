@@ -25,7 +25,7 @@ it('requests selected whole files with exact sizes and reuses an uncertain reque
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   await screen.findByRole('alert');
   const input = call.mock.calls[0][1];
-  expect(input).toEqual({ case_id: id(2), artifact_digests: [artifact(3).digest, artifact(4).digest], operations: ['download_artifact'], reason: 'Inspect incident', max_bytes: 1536, expires_in_seconds: 3600, idempotency_key: 'same-key' });
+  expect(input).toEqual({ case_id: id(2), artifact_digests: [artifact(3).digest, artifact(4).digest], operations: ['download_artifact'], reason: 'Inspect incident', max_bytes: 1536, idempotency_key: 'same-key' });
   expect(validInput_request_raw_access(input)).toBe(true);
   expect(screen.getByRole('group')).toHaveProperty('disabled', true);
   fireEvent.click(screen.getByRole('button', { name: 'Retry same approval request' }));
@@ -34,14 +34,14 @@ it('requests selected whole files with exact sizes and reuses an uncertain reque
   expect(screen.getByText(/starts no collection/)).toBeTruthy();
 });
 
-it('bounds selection to64 and refuses empty, duplicate or oversized selectors while retaining future operation contracts', () => {
-  render(<RawAccessPanel session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={Array.from({ length: 65 }, (_, n) => artifact(n + 3, 1))}/>);
+it('selects any number of artifacts and refuses empty or duplicate selectors while retaining future operation contracts', () => {
+  render(<RawAccessPanel session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={Array.from({ length: 3 }, (_, n) => artifact(n + 3, 1))}/>);
   const boxes = screen.getAllByRole('checkbox');
-  for (const b of boxes.slice(0, 64)) fireEvent.click(b);
-  expect(boxes[64]).toHaveProperty('disabled', true);
-  const input = { case_id: id(2), artifact_digests: Array.from({ length: 64 }, (_, n) => artifact(n + 3).digest), operations: ['download_artifact'], reason: 'incident', max_bytes: 64, expires_in_seconds: 3600, idempotency_key: 'key' };
+  for (const b of boxes) fireEvent.click(b);
+  expect(boxes.every(b => (b as HTMLInputElement).checked)).toBe(true);
+  const input = { case_id: id(2), artifact_digests: Array.from({ length: 65 }, (_, n) => artifact(n + 3).digest), operations: ['download_artifact'], reason: 'incident', max_bytes: 64, expires_in_seconds: 3600, idempotency_key: 'key' };
   expect(validInput_request_raw_access(input)).toBe(true);
-  for (const artifact_digests of [[], [...input.artifact_digests, artifact(80).digest], [artifact(3).digest, artifact(3).digest]]) expect(validInput_request_raw_access({ ...input, artifact_digests })).toBe(false);
+  for (const artifact_digests of [[], [artifact(3).digest, artifact(3).digest]]) expect(validInput_request_raw_access({ ...input, artifact_digests })).toBe(false);
   for (const operations of [[], ['download_artifact', 'download_artifact']]) expect(validInput_request_raw_access({ ...input, operations })).toBe(false);
   expect(validInput_request_raw_access({ ...input, operations: ['read_memory'] })).toBe(true);
   for (const phase of ['Expired', 'Revoked']) expect(validOutput_request_raw_access(result({ grant_id: id(41), phase }))).toBe(true);
@@ -78,13 +78,14 @@ it('unlocks a definitive validated refusal and submits edited values with a new 
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   expect((await screen.findByRole('alert')).textContent).toBe('Choose a shorter approval period.');
   expect(screen.getByRole('group')).toHaveProperty('disabled', false);
-  fireEvent.change(screen.getByLabelText('Approval period in seconds'), { target: { value: '300' } });
+  fireEvent.change(screen.getByLabelText('Approval period in seconds (empty: until the evidence access ends)'), { target: { value: '300' } });
   fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect selected incident' } });
   fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
   await screen.findByRole('link', { name: 'Review download approval' });
   const first = JSON.parse(fetch.mock.calls[0][1].body);
   const second = JSON.parse(fetch.mock.calls[1][1].body);
-  expect(first).toMatchObject({ idempotency_key: 'first-key', expires_in_seconds: 3600, reason: 'Inspect incident' });
+  expect(first).toMatchObject({ idempotency_key: 'first-key', reason: 'Inspect incident' });
+  expect(first).not.toHaveProperty('expires_in_seconds');
   expect(second).toEqual({ ...first, idempotency_key: 'edited-key', expires_in_seconds: 300, reason: 'Inspect selected incident' });
   expect(fetch.mock.calls[1][1].headers['Idempotency-Key']).toBe('edited-key');
   expect(newID).toHaveBeenCalledTimes(2);
@@ -97,7 +98,7 @@ it.each(['transport', 'http-refusal', 'invalid-envelope', 'retryable', 'pending'
   else if (mode === 'invalid-envelope') fetch.mockResolvedValueOnce(jsonReply({ status: 'error', data: refusal(false).data }));
   else if (mode === 'retryable') fetch.mockResolvedValueOnce(jsonReply(refusal(true)));
   else {
-    const pending = { ...result({ query_handle: 'pending-query', retry_after_seconds: 1 }), status: 'pending' };
+    const pending = { ...result({ query_handle: 'pending-query', revision: 1 }), status: 'pending' };
     expect(validOutput_request_raw_access(pending)).toBe(true);
     fetch.mockResolvedValueOnce(jsonReply(pending));
   }

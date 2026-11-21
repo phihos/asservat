@@ -17,7 +17,7 @@ it('prefills a saved heap summary before its first query and gets units only fro
   const summary = { ...original, data: { ...original.data, sample_type: 'inuse_space', unit: 'bytes', duration_seconds: null } };
   const fetcher = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
     if (url === '/api/v1/operations/get_case') return json(value);
-    if (url === '/api/v1/operations/get_profile_summary') return json(summary);
+    if (url === '/api/v1/operations/get_extract') return json(summary);
     throw new Error('unexpected request');
   });
   vi.stubGlobal('fetch', fetcher);
@@ -31,8 +31,8 @@ it('prefills a saved heap summary before its first query and gets units only fro
   await view.findByRole('table', { name: 'Profile function costs' });
   expect(view.getByText('bytes')).toBeTruthy(); expect(view.getByText('Unavailable')).toBeTruthy();
   expect(fetcher).toHaveBeenCalledTimes(2);
-  expect(fetcher.mock.calls[1][0]).toBe('/api/v1/operations/get_profile_summary');
-  expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string)).toEqual({ case_id: id(2), artifact_id: id(3), sample_type: 'inuse_space', top_n: 20 });
+  expect(fetcher.mock.calls[1][0]).toBe('/api/v1/operations/get_extract');
+  expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string)).toEqual({ view: 'profileSummary', case_id: id(2), artifact_id: id(3), sample_type: 'inuse_space', limit: 20 });
   expect(fetcher.mock.calls[1][1]).toMatchObject({ credentials: 'same-origin', headers: { 'X-CSRF-Token': session.csrf_token } });
   expect(new Headers(fetcher.mock.calls[1][1]!.headers).has('Authorization')).toBe(false);
   act(() => scope.abort()); expect(screen.queryByRole('region', { name: 'Saved profile summary' })).toBeNull();

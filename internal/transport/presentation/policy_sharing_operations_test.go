@@ -1,12 +1,12 @@
 package presentation
 
 import (
+	app "asservat.local/asservat/internal/application/capture"
 	"context"
 	"strings"
 	"testing"
 	"time"
 
-	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -15,18 +15,8 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ADR-239 fixtures: an activation that shares, and a share service that
-// also revokes a policy acceptance's recurring sharing.
-type sharingActivationFixture struct {
-	policyOperationsFixture
-	result app.PolicyActivationResult
-	err    error
-}
-
-func (f *sharingActivationFixture) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
-	return f.result, f.err
-}
-
+// ADR-239 fixture: a share service that also revokes a policy acceptance's
+// recurring sharing.
 type policyRevokeFixture struct {
 	shareOperationsFixture
 	acceptance string
@@ -53,13 +43,9 @@ func policyShareInstruction(end time.Time) *value.PolicyShareInstruction {
 
 func TestPolicyActivationStatesThatRepeatedCollectionsWillBeShared(t *testing.T) {
 	end := time.Date(2026, 10, 28, 18, 0, 0, 0, time.UTC)
-	f := &sharingActivationFixture{policyOperationsFixture: policyOperationsFixture{scopes: []string{"evidence:read", "evidence:capture"}},
-		result: app.PolicyActivationResult{PolicyUID: "policy-uid", AcceptanceID: "99999999-9999-4999-8999-999999999999", NotAfter: time.Now().Add(time.Hour), MaxExecutions: 10, Audited: true, Sharing: policyShareInstruction(end)}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
+	f := &policyOperationsFixture{scopes: []string{"evidence:read", "evidence:capture"}, activated: &app.PolicyActivationResult{PolicyUID: "policy-uid", AcceptanceID: "99999999-9999-4999-8999-999999999999", NotAfter: time.Now().Add(time.Hour), MaxExecutions: 10, Audited: true, Sharing: policyShareInstruction(end)}}
+	s := newPolicyOperations(t, f)
+	out := policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
 	data, _ := out["data"].(map[string]any)
 	sharingData, _ := data["sharing"].(map[string]any)
 	warnings, _ := out["warnings"].([]any)
@@ -71,29 +57,34 @@ func TestPolicyActivationStatesThatRepeatedCollectionsWillBeShared(t *testing.T)
 	}
 	// Without sharing_reviewed the server returns the review: the statement,
 	// the recipients, the capture limit and the end.
-	f.result, f.err = app.PolicyActivationResult{}, app.PolicySharingReview{Instruction: *policyShareInstruction(end)}
-	out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
+	f.activated, f.activateErr = nil, app.PolicySharingReview{Instruction: *policyShareInstruction(end)}
+	out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
 	review, _ := out["data"].(map[string]any)
 	if out["status"] != "error" || review["code"] != "SharingReviewRequired" || !strings.HasPrefix(review["message"].(string), "Repeated collections will be shared with Group incident, User oncall: at most the next 10 capture(s) of this policy until 2026-10-28T18:00:00Z") {
 		t.Fatal("sharing review", out)
 	}
-	if out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k","sharing_reviewed":true}`); out["status"] != "error" {
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k","sharing_reviewed":true}`); out["status"] != "error" {
 		t.Fatal("reviewed activation input refused", out)
 	}
-	f.result, f.err = app.PolicyActivationResult{}, value.ErrSharingDenied
-	if out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "SharingNotPermitted" {
+	f.activateErr = value.ErrSharingDenied
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "SharingNotPermitted" {
 		t.Fatal("sharing refusal", out)
 	}
+}
+
+func TestPolicyStatusReportsRecurringSharing(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
+	s := newPolicyOperations(t, f)
 	// Status reports the derived sharing state and the counter.
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 2, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour),
 		Sharing: &value.PolicySharingStatus{Instruction: *policyShareInstruction(time.Now().Add(time.Hour)), Spent: 4}}
-	out = policyCall(t, s, &f.policyOperationsFixture, "get_policy_status", `{"policy_name":"restarts"}`)
+	out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"restarts"}`)
 	status, _ := out["data"].(map[string]any)["sharing"].(map[string]any)
 	if out["status"] != "ok" || status["state"] != "policyChanged" || status["revision"] != float64(1) || status["shared_captures"] != float64(4) || status["max_captures"] != float64(10) || status["recipients"] != float64(2) {
 		t.Fatal("status sharing", out)
 	}
 	f.status.Sharing.StoppedAt = time.Now()
-	out = policyCall(t, s, &f.policyOperationsFixture, "get_policy_status", `{"policy_name":"restarts"}`)
+	out = policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"restarts"}`)
 	if status, _ = out["data"].(map[string]any)["sharing"].(map[string]any); status["state"] != "stopped" || status["revision"] != float64(2) || status["stopped_at"] == nil {
 		t.Fatal("stopped sharing status", out)
 	}

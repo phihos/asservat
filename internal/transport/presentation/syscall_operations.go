@@ -15,27 +15,6 @@ type SyscallQueryService interface {
 	Begin(context.Context, identities.CurrentIdentity, string, value.SyscallQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
 
-type SyscallOperationInput struct {
-	CaseID     string   `json:"case_id"`
-	ArtifactID string   `json:"artifact_id"`
-	Cursor     string   `json:"cursor,omitempty"`
-	Limit      int      `json:"limit,omitempty"`
-	Names      []string `json:"syscall_names,omitempty"`
-	ErrorsOnly bool     `json:"errors_only,omitempty"`
-}
-
-func syscallQueryOperation(name string) bool {
-	return name == "get_syscall_summary" || name == "get_syscall_events"
-}
-func syscallView(name string) value.SyscallView {
-	if name == "get_syscall_summary" {
-		return value.SyscallSummaryView
-	}
-	if name == "get_syscall_events" {
-		return value.SyscallEventsView
-	}
-	return ""
-}
 func (s *ContextProjectionOperations) WithSyscalls(syscalls SyscallQueryService) (*ContextProjectionOperations, error) {
 	if s == nil || syscalls == nil || s.syscalls != nil {
 		return nil, ErrOperationsConfiguration
@@ -59,7 +38,6 @@ func savedSyscallCoverage(c value.SyscallRecordCounts) syscallCoverage {
 	return syscallCoverage{Unmatched: c.UnmatchedEvents, Unfinished: c.UnfinishedEvents, Unknown: c.UnknownEvents, RecordCount: c.RecordCount, Gaps: []string{"Acquisition coverage and dropped-event count are unknown; counts describe only the recorded file."}}
 }
 
-var syscallInvalidCursor = OperationFailure{Code: "InvalidCursor", Message: "The cursor is not valid for this syscall view. Start again without a cursor.", Retryable: false}
 var syscallNotAvailable = OperationFailure{Code: "NotAvailable", Message: "Syscall evidence is not available with your current access or service conditions. Check your access or retry later.", Retryable: true}
 var syscallTooLarge = OperationFailure{Code: "AnalysisUnavailable", Message: "This syscall record does not fit the response limit.", Retryable: false}
 

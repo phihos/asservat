@@ -31,9 +31,7 @@
                 }
               ],
               "protocol": "any",
-              "resolution": "frozen",
-              "maxEndpoints": 1,
-              "maxStaleness": "5s"
+              "resolution": "frozen"
             }
           },
           "required": true,

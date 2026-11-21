@@ -6,7 +6,7 @@ import { Evidence } from './evidence';
 import { SyntheticEvidence, caseResult, id, session } from './test-fixtures';
 import { result } from '../capture/test-fixtures';
 import { validOutput_get_grant } from '../generated/validate-approvals';
-import { validOutput_syscall_query } from '../generated/validate-projection';
+import { validOutput_query_artifact } from '../generated/validate-projection';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -29,7 +29,7 @@ it('requires approval before querying the same saved arguments through the HTTP 
   page.data.query_observed_at = queryObservedAt.toISOString();
   page.data.query_expires_at = new Date(queryObservedAt.getTime() + 60000).toISOString();
   expect(validOutput_get_grant(grant)).toBe(true);
-  expect(validOutput_syscall_query(page)).toBe(true);
+  expect(validOutput_query_artifact(page)).toBe(true);
   const reply = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
   const fetch = vi.fn().mockResolvedValueOnce(reply(result({ grant_id: id(41), phase: 'Pending' }))).mockResolvedValueOnce(reply(grant)).mockResolvedValueOnce(reply(page));
   vi.stubGlobal('fetch', fetch);
@@ -52,9 +52,9 @@ it('requires approval before querying the same saved arguments through the HTTP 
     fireEvent.click(screen.getByRole('button', { name: 'Run syscall query' }));
     expect(await screen.findByRole('table', { name: 'Saved syscall argument events' })).toBeTruthy();
     expect(screen.getByText('base64:c3ludGhldGlj')).toBeTruthy();
-    expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant', '/api/v1/operations/syscall_query']);
+    expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant', '/api/v1/operations/query_artifact']);
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ artifact_digests: [artifact.digest], operations: ['syscall_query'], max_bytes: 49152 });
-    expect(JSON.parse(fetch.mock.calls[2][1].body)).toMatchObject({ case_id: id(2), artifact_id: artifact.artifact_id, grant_id: id(41) });
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toMatchObject({ operation: 'syscalls', case_id: id(2), artifact_id: artifact.artifact_id, grant_id: id(41) });
     expect(client.calls.map(call => call.name)).toEqual(['get_case']);
     expect(fetch.mock.calls[2][1].headers['X-CSRF-Token']).toBe(session.csrf_token);
     act(() => scope.abort());

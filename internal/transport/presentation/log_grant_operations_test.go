@@ -16,7 +16,9 @@ func TestFiniteLogsGrantRetainsReviewedWindowWithoutRecorderFields(t *testing.T)
 	base, current := operationFixture(t, true)
 	view := grantView(current.i.VerifiedAt)
 	view.Grant.DataClass = "raw"
-	view.Grant.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "recordingApprovalRequired"}}
+	// The planner's internal recordingApprovalRequired marker is not a public
+	// reason; the review shows the canonical ones.
+	view.Grant.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "recordingApprovalRequired"}, {ActionID: "a1", Code: "rawBytePredicate"}}
 	view.Grant.ResultAccess.Operations = []string{"download_artifact", "get_logs"}
 	view.Review.ObservationLimits = nil
 	view.Review.Actions = []authapp.GrantReviewAction{{ActionID: "a1", Kind: "logs", ExecutionMode: "onTrigger", Before: "1h", After: "10s", MaxBytes: artifact.LogNativeLimit, Sensitive: []string{"recordingApprovalRequired"}}}

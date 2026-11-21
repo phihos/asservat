@@ -1,6 +1,6 @@
 {
   "name": "create_share",
-  "description": "Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at (at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. Needs the evidence-owner role on the workload and the evidence:share scope. By default your owner teams manage the share; an installation administrator may also name owner teams they do not belong to; management may instead name some of the owner teams you belong to (mode teams) or only you (mode creator). Repeat an uncertain request with the same idempotency key.",
+  "description": "Share an explicit existing evidence snapshot with eligible users/groups within the organization.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -19,40 +19,70 @@
         "items": {
           "$ref": "#/$defs/d0"
         },
-        "maxItems": 1,
         "minItems": 1
       },
       "recipients": {
         "type": "array",
         "items": {
-          "$ref": "#/$defs/d1"
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "Group"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group name as in the identity provider's groups claim. A user is named by issuer and stable subject ID, because tokens carry no username the hub could match."
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            {
+              "$ref": "#/$defs/d1"
+            }
+          ]
         },
-        "maxItems": 8,
-        "minItems": 1
+        "minItems": 1,
+        "description": "No count limit; bounded only by the request body byte limit (memory)."
       },
       "data_classes": {
-        "const": [
-          "metadata"
-        ]
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "metadata",
+            "extract",
+            "raw"
+          ]
+        },
+        "minItems": 1
       },
       "operations": {
-        "const": [
-          "get_case"
-        ]
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1
       },
       "expires_at": {
         "type": "string",
-        "format": "date-time"
+        "format": "date-time",
+        "description": "Optional earlier end; a share otherwise lasts until the evidence's access end."
       },
       "reason": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 512
+        "minLength": 1
       },
       "idempotency_key": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 128
+        "minLength": 1
       },
       "management": {
         "$ref": "#/$defs/d2"
@@ -64,8 +94,6 @@
       "recipients",
       "data_classes",
       "operations",
-      "expires_at",
-      "reason",
       "idempotency_key"
     ],
     "$defs": {
@@ -104,8 +132,7 @@
           },
           "id": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           }
         },
         "required": [
@@ -150,8 +177,7 @@
                     },
                     "id": {
                       "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256
+                      "minLength": 1
                     }
                   },
                   "required": [
@@ -161,7 +187,6 @@
                   ]
                 },
                 "minItems": 1,
-                "maxItems": 8,
                 "uniqueItems": true
               }
             },
@@ -175,69 +200,10 @@
     }
   },
   "outputSchema": {
-    "title": "Asservat mcp-result v1",
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "schema_version": {
-        "const": "mcp-result/v1"
-      },
-      "request_id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "data_class": {
-        "const": "metadata"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "pending",
-          "error"
-        ]
-      },
-      "data": {
-        "type": "object"
-      },
-      "truncated": {
-        "const": false
-      },
-      "next_cursor": {
-        "type": "null"
-      },
-      "narrowing_hint": {
-        "type": "null"
-      },
-      "warnings": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "maxItems": 32,
-        "minItems": 0,
-        "uniqueItems": true
-      },
-      "provenance": {
-        "type": "array",
-        "maxItems": 0
-      }
-    },
-    "required": [
-      "schema_version",
-      "request_id",
-      "data_class",
-      "status",
-      "data",
-      "truncated",
-      "next_cursor",
-      "narrowing_hint",
-      "warnings",
-      "provenance"
-    ],
     "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      },
       {
         "oneOf": [
           {
@@ -255,12 +221,51 @@
                     "format": "uuid"
                   },
                   "phase": {
-                    "const": "Active"
+                    "type": "string",
+                    "enum": [
+                      "Active",
+                      "PendingApproval"
+                    ]
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri"
                   }
                 },
                 "required": [
                   "share_id",
                   "phase"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "revision"
                 ]
               }
             },
@@ -281,21 +286,18 @@
                 "properties": {
                   "code": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                    "minLength": 1
                   },
                   "message": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                    "minLength": 1
                   },
                   "retryable": {
                     "type": "boolean"
                   },
                   "navigation_uri": {
                     "type": "string",
-                    "format": "uri",
-                    "maxLength": 2048
+                    "format": "uri"
                   },
                   "responsible_role": {
                     "enum": [
@@ -307,8 +309,7 @@
                   },
                   "retry_after_seconds": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 60
+                    "minimum": 1
                   }
                 },
                 "required": [
@@ -325,6 +326,135 @@
           }
         ]
       }
-    ]
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d0": {
+        "title": "Asservat mcp-result v1",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "mcp-result/v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_class": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "pending",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narrowing_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "data_class",
+          "status",
+          "data",
+          "truncated",
+          "next_cursor",
+          "narrowing_hint",
+          "warnings",
+          "provenance"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "truncated": {
+                  "const": true
+                }
+              },
+              "required": [
+                "truncated"
+              ]
+            },
+            "then": {
+              "properties": {
+                "narrowing_hint": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
   }
 }

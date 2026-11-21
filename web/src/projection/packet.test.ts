@@ -14,7 +14,7 @@ function setup() {
 it('requests only the attached saved packet explicitly and owns an independent result copy', async () => {
   const { client, controller } = setup(); const value = packetSummary(); client.responder = () => value;
   expect(client.calls).toHaveLength(0); await controller.inspect();
-  expect(client.calls).toHaveLength(1); expect(client.calls[0]).toMatchObject({ name: 'get_pcap_summary', input: { case_id: id(2), artifact_id: id(3) } });
+  expect(client.calls).toHaveLength(1); expect(client.calls[0]).toMatchObject({ name: 'get_extract', input: { view: 'pcapSummary', case_id: id(2), artifact_id: id(3) } });
   expect(controller.snapshot().phase).toBe('result'); value.data.conversations[0].source = 'changed'; value.warnings.push('later');
   expect(controller.snapshot().packetSummary?.conversations[0].source).toBe('192.0.2.1:40000'); expect(controller.snapshot().warnings).toEqual([]);
   controller.close(); expect(controller.snapshot()).toEqual({ phase: 'idle' }); expect(client.calls).toHaveLength(1);
@@ -22,7 +22,7 @@ it('requests only the attached saved packet explicitly and owns an independent r
 it('polls one original handle without renewing the request-start lifetime', async () => {
   const { client, controller, delay, advance } = setup();
   client.responder = () => { delay(3000); return pending(); }; await controller.inspect();
-  expect(controller.snapshot().phase).toBe('pending'); await controller.check(); expect(client.calls).toHaveLength(1);
+  expect(controller.snapshot().phase).toBe('pending'); expect(client.calls).toHaveLength(1);
   await advance(1000); client.responder = () => packetResult(); await controller.check();
   expect(client.calls[1]).toMatchObject({ name: 'get_query_result', input: { query_handle: 'synthetic-original-query' } });
   expect(controller.snapshot().phase).toBe('result'); await advance(5999);
@@ -34,7 +34,7 @@ it.each(['artifact', 'version', 'request', 'tool', 'handle', 'time', 'outer-clas
   if (mode === 'artifact') inner.provenance[0].artifactID = id(8);
   if (mode === 'version') inner.provenance[0].digest = '8'.repeat(64);
   if (mode === 'request') inner.request_id = id(99);
-  if (mode === 'tool') output.data.tool_name = 'get_profile_summary';
+  if (mode === 'tool') output.data.tool_name = 'query_artifact';
   if (mode === 'handle') output.data.query_handle = 'replacement';
   if (mode === 'time') inner.data.query_expires_at = '2026-10-18T12:00:11Z';
   if (mode === 'outer-class') output.data_class = 'metadata';

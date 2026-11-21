@@ -72,6 +72,17 @@ func publicJourneyData[T any](t *testing.T, name string, reply presentation.Oper
 	publicJourneyRequire(t, name+" data", json.Unmarshal(envelope.Data, &zero))
 	return zero
 }
+
+// publicJourneyPreparing reports whether reply is the ok reply of a download
+// session still Preparing; the caller repeats prepare with the same key.
+func publicJourneyPreparing(reply presentation.OperationReply, err error) bool {
+	var envelope struct {
+		Status string                           `json:"status"`
+		Data   presentation.ContextDownloadData `json:"data"`
+	}
+	return err == nil && json.Unmarshal(reply.Body, &envelope) == nil && envelope.Status == "ok" && envelope.Data.State == "Preparing" && envelope.Data.DownloadID != ""
+}
+
 func publicJourneyInput(t *testing.T, v any) json.RawMessage {
 	t.Helper()
 	b, e := json.Marshal(v)
@@ -145,7 +156,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	server.EnableHTTP2 = true
 	t.Cleanup(server.Close)
 	origin := "https://" + server.Listener.Addr().String()
-	operations, e := bootstrap.NewPublicContextOperations(bootstrap.PublicContextOperationsConfig{RootID: s.a.RootID, InstallationID: s.recovery.installation, PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: custodyID}, bootstrap.PublicContextOperationServices{Investigation: investigation, Intents: intents, Regional: bridge, Progress: captureapp.ContextProgressService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Reader: progress}, Cases: cases, Downloads: native.coordinator, Native: native.services})
+	operations, e := bootstrap.NewPublicContextOperations(bootstrap.PublicContextOperationsConfig{RootID: s.a.RootID, InstallationID: s.recovery.installation, PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: custodyID, Clusters: presentation.NewClusterNames(map[string]string{"local": n.target.ClusterID})}, bootstrap.PublicContextOperationServices{Investigation: investigation, Intents: intents, Regional: bridge, Progress: captureapp.ContextProgressService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Reader: progress}, Cases: cases, Downloads: native.coordinator, Native: native.services})
 	publicJourneyRequire(t, "one complete public operation assembly", e)
 	// Fund the finite whole journey up front, preserving processing revision and
 	// spend. No replenishment is performed once the first public operation begins.
@@ -160,7 +171,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	call := func(name string, input any, browserIdentity bool) (presentation.OperationReply, error) {
 		return shared.Call(ctx, current(ctx, browserIdentity), name, publicJourneyInput(t, input))
 	}
-	previewInput := map[string]any{"target_ref": presentation.WorkloadReference{ClusterID: n.target.ClusterID, Namespace: n.target.Namespace, Kind: n.target.Kind, Name: n.target.Name}, "preset_ref": presentation.PresetReference{Name: "pod-status", Version: "v1"}, "requested_retention_seconds": 3600}
+	previewInput := map[string]any{"target_ref": presentation.TargetRef{Cluster: "local", Namespace: n.target.Namespace, Kind: n.target.Kind, Name: n.target.Name}, "preset_ref": presentation.PresetReference{Name: "pod-status", Version: "v1"}, "requested_retention_seconds": 3600}
 	reply, e := call("preview_capture", previewInput, true)
 	diagnostic.Report(t)
 	preview := publicJourneyData[presentation.ContextPreviewData](t, "browser preview", reply, e)
@@ -231,15 +242,20 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	if len(caseData.Artifacts) != 1 || caseData.Artifacts[0].ArtifactID != artifactID || caseData.Case.CaseID != published.Expectation.CaseID {
 		t.Fatal("shared case changed original artifact")
 	}
-	downloadInput := map[string]string{"artifact_id": artifactID, "idempotency_key": "public-journey-original-download"}
-	reply, e = call("prepare_artifact_download", downloadInput, false)
-	pending := publicJourneyData[presentation.ContextDownloadData](t, "first real pending preparation", reply, e)
-	if !pending.ContinuePreparation || pending.State != artifact.DownloadPreparing || pending.ArtifactID != artifactID || pending.ContentPath != "" {
-		t.Fatal("first preparation manufactured ready bytes", pending.State)
+	downloadInput := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "public-journey-original-download"}
+	reply, e = call("download_artifact", downloadInput, false)
+	if !publicJourneyPreparing(reply, e) {
+		t.Fatalf("first preparation manufactured ready bytes: %s", reply.Body)
 	}
-	original, e := native.runtime.LookupDownload(ctx, pending.DownloadID, actor.Principal)
+	// The pending session ID is read from SQL to check its stored state.
+	var pendingID string
+	publicJourneyRequire(t, "original pending session ID", admin.QueryRow(ctx, "SELECT id FROM artifact_download WHERE allocation_id=$1", native.allocation.ID).Scan(&pendingID))
+	original, e := native.runtime.LookupDownload(ctx, pendingID, actor.Principal)
 	publicJourneyRequire(t, "original pending session", e)
-	credential := native.credentialClient(t, ctx, pending.DownloadID)
+	if original.State != artifact.DownloadPreparing || original.Scope.ArtifactID != artifactID {
+		t.Fatal("first preparation did not leave one original Preparing session", original.State)
+	}
+	credential := native.credentialClient(t, ctx, pendingID)
 	// A deliberate continuation of an acknowledged Pending response. This is not
 	// an automatic retry of an uncertain write, nor a replacement session/worker.
 	continuation, stopContinuation := context.WithCancel(ctx)
@@ -248,7 +264,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	raw := publicJourneyInput(t, downloadInput)
 	go func() {
 		done <- recordPublicJourneyContinuation(continuation, func() (presentation.OperationReply, error) {
-			return shared.Call(continuation, continuationIdentity, "prepare_artifact_download", raw)
+			return shared.Call(continuation, continuationIdentity, "download_artifact", raw)
 		})
 	}()
 	joinedRequest := false
@@ -266,8 +282,8 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	cleanupStarted := time.Now()
 	stopContinuation()
 	outcome.report(t, cleanupStarted)
-	ready := publicJourneyData[presentation.ContextDownloadData](t, "original preparation continuation", outcome.reply, outcome.err)
-	if ready.State == artifact.DownloadPreparing && ready.ContinuePreparation {
+	continued, continuedErr := outcome.reply, outcome.err
+	if publicJourneyPreparing(continued, continuedErr) {
 		// Enrollment runs independently of the requesting socket; the console repeats
 		// an acknowledged Preparing reply with the same key after two seconds. This
 		// single next continuation is equally deliberate and has its own identity.
@@ -276,10 +292,10 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 			t.Fatal("journey ended before the next deliberate continuation")
 		case <-time.After(2 * time.Second):
 		}
-		reply, e := shared.Call(ctx, current(ctx, false), "prepare_artifact_download", raw)
-		ready = publicJourneyData[presentation.ContextDownloadData](t, "next deliberate preparation continuation", reply, e)
+		continued, continuedErr = shared.Call(ctx, current(ctx, false), "download_artifact", raw)
 	}
-	if ready.DownloadID != original.ID || ready.ArtifactID != artifactID || ready.State != artifact.DownloadReady || ready.SizeBytes == nil || ready.ContentPath == "" {
+	ready := publicJourneyData[presentation.ContextDownloadData](t, "original preparation continuation", continued, continuedErr)
+	if ready.DownloadID != original.ID || ready.ArtifactID != artifactID || ready.State != "Ready" || ready.ContentPath == "" {
 		t.Fatal("continued preparation changed original identity or remained unavailable", ready.State)
 	}
 	same, e := native.runtime.LookupDownload(ctx, original.ID, actor.Principal)
@@ -313,7 +329,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	waitContextNativeHTTP(t, ctx, completed)
 	defer clear(body)
 	digest := sha256.Sum256(body)
-	if e != nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || !bytes.Equal(body, collector.native) || int64(len(body)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 || response.Header.Get("ETag") != ready.ETag {
+	if e != nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || !bytes.Equal(body, collector.native) || ready.SizeBytes == nil || int64(len(body)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 || response.Header.Get("ETag") != ready.ETag {
 		t.Fatal("authenticated native bytes differ from the original Kubernetes capture", response.StatusCode, len(body), e)
 	}
 	// Preparation and the content response; ADR-167 hands the prepared facts to
@@ -325,7 +341,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	if completedSession.State != artifact.DownloadCompleted || completedSession.Scope != original.Scope {
 		t.Fatal("native completion changed original session")
 	}
-	reply, e = call("cancel_artifact_download", map[string]string{"download_id": original.ID, "idempotency_key": "public-journey-stop"}, true)
+	reply, e = call("download_artifact", map[string]string{"action": "cancel", "download_id": original.ID, "idempotency_key": "public-journey-stop"}, true)
 	stopped := publicJourneyData[presentation.ContextDownloadCancelData](t, "browser prepaid Stop", reply, e)
 	if stopped.DownloadID != original.ID || stopped.State == "" {
 		native.gateTrace.Report(t)
@@ -342,7 +358,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 		name    string
 		input   any
 		current identities.CurrentIdentity
-	}{{"get_case", map[string]string{"case_id": published.Expectation.CaseID}, oldBearer}, {"get_capture", map[string]string{"capture_id": accepted.CaptureID}, oldBrowser}, {"get_artifact_download", map[string]string{"download_id": original.ID}, oldBearer}} {
+	}{{"get_case", map[string]string{"case_id": published.Expectation.CaseID}, oldBearer}, {"get_capture", map[string]string{"capture_id": accepted.CaptureID}, oldBrowser}, {"download_artifact", map[string]string{"action": "status", "download_id": original.ID}, oldBearer}} {
 		if result, err := shared.Call(ctx, request.current, request.name, publicJourneyInput(t, request.input)); !errors.Is(err, identity.ErrDenied) || len(result.Body) != 0 {
 			t.Fatal("revoked current identity received metadata", request.name)
 		}

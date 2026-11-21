@@ -50,7 +50,7 @@ func auditedMCPFixture(t *testing.T) (*Handler, *httptest.Server, *mcpCaptureFix
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
 	t.Cleanup(server.Close)
 	capture := &mcpCaptureFixture{}
-	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, capture, capture)
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, capture, capture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,3 +306,5 @@ func TestMCPReplyWriterRetainsMetadataClosureFence(t *testing.T) {
 		}
 	}
 }
+
+var localCluster = presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000001"})

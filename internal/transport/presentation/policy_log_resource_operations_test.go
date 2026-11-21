@@ -1,12 +1,12 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
 	"strings"
 	"testing"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ADR-241: log and resource occurrences report their second as failed_at;
@@ -20,15 +20,12 @@ func TestPolicyStatusReportsLogAndResourceDetectors(t *testing.T) {
 		{Kind: "resource", Resource: &targets.ResourceCondition{Metric: "memoryLimitRatio", Operator: "gte", Threshold: 0.9, MaxAgeSeconds: 60}},
 	} {
 		f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
-		s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-		if err != nil {
-			t.Fatal(err)
-		}
+		s := newPolicyOperations(t, f)
 		f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour),
 			Detector:     &d,
 			Recent:       []value.PolicyOccurrenceStatus{{ID: "11111111-1111-4111-8111-111111111111", Outcome: "captured", CaptureID: "22222222-2222-4222-8222-222222222222", Detector: d.Kind, Restarts: created.Add(-time.Minute).Unix(), CreatedAt: created}},
 			Suppressions: []value.PolicySuppression{{Reason: "overlong", Count: 4, FirstAt: created, LastAt: created}}}
-		out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"signals"}`)
+		out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"signals"}`)
 		data, _ := out["data"].(map[string]any)
 		detector, _ := data["detector"].(map[string]any)
 		recent, _ := data["recent"].([]any)

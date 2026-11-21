@@ -201,8 +201,8 @@ func TestPreviewAccessChangeInvalidInput(t *testing.T) {
 }
 
 // A result larger than one reply is paged: every page fits the shared
-// operation reply limit, the pages together list every row within the
-// 256 KiB result bound, and a cursor from another result is refused.
+// operation reply limit, the pages together list every row, and a cursor
+// from another result is refused.
 func TestPreviewAccessChangePages(t *testing.T) {
 	f, s := newPreviewOps(t)
 	group := strings.Repeat("g", 256)
@@ -217,7 +217,7 @@ func TestPreviewAccessChangePages(t *testing.T) {
 		}
 		return in + `}`
 	}
-	cursor, rows, pages, listedBytes := "", 0, 0, 0
+	cursor, rows, pages := "", 0, 0
 	var first previewReply
 	for {
 		got, err := callPreview(t, f, s, input(cursor))
@@ -228,23 +228,14 @@ func TestPreviewAccessChangePages(t *testing.T) {
 			first = got
 		}
 		rows += len(got.Data.Deltas)
-		var page struct {
-			Data struct{ Deltas []json.RawMessage } `json:"data"`
-		}
-		if json.Unmarshal(got.raw, &page) != nil {
-			t.Fatal("page")
-		}
-		for _, d := range page.Data.Deltas {
-			listedBytes += len(d)
-		}
 		pages++
 		if got.NextCursor == nil {
 			break
 		}
 		cursor = *got.NextCursor
 	}
-	if pages < 2 || rows != first.Data.ListedRows || rows >= 600 || listedBytes > 256<<10 || listedBytes < 200<<10 {
-		t.Fatalf("pages %d rows %d listed %d bytes %d", pages, rows, first.Data.ListedRows, listedBytes)
+	if pages < 2 || rows != first.Data.ListedRows || rows != 600 {
+		t.Fatalf("pages %d rows %d listed %d", pages, rows, first.Data.ListedRows)
 	}
 	stale, err := callPreview(t, f, s, input("1:"+strings.Repeat("0", 32)))
 	if err != nil || stale.Status != "error" || stale.Data.Code != "PreviewChanged" {

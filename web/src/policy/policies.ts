@@ -1,19 +1,24 @@
-import { operations as grantOperations, type Operations as GrantOperations, type Input as GrantInput, type Grant } from '../approvals/http';
+import { operations as legacyOperations, type Operations as LegacyOperations, type Input as LegacyInput, type Data as LegacyData, type Operation as LegacyOperation } from './legacy';
 import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage } from '../capture/http';
 import { operations, type Data, type Input, type Operation, type Operations, type Output, type Status } from './http';
 import { operations as shareOperations, type Operations as ShareOperations } from '../sharing/http';
 
+// A policy is named by cluster, namespace and DebugPolicy name; key is their join.
+export type Ref = { cluster: string; namespace: string; policy_name: string };
 // review is the server's recurring-sharing review (ADR-239), shown before the
 // user activates a policy that shares its captures.
-export type Entry = { name: string; status?: Status; message?: string; review?: string; grant?: Grant; requestPending?: boolean; attachmentPending?: string; busy: boolean };
+export type Entry = Ref & { key: string; status?: Status; message?: string; review?: string; grant?: LegacyData<'request_policy_grant'>; requestPending?: boolean; attachmentPending?: string; busy: boolean };
+export type GrantChoices = Omit<LegacyInput<'request_policy_grant'>, 'policy_uid' | 'policy_name' | 'idempotency_key'>;
 export type State = { entries: Entry[] };
 
+const name = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+const keyOf = (ref: Ref) => [ref.cluster, ref.namespace, ref.policy_name].join('/');
+
 // UI coordination is not authority: the server rechecks every operation. The
-// looked-up names and their content-free status live only in this tab; there
-// is no policy listing operation, so the user names the hub-held policy.
+// looked-up policies and their content-free status live only in this tab.
 // One idempotency key per pending command is reused on retry and dropped on
-// a definite result, so a retried uncertain activation is never a second one.
+// a definite result.
 export class Policies {
   private state: State = { entries: [] };
   private listeners = new Set<() => void>();
@@ -21,15 +26,19 @@ export class Policies {
   private session?: Session;
   private scope?: AbortSignal;
   private keys = new Map<string, string>();
- private requests = new Map<string, GrantInput<'request_policy_grant'>>();
- private attachments = new Map<string, string>();
+  private requests = new Map<string, LegacyInput<'request_policy_grant'>>();
+  private attachments = new Map<string, string>();
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private shares: ShareOperations = shareOperations, private grants: GrantOperations = grantOperations) {}
+  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private shares: ShareOperations = shareOperations, private legacy: LegacyOperations = legacyOperations) {}
 
-  private update(name: string, patch: Partial<Entry>) {
-    this.state = { entries: this.state.entries.map(entry => entry.name === name ? { ...entry, ...patch } : entry) };
+  private update(key: string, patch: Partial<Entry>) {
+    this.state = { entries: this.state.entries.map(entry => entry.key === key ? { ...entry, ...patch } : entry) };
     for (const listener of this.listeners) listener();
+  }
+  private ref(key: string): Ref | undefined {
+    const e = this.state.entries.find(entry => entry.key === key);
+    return e && { cluster: e.cluster, namespace: e.namespace, policy_name: e.policy_name };
   }
 
   attach(session: Session, scope: AbortSignal) {
@@ -40,96 +49,127 @@ export class Policies {
   }
 
   reset = () => {
-    this.identity = undefined; this.session = undefined; this.scope = undefined; this.keys.clear(); this.requests.clear();this.attachments.clear();
+    this.identity = undefined; this.session = undefined; this.scope = undefined; this.keys.clear(); this.requests.clear(); this.attachments.clear();
     this.state = { entries: [] };
     for (const listener of this.listeners) listener();
   };
 
-  private async run<N extends Operation>(name: string, operation: N, input: Input<N>): Promise<Data<N> | undefined> {
+  private run<N extends Operation>(key: string, operation: N, input: Input<N>): Promise<Data<N> | undefined> {
+    return this.send(key, operation, (csrf, scope) => this.client.call(operation, input, csrf, scope) as Promise<Output<N>>);
+  }
+  private runLegacy<N extends LegacyOperation>(key: string, operation: N, input: LegacyInput<N>): Promise<LegacyData<N> | undefined> {
+    return this.send(key, operation, (csrf, scope) => this.legacy.call(operation, input, csrf, scope));
+  }
+  private async send<R extends { status: string; data: unknown }>(key: string, operation: string, call: (csrf: string, scope: AbortSignal) => Promise<R>): Promise<Extract<R, { status: 'ok' }>['data'] | undefined> {
     const session = this.session, scope = this.scope;
     if (!session || !scope || scope.aborted) return;
-    this.update(name, { busy: true, message: undefined });
+    this.update(key, { busy: true, message: undefined });
     try {
-      const result: Output<N> = await this.client.call(operation, input, session.csrf_token, scope);
+      const result = await call(session.csrf_token, scope);
       if (scope.aborted) return;
-      if (result.status !== 'ok') throw new OperationFailure(503, result.status === 'error' ? result.data.code : 'Pending', result.status === 'error' ? result.data.message : 'This operation is still pending.');
-      return result.data as Data<N>;
+      if (result.status !== 'ok') {
+        const failure = result.data as { code?: string; message?: string };
+        throw new OperationFailure(503, result.status === 'error' ? failure.code ?? 'Error' : 'Pending', result.status === 'error' ? failure.message ?? '' : 'This operation is still pending.');
+      }
+      return result.data as Extract<R, { status: 'ok' }>['data'];
     } catch (error) {
       if (!scope.aborted) {
         // A canonical domain refusal is definite: the next command gets a new key.
-        if (error instanceof OperationFailure && error.detail) this.keys.delete(operation + '\n' + name);
-        if (error instanceof OperationFailure && error.code === 'SharingReviewRequired') this.update(name, { review: error.detail });
-        else this.update(name, { message: operationMessage(error) });
+        if (error instanceof OperationFailure && error.detail) this.keys.delete(operation + '\n' + key);
+        if (error instanceof OperationFailure && error.code === 'SharingReviewRequired') this.update(key, { review: error.detail });
+        else this.update(key, { message: operationMessage(error) });
       }
       return;
-    } finally { if (!scope.aborted) this.update(name, { busy: false }); }
+    } finally { if (!scope.aborted) this.update(key, { busy: false }); }
   }
 
-  lookup = async (name: string) => {
-    name = name.trim();
-    if (!/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/.test(name) || name.length > 253) return;
-    if (!this.state.entries.some(entry => entry.name === name)) {
-      this.state = { entries: [...this.state.entries, { name, busy: false }] };
+  lookup = async (input: Ref) => {
+    const ref = { cluster: input.cluster.trim(), namespace: input.namespace.trim(), policy_name: input.policy_name.trim() };
+    if (!name.test(ref.cluster) || ref.cluster.length > 63 || !name.test(ref.namespace) || ref.namespace.length > 63 || !/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/.test(ref.policy_name) || ref.policy_name.length > 253) return;
+    const key = keyOf(ref);
+    if (!this.state.entries.some(entry => entry.key === key)) {
+      this.state = { entries: [...this.state.entries, { ...ref, key, busy: false }] };
       for (const listener of this.listeners) listener();
     }
-    await this.refresh(name);
+    await this.refresh(key);
   };
 
-  refresh = async (name: string) => {
-    const data = await this.run(name, 'get_policy_status', { policy_name: name });
-    if (data) this.update(name, { status: data });
+  refresh = async (key: string) => {
+    const ref = this.ref(key);
+    if (!ref) return;
+    const data = await this.run(key, 'get_policy_status', ref);
+    if (data) this.update(key, { status: data });
   };
 
-  private async command(name: string, operation: 'activate_policy' | 'deactivate_policy', reviewed = false, grantID?: string) {
-    const slot = operation + '\n' + name + (grantID ? '\nattachment' : '');
-    const key = this.keys.get(slot) ?? this.newID();
-    this.keys.set(slot, key);
-    this.update(name, { review: undefined });
-    const pinnedGrant = grantID ? this.attachments.get(name) ?? grantID : undefined;
-    if (pinnedGrant) { this.attachments.set(name, pinnedGrant);this.update(name,{attachmentPending:pinnedGrant}); }
-    const input = pinnedGrant ? {policy_name:name,idempotency_key:key,grant_id:pinnedGrant} : operation === 'activate_policy' && reviewed ? { policy_name: name, idempotency_key: key, sharing_reviewed: true } : { policy_name: name, idempotency_key: key };
-    const data = await this.run(name, operation, input);
-    if (!data) return;
-    this.keys.delete(slot);if (pinnedGrant) {this.attachments.delete(name);this.update(name,{attachmentPending:undefined});}
-    await this.refresh(name);
+  deactivate = async (key: string) => {
+    const ref = this.ref(key);
+    if (!ref) return;
+    const slot = 'deactivate_policy\n' + key;
+    const idempotency_key = this.keys.get(slot) ?? this.newID();
+    this.keys.set(slot, idempotency_key);
+    if (!await this.run(key, 'deactivate_policy', { ...ref, idempotency_key })) return;
+    this.keys.delete(slot);
+    await this.refresh(key);
+  };
+
+  // activate_policy and request_policy_grant (legacy contract) remain until
+  // hub-side acceptance (specs/policy-automation.md) replaces them. They name
+  // the hub-held DebugPolicy by name.
+  private async activation(key: string, reviewed = false, grantID?: string) {
+    const ref = this.ref(key);
+    if (!ref) return;
+    const slot = 'activate_policy\n' + key + (grantID ? '\nattachment' : '');
+    const idempotency_key = this.keys.get(slot) ?? this.newID();
+    this.keys.set(slot, idempotency_key);
+    this.update(key, { review: undefined });
+    const pinned = grantID ? this.attachments.get(key) ?? grantID : undefined;
+    if (pinned) { this.attachments.set(key, pinned); this.update(key, { attachmentPending: pinned }); }
+    const input = pinned ? { policy_name: ref.policy_name, idempotency_key, grant_id: pinned } : reviewed ? { policy_name: ref.policy_name, idempotency_key, sharing_reviewed: true } : { policy_name: ref.policy_name, idempotency_key };
+    if (!await this.runLegacy(key, 'activate_policy', input)) return;
+    this.keys.delete(slot);
+    if (pinned) { this.attachments.delete(key); this.update(key, { attachmentPending: undefined }); }
+    await this.refresh(key);
   }
-  requestGrant = async (name: string, choices: Omit<GrantInput<'request_policy_grant'>, 'policy_uid' | 'policy_name' | 'idempotency_key'>) => {
-    const session = this.session, scope = this.scope, status = this.state.entries.find(e => e.name === name)?.status;
-    if (!session || !scope || scope.aborted || !status || (status.collection_kind !== 'packetCapture' && status.collection_kind !== 'syscallTrace' && status.collection_kind !== 'profile' && status.collection_kind !== 'logs')) return;
-    const input = this.requests.get(name) ?? { ...structuredClone(choices), policy_uid: status.policy_uid,policy_name:name, idempotency_key: this.newID() };
-    this.requests.set(name, input);
-    this.update(name, { busy: true, message: undefined, requestPending: true });
+  activate = (key: string) => this.activation(key);
+  // ADR-239: activation after the user reviewed the recurring sharing.
+  activateSharing = (key: string) => this.activation(key, true);
+  attachGrant = (key: string, id: string) => this.activation(key, false, id);
+  requestGrant = async (key: string, choices: GrantChoices) => {
+    const session = this.session, scope = this.scope, entry = this.state.entries.find(e => e.key === key), status = entry?.status;
+    if (!session || !scope || scope.aborted || !entry || !status || status.collection_kind === 'podStatus' || !status.policy_uid) return;
+    const input = this.requests.get(key) ?? { ...structuredClone(choices), policy_uid: status.policy_uid, policy_name: entry.policy_name, idempotency_key: this.newID() };
+    this.requests.set(key, input);
+    this.update(key, { busy: true, message: undefined, requestPending: true });
     try {
-      const reply = await this.grants.call('request_policy_grant', input, session.csrf_token, scope);
+      const reply = await this.legacy.call('request_policy_grant', input, session.csrf_token, scope);
       if (scope.aborted) return;
       if (reply.status !== 'ok') throw new OperationFailure(503, reply.status === 'error' ? reply.data.code : 'Pending', reply.status === 'error' ? reply.data.message : 'The request is pending.');
-      this.requests.delete(name);this.update(name,{ grant:reply.data, requestPending:false });
-    } catch(error) {
-      if (!scope.aborted) { if (error instanceof OperationFailure && error.code==='InvalidApprovalRequest') { this.requests.delete(name);this.update(name,{requestPending:false}); }this.update(name,{message:operationMessage(error)}); }
-    } finally { if (!scope.aborted) this.update(name,{busy:false}); }
+      this.requests.delete(key); this.update(key, { grant: reply.data as LegacyData<'request_policy_grant'>, requestPending: false });
+    } catch (error) {
+      if (!scope.aborted) {
+        if (error instanceof OperationFailure && error.code === 'InvalidApprovalRequest') { this.requests.delete(key); this.update(key, { requestPending: false }); }
+        this.update(key, { message: operationMessage(error) });
+      }
+    } finally { if (!scope.aborted) this.update(key, { busy: false }); }
   };
-  attachGrant = (name: string, id: string) => this.command(name,'activate_policy',false,id);
-  activate = (name: string) => this.command(name, 'activate_policy');
-  // ADR-239: activation after the user reviewed the recurring sharing.
-  activateSharing = (name: string) => this.command(name, 'activate_policy', true);
 
   // ADR-239: stop future sharing (stop_future_sharing) or revoke every share
   // of the acceptance's recurring sharing and stop it (revoke_share with
   // sharing_intent_id). The server checks that the caller created or
   // currently manages it.
-  stopSharing = (name: string) => this.changeSharing(name, 'stop_future_sharing');
-  revokeSharing = (name: string) => this.changeSharing(name, 'revoke_share');
-  private changeSharing = async (name: string, operation: 'stop_future_sharing' | 'revoke_share') => {
+  stopSharing = (key: string) => this.changeSharing(key, 'stop_future_sharing');
+  revokeSharing = (key: string) => this.changeSharing(key, 'revoke_share');
+  private changeSharing = async (key: string, operation: 'stop_future_sharing' | 'revoke_share') => {
     const session = this.session, scope = this.scope;
-    const status = this.state.entries.find(entry => entry.name === name)?.status;
+    const status = this.state.entries.find(entry => entry.key === key)?.status;
     const acceptance = status?.acceptance_id;
     if (!session || !scope || scope.aborted || !acceptance) return;
     const slot = operation + '\n' + acceptance;
-    const key = this.keys.get(slot) ?? this.newID();
-    this.keys.set(slot, key);
-    this.update(name, { busy: true, message: undefined });
+    const idempotency_key = this.keys.get(slot) ?? this.newID();
+    this.keys.set(slot, idempotency_key);
+    this.update(key, { busy: true, message: undefined });
     try {
-      const input = { sharing_intent_id: acceptance, expected_revision: operation === 'revoke_share' ? status?.sharing?.revision ?? 1 : 1, idempotency_key: key };
+      const input = { sharing_intent_id: acceptance, expected_revision: operation === 'revoke_share' ? status?.sharing?.revision ?? 1 : 1, idempotency_key };
       const reply = await this.shares.call(operation, input, session.csrf_token, scope);
       if (scope.aborted) return;
       if (reply.status !== 'ok') throw new OperationFailure(503, reply.status === 'error' ? reply.data.code : 'Pending', reply.status === 'error' ? reply.data.message : 'This operation is still pending.');
@@ -137,11 +177,10 @@ export class Policies {
     } catch (error) {
       if (!scope.aborted) {
         if (error instanceof OperationFailure && error.detail) this.keys.delete(slot);
-        this.update(name, { message: operationMessage(error) });
+        this.update(key, { message: operationMessage(error) });
       }
       return;
-    } finally { if (!scope.aborted) this.update(name, { busy: false }); }
-    await this.refresh(name);
+    } finally { if (!scope.aborted) this.update(key, { busy: false }); }
+    await this.refresh(key);
   };
-  deactivate = (name: string) => this.command(name, 'deactivate_policy');
 }

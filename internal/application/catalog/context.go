@@ -76,18 +76,9 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		until = identity.Earlier(until, d)
 	}
 	if raw != nil {
-		var selected []value.ContextCaseRoute
-		for _, digest := range raw.digests {
-			var matches []value.ContextCaseRoute
-			for _, route := range routes.Routes {
-				if route.Version == digest {
-					matches = append(matches, route)
-				}
-			}
-			if len(matches) != 1 {
-				return zero, value.ErrUnavailable
-			}
-			selected = append(selected, matches[0])
+		selected, ok := permissions.Select(raw.selection, routes.Routes, func(r value.ContextCaseRoute) (string, artifact.Digest) { return r.ArtifactID, r.Version })
+		if !ok {
+			return zero, value.ErrUnavailable
 		}
 		routes.Routes = selected
 	}

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -108,9 +109,11 @@ func TestConsoleNativeRestartWithBuiltPackage(t *testing.T) {
 			// Use the actual socket for deadline control but hold the finite canonical
 			// reply until the selected test-only lost-response boundary is applied.
 			held := &consoleRestartReply{ResponseRecorder: httptest.NewRecorder(), wire: w}
+			raw, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+			r.Body = io.NopCloser(bytes.NewReader(raw))
 			operations.ServeHTTP(held, r)
 			name := strings.TrimPrefix(r.URL.Path, "/api/v1/operations/")
-			if service.loseReply(name) {
+			if service.loseReply(name, presentation.DownloadAction(raw)) {
 				if held.Code != 200 || !strings.Contains(held.Body.String(), `"status":"ok"`) {
 					t.Error("lost-reply fixture did not reach positive canonical reply")
 				}
@@ -249,7 +252,8 @@ func (s *consoleRestartDownloads) view(i identity.Identity, id string) evidence.
 	if state.Terminal() {
 		m = nil
 	}
-	return evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: id, AllocationID: consoleCaptureID(82), Scope: artifact.DownloadScope{RootID: consoleCaptureID(1), ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid", Version: artifact.Digest{9}, Principal: i.Principal}, RequestDigest: artifact.Digest{10}, State: state, CreatedAt: s.created, Deadline: deadline, OutputLimit: 8192, ReadLimit: 12 << 20}, Metadata: m, ValidUntil: identity.Earlier(now.Add(5*time.Second), identity.Earlier(i.ValidUntil, deadline)), AccessUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
+	// The coordinator records the verified facts on the session at Ready.
+	return evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: id, AllocationID: consoleCaptureID(82), Scope: artifact.DownloadScope{RootID: consoleCaptureID(1), ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid", Version: artifact.Digest{9}, Principal: i.Principal}, RequestDigest: artifact.Digest{10}, State: state, CreatedAt: s.created, Deadline: deadline, OutputLimit: 8192, ReadLimit: 12 << 20, NativeSize: int64(len(consoleRestartBody)), NativeSHA256: sha256.Sum256([]byte(consoleRestartBody))}, Metadata: m, ValidUntil: identity.Earlier(now.Add(5*time.Second), identity.Earlier(i.ValidUntil, deadline)), AccessUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
 }
 func (s *consoleRestartDownloads) PrepareContextDownload(ctx context.Context, c app.CurrentIdentity, artifactID, key string) (evidence.ContextDownloadView, error) {
 	i, e := s.current(ctx, c)
@@ -326,10 +330,13 @@ func (s *consoleRestartDownloads) CancelContextDownload(ctx context.Context, c a
 	now := time.Now()
 	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: s.stopRequest, State: "Cancelled", ObservedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), i.ValidUntil)}, nil
 }
-func (s *consoleRestartDownloads) loseReply(name string) bool {
+func (s *consoleRestartDownloads) loseReply(name, action string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if name == "cancel_artifact_download" {
+	if name != "download_artifact" {
+		return false
+	}
+	if action == "cancel" {
 		if s.dropStop {
 			s.dropStop = false
 			s.stats.LostStop = true
@@ -339,7 +346,7 @@ func (s *consoleRestartDownloads) loseReply(name string) bool {
 			s.stats.StopPositive = true
 		}
 	}
-	if name == "prepare_artifact_download" && s.dropPrepare {
+	if action == "prepare" && s.dropPrepare {
 		s.dropPrepare = false
 		s.stats.LostPrepare = true
 		return true

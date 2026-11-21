@@ -101,9 +101,10 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     };
     stage('workload-discovery');
     await search.getByLabel('Search by', { exact: true }).selectOption('workload');
-    await search.getByLabel('Cluster ID', { exact: true }).fill(scope.clusterID);
-    await search.getByLabel('Namespace UID', { exact: true }).fill(scope.namespaceUID);
-    await search.getByLabel('Workload UID', { exact: true }).fill(scope.workloadUID);
+    // ADR-335 D4: the search names the cluster, namespace and workload.
+    await search.getByLabel('Cluster', { exact: true }).fill('local');
+    await search.getByLabel('Namespace', { exact: true }).fill('synthetic-namespace');
+    await search.getByLabel('Workload', { exact: true }).fill('synthetic-workload');
     // datetime-local normalizes a zero-seconds value to HH:MM; Playwright
     // rejects a fill whose read-back value differs ("Malformed value").
     const local = date => date.toISOString().slice(0, 19).replace(/:00$/, '');
@@ -117,7 +118,7 @@ export async function processingJourney({ page, origin, artifactID, casePath, pa
     const query = actual.request().postDataJSON();
     assert(validInput_search_processing_evidence(query), 'closed workload discovery query');
     assert.deepEqual(query, {
-      cluster_id: scope.clusterID, namespace_uid: scope.namespaceUID, workload_uid: scope.workloadUID,
+      cluster: 'local', namespace: 'synthetic-namespace', workload: 'synthetic-workload',
       acquired_from: scope.acquiredFrom, acquired_until: scope.acquiredUntil, purpose_ref: candidate.purpose_ref, limit: 12,
     });
     const body = await operationBody(actual), reply = JSON.parse(body);

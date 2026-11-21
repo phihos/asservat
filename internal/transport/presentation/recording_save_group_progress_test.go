@@ -89,7 +89,7 @@ func TestRecordingSaveGroupProgressKeepsEveryChildUnderOneParent(t *testing.T) {
 }
 
 func TestRecordingSaveGroupedPreviewKeepsPerSourceWindowsWithoutParentArtifact(t *testing.T) {
-	_, ops, current, f, _ := recordingOperationTestFixture(t)
+	ops, _, current, f, _ := recordingOperationTestFixture(t)
 	first := f.result.RecordingSave.Selected[0]
 	second := first
 	second.Handle = "other-opaque-handle"
@@ -106,12 +106,12 @@ func TestRecordingSaveGroupedPreviewKeepsPerSourceWindowsWithoutParentArtifact(t
 	f.result.RecordingSave.Before = 0
 	f.result.RecordingSave.Windows = []app.RecordingSaveWindow{{Handle: first.Handle, Before: 20 * time.Second}, {Handle: second.Handle, Before: 10 * time.Second}}
 	handles := []string{first.Handle, second.Handle}
-	reply, err := ops.Call(t.Context(), current, "preview_recording_save", json.RawMessage(`{"recording_handles":["`+first.Handle+`","`+second.Handle+`"]}`))
+	reply, err := ops.Call(t.Context(), current, "preview_capture", json.RawMessage(`{"recording_handles":["`+first.Handle+`","`+second.Handle+`"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var envelope struct{ Data RecordingSavePreviewData }
-	if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.PlanDigest) != 64 || len(envelope.Data.Selected) != 2 || len(envelope.Data.Windows) != 2 || envelope.Data.Windows[0].Before != "20s" || envelope.Data.Windows[1].Before != "10s" {
+	var envelope struct{ Data ContextPreviewData }
+	if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.PlanDigest) != 64 || envelope.Data.PodCount != 2 || len(envelope.Data.Lifecycle.Actions) != 2 || envelope.Data.Lifecycle.Actions[0].RequestedBefore != "20s" || envelope.Data.Lifecycle.Actions[1].RequestedBefore != "10s" || envelope.Data.Lifecycle.Actions[0].After != "0s" || envelope.Data.Lifecycle.RequestKind != "DebugPolicy" {
 		t.Fatal("grouped preview collapsed windows or parent", string(reply.Body))
 	}
 	f.result.RecordingSave.Windows[1].Before = 11 * time.Second
@@ -217,23 +217,23 @@ func TestRecordingSaveMaximumGroupedProgressFitsExistingEnvelope(t *testing.T) {
 }
 
 func TestRecordingSaveAssessmentUsesActualSourceActionAndRetention(t *testing.T) {
-	_, ops, current, f, _ := recordingOperationTestFixture(t)
-	reply, err := ops.Call(t.Context(), current, "preview_recording_save", json.RawMessage(`{"recording_handles":["opaque-recording-handle"]}`))
+	ops, _, current, f, _ := recordingOperationTestFixture(t)
+	reply, err := ops.Call(t.Context(), current, "preview_capture", json.RawMessage(`{"recording_handles":["opaque-recording-handle"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var envelope struct{ Data RecordingSavePreviewData }
+	var envelope struct{ Data ContextPreviewData }
 	if json.Unmarshal(reply.Body, &envelope) != nil {
 		t.Fatal(string(reply.Body))
 	}
 	assessment := envelope.Data.Assessment
-	if len(assessment.Actions) != 1 || assessment.Actions[0].ActionID != f.result.RecordingSave.Selected[0].ActionID || assessment.Actions[0].Retention.AnchorRule != "firstAcquisitionOrEarlierSource" || assessment.Actions[0].Quantities[0].SourceRef == "builtin-pod-status-v1" {
+	if len(assessment.Actions) != 1 || assessment.Actions[0].ActionID != f.result.RecordingSave.Selected[0].ActionID || assessment.Actions[0].Retention.AnchorRule != "submissionPreparation" || assessment.Actions[0].RecordingHandle != "opaque-recording-handle" || assessment.Actions[0].Quantities[0].SourceRef == "builtin-pod-status-v1" {
 		t.Fatal("snapshot assessment fabricated podstatus metadata", string(reply.Body))
 	}
 }
 
-func TestRecordingSaveSixteenSourcePreviewFitsResponseBound(t *testing.T) {
-	audited, ops, current, f, gate := recordingOperationTestFixture(t)
+func TestRecordingSaveOversizedPreviewNavigatesToBrowser(t *testing.T) {
+	audited, _, current, f, gate := recordingOperationTestFixture(t)
 	m := f.result.RecordingSave
 	prototype := m.Selected[0]
 	perSource := f.result.Assessment
@@ -268,30 +268,21 @@ func TestRecordingSaveSixteenSourcePreviewFitsResponseBound(t *testing.T) {
 		handles = append(handles, r.Handle)
 	}
 	f.result.Assessment.OutputLimit = 16 * perSource.OutputLimit
-	assessment, err := recordingSaveAssessment(f.result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, windows, err := recordingPreviewSelection(f.result, handles)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, _ := json.Marshal(RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PlanDigest: hash(f.result.Preview.ScopeDigest), Selected: rows, Windows: windows, Assessment: assessment, Blockers: []string{}, NavigationURI: ops.PublicOrigin() + "/captures/new", IncidentPodCap: 16})
-	t.Logf("maximum16-source preview (128handle/128PodUID/63PodName/63actionID/64retention refs perchild) data bytes=%d before envelope; configured bounds, not measured collector overhead", len(raw))
 	input, _ := json.Marshal(map[string]any{"recording_handles": handles})
-	reply, err := ops.Call(t.Context(), current, "preview_recording_save", input)
-	if err != nil {
-		t.Fatal(err)
-	}
+	auditedReply, auditErr := audited.Call(t.Context(), current, "preview_capture", input)
+	// Sixteen worst-case sources exceed the MCP result bound: the reply sends
+	// the reviewer to the browser instead of a shortened plan (specs/mcp.md).
 	var envelope struct {
 		Status string
-		Data   json.RawMessage
+		Data   struct {
+			Code          string `json:"code"`
+			NavigationURI string `json:"navigation_uri"`
+		}
 	}
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" {
-		t.Fatal("accepted16-source contract cannot fit current response", len(raw), string(reply.Body))
+	if auditErr != nil || json.Unmarshal(auditedReply.Body, &envelope) != nil || envelope.Status != "error" || envelope.Data.Code != "PlanTooLarge" || envelope.Data.NavigationURI == "" {
+		t.Fatal("oversized plan not refused with navigation", auditErr, string(auditedReply.Body))
 	}
-	auditedReply, auditErr := audited.Call(t.Context(), current, "preview_recording_save", input)
-	if auditErr != nil || len(gate.events) != 1 || gate.events[0].OutputBytes != int64(len(auditedReply.Body)) || gate.events[0].Effect != "none" {
+	if len(gate.events) != 1 || gate.events[0].OutputBytes != int64(len(auditedReply.Body)) || gate.events[0].Effect != "none" {
 		t.Fatal("large preview escaped exact audit/count", auditErr, gate.events)
 	}
 }

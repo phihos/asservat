@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -153,17 +154,32 @@ func TestShareOperationsContract(t *testing.T) {
 	if out := shareCall(t, s, f, "revoke_share", `{"share_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`); out["status"] != "ok" || out["data"].(map[string]any)["revision"] != float64(2) {
 		t.Fatal("revoke reply", out)
 	}
-	// Increment 1 rejects every other share shape at the contract.
+	// A recipient by name takes the caller's issuer (ADR-335 D4); reason and
+	// expiry are optional.
+	byName := `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + strings.Repeat("0a", 32) + `"}],"recipients":[{"kind":"Group","name":"incident"}],"data_classes":["metadata"],"operations":["get_case","download_artifact"],"idempotency_key":"n"}`
+	if out := shareCall(t, s, f, "create_share", byName); out["status"] != "ok" || f.input.Recipients[0] != (authorization.ShareRecipient{Kind: "Group", Issuer: "https://id.example.invalid", ID: "incident"}) || !f.input.ExpiresAt.IsZero() {
+		t.Fatal("create by name", out, f.input)
+	}
+	// Canonical inputs the runtime does not serve are refused, never narrowed.
+	f.calls = nil
+	two := `[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + strings.Repeat("0a", 32) + `"},{"artifactID":"44444444-4444-4444-8444-444444444444","digest":"` + strings.Repeat("0b", 32) + `"}]`
 	for name, input := range map[string]string{
-		"create_share": `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + "0a" + `0000000000000000000000000000000000000000000000000000000000000a"}],"recipients":[{"kind":"User","issuer":"https://id.example.invalid","id":"outsider"}],"data_classes":["metadata","raw"],"operations":["get_case"],"expires_at":"2026-10-27T12:00:00Z","reason":"r","idempotency_key":"k"}`,
-		"list_shares":  `{"view":"owned","include_intents":true}`,
-		// ADR-239 accepts sharing_intent_id (a policy acceptance), but never
-		// together with share_id.
-		"revoke_share": `{"share_id":"11111111-1111-4111-8111-111111111111","sharing_intent_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`,
+		"create_share":   strings.Replace(byName, `"data_classes":["metadata"]`, `"data_classes":["metadata","raw"]`, 1),
+		"create_share ":  strings.Replace(byName, `"operations":["get_case","download_artifact"]`, `"operations":["query_artifact"]`, 1),
+		"create_share  ": strings.Replace(byName, byName[strings.Index(byName, `[{"artifactID"`):strings.Index(byName, `,"recipients"`)], two, 1),
+		"list_shares":    `{"view":"owned","include_intents":true}`,
+		"transfer_share": `{"sharing_intent_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"t","management":{"mode":"creator"}}`,
 	} {
-		if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, name, json.RawMessage(input)); err == nil {
-			t.Fatal("unsupported share input accepted", name)
+		if out := shareCall(t, s, f, strings.TrimSpace(name), input); out["status"] != "error" || out["data"].(map[string]any)["code"] != "CapabilityUnavailable" {
+			t.Fatal("unserved share input", name, out)
 		}
+	}
+	if len(f.calls) != 0 {
+		t.Fatal("unserved input dispatched", f.calls)
+	}
+	// ADR-239 accepts sharing_intent_id, but never together with share_id.
+	if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "revoke_share", json.RawMessage(`{"share_id":"11111111-1111-4111-8111-111111111111","sharing_intent_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`)); err == nil {
+		t.Fatal("revoke with share_id and sharing_intent_id accepted")
 	}
 	// Without evidence:share nothing is dispatched; received needs only read.
 	f.scopes, f.calls = []string{"evidence:read"}, nil
@@ -224,5 +240,36 @@ func TestShareMutationsCarryServerOperationID(t *testing.T) {
 				t.Fatal("public operation ID accepted")
 			}
 		})
+	}
+}
+
+// Codex review: a recipient named in create_share must be one the read path
+// matches. Groups are matched by their groups-claim name and users by
+// subject (tokens carry no username), so a user is named by subject ID and
+// a user name is refused at the contract.
+func TestShareRecipientsMatchTheirReaders(t *testing.T) {
+	f := &shareOperationsFixture{scopes: []string{"evidence:read", "evidence:share"}}
+	s, err := NewShareOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const issuer = "https://id.example.invalid"
+	body := func(recipients string) string {
+		return `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + strings.Repeat("0a", 32) + `"}],"recipients":` + recipients + `,"data_classes":["metadata"],"operations":["get_case"],"idempotency_key":"m"}`
+	}
+	if out := shareCall(t, s, f, "create_share", body(`[{"kind":"Group","name":"incident"},{"kind":"User","issuer":"`+issuer+`","id":"f3c1-subject"}]`)); out["status"] != "ok" {
+		t.Fatal(out)
+	}
+	readers := []identity.Identity{
+		{Principal: identity.Principal{Issuer: issuer, Subject: "someone", ClientID: "console", Kind: identity.Human}, Groups: []string{"incident"}},
+		{Principal: identity.Principal{Issuer: issuer, Subject: "f3c1-subject", ClientID: "console", Kind: identity.Human}},
+	}
+	for n, reader := range readers {
+		if !slices.Contains(authorization.RecipientKeys(reader), f.input.Recipients[n].Key()) {
+			t.Fatal("recipient never matches its reader", f.input.Recipients[n], reader.Principal)
+		}
+	}
+	if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "create_share", json.RawMessage(body(`[{"kind":"User","name":"alice@example.invalid"}]`))); err == nil {
+		t.Fatal("a user name was accepted although no reader can match it")
 	}
 }

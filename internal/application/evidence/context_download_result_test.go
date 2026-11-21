@@ -73,6 +73,9 @@ func (f *downloadResultFixture) ReadWorkerEnrollmentProof(_ context.Context, ses
 
 type blockResultObservation struct{}
 
+func (f *downloadResultFixture) RecordDownloadNativeFacts(context.Context, string, int64, artifact.Digest) error {
+	return nil
+}
 func (f *downloadResultFixture) ObserveDownload(ctx context.Context, id string, a artifact.DownloadAuthority, p *artifact.DownloadPreparation) (artifact.DownloadObservation, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

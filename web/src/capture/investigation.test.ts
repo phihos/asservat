@@ -1,13 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from './investigation';
 import { FakeEventSource } from '../test-setup';
-import { SyntheticOperations, SyntheticGrants, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
+import { SyntheticOperations, SyntheticGrants, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult, clusterID, isSettings } from './test-fixtures';
 
 const controllers: Investigation[] = [];
 const submission = (retention: number, key = id(4)) => ({ preview: { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' }, requested_retention_seconds: retention }, expected_plan_digest: 'b'.repeat(64), idempotency_key: key });
 it('opens settings from a direct capture URL and repeats only after an explicit review with a fresh target', async () => {
   const client = new SyntheticOperations(); const controller = new Investigation(client); controllers.push(controller);
-  client.responder = name => name === 'get_capture' ? progressResult('Succeeded') : name === 'get_capture_settings' ? settingsResult(id(8)) : previewResult();
+  client.responder = (name, input) => isSettings(name, input) ? settingsResult(id(8)) : name === 'get_capture' ? progressResult('Succeeded') : previewResult();
   controller.attach(session, new AbortController().signal, id(8));
   await vi.waitFor(() => expect(controller.snapshot().busy).toBe(false));
   await controller.repeat(id(8));
@@ -26,7 +26,7 @@ it('opens settings from a direct capture URL and repeats only after an explicit 
 });
 it('reviews edited recorder parameters under the same source and version pins without restoring old authority', async () => {
   const { controller, client } = await ready('3600');
-  client.responder = name => name === 'get_capture_settings' ? settingsResult() : recordingPreviewResult(id(41));
+  client.responder = (name, input) => isSettings(name, input) ? settingsResult() : recordingPreviewResult(id(41));
   await controller.showSettings(id(41));
   expect(controller.snapshot().settings?.capture_id).toBe(id(41));
   const saved = recordingPreviewResult(); if (saved.status !== 'ok') throw new Error();
@@ -131,7 +131,6 @@ it('submits only the reviewed preview input and digest and freezes its key befor
 it('submits the same reviewed handle after two minutes; assessment age does not impose a five-second click timer', async () => {
   vi.useFakeTimers(); const { controller, client } = await ready('60');
   await vi.advanceTimersByTimeAsync(120_000);
-  expect(controller.snapshot().stale).toBe(true);
   expect(client.calls.some(call => call.name === 'request_capture')).toBe(false);
   await controller.submit();
   expect(client.calls.filter(call => call.name === 'preview_capture')).toHaveLength(1);
@@ -187,14 +186,14 @@ it('never treats an available preview as permission to bypass runtime disablemen
 it('accepts reordered object fields and rejects a substituted exact target', async () => {
   const { controller, client } = await ready();
   const value = previewResult(); if (value.status !== 'ok') throw new Error();
-  value.data.target_ref = { name: target.name, kind: target.kind, namespace: target.namespace, cluster_id: target.cluster_id };
+  value.data.target_ref = { name: target.name, kind: target.kind, namespace: target.namespace, cluster_id: clusterID };
   client.responder = () => value; await controller.preview(); expect(controller.snapshot().preview).toBeTruthy();
   value.data.target_ref.name = 'another'; await controller.preview(); expect(controller.snapshot().preview).toBeUndefined();
 });
 it('hides progress after a denied read and rejects decreasing durable revisions', async () => {
   const { controller, client } = await ready(); await controller.submit();
   client.responder = () => progressResult('Finalizing', 3); await controller.refreshProgress();
-  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  expect(controller.snapshot().progress?.phase).toBe('Running');
   client.responder = () => progressResult('Pending', 2); await controller.refreshProgress();
   expect(controller.snapshot().progress).toBeUndefined();
   client.responder = () => { throw new Error('permission changed'); }; await controller.refreshProgress();
@@ -211,7 +210,7 @@ it('follows pushed status events instead of polling and stops at a terminal phas
   await vi.advanceTimersByTimeAsync(60_000);
   expect(client.calls.filter(c => c.name === 'get_capture').length).toBe(reads);
   stream.emit('capture', { type: 'capture', id: id(8), revision: 2, result: progressResult('Finalizing', 2) });
-  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  expect(controller.snapshot().progress?.phase).toBe('Running');
   stream.emit('capture', { type: 'capture', id: id(8), revision: 3, result: progressResult('Succeeded', 3) });
   expect(controller.snapshot().progress?.phase).toBe('Succeeded');
   expect(stream.closed).toBe(true);
@@ -222,7 +221,7 @@ it('resynchronizes once after the stream closes and reports a failed resync', as
   const first = FakeEventSource.instances.at(-1)!;
   client.responder = () => progressResult('Finalizing', 2);
   first.fail(); await vi.advanceTimersByTimeAsync(0);
-  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  expect(controller.snapshot().progress?.phase).toBe('Running');
   const second = FakeEventSource.instances.at(-1)!;
   expect(second).not.toBe(first);
   client.responder = () => { throw new Error('session ended'); };
@@ -381,8 +380,8 @@ it('retains selected result access unchanged through uncertain submission and ap
   client.responder = () => { throw new Error('lost response'); };
   await controller.submit(access);
   access.maxBytes = 1; access.actionIds[0] = 'changed'; access.operations.reverse(); access.maxOperations = 1; access.notAfter = new Date(0).toISOString();
-  const first = client.calls.filter(c => c.name === 'request_capture')[0].input;
-  expect(first).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxOperations: 10, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
+  const first = client.calls.filter(c => c.name === 'request_capture')[0].input as { preview: unknown };
+  expect(first.preview).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxOperations: 10, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
   scope.abort(); controller.attach(session, new AbortController().signal);
   client.responder = () => approvalPendingResult();
   await controller.retrySubmission();

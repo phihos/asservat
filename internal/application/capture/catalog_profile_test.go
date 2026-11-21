@@ -148,3 +148,34 @@ func TestCaptureProfileListAndGet(t *testing.T) {
 		t.Fatal("ineligible caller listed profiles")
 	}
 }
+
+// capture-composition.schema.json: an omitted profile version resolves to the
+// current version of that profile (highest available, not deprecated first)
+// and the resolved version is what the plan records.
+func TestOmittedProfileVersionResolvesToCurrent(t *testing.T) {
+	f := newInvestigationFixture()
+	f.svc.Filters = &stubFilters{}
+	published := func(version, uid string, enabled bool) planning.CatalogProfile {
+		return planning.CatalogProfile{Ref: planning.ProfileRef{Catalog: "organization", Name: "team-network", Version: version}, SourceClusterID: fixtureID(4), SourceNamespaceUID: "hub-ns", SourceUID: uid, Document: organizationDocument(t, "team-network", version), Enabled: enabled}
+	}
+	f.svc.Profiles = &catalogFixture{profiles: []planning.CatalogProfile{published("v2", "org-v2", true), published("v3", "org-v3", true), published("v4", "org-v4", false)}}
+	ctx := context.Background()
+	source := f.source(t, ctx)
+	target := f.compositionIntent(networkComposition()).Target
+	versionless := planning.ProfileRef{Catalog: "organization", Name: "team-network"}
+	if got, _, err := f.svc.CaptureProfile(ctx, source, target, versionless); err != nil || got.Ref.Version != "v3" {
+		t.Fatal("organization current version", got.Ref, err)
+	}
+	if got, _, err := f.svc.CaptureProfile(ctx, source, target, planning.ProfileRef{Catalog: "builtin", Name: "network-connections"}); err != nil || got.Ref.Version != "v1" {
+		t.Fatal("builtin current version", got.Ref, err)
+	}
+	if _, _, err := f.svc.CaptureProfile(ctx, source, target, planning.ProfileRef{Catalog: "organization", Name: "absent"}); !errors.Is(err, value.ErrProfileNotFound) {
+		t.Fatal("absent profile", err)
+	}
+	c := networkComposition()
+	c.Components[0].Profile = versionless
+	r, err := f.svc.PreviewComposition(ctx, source, f.compositionIntent(c))
+	if err != nil || len(r.Plan.Profiles) != 1 || r.Plan.Profiles[0].SourceUID != "org-v3" || r.Preview.Intent.Composition.Components[0].Profile.Version != "v3" {
+		t.Fatal("composition did not resolve and record the current version", err, r.Plan.Profiles)
+	}
+}

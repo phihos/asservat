@@ -154,10 +154,10 @@ func setup(t *testing.T) (*Service, *fixture, fixedIdentity, v.Open) {
 	t.Cleanup(s.Close)
 	i := fixedIdentity{identity.Identity{Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "viewer", ClientID: "console", Kind: identity.Human}, Scopes: []string{"evidence:read"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(time.Minute)}}
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	r := v.Open{Handles: []string{page.Sources[0].Handle}, Projection: v.Packet, Key: "open", Filter: v.Filter{All: []v.Predicate{}}}
+	r := v.Open{Handles: []string{page[0].Handle}, Projection: v.Packet, Key: "open", Filter: v.Filter{All: []v.Predicate{}}}
 	return s, f, i, r
 }
 func (f *fixture) add() {
@@ -201,10 +201,10 @@ func TestLivePrincipalAccountingIsSharedAcrossClientsButHandlesRemainClientBound
 		t.Fatal("foreign-client source reference accepted")
 	}
 	page, _, e := s.List(t.Context(), mcp, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	request.Handles = []string{page.Sources[0].Handle}
+	request.Handles = []string{page[0].Handle}
 	second, e := s.Open(t.Context(), mcp, request)
 	if e != nil || second.ID == first.ID {
 		t.Fatal(second, e)
@@ -528,10 +528,10 @@ func TestLiveInventoryReportsUnavailableCapabilityWithoutInventingActiveLease(t 
 	f.source.LeaseUntil = f.now.Add(-time.Second)
 	f.source.Blockers = []string{"ProjectionUnavailable"}
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 || page.Sources[0].Eligible || len(page.Sources[0].Projections) != 0 || !page.Sources[0].LeaseUntil.Equal(f.source.LeaseUntil) {
+	if e != nil || len(page) != 1 || page[0].Live || len(page[0].Source.Projections) != 0 || !page[0].Source.LeaseUntil.Equal(f.source.LeaseUntil) {
 		t.Fatal(page, e)
 	}
-	if _, e = s.Open(t.Context(), i, v.Open{Handles: []string{page.Sources[0].Handle}, Projection: v.Packet, Key: "unavailable"}); e == nil {
+	if _, e = s.Open(t.Context(), i, v.Open{Handles: []string{page[0].Handle}, Projection: v.Packet, Key: "unavailable"}); e == nil {
 		t.Fatal("metadata handle granted unavailable source")
 	}
 	if f.reads != 0 || f.heads != 0 || f.created != 0 {
@@ -570,10 +570,10 @@ func TestLiveStatelessHandleIsReferenceNotFiveSecondObservationOrPermit(t *testi
 	s, f, i, _ := setup(t)
 	i.i.ValidUntil = f.now.Add(5 * time.Second)
 	page, _, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 20)
-	if e != nil || len(page.Sources) != 1 {
+	if e != nil || len(page) != 1 {
 		t.Fatal(page, e)
 	}
-	handle := page.Sources[0].Handle
+	handle := page[0].Handle
 	if len(handle) > 128 {
 		t.Fatal("reference borrowed operation observation", handle)
 	}
@@ -673,9 +673,8 @@ func TestLiveInventoryLargeRequestedPageUsesBoundedProducerAndOriginalContinuati
 	paged := &liveInventoryPage{fixture: f}
 	s.sources = paged
 	out, next, e := s.List(t.Context(), i, targets.WorkloadRequest{ClusterID: uid, Namespace: "ns", Kind: "Deployment", Name: "workload"}, "", 100)
-	b, _ := json.Marshal(out)
-	if e != nil || paged.requested != 20 || len(out.Sources) != 20 || next != "existing-position" || len(b) > 20<<10 {
-		t.Fatal("inventory exceeded public envelope or lost original cursor", e, paged.requested, len(out.Sources), next, len(b))
+	if e != nil || paged.requested != 20 || len(out) != 20 || next != "existing-position" {
+		t.Fatal("inventory exceeded public envelope or lost original cursor", e, paged.requested, len(out), next)
 	}
 }
 
@@ -1031,5 +1030,33 @@ func TestLiveCommittedChargeLapseRedeliversWithoutSecondCharge(t *testing.T) {
 		if e != nil || len(next.Rows) != 0 {
 			t.Fatal("paid rows repeated after delivery", e, len(next.Rows))
 		}
+	}
+}
+
+func TestLiveHeadReadAndPausedWaitEndsOnUpdate(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	head, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: v.HeadCursor})
+	if e != nil || len(head.Rows) != 0 || head.Cursor != *w.Cursor || f.reads != 0 {
+		t.Fatal("head read must return the current cursor without rows", head, e)
+	}
+	paused, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: 1, Key: "pause", Mode: "Paused"}, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_, _ = s.Update(context.Background(), i, v.Update{ID: w.ID, Revision: 2, Key: "resume", Mode: "Active"}, false)
+	}()
+	started := time.Now()
+	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *paused.Cursor, WaitMS: 3000}); e == nil {
+		t.Fatal("a paused read woken by an update must report the changed revision")
+	}
+	if waited := time.Since(started); waited < 50*time.Millisecond || waited > 2*time.Second {
+		t.Fatal("paused read did not wait for the update", waited)
 	}
 }

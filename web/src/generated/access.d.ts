@@ -5,8 +5,8 @@ export interface components {
     schemas: {
         McpInput_explain_access: {
             target_ref: {
-                /** Format: uuid */
-                cluster_id: string;
+                /** @description Cluster name as configured in the hub (ADR-335 D4). */
+                cluster: string;
                 namespace: string;
                 /** @enum {unknown} */
                 kind: "Deployment" | "StatefulSet" | "Pod";
@@ -46,7 +46,7 @@ export interface components {
                 /** @enum {unknown} */
                 operation: "capture" | "read" | "download";
                 /** @enum {unknown} */
-                unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClientScopeMissing" | "PermissionObservationStale" | "IdentityUnavailable" | "AudienceOverflow" | "ServiceUnavailable";
+                unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClientScopeMissing" | "ClusterNotObserved" | "IdentityUnavailable" | "ServiceUnavailable";
                 /** @enum {unknown} */
                 missing_scope?: "evidence:read" | "evidence:capture" | "evidence:download";
                 required_roles: ("evidence-reader" | "workload-maintainer" | "evidence-owner" | "action-approver")[];
@@ -58,6 +58,7 @@ export interface components {
                     workload_uid: string;
                     pod_uid: string;
                 };
+                /** @description The caller's contributing assignments from AccessBinding, ClusterAccessBinding and PermissionSource objects: the first 64, which fit one result frame; assignments_total counts all. */
                 assignments: {
                     /** @enum {unknown} */
                     effect: "allow" | "deny";
@@ -73,8 +74,6 @@ export interface components {
                     revision: string;
                 }[];
                 assignments_total: number;
-                /** Format: date-time */
-                valid_until?: string;
             };
         } | {
             /** @constant */

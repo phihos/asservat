@@ -28,7 +28,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 8
+const currentSchemaVersion = 11
 
 // schemaCompatible reports why this binary (compiled head
 // currentSchemaVersion) cannot run against the database, or "" when it can.

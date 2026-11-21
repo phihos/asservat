@@ -774,8 +774,10 @@ func TestManualSaveFixtureReviewedOptInAndSharingCompile(t *testing.T) {
 		t.Fatal(err)
 	}
 	old, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
-	if err != nil || old.RecordingSaves {
-		t.Fatal("legacy policy silently gained manual save capability", err)
+	// recording-save.schema.json: recordingSaves defaults to true for a
+	// policy with an ongoing recorder.
+	if err != nil || !old.RecordingSaves {
+		t.Fatal("omitted recordingSaves did not default to true", err)
 	}
 }
 

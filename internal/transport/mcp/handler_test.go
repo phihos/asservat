@@ -528,3 +528,37 @@ func TestUnsupportedMethodsAndForgedNameNeverStartSDK(t *testing.T) {
 		t.Fatal("unavailable operation reached SDK")
 	}
 }
+
+// discoveredTools follows tools/list cursors; pages are size-bounded.
+func discoveredTools(t *testing.T, s *httptest.Server, version string) map[string]bool {
+	t.Helper()
+	names := map[string]bool{}
+	cursor := ""
+	for page := 0; page < 64; page++ {
+		var params any
+		if cursor != "" {
+			params = map[string]any{"cursor": cursor}
+		}
+		response, b := send(t, s, rpcRequest(t, s, version, "tools/list", params))
+		var listed struct {
+			Result struct {
+				Tools      []struct{ Name string }
+				NextCursor string `json:"nextCursor"`
+			}
+		}
+		if response.StatusCode != 200 || json.Unmarshal(b, &listed) != nil || bytes.Contains(b, []byte(`"$ref":"https:`)) {
+			t.Fatalf("tools/list: %d %s", response.StatusCode, b)
+		}
+		for _, tool := range listed.Result.Tools {
+			if names[tool.Name] {
+				t.Fatal("duplicate discovery tool", tool.Name)
+			}
+			names[tool.Name] = true
+		}
+		if cursor = listed.Result.NextCursor; cursor == "" {
+			return names
+		}
+	}
+	t.Fatal("tool discovery did not finish")
+	return nil
+}

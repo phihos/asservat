@@ -191,10 +191,10 @@ func newConsoleLive(t *testing.T, origin string) (*presentation.AuditedOperation
 	for n, p := range []string{v.Packet, v.HTTP, v.Syscall} {
 		id := consoleCaptureID(700 + n)
 		b := collector.SourceBinding{RootID: consoleCaptureID(1), AcceptanceID: consoleCaptureID(2), SourceID: id, Fence: consoleCaptureID(3), PodUID: consoleCaptureID(4), NodeUID: consoleCaptureID(5), BootID: consoleCaptureID(6), CollectorPodUID: consoleCaptureID(7), CollectorEpoch: consoleCaptureID(8), PolicyUID: "synthetic-policy", ActionID: p, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: [32]byte{3}}
-		f.sources = append(f.sources, v.Source{Binding: b, Target: authorization.Target{ClusterID: consoleCaptureID(1), NamespaceUID: "ns", WorkloadUID: "workload", PodUID: b.PodUID}, OwnerKind: "policy", OwnerID: b.PolicyUID, State: "Ready", SaveVia: "recordingSave", Projections: []string{p}, Blockers: []string{}, LeaseUntil: now.Add(2 * time.Minute), HardUntil: now.Add(2 * time.Minute), PrivacyUntil: now.Add(2 * time.Minute)})
+		f.sources = append(f.sources, v.Source{Binding: b, Target: authorization.Target{ClusterID: consoleCaptureID(1), NamespaceUID: "ns", WorkloadUID: "workload", PodUID: b.PodUID}, OwnerKind: "policy", OwnerID: b.PolicyUID, PolicyName: "payments-recorder", PodName: "api-0", State: "Ready", SaveVia: "recordingSave", Projections: []string{p}, Blockers: []string{}, LeaseUntil: now.Add(2 * time.Minute), HardUntil: now.Add(2 * time.Minute), PrivacyUntil: now.Add(2 * time.Minute)})
 	}
 	m := collector.ManualLiveSource{RootID: consoleCaptureID(1), CaptureID: consoleCaptureID(750), AttemptID: consoleCaptureID(2), ActionID: "finite-packets", WorkID: consoleCaptureID(3), ExecutorPodUID: consoleCaptureID(9), ExecutorEpoch: consoleCaptureID(10), PodUID: consoleCaptureID(4), NodeUID: consoleCaptureID(5), BootID: consoleCaptureID(6), CollectorPodUID: consoleCaptureID(7), CollectorEpoch: consoleCaptureID(8), Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, StartedAt: now, HardUntil: now.Add(2 * time.Minute)}
-	f.sources = append(f.sources, v.Source{RootID: m.RootID, Manual: &m, Target: f.sources[0].Target, OwnerKind: "manualSession", OwnerID: m.CaptureID, State: "Ready", SaveVia: "captureOutcome", Projections: []string{v.Packet}, Blockers: []string{}, LeaseUntil: m.HardUntil, HardUntil: m.HardUntil, PrivacyUntil: m.HardUntil})
+	f.sources = append(f.sources, v.Source{RootID: m.RootID, Manual: &m, Target: f.sources[0].Target, OwnerKind: "manualSession", OwnerID: m.CaptureID, PodName: "api-0", State: "Ready", SaveVia: "captureOutcome", Projections: []string{v.Packet}, Blockers: []string{}, LeaseUntil: m.HardUntil, HardUntil: m.HardUntil, PrivacyUntil: m.HardUntil})
 	key := make([]byte, 32)
 	key[0] = 1
 	accountKey := make([]byte, 32)
@@ -212,7 +212,7 @@ func newConsoleLive(t *testing.T, origin string) (*presentation.AuditedOperation
 		t.Fatal(e)
 	}
 	t.Cleanup(service.Close)
-	liveOps, e := presentation.NewLiveOperations(origin, service, time.Now)
+	liveOps, e := presentation.NewLiveOperations(presentation.LiveOperationsConfig{PublicOrigin: origin, Live: service, Clusters: presentation.NewClusterNames(map[string]string{"local": consoleCaptureID(1)}), Now: time.Now})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -258,6 +258,10 @@ func TestConsoleLiveObservationWithBuiltPackage(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	lh, e := browser.NewLiveEventsHandler(sh, ops)
+	if e != nil {
+		t.Fatal(e)
+	}
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/test/live-event":
@@ -280,6 +284,8 @@ func TestConsoleLiveObservationWithBuiltPackage(t *testing.T) {
 			sh.ServeHTTP(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/v1/operations/"):
 			bh.ServeHTTP(w, r)
+		case strings.HasPrefix(r.URL.Path, browser.LiveEventsPrefix):
+			lh.ServeHTTP(w, r)
 		default:
 			static.ServeHTTP(w, r)
 		}
@@ -360,16 +366,28 @@ func TestLiveObservationOfficialMCPBoundary(t *testing.T) {
 		}
 		return raw
 	}
-	raw := invoke("list_live_sources", map[string]any{"target_ref": map[string]string{"cluster_id": consoleCaptureID(1), "namespace": "payments", "kind": "Deployment", "name": "api"}, "limit": 20})
+	raw := invoke("list_recordings", map[string]any{"target_ref": map[string]string{"cluster": "local", "namespace": "payments", "kind": "Deployment", "name": "api"}})
 	var page struct {
-		Data v.SourcePage `json:"data"`
+		Data struct {
+			Recordings []struct {
+				Handle      string   `json:"recording_handle"`
+				Projections []string `json:"live_projections"`
+			} `json:"recordings"`
+		} `json:"data"`
 	}
-	if json.Unmarshal(raw, &page) != nil || len(page.Data.Sources) != 4 {
+	if json.Unmarshal(raw, &page) != nil || len(page.Data.Recordings) != 4 {
 		t.Fatal(string(raw))
 	}
-	for n, source := range page.Data.Sources {
+	watch := func(action string, in any) map[string]any {
+		b, _ := json.Marshal(in)
+		m := map[string]any{}
+		_ = json.Unmarshal(b, &m)
+		m["action"] = action
+		return m
+	}
+	for n, source := range page.Data.Recordings {
 		p := source.Projections[0]
-		raw = invoke("open_live_watch", v.Open{Handles: []string{page.Data.Sources[n].Handle}, Projection: p, Key: fmt.Sprintf("sdk-%d-%s", n, p)})
+		raw = invoke("watch_live", watch("open", v.Open{Handles: []string{source.Handle}, Projection: p, Key: fmt.Sprintf("sdk-%d-%s", n, p)}))
 		var opened struct {
 			Data v.Watch `json:"data"`
 		}
@@ -379,7 +397,7 @@ func TestLiveObservationOfficialMCPBoundary(t *testing.T) {
 		w := opened.Data
 		f.emit(p)
 		input := v.Read{ID: w.ID, Cursor: *w.Cursor}
-		raw = invoke("read_live_watch", input)
+		raw = invoke("watch_live", watch("read", input))
 		var read struct {
 			Data struct {
 				Rows  []json.RawMessage `json:"rows"`
@@ -392,7 +410,7 @@ func TestLiveObservationOfficialMCPBoundary(t *testing.T) {
 		f.mu.Lock()
 		before := f.reads
 		f.mu.Unlock()
-		replayed := invoke("read_live_watch", input)
+		replayed := invoke("watch_live", watch("read", input))
 		var replay struct {
 			Data struct {
 				Rows  []json.RawMessage `json:"rows"`
@@ -407,11 +425,11 @@ func TestLiveObservationOfficialMCPBoundary(t *testing.T) {
 			t.Fatal("replay reread source")
 		}
 		f.mu.Unlock()
-		raw = invoke("update_live_watch", v.Update{ID: w.ID, Revision: 1, Key: fmt.Sprintf("pause-%d-%s", n, p), Mode: "Paused"})
+		raw = invoke("watch_live", watch("update", v.Update{ID: w.ID, Revision: 1, Key: fmt.Sprintf("pause-%d-%s", n, p), Mode: "Paused"}))
 		if !strings.Contains(string(raw), `"Paused"`) {
 			t.Fatal(string(raw))
 		}
-		raw = invoke("close_live_watch", map[string]any{"watch_id": w.ID, "expected_revision": 2, "idempotency_key": fmt.Sprintf("close-%d-%s", n, p)})
+		raw = invoke("watch_live", map[string]any{"action": "close", "watch_id": w.ID, "expected_revision": 2, "idempotency_key": fmt.Sprintf("close-%d-%s", n, p)})
 		if !strings.Contains(string(raw), `"Closed"`) {
 			t.Fatal(string(raw))
 		}

@@ -213,9 +213,26 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	parent := value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}
 	// A new worker request observes current sources; admitted dates stay fixed.
 	f.refresh(t)
+	// Migration 00007: activating the worker certificate makes the query
+	// readable and notifies its ID, which get_query_result's wait consumes.
+	listening, stopListening := context.WithCancel(ctx)
+	defer stopListening()
+	payloads := make(chan string, 64)
+	postgres.ListenPayloads(listening, base.admin, postgres.CaptureProgressChannel, func(p string) { payloads <- p })
+	if p := <-payloads; p != "" {
+		t.Fatal("listener did not report its connection first", p)
+	}
 	cert, err := enrollmentService.EnrollProjection(ctx, parent, q.WorkerID, csr)
 	if err != nil || !cert.Peer.Valid(time.Now()) {
 		t.Fatal("identity enrollment after human request closed", err)
+	}
+	for notified := false; !notified; {
+		select {
+		case p := <-payloads:
+			notified = p == q.ID
+		case <-time.After(10 * time.Second):
+			t.Fatal("certificate activation did not notify the query ID")
+		}
 	}
 	again, err := enrollmentService.EnrollProjection(ctx, parent, q.WorkerID, csr)
 	if err != nil || again.Peer != cert.Peer || issuer.calls.Load() != 1 {

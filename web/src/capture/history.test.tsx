@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation, historyPageSize } from './investigation';
-import { SyntheticOperations, session, target, id, historyResult, repeatedPreviewResult, previewResult, result } from './test-fixtures';
+import { SyntheticOperations, session, target, id, historyResult, repeatedPreviewResult, previewResult, result, clusterID } from './test-fixtures';
 import type { Operation } from './http';
 
 // ADR-236: Recent captures and Collect again. The synthetic client is not
@@ -12,10 +12,10 @@ afterEach(() => { cleanup(); for (const c of controllers) c.reset(); controllers
 async function discovered(history = [id(41), id(42)]) {
   const client = new SyntheticOperations();
   const base = client.responder;
-  client.responder = (name: Operation) => {
+  client.responder = (name: Operation, input?: unknown) => {
     if (name === 'list_capture_history') return historyResult(history);
     const repeated = (client.calls.at(-1)?.input as { history_capture_id?: string }).history_capture_id;
-    return name === 'preview_capture' && repeated ? repeatedPreviewResult(repeated) : base(name);
+    return name === 'preview_capture' && repeated ? repeatedPreviewResult(repeated) : base(name, input);
   };
   const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   controller.attach(session, new AbortController().signal);
@@ -35,8 +35,8 @@ it('lists recent captures of the draft target after its diagnostics', async () =
 it('keeps diagnostics usable when history is unavailable', async () => {
   const client = new SyntheticOperations();
   const base = client.responder;
-  client.responder = (name: Operation) => {
-    if (name !== 'list_capture_history') return base(name);
+  client.responder = (name: Operation, input?: unknown) => {
+    if (name !== 'list_capture_history') return base(name, input);
     const value = result<'list_capture_history'>({ code: 'NotAvailable', message: 'The operation is unavailable.', retryable: true });
     (value as { status: string }).status = 'error';
     return value;
@@ -75,10 +75,9 @@ it('rejects a repeat review for another capture and an ordinary review claiming 
 it('renders the Recent captures panel with Collect again', async () => {
   const client = new SyntheticOperations();
   const base = client.responder;
-  client.responder = (name: Operation) => name === 'list_capture_history' ? historyResult([id(41)]) : name === 'preview_capture' ? repeatedPreviewResult(id(41)) : base(name);
+  client.responder = (name: Operation, input?: unknown) => name === 'list_capture_history' ? historyResult([id(41)]) : name === 'preview_capture' ? repeatedPreviewResult(id(41)) : base(name, input);
   const controller = new Investigation(client, () => id(6)); controllers.push(controller);
   render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
-  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
   fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
   fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
   fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));

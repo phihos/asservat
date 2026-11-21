@@ -23,8 +23,8 @@ import (
 
 type rawQueryServiceSelection func(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (authapp.RawQuerySelection, error)
 
-func (f rawQueryServiceSelection) ResolveRawQuery(ctx context.Context, current identities.CurrentIdentity, id string, versions []artifact.Digest) (authapp.RawQuerySelection, error) {
-	return f(ctx, current, id, versions)
+func (f rawQueryServiceSelection) ResolveRawQuery(ctx context.Context, current identities.CurrentIdentity, id string, sel authapp.RawArtifactSelection) (authapp.RawQuerySelection, error) {
+	return f(ctx, current, id, sel.Digests)
 }
 
 // This component composes the real request producer, SQL ledger, service reads
@@ -82,7 +82,7 @@ func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissio
 		}
 		return authapp.RawQuerySelection{Artifacts: []value.RawQueryArtifact{{Output: output, NativeBytes: nativeBytes, ExpiresAt: e.Registration.ExpiresAt}}, Review: []authapp.RawQueryReviewArtifact{{Output: output, NativeBytes: nativeBytes, ExpiresAt: e.Registration.ExpiresAt, Namespace: e.Namespace, WorkloadKind: "Deployment", WorkloadName: "synthetic-api", PodName: "synthetic-api-pod", NativeType: artifact.SyscallArgumentsArtifact}}, ValidUntil: time.Now().Add(5 * time.Second)}, nil
 	})
-	input := authapp.RawQueryRequestInput{CaseID: e.CaseID, ArtifactDigests: []artifact.Digest{output.ArtifactDigest}, Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect the synthetic exact published output", MaxBytes: nativeBytes, Lifetime: 5 * time.Minute, IdempotencyKey: "raw-service-request"}
+	input := authapp.RawQueryRequestInput{CaseID: e.CaseID, Artifacts: authapp.RawArtifactSelection{Digests: []artifact.Digest{output.ArtifactDigest}}, Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect the synthetic exact published output", MaxBytes: nativeBytes, Lifetime: 5 * time.Minute, IdempotencyKey: "raw-service-request"}
 	pending, replay, err := service.RequestRaw(ctx, as(false), input)
 	if err != nil || replay || !pending.Valid() || pending.Phase(time.Now()) != value.GrantPending || !authapp.RawQueryScopeMatches(pending) {
 		t.Fatal("service-produced raw request", replay, err)

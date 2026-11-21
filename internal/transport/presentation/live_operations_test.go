@@ -48,7 +48,7 @@ func liveBoundaryFixture(t *testing.T) (*AuditedOperations, *contextOperationFix
 	now := a.config.Now()
 	id := "11111111-1111-4111-8111-111111111111"
 	b := collector.SourceBinding{RootID: id, AcceptanceID: id, SourceID: id, Fence: id, PodUID: id, NodeUID: id, BootID: id, CollectorPodUID: id, CollectorEpoch: id, PolicyUID: "policy", ActionID: "packets", Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: [32]byte{3}}
-	f := &liveBoundary{now: now, source: v.Source{Binding: b, Target: authorization.Target{ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: id}, OwnerKind: "policy", OwnerID: "policy", State: "Ready", SaveVia: "recordingSave", Projections: []string{v.Packet}, LeaseUntil: now.Add(30 * time.Second), HardUntil: now.Add(time.Hour), PrivacyUntil: now.Add(time.Hour)}, controls: map[string]app.Control{}}
+	f := &liveBoundary{now: now, source: v.Source{Binding: b, Target: authorization.Target{ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: id}, OwnerKind: "policy", OwnerID: "policy", PolicyName: "policy", State: "Ready", SaveVia: "recordingSave", Projections: []string{v.Packet}, LeaseUntil: now.Add(30 * time.Second), HardUntil: now.Add(time.Hour), PrivacyUntil: now.Add(time.Hour)}, controls: map[string]app.Control{}}
 	n := 100
 	newID := func() string { n++; return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 	s, e := app.New(app.Config{RootID: id, OwnerID: id, Keys: a.mac, Now: a.config.Now, NewID: newID, Limits: v.DefaultLimits(), MaxWatches: 10, MaxControls: 40}, f, f, f)
@@ -56,7 +56,7 @@ func liveBoundaryFixture(t *testing.T) (*AuditedOperations, *contextOperationFix
 		t.Fatal(e)
 	}
 	t.Cleanup(s.Close)
-	ops, e := NewLiveOperations(a.PublicOrigin(), s, a.config.Now)
+	ops, e := NewLiveOperations(LiveOperationsConfig{PublicOrigin: a.PublicOrigin(), Live: s, Clusters: NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000001"}), Now: a.config.Now})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -70,18 +70,18 @@ func liveBoundaryFixture(t *testing.T) (*AuditedOperations, *contextOperationFix
 }
 func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 	a, actor, gate, f := liveBoundaryFixture(t)
-	r, e := a.Call(t.Context(), actor, "list_live_sources", []byte(`{`+wireTarget+`}`))
+	r, e := a.Call(t.Context(), actor, "list_recordings", []byte(`{`+liveWireTarget+`}`))
 	if e != nil {
 		t.Fatal(e)
 	}
 	var page struct {
-		Data v.SourcePage `json:"data"`
+		Data recordingListPage `json:"data"`
 	}
-	if json.Unmarshal(r.Body, &page) != nil || len(page.Data.Sources) != 1 {
+	if json.Unmarshal(r.Body, &page) != nil || len(page.Data.Recordings) != 1 || page.Data.Recordings[0].SaveVia != "recordingSave" || len(page.Data.Recordings[0].Projections) != 1 {
 		t.Fatal(string(r.Body))
 	}
-	input, _ := json.Marshal(v.Open{Handles: []string{page.Data.Sources[0].Handle}, Projection: v.Packet, Key: "open"})
-	r, e = a.Call(t.Context(), actor, "open_live_watch", input)
+	input := watchInput("open", v.Open{Handles: []string{page.Data.Recordings[0].Handle}, Projection: v.Packet, Key: "open"})
+	r, e = a.Call(t.Context(), actor, "watch_live", input)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -93,8 +93,8 @@ func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 	}
 	w := opened.Data
 	f.rows = []v.Row{{ID: "source:1", SourceID: f.source.Binding.SourceID, Sequence: 1, ObservedAt: f.now, ReceivedAt: f.now, ExpiresAt: f.now.Add(30 * time.Second), Projection: v.Packet, PodUID: f.source.Target.PodUID, Packet: &v.PacketFields{Protocol: "TCP", RemoteIP: "192.0.2.1", RemotePort: 0, Direction: "unknown", WireBytes: 64}}}
-	input, _ = json.Marshal(v.Read{ID: w.ID, Cursor: *w.Cursor})
-	r, e = a.Call(t.Context(), actor, "read_live_watch", input)
+	input = watchInput("read", v.Read{ID: w.ID, Cursor: *w.Cursor})
+	r, e = a.Call(t.Context(), actor, "watch_live", input)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -113,8 +113,8 @@ func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 			t.Fatal("transient response retained after join")
 		}
 	}
-	input, _ = json.Marshal(v.Update{ID: w.ID, Revision: 1, Key: "close"})
-	if _, e = a.Call(t.Context(), actor, "close_live_watch", input); e != nil {
+	input = watchInput("close", v.Update{ID: w.ID, Revision: 1, Key: "close"})
+	if _, e = a.Call(t.Context(), actor, "watch_live", input); e != nil {
 		t.Fatal(e)
 	}
 	if actor.requests != 0 {
@@ -123,18 +123,18 @@ func TestLiveAuditedPublicOpenReadCloseOwnsTransientBytes(t *testing.T) {
 }
 func TestLiveAuditInputBindsFilterAndFailedAuditDiscardsResult(t *testing.T) {
 	a, actor, gate, f := liveBoundaryFixture(t)
-	first := []byte(`{"source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":0}]},"idempotency_key":"k"}`)
-	second := []byte(`{"source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":1}]},"idempotency_key":"k"}`)
-	x, e := a.normalize("open_live_watch", first)
+	first := []byte(`{"action":"open","source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":0}]},"idempotency_key":"k"}`)
+	second := []byte(`{"action":"open","source_handles":["source"],"projection":"packetMetadata","display_filter":{"all":[{"field":"port","op":"eq","value":1}]},"idempotency_key":"k"}`)
+	x, e := a.normalize("watch_live", first)
 	if e != nil {
 		t.Fatal(e)
 	}
-	y, e := a.normalize("open_live_watch", second)
+	y, e := a.normalize("watch_live", second)
 	if e != nil || string(x) == string(y) {
 		t.Fatal("filter omitted from keyed audit input", e)
 	}
 	gate.fail = true
-	if r, e := a.Call(t.Context(), actor, "list_live_sources", []byte(`{`+wireTarget+`}`)); e == nil || len(r.Body) != 0 || f.reads != 0 || len(f.controls) != 0 {
+	if r, e := a.Call(t.Context(), actor, "list_recordings", []byte(`{`+liveWireTarget+`}`)); e == nil || len(r.Body) != 0 || f.reads != 0 || len(f.controls) != 0 {
 		t.Fatal("unaudited result escaped or source read")
 	}
 }
@@ -149,4 +149,21 @@ func (f *liveBoundary) CurrentLive(_ context.Context, c app.Control) error {
 
 func (f *liveBoundary) Resolve(context.Context, app.CurrentIdentity, string, string, string) (v.Source, time.Time, error) {
 	return f.source.Clone(), f.now.Add(5 * time.Second), nil
+}
+
+const liveWireTarget = `"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"}`
+
+// watchInput adds the watch_live action to a typed live request.
+func watchInput(action string, in any) []byte {
+	b, _ := json.Marshal(in)
+	var m map[string]any
+	_ = json.Unmarshal(b, &m)
+	m["action"] = action
+	for k, v := range m {
+		if v == nil || k == "limit" && v == float64(0) || k == "wait_ms" && v == float64(0) || k == "mode" && v == "" {
+			delete(m, k)
+		}
+	}
+	out, _ := json.Marshal(m)
+	return out
 }

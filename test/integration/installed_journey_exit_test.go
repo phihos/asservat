@@ -83,10 +83,10 @@ func installedJourneyIdempotency(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("installed duplicate request_capture did not replay the original operation", code)
 	}
 	changed := installedJourneyReviewedRequest(original["preview"].(map[string]any), strings.Repeat("f", 64), original["idempotency_key"].(string))
-	// The admission already exists under this key; a different reviewed
-	// digest must conflict before the hub can admit anything else.
-	if code := submit(changed); code != "Conflict" {
-		t.Fatal("installed request_capture reusing the key with different content was not Conflict", code)
+	// A changed plan under the same key is refused (Conflict, or ReviewChanged
+	// when the recomputed plan is compared first); it never admits work.
+	if code := submit(changed); code != "Conflict" && code != "ReviewChanged" {
+		t.Fatal("installed request_capture reusing the key with different content was not refused", code)
 	}
 	changedPreview := maps.Clone(original["preview"].(map[string]any))
 	changedPreview["requested_retention_seconds"] = installedJourneyRetentionSeconds() + 1
@@ -227,7 +227,7 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 		}
 		return data, nil
 	}
-	absent := map[string]string{"cluster_id": target["cluster_id"], "namespace": target["namespace"], "kind": target["kind"], "name": "absent-" + uuid.NewString()[:8]}
+	absent := map[string]string{"cluster": target["cluster"], "namespace": target["namespace"], "kind": target["kind"], "name": "absent-" + uuid.NewString()[:8]}
 	preset := map[string]string{"name": "pod-status", "version": "v1"}
 	key := "installed-unrelated-" + uuid.NewString()
 	previewFor := func(target map[string]string) map[string]any {
@@ -241,7 +241,7 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 		{"preview_capture", previewFor(target), previewFor(absent)},
 		{"request_capture", installedJourneyReviewedRequest(previewFor(target), planDigest, key), installedJourneyReviewedRequest(previewFor(absent), planDigest, key+"-absent")},
 		{"get_case", map[string]string{"case_id": caseID}, map[string]string{"case_id": uuid.NewString()}},
-		{"prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key}, map[string]string{"artifact_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
+		{"download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": key}, map[string]string{"action": "prepare", "artifact_id": uuid.NewString(), "idempotency_key": key + "-absent"}},
 	} {
 		var failure error
 		for attempt := 1; attempt <= 3; attempt++ {
@@ -262,7 +262,9 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 	// ADR-234: the unrelated user's own explanation is the uniform Deny, the
 	// same for the real workload as for an absent one.
 	explain := func(ref map[string]string) (map[string]any, error) {
-		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "explain_access", Arguments: map[string]any{"target_ref": ref, "operation": "capture"}})
+		// ADR-335 D4: explain_access names the cluster; the hub's own is local.
+		named := map[string]string{"cluster": "local", "namespace": ref["namespace"], "kind": ref["kind"], "name": ref["name"]}
+		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "explain_access", Arguments: map[string]any{"target_ref": named, "operation": "capture"}})
 		if err != nil {
 			return nil, err
 		}

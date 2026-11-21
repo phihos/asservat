@@ -32,9 +32,9 @@ const (
 	MaxRequestBytes  = 32 << 10
 	MaxResponseBytes = 64 << 10
 	// Only the16-source preview has a larger SDK text+structured result frame.
-	MaxRecordingSavePreviewResponseBytes = presentation.OperationRecordingSavePreviewFrameLimit
-	MaxGrantReviewResponseBytes          = presentation.OperationGrantReviewFrameLimit
-	maxNesting                           = 32
+	MaxResultBoundResponseBytes = presentation.OperationResultBoundFrameLimit
+	MaxGrantReviewResponseBytes = presentation.OperationGrantReviewFrameLimit
+	maxNesting                  = 32
 	// toolsListBudget bounds the encoded tools of one tools/list page. The
 	// rest of MaxResponseBytes covers the JSON-RPC envelope, cursor and cache
 	// fields; every single descriptor must fit it (tested).
@@ -447,6 +447,10 @@ func (h *Handler) releaseIdentity(p identity.Principal) {
 	}
 }
 
+// maxTransportWindow is the longest operation request: a status read's
+// after_revision wait with its two reads.
+var maxTransportWindow = max(identity.EvidenceReadRequestWindow, identity.StatusWaitRequestWindow)
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	securityHeaders(w)
 	origin, _ := url.Parse(h.config.PublicOrigin)
@@ -467,7 +471,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if _, ok := h.operations.Tool("request_capture"); ok {
 				scopes = append(scopes, "evidence:capture")
 			}
-			if _, ok := h.operations.Tool("prepare_artifact_download"); ok {
+			if _, ok := h.operations.Tool("download_artifact"); ok {
 				scopes = append(scopes, "evidence:download")
 			}
 			if _, ok := h.operations.Tool("create_share"); ok {
@@ -521,9 +525,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Evidence reads may use the longer evidence-read window; every other
 	// request is shortened to requestLifetime once its route is known below.
 	started, identityStarted := time.Now(), h.now()
-	ctx, cancel := context.WithTimeout(r.Context(), identity.EvidenceReadRequestWindow)
+	ctx, cancel := context.WithTimeout(r.Context(), maxTransportWindow)
 	defer cancel()
-	current, i, err := identities.NewBearerRequestWithin(ctx, pinnedResolver{h}, fields[1], h.now, identity.EvidenceReadRequestWindow)
+	current, i, err := identities.NewBearerRequestWithin(ctx, pinnedResolver{h}, fields[1], h.now, maxTransportWindow)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
 		h.authFailure(w, err, "identity")
@@ -569,12 +573,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400)
 		return
 	}
-	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationRequestWindow(early.Name) > requestLifetime {
-		operationUntil := identity.Earlier(deadline, started.Add(audit.OperationRequestWindow(early.Name)))
+	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationTransportWindow(early.Name) > requestLifetime {
+		operationUntil := identity.Earlier(deadline, started.Add(audit.OperationTransportWindow(early.Name)))
 		var shorten context.CancelFunc
 		ctx, shorten = context.WithDeadline(ctx, operationUntil)
 		defer shorten()
-		identityUntil := identityStarted.Add(audit.OperationRequestWindow(early.Name))
+		identityUntil := identityStarted.Add(audit.OperationTransportWindow(early.Name))
 		current = identities.ShortenRequest(current, identityUntil, h.now)
 		i.ValidUntil = identity.Earlier(i.ValidUntil, identityUntil)
 		ctx = context.WithValue(ctx, operationIdentityKey{}, current)
@@ -635,7 +639,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !slices.Contains(i.Scopes, "evidence:read") && !(h.stopSupported() && (route.Method != "tools/call" || route.Name == "cancel_artifact_download")) {
+	if !slices.Contains(i.Scopes, "evidence:read") && !(h.stopSupported() && (route.Method != "tools/call" || route.Name == "download_artifact" && h.validStopInput(body))) {
 		if route.Method != "tools/call" || h.rejectIngress(w, r, current, delivery, route.Name, body, presentation.IngressDenied) {
 			h.challenge(w, 403, "insufficient_scope")
 		}
@@ -644,7 +648,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Authentication/body parsing remains finite. Long normal provider calls
 	// cannot occupy the stop execution slots or its per-principal allowance.
 	if route.Method == "tools/call" {
-		stopCall := route.Name == "cancel_artifact_download" && h.stopSupported() && h.validStopInput(body)
+		stopCall := route.Name == "download_artifact" && h.stopSupported() && h.validStopInput(body)
 		slots := h.normalWork
 		if stopCall {
 			slots = h.stopWork
@@ -695,9 +699,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The SDK owns revision-specific initialization, metadata and header/body
 	// agreement. Do not emulate future protocol fields or retain transport state.
 	response := newBoundedResponse()
-	if route.Method == "tools/call" && route.Name == "preview_recording_save" && h.operations != nil {
+	if route.Method == "tools/call" && (route.Name == "preview_capture" || route.Name == "get_capture") && h.operations != nil {
 		if _, ok := h.operations.Tool(route.Name); ok {
-			response.limit = MaxRecordingSavePreviewResponseBytes
+			response.limit = MaxResultBoundResponseBytes
 		}
 	}
 	if route.Method == "tools/call" && route.Name == "get_grant" && h.operations != nil {
@@ -908,7 +912,7 @@ func (h *Handler) stopSupported() bool {
 	if h.operations == nil {
 		return false
 	}
-	_, ok := h.operations.Tool("cancel_artifact_download")
+	_, ok := h.operations.Tool("download_artifact")
 	return ok
 }
 func (h *Handler) acquireLaneIdentity(p identity.Principal, stop bool) bool {
@@ -946,5 +950,6 @@ func (h *Handler) validStopInput(body []byte) bool {
 			Arguments json.RawMessage `json:"arguments"`
 		} `json:"params"`
 	}
-	return json.Unmarshal(body, &call) == nil && h.wire.ValidateInput("cancel_artifact_download", call.Params.Arguments) == nil
+	// The stop lane serves only download_artifact action=cancel.
+	return json.Unmarshal(body, &call) == nil && presentation.DownloadAction(call.Params.Arguments) == "cancel" && h.wire.ValidateInput("download_artifact", call.Params.Arguments) == nil
 }

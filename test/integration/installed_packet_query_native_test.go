@@ -29,7 +29,7 @@ func installedPacketQueryRequest(source installedPacketQuerySource, key string) 
 	for i, f := range selection.Fields {
 		fields[i] = string(f)
 	}
-	request := map[string]any{"case_id": source.CaseID, "artifact_id": source.ArtifactID, "idempotency_key": key, "packet_filter": "tcp port 8080", "fields": fields, "max_packets": 20, "max_scan_bytes": artifact.RecordingNativeLimit}
+	request := map[string]any{"operation": "packets", "case_id": source.CaseID, "artifact_id": source.ArtifactID, "idempotency_key": key, "packet_filter": "tcp port 8080", "fields": fields, "limit": 20}
 	if packetQueryCaptureMode(source) == "rawPackets" {
 		request["grant_id"] = source.GrantID
 		request["frame_prefix"] = map[string]int{"offset": 0, "length": 64}
@@ -49,9 +49,9 @@ func installedPacketQuerySelection(mode ...string) query.PacketQuerySelection {
 // starts one real React query; it does not fabricate an extra UI invocation.
 func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source installedPacketQuerySource, request map[string]any, call func(string, any) installedComparisonReply, verify func(string, string) func(), replayBegin ...bool) query.PacketQueryResult {
 	t.Helper()
-	result := call("pcap_query", request)
+	result := call("query_artifact", request)
 	operation, handle := result.RequestID, ""
-	var observed, until time.Time
+	var until time.Time
 	directReady := result.Status == "ok"
 	var directObserved time.Time
 	if result.Status != "ok" && result.Status != "pending" {
@@ -66,7 +66,7 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 		if json.Unmarshal(result.Data, &first) != nil || first.Observed.IsZero() || !first.Expires.After(first.Observed) {
 			t.Fatal("initial query replay association")
 		}
-		replay := call("pcap_query", request)
+		replay := call("query_artifact", request)
 		var again struct {
 			Handle   string    `json:"query_handle"`
 			Observed time.Time `json:"query_observed_at"`
@@ -76,7 +76,7 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 			t.Fatal("same-key Begin disclosed/read or changed original query")
 		}
 		if directReady {
-			handle, observed, until = again.Handle, first.Observed, first.Expires
+			handle, until = again.Handle, first.Expires
 			directObserved = first.Observed
 		}
 		t.Log("installed packet query same-key Begin: original pending handle/deadline, no page disclosure; exact query/batch/use counts checked in SQL")
@@ -84,27 +84,20 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 	for poll := 0; result.Status == "pending"; poll++ {
 		var p struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &p) != nil || p.Handle == "" || p.Retry < 1 || p.Observed.IsZero() || !p.Expires.After(p.Observed) || p.Expires.After(source.Expires) {
+		if json.Unmarshal(result.Data, &p) != nil || p.Handle == "" || p.Revision < 1 || p.Observed.IsZero() || !p.Expires.After(p.Observed) || p.Expires.After(source.Expires) {
 			t.Fatal("invalid pending packet query")
 		}
 		if poll == 0 {
-			handle, observed, until = p.Handle, p.Observed, p.Expires
+			handle, until = p.Handle, p.Expires
 		}
 		if p.Handle != handle || !p.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("packet query changed original handle/deadline or exhausted polls")
 		}
-		next, err := installedProjectionPollTime(observed, until, time.Now(), time.Duration(p.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal(ctx.Err())
-		}
-		result = call("get_query_result", map[string]string{"query_handle": handle})
+		result = call("get_query_result", map[string]any{"query_handle": handle, "after_revision": p.Revision})
 	}
 	if result.Status != "ok" {
 		t.Fatal("packet query unavailable", result.Status)
@@ -118,7 +111,7 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 			Observed time.Time                `json:"query_observed_at"`
 			Expires  time.Time                `json:"query_expires_at"`
 		}
-		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "pcap_query" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
+		if json.Unmarshal(result.Data, &nested) != nil || nested.Handle != handle || nested.Tool != "query_artifact" || nested.Result.RequestID != result.RequestID || !nested.Expires.Equal(until) {
 			t.Fatal("packet query changed poll association")
 		}
 		outerObserved = nested.Observed

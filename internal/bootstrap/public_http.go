@@ -12,7 +12,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -37,7 +36,15 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	// ADR-335 D14: identity.administrators names the installation administrators.
 	pc.administrators = id.mcp.Policies
 	ongoingSources := pc.packetSourceRuntime(time.Now, ownerRandomID)
-	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	clusterNames := map[string]string{}
+	if !in.hubOnly() {
+		clusterNames[presentation.LocalClusterName] = c.ClusterID
+	}
+	for _, r := range in.remote {
+		clusterNames[r.Name] = r.clusterID
+	}
+	clusters := presentation.NewClusterNames(clusterNames)
+	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{ongoingSources: ongoingSources, Recordings: pc.recordings, Cancellations: pc.cancellations, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
@@ -46,8 +53,15 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"live", err}
 	}
-	if liveService != nil {
-		liveOperations, e := presentation.NewLiveOperations(p.Origin, liveService, time.Now)
+	// list_recordings always serves; watch_live only with live viewing.
+	liveConfig := presentation.LiveOperationsConfig{PublicOrigin: p.Origin, Live: liveService, Clusters: clusters, CollectionEnabled: true, Now: time.Now}
+	if pc.recordings != nil {
+		saves := *pc.recordings
+		saves.Inventory.Now, saves.Inventory.NewID = time.Now, ownerRandomID
+		liveConfig.Recordings = saves
+	}
+	if liveConfig.Live != nil || liveConfig.Recordings != nil {
+		liveOperations, e := presentation.NewLiveOperations(liveConfig)
 		if e != nil {
 			return nil, e
 		}
@@ -57,9 +71,9 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, e
 		}
 	}
-	// ADR-228: activate_policy and get_policy_status on the same audited
+	// ADR-228: activate_policy, get_policy_status and deactivate_policy on the same audited
 	// routes, and the restart trigger that RunPublic supervises.
-	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{ongoingSources: ongoingSources, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"policies", mounts.ErrUnavailable}
@@ -72,7 +86,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	d.recordingCollect = &collect
 	d.history = pc.history
 	// ADR-232: create_share, list_shares and revoke_share on the same routes.
-	shares, err := composePublicShares(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	shares, err := composePublicShares(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"shares", mounts.ErrUnavailable}
@@ -81,7 +95,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"shares", mounts.ErrUnavailable}
 	}
 	// ADR-234: caller-only explain_access on the same routes.
-	access, err := composePublicAccess(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	access, err := composePublicAccess(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"access", mounts.ErrUnavailable}
@@ -90,7 +104,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"access", mounts.ErrUnavailable}
 	}
 	// ADR-237: the fleet operators' browser-only preview_access_change.
-	preview, err := composePublicAccessPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	preview, err := composePublicAccessPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
@@ -101,7 +115,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 	}
 	// ADR-240: the fleet operators' browser-only preview_retention_change.
-	retentionPreview, err := composePublicRetentionPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+	retentionPreview, err := composePublicRetentionPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID, Clusters: clusters},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"retention-preview", mounts.ErrUnavailable}
@@ -135,7 +149,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"processing-inventory", mounts.ErrUnavailable}
 		}
 		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Inventory: inventory, Now: time.Now}}
-		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID,
+		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID, clusters,
 			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Discovery: inventory, Now: time.Now},
 			&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Status: decisions, Now: time.Now},
 			&privacyapp.ProcessingReport{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Reports: inventory, Now: time.Now})
@@ -152,11 +166,11 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"capture-progress-pool", mounts.ErrUnavailable}
 	}
-	services.CaptureChanges = browser.NewChanges()
+	services.CaptureChanges = presentation.NewChanges()
 	postgres.ListenPayloads(ctx, progressPool, postgres.CaptureProgressChannel, services.CaptureChanges.Publish)
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency,
-		Audit: presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: ownerRandomID}},
+		Audit: presentation.AuditedOperationsConfig{RootID: root, Now: time.Now, NewID: ownerRandomID, Changes: services.CaptureChanges}},
 		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
 	if err != nil {
 		return nil, &fixedStepError{"handler", err}

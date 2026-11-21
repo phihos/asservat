@@ -12,6 +12,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -29,7 +30,9 @@ func (f *browserDownloadFixture) CancelContextDownload(ctx context.Context, curr
 		return artifact.DownloadStopReceipt{}, e
 	}
 	f.stops++
-	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: time.Now(), ValidUntil: i.ValidUntil}, nil
+	now := time.Now()
+	// Like the stop service: the receipt is one lease long.
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: request, State: "Cancelled", ObservedAt: now, ValidUntil: identity.Earlier(i.ValidUntil, now.Add(artifact.DownloadLease))}, nil
 }
 func TestBrowserStopWithoutEvidenceScopesSurvivesNormalSaturation(t *testing.T) {
 	var h *InvestigationHandler
@@ -47,8 +50,8 @@ func TestBrowserStopWithoutEvidenceScopesSurvivesNormalSaturation(t *testing.T) 
 	}
 	h.slots <- struct{}{}
 	defer func() { <-h.slots }()
-	const body = `{"download_id":"00000000-0000-4000-8000-000000000090","idempotency_key":"same-key"}`
-	r, e := http.NewRequest("POST", server.URL+"/api/v1/operations/cancel_artifact_download", strings.NewReader(body))
+	const body = `{"action":"cancel","download_id":"00000000-0000-4000-8000-000000000090","idempotency_key":"same-key"}`
+	r, e := http.NewRequest("POST", server.URL+"/api/v1/operations/download_artifact", strings.NewReader(body))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -68,7 +71,7 @@ func TestBrowserStopWithoutEvidenceScopesSurvivesNormalSaturation(t *testing.T) 
 	}
 	// Invalid input is ordinary rejected work, never a reservation in the
 	// protected Stop lane. The saturated normal lane must reject it promptly.
-	bad, e := http.NewRequest("POST", server.URL+"/api/v1/operations/cancel_artifact_download", strings.NewReader(`{"download_id":"invalid","idempotency_key":"same-key"}`))
+	bad, e := http.NewRequest("POST", server.URL+"/api/v1/operations/download_artifact", strings.NewReader(`{"action":"cancel","download_id":"invalid","idempotency_key":"same-key"}`))
 	if e != nil {
 		t.Fatal(e)
 	}

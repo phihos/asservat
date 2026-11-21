@@ -59,7 +59,13 @@ for state in ('Completed', 'Cancelled'):
 failed = copy.deepcopy(terminal); failed['state'] = 'Failed'; invalid(status, failed)
 failed['failure_reason'] = 'Expired'; valid(status, failed)
 bad = copy.deepcopy(terminal); bad['state'] = 'Completed'; bad['failure_reason'] = 'Denied'; invalid(status, bad)
-# Prepare returns Ready with the catalog's verified metadata; there is no Preparing state.
+# Preparing carries neither links nor native facts; Ready and Completed carry size and SHA-256.
+preparing = {k: v for k, v in terminal.items() if k not in ('size_bytes', 'sha256', 'filename', 'native_format', 'etag', 'coverage_notice')}
+preparing['state'] = 'Preparing'; valid(status, preparing)
+for field in ('sha256', 'filename'):
+    bad = copy.deepcopy(preparing); bad[field] = ready[field]; invalid(status, bad)
+cancelled = copy.deepcopy(preparing); cancelled['state'] = 'Cancelled'; valid(status, cancelled)
+bad = copy.deepcopy(preparing); bad['state'] = 'Completed'; invalid(status, bad)
 native_fields = ('filename', 'native_format', 'etag', 'coverage_notice')
 for field in ('size_bytes', 'sha256'):
     for value in (ready, terminal):

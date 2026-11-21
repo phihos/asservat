@@ -57,9 +57,6 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			if err != nil {
 				return err
 			}
-			if len(reviewRows)+len(rows) > cfg.MaxPreviewTargets {
-				return cfg.ErrLimit
-			}
 			for _, row := range rows {
 				reviewSource[uid(row.ID)] = ref.UID
 			}
@@ -147,19 +144,21 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		slices.SortFunc(namespaces, func(a, b cfg.PreviewNamespace) int {
 			return cmp.Or(cmp.Compare(a.ClusterID, b.ClusterID), cmp.Compare(a.NamespaceUID, b.NamespaceUID))
 		})
-		cells := 0
-		for _, ns := range namespaces {
-			cells += len(named[ns]) + 1
-		}
-		if cells > cfg.MaxPreviewTargets {
-			return cfg.ErrLimit
+		// The stream's check time and audit roots are read once; each cell
+		// then costs its own assignment and review reads.
+		header, headerErr := readProjectionStream(ctx, q, s)
+		if headerErr != nil && !errors.Is(headerErr, cfg.ErrUnavailable) {
+			return headerErr
 		}
 		for _, ns := range namespaces {
 			workloads := slices.Sorted(slices.Values(named[ns]))
 			for _, w := range append(workloads, cfg.OtherWorkloads) {
 				target := authorization.Target{ClusterID: ns.ClusterID, NamespaceUID: ns.NamespaceUID, WorkloadUID: w, PodUID: w}
 				cell := cfg.PreviewCell{Target: target}
-				projection, err := permissionProjection(ctx, q, s, target)
+				projection, err := authorization.Projection{}, headerErr
+				if headerErr == nil {
+					projection, err = header.projection(ctx, q, target)
+				}
 				switch {
 				case err == nil:
 					cell.Projection = projection
@@ -168,13 +167,23 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 					}
 					offset.projection(&cell.Projection)
 				case errors.Is(err, cfg.ErrUnavailable):
-					cell.Unavailable = authorization.UnmetPermissionStale
+					cell.Unavailable = authorization.UnmetClusterNotObserved
 				case errors.Is(err, cfg.ErrLimit):
 					cell.Unavailable = authorization.UnmetServiceUnavailable
 				default:
 					return err
 				}
 				out.Cells = append(out.Cells, cell)
+			}
+		}
+		if headerErr == nil {
+			if err := header.stillCurrent(ctx, q); errors.Is(err, cfg.ErrUnavailable) {
+				// The stream's lease or freshness ended during the read.
+				for n := range out.Cells {
+					out.Cells[n] = cfg.PreviewCell{Target: out.Cells[n].Target, Unavailable: authorization.UnmetClusterNotObserved}
+				}
+			} else if err != nil {
+				return err
 			}
 		}
 		return nil

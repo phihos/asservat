@@ -37,6 +37,9 @@ func (f *recordingOperationFixture) List(_ context.Context, _ identities.Current
 	}
 	return f.page, f.err
 }
+func (f *recordingOperationFixture) Select(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, ids []string) (app.RecordingPage, error) {
+	return f.List(ctx, current, target, "", "", len(ids))
+}
 func (f *recordingOperationFixture) Preview(_ context.Context, _ identities.CurrentIdentity, in app.RecordingSavePreviewRequest) (app.ContextPreviewResult, error) {
 	f.previewCalls++
 	f.request = in
@@ -53,7 +56,7 @@ func recordingOperationTestFixture(t *testing.T) (*AuditedOperations, *Recording
 	t.Helper()
 	audited, actor, gate := auditedFixture(t)
 	now := audited.config.Now()
-	row := app.RecordingRow{Handle: "opaque-recording-handle", PolicyUID: "policy-a", PodUID: "pod-a", PodName: "api-a", ActionID: "packets", Kind: "packetCapture", State: "Unknown", History: "Unknown", MaximumBefore: 90 * time.Second, IncidentPodCap: 3}
+	row := app.RecordingRow{Handle: "opaque-recording-handle", PolicyName: "policy-a", PolicyUID: "policy-a", PodUID: "pod-a", PodName: "api-a", ActionID: "packets", Kind: "packetCapture", State: "Unknown", History: "Unknown", MaximumBefore: 90 * time.Second, IncidentPodCap: 3}
 	f := &recordingOperationFixture{page: app.RecordingPage{Rows: []app.RecordingRow{row}, Cursor: "opaque-next", ExpiresAt: now.Add(time.Minute), ValidUntil: now.Add(2 * time.Second)}}
 	assessment := assessmentFixture()
 	assessment.GeneratedAt = now
@@ -67,129 +70,121 @@ func recordingOperationTestFixture(t *testing.T) (*AuditedOperations, *Recording
 	if err != nil {
 		t.Fatal(err)
 	}
+	// list_recordings without live viewing lists save rows only.
+	list, err := NewLiveOperations(LiveOperationsConfig{PublicOrigin: audited.PublicOrigin(), Recordings: f, Clusters: NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000001"}), Now: audited.config.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if combined, err = NewInvestigationLiveOperations(combined, list); err != nil {
+		t.Fatal(err)
+	}
 	audited.inner = combined
 	return audited, operations, actor, f, gate
 }
 func TestRecordingSaveOperationsUseExistingAuditAndPassiveNamedTarget(t *testing.T) {
 	audited, _, actor, f, gate := recordingOperationTestFixture(t)
-	reply, err := audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+wireTarget+`}`))
+	reply, err := audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+liveWireTarget+`}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var out struct {
 		Status     string
-		Data       RecordingPageData
+		Data       recordingListPage
 		NextCursor *string `json:"next_cursor"`
 	}
-	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || len(out.Data.Recordings) != 1 || out.Data.CaptureEnabled || out.Data.Recordings[0].History != "Unknown" || out.Data.Recordings[0].MaximumBefore != "90s" || out.Data.Recordings[0].IncidentPodCap != 3 || out.NextCursor == nil || f.limit != 20 || f.target.Name != "api" {
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || len(out.Data.Recordings) != 1 || out.Data.CaptureEnabled || out.Data.Recordings[0].History != "Unknown" || out.Data.Recordings[0].MaximumBefore != "90s" || out.Data.Recordings[0].IncidentPodCap != 3 || out.Data.Recordings[0].SaveVia != "recordingSave" || out.NextCursor == nil || f.limit != 16 || f.target.Name != "api" {
 		t.Fatal("lost bounded passive inventory", string(reply.Body))
 	}
 	if len(gate.events) != 1 || gate.events[0].Operation != "list_recordings" || !reply.ValidUntil.Equal(f.page.ValidUntil) || actor.requests != 0 {
 		t.Fatal("lost original audit/freshness or acquired work", gate, reply.ValidUntil)
 	}
 	gate.fail = true
-	if reply, err = audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+wireTarget+`}`)); err == nil || len(reply.Body) != 0 {
+	if reply, err = audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+liveWireTarget+`}`)); err == nil || len(reply.Body) != 0 {
 		t.Fatal("inventory escaped without its audit row", err)
 	}
 }
 func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
 	audited, _, actor, f, gate := recordingOperationTestFixture(t)
-	reply, err := audited.Call(t.Context(), actor, "preview_recording_save", []byte(`{"recording_handles":["opaque-recording-handle"],"before":"30s"}`))
+	reply, err := audited.Call(t.Context(), actor, "preview_capture", []byte(`{"recording_handles":["opaque-recording-handle"],"before":"30s"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var out struct {
 		Status string
-		Data   RecordingSavePreviewData
+		Data   ContextPreviewData
 	}
-	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Operation != "recordingSave" || out.Data.CaptureEnabled || out.Data.IncidentPodCap != 3 || len(out.Data.Selected) != 1 || out.Data.Windows[0].Before != "30s" || out.Data.Windows[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0] != "CollectionDisabled" || f.request.Before != 30*time.Second {
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.CaptureEnabled || out.Data.PodCount != 1 || out.Data.MaxProcessStarts != 0 || len(out.Data.Lifecycle.Actions) != 1 || out.Data.Lifecycle.Actions[0].RequestedBefore != "30s" || out.Data.Lifecycle.Actions[0].After != "0s" || len(out.Data.Blockers) != 1 || out.Data.Blockers[0].Code != "CollectionDisabled" || f.request.Before != 30*time.Second {
 		t.Fatal("preview became ordinary capture or invented coverage", string(reply.Body))
 	}
 	if len(out.Data.PlanDigest) != 64 || len(gate.events) != 1 || actor.requests != 0 {
 		t.Fatal("preview lost its plan digest or started acquisition", out.Data)
 	}
 	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
-		if _, err = audited.Call(t.Context(), actor, "preview_recording_save", []byte(bad)); err == nil || f.previewCalls != 1 {
+		if _, err = audited.Call(t.Context(), actor, "preview_capture", []byte(bad)); err == nil || f.previewCalls != 1 {
 			t.Fatal("unsupported input reached source use case", bad, err, f.previewCalls)
 		}
 	}
 }
 func TestRecordingSaveMetadataRechecksIdentityAndDoesNotLeakProviderErrors(t *testing.T) {
-	_, ops, actor, f, _ := recordingOperationTestFixture(t)
+	audited, _, actor, f, _ := recordingOperationTestFixture(t)
 	f.after = func() { actor.revoke = true }
-	if _, err := ops.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{`+wireTarget+`}`)); err == nil {
+	if _, err := audited.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{`+liveWireTarget+`}`)); err == nil {
 		t.Fatal("revoked identity disclosed inventory")
 	}
-	_, ops, actor, f, _ = recordingOperationTestFixture(t)
+	audited, _, actor, f, _ = recordingOperationTestFixture(t)
 	f.err = errors.New("private SQL source and credential detail")
-	reply, err := ops.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{`+wireTarget+`}`))
+	reply, err := audited.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{`+liveWireTarget+`}`))
 	if err != nil || strings.Contains(string(reply.Body), "private SQL") || !strings.Contains(string(reply.Body), `"status":"error"`) {
 		t.Fatal(err, string(reply.Body))
 	}
+	reply, err = audited.Call(t.Context(), actor, "list_recordings", json.RawMessage(`{"target_ref":{"cluster":"elsewhere","namespace":"payments","kind":"Deployment","name":"api"}}`))
+	if err != nil || !strings.Contains(string(reply.Body), `"code":"UnknownCluster"`) {
+		t.Fatal("unknown cluster name is not a domain error", err, string(reply.Body))
+	}
 }
 func TestRecordingSaveToolsRequireExplicitComposition(t *testing.T) {
-	base, _ := operationFixture(t, false)
-	for _, name := range []string{"list_recordings", "preview_recording_save"} {
-		if _, ok := base.Tool(name); ok {
-			t.Fatal("schema registration enabled source service")
-		}
+	base, current := operationFixture(t, false)
+	if _, ok := base.Tool("list_recordings"); ok {
+		t.Fatal("schema registration enabled source service")
+	}
+	if reply, err := base.Call(t.Context(), current, "preview_capture", []byte(`{"recording_handles":["opaque-recording-handle"]}`)); err != nil || !strings.Contains(string(reply.Body), "CapabilityUnavailable") {
+		t.Fatal("recording save preview served without the source service", err, string(reply.Body))
 	}
 	audited, _, _, _, _ := recordingOperationTestFixture(t)
-	for _, name := range []string{"list_recordings", "preview_recording_save"} {
+	for _, name := range []string{"list_recordings", "preview_capture"} {
 		if _, ok := audited.Tool(name); !ok {
 			t.Fatal("explicitly composed passive route missing", name)
 		}
 	}
 }
 
-func TestRecordingInventoryBoundsWholePageBeforeCursorAdvance(t *testing.T) {
-	for _, oversized := range []bool{false, true} {
-		t.Run(map[bool]string{false: "maximum ASCII rows", true: "escaped maximum rows"}[oversized], func(t *testing.T) {
-			audited, _, actor, f, _ := recordingOperationTestFixture(t)
-			row := f.page.Rows[0]
-			row.Handle = strings.Repeat("h", 128)
-			row.PolicyUID = strings.Repeat("u", 64)
-			row.PodUID = strings.Repeat("p", 128)
-			row.PodName = strings.Repeat("n", 253)
-			row.ActionID = strings.Repeat("a", 63)
-			if oversized {
-				row.PodName = strings.Repeat("<", 253)
-				row.Handle = strings.Repeat("<", 128)
-				row.PodUID = strings.Repeat("<", 128)
-			}
-			f.page.Rows = make([]app.RecordingRow, 20)
-			for i := range f.page.Rows {
-				f.page.Rows[i] = row
-				f.page.Rows[i].Handle = fmt.Sprintf("%02d", i) + row.Handle[2:]
-			}
-			reply, err := audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+wireTarget+`,"limit":100}`))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if f.limit != 20 || len(reply.Body) > 24<<10 {
-				t.Fatal("unbounded page", f.limit, len(reply.Body))
-			}
-			var envelope struct {
-				Status     string
-				Data       json.RawMessage
-				NextCursor *string `json:"next_cursor"`
-			}
-			if json.Unmarshal(reply.Body, &envelope) != nil {
-				t.Fatal("invalid envelope")
-			}
-			if oversized {
-				if envelope.Status != "error" || !strings.Contains(string(envelope.Data), "ReduceLimit") || envelope.NextCursor != nil {
-					t.Fatal(string(reply.Body))
-				}
-			} else {
-				var page RecordingPageData
-				if json.Unmarshal(envelope.Data, &page) != nil || len(page.Recordings) != 20 || envelope.NextCursor == nil {
-					t.Fatal(string(reply.Body))
-				}
-				t.Logf("20 maximum ASCII rows: %d bytes", len(reply.Body))
-			}
-		})
+func TestRecordingInventoryBoundsWholePage(t *testing.T) {
+	audited, _, actor, f, _ := recordingOperationTestFixture(t)
+	row := f.page.Rows[0]
+	row.Handle = strings.Repeat("h", 146)
+	row.PolicyUID = strings.Repeat("u", 64)
+	row.PolicyName = strings.Repeat("n", 253)
+	row.PodUID = strings.Repeat("p", 128)
+	row.PodName = strings.Repeat("n", 253)
+	row.ActionID = strings.Repeat("a", 128)
+	f.page.Rows = make([]app.RecordingRow, 16)
+	for i := range f.page.Rows {
+		f.page.Rows[i] = row
+		f.page.Rows[i].Handle = fmt.Sprintf("%02d", i) + row.Handle[2:]
 	}
+	reply, err := audited.Call(t.Context(), actor, "list_recordings", []byte(`{`+liveWireTarget+`,"limit":100}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Status     string
+		Data       recordingListPage
+		NextCursor *string `json:"next_cursor"`
+	}
+	if f.limit != 16 || len(reply.Body) > 24<<10 || json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.Recordings) != 16 || envelope.NextCursor == nil {
+		t.Fatal("unbounded page", f.limit, len(reply.Body))
+	}
+	t.Logf("16 maximum ASCII rows: %d bytes", len(reply.Body))
 }
 
 type cancellationOperationFixture struct {
@@ -267,7 +262,7 @@ func TestRecordingCancellationRespectsOrdinaryCompositionGate(t *testing.T) {
 	if _, err = composed.Call(t.Context(), actor, "cancel_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030","expected_revision":1,"idempotency_key":"same"}`)); err == nil {
 		t.Fatal("disabled cancellation reached service")
 	}
-	for _, name := range []string{"list_recordings", "preview_recording_save"} {
+	for _, name := range []string{"preview_capture"} {
 		if _, ok := composed.Tool(name); !ok {
 			t.Fatal("passive tool disappeared", name)
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,7 +49,7 @@ func newAccessFixture() (*accessFixture, *AccessOperations) {
 	other.SubjectID, other.AssignmentID, other.BasisUID = "team-b", "55555555-5555-4666-8777-888888888888", "binding-b"
 	f.allows = []authorization.CurrentAssignment{{Audience: mine, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}, {Audience: other, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}
 	service := authapp.AccessExplainer{InstallationID: "11111111-2222-4333-8444-555555555555", Targets: f, Permissions: f, Now: func() time.Time { return f.now }}
-	s, err := NewAccessOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "88888888-8888-4888-8888-888888888888" }, service)
+	s, err := NewAccessOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "88888888-8888-4888-8888-888888888888" }, NewClusterNames(map[string]string{"prod": accessCluster}), service)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +70,7 @@ func accessCall(t *testing.T, s *AccessOperations, f *accessFixture, input strin
 }
 
 func accessRequest(op string) string {
-	b, _ := json.Marshal(map[string]any{"target_ref": map[string]string{"cluster_id": accessCluster, "namespace": "payments", "kind": "Deployment", "name": "api"}, "operation": op})
+	b, _ := json.Marshal(map[string]any{"target_ref": map[string]string{"cluster": "prod", "namespace": "payments", "kind": "Deployment", "name": "api"}, "operation": op})
 	return string(b)
 }
 
@@ -77,7 +78,7 @@ func TestExplainAccessOperationContract(t *testing.T) {
 	f, s := newAccessFixture()
 	got := accessCall(t, s, f, accessRequest("read"))
 	rows := got["assignments"].([]any)
-	if got["decision"] != "Allow" || len(rows) != 1 || rows[0].(map[string]any)["basis_uid"] != "binding-a" || got["target"] == nil || got["valid_until"] == nil {
+	if got["decision"] != "Allow" || len(rows) != 1 || rows[0].(map[string]any)["basis_uid"] != "binding-a" || got["target"] == nil || got["valid_until"] != nil {
 		t.Fatalf("allow: %v", got)
 	}
 	f.allows[0].Audience.BasisKind = authorization.ClusterAccessBindingKind
@@ -99,6 +100,10 @@ func TestExplainAccessOperationContract(t *testing.T) {
 	if got["decision"] != "Deny" || got["unmet"] != "NoMatchingAllow" || got["required_roles"].([]any)[0] != "workload-maintainer" || got["target"] == nil {
 		t.Fatalf("reader capture: %v", got)
 	}
+	// An unknown cluster name is a domain error, not a transport failure.
+	if got = accessCall(t, s, f, strings.Replace(accessRequest("read"), `"prod"`, `"staging"`, 1)); got["code"] != "UnknownCluster" {
+		t.Fatalf("unknown cluster: %v", got)
+	}
 	if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "explain_access", json.RawMessage(accessRequest("delete"))); !errors.Is(err, contracts.ErrInvestigationWire) {
 		t.Fatalf("unknown operation accepted: %v", err)
 	}
@@ -115,7 +120,7 @@ func TestExplainAccessCountsAllMatchingAssignments(t *testing.T) {
 	}
 	got := accessCall(t, s, f, accessRequest("read"))
 	rows := got["assignments"].([]any)
-	if got["decision"] != "Allow" || got["assignments_total"] != float64(257) || len(rows) != 32 {
+	if got["decision"] != "Allow" || got["assignments_total"] != float64(257) || len(rows) != accessExplanationRows {
 		t.Fatal("incomplete explanation", got["decision"], got["assignments_total"], len(rows))
 	}
 }

@@ -172,8 +172,8 @@ func (g consoleArgumentGrants) Get(ctx context.Context, current identities.Curre
 	}
 	return v, i.ValidUntil, nil
 }
-func (consoleArgumentGrants) List(context.Context, identities.CurrentIdentity, string, int) ([]authapp.GrantView, time.Time, error) {
-	return nil, time.Time{}, authapp.ErrGrantUnavailable
+func (consoleArgumentGrants) List(context.Context, identities.CurrentIdentity, string, authapp.GrantCursor, int) ([]authapp.GrantView, authapp.GrantCursor, time.Time, error) {
+	return nil, authapp.GrantCursor{}, time.Time{}, authapp.ErrGrantUnavailable
 }
 func (consoleArgumentGrants) Decide(context.Context, identities.CurrentIdentity, string, bool, string, string) (authorization.Grant, bool, error) {
 	return authorization.Grant{}, false, authapp.ErrGrantUnavailable
@@ -184,7 +184,7 @@ func (consoleArgumentGrants) Revoke(context.Context, identities.CurrentIdentity,
 
 func consoleArgumentOperations(t *testing.T, origin string, service *consoleArgumentCaptures) *presentation.ContextOperations {
 	t.Helper()
-	op, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, service, service, nil)
+	op, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }, Clusters: presentation.NewClusterNames(map[string]string{"local": consoleCaptureID(1)})}, service, service, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func consoleArgumentOperations(t *testing.T, origin string, service *consoleArgu
 func TestConsoleSyscallCaptureAuthoringProducer(t *testing.T) {
 	service := newConsoleArgumentCaptures(t)
 	sessions := &consoleSyntheticSessions{origin: "https://console.invalid", state: "ready", expiresAt: time.Now().Add(time.Minute)}
-	in := manualArgumentsCaptureInput(consoleCaptureID(1), "payments", "api", false)
+	in := manualArgumentsCaptureInput("local", "payments", "api", false)
 	raw, _ := json.Marshal(in)
 	reply, err := consoleArgumentOperations(t, sessions.origin, service).Call(t.Context(), consoleArgumentCurrent{sessions}, "preview_capture", raw)
 	var out struct {

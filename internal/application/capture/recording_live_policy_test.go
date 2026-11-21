@@ -24,6 +24,7 @@ func TestCurrentSourcePolicyDoesNotRequireSeparateRecordingSaveOptIn(t *testing.
 		edit(spec)
 		component := spec["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
 		delete(component, "overrides")
+		spec["recordingSaves"] = map[string]any{"enabled": false}
 	}
 	if _, e := activation.Activate(t.Context(), f, "restarts", "ongoing", true); e != nil {
 		t.Fatal(e)

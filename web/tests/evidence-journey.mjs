@@ -76,7 +76,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     await expect(preview).toBeVisible();
     await expect(preview.getByText('Approved metadata · complete', { exact: true })).toBeVisible();
     await expect(preview.getByText(/Other evidence in this case, further sharing/)).toBeVisible();
-    await panel.getByLabel('Recipient ID').fill('synthetic-recipient');
+    await panel.getByLabel('Group name or user ID').fill('synthetic-recipient');
     await panel.getByRole('button', { name: 'Add recipient', exact: true }).click();
     await panel.getByLabel('Reason').fill('incident review');
     const createReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/create_share');
@@ -124,15 +124,14 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     checks.push('idle artifact expiry removes Download and explains expiry without metadata polling or renewing retention');
 
     // Native worker/session/relay composition is intentionally absent. The
-    // real dispatch returns 404, not fabricated Preparing or transfer success.
-    const prepareReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/prepare_artifact_download');
+    // real dispatch returns 404, not a fabricated transfer success.
+    const prepareReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/download_artifact');
     await page.getByRole('button', { name: 'Download', exact: true }).click();
     const missing = await prepareReply;
     assert.equal(missing.status(), 404);
     assert.notEqual(missing.headers()['content-type'], 'text/html; charset=utf-8');
     await expect(page.getByRole('alert')).toContainText('unavailable');
     await expect(page.getByRole('button', { name: 'Retry same download request', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Preparing the native file', exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Download native file', exact: true })).toHaveCount(0);
     await expect(page.getByText('SHA-256', { exact: true })).toHaveCount(0);
     await scan('native-download-unavailable');
@@ -185,7 +184,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     artifact.kind = 'profile'; artifact.data_class = 'raw'; artifact.native_format = 'pprof';
     let summaryCalls = 0;
     const caseRoute = origin + '/api/v1/operations/get_case';
-    const summaryRoute = origin + '/api/v1/operations/get_profile_summary';
+    const summaryRoute = origin + '/api/v1/operations/get_extract';
     const heapOperations = [];
     const heapRequestListener = request => {
       const path = new URL(request.url()).pathname;
@@ -197,7 +196,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       const heap = artifact.profile_acquisition?.requested_type === 'heap';
       const sampleType = heap ? 'inuse_space' : 'cpu';
       assert.equal(route.request().method(), 'POST');
-      assert.deepEqual(route.request().postDataJSON(), { case_id: caseID, artifact_id: artifact.artifact_id, sample_type: sampleType, top_n: 20 });
+      assert.deepEqual(route.request().postDataJSON(), { view: 'profileSummary', case_id: caseID, artifact_id: artifact.artifact_id, sample_type: sampleType, limit: 20 });
       assert(route.request().headers()['x-csrf-token']);
       assert.equal(route.request().headers().authorization, undefined);
       const now = Date.now();
@@ -242,7 +241,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       await expect(heapView.locator('dl.facts dd')).toHaveText(['inuse_space', 'bytes', '100', 'Unavailable', 'partial']);
       await expect(heapView.locator('img')).toHaveCount(0);
       assert.equal(summaryCalls, 2);
-      assert.deepEqual(heapOperations, ['get_case', 'get_profile_summary'], 'heap inspection makes one selected summary query without acquisition or probes');
+      assert.deepEqual(heapOperations, ['get_case', 'get_extract'], 'heap inspection makes one selected summary query without acquisition or probes');
       await page.evaluate(() => document.fonts.ready);
       for (const width of [375, 320]) {
         await page.setViewportSize({ width, height: 740 });

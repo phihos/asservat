@@ -118,7 +118,7 @@ func installedSyscallQueryBrowser(t *testing.T, ctx context.Context, browser *in
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "syscall_query" && name != "get_query_result" {
+		if closed || name != "query_artifact" && name != "get_query_result" {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -142,7 +142,7 @@ func installedSyscallQueryBrowser(t *testing.T, ctx context.Context, browser *in
 		if err != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil {
 			fail("canonical input unavailable")
 		}
-		if name == "syscall_query" {
+		if name == "query_artifact" {
 			a, aok := actual.(map[string]any)
 			w, wok := wanted.(map[string]any)
 			key, kok := a["idempotency_key"].(string)

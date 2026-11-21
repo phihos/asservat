@@ -16,6 +16,12 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const implemented = resolve(root, 'specs/contracts/implemented');
 const implementedFiles = new Set(await readdir(implemented));
 const browser = parse(await readFile(implementedFiles.has('browser-openapi.yaml') ? resolve(implemented, 'browser-openapi.yaml') : resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
+// Operations listed in implemented/legacy-tools.txt still take their schemas
+// from the implemented copy; the others use the canonical document.
+// activate_policy and request_policy_grant remain until hub-side acceptance
+// (specs/policy-automation.md) replaces them.
+const canonicalBrowser = parse(await readFile(resolve(root, 'docs/interfaces/browser-openapi.yaml'), 'utf8'));
+const legacyTools = new Set(implementedFiles.has('legacy-tools.txt') ? (await readFile(resolve(implemented, 'legacy-tools.txt'), 'utf8')).split(/\s+/).filter(Boolean) : []);
 const auth = parse(await readFile(implementedFiles.has('browser-auth-openapi.yaml') ? resolve(implemented, 'browser-auth-openapi.yaml') : resolve(root, 'docs/interfaces/browser-auth-openapi.yaml'), 'utf8'));
 auth.components.schemas = { Session: browser.components.schemas.Session };
 auth.paths['/api/v1/session'] = browser.paths['/api/v1/session'];
@@ -43,13 +49,22 @@ const outputs = {
 // The capture bundle covers the five implemented business operations. The
 // canonical documents remain shared with MCP; this is a code-generation adapter,
 // not another manually maintained wire schema or a network schema loader.
-const registry = new Map();
-const contractFiles = new Set([...(await readdir(resolve(root, 'specs/contracts'))), ...implementedFiles]);
-for (const file of [...contractFiles].filter(file => file.endsWith('.schema.json')).sort()) {
-  const schema = JSON.parse(await readFile(implementedFiles.has(file) ? resolve(implemented, file) : resolve(root, 'specs/contracts', file), 'utf8'));
-  registry.set(schema.$id, { name: 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_'), schema });
+// Legacy operations reference the implemented schema copies; canonical
+// operations reference the canonical schemas. A bundle uses one of the two.
+const legacyRegistry = new Map(), canonicalRegistry = new Map();
+const canonicalFiles = await readdir(resolve(root, 'specs/contracts'));
+for (const file of [...new Set([...canonicalFiles, ...implementedFiles])].filter(file => file.endsWith('.schema.json')).sort()) {
+  const name = 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_');
+  const legacy = JSON.parse(await readFile(implementedFiles.has(file) ? resolve(implemented, file) : resolve(root, 'specs/contracts', file), 'utf8'));
+  legacyRegistry.set(legacy.$id, { name, schema: legacy });
+  if (!canonicalFiles.includes(file)) continue;
+  const canonical = JSON.parse(await readFile(resolve(root, 'specs/contracts', file), 'utf8'));
+  canonicalRegistry.set(canonical.$id, { name, schema: canonical });
 }
 async function operationBundle(names, bundle, direct = []) {
+  const legacy = names.filter(name => legacyTools.has(name));
+  if (legacy.length > 0 && legacy.length < names.length) throw new Error('Bundle ' + bundle + ' mixes legacy and canonical operations');
+  const registry = names.length > 0 && legacy.length === 0 && direct.length === 0 ? canonicalRegistry : legacyRegistry;
   const capture = { openapi: browser.openapi, info: browser.info, paths: {}, components: { schemas: {} } };
   function localSchema(value, base) {
     if (Array.isArray(value)) return value.map(child => localSchema(child, base));
@@ -84,7 +99,7 @@ async function operationBundle(names, bundle, direct = []) {
   for (const name of names) {
     for (const direction of ['Input', 'Output']) {
       const key = 'Mcp' + direction + '_' + name;
-      const schema = browser.components.schemas[key];
+      const schema = (legacyTools.has(name) ? browser : canonicalBrowser).components.schemas[key];
       capture.components.schemas[key] = localSchema(schema);
       validators.addSchema(schema, key);
       exports['valid' + direction + '_' + name] = key;
@@ -103,11 +118,11 @@ async function operationBundle(names, bundle, direct = []) {
 
 }
 await operationBundle([], 'processing', ['ProcessingInventory', 'ProcessingChange', 'ProcessingReceipt']);
-await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_settings', 'list_capture_profiles', 'get_capture_profile'], 'capture');
-await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
-await operationBundle(['get_file_excerpt', 'get_profile_summary', 'get_pcap_summary', 'pcap_query', 'compare_profiles', 'get_syscall_summary', 'get_syscall_events', 'syscall_query', 'get_logs', 'get_query_result'], 'projection');
-await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
-await operationBundle(['list_recordings', 'preview_recording_save'], 'recordings');
+await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_profile'], 'capture');
+await operationBundle(['get_case', 'download_artifact'], 'evidence');
+await operationBundle(['get_extract', 'query_artifact', 'compare_profiles', 'get_query_result'], 'projection');
+await operationBundle(['deactivate_policy', 'get_policy_status'], 'policy');
+await operationBundle(['activate_policy', 'request_policy_grant'], 'policy-legacy');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
@@ -115,9 +130,9 @@ await operationBundle(['preview_retention_change'], 'retention-preview');
 await operationBundle(['search_processing_evidence'], 'processing-discovery');
 await operationBundle(['get_processing_erasure'], 'processing-erasure');
 await operationBundle(['get_processing_report'], 'processing-report', ['ProcessingReportExport']);
-await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
+await operationBundle(['request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
-await operationBundle(['list_live_sources', 'open_live_watch', 'read_live_watch', 'update_live_watch', 'close_live_watch'], 'live');
+await operationBundle(['list_recordings', 'watch_live'], 'live');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.
@@ -148,7 +163,7 @@ outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);
 outputs['validate-projection.js'] = browserModules(outputs['validate-projection.js']);
 outputs['validate-policy.js'] = browserModules(outputs['validate-policy.js']);
-outputs['validate-recordings.js'] = browserModules(outputs['validate-recordings.js']);
+outputs['validate-policy-legacy.js'] = browserModules(outputs['validate-policy-legacy.js']);
 outputs['validate-sharing.js'] = browserModules(outputs['validate-sharing.js']);
 outputs['validate-access.js'] = browserModules(outputs['validate-access.js']);
 outputs['validate-access-preview.js'] = browserModules(outputs['validate-access-preview.js']);

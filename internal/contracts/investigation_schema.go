@@ -7,9 +7,10 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"io"
+	"io/fs"
+	"path"
 	"slices"
 	"strings"
-	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -28,8 +29,10 @@ const InvestigationOutputLimit = 24 << 10
 // Up to64 exact artifacts and readable targets in one independent review.
 const InvestigationGrantReviewOutputLimit = 256 << 10
 
-// Bounded disclosures for16 selected source snapshots with64 retention refs each.
-const InvestigationRecordingSavePreviewOutputLimit = 128 << 10
+// InvestigationResultBound is the MCP result bound of specs/mcp.md (96 KiB,
+// from the common client tool-output limit). get_capture and preview_capture
+// may use it; other results keep the 24 KiB target.
+const InvestigationResultBound = 96 << 10
 
 // The sole browser settings budget; audit independently bounds its minimized
 // output byte count. Wire contracts do not import domain behavior.
@@ -67,7 +70,12 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 // InvestigationToolNames lists every embedded operation contract.
 func InvestigationToolNames() []string {
-	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "search_processing_evidence", "get_processing_erasure", "get_processing_report", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"}
+	files, _ := fs.Glob(investigationSchemas, "investigation-schemas/*.json")
+	names := make([]string, 0, len(files))
+	for _, f := range files {
+		names = append(names, strings.TrimSuffix(path.Base(f), ".json"))
+	}
+	return names
 }
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
@@ -141,8 +149,8 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 		if name == "get_grant" {
 			limit = InvestigationGrantReviewOutputLimit
 		}
-		if name == "preview_recording_save" {
-			limit = InvestigationRecordingSavePreviewOutputLimit
+		if name == "get_capture" || name == "preview_capture" {
+			limit = InvestigationResultBound
 		}
 	}
 	return v.validateBound(name, b, output, limit)
@@ -174,73 +182,13 @@ func (v *InvestigationContracts) ValidateInput(name string, b []byte) error {
 // ValidateBrowserOutput uses the identical canonical schema. Only this fixed
 // server-owned operation has a larger browser body; MCP uses ValidateOutput.
 func (v *InvestigationContracts) ValidateBrowserOutput(name string, b []byte) error {
-	if name == "get_capture_settings" {
+	if name == "get_capture" {
 		return v.validateBound(name, b, true, InvestigationBrowserSettingsOutputLimit)
 	}
 	return v.ValidateOutput(name, b)
 }
 func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
-	if err := v.validate(name, b, true); err != nil {
-		return err
-	}
-	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" && name != "get_pcap_summary" && name != "pcap_query" && name != "compare_profiles" && name != "get_syscall_summary" && name != "get_syscall_events" && name != "get_logs" && name != "syscall_query" {
-		return nil
-	}
-	var out struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"`
-		DataClass string `json:"data_class"`
-		Data      struct {
-			ObservedAt time.Time       `json:"query_observed_at"`
-			ExpiresAt  time.Time       `json:"query_expires_at"`
-			Tool       string          `json:"tool_name"`
-			Result     json.RawMessage `json:"result"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(b, &out) != nil {
-		return ErrInvestigationWire
-	}
-	if out.Status == "error" {
-		return nil
-	}
-	if out.Data.ObservedAt.IsZero() || !out.Data.ExpiresAt.After(out.Data.ObservedAt) || out.Data.ExpiresAt.Sub(out.Data.ObservedAt) > time.Minute {
-		return ErrInvestigationWire
-	}
-	if name != "get_query_result" || out.Status != "ok" {
-		return nil
-	}
-	// The server-selected original tool is closed at this implementation
-	// boundary. A future catalog entry cannot choose a weaker nested schema.
-	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" && out.Data.Tool != "get_pcap_summary" && out.Data.Tool != "pcap_query" && out.Data.Tool != "compare_profiles" && out.Data.Tool != "get_syscall_summary" && out.Data.Tool != "get_syscall_events" && out.Data.Tool != "get_logs" && out.Data.Tool != "syscall_query" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
-		return ErrInvestigationWire
-	}
-	if out.Data.Tool == "get_http_headers" {
-		// ADR-282: the page carries no query times; it is the same request's
-		// successful page.
-		var page struct {
-			RequestID string `json:"request_id"`
-			Status    string `json:"status"`
-		}
-		if json.Unmarshal(out.Data.Result, &page) != nil || page.Status != "ok" || page.RequestID != out.RequestID {
-			return ErrInvestigationWire
-		}
-		return nil
-	}
-	var nested struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"`
-		DataClass string `json:"data_class"`
-		Data      struct {
-			ObservedAt time.Time `json:"query_observed_at"`
-			ExpiresAt  time.Time `json:"query_expires_at"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(out.Data.Result, &nested) != nil || nested.Status != "ok" || nested.RequestID != out.RequestID ||
-		(out.Data.Tool == "get_logs" || out.Data.Tool == "pcap_query" || out.Data.Tool == "syscall_query") && nested.DataClass != out.DataClass ||
-		!nested.Data.ObservedAt.Equal(out.Data.ObservedAt) || !nested.Data.ExpiresAt.Equal(out.Data.ExpiresAt) {
-		return ErrInvestigationWire
-	}
-	return nil
+	return v.validate(name, b, true)
 }
 
 // OutputViolation names the first leaf output-schema violation by JSON
@@ -257,8 +205,8 @@ func (v *InvestigationContracts) OutputViolation(name string, b []byte) string {
 	if name == "get_grant" {
 		limit = InvestigationGrantReviewOutputLimit
 	}
-	if name == "preview_recording_save" {
-		limit = InvestigationRecordingSavePreviewOutputLimit
+	if name == "get_capture" || name == "preview_capture" {
+		limit = InvestigationResultBound
 	}
 	out, err := investigationJSON(b, limit)
 	if err != nil {

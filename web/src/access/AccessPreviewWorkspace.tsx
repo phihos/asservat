@@ -12,7 +12,7 @@ const example = JSON.stringify([{ action: 'create', kind: 'AccessBinding',
   } }], null, 2);
 const operations: Record<string, string> = { capture: 'Collect', read: 'Read', download: 'Download' };
 const unmet: Record<string, string> = {
-  PermissionObservationStale: 'permission data is not current',
+  ClusterNotObserved: "the cluster's permission state has not reached the hub",
   ServiceUnavailable: 'permission data could not be read',
   ClusterUnavailable: 'the cluster is not enrolled in this installation',
   DecisionTimeSource: 'decided per user and Pod by a Kubernetes access review at request time',

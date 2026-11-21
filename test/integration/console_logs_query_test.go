@@ -132,7 +132,7 @@ func savedLogsBrowser(t *testing.T, ctx context.Context, browser *installedBrows
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "get_logs" && name != "get_query_result" {
+		if closed || name != "get_extract" && name != "get_query_result" {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -156,7 +156,7 @@ func savedLogsBrowser(t *testing.T, ctx context.Context, browser *installedBrows
 		if err != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil {
 			fail("canonical input unavailable")
 		}
-		if name == "get_logs" {
+		if name == "get_extract" {
 			a, aok := actual.(map[string]any)
 			w, wok := wanted.(map[string]any)
 			key, kok := a["idempotency_key"].(string)
@@ -250,7 +250,7 @@ func TestConsoleLogsQueryWithBuiltPackage(t *testing.T) {
 	b := &installedBrowser{t: t, client: client, base: origin, csrf: strings.Repeat("C", 43), wire: wire}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
-	selection := map[string]any{"case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "not-injected", "limit": 100}
+	selection := map[string]any{"view": "logs", "case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "not-injected", "limit": 100}
 	observed := 0
 	call, finish := savedLogsBrowser(t, ctx, b, server.Listener.Addr().String(), source, selection, func(r installedComparisonReply) {
 		observed++
@@ -260,7 +260,7 @@ func TestConsoleLogsQueryWithBuiltPackage(t *testing.T) {
 	})
 	defer finish()
 	for page := 0; page < 2; page++ {
-		pending := call("get_logs", selection)
+		pending := call("get_extract", selection)
 		var p struct {
 			Handle  string    `json:"query_handle"`
 			Expires time.Time `json:"query_expires_at"`
@@ -268,10 +268,7 @@ func TestConsoleLogsQueryWithBuiltPackage(t *testing.T) {
 		if pending.Status != "pending" || json.Unmarshal(pending.Data, &p) != nil || p.Handle == "" {
 			t.Fatal("pending query")
 		}
-		if err := installedJourneyPause(ctx, time.Second); err != nil {
-			t.Fatal(err)
-		}
-		ready := call("get_query_result", map[string]string{"query_handle": p.Handle})
+		ready := call("get_query_result", map[string]any{"query_handle": p.Handle, "after_revision": 1})
 		var out struct {
 			Tool   string `json:"tool_name"`
 			Result struct {
@@ -282,7 +279,7 @@ func TestConsoleLogsQueryWithBuiltPackage(t *testing.T) {
 				}
 			} `json:"result"`
 		}
-		if ready.Status != "ok" || json.Unmarshal(ready.Data, &out) != nil || out.Tool != "get_logs" || !out.Result.Data.Expires.Equal(p.Expires) {
+		if ready.Status != "ok" || json.Unmarshal(ready.Data, &out) != nil || out.Tool != "get_extract" || !out.Result.Data.Expires.Equal(p.Expires) {
 			t.Fatal("nested exact original query")
 		}
 		if page == 0 {
@@ -332,7 +329,7 @@ type consoleSyntheticLogOperations struct {
 
 func (s *consoleSyntheticLogOperations) PublicOrigin() string { return s.origin }
 func (s *consoleSyntheticLogOperations) ToolNames() []string {
-	return []string{"get_case", "request_raw_access", "get_grant", "get_logs", "get_query_result"}
+	return []string{"get_case", "request_raw_access", "get_grant", "get_extract", "get_query_result"}
 }
 func (s *consoleSyntheticLogOperations) Tool(n string) (contracts.InvestigationTool, bool) {
 	return s.wire.Tool(n)
@@ -380,8 +377,8 @@ func (s *consoleSyntheticLogOperations) Call(ctx context.Context, i identities.C
 		item["native_bytes"] = 64 << 20
 		item["action_id"] = "logs"
 		env["data"] = g
-	case "get_logs":
-		if s.grantReads != 1 || s.starts >= 2 || a["case_id"] != s.source.CaseID || a["artifact_id"] != s.source.ArtifactID || a["grant_id"] != s.source.GrantID || a["limit"] != float64(100) {
+	case "get_extract":
+		if a["view"] != "logs" || s.grantReads != 1 || s.starts >= 2 || a["case_id"] != s.source.CaseID || a["artifact_id"] != s.source.ArtifactID || a["grant_id"] != s.source.GrantID || a["limit"] != float64(100) {
 			return bad()
 		}
 		if s.starts == 0 && a["cursor"] != nil || s.starts == 1 && a["cursor"] != s.cursor {
@@ -396,9 +393,9 @@ func (s *consoleSyntheticLogOperations) Call(ctx context.Context, i identities.C
 		s.observed = time.Now().UTC()
 		s.expires = s.observed.Add(20 * time.Second)
 		env["status"] = "pending"
-		env["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "retry_after_seconds": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
+		env["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "revision": 1, "query_observed_at": s.observed, "query_expires_at": s.expires}
 	case "get_query_result":
-		if s.starts < 1 || s.polls != s.starts-1 || a["query_handle"] != consoleCaptureID(90+s.starts) {
+		if s.starts < 1 || s.polls != s.starts-1 || a["query_handle"] != consoleCaptureID(90+s.starts) || a["after_revision"] != nil && a["after_revision"] != float64(1) {
 			return bad()
 		}
 		s.polls++
@@ -445,7 +442,7 @@ func (s *consoleSyntheticLogOperations) Call(ctx context.Context, i identities.C
 		coverage["gapped_origins"] = 3
 		coverage["total_fragments"] = 3
 		env["data_class"] = "raw"
-		env["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "tool_name": "get_logs", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
+		env["data"] = map[string]any{"query_handle": consoleCaptureID(90 + s.starts), "tool_name": "get_extract", "result": inner, "query_observed_at": now, "query_expires_at": s.expires}
 	default:
 		return bad()
 	}
@@ -456,7 +453,7 @@ func (s *consoleSyntheticLogOperations) Call(ctx context.Context, i identities.C
 	return presentation.OperationReply{Body: body, ValidUntil: time.Now().Add(5 * time.Second)}, e
 }
 
-// Official SDK over real TLS reaches the same closed get_logs/pending/poll page
+// Official SDK over real TLS reaches the same closed get_extract logs/pending/poll page
 // contract as the React fixture. This synthetic transport proof confers no SQL
 // or evidence/key authority; the C20 test separately exercises the real C18.
 func TestRawLogsOfficialMCPBoundary(t *testing.T) {
@@ -489,17 +486,17 @@ func TestRawLogsOfficialMCPBoundary(t *testing.T) {
 	}
 	found := false
 	for _, tool := range tools.Tools {
-		found = found || tool.Name == "get_logs"
+		found = found || tool.Name == "get_extract"
 	}
 	if !found {
-		t.Fatal("get_logs not discoverable")
+		t.Fatal("get_extract not discoverable")
 	}
-	begin, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "get_logs", Arguments: map[string]any{"case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "same-official-sdk-page", "limit": 100}})
+	begin, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "get_extract", Arguments: map[string]any{"view": "logs", "case_id": source.CaseID, "artifact_id": source.ArtifactID, "grant_id": source.GrantID, "idempotency_key": "same-official-sdk-page", "limit": 100}})
 	if err != nil || begin.IsError {
 		t.Fatal("begin", err, begin)
 	}
 	raw, err := json.Marshal(begin.StructuredContent)
-	if err != nil || wire.ValidateOutput("get_logs", raw) != nil {
+	if err != nil || wire.ValidateOutput("get_extract", raw) != nil {
 		t.Fatal("closed pending SDK output", err)
 	}
 	var p struct {
@@ -533,7 +530,7 @@ func TestRawLogsOfficialMCPBoundary(t *testing.T) {
 			} `json:"result"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(raw, &r) != nil || r.Class != "raw" || r.Data.Tool != "get_logs" || len(r.Data.Result.Data.Entries) != 2 || r.Data.Result.Data.Entries[0].Text == nil || *r.Data.Result.Data.Entries[0].Text != "\n" || r.Data.Result.Data.Entries[1].Bytes == nil || *r.Data.Result.Data.Entries[1].Bytes != "/wo=" {
+	if json.Unmarshal(raw, &r) != nil || r.Class != "raw" || r.Data.Tool != "get_extract" || len(r.Data.Result.Data.Entries) != 2 || r.Data.Result.Data.Entries[0].Text == nil || *r.Data.Result.Data.Entries[0].Text != "\n" || r.Data.Result.Data.Entries[1].Bytes == nil || *r.Data.Result.Data.Entries[1].Bytes != "/wo=" {
 		t.Fatal("lossless primitive SDK payload")
 	}
 	ops.mu.Lock()

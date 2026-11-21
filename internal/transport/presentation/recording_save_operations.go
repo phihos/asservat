@@ -15,13 +15,11 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/domain/targets"
 )
 
 // RecordingSaveUseCase is the existing-source application boundary. Public
 // inputs contain names/opaque selections, never runtime pins or an executor.
 type RecordingSaveUseCase interface {
-	List(context.Context, identities.CurrentIdentity, targets.WorkloadRequest, string, string, int) (app.RecordingPage, error)
 	Preview(context.Context, identities.CurrentIdentity, app.RecordingSavePreviewRequest) (app.ContextPreviewResult, error)
 }
 type RecordingSaveOperationsConfig struct {
@@ -59,7 +57,7 @@ func (s *RecordingSaveOperations) PublicOrigin() string {
 	return s.config.PublicOrigin
 }
 func (s *RecordingSaveOperations) ToolNames() []string {
-	names := []string{"list_recordings", "preview_recording_save"}
+	names := []string{}
 	if s != nil && s.cancellations != nil {
 		names = append(names, "cancel_capture")
 	}
@@ -87,6 +85,7 @@ func NewInvestigationRecordingSaveOperations(base *InvestigationOperations, save
 	if base.captures != nil {
 		capture := *base.captures
 		capture.recordingSaveCancellationEnabled = composed.cancellations != nil
+		capture.recordingSaveCollection = composed.config.CollectionEnabled
 		capture.recordingSaves = saves.saves
 		out.captures = &capture
 		for name, part := range out.routes {
@@ -113,42 +112,16 @@ type RecordingRow struct {
 	IncidentPodCap  int        `json:"incident_pod_cap"`
 	HandleExpiresAt *time.Time `json:"handle_expires_at,omitempty"`
 }
-type RecordingPageData struct {
-	Kind           string         `json:"kind"`
-	Recordings     []RecordingRow `json:"recordings"`
-	ExpiresAt      time.Time      `json:"expires_at"`
-	CaptureEnabled bool           `json:"capture_enabled"`
-}
 type RecordingWindow struct {
 	Handle string `json:"recording_handle"`
 	Before string `json:"before"`
 	After  string `json:"after"`
 }
-type RecordingSavePreviewData struct {
-	Kind           string            `json:"kind"`
-	Operation      string            `json:"operation"`
-	PlanDigest     string            `json:"plan_digest"`
-	Selected       []RecordingRow    `json:"selected_recordings"`
-	Windows        []RecordingWindow `json:"windows"`
-	Assessment     CaptureAssessment `json:"capture_assessment"`
-	Blockers       []string          `json:"blockers"`
-	NavigationURI  string            `json:"navigation_uri"`
-	CaptureEnabled bool              `json:"capture_enabled"`
-	IncidentPodCap int               `json:"incident_pod_cap"`
-}
 type recordingSaveInput struct {
-	CaptureID        string               `json:"capture_id,omitempty"`
-	ExpectedRevision int64                `json:"expected_revision,omitempty"`
-	IdempotencyKey   string               `json:"idempotency_key,omitempty"`
-	Target           WorkloadReference    `json:"target_ref"`
-	PolicyUID        string               `json:"policy_uid,omitempty"`
-	Cursor           string               `json:"cursor,omitempty"`
-	Limit            int                  `json:"limit,omitempty"`
-	Handles          []string             `json:"recording_handles,omitempty"`
-	Before           string               `json:"before,omitempty"`
-	Sharing          *ContextSharingInput `json:"sharing,omitempty"`
-	Reason           *string              `json:"reason,omitempty"`
-	RepeatedFrom     string               `json:"repeated_from_capture_id,omitempty"`
+	CaptureID        string            `json:"capture_id,omitempty"`
+	ExpectedRevision int64             `json:"expected_revision,omitempty"`
+	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
+	Target           WorkloadReference `json:"target_ref"`
 }
 
 func recordingRow(row app.RecordingRow, expires time.Time) RecordingRow {
@@ -206,72 +179,13 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 			if decision.ApplicationStopUnknown {
 				out.Warnings = append(out.Warnings, "Stopping Asservat collection does not confirm that the application stopped profiling.")
 			}
-			out.Data = RecordingCancellationData{decision.CaptureID, decision.Phase, decision.Revision, decision.Requested, s.config.PublicOrigin + "/captures/" + decision.CaptureID}
+			out.Data = RecordingCancellationData{decision.CaptureID, capturePhase(decision.Phase), decision.Revision, decision.Requested, s.config.PublicOrigin + "/captures/" + decision.CaptureID}
 			if operationErr != nil && decision.Requested {
 				out.Warnings = append(out.Warnings, "Cancellation delivery is unconfirmed; the durable request remains pending.")
 				operationErr = nil
 			}
 		} else if operationErr == nil {
 			operationErr = value.ErrChanged
-		}
-	} else if name == "list_recordings" {
-		limit := in.Limit
-		if limit == 0 {
-			limit = 20
-		}
-		// A requested limit is an upper bound. Bound the service page before its
-		// cursor advances so the existing 24 KiB envelope can retain whole rows.
-		limit = min(limit, 20)
-		var page app.RecordingPage
-		page, operationErr = s.saves.List(bounded, current, in.Target.target(), in.PolicyUID, in.Cursor, limit)
-		if operationErr == nil {
-			if page.ValidUntil.IsZero() || !s.config.Now().Before(page.ExpiresAt) || len(page.Rows) > limit {
-				return OperationReply{}, value.ErrUnavailable
-			}
-			until = identity.Earlier(until, page.ValidUntil)
-			rows := make([]RecordingRow, 0, len(page.Rows))
-			for _, row := range page.Rows {
-				rows = append(rows, recordingRow(row, page.ExpiresAt))
-			}
-			out.Data = RecordingPageData{Kind: "recordingPage", Recordings: rows, ExpiresAt: page.ExpiresAt.UTC(), CaptureEnabled: s.config.CollectionEnabled}
-			if page.Cursor != "" {
-				cursor := page.Cursor
-				out.NextCursor = &cursor
-			}
-		}
-	} else {
-		var before time.Duration
-		if in.Before != "" {
-			before, err = time.ParseDuration(in.Before)
-			if err != nil {
-				return OperationReply{}, contracts.ErrInvestigationWire
-			}
-		}
-		planCtx, digest := app.WithPlanScope(bounded)
-		var result app.ContextPreviewResult
-		result, operationErr = s.saves.Preview(planCtx, current, recordingSaveRequest(in.Handles, before, in.Sharing, in.RepeatedFrom, in.Reason))
-		if operationErr == nil {
-			p, m := result.Preview, result.RecordingSave
-			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest {
-				return OperationReply{}, stopped("preview-shape", value.ErrUnavailable)
-			}
-			if !s.config.Now().Before(p.SelectionUntil) {
-				return OperationReply{}, stopped("preview-selection-expired", value.ErrUnavailable)
-			}
-			rows, windows, selectionErr := recordingPreviewSelection(result, in.Handles)
-			if selectionErr != nil {
-				return OperationReply{}, stopped("preview-rows", selectionErr)
-			}
-			assessment, assessmentErr := recordingSaveAssessment(result)
-			if assessmentErr != nil {
-				return OperationReply{}, stopped("preview-assessment", assessmentErr)
-			}
-			until = identity.Earlier(until, result.ValidUntil)
-			blockers := []string{}
-			if !s.config.CollectionEnabled {
-				blockers = append(blockers, "CollectionDisabled")
-			}
-			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PlanDigest: hash(digest(p)), Selected: rows, Windows: windows, Assessment: assessment, Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
 		}
 	}
 	if operationErr != nil {
@@ -290,11 +204,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 	}
 	until = identity.Earlier(until, final.ValidUntil)
 	b, err := json.Marshal(out)
-	limit := contracts.InvestigationOutputLimit
-	if name == "preview_recording_save" {
-		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
-	}
-	if err == nil && len(b) > limit {
+	if err == nil && len(b) > contracts.InvestigationOutputLimit {
 		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Use a smaller inventory page or recording selection to fit the metadata response.", false}, nil
 		b, err = json.Marshal(out)
 	}
@@ -308,7 +218,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		clear(b)
 		return OperationReply{}, stopped("reply-interval", value.ErrUnavailable)
 	}
-	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}
+	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr)}
 	var step interface{ FixedStep() string }
 	if errors.As(operationErr, &step) {
 		reply.failureStep = step.FixedStep()

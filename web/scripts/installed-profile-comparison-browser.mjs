@@ -49,7 +49,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_profile_summary|get_query_result|prepare_artifact_download|get_artifact_download)$/.test(path)) && response.status === 200) {
+      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_extract|get_query_result|download_artifact)$/.test(path)) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -64,7 +64,7 @@ try {
   page.on('pageerror', () => errors.push('pageerror'));
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
-    if (path === '/api/v1/operations/' + (heap ? 'get_profile_summary' : 'compare_profiles')) compareRequests++;
+    if (path === '/api/v1/operations/' + (heap ? 'get_extract' : 'compare_profiles')) compareRequests++;
     if (path === '/api/v1/operations/get_query_result') pollRequests++;
     if (path === '/api/v1/operations/get_case') caseRequests++;
     if (path.startsWith('/api/')) timeline.push(`+${Date.now() - started}ms request ${request.method()} ${path}`);
@@ -241,7 +241,7 @@ try {
   }
   let heapSummaryChecked = false;
   let heapRenderedCaseRequests = 0;
-  let handle;
+  let handle, revision;
   let terminal = false;
   let terminalComparison;
   let nativeCompleted = false;
@@ -253,7 +253,7 @@ try {
       stage = 'heap-native-prepare';
       let from = seen.length;
       await panel.locator('..').getByRole('button', { name: 'Download', exact: true }).click();
-      let response = await observed('prepare_artifact_download', from);
+      let response = await observed('download_artifact', from);
       let original, key, deadline;
       const end = Date.now() + 180_000; // Existing native helper ceiling; parent Go context still wins.
       for (;;) {
@@ -262,15 +262,27 @@ try {
         assert.equal(response.reply.status, 'ok');
         const data = response.reply.data;
         assert.equal(data.artifact_id, config.artifactID);
-        if (original === undefined) { original = data.download_id; deadline = data.expires_at; key = response.input.idempotency_key; }
+        if (original === undefined) {
+          assert.equal(response.input.action, 'prepare');
+          key = response.input.idempotency_key;
+          assert(key, 'native preparation key');
+          original = data.download_id; deadline = data.access_until;
+        } else {
+          // The console follows a Preparing session by its download_id and
+          // the revision it last saw.
+          assert.equal(response.input.action, 'status');
+          assert.equal(response.input.download_id, original);
+          assert.equal(typeof response.input.after_revision, 'number');
+        }
         assert.equal(data.download_id, original);
-        assert.equal(data.expires_at, deadline);
-        if (response.name === 'prepare_artifact_download') assert.equal(response.input.idempotency_key, key);
-        else assert.equal(response.input.download_id, original);
-        assert(['Preparing', 'Ready'].includes(data.state), 'finite native preparation');
-        if (data.state === 'Ready') break;
-        assert(Date.now() < Math.min(end, Date.parse(deadline)), 'original preparation deadline');
-        response = await observed(['prepare_artifact_download', 'get_artifact_download'], response.responseIndex);
+        assert.equal(data.access_until, deadline);
+        if (data.state === 'Preparing') {
+          assert(Date.now() < end, 'finite native preparation');
+          response = await observed('download_artifact', response.responseIndex);
+          continue;
+        }
+        assert.equal(data.state, 'Ready');
+        break;
       }
       const ready = response.reply.data;
       assert.equal(ready.content_path, '/api/v1/downloads/' + original + '/content');
@@ -375,13 +387,13 @@ try {
     }
     assert.equal(next.kind, 'call');
     assert(!terminal && ++calls <= 5, 'bounded original query calls');
-    const name = calls === 1 ? (heap ? 'get_profile_summary' : 'compare_profiles') : 'get_query_result';
+    const name = calls === 1 ? (heap ? 'get_extract' : 'compare_profiles') : 'get_query_result';
     assert.equal(next.name, name);
-    const expected = name === 'get_profile_summary'
-      ? { case_id: config.caseID, artifact_id: config.artifactID, sample_type: 'inuse_space', top_n: 20 }
+    const expected = name === 'get_extract'
+      ? { view: 'profileSummary', case_id: config.caseID, artifact_id: config.artifactID, sample_type: 'inuse_space', limit: 20 }
       : name === 'compare_profiles'
-      ? { case_id: config.caseID, artifact_id: config.artifactID, baseline_case_id: config.caseID, baseline_artifact_id: config.artifactID, sample_type: 'cpu', normalization: 'perSecond', top_n: 20 }
-      : { query_handle: handle };
+      ? { case_id: config.caseID, artifact_id: config.artifactID, baseline_case_id: config.caseID, baseline_artifact_id: config.artifactID, sample_type: 'cpu', normalization: 'perSecond', limit: 20 }
+      : { query_handle: handle, after_revision: revision };
     assert.deepEqual(next.input, expected);
     stage = name;
     const button = panel.getByRole('button', { name: heap ? (calls === 1 ? 'Inspect saved profile' : 'Check result') : (calls === 1 ? 'Compare profiles' : 'Check comparison result'), exact: true });
@@ -400,8 +412,9 @@ try {
     if (response.reply.status === 'pending') {
       const pending = response.reply.data;
       if (handle !== undefined) assert.equal(pending.query_handle, handle);
-      handle = pending.query_handle;
+      handle = pending.query_handle; revision = pending.revision;
       assert.equal(typeof handle, 'string');
+      assert(Number.isSafeInteger(revision) && revision >= 1);
     } else {
       assert.equal(response.reply.status, 'ok');
       terminalComparison = name === 'get_query_result' ? response.reply.data.result.data : response.reply.data;

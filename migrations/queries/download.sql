@@ -46,3 +46,7 @@ UPDATE download_batch SET outcome_acknowledged_at=clock_timestamp(),outcome_rece
 -- name: AcknowledgeDownloadState :execrows
 UPDATE artifact_download SET state=$3 WHERE id=$1 AND root_id=$2;
 
+
+-- name: RecordDownloadNativeFacts :execrows
+UPDATE artifact_download SET native_size=$3,native_sha256=$4
+WHERE id=$1 AND root_id=$2 AND native_sha256 IS NULL;

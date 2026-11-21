@@ -113,7 +113,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	reader := publicProjectionReader{ledger, runtime}
 	service := &analysisapp.ContextProjectionService{Results: analysisapp.ContextProjectionResults{RootID: root, InstallationID: installation, HubProcessEpoch: d.Runtime.binding.ProcessEpoch,
 		Authority: authority, Ledger: ledger, Reader: reader, Now: time.Now, NewID: ownerRandomID,
-		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Routes: routes, HeaderRoutes: routes, Plans: plans,
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Routes: routes, HeaderRoutes: routes, Plans: plans, RawGrants: pc.grants,
 		Workers: publicProjectionAdmission{&evidence.ProjectionWorkerAdmission{Cleanup: cleanup, Ledger: workers, Jobs: jobs, Audit: audit.projectionWorkerObjects(), Now: time.Now}}}
 	// Existing accepted worker and per-query backing gates remain mandatory.
 	// Old smaller transient profiles still serve older tools; summary admission

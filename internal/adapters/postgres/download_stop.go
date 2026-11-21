@@ -84,7 +84,7 @@ func (s *DownloadStops) StopDownload(ctx context.Context, i identity.Identity, d
 			return e
 		}
 		out = artifact.DownloadStop{RootID: s.root, DownloadID: downloadID, RequestID: requestID, Actor: i.Principal, KeyDigest: key, State: state}
-		return InsertAuditEvent(ctx, q, audit.Event{ID: uuid.NewString(), OperationID: requestID, Kind: "download.stop", Operation: "cancel_artifact_download",
+		return InsertAuditEvent(ctx, q, audit.Event{ID: uuid.NewString(), OperationID: requestID, Kind: "download.stop", Operation: "download_artifact",
 			Actor: i.Principal, Status: "success", Effect: "accepted", ArtifactIDs: []string{session.Scope.ArtifactID}})
 	})
 	if conflict {

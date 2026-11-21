@@ -35,7 +35,7 @@ func TestPublicContextRoutesKeepDistinctProtocolOwners(t *testing.T) {
 		{"/auth/login?return_to=%2Fcases%2Fx", "session"},
 		{"/auth/callback?state=opaque&code=opaque&iss=https%3A%2F%2Fidentity.invalid", "session"},
 		{"/api/v1/session", "session"},
-		{"/api/v1/operations/cancel_artifact_download", "operation"},
+		{"/api/v1/operations/download_artifact", "operation"},
 		{"/mcp", "mcp"},
 		{"/.well-known/oauth-protected-resource/mcp", "mcp"},
 		{"/.well-known/oauth-protected-resource/downloads", "content"},
@@ -75,7 +75,7 @@ func TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests(t *testing.T
 		"/auth/backchannel-logout", "/auth/csrf", "/auth/refresh", "/auth/logout", "/api/v1/session",
 		"/mcp", "/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource/downloads",
 		"/api/v1/processing/changes", "/api/v1/processing/rules?limit=2&after=00000000-0000-4000-8000-000000000001",
-		"/api/v1/operations/request_capture", "/api/v1/operations/cancel_artifact_download",
+		"/api/v1/operations/request_capture", "/api/v1/operations/download_artifact",
 		"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content",
 		"/", "/assets/entry-12345678.js", "/captures/new", "/captures/00000000-0000-4000-8000-000000000001", "/cases/00000000-0000-4000-8000-000000000001",
 	} {
@@ -195,7 +195,7 @@ func TestPublicContextRoutesWithoutContentAnswerUnavailable(t *testing.T) {
 	for target, want := range map[string]int{
 		"/.well-known/oauth-protected-resource/downloads":                http.StatusServiceUnavailable,
 		"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content": http.StatusServiceUnavailable,
-		"/api/v1/operations/prepare_artifact_download":                   http.StatusAccepted,
+		"/api/v1/operations/download_artifact":                           http.StatusAccepted,
 		"/cases/00000000-0000-4000-8000-000000000001":                    http.StatusAccepted,
 	} {
 		r := httptest.NewRequest(http.MethodGet, target, nil)

@@ -16,27 +16,6 @@ import (
 type RawLogQueryService interface {
 	Begin(context.Context, identities.CurrentIdentity, string, value.RawLogQueryRequest) (*analysisapp.ContextProjectionDelivery, error)
 }
-type RawLogQueryOperationInput struct {
-	CaseID         string `json:"case_id"`
-	ArtifactID     string `json:"artifact_id"`
-	GrantID        string `json:"grant_id,omitempty"`
-	IdempotencyKey string `json:"idempotency_key"`
-	Cursor         string `json:"cursor,omitempty"`
-	Limit          int    `json:"limit,omitempty"`
-}
-
-func normalizeRawLogInput(in RawLogQueryOperationInput) RawLogQueryOperationInput {
-	if in.Limit == 0 {
-		in.Limit = value.LogPageRecords
-	}
-	return in
-}
-func (in RawLogQueryOperationInput) request() (value.RawLogQueryRequest, error) {
-	in = normalizeRawLogInput(in)
-	s, err := value.NormalizeLogSelection(in.CaseID, in.ArtifactID, in.Cursor, in.Limit)
-	return value.RawLogQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, GrantID: in.GrantID, IdempotencyKey: in.IdempotencyKey, Selection: s.LogWindow}, err
-}
-
 type logOriginOutput struct {
 	OriginID      uint16  `json:"origin_id"`
 	ContainerKind string  `json:"container_kind"`

@@ -95,11 +95,11 @@ func TestConsoleProfileComparisonWithBuiltPackage(t *testing.T) {
 	events := 0
 	call, finish := installedProfileComparisonBrowser(t, ctx, b, server.Listener.Addr().String(), installedProfileComparisonSource{CaseID: consoleCaptureID(80), ArtifactID: consoleCaptureID(81)}, func(installedComparisonReply) { events++ })
 	defer finish()
-	first := call("compare_profiles", map[string]any{"case_id": consoleCaptureID(80), "artifact_id": consoleCaptureID(81), "baseline_case_id": consoleCaptureID(80), "baseline_artifact_id": consoleCaptureID(81), "sample_type": "cpu", "normalization": "perSecond", "top_n": 20})
+	first := call("compare_profiles", map[string]any{"case_id": consoleCaptureID(80), "artifact_id": consoleCaptureID(81), "baseline_case_id": consoleCaptureID(80), "baseline_artifact_id": consoleCaptureID(81), "sample_type": "cpu", "normalization": "perSecond", "limit": 20})
 	if first.Status != "pending" {
 		t.Fatal("synthetic comparison pending")
 	}
-	last := call("get_query_result", map[string]string{"query_handle": consoleCaptureID(90)})
+	last := call("get_query_result", map[string]any{"query_handle": consoleCaptureID(90), "after_revision": 1})
 	if last.Status != "ok" {
 		t.Fatal("synthetic comparison result")
 	}
@@ -158,7 +158,7 @@ func (s *consoleSyntheticComparisonOperations) PublicOrigin() string { return s.
 func (s *consoleSyntheticComparisonOperations) ToolNames() []string {
 	tool := "compare_profiles"
 	if s.heap {
-		tool = "get_profile_summary"
+		tool = "get_extract"
 	}
 	return []string{"get_case", tool, "get_query_result"}
 }
@@ -184,12 +184,12 @@ func (s *consoleSyntheticComparisonOperations) Call(ctx context.Context, current
 	}
 	tool := "compare_profiles"
 	if s.heap {
-		tool = "get_profile_summary"
+		tool = "get_extract"
 	}
 	if name == tool {
 		s.starts++
 		envelope["status"], envelope["data_class"], envelope["provenance"] = "pending", "metadata", []any{}
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "retry_after_seconds": 1, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "revision": 1, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
 	} else {
 		s.polls++
 		envelope["provenance"] = []any{}

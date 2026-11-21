@@ -7,6 +7,7 @@
     "download_id": "00000000-0000-4000-8000-000000000902",
     "artifact_id": "00000000-0000-4000-8000-000000000901",
     "state": "Ready",
+    "revision": 2,
     "representation": "bundle",
     "filename": "ledger-ledger-0-20261009T120000Z.core.tar",
     "native_format": "Core bundle (POSIX tar)",

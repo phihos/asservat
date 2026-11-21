@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"cmp"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -86,6 +87,41 @@ type shareRecipientInput struct {
 	Issuer string `json:"issuer"`
 	ID     string `json:"id"`
 }
+
+// shareRecipientRef is a create_share recipient: a group name of the
+// caller's issuer (ADR-335 D4: groups are matched by their groups-claim
+// name), or an explicit issuer and ID. A user is named by stable subject ID:
+// tokens carry no username the evaluator could match.
+type shareRecipientRef struct {
+	Kind   string `json:"kind"`
+	Name   string `json:"name,omitempty"`
+	Issuer string `json:"issuer,omitempty"`
+	ID     string `json:"id,omitempty"`
+}
+
+func (r shareRecipientRef) recipient(issuer string) authorization.ShareRecipient {
+	if r.Name != "" {
+		return authorization.ShareRecipient{Kind: r.Kind, Issuer: issuer, ID: r.Name}
+	}
+	return authorization.ShareRecipient{Kind: r.Kind, Issuer: r.Issuer, ID: r.ID}
+}
+
+// The runtime shares one published metadata artifact per share; it confers
+// get_case and native download (REQ-SHR-001, ADR-233).
+var shareOperationsServed = []string{"get_case", "download_artifact"}
+
+// errShareCapability marks a canonical create_share or transfer_share
+// input the runtime does not serve yet; it is refused, never narrowed.
+var errShareCapability = errors.New("share capability unavailable")
+
+// shareUnserved names the first canonical input the runtime cannot serve.
+func shareUnserved(in ShareOperationInput) bool {
+	if len(in.Artifacts) != 1 || slices.ContainsFunc(in.DataClasses, func(c string) bool { return c != "metadata" }) {
+		return true
+	}
+	return slices.ContainsFunc(in.Operations, func(op string) bool { return !slices.Contains(shareOperationsServed, op) })
+}
+
 type shareArtifactInput struct {
 	ArtifactID string `json:"artifactID"`
 	Digest     string `json:"digest"`
@@ -119,12 +155,13 @@ type ShareOperationInput struct {
 	Management       *shareManagementInput `json:"management,omitempty"`
 	CaseID           string                `json:"case_id,omitempty"`
 	Artifacts        []shareArtifactInput  `json:"artifacts,omitempty"`
-	Recipients       []shareRecipientInput `json:"recipients,omitempty"`
+	Recipients       []shareRecipientRef   `json:"recipients,omitempty"`
 	DataClasses      []string              `json:"data_classes,omitempty"`
 	Operations       []string              `json:"operations,omitempty"`
 	ExpiresAt        *time.Time            `json:"expires_at,omitempty"`
 	Reason           string                `json:"reason,omitempty"`
 	View             string                `json:"view,omitempty"`
+	IncludeIntents   bool                  `json:"include_intents,omitempty"`
 	Limit            int                   `json:"limit,omitempty"`
 	Cursor           string                `json:"cursor,omitempty"`
 	ShareID          string                `json:"share_id,omitempty"`
@@ -181,10 +218,12 @@ func managedBy(s authorization.Share) []shareRecipientInput {
 
 func publicShareFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, errShareCapability):
+		return OperationFailure{"CapabilityUnavailable", "This installation shares one published metadata artifact per share, for get_case and download_artifact, and lists and transfers concrete shares only. Multi-artifact, extract and raw shares, sharing-intent listing and intent transfer are not available yet.", false}
 	case errors.Is(err, sharing.ErrManagementNotHeld):
 		return OperationFailure{"ManagementNotHeld", "Management can only name owner teams you belong to that currently hold evidence-owner for this artifact (or, as its creator, only you). Assigning an owner team you do not belong to requires an installation administrator; the team must currently hold evidence-owner for this artifact.", false}
 	case errors.Is(err, value.ErrInvalid):
-		return OperationFailure{"InvalidShare", "Recipients must be stable user or group IDs of your identity provider, and the expiry must be in the future.", false}
+		return OperationFailure{"InvalidShare", "Recipients must be user or group names of your identity provider, each named once, and the expiry must be in the future.", false}
 	case errors.Is(err, value.ErrChanged):
 		return OperationFailure{"ArtifactChanged", "The artifact digest does not match the current verified artifact. Read the case again and share the version you reviewed.", false}
 	case errors.Is(err, value.ErrConflict):
@@ -231,6 +270,10 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 	} else {
 		switch name {
 		case "create_share":
+			if shareUnserved(in) {
+				operationErr = errShareCapability
+				break
+			}
 			var version artifact.Digest
 			b, e := hex.DecodeString(in.Artifacts[0].Digest)
 			if e != nil || len(b) != len(version) {
@@ -242,7 +285,7 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				input.ExpiresAt = in.ExpiresAt.UTC()
 			}
 			for _, r := range in.Recipients {
-				input.Recipients = append(input.Recipients, authorization.ShareRecipient{Kind: r.Kind, Issuer: r.Issuer, ID: r.ID})
+				input.Recipients = append(input.Recipients, r.recipient(i.Principal.Issuer))
 			}
 			var share authorization.Share
 			if input.Management, operationErr = in.Management.request(i.Principal.Issuer); operationErr == nil {
@@ -252,10 +295,13 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				out.Data = shareCreateData{ShareID: share.ID, Phase: string(authorization.ShareActive)}
 			}
 		case "list_shares":
-			limit := in.Limit
-			if limit == 0 {
-				limit = 20
+			if in.IncludeIntents {
+				operationErr = errShareCapability
+				break
 			}
+			// A page ends at 100 rows: the reply's 24 KiB size target
+			// (REQ-MCP-002) holds about 100 owned rows.
+			limit := min(cmp.Or(in.Limit, 20), 100)
 			var views []sharing.View
 			var valid time.Time
 			var next string
@@ -316,6 +362,10 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				out.Data = policySharingStopData{SharingIntentID: r.AcceptanceID, State: "Stopped", Revision: 2}
 			}
 		case "transfer_share":
+			if in.SharingIntentID != "" {
+				operationErr = errShareCapability
+				break
+			}
 			input := sharing.TransferInput{OperationID: call.requestID, ShareID: in.ShareID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey}
 			var share authorization.Share
 			if input.Management, operationErr = in.Management.request(i.Principal.Issuer); operationErr == nil {

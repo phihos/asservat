@@ -269,7 +269,7 @@ func installedBrowserSame(what string, mcp, browser map[string]any, required ...
 // Browser and MCP clients can have different client-bound plan digests. Each
 // assessment also names its own observation and validity interval.
 func installedBrowserComparablePreview(raw json.RawMessage) (map[string]any, error) {
-	preview, err := installedBrowserComparable(raw, "plan_digest", "execution_digest", "assessmentID", "planDigest")
+	preview, err := installedBrowserComparable(raw, "plan_digest", "expires_at", "execution_digest", "assessmentID", "planDigest")
 	if err != nil {
 		return nil, err
 	}
@@ -418,41 +418,38 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	t.Log("installed browser journey: console case and approved pod-status extract equal the MCP replies")
 
 	// (c) Native download through the console route, bound to this session.
-	prepare := map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-browser-download"}
-	prepareOnce := func() installedJourneyDownload {
-		t.Helper()
+	prepare := map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": "installed-browser-download"}
+	var download installedJourneyDownload
+	limit, stop := context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
+	defer stop()
+	for {
 		// An uncertain prepare is never replayed; only an acknowledged
-		// continue_preparation permits the same-key call again.
-		reply, status, err := b.operation(ctx, "prepare_artifact_download", prepare, prepare["idempotency_key"])
-		var d installedJourneyDownload
-		if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &d) != nil {
+		// Preparing reply permits the same-key call again.
+		reply, status, err := b.operation(limit, "download_artifact", prepare, prepare["idempotency_key"])
+		if err == nil && installedJourneyPreparing(reply) {
+			if installedJourneyPause(limit, 2*time.Second) != nil {
+				diagnose()
+				t.Fatal("browser download stayed Preparing")
+			}
+			continue
+		}
+		if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &download) != nil {
 			diagnose()
 			t.Fatal("browser download preparation", status, reply.Status, reply.RequestID, err)
 		}
-		return d
+		break
 	}
-	download := prepareOnce()
-	original, until := download.DownloadID, download.ExpiresAt
+	original, until := download.DownloadID, download.AccessUntil
 	if original == "" || until.IsZero() || until.After(expires) {
 		t.Fatal("browser download deadline", until)
 	}
-	limit, stop := context.WithDeadline(ctx, installedJourneyEarlier(until, time.Now().Add(5*time.Minute)))
-	defer stop()
-	for download.State == "Preparing" {
-		if installedJourneyPause(limit, 2*time.Second) != nil {
-			diagnose()
-			t.Fatal("browser download stayed Preparing")
-		}
-		if download.ContinuePreparation {
-			download = prepareOnce()
-		} else {
-			b.read(limit, "get_artifact_download", map[string]string{"download_id": original}, &download)
-		}
-		if download.DownloadID != original || !download.ExpiresAt.Equal(until) {
-			t.Fatal("browser download changed its original identity/deadline")
-		}
+	// A status read (no Idempotency-Key) keeps the original identity/deadline.
+	var observed installedJourneyDownload
+	b.read(limit, "download_artifact", map[string]string{"action": "status", "download_id": original}, &observed)
+	if observed.DownloadID != original || !observed.AccessUntil.Equal(until) {
+		t.Fatal("browser download changed its original identity/deadline")
 	}
-	if download.State != "Ready" || download.ContentPath != "/api/v1/downloads/"+original+"/content" || download.SizeBytes == nil || download.SHA256 == "" {
+	if download.State != "Ready" || download.ContentPath != "/api/v1/downloads/"+original+"/content" || download.SHA256 == "" {
 		diagnose()
 		t.Fatal("browser download was not prepared", download.State)
 	}
@@ -473,7 +470,7 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	bytesRead, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
 	response.Body.Close()
 	got, want := sha256.Sum256(bytesRead), sha256.Sum256(native)
-	if err != nil || response.StatusCode != http.StatusOK || int64(len(bytesRead)) != *download.SizeBytes || hex.EncodeToString(got[:]) != download.SHA256 || got != want {
+	if err != nil || response.StatusCode != http.StatusOK || int64(len(bytesRead)) != download.SizeBytes || hex.EncodeToString(got[:]) != download.SHA256 || got != want {
 		diagnose()
 		t.Fatal("browser native download differs from its metadata or the MCP-downloaded bytes", response.StatusCode, len(bytesRead), err)
 	}
@@ -541,8 +538,8 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 }
 
 // installedBrowserExcerpt runs the console's approved inspection: one
-// get_file_excerpt, then at most four same-handle get_query_result polls on
-// the fixed schedule. Paid polls are not retried on transport failure.
+// get_extract fileExcerpt, then at most four same-handle get_query_result calls;
+// each waits server-side for the next revision and is not retried on transport failure.
 func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrowser, caseID, artifactID string, expires time.Time, diagnose func()) (query.ContextExcerpt, string, string) {
 	t.Helper()
 	once := func(name string, input any) installedJourneyEnvelope {
@@ -554,33 +551,26 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 		}
 		return reply
 	}
-	result := once("get_file_excerpt", map[string]any{"case_id": caseID, "artifact_id": artifactID, "line_start": 1, "max_lines": 14})
+	result := once("get_extract", map[string]any{"view": "fileExcerpt", "case_id": caseID, "artifact_id": artifactID, "line_start": 1, "limit": 14})
 	operation, handle := result.RequestID, ""
-	var first, until time.Time
+	var until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
 		var pending struct {
 			Handle   string    `json:"query_handle"`
-			Retry    int       `json:"retry_after_seconds"`
+			Revision int       `json:"revision"`
 			Observed time.Time `json:"query_observed_at"`
 			Expires  time.Time `json:"query_expires_at"`
 		}
-		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
+		if installedJourneyDecode(result.Data, &pending) != nil || pending.Handle == "" || pending.Revision < 1 || pending.Observed.IsZero() || pending.Expires.IsZero() || pending.Expires.After(expires) {
 			t.Fatal("invalid pending browser approved query")
 		}
 		if poll == 0 {
-			handle, first, until = pending.Handle, pending.Observed, pending.Expires
+			handle, until = pending.Handle, pending.Expires
 		}
 		if pending.Handle != handle || !pending.Expires.Equal(until) || poll >= 4 {
 			t.Fatal("browser approved query changed identity/lifetime or exhausted its poll allowance")
 		}
-		next, err := installedProjectionPollTime(first, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if installedJourneyPause(ctx, time.Until(next)) != nil {
-			t.Fatal("browser approved poll canceled", ctx.Err())
-		}
-		result = once("get_query_result", map[string]string{"query_handle": handle})
+		result = once("get_query_result", map[string]any{"query_handle": handle, "after_revision": pending.Revision})
 	}
 	if result.Status != "ok" {
 		diagnose()
@@ -593,7 +583,7 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 			Tool   string                   `json:"tool_name"`
 			Result installedJourneyEnvelope `json:"result"`
 		}
-		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != handle || resolved.Tool != "get_file_excerpt" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
+		if installedJourneyDecode(result.Data, &resolved) != nil || resolved.Handle != handle || resolved.Tool != "get_extract" || resolved.Result.Status != "ok" || installedJourneyDecode(resolved.Result.Data, &excerpt) != nil {
 			t.Fatal("browser approved result changed original handle/tool")
 		}
 	} else if installedJourneyDecode(result.Data, &excerpt) != nil {

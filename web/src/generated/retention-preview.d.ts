@@ -61,6 +61,7 @@ export interface components {
                 source_cluster_id?: string;
                 uid: string;
             })[];
+            cursor?: string;
         };
         /** Asservat mcp-result v1 */
         Contract_mcp_result: {

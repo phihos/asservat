@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,28 +90,31 @@ func (m *memoryGrants) GrantByCapture(_ context.Context, capture string) (value.
 	return value.Grant{}, ErrGrantNotFound
 }
 
-func (m *memoryGrants) PendingGrants(context.Context, int) ([]value.Grant, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var out []value.Grant
-	for _, g := range m.rows {
-		if g.Phase(m.now()) == value.GrantPending {
-			out = append(out, g)
-		}
-	}
-	return out, nil
+func (m *memoryGrants) PendingGrants(_ context.Context, after GrantCursor, _ int) ([]value.Grant, error) {
+	return m.page(after, func(g value.Grant) bool { return g.Phase(m.now()) == value.GrantPending }), nil
 }
 
-func (m *memoryGrants) RequestedGrants(_ context.Context, p identity.Principal, _ int) ([]value.Grant, error) {
+func (m *memoryGrants) RequestedGrants(_ context.Context, p identity.Principal, after GrantCursor, _ int) ([]value.Grant, error) {
+	return m.page(after, func(g value.Grant) bool { return g.Requester.Issuer == p.Issuer && g.Requester.Subject == p.Subject }), nil
+}
+
+// page lists matching rows newest first after the cursor, like the SQL store.
+func (m *memoryGrants) page(after GrantCursor, match func(value.Grant) bool) []value.Grant {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []value.Grant
 	for _, g := range m.rows {
-		if g.Requester.Issuer == p.Issuer && g.Requester.Subject == p.Subject {
+		if match(g) && (after.ID == "" || g.RequestedAt.Before(after.RequestedAt) || g.RequestedAt.Equal(after.RequestedAt) && g.ID > after.ID) {
 			out = append(out, g)
 		}
 	}
-	return out, nil
+	slices.SortFunc(out, func(a, b value.Grant) int {
+		if c := b.RequestedAt.Compare(a.RequestedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	return out
 }
 
 func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput) (value.Grant, bool, error) {
@@ -441,14 +446,28 @@ func TestGrantRevocationDenialAndVisibility(t *testing.T) {
 	if _, _, err := f.svc.Get(ctx, grantIdentity{f.outside, &f.now}, g.ID); !errors.Is(err, ErrGrantNotFound) {
 		t.Fatal("outsider read", err)
 	}
-	inbox, _, err := f.svc.List(ctx, grantIdentity{f.approver, &f.now}, "pending", 20)
-	if err != nil || len(inbox) != 1 || !inbox[0].Approver || inbox[0].Review.Namespace != "payments" {
-		t.Fatal("approver inbox", inbox, err)
+	inbox, next, _, err := f.svc.List(ctx, grantIdentity{f.approver, &f.now}, "pending", GrantCursor{}, 20)
+	if err != nil || len(inbox) != 1 || !inbox[0].Approver || inbox[0].Review.Namespace != "payments" || next != (GrantCursor{}) {
+		t.Fatal("approver inbox", inbox, next, err)
 	}
-	if own, _, err := f.svc.List(ctx, grantIdentity{f.requester, &f.now}, "pending", 20); err != nil || len(own) != 0 {
+	// A second request pages: one row, a cursor, then the older row.
+	f.now = f.now.Add(time.Second)
+	second := f.request(t, 9, nil)
+	first, next, _, err := f.svc.List(ctx, grantIdentity{f.approver, &f.now}, "pending", GrantCursor{}, 1)
+	if err != nil || len(first) != 1 || first[0].Grant.ID != second.ID || next.ID != second.ID {
+		t.Fatal("first page", first, next, err)
+	}
+	rest, last, _, err := f.svc.List(ctx, grantIdentity{f.approver, &f.now}, "pending", next, 1)
+	if err != nil || len(rest) != 1 || rest[0].Grant.ID != g.ID || last != (GrantCursor{}) {
+		t.Fatal("second page", rest, last, err)
+	}
+	if _, _, err := f.svc.Revoke(ctx, grantIdentity{f.requester, &f.now}, second.ID, 1, "drop-second"); err != nil {
+		t.Fatal(err)
+	}
+	if own, _, _, err := f.svc.List(ctx, grantIdentity{f.requester, &f.now}, "pending", GrantCursor{}, 20); err != nil || len(own) != 0 {
 		t.Fatal("own request in own inbox", own, err)
 	}
-	if mine, _, err := f.svc.List(ctx, grantIdentity{f.requester, &f.now}, "requested", 20); err != nil || len(mine) != 1 || mine[0].Approver {
+	if mine, _, _, err := f.svc.List(ctx, grantIdentity{f.requester, &f.now}, "requested", GrantCursor{}, 20); err != nil || len(mine) != 2 || mine[1].Grant.ID != g.ID || mine[1].Approver {
 		t.Fatal("requested view", mine, err)
 	}
 	// An outsider cannot revoke; the requester withdraws.

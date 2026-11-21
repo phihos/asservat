@@ -63,7 +63,12 @@ func (s RecordingSelectionSet) Handle(slot int) string {
 	return s.ID + ":" + strconv.Itoa(slot)
 }
 
+// RecordingHandleSeparator joins a save handle and a live source handle into
+// one list_recordings recording_handle; each consumer reads its own part.
+const RecordingHandleSeparator = "~"
+
 func ParseRecordingHandle(handle string) (string, int, bool) {
+	handle, _, _ = strings.Cut(handle, RecordingHandleSeparator)
 	id, raw, ok := strings.Cut(handle, ":")
 	slot, err := strconv.Atoi(raw)
 	return id, slot, ok && authorization.UUID(id) && err == nil && slot >= 0 && slot < MaxRecordingSelections && strconv.Itoa(slot) == raw

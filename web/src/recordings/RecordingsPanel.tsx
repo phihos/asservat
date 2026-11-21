@@ -1,24 +1,24 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import type { Target } from '../capture/http';
 import { Recordings, type Repeat } from './recordings';
-import type { Input, SavePreview } from './http';
+import type { Input, Recording, SavePreview, Target } from './http';
 
 const names: Record<string, string> = { packetCapture: 'Packet recording', syscallTrace: 'Syscall recording' };
-const blockers: Record<string, string> = {
+const rowBlockers: Record<string, string> = {
   NoHistoryConfigured: 'This source has no configured history. Choose an ordinary future capture separately.',
   SourceExpired: 'The original source authority has expired. Refresh to check current recordings.',
 };
 function seconds(value: number) { return `${value.toLocaleString()} seconds`; }
-function SaveAssessment({ preview }: { preview: SavePreview }) {
+function SaveAssessment({ preview, selected }: { preview: SavePreview; selected: Recording[] }) {
   return <section className="review-section" aria-label="Recording save review">
     <h3>Save the selected history</h3>
     <p>{preview.capture_assessment.combinedImpact.explanation}</p>
     <p>The continuing recorder has its own limits. This save adds snapshot copying, encryption and upload; its configured limits do not measure overhead.</p>
-    <ul>{preview.windows.map(window => <li key={window.recording_handle}>Save the last {window.before} of {preview.selected_recordings.find(row => row.recording_handle === window.recording_handle)?.pod_name}, ending at the first successful acceptance. No future window is added.</li>)}</ul>
+    <ul>{preview.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>
+    <p>Each saved window ends at the first successful acceptance. No future window is added.</p>
     {preview.capture_assessment.actions.map(action => <div key={action.recording_handle ?? action.actionID}>
-      <h4>{action.actionID}{action.recording_handle && <> · {preview.selected_recordings.find(row => row.recording_handle === action.recording_handle)?.pod_name}</>}</h4>
+      <h4>{action.actionID}{action.recording_handle && <> · {selected.find(row => row.recording_handle === action.recording_handle)?.pod_name}</>}</h4>
       <p>Possible retained user data: {action.data.retainedPossible.map(value => value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ') || 'See the current data assessment'}.</p>
       {action.data.transientOnly.length > 0 && <p>Processing may transiently expose {action.data.transientOnly.map(value => value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ')}.</p>}
       <dl className="facts"><dt>Evidence access</dt><dd>Up to {seconds(action.retention.accessAgeSeconds)} from original source acquisition.</dd><dt>Managed deletion</dt><dd>Within {seconds(action.retention.deleteAgeSeconds)} of original source acquisition.</dd></dl>
@@ -26,14 +26,14 @@ function SaveAssessment({ preview }: { preview: SavePreview }) {
     </div>)}
     <p>Retention already counts the age of saved source data. Current rules and the original source audience still apply. Policy recurring sharing instructions are not inherited. Asservat cannot delete downloaded local copies.</p>
     <p>The preview does not pin history or reserve capacity. Rotation or network delay may produce missing coverage. The saved interval ends at the server’s actual acceptance time, which a retry cannot change.</p>
-    {preview.blockers.map(code => <p className="notice" key={code}>{blockers[code] ?? code}</p>)}
+    {preview.blockers.map(blocker => <p className="notice" key={blocker.code}>{blocker.message}</p>)}
     {!preview.capture_enabled && <p className="notice">Saving is not enabled for this client. An administrator can check the installation settings.</p>}
   </section>;
 }
 
 export function RecordingsPanel({ session, scope, target, repeat, submit, controller: provided }: {
   session: Session; scope: AbortSignal; target: Target; repeat?: Repeat;
-  submit: (preview: Input<'preview_recording_save'>, digest: string) => Promise<void>;
+  submit: (preview: Input<'preview_capture'>, digest: string) => Promise<void>;
   controller?: Recordings;
 }) {
   const [owned] = useState(() => new Recordings());
@@ -55,11 +55,11 @@ export function RecordingsPanel({ session, scope, target, repeat, submit, contro
     {state.rows?.length === 0 && <p>No eligible recordings are available for this target.</p>}
     {state.rows && state.rows.length > 0 && <fieldset disabled={state.busy}><legend>Current recording sources</legend>
       {state.rows.map((row, index) => <article className="diagnostic" key={row.recording_handle ?? `${row.policy_uid}:${row.pod_uid}:${row.action_id}:${index}`}>
-        <label><input type="checkbox" checked={state.selected.some(selected => selected.recording_handle === row.recording_handle)} disabled={!row.recording_handle || !row.save_eligible || row.blockers.length > 0 || state.expired} onChange={event => { controller.select(row, event.currentTarget.checked); if (controller.snapshot().selected.length > 0 && !controller.snapshot().error) void controller.review(); }}/> {row.pod_name} · {row.action_id}</label>
-        <p>{names[row.kind] ?? row.kind} · policy {row.policy_uid}</p>
+        <label><input type="checkbox" checked={state.selected.some(selected => selected.recording_handle === row.recording_handle)} disabled={!row.recording_handle || !row.save_eligible || state.expired} onChange={event => { controller.select(row, event.currentTarget.checked); if (controller.snapshot().selected.length > 0 && !controller.snapshot().error) void controller.review(); }}/> {row.pod_name} · {row.action_id}</label>
+        <p>{names[row.kind] ?? row.kind} · {row.owner_kind === 'policy' ? `policy ${row.policy_name}` : 'manual capture'}</p>
         <p>Source state: {row.state}. History: {row.history}. Configured maximum lookback: {row.maximum_before}. Incident pod cap: {row.incident_pod_cap}.</p>
         {row.history === 'Unknown' && <p>Available history and gaps have not been measured. A running source or this list is not proof of complete coverage.</p>}
-        {row.blockers.map(code => <p className="notice" key={code}>{blockers[code] ?? code}</p>)}
+        {row.blockers.map(code => <p className="notice" key={code}>{rowBlockers[code] ?? code}</p>)}
       </article>)}
     </fieldset>}
     {state.rows && !state.captureEnabled && <p className="notice">Saving is not enabled for this client. Inventory does not grant permission to collect.</p>}
@@ -74,7 +74,7 @@ export function RecordingsPanel({ session, scope, target, repeat, submit, contro
         <Button className="button secondary" onPress={controller.clear}>Clear selection</Button>
       </fieldset>
     </form>}
-    {state.preview && <><SaveAssessment preview={state.preview}/><Button className="button" isDisabled={!controller.submittable} onPress={() => void controller.save(submit)}>{state.preview.windows.length === 1 ? `Save last ${state.preview.windows[0].before} now` : 'Save selected recordings now'}</Button></>}
+    {state.preview && <><SaveAssessment preview={state.preview} selected={state.selected}/><Button className="button" isDisabled={!controller.submittable} onPress={() => void controller.save(submit)}>{state.preview.lifecycle_plan.actions.length === 1 ? `Save last ${state.preview.lifecycle_plan.actions[0].requestedBefore} now` : 'Save selected recordings now'}</Button></>}
     <div className="actions"><Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.load()}>Refresh recordings and clear selection</Button>
       {state.cursor && <Button className="button secondary" isDisabled={state.busy || state.selected.length > 0} onPress={() => void controller.load(state.cursor)}>Next recordings</Button>}
     </div>

@@ -93,11 +93,12 @@ func (s CurrentRecordingPolicies) currentSourcePolicy(ctx context.Context, name,
 // RecordingRow is metadata only. Unknown observation/history stays explicit;
 // original source SQL times never become evidence of continuous ring coverage.
 type RecordingRow struct {
-	IncidentPodCap                                     int
-	Handle, PolicyUID, PodUID, PodName, ActionID, Kind string
-	State, History                                     string
-	MaximumBefore                                      time.Duration
-	Blocker                                            string
+	IncidentPodCap                                               int
+	Handle, SourceID, PolicyUID, PodUID, PodName, ActionID, Kind string
+	PolicyName                                                   string
+	State, History                                               string
+	MaximumBefore                                                time.Duration
+	Blocker                                                      string
 }
 type RecordingPage struct {
 	ValidUntil time.Time // Original current observation bound, not handle expiry.
@@ -145,6 +146,19 @@ func (s RecordingInventory) authorize(ctx context.Context, current identities.Cu
 // Current exact source status is resolved only for a selected preview. This
 // keeps100-row inventory independent of regional per-source round trips.
 func (s RecordingInventory) List(ctx context.Context, current identities.CurrentIdentity, target authorization.WorkloadTarget, policyUID, cursor string, limit int) (RecordingPage, error) {
+	return s.list(ctx, current, target, policyUID, cursor, limit, nil)
+}
+
+// Select returns save rows for exactly these source IDs (one new selection
+// set), for an inventory page another lane already chose.
+func (s RecordingInventory) Select(ctx context.Context, current identities.CurrentIdentity, target authorization.WorkloadTarget, ids []string) (RecordingPage, error) {
+	if len(ids) == 0 || len(ids) > value.MaxRecordingSelections {
+		return RecordingPage{}, value.ErrInvalid
+	}
+	return s.list(ctx, current, target, "", "", len(ids), ids)
+}
+
+func (s RecordingInventory) list(ctx context.Context, current identities.CurrentIdentity, target authorization.WorkloadTarget, policyUID, cursor string, limit int, ids []string) (RecordingPage, error) {
 	var zero RecordingPage
 	if ctx == nil || s.Candidates == nil || s.Policies == nil || s.Selections == nil || s.Eligibility == nil || s.Accepted == nil || s.NewID == nil || !authorization.UUID(s.RootID) {
 		return zero, value.ErrUnavailable
@@ -192,7 +206,15 @@ func (s RecordingInventory) List(ctx context.Context, current identities.Current
 		}
 	}
 	var candidates []RecordingCandidate
-	if newBatch {
+	if ids != nil {
+		candidates, err = s.Candidates.RecordingSources(call, target, ids)
+		if err != nil {
+			return zero, err
+		}
+		if len(candidates) > len(ids) {
+			return zero, value.ErrUnavailable
+		}
+	} else if newBatch {
 		page, e := s.Candidates.RecordingCandidates(call, target, query)
 		if e != nil {
 			return zero, e
@@ -270,7 +292,7 @@ func (s RecordingInventory) List(ctx context.Context, current identities.Current
 		if e != nil {
 			return zero, value.ErrUnavailable
 		}
-		row := RecordingRow{IncidentPodCap: recordingSaveIncidentPodCap(p.Policy), PolicyUID: b.PolicyUID, PodUID: b.PodUID, PodName: source.Target.Request.PodName, ActionID: b.ActionID, Kind: rec.Action.Kind, State: "Unknown", History: "Unknown", MaximumBefore: before}
+		row := RecordingRow{IncidentPodCap: recordingSaveIncidentPodCap(p.Policy), SourceID: b.SourceID, PolicyName: candidate.PolicyName, PolicyUID: b.PolicyUID, PodUID: b.PodUID, PodName: source.Target.Request.PodName, ActionID: b.ActionID, Kind: rec.Action.Kind, State: "Unknown", History: "Unknown", MaximumBefore: before}
 		if before <= 0 {
 			row.Blocker = "NoHistoryConfigured"
 		} else if !s.Now().Before(source.HardUntil) {

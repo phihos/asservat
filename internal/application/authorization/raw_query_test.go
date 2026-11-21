@@ -61,8 +61,8 @@ func (m *memoryGrants) GrantUseByID(_ context.Context, id string) (GrantUseReque
 
 type rawSelectionFunc func(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
 
-func (f rawSelectionFunc) ResolveRawQuery(ctx context.Context, i identities.CurrentIdentity, c string, d []artifact.Digest) (RawQuerySelection, error) {
-	return f(ctx, i, c, d)
+func (f rawSelectionFunc) ResolveRawQuery(ctx context.Context, i identities.CurrentIdentity, c string, sel RawArtifactSelection) (RawQuerySelection, error) {
+	return f(ctx, i, c, sel.Digests)
 }
 
 func rawQueryFixture(t *testing.T) (*grantFixture, RawQueryRequestInput, *int) {
@@ -83,7 +83,7 @@ func rawQueryFixture(t *testing.T) (*grantFixture, RawQueryRequestInput, *int) {
 		}
 		return selection, nil
 	})
-	in := RawQueryRequestInput{CaseID: grantID(99), ArtifactDigests: []artifact.Digest{{1}, {2}}, Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect saved syscall arguments", MaxBytes: 40, Lifetime: time.Hour, IdempotencyKey: "raw-1"}
+	in := RawQueryRequestInput{CaseID: grantID(99), Artifacts: RawArtifactSelection{Digests: []artifact.Digest{{1}, {2}}}, Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect saved syscall arguments", MaxBytes: 40, Lifetime: time.Hour, IdempotencyKey: "raw-1"}
 	return f, in, &reads
 }
 func requestRawFixture(t *testing.T, f *grantFixture, in RawQueryRequestInput) value.Grant {
@@ -138,10 +138,10 @@ func TestRawQueryReviewRequiresEveryTargetAndDoesNotAliasInbox(t *testing.T) {
 		t.Fatal("first target's approval admitted second", err)
 	}
 	single := in
-	single.ArtifactDigests = single.ArtifactDigests[:1]
+	single.Artifacts.Digests = single.Artifacts.Digests[:1]
 	single.IdempotencyKey = "one-target"
 	only := requestRawFixture(t, f, single)
-	rows, _, err := f.svc.List(t.Context(), grantIdentity{f.approver, &f.now}, "pending", 100)
+	rows, _, _, err := f.svc.List(t.Context(), grantIdentity{f.approver, &f.now}, "pending", GrantCursor{}, 100)
 	if err != nil || len(rows) != 1 || rows[0].Grant.ID != only.ID {
 		t.Fatal("zero-target cache conflated reviews", rows, err)
 	}
@@ -212,12 +212,12 @@ func TestRawQueryReusesCoveringGrantAndRejectsUnsupportedOperations(t *testing.T
 
 func TestRawQuerySixtyFourSelectedArtifactsFitReviewedRequest(t *testing.T) {
 	f, in, _ := rawQueryFixture(t)
-	in.ArtifactDigests = nil
+	in.Artifacts.Digests = nil
 	in.MaxBytes = 640
 	for n := 1; n <= 64; n++ {
-		in.ArtifactDigests = append(in.ArtifactDigests, artifact.Digest{byte(n)})
+		in.Artifacts.Digests = append(in.Artifacts.Digests, artifact.Digest{byte(n)})
 	}
-	selected, _ := f.svc.RawSelections.ResolveRawQuery(t.Context(), grantIdentity{f.requester, &f.now}, in.CaseID, in.ArtifactDigests)
+	selected, _ := f.svc.RawSelections.ResolveRawQuery(t.Context(), grantIdentity{f.requester, &f.now}, in.CaseID, in.Artifacts)
 	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: selected.Artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: f.now.Add(in.Lifetime)}
 	b, _ := RawQueryScopeBytes(scope)
 	review, _ := json.Marshal(GrantReview{RawQuery: &RawQueryReview{CaseID: in.CaseID, Artifacts: selected.Review, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: scope.NotAfter}, Deadline: scope.NotAfter})
@@ -272,7 +272,7 @@ func TestRawQueryConcurrentUsesNeverRefillSharedPool(t *testing.T) {
 
 func TestRawQuerySixtyFourMaximumNamesAndEscapedUIDsFit(t *testing.T) {
 	f, in, _ := rawQueryFixture(t)
-	in.ArtifactDigests = nil
+	in.Artifacts.Digests = nil
 	in.MaxBytes = 640
 	for n := 1; n <= 64; n++ {
 		d := artifact.Digest{}
@@ -280,11 +280,11 @@ func TestRawQuerySixtyFourMaximumNamesAndEscapedUIDsFit(t *testing.T) {
 			d[j] = 255
 		}
 		d[0] = byte(n)
-		in.ArtifactDigests = append(in.ArtifactDigests, d)
+		in.Artifacts.Digests = append(in.Artifacts.Digests, d)
 	}
 	original := f.svc.RawSelections
 	f.svc.RawSelections = rawSelectionFunc(func(ctx context.Context, current identities.CurrentIdentity, caseID string, digests []artifact.Digest) (RawQuerySelection, error) {
-		out, err := original.ResolveRawQuery(ctx, current, caseID, digests)
+		out, err := original.ResolveRawQuery(ctx, current, caseID, RawArtifactSelection{Digests: digests})
 		if err != nil {
 			return out, err
 		}
@@ -309,5 +309,44 @@ func TestRawQuerySixtyFourMaximumNamesAndEscapedUIDsFit(t *testing.T) {
 	t.Logf("64 maximum display names and escaped UIDs: scope=%d review=%d", len(g.Scope), len(g.Review))
 	if len(g.Scope) > value.GrantMaxScopeBytes || len(g.Review) > value.GrantReviewBytesLimit(g.Kind) {
 		t.Fatal("review exceeded bounded serialization")
+	}
+}
+
+// Without max_bytes or expires_in_seconds a download grant covers the
+// selected verified sizes until the earliest selected access end.
+func TestRawQueryRequestDefaultsToVerifiedSizesAndAccessEnd(t *testing.T) {
+	f, in, _ := rawQueryFixture(t)
+	in.MaxBytes, in.Lifetime = 0, 0
+	g := requestRawFixture(t, f, in)
+	if g.RawQuery.MaxBytes != 20 || !g.RawQuery.NotAfter.Equal(f.now.Add(time.Hour)) || g.Lifetime != time.Hour {
+		t.Fatal("defaults", g.RawQuery.MaxBytes, g.RawQuery.NotAfter, g.Lifetime)
+	}
+}
+
+func TestRawArtifactSelectionByIDOrPinnedDigest(t *testing.T) {
+	type c struct {
+		id string
+		v  artifact.Digest
+	}
+	candidates := []c{{grantID(1), artifact.Digest{1}}, {grantID(2), artifact.Digest{2}}}
+	key := func(x c) (string, artifact.Digest) { return x.id, x.v }
+	for name, tc := range map[string]struct {
+		sel  RawArtifactSelection
+		want int
+		ok   bool
+	}{
+		"ids":        {RawArtifactSelection{IDs: []string{grantID(2)}}, 1, true},
+		"digests":    {RawArtifactSelection{Digests: []artifact.Digest{{1}, {2}}}, 2, true},
+		"pinned":     {RawArtifactSelection{IDs: []string{grantID(1)}, Digests: []artifact.Digest{{1}}}, 1, true},
+		"wrong pin":  {RawArtifactSelection{IDs: []string{grantID(1)}, Digests: []artifact.Digest{{2}}}, 0, false},
+		"unknown id": {RawArtifactSelection{IDs: []string{grantID(3)}}, 0, false},
+	} {
+		got, ok := Select(tc.sel, candidates, key)
+		if ok != tc.ok || len(got) != tc.want || !tc.sel.Valid() {
+			t.Fatal(name, got, ok)
+		}
+	}
+	if (RawArtifactSelection{}).Valid() || (RawArtifactSelection{IDs: []string{grantID(1), grantID(1)}}).Valid() || (RawArtifactSelection{IDs: []string{grantID(1)}, Digests: []artifact.Digest{{1}, {2}}}).Valid() {
+		t.Fatal("invalid selection accepted")
 	}
 }

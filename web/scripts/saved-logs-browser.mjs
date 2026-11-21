@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
-import { validInput_get_logs, validOutput_get_logs, validOutput_get_query_result } from '../src/generated/validate-projection.js';
+import { validInput_get_extract, validOutput_get_extract, validOutput_get_query_result } from '../src/generated/validate-projection.js';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 async function command() {
@@ -47,7 +47,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if (/^\/api\/v1\/operations\/(get_case|get_logs|get_query_result|request_raw_access|get_grant)$/.test(path) && response.status === 200) {
+      if (/^\/api\/v1\/operations\/(get_case|get_extract|get_query_result|request_raw_access|get_grant)$/.test(path) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -60,11 +60,11 @@ try {
   page.on('pageerror', () => errors.push('pageerror'));
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
-    if (path === '/api/v1/operations/get_logs') starts++;
+    if (path === '/api/v1/operations/get_extract') starts++;
     if (path === '/api/v1/operations/get_query_result') polls++;
     if (path === '/api/v1/operations/get_case') cases++;
     if (path.startsWith('/api/v1/operations/')) {
-      if (!['/api/v1/operations/get_case', '/api/v1/operations/get_logs', '/api/v1/operations/get_query_result', '/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant'].includes(path)) errors.push('unexpected-operation');
+      if (!['/api/v1/operations/get_case', '/api/v1/operations/get_extract', '/api/v1/operations/get_query_result', '/api/v1/operations/request_raw_access', '/api/v1/operations/get_grant'].includes(path)) errors.push('unexpected-operation');
       timeline.push(`${request.method()} ${path}`);
     }
   });
@@ -152,7 +152,7 @@ try {
   await expect(panel.getByRole('button', { name: 'Inspect saved logs', exact: true })).toBeEnabled();
   assert.equal(starts + polls, 0, 'approval does not run a query');
   event({ kind: 'ready' });
-  let handle, expiresAt, nextCursor, lastKey;
+  let handle, revision, expiresAt, nextCursor, lastKey;
   let terminal = false, queries = 0, calls = 0;
   for (;;) {
     const next = await command();
@@ -167,13 +167,13 @@ try {
     }
     assert.equal(next.kind, 'call');
     assert(++calls <= 10);
-    const begin = next.name === 'get_logs';
+    const begin = next.name === 'get_extract';
     let button;
     if (begin) {
       assert(++queries <= 2);
       if (queries === 1) button = 'Inspect saved logs';
       else { assert(terminal && nextCursor); assert.equal(next.input.cursor, nextCursor); button = 'Next log page'; }
-      handle = undefined; expiresAt = undefined; terminal = false;
+      handle = undefined; revision = undefined; expiresAt = undefined; terminal = false;
     } else { assert.equal(next.name, 'get_query_result'); assert(!terminal && handle); button = 'Check log query'; }
     stage = next.name;
     await expect(panel.getByRole('button', { name: button, exact: true })).toBeEnabled({ timeout: 30_000 });
@@ -183,29 +183,29 @@ try {
     event({ kind: 'operation', ...response });
     assert(Object.values(response.transport).every(Boolean));
     if (begin) {
-      assert(validInput_get_logs(response.input));
+      assert(validInput_get_extract(response.input) && response.input.view === 'logs');
       assert.match(response.input.idempotency_key, /^[0-9a-f-]{36}$/);
       if (lastKey) assert.notEqual(response.input.idempotency_key, lastKey, 'explicit next-page fresh key');
       lastKey = response.input.idempotency_key;
       const actual = { ...response.input }, expected = { ...next.input };
       delete actual.idempotency_key; delete expected.idempotency_key;
       assert.deepEqual(actual, expected, 'exact source/grant/selection/cursor');
-    } else assert.deepEqual(response.input, { query_handle: handle });
+    } else assert.deepEqual(response.input, { query_handle: handle, after_revision: revision });
     const reply = response.reply;
-    assert((begin ? validOutput_get_logs : validOutput_get_query_result)(reply));
+    assert((begin ? validOutput_get_extract : validOutput_get_query_result)(reply));
     const currentObserved = reply.data.query_observed_at;
     if (expiresAt === undefined) expiresAt = reply.data.query_expires_at;
     assert.equal(reply.data.query_expires_at, expiresAt);
     assert(Number.isFinite(Date.parse(currentObserved)) && Date.parse(currentObserved) < Date.parse(expiresAt));
     if (reply.status === 'pending') {
       if (handle !== undefined) assert.equal(reply.data.query_handle, handle);
-      handle = reply.data.query_handle;
+      handle = reply.data.query_handle; revision = reply.data.revision;
       continue;
     }
     assert.equal(reply.status, 'ok');
     const result = begin ? reply : reply.data.result;
-    if (!begin) { assert.equal(reply.data.query_handle, handle); assert.equal(reply.data.tool_name, 'get_logs'); assert.equal(reply.truncated, false); assert.equal(reply.next_cursor, null); }
-    assert(validOutput_get_logs(result) && result.status === 'ok');
+    if (!begin) { assert.equal(reply.data.query_handle, handle); assert.equal(reply.data.tool_name, 'get_extract'); assert.equal(reply.truncated, false); assert.equal(reply.next_cursor, null); }
+    assert(validOutput_get_extract(result) && result.status === 'ok');
     assert.equal(result.request_id, reply.request_id);
     assert.equal(reply.data_class, 'raw'); assert.equal(result.data_class, 'raw');
     assert.equal(result.data.query_observed_at, currentObserved);

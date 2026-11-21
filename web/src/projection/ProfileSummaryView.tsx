@@ -34,7 +34,7 @@ function SourceProfileSummary({ controller, session, scope, caseID, artifactID, 
     </>}
     {state.phase === 'expired' && <p role="status">This view has expired. Inspect again to request a fresh view.</p>}
     {state.phase === 'unavailable' && <p role="alert">The saved summary is unavailable or your access could not be checked.</p>}
-    {!['loading', 'pending'].includes(state.phase) && <Button className="button secondary" isDisabled={!attached || !sampleType || !Number.isInteger(Number(topN)) || Number(topN) < 1 || Number(topN) > 100} onPress={() => void controller.inspect({ sample_type: sampleType, top_n: Number(topN) })}>{state.phase === 'idle' ? 'Inspect saved profile' : 'Inspect again'}</Button>}
+    {!['loading', 'pending'].includes(state.phase) && <Button className="button secondary" isDisabled={!attached || !sampleType || !Number.isInteger(Number(topN)) || Number(topN) < 1 || Number(topN) > 100} onPress={() => void controller.inspect({ sample_type: sampleType, limit: Number(topN) })}>{state.phase === 'idle' ? 'Inspect saved profile' : 'Inspect again'}</Button>}
     {state.phase !== 'idle' && <Button className="button secondary" onPress={controller.close}>Close view</Button>}
   </section>;
 }

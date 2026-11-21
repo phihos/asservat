@@ -36,10 +36,10 @@ func TestExplainUsesEvaluatorDecision(t *testing.T) {
 		}, CollectContext, Deny, UnmetNoMatchingAllow},
 		{"stale allow", func(p *Projection, _ *[]string, now *time.Time) {
 			p.Allows[0].ObservedAt, p.Allows[0].FreshUntil = now.Add(-2*time.Minute), now.Add(-time.Minute)
-		}, ReadApproved, Indeterminate, UnmetPermissionStale},
+		}, ReadApproved, Indeterminate, UnmetClusterNotObserved},
 		{"stale projection", func(p *Projection, _ *[]string, now *time.Time) {
 			p.DeniesFreshUntil = now.Add(-time.Second)
-		}, ReadApproved, Indeterminate, UnmetPermissionStale},
+		}, ReadApproved, Indeterminate, UnmetClusterNotObserved},
 	} {
 		t.Run(s.name, func(t *testing.T) {
 			i, p, _, now := fixture()

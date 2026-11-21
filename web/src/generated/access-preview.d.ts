@@ -36,13 +36,10 @@ export interface components {
             /** @description Kubernetes UID (a UUID; 64 characters leaves room for its textual forms). */
             uid?: string;
         };
+        /** @description Automation envelope on an AccessBinding (ADR-335 D6). Only allowedActions is required; an omitted lifetime is unbounded. Bytes are bounded by the installation's capacity and rate limits, not a lifetime budget. Intrusive actions still need an expiring policy grant. */
         Contract_policy_authority_82c5ee701fbfe76f: {
             allowedActions: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
-            maxLifetimeSeconds: number;
-            maxExecutions: number;
-            maxBytes: number;
-            maxObservedBytes: number;
-            maxObservedEvents?: number;
+            maxLifetimeSeconds?: number;
         };
         Contract_permission_common_94881780cf4467f4: {
             /** @description Kubernetes namespace name (DNS label). */
@@ -199,7 +196,7 @@ export interface components {
                     /** @constant */
                     decision: "Indeterminate";
                     /** @enum {unknown} */
-                    unmet: "PermissionObservationStale" | "ServiceUnavailable" | "ClusterUnavailable";
+                    unmet: "ClusterNotObserved" | "ServiceUnavailable" | "ClusterUnavailable";
                 }[];
                 deltas: {
                     /** Format: uuid */
@@ -215,9 +212,9 @@ export interface components {
                     /** @enum {unknown} */
                     after: "Allow" | "Deny" | "Indeterminate";
                     /** @enum {unknown} */
-                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
+                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClusterNotObserved" | "ServiceUnavailable" | "DecisionTimeSource";
                     /** @enum {unknown} */
-                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
+                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "ClusterNotObserved" | "ServiceUnavailable" | "DecisionTimeSource";
                     before_basis: {
                         /** @enum {unknown} */
                         effect: "allow" | "deny";

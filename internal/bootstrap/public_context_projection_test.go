@@ -40,12 +40,12 @@ func TestPublicContextProjectionRegistersOnlyCompleteInstalledComposition(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := append(base.ToolNames(), "get_file_excerpt", "get_query_result")
+	want := append(base.ToolNames(), "get_extract", "get_query_result")
 	slices.Sort(want)
 	if !slices.Equal(composed.ToolNames(), want) {
 		t.Fatal("query or unrelated tools missing", composed.ToolNames())
 	}
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
+	for _, name := range []string{"get_extract", "get_query_result"} {
 		if presentation.BrowserOperationSupported(base, name) || !presentation.BrowserOperationSupported(composed, name) {
 			t.Fatal("optional browser composition", name)
 		}
@@ -53,25 +53,10 @@ func TestPublicContextProjectionRegistersOnlyCompleteInstalledComposition(t *tes
 	// Disabling new captures does not disable ordinary reads of saved content.
 	c.CollectionEnabled = false
 	composed, err = NewPublicContextOperations(c, services)
-	if err != nil || !presentation.BrowserOperationSupported(composed, "get_file_excerpt") || slices.Contains(composed.ToolNames(), "request_capture") {
+	if err != nil || !presentation.BrowserOperationSupported(composed, "get_extract") || slices.Contains(composed.ToolNames(), "request_capture") {
 		t.Fatal("read tied to collection enablement", err)
 	}
 }
-func TestPublicProfileSummaryRequiresInstalledTypedRoute(t *testing.T) {
-	c, services := publicContextOperationFixture(t)
-	services.Projection = publicProjectionFixture(c)
-	without, err := NewPublicContextOperations(c, services)
-	if err != nil || presentation.BrowserOperationSupported(without, "get_profile_summary") {
-		t.Fatal("summary enabled without typed source route", err)
-	}
-	services.Projection.ProfileRoutes = &publicProjectionPorts{}
-	c.CollectionEnabled = false
-	with, err := NewPublicContextOperations(c, services)
-	if err != nil || !presentation.BrowserOperationSupported(with, "get_profile_summary") || !slices.Contains(with.ToolNames(), "get_profile_summary") {
-		t.Fatal("complete retained summary composition unavailable", err)
-	}
-}
-
 func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
 	c, services := publicContextOperationFixture(t)
 	services.Projection = publicProjectionFixture(c)
@@ -79,10 +64,8 @@ func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"get_syscall_summary", "get_syscall_events", "syscall_query"} {
-		if presentation.BrowserOperationSupported(without, name) || slices.Contains(without.ToolNames(), name) {
-			t.Fatal("saved syscall view enabled without typed source route", name)
-		}
+	if presentation.BrowserOperationSupported(without, "query_artifact") || slices.Contains(without.ToolNames(), "query_artifact") {
+		t.Fatal("syscall query enabled without typed source route")
 	}
 	services.Projection.SyscallRoutes = &publicProjectionPorts{}
 	c.CollectionEnabled = false
@@ -90,13 +73,8 @@ func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"get_syscall_summary", "get_syscall_events", "syscall_query"} {
-		if !presentation.BrowserOperationSupported(with, name) || !slices.Contains(with.ToolNames(), name) {
-			t.Fatal("retained syscall view missing from browser/MCP composition", name)
-		}
-	}
-	if presentation.BrowserOperationSupported(with, "pcap_query") || slices.Contains(with.ToolNames(), "pcap_query") || slices.Contains(with.ToolNames(), "request_capture") {
-		t.Fatal("typed syscall route enabled an unrelated packet query or collection")
+	if !presentation.BrowserOperationSupported(with, "query_artifact") || !slices.Contains(with.ToolNames(), "query_artifact") || slices.Contains(with.ToolNames(), "request_capture") {
+		t.Fatal("retained syscall query missing from browser/MCP composition or collection enabled")
 	}
 }
 
@@ -141,23 +119,5 @@ func TestPublicProfileComparisonRequiresInstalledTypedRoute(t *testing.T) {
 	with, err := NewPublicContextOperations(c, services)
 	if err != nil || !presentation.BrowserOperationSupported(with, "compare_profiles") || !slices.Contains(with.ToolNames(), "compare_profiles") {
 		t.Fatal("typed retained comparison missing", err)
-	}
-}
-
-func TestPublicPacketSummaryRequiresInstalledTypedRoute(t *testing.T) {
-	c, services := publicContextOperationFixture(t)
-	services.Projection = publicProjectionFixture(c)
-	without, err := NewPublicContextOperations(c, services)
-	if err != nil || presentation.BrowserOperationSupported(without, "get_pcap_summary") {
-		t.Fatal("packet summary enabled without typed protected route", err)
-	}
-	services.Projection.PacketRoutes = &publicProjectionPorts{}
-	c.CollectionEnabled = false
-	with, err := NewPublicContextOperations(c, services)
-	if err != nil || !presentation.BrowserOperationSupported(with, "get_pcap_summary") || !slices.Contains(with.ToolNames(), "get_pcap_summary") {
-		t.Fatal("complete saved packet composition unavailable", err)
-	}
-	if presentation.BrowserOperationSupported(with, "packet_query") || slices.Contains(with.ToolNames(), "request_capture") {
-		t.Fatal("metadata summary enabled raw query/acquisition")
 	}
 }

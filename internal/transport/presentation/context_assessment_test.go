@@ -25,7 +25,7 @@ func canonicalSchema(t *testing.T, name string) *jsonschema.Schema {
 	c.UseLoader(offlineLoader{})
 	c.AssertFormat()
 	for _, file := range []string{"common.schema.json", "privacy-common.schema.json", "capture-assessment.schema.json", "action-lifecycle.schema.json"} {
-		b, err := readImplementedContract(file)
+		b, err := os.ReadFile("../../../specs/contracts/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}

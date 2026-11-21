@@ -708,12 +708,53 @@ func (p *Permissions) WorkloadPermissions(ctx context.Context, target authorizat
 // permissionProjection runs with the permission stream already locked. It may
 // be reused by named admission facets after taking their remaining SQL locks.
 func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, target authorization.Target) (authorization.Projection, error) {
-	var out authorization.Projection
-	n, err := q.CurrentTime(ctx)
+	h, err := readProjectionStream(ctx, q, s)
 	if err != nil {
 		return authorization.Projection{}, err
 	}
-	if slices.Contains(s.UnavailableClusters, target.ClusterID) || s.Sequence < 1 || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
+	out, err := h.projection(ctx, q, target)
+	if err != nil {
+		return authorization.Projection{}, err
+	}
+	return out, h.stillCurrent(ctx, q)
+}
+
+// projectionStream is the per-stream part of a projection read: the check
+// time and the stream's currency. A caller that reads many targets in one
+// transaction (the access preview) reads it once.
+type projectionStream struct {
+	s custodydb.PermissionStream
+	n time.Time
+}
+
+func readProjectionStream(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream) (projectionStream, error) {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return projectionStream{}, err
+	}
+	if s.Sequence < 1 || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
+		return projectionStream{}, cfg.ErrUnavailable
+	}
+	return projectionStream{s: s, n: n.Time}, nil
+}
+
+// stillCurrent rechecks, after the reads, that the stream's lease and
+// freshness have not ended.
+func (h projectionStream) stillCurrent(ctx context.Context, q *custodydb.Queries) error {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	if !n.Time.Before(identity.Earlier(h.s.FreshUntil.Time, h.s.LeaseUntil.Time)) {
+		return cfg.ErrUnavailable
+	}
+	return nil
+}
+
+func (h projectionStream) projection(ctx context.Context, q *custodydb.Queries, target authorization.Target) (authorization.Projection, error) {
+	var out authorization.Projection
+	s, n := h.s, h.n
+	if slices.Contains(s.UnavailableClusters, target.ClusterID) {
 		return authorization.Projection{}, cfg.ErrUnavailable
 	}
 	rows, err := q.SelectPermissionAssignments(ctx, custodydb.SelectPermissionAssignmentsParams{StreamID: s.ID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column4: target.WorkloadUID})
@@ -737,7 +778,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		if a.NotAfter.Valid {
 			deadline = identity.Earlier(deadline, a.NotAfter.Time)
 		}
-		if !n.Time.Before(deadline) {
+		if !n.Before(deadline) {
 			continue
 		}
 		audience := artifact.AudienceAssignment{Kind: a.SubjectKind, Issuer: a.Issuer, SubjectID: a.SubjectID, Role: a.Role, BasisKind: a.SourceKind, BasisUID: a.SourceUid, AssignmentID: uid(a.ID)}
@@ -758,20 +799,13 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 		}
 		for _, r := range reviews {
 			deadline := identity.Earlier(until, r.FreshUntil.Time)
-			if !n.Time.Before(deadline) {
+			if !n.Before(deadline) {
 				continue
 			}
 			audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}
 			copy(audience.BasisDigest[:], r.BasisDigest)
 			out.Allows = append(out.Allows, authorization.CurrentAssignment{Audience: audience, ObservedAt: r.DecidedAt.Time, FreshUntil: deadline, Reviewed: true})
 		}
-	}
-	n, err = q.CurrentTime(ctx)
-	if err != nil {
-		return authorization.Projection{}, err
-	}
-	if !n.Time.Before(until) {
-		return authorization.Projection{}, cfg.ErrUnavailable
 	}
 	return out, nil
 }

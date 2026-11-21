@@ -240,7 +240,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	activation := captureapp.PolicyActivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Sources: source, Ledger: statuses, GrantAttachments: policyStore, Now: clock}
 	status := captureapp.PolicyStatusService{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Now: clock}
 	stop := captureapp.PolicyDeactivation{RootID: root, InstallationID: a.InstallationID, Documents: docs, Ledger: statuses, Permissions: currentPermissions, Now: clock}
-	policyOps, e := presentation.NewPolicyOperations(origin, clock, custodyID, activation, status, stop)
+	policyOps, e := presentation.NewPolicyOperations(origin, clock, custodyID, presentation.NewClusterNames(map[string]string{presentation.LocalClusterName: a.ClusterID}), activation, status, stop)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -338,7 +338,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 	if result, e = call(actor, "activate_policy", attachment); e != nil || result["status"] != "ok" || result["data"].(map[string]any)["replay"] != true {
 		t.Fatal("same-key attachment recovery", result, e)
 	}
-	if result, e = call(actor, "get_policy_status", map[string]any{"policy_name": observation.Name}); e != nil || result["status"] != "ok" || result["data"].(map[string]any)["attached_grant_id"] != nil {
+	if result, e = call(actor, "get_policy_status", map[string]any{"cluster": presentation.LocalClusterName, "namespace": "app", "policy_name": observation.Name}); e != nil || result["status"] != "ok" || result["data"].(map[string]any)["attached_grant_id"] != nil {
 		t.Fatal("historical receipt became current pointer", result, e)
 	}
 	after, e := grants.Grant(ctx, grantID)

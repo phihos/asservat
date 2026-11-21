@@ -11,9 +11,10 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// OperationRecordingSavePreviewFrameLimit retains the SDK text and structured
-// copies of the one larger passive metadata preview. Other writers stay64KiB.
-const OperationRecordingSavePreviewFrameLimit = 256 << 10
+// OperationResultBoundFrameLimit holds the SDK structured copy and the
+// escaped text copy (up to twice its size) of a result at the MCP result
+// bound, plus framing. Other writers stay 64 KiB.
+const OperationResultBoundFrameLimit = 3*contracts.InvestigationResultBound + 32<<10
 
 // Both SDK result copies and worst-case escaping, bounded for get_grant only.
 const OperationGrantReviewFrameLimit = 768 << 10
@@ -37,10 +38,10 @@ func WriteBrowserOperationResponse(ctx context.Context, w http.ResponseWriter, s
 	if name == "get_grant" && reply.grantReview {
 		limit = contracts.InvestigationGrantReviewOutputLimit
 	}
-	if name == "preview_recording_save" && reply.recordingSavePreview {
-		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
+	if reply.resultBound {
+		limit = OperationResultBoundFrameLimit
 	}
-	if browserSettingsView(ctx, name) && reply.browserSettings {
+	if browserSettingsView(ctx) && reply.browserSettings {
 		limit = contracts.InvestigationBrowserSettingsOutputLimit
 	}
 	return writeOperationResponse(ctx, w, status, reply.Body, until, reply.CheckDisclosure, limit)
@@ -90,8 +91,8 @@ func WriteOperationReplyResponse(ctx context.Context, w http.ResponseWriter, sta
 		if reply.grantReview {
 			return writeOperationResponse(ctx, w, status, body, until, check, OperationGrantReviewFrameLimit)
 		}
-		if reply.recordingSavePreview {
-			return writeOperationResponse(ctx, w, status, body, until, check, OperationRecordingSavePreviewFrameLimit)
+		if reply.resultBound {
+			return writeOperationResponse(ctx, w, status, body, until, check, OperationResultBoundFrameLimit)
 		}
 		return WriteOperationResponse(ctx, w, status, body, until, check)
 	}

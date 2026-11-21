@@ -61,7 +61,7 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	// reply. Production HTTP, current-identity, CSRF and canonical projection are
 	// exercised without claiming SQL/admission/execution qualification.
 	captureService := &consoleSyntheticCaptures{state: "ready"}
-	operations, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, captureService, captureService, &consoleSyntheticHistory{captures: captureService})
+	operations, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }, Clusters: presentation.NewClusterNames(map[string]string{"local": consoleCaptureID(1)})}, captureService, captureService, &consoleSyntheticHistory{captures: captureService})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	captureService.changes = browser.NewChanges()
+	captureService.changes = presentation.NewChanges()
 	events, err := browser.NewEventsHandler(sessionHandler, composed, captureService.changes)
 	if err != nil {
 		t.Fatal(err)
@@ -342,7 +342,7 @@ func consoleCaptureID(n int) string {
 // never evidence that a Kubernetes read, SQL admission or capture occurred.
 type consoleSyntheticCaptures struct {
 	mu               sync.Mutex
-	changes          *browser.Changes
+	changes          *presentation.Changes
 	state            string
 	plan             artifact.Digest
 	key              string

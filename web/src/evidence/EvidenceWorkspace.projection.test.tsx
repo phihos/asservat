@@ -22,9 +22,9 @@ it('opens the actual approved-read HTTP path from saved evidence without prepari
   fireEvent.click(inspect);
   await screen.findByLabelText('Approved pod status');
   expect(fetcher).toHaveBeenCalledOnce();
-  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_file_excerpt');
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_extract');
   const request = fetcher.mock.calls[0][1]!;
-  expect(JSON.parse(request.body as string)).toEqual({ case_id: id(2), artifact_id: id(3), line_start: 1, max_lines: 14 });
+  expect(JSON.parse(request.body as string)).toEqual({ view: 'fileExcerpt', case_id: id(2), artifact_id: id(3), line_start: 1, limit: 14 });
   expect(request).toMatchObject({ method: 'POST', credentials: 'same-origin', redirect: 'error', headers: { 'X-CSRF-Token': session.csrf_token } });
   expect(client.calls.map(call => call.name)).toEqual(['get_case']);
   expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy();
@@ -42,14 +42,13 @@ it('keeps pending polling explicit and uses only the original query handle', asy
   let mounted!: ReturnType<typeof mount>;
   await act(async () => { mounted = mount(); });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Inspect saved status' })); });
-  expect(screen.getByRole('button', { name: 'Check result' }).hasAttribute('disabled')).toBe(true);
   monotonic += 2000;
   await act(() => vi.advanceTimersByTimeAsync(2000));
   expect(fetcher).toHaveBeenCalledOnce();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Check result' })); });
   expect(screen.getByLabelText('Approved pod status')).toBeTruthy();
   expect(fetcher.mock.calls[1][0]).toBe('/api/v1/operations/get_query_result');
-  expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string)).toEqual({ query_handle: queryHandle });
+  expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string)).toEqual({ query_handle: queryHandle, after_revision: 1 });
   expect(mounted.client.calls.map(call => call.name)).toEqual(['get_case']);
   monotonic += 10_000;
   await act(() => vi.advanceTimersByTimeAsync(10_000));

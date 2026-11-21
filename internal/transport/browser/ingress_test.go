@@ -74,7 +74,7 @@ func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Han
 	t.Cleanup(server.Close)
 	sessions := &auditBrowserSession{}
 	calls := &investigationCalls{}
-	ops, e := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
+	ops, e := presentation.NewContextOperations(presentation.ContextOperationsConfig{Clusters: localCluster, PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, calls, calls)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -100,7 +100,7 @@ func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Han
 	return h, server, calls, rows, sessions
 }
 
-const auditedBrowserCaptureRequest = `{"preview":{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"same-key"}`
+const auditedBrowserCaptureRequest = `{"preview":{"target_ref":{"cluster":"local","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"}},"expected_plan_digest":"1111111111111111111111111111111111111111111111111111111111111111","idempotency_key":"same-key"}`
 
 func auditedBrowserRequest(t *testing.T, s *httptest.Server, name, body string) *http.Request {
 	t.Helper()
@@ -247,3 +247,5 @@ func TestBrowserRejectionPreservesOriginalDeadlineThroughFinalRead(t *testing.T)
 		}
 	}
 }
+
+var localCluster = presentation.NewClusterNames(map[string]string{"local": "00000000-0000-4000-8000-000000000001"})

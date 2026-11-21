@@ -47,7 +47,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	if installedJourneyFocus() == "manual-mixed" {
 		// ADR-276: packet and syscall finite recordings of one Pod at once.
 		return map[string]any{
-			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 			"requested_retention_seconds": 600,
 			"profile_composition": map[string]any{
 				"components": []any{
@@ -79,7 +79,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	if installedJourneyFocus() == "manual-syscall" {
 		// B3: one finite manual syscall metadata recording of 5 seconds.
 		return map[string]any{
-			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 			"requested_retention_seconds": 600,
 			"profile_composition": map[string]any{
 				"components": []any{map[string]any{
@@ -98,7 +98,7 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		}
 	}
 	return map[string]any{
-		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+		"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 		"requested_retention_seconds": 600,
 		"profile_composition": map[string]any{
 			"components": []any{map[string]any{
@@ -118,31 +118,26 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 
 // installedNativeDownload prepares, awaits and reads one native artifact whose
 // filename extension is one of extensions.
-func installedNativeDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func(), extensions ...string) ([]byte, string) {
+func installedNativeDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), diagnose func(), extensions ...string) ([]byte, string) {
 	t.Helper()
 	var download installedJourneyDownload
-	// As in the main flow: preparation is an effect, so only the server's
-	// continuation flag permits another exact same-key prepare.
-	prepare := func() {
-		t.Helper()
-		reply, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key})
-		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
+	// As in the main flow: preparation is an effect, so only an acknowledged
+	// Preparing reply permits another exact same-key prepare.
+	for until := time.Now().Add(3 * time.Minute); ; {
+		reply, code := invoke("download_artifact", map[string]string{"action": "prepare", "artifact_id": artifactID, "idempotency_key": key})
+		preparing := code == "" && installedJourneyPreparing(reply)
+		if code == "" && !preparing && reply.Status == "ok" && json.Unmarshal(reply.Data, &download) == nil {
+			break
+		}
+		if !preparing || !time.Now().Before(until) {
 			diagnose()
 			t.Fatal("mixed download preparation failed", code)
 		}
-	}
-	prepare()
-	for until := time.Now().Add(3 * time.Minute); download.State == "Preparing" && time.Now().Before(until); {
 		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
 			t.Fatal(err)
 		}
-		if download.ContinuePreparation {
-			prepare()
-		} else {
-			read("get_artifact_download", map[string]string{"download_id": download.DownloadID}, &download)
-		}
 	}
-	if download.State != "Ready" || download.SizeBytes == nil {
+	if download.State != "Ready" || download.SizeBytes < 0 {
 		diagnose()
 		t.Fatal("mixed download not ready", download.State)
 	}
@@ -153,7 +148,7 @@ func installedNativeDownload(t *testing.T, ctx context.Context, transport http.R
 	extension := filepath.Ext(name)
 	native, readErr := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
 	digest := sha256.Sum256(native)
-	if err != nil || readErr != nil || name != "artifact-"+artifactID+extension || !slices.Contains(extensions, extension) || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
+	if err != nil || readErr != nil || name != "artifact-"+artifactID+extension || !slices.Contains(extensions, extension) || response.StatusCode != http.StatusOK || int64(len(native)) != download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
 		t.Fatal("mixed native download does not match its metadata", name, err, readErr)
 	}
 	return native, extension

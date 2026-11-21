@@ -6,10 +6,6 @@ import { TeamsEditor } from './SharePanel';
 import type { Shares } from './shares';
 
 const date = (value: string) => new Date(value).toLocaleString();
-const phases: Record<string, string> = {
-  Active: 'Active', Expired: 'Expired', Revoked: 'Revoked',
-  Suspended: 'Suspended: no managing team holds the evidence-owner role for this workload any longer',
-};
 const subject = (s: { kind: string; id: string }) => (s.kind === 'Group' ? 'team ' : '') + s.id;
 
 // ADR-238: hand management to owner teams the user belongs to.
@@ -20,29 +16,29 @@ function Transfer({ row, controller, busy, administrator }: { row: ShareRow; con
     <p className="field-help">The named owner teams replace the current managers. Recipients, creator and end date stay the same, and managing grants no access to the evidence. {administrator
       ? 'Name owner teams that currently hold evidence-owner for this artifact.'
       : 'You can name owner teams you belong to; assigning other owner teams requires an installation administrator.'}</p>
-    <TeamsEditor teams={teams} onChange={setTeams} label="New managing team ID"/>
+    <TeamsEditor teams={teams} onChange={setTeams} label="New managing team name"/>
     <Button className="button secondary" isDisabled={busy || teams.length === 0} onPress={() => void controller.transfer(row, teams).then(() => setTeams([]))}>Transfer</Button>
   </details>;
 }
 
 // ADR-238: installation administrators see every share management-only
 // (IDs, phase, expiry, creator, managers; never recipients or evidence),
-// revoke it, or assign current owner teams (also to recover a Suspended
-// share). The server refuses everyone else.
+// revoke it, or assign current owner teams (for example after a managing
+// team was deleted). The server refuses everyone else.
 function Administration({ controller, rows, cursor, message, busy }: { controller: Shares; rows?: ShareRow[]; cursor?: string; message?: string; busy: boolean }) {
   return <details className="retention-edit" aria-busy={busy}>
     <summary>All shares (installation administrators)</summary>
-    <p className="field-help">For installation administrators only. Revoking stops every recipient's access at their next read; assigning managing teams can recover a suspended share. Neither gives you access to the evidence.</p>
+    <p className="field-help">For installation administrators only. Revoking stops every recipient's access at their next read; assigning managing teams replaces a deleted team. Neither gives you access to the evidence.</p>
     <Button className="button secondary" isDisabled={busy} onPress={() => void controller.loadAdministration()}>Load all shares</Button>
     {message && <p className="notice">{message}</p>}
     {rows?.length === 0 && <p>There are no shares.</p>}
     {!!rows?.length && <ul className="progress-actions" aria-label="All shares">{rows.map(row => <li key={row.share_id}>
-      <span><span className="identifier">{row.share_id}</span> · case <span className="identifier">{row.case_id}</span> · {phases[row.phase] ?? row.phase} · until {date(row.expires_at)}
+      <span><span className="identifier">{row.share_id}</span> · case <span className="identifier">{row.case_id}</span> · {row.phase} · until {date(row.expires_at)}
         {row.created_by && <> · Created by {row.created_by.id}</>}
         {!!row.managed_by?.length && <> · Managed by {row.managed_by.map(subject).join(', ')}</>}
       </span>
-      {(row.phase === 'Active' || row.phase === 'Suspended') && <Button className="button secondary" isDisabled={busy} onPress={() => void controller.revoke(row)}>Revoke {row.share_id}</Button>}
-      {(row.phase === 'Active' || row.phase === 'Suspended') && <Transfer row={row} controller={controller} busy={busy} administrator/>}
+      {row.phase === 'Active' && <Button className="button secondary" isDisabled={busy} onPress={() => void controller.revoke(row)}>Revoke {row.share_id}</Button>}
+      {row.phase === 'Active' && <Transfer row={row} controller={controller} busy={busy} administrator/>}
     </li>)}</ul>}
     {cursor && <Button className="button secondary" isDisabled={busy} onPress={() => void controller.loadAdministration(true)}>More shares</Button>}
   </details>;
@@ -78,7 +74,7 @@ export function SharesWorkspace({ session, scope, controller }: { session: Sessi
       {state.ownedMessage && <p className="notice">{state.ownedMessage}</p>}
       {state.owned?.length === 0 && <p>You have not shared evidence.</p>}
       {!!state.owned?.length && <ul className="progress-actions">{state.owned.map(row => <li key={row.share_id}>
-        <span><a href={'/cases/' + row.case_id}>Case</a> · {phases[row.phase] ?? row.phase} · until {date(row.expires_at)}
+        <span><a href={'/cases/' + row.case_id}>Case</a> · {row.phase} · until {date(row.expires_at)}
           {row.created_by && <> · Created by {row.created_by.id}</>}
           {!!row.managed_by?.length && <> · Managed by {row.managed_by.map(subject).join(', ')}</>}
         </span>

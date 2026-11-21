@@ -147,7 +147,7 @@ func TestCaseProjectionUsesVerifiedVersionAndEffectiveHandlingDates(t *testing.T
 			t.Fatal("fabricated or private metadata", private)
 		}
 	}
-	for _, op := range []string{"prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "request_capture"} {
+	for _, op := range []string{"download_artifact", "request_capture"} {
 		if _, ok := s.Tool(op); ok {
 			t.Fatal("unavailable service advertised", op)
 		}
@@ -273,7 +273,7 @@ func TestInvestigationCompositionExposesOnlyConfiguredCapabilities(t *testing.T)
 		t.Fatal("case-only hidden capture dispatch")
 	}
 	names := only.ToolNames()
-	names[0] = "prepare_artifact_download"
+	names[0] = "download_artifact"
 	if only.ToolNames()[0] != "get_case" {
 		t.Fatal("caller changed operation set")
 	}

@@ -2493,14 +2493,13 @@ components:
               additionalProperties: false
               properties:
                 kind:
-                  enum:
-                  - User
-                  - Group
+                  const: Group
                 name:
                   type: string
                   minLength: 1
-                  description: User name, e-mail address or group name known to the
-                    installation.
+                  description: Group name as in the identity provider's groups claim.
+                    A user is named by issuer and stable subject ID, because tokens
+                    carry no username the hub could match.
               required:
               - kind
               - name
@@ -6173,9 +6172,7 @@ components:
                     - basis_kind
                     - basis_uid
                     - revision
-                  description: All of the caller's contributing assignments; bounded
-                    by the caller's AccessBinding, ClusterAccessBinding and PermissionSource objects, so
-                    the list is not paged.
+                  description: "The caller's contributing assignments from AccessBinding, ClusterAccessBinding and PermissionSource objects: the first 64, which fit one result frame; assignments_total counts all."
                 assignments_total:
                   type: integer
                   minimum: 0

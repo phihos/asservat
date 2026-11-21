@@ -1,18 +1,20 @@
 // Synthetic canonical fixtures for unit tests only; never imported by the UI.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import type { Session } from '../auth/session';
-import type { Input, Output, Operation, Operations } from './http';
+import type { Input, Output, Operation, Operations, Settings } from './http';
 import type { Operations as GrantOperations, Operation as GrantOperation, Output as GrantOutput } from '../approvals/http';
 
 export const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const session: Session = { principal: { issuer: 'https://identity.invalid', subject_id: 'synthetic-developer', kind: 'user' }, roles: [], csrf_token: 'C'.repeat(43), expires_at: new Date(Date.now() + 120_000).toISOString(), step_up: 'unavailable' };
-export const target = { cluster_id: id(1), namespace: 'payments', kind: 'Deployment' as const, name: 'api' };
-const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+export const target = { cluster: 'local', namespace: 'payments', kind: 'Deployment' as const, name: 'api' };
+// The cluster UUID that outputs carry as provenance.
+export const clusterID = id(1);
+// The capture operations implement the canonical contracts and their examples.
+const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
 export function previewResult(): Output<'preview_capture'> {
   const value = example('mcp-pod-status-preview-result.json');
   value.data.capture_enabled = true; value.data.blockers = []; value.data.warnings = [];
   value.data.capture_assessment.generatedAt = new Date().toISOString();
-  value.data.capture_assessment.validUntil = new Date(Date.now() + 5_000).toISOString();
   return value;
 }
 export function catalogResult(): Output<'list_diagnostics'> {
@@ -23,8 +25,9 @@ export function catalogResult(): Output<'list_diagnostics'> {
 export function result<N extends Operation>(data: unknown): Output<N> {
   return { schema_version: 'mcp-result/v1', request_id: id(500), data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] } as unknown as Output<N>;
 }
+// 'Finalizing' is an action phase; its capture is Running.
 export function progressResult(phase: 'Pending' | 'Finalizing' | 'Succeeded' = 'Pending', revision = 1): Output<'get_capture'> {
-  return result<'get_capture'>({ capture_id: id(8), revision, phase, actions: [{ action_id: 'pod-status', phase }], navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), can_cancel: false, blockers: [] });
+  return result<'get_capture'>({ capture_id: id(8), revision, phase: phase === 'Finalizing' ? 'Running' : phase, actions: [{ action_id: 'pod-status', phase }], navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), can_cancel: false, blockers: [] });
 }
 export function acceptedResult(): Output<'request_capture'> {
   return result<'request_capture'>({ capture_id: id(8), phase: 'Accepted', navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), operation: 'collect' });
@@ -42,8 +45,8 @@ export function repeatedPreviewResult(from: string): Output<'preview_capture'> {
   return value;
 }
 const builtin = (name: string) => JSON.parse(readFileSync(new URL('../../../internal/application/planning/profiles/' + name + '-v1.json', import.meta.url), 'utf8'));
-export function profilesResult(): Output<'list_capture_profiles'> {
-  return result<'list_capture_profiles'>({ profiles: ['network-connections', 'syscall-activity'].map(name => ({ profile_ref: { catalog: 'builtin', name, version: 'v1' }, display_name: builtin(name).definition.displayName, description: builtin(name).definition.description,
+export function profilesResult(): Output<'list_diagnostics'> {
+  return result<'list_diagnostics'>({ diagnostics: ['network-connections', 'syscall-activity'].map(name => ({ kind: 'captureProfile', name, version: 'v1', profile_ref: { catalog: 'builtin', name, version: 'v1' }, display_name: builtin(name).definition.displayName, description: builtin(name).definition.description,
     available: true, deprecated: false, approval_required: false, blockers: [], execution_modes: ['onTrigger', 'ongoing'] })) });
 }
 export function profileResult(name = 'network-connections'): Output<'get_capture_profile'> {
@@ -53,10 +56,11 @@ export function profileResult(name = 'network-connections'): Output<'get_capture
 }
 export class SyntheticOperations implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal; csrf: string }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, get_capture: progressResult, cancel_capture: () => result<'cancel_capture'>({ capture_id: id(8), revision: 2, phase: 'Running', cancellation_requested: true, navigation_uri: 'https://asservat.invalid/captures/' + id(8) }), list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult(), list_capture_profiles: profilesResult, get_capture_profile: profileResult })[name]();
+  // input: get_capture answers view "settings" and list_diagnostics kind "captureProfile".
+  responder: (name: Operation, input?: unknown) => unknown | Promise<unknown> = (name, input) => ({ list_diagnostics: (input as { kind?: string } | undefined)?.kind === 'captureProfile' ? profilesResult : catalogResult, preview_capture: previewResult, request_capture: acceptedResult, get_capture: (input as { view?: string } | undefined)?.view === 'settings' ? () => settingsResult() : progressResult, cancel_capture: () => result<'cancel_capture'>({ capture_id: id(8), revision: 2, phase: 'Running', cancellation_requested: true, navigation_uri: 'https://asservat.invalid/captures/' + id(8) }), list_capture_history: () => historyResult(), get_capture_profile: profileResult })[name]();
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
-    return await this.responder(name) as Output<N>;
+    return await this.responder(name, input) as Output<N>;
   }
 }
 
@@ -76,7 +80,6 @@ export function recordingPreviewResult(from?: string): Output<'preview_capture'>
   value.data.target_ref = pod.data.target_ref;
   value.data.selected_pods = pod.data.selected_pods;
   value.data.capture_assessment.generatedAt = new Date().toISOString();
-  value.data.capture_assessment.validUntil = new Date(Date.now() + 5_000).toISOString();
   value.data.capture_enabled = false; value.data.approval_required = true;
   value.data.blockers = [{ code: 'ApprovalRequired', message: 'Independent review is required.', responsible_role: 'approver', retryable: false }];
   if (from) value.data.repeated_from_capture_id = from;
@@ -87,11 +90,14 @@ export function approvalPendingResult(): Output<'request_capture'> {
     responsible_role: 'approver', navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41) } } as Output<'request_capture'>;
 }
 
-export function settingsResult(capture = id(41)): Output<'get_capture_settings'> {
-  const value = result<'get_capture_settings'>({ kind: 'captureSettings', capture_id: capture, cluster_id: target.cluster_id, namespace_uid: 'namespace-uid', accepted_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(), settings_digest: 'a'.repeat(64), original_execution_digest: 'b'.repeat(64), navigation_uri: 'https://asservat.example.invalid/captures/' + capture, settings: {
+export function settingsResult(capture = id(41)): Extract<Output<'get_capture'>, { status: 'ok' }> & { data: Extract<Settings, { kind: 'captureSettings' }> } {
+  const value = result<'get_capture'>({ kind: 'captureSettings', capture_id: capture, cluster_id: clusterID, namespace_uid: 'namespace-uid', accepted_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(), settings_digest: 'a'.repeat(64), original_execution_digest: 'b'.repeat(64), navigation_uri: 'https://asservat.example.invalid/captures/' + capture, settings: {
     target: { namespace: target.namespace, workloadRef: { apiVersion: 'apps/v1', kind: target.kind, name: target.name, uid: 'workload-uid' }, maxPods: 1, selection: 'allWithinLimit', adoption: 'pinUID' },
     recipe_spec: { actions: [{ id: 'pod-status', kind: 'kubernetesSnapshot', parameters: { include: ['pod'] }, dependsOn: [], required: true, impact: 'observe', limits: { maxBytes: 4096, timeout: '5s' }, executionMode: 'onTrigger' }], maxTotalBytes: 4096, maxDuration: '5s' }, dependency_pins: [{ role: 'recipe', digest: 'c'.repeat(64) }], requested_retention: '120s',
   } });
   value.data_class = 'extract';
-  return value;
+  return value as ReturnType<typeof settingsResult>;
 }
+
+export const isSettings = (name: Operation, input: unknown) => name === 'get_capture' && (input as { view?: string } | undefined)?.view === 'settings';
+export const isProfiles = (name: Operation, input: unknown) => name === 'list_diagnostics' && (input as { kind?: string } | undefined)?.kind === 'captureProfile';

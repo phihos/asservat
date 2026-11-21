@@ -32,7 +32,7 @@ func composedProjectionFixture(t *testing.T) (*AuditedOperations, *bridgeFixture
 
 func TestInvestigationProjectionIsExplicitAuditedComposition(t *testing.T) {
 	s, f, _, base := composedProjectionFixture(t)
-	want := append(base.ToolNames(), "get_file_excerpt", "get_query_result")
+	want := append(base.ToolNames(), "get_extract", "get_query_result")
 	slices.Sort(want)
 	if !slices.Equal(s.ToolNames(), want) || s.PublicOrigin() != base.PublicOrigin() {
 		t.Fatal("changed unrelated operation set or origin")
@@ -42,7 +42,7 @@ func TestInvestigationProjectionIsExplicitAuditedComposition(t *testing.T) {
 	if !slices.Equal(s.ToolNames(), want) {
 		t.Fatal("mutable advertised inventory")
 	}
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
+	for _, name := range []string{"get_extract", "get_query_result"} {
 		if _, ok := base.Tool(name); ok || BrowserOperationSupported(base, name) {
 			t.Fatal("unconfigured query advertised", name)
 		}
@@ -103,8 +103,8 @@ func TestInvestigationProjectionUsesReadScopeAndOriginalLiveOwner(t *testing.T) 
 	ctx, cancel := context.WithDeadline(context.WithValue(t.Context(), projectionRequestMarker{}, "original"), f.now.Add(3*time.Second))
 	defer cancel()
 	current := &projectionCurrent{t: t, f: f, original: ctx}
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
-		input := bridgeInput()
+	for _, name := range []string{"get_extract", "get_query_result"} {
+		input := extractInput("fileExcerpt", bridgeInput())
 		if name == "get_query_result" {
 			input = bridgePoll(f.q.ID)
 		}
@@ -150,7 +150,7 @@ func TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit(t *testing
 				wantReads = 1
 				g.fail = true
 			}
-			reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
+			reply, err := s.Call(ctx, f, "get_extract", extractInput("fileExcerpt", bridgeInput()))
 			if err == nil || len(reply.Body) != 0 || f.reads != wantReads || f.active {
 				t.Fatal("lost authority disclosed or leaked owner", err, f.reads, f.active)
 			}

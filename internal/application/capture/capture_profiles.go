@@ -44,6 +44,9 @@ func (s ContextInvestigation) CaptureProfile(ctx context.Context, source identit
 	if err != nil {
 		return zero, time.Time{}, err
 	}
+	if ref, err = s.currentProfile(ctx, target, ref); err != nil {
+		return zero, time.Time{}, err
+	}
 	var published []planning.CatalogProfile
 	if ref.Catalog != "builtin" && s.Profiles != nil {
 		if published, err = s.Profiles.ReadCatalogProfiles(ctx, target, []planning.ProfileRef{ref}); err != nil {
@@ -56,6 +59,26 @@ func (s ContextInvestigation) CaptureProfile(ctx context.Context, source identit
 		}
 	}
 	return zero, time.Time{}, value.ErrProfileNotFound
+}
+
+// currentProfile resolves a versionless ref to the current version of that
+// profile in its catalog for target; an exact ref is returned unchanged.
+func (s ContextInvestigation) currentProfile(ctx context.Context, target targets.PodResolution, ref planning.ProfileRef) (planning.ProfileRef, error) {
+	if ref.Version != "" {
+		return ref, nil
+	}
+	var published []planning.CatalogProfile
+	if ref.Catalog != "builtin" && s.Profiles != nil {
+		var err error
+		if published, err = s.Profiles.ListCatalogProfiles(ctx, target, ref.Catalog); err != nil {
+			return ref, err
+		}
+	}
+	current, ok := compiler.CurrentProfileVersion(compiler.DescribeProfiles(ref.Catalog, published), ref)
+	if !ok {
+		return ref, value.ErrProfileNotFound
+	}
+	return current, nil
 }
 
 // profileTarget resolves targetRef for a caller currently eligible for it.

@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import type { Target } from '../capture/http';
 import { operationMessage } from '../capture/http';
-import { client as defaultClient, type AccessOperation, type Client, type Explanation } from './http';
+import { client as defaultClient, type AccessOperation, type Client, type Explanation, type Input } from './http';
 
 const decisions: Record<Explanation['decision'], string> = {
   Allow: 'You have this access',
@@ -13,15 +12,20 @@ const decisions: Record<Explanation['decision'], string> = {
 
 // "Why?" next to an unavailable or blocked operation (ADR-234). It asks the
 // server to explain only the signed-in user's own access to this workload;
-// nothing is requested until the user asks.
-export function WhyAccess({ session, scope, target, operation, client = defaultClient }: { session: Session; scope: AbortSignal; target: Target; operation: AccessOperation; client?: Client }) {
+// nothing is requested until the user asks. The target names its cluster
+// (ADR-335 D4); a target that still carries a cluster ID passes it as that
+// name.
+type WhyTarget = Omit<Input['target_ref'], 'cluster'> & ({ cluster: string } | { cluster_id: string });
+export function WhyAccess({ session, scope, target, operation, client = defaultClient }: { session: Session; scope: AbortSignal; target: WhyTarget; operation: AccessOperation; client?: Client }) {
   const [busy, setBusy] = useState(false);
   const [explanation, setExplanation] = useState<Explanation>();
   const [message, setMessage] = useState<string>();
   const explain = async () => {
     setBusy(true); setMessage(undefined); setExplanation(undefined);
     try {
-      const result = await client.explain({ target_ref: target, operation }, session.csrf_token, scope);
+      const { namespace, kind, name } = target;
+      const cluster = 'cluster' in target ? target.cluster : target.cluster_id;
+      const result = await client.explain({ target_ref: { cluster, namespace, kind, name }, operation }, session.csrf_token, scope);
       if (scope.aborted) return;
       if (result.status === 'ok') setExplanation(result.data);
       else if (result.status === 'error') setMessage(result.data.message);

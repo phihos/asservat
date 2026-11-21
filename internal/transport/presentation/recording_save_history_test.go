@@ -31,9 +31,13 @@ func (h recordingHistoryFixture) PreviewRepeat(ctx context.Context, i identities
 func TestRecordingSaveHistorySettingsNeverBecomeRecipeOrOldSourceReplay(t *testing.T) {
 	ops, current, h := historyOperations(t)
 	ops.history = recordingHistoryFixture{h}
-	reply, err := ops.Call(t.Context(), current, "get_capture_settings", json.RawMessage(`{"capture_id":"`+historyCapture+`"}`))
+	reply, err := ops.Call(t.Context(), current, "get_capture", json.RawMessage(`{"capture_id":"`+historyCapture+`","view":"settings"}`))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// A repeat addresses the saved cluster by its configured name.
+	if !strings.Contains(string(reply.Body), `"cluster":"local"`) {
+		t.Fatal("settings omit the saved cluster name", string(reply.Body))
 	}
 	if !strings.Contains(string(reply.Body), `"kind":"recordingSaveSettings"`) || strings.Contains(string(reply.Body), "recipe_spec") || strings.Contains(string(reply.Body), "dependency_pins") || strings.Contains(string(reply.Body), "recording_handle") {
 		t.Fatal("recording preferences became ordinary recipe/source authority", string(reply.Body))
@@ -42,7 +46,7 @@ func TestRecordingSaveHistorySettingsNeverBecomeRecipeOrOldSourceReplay(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(reply.Body), `"code":"RecordingSelectionRequired"`) || !strings.Contains(string(reply.Body), `"navigation_uri":"https://console.invalid/captures/new"`) {
+	if !strings.Contains(string(reply.Body), `"code":"NoCurrentSource"`) || !strings.Contains(string(reply.Body), `"navigation_uri":"https://console.invalid/captures/new"`) {
 		t.Fatal("old recording settings silently invoked a recipe", string(reply.Body))
 	}
 }

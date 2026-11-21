@@ -123,12 +123,12 @@ func TestPolicyStatusGrantStartsUsesExistingAcceptedInputsAndOneLocalCompile(t *
 		return ongoingSaveCompilerOne(raw)
 	})}
 	originalObservations, originalAcceptances := len(f.observed), len(f.accepted)
-	status, _, err := service.Get(t.Context(), f, "restarts")
+	status, _, err := service.Get(t.Context(), f, activationCluster, "apps", "restarts")
 	if err != nil || status.MaxGrantStarts != 2 || status.MaxExecutions != 1 || calls != 1 || len(f.observed) != originalObservations || len(f.accepted) != originalAcceptances {
 		t.Fatal("status invented I/O, authority or unbounded source-start guidance", status.MaxGrantStarts, status.MaxExecutions, calls, err)
 	}
 	f.status.Authority.ScopeDigest[0] ^= 1
-	status, _, err = service.Get(t.Context(), f, "restarts")
+	status, _, err = service.Get(t.Context(), f, activationCluster, "apps", "restarts")
 	if err != nil || status.MaxGrantStarts != 0 || calls != 2 {
 		t.Fatal("changed accepted scope supplied widened grant guidance", status.MaxGrantStarts, calls, err)
 	}

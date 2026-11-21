@@ -15,10 +15,25 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+const policyTestCluster = "11111111-1111-4111-8111-111111111111"
+
 type policyOperationsFixture struct {
 	scopes  []string
 	stopped int
 	status  value.PolicyStatus
+	named   []string
+	// activated/activateErr answer activate_policy; nil means deactivated.
+	activated   *app.PolicyActivationResult
+	activateErr error
+}
+
+func newPolicyOperations(t *testing.T, f *policyOperationsFixture) *PolicyOperations {
+	t.Helper()
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, NewClusterNames(map[string]string{"local": policyTestCluster}), f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
 }
 
 func (f *policyOperationsFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
@@ -26,12 +41,20 @@ func (f *policyOperationsFixture) ResolveIdentity(context.Context) (identity.Ide
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}, Scopes: f.scopes, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}, nil
 }
 func (f *policyOperationsFixture) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
-	return app.PolicyActivationResult{}, app.ErrPolicyDeactivated
+	if f.activated == nil && f.activateErr == nil {
+		return app.PolicyActivationResult{}, app.ErrPolicyDeactivated
+	}
+	if f.activateErr != nil {
+		return app.PolicyActivationResult{}, f.activateErr
+	}
+	return *f.activated, nil
 }
-func (f *policyOperationsFixture) Get(context.Context, identities.CurrentIdentity, string) (value.PolicyStatus, time.Time, error) {
+func (f *policyOperationsFixture) Get(_ context.Context, _ identities.CurrentIdentity, cluster, namespace, name string) (value.PolicyStatus, time.Time, error) {
+	f.named = []string{cluster, namespace, name}
 	return f.status, time.Now().Add(5 * time.Second), nil
 }
-func (f *policyOperationsFixture) Deactivate(context.Context, identities.CurrentIdentity, string) (app.PolicyDeactivationResult, error) {
+func (f *policyOperationsFixture) Deactivate(_ context.Context, _ identities.CurrentIdentity, cluster, namespace, name string) (app.PolicyDeactivationResult, error) {
+	f.named = []string{cluster, namespace, name}
 	f.stopped++
 	return app.PolicyDeactivationResult{PolicyUID: "policy-uid", AcceptanceID: "99999999-9999-4999-8999-999999999999", Replay: f.stopped > 1}, nil
 }
@@ -51,32 +74,28 @@ func policyCall(t *testing.T, s *PolicyOperations, f *policyOperationsFixture, n
 
 func TestPolicyDeactivationOperationContract(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read", "evidence:capture"}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in := `{"policy_name":"restarts","idempotency_key":"k"}`
+	s := newPolicyOperations(t, f)
+	in := `{"cluster":"local","namespace":"apps","policy_name":"restarts","idempotency_key":"k"}`
 	out := policyCall(t, s, f, "deactivate_policy", in)
 	data, _ := out["data"].(map[string]any)
-	if out["status"] != "ok" || data["state"] != "deactivated" || data["replay"] != false {
-		t.Fatal("deactivation reply", out)
+	if out["status"] != "ok" || data["state"] != "deactivated" || data["replay"] != false || data["policy_name"] != "restarts" || data["namespace"] != "apps" || !slices.Equal(f.named, []string{policyTestCluster, "apps", "restarts"}) {
+		t.Fatal("deactivation reply", out, f.named)
+	}
+	// An unknown cluster name is a domain refusal; nothing is dispatched.
+	if out = policyCall(t, s, f, "deactivate_policy", `{"cluster":"elsewhere","namespace":"apps","policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "UnknownCluster" || f.stopped != 1 {
+		t.Fatal("unknown cluster", out)
 	}
 	if out = policyCall(t, s, f, "deactivate_policy", in); out["data"].(map[string]any)["replay"] != true {
 		t.Fatal("repeated deactivation is not a replay", out)
 	}
 	// A deactivated revision explains why it cannot be activated again.
-	if out = policyCall(t, s, f, "activate_policy", in); out["status"] != "error" || out["data"].(map[string]any)["code"] != "PolicyDeactivated" {
+	if out = policyCall(t, s, f, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "PolicyDeactivated" {
 		t.Fatal("reactivation refusal", out)
 	}
 	// Status of a deactivated policy reports it, with its last acceptance.
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", DeactivatedID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour)}
-	if out = policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`); out["status"] != "ok" || out["data"].(map[string]any)["state"] != "deactivated" || out["data"].(map[string]any)["acceptance_id"] != f.status.DeactivatedID {
+	if out = policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"restarts"}`); out["status"] != "ok" || out["data"].(map[string]any)["state"] != "deactivated" || out["data"].(map[string]any)["acceptance_id"] != f.status.DeactivatedID {
 		t.Fatal("deactivated status", out)
-	}
-	// A new DebugPolicy generation after deactivation can be activated: changed.
-	f.status.Generation = 2
-	if out = policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`); out["data"].(map[string]any)["state"] != "changed" {
-		t.Fatal("changed revision after deactivation", out)
 	}
 	// Without whole-pod collection rights nothing is dispatched.
 	f.scopes = []string{"evidence:read"}
@@ -89,10 +108,7 @@ func TestPolicyDeactivationOperationContract(t *testing.T) {
 // count or a probe occurrence's failure time; the output schema accepts both.
 func TestPolicyStatusReportsDetectorAndOccurrenceKinds(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := newPolicyOperations(t, f)
 	created := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour),
 		Detector: &value.PolicyDetector{Kind: "probe", ProbeType: "Readiness", MinimumFailures: 2, WindowSeconds: 60},
@@ -100,7 +116,7 @@ func TestPolicyStatusReportsDetectorAndOccurrenceKinds(t *testing.T) {
 			{ID: "11111111-1111-4111-8111-111111111111", Outcome: "captured", CaptureID: "22222222-2222-4222-8222-222222222222", Detector: "probe", Restarts: created.Add(-time.Minute).Unix(), CreatedAt: created},
 			{ID: "33333333-3333-4333-8333-333333333333", Outcome: "refused", Detector: "exit", Restarts: 3, CreatedAt: created},
 		}}
-	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"probes"}`)
+	out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"probes"}`)
 	data, _ := out["data"].(map[string]any)
 	if out["status"] != "ok" {
 		t.Fatal("status", out)
@@ -119,17 +135,14 @@ func TestPolicyStatusReportsDetectorAndOccurrenceKinds(t *testing.T) {
 func TestPolicyStatusReportsSharedAcceptedPoolsIndependentlyOfGrants(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 5, MaxExecutions: 100, CollectedBytesSpent: 16384, MaxCollectedBytes: 1048576, ObservedBytesSpent: 4096, MaxObservedBytes: 8192, NotAfter: time.Now().Add(time.Hour)}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := newPolicyOperations(t, f)
 	for _, expired := range []bool{false, true} {
 		if expired {
 			f.status.NotAfter = time.Now().Add(-time.Hour)
 		}
-		out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`)
+		out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"restarts"}`)
 		data := out["data"].(map[string]any)
-		for key, expected := range map[string]int64{"executions_spent": 5, "max_executions": 100, "collected_bytes_spent": 16384, "max_collected_bytes": 1048576, "observed_bytes_spent": 4096, "max_observed_bytes": 8192} {
+		for key, expected := range map[string]int64{"executions_spent": 5, "collected_bytes_spent": 16384, "max_collected_bytes": 1048576} {
 			if data[key] != float64(expected) {
 				t.Fatalf("shared accepted %s = %v, want %d", key, data[key], expected)
 			}
@@ -142,27 +155,21 @@ func TestPolicyStatusReportsSharedAcceptedPoolsIndependentlyOfGrants(t *testing.
 
 func TestPolicyProfileStatusReportsNativeCollectionAndOriginalSpend(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", AttachedGrantID: "77777777-7777-4777-8777-777777777777", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 1, MaxExecutions: 1, CollectedBytesSpent: 16 << 20, MaxCollectedBytes: 16 << 20, NotAfter: time.Now().Add(time.Hour), Authority: authorization.AcceptedPolicyAuthority{Actions: []string{"profile"}}}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := newPolicyOperations(t, f)
 	if tool, ok := s.Tool("get_policy_status"); !ok || !tool.MCP() || len(tool.Transports) != 0 && !slices.Contains(tool.Transports, "browser") {
 		t.Fatal("profile policy status lost its shared MCP/browser contract")
 	}
-	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"regional-finite-go-profile"}`)
+	out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"regional-finite-go-profile"}`)
 	data := out["data"].(map[string]any)
-	if out["status"] != "ok" || data["collection_kind"] != "profile" || data["attached_grant_id"] != f.status.AttachedGrantID || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(16<<20) || data["observed_bytes_spent"] != float64(0) || data["max_observed_bytes"] != float64(0) || data["observed_events_spent"] != nil {
+	if out["status"] != "ok" || data["collection_kind"] != "profile" || data["attached_grant_id"] != f.status.AttachedGrantID || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(16<<20) || data["observed_bytes_spent"] != nil || data["max_observed_bytes"] != nil {
 		t.Fatal("native profile status mislabeled collection or changed original pools", data)
 	}
 }
 
 func TestPolicyProfileStatusContractAcceptsProfileAndRefusesUnknownCollection(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 1, NotAfter: time.Now().Add(time.Hour)}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"regional-finite-go-profile"}`)
+	s := newPolicyOperations(t, f)
+	out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"regional-finite-go-profile"}`)
 	for _, kind := range []string{"podStatus", "packetCapture", "syscallTrace", "profile", "unknown"} {
 		out["data"].(map[string]any)["collection_kind"] = kind
 		raw, _ := json.Marshal(out)
@@ -174,13 +181,10 @@ func TestPolicyProfileStatusContractAcceptsProfileAndRefusesUnknownCollection(t 
 
 func TestPolicyLogsStatusReportsNativeCollectionAndOriginalSpend(t *testing.T) {
 	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 1, MaxExecutions: 2, CollectedBytesSpent: 64 << 20, MaxCollectedBytes: 128 << 20, NotAfter: time.Now().Add(time.Hour), Authority: authorization.AcceptedPolicyAuthority{Actions: []string{"logs"}}}}
-	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"finite-logs"}`)
+	s := newPolicyOperations(t, f)
+	out := policyCall(t, s, f, "get_policy_status", `{"cluster":"local","namespace":"apps","policy_name":"finite-logs"}`)
 	data := out["data"].(map[string]any)
-	if data["collection_kind"] != "logs" || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(64<<20) || data["observed_bytes_spent"] != float64(0) {
+	if data["collection_kind"] != "logs" || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(64<<20) {
 		t.Fatal("log policy status lost exact finite collection or spend", data)
 	}
 	raw, _ := json.Marshal(out)

@@ -63,7 +63,7 @@ func manualArgumentsCaptureInput(cluster, namespace, workload string, stop bool)
 		after, timeout, duration = "30s", "40s", "45s"
 	}
 	return map[string]any{
-		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+		"target_ref":                  map[string]string{"cluster": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 		"requested_retention_seconds": 600,
 		"profile_composition": map[string]any{
 			"components": []any{map[string]any{"id": "calls", "profileRef": map[string]string{"catalog": "namespace", "name": manualArgumentsProfile, "version": "v1"},

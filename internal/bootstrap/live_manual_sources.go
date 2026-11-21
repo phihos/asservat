@@ -74,6 +74,12 @@ func (s liveManualCatalog) list(ctx context.Context, target authorization.Worklo
 	out, e := s.records(ctx, rows)
 	return out, next, e
 }
+func manualKind(projection string) string {
+	if projection == live.Syscall {
+		return "syscallTrace"
+	}
+	return "packetCapture"
+}
 func manualProjection(e artifact.ContextExpectation) string {
 	if e.Recording == nil || e.Snapshot != nil {
 		return ""
@@ -139,7 +145,7 @@ func (s liveManualCatalog) records(ctx context.Context, rows []executionapp.Live
 			if b := w.Arguments; b != nil && (b.NodeUID != m.NodeUID || b.BootID != m.BootID || b.CollectorPodUID != m.CollectorPodUID || b.CollectorEpoch != m.CollectorEpoch) {
 				return nil, fmt.Errorf("%w: live_manual_sources:144", live.ErrDenied)
 			}
-			source := live.Source{RootID: s.root, Manual: &m, Target: r.Original.Target, OwnerKind: "manualSession", OwnerID: m.CaptureID, State: "Ready", SaveVia: "captureOutcome", Projections: []string{r.Original.Projection}, Blockers: []string{}, HardUntil: m.HardUntil, LeaseUntil: m.HardUntil, PrivacyUntil: identity.Earlier(identity.Earlier(m.HardUntil, r.Original.WriteUntil), w.Work.Accepted.Deadline)}
+			source := live.Source{RootID: s.root, Manual: &m, Target: r.Original.Target, OwnerKind: "manualSession", OwnerID: m.CaptureID, State: "Ready", SaveVia: "captureOutcome", Projections: []string{r.Original.Projection}, Blockers: []string{}, HardUntil: m.HardUntil, LeaseUntil: m.HardUntil, PrivacyUntil: identity.Earlier(identity.Earlier(m.HardUntil, r.Original.WriteUntil), w.Work.Accepted.Deadline), PodName: w.Work.Target.PodName, Kind: manualKind(r.Original.Projection), IncidentPodCap: 1}
 			// SQL/holder freshness bounds this read, not the reference's original source
 			// privacy end. The reference is clipped by immutable source/write limits.
 

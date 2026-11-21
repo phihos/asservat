@@ -18,31 +18,35 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-// PolicyActivationUseCase and PolicyStatusUseCase are the ADR-228 services.
+// PolicyStatusUseCase and PolicyDeactivationUseCase name a DebugPolicy by
+// cluster ID, namespace and name.
+// PolicyActivationUseCase serves the legacy activate_policy, which remains
+// until hub-side acceptance (specs/policy-automation.md) replaces it.
 type PolicyActivationUseCase interface {
 	Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error)
 }
 type PolicyStatusUseCase interface {
-	Get(context.Context, identities.CurrentIdentity, string) (value.PolicyStatus, time.Time, error)
+	Get(context.Context, identities.CurrentIdentity, string, string, string) (value.PolicyStatus, time.Time, error)
 }
 type PolicyDeactivationUseCase interface {
-	Deactivate(context.Context, identities.CurrentIdentity, string) (app.PolicyDeactivationResult, error)
+	Deactivate(context.Context, identities.CurrentIdentity, string, string, string) (app.PolicyDeactivationResult, error)
 }
 
-// PolicyOperations serves activate_policy, get_policy_status and
-// deactivate_policy to MCP and the browser through the same audited
-// operation path.
+// PolicyOperations serves get_policy_status and deactivate_policy to MCP and
+// the browser through the same audited operation path. Policies are accepted
+// from their DebugPolicy objects; there is no public activation.
 type PolicyOperations struct {
 	origin     string
 	now        func() time.Time
 	newID      func() string
+	clusters   ClusterNames
 	activation PolicyActivationUseCase
 	status     PolicyStatusUseCase
 	stop       PolicyDeactivationUseCase
 	contracts  *contracts.InvestigationContracts
 }
 
-func NewPolicyOperations(origin string, now func() time.Time, newID func() string, activation PolicyActivationUseCase, status PolicyStatusUseCase, stop PolicyDeactivationUseCase) (*PolicyOperations, error) {
+func NewPolicyOperations(origin string, now func() time.Time, newID func() string, clusters ClusterNames, activation PolicyActivationUseCase, status PolicyStatusUseCase, stop PolicyDeactivationUseCase) (*PolicyOperations, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || activation == nil || status == nil || stop == nil || now == nil || newID == nil {
 		return nil, ErrOperationsConfiguration
@@ -51,7 +55,7 @@ func NewPolicyOperations(origin string, now func() time.Time, newID func() strin
 	if err != nil {
 		return nil, err
 	}
-	return &PolicyOperations{origin: origin, now: now, newID: newID, activation: activation, status: status, stop: stop, contracts: wire}, nil
+	return &PolicyOperations{origin: origin, now: now, newID: newID, clusters: clusters, activation: activation, status: status, stop: stop, contracts: wire}, nil
 }
 
 func (s *PolicyOperations) PublicOrigin() string {
@@ -72,11 +76,13 @@ func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool)
 
 // PolicyOperationInput is the closed input of the policy operations.
 type PolicyOperationInput struct {
-	GrantID        string `json:"grant_id,omitempty"`
+	Cluster        string `json:"cluster"`
+	Namespace      string `json:"namespace"`
 	PolicyName     string `json:"policy_name"`
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
-	// SharingReviewed accepts a policy's reviewed recurring sharing (ADR-239).
-	SharingReviewed bool `json:"sharing_reviewed,omitempty"`
+	// activate_policy (legacy contract) only.
+	GrantID         string `json:"grant_id,omitempty"`
+	SharingReviewed bool   `json:"sharing_reviewed,omitempty"`
 }
 
 type policyActivationData struct {
@@ -96,18 +102,6 @@ type policyActivationSharing struct {
 	Recipients  int       `json:"recipients"`
 	MaxCaptures int       `json:"max_captures"`
 	NotAfter    time.Time `json:"not_after"`
-}
-
-// policyStatusSharing is the content-free recurring sharing status (ADR-239).
-type policyStatusSharing struct {
-	State          string     `json:"state"`
-	Recipients     int        `json:"recipients"`
-	SharedCaptures int64      `json:"shared_captures"`
-	MaxCaptures    int        `json:"max_captures"`
-	NotAfter       time.Time  `json:"not_after"`
-	Revision       int64      `json:"revision"`
-	StoppedAt      *time.Time `json:"stopped_at,omitempty"`
-	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
 }
 
 // policySharingReview is the pre-activation review (REQ-SHR-005): the
@@ -134,7 +128,21 @@ func policySharingStatement(s *value.PolicyShareInstruction) string {
 	return value.PolicySharingStatement + " with " + strconv.Itoa(len(s.Recipients)) + " recipient(s): at most the next " + strconv.Itoa(s.MaxCaptures) + " capture(s) of this policy until " + s.NotAfter.UTC().Format(time.RFC3339) + ". Existing shares stay until they expire or are revoked."
 }
 
+// policyStatusSharing is the content-free recurring sharing status (ADR-239).
+type policyStatusSharing struct {
+	State          string     `json:"state"`
+	Recipients     int        `json:"recipients"`
+	SharedCaptures int64      `json:"shared_captures"`
+	MaxCaptures    int        `json:"max_captures"`
+	NotAfter       time.Time  `json:"not_after"`
+	Revision       int64      `json:"revision"`
+	StoppedAt      *time.Time `json:"stopped_at,omitempty"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+}
+
 type policyDeactivationData struct {
+	PolicyName   string `json:"policy_name"`
+	Namespace    string `json:"namespace"`
 	PolicyUID    string `json:"policy_uid"`
 	AcceptanceID string `json:"acceptance_id"`
 	State        string `json:"state"`
@@ -182,23 +190,19 @@ type policySuppressionData struct {
 	LastAt  time.Time `json:"last_at"`
 }
 type policyStatusData struct {
-	MaxObservedEvents   int64                   `json:"max_observed_events,omitempty"`
-	ObservedEventsSpent int64                   `json:"observed_events_spent,omitempty"`
-	MaxGrantStarts      int64                   `json:"max_grant_starts,omitempty"`
+	PolicyName          string                  `json:"policy_name"`
+	Namespace           string                  `json:"namespace"`
 	AttachedGrantID     string                  `json:"attached_grant_id,omitempty"`
 	CollectionKind      string                  `json:"collection_kind"`
 	CollectedBytesSpent int64                   `json:"collected_bytes_spent"`
 	MaxCollectedBytes   int64                   `json:"max_collected_bytes"`
-	ObservedBytesSpent  int64                   `json:"observed_bytes_spent"`
-	MaxObservedBytes    int64                   `json:"max_observed_bytes"`
 	PolicyUID           string                  `json:"policy_uid"`
 	AcceptanceID        string                  `json:"acceptance_id"`
 	State               string                  `json:"state"`
 	Generation          int64                   `json:"generation"`
-	ExpiresAt           time.Time               `json:"expires_at"`
+	ExpiresAt           *time.Time              `json:"expires_at,omitempty"`
 	Executor            policyExecutor          `json:"executor"`
 	ExecutionsSpent     int64                   `json:"executions_spent"`
-	MaxExecutions       int64                   `json:"max_executions"`
 	WatchedPods         int64                   `json:"watched_pods"`
 	Occurrences         int64                   `json:"occurrences"`
 	Captured            int64                   `json:"captured"`
@@ -221,20 +225,22 @@ func publicPolicyFailure(err error) OperationFailure {
 		return OperationFailure{"SharingNotPermitted", "The policy shares its captures (spec.sharing), which needs the evidence:share scope and an evidence-owner group of the workload's automation AccessBinding that you belong to. Remove spec.sharing or ask a permission administrator to add evidence-owner to that binding.", false}
 	case errors.As(err, &review):
 		return OperationFailure{"SharingReviewRequired", policySharingReview(review.Instruction), false}
-	case errors.Is(err, app.ErrPolicyDelegation):
-		return OperationFailure{"DelegationRequired", "No sole automation AccessBinding covers this workload for one of your groups, or its envelope does not allow pod-status snapshots. Ask a permission administrator to add spec.automation to the team's AccessBinding.", false}
 	case errors.Is(err, value.ErrCapacity):
 		return OperationFailure{"CapacityUnavailable", "The workload cluster already has the maximum number of active policies.", false}
 	case errors.Is(err, value.ErrConflict):
 		return OperationFailure{"Conflict", "This request conflicts with a newer activation of the policy. Check its status and retry.", false}
 	case errors.Is(err, value.ErrChanged):
 		return OperationFailure{"PolicySuspended", "The policy is suspended or being deleted and cannot be activated.", false}
-	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
-		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid):
 		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-, probe-, alert-, log- or resource-trigger DebugPolicy.", false}
 	case errors.Is(err, targets.ErrUnsupported):
 		return OperationFailure{"DetectorUnavailable", "The workload cluster's connector cannot observe this detector. An alert policy needs the cluster's Alertmanager address (Helm value cluster.alertmanager); a resource policy needs the Kubernetes metrics API (metrics-server) and, for a ratio, a finite limit on every container.", false}
+	case errors.Is(err, errUnknownCluster):
+		return OperationFailure{"UnknownCluster", "No cluster of this installation has this name. Use local for the hub's own cluster or a configured clusters[].name.", false}
+	case errors.Is(err, app.ErrPolicyDelegation):
+		return OperationFailure{"DelegationRequired", "No sole automation AccessBinding covers this workload for one of your groups, or its envelope does not allow pod-status snapshots. Ask a permission administrator to add spec.automation to the team's AccessBinding.", false}
+	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
+		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	}
 	return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 }
@@ -249,6 +255,9 @@ func (s *PolicyOperations) Call(ctx context.Context, current identities.CurrentI
 func (s *PolicyOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil || ctx == nil || current == nil {
 		return OperationReply{}, value.ErrUnavailable
+	}
+	if !slices.Contains(s.ToolNames(), name) {
+		return OperationReply{}, contracts.ErrInvestigationWire
 	}
 	if err := s.contracts.ValidateInput(name, raw); err != nil {
 		return OperationReply{}, err
@@ -268,8 +277,9 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 	until := i.ValidUntil
 	var operationErr error
 	noDispatch := false
-	switch name {
-	case "activate_policy":
+	clusterID, known := s.clusters.ID(in.Cluster)
+	switch {
+	case name == "activate_policy":
 		if !slices.Contains(i.Scopes, "evidence:capture") {
 			noDispatch, operationErr = true, value.ErrDenied
 			break
@@ -298,32 +308,39 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			}
 			out.Data = data
 		}
-	case "deactivate_policy":
+	case !known:
+		noDispatch, operationErr = true, errUnknownCluster
+	case name == "deactivate_policy":
 		if !slices.Contains(i.Scopes, "evidence:capture") {
 			noDispatch, operationErr = true, value.ErrDenied
 			break
 		}
 		var r app.PolicyDeactivationResult
-		r, operationErr = s.stop.Deactivate(ctx, current, in.PolicyName)
+		r, operationErr = s.stop.Deactivate(ctx, current, clusterID, in.Namespace, in.PolicyName)
 		if operationErr == nil {
-			out.Data = policyDeactivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: "deactivated", Replay: r.Replay}
+			out.Data = policyDeactivationData{PolicyName: in.PolicyName, Namespace: in.Namespace, PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: "deactivated", Replay: r.Replay}
 		}
-	case "get_policy_status":
+	default:
 		var st value.PolicyStatus
 		var valid time.Time
-		st, valid, operationErr = s.status.Get(ctx, current, in.PolicyName)
+		st, valid, operationErr = s.status.Get(ctx, current, clusterID, in.Namespace, in.PolicyName)
 		if operationErr == nil {
 			until = identity.Earlier(until, valid)
 			acceptance := st.ActiveID
 			if acceptance == "" {
 				acceptance = st.DeactivatedID
 			}
-			data := policyStatusData{MaxGrantStarts: st.MaxGrantStarts, AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, MaxObservedEvents: st.MaxObservedEvents, ObservedEventsSpent: st.ObservedEventsSpent, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			data := policyStatusData{PolicyName: in.PolicyName, Namespace: in.Namespace, AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
 			data.CollectionKind = "podStatus"
 			for _, kind := range []string{"packetCapture", "syscallTrace", "profile", "logs"} {
 				if slices.Contains(st.Authority.Actions, kind) {
 					data.CollectionKind = kind
 				}
+			}
+			if data.CollectionKind != "podStatus" {
+				// Only automatic intrusive actions have a policy grant end.
+				end := st.NotAfter.UTC()
+				data.ExpiresAt = &end
 			}
 			for _, o := range st.Recent {
 				outcome := o.Outcome
@@ -363,8 +380,6 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			}
 			out.Data = data
 		}
-	default:
-		return OperationReply{}, contracts.ErrInvestigationWire
 	}
 	if operationErr != nil {
 		out.Status, out.Data = "error", publicPolicyFailure(operationErr)
@@ -389,15 +404,11 @@ func policyState(st value.PolicyStatus, now time.Time) string {
 	switch {
 	case st.Deleted:
 		return "deleted"
-	case st.ActiveID == "" && st.Generation != st.AcceptedGeneration:
-		// Deactivated, but the DebugPolicy has a new revision to activate.
-		return "changed"
-	case st.ActiveID == "":
-		return "deactivated"
 	case st.Suspended:
 		return "suspended"
-	case st.AcceptedIntentVersion != st.IntentVersion:
-		return "changed"
+	case st.ActiveID == "", st.AcceptedIntentVersion != st.IntentVersion:
+		// A new generation stops admissions for the old acceptance.
+		return "deactivated"
 	case !now.Before(st.NotAfter):
 		return "expired"
 	}

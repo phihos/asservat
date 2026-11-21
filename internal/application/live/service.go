@@ -121,7 +121,24 @@ type session struct {
 	gap        []v.Gap
 	reading    bool
 	updates    map[string]updateReceipt
+	// changed is closed when an update or end changes the view; a paused
+	// read waits on it instead of returning at once.
+	changed chan struct{}
 }
+
+func (st *session) signal() {
+	if st.changed != nil {
+		close(st.changed)
+		st.changed = nil
+	}
+}
+func (st *session) changes() <-chan struct{} {
+	if st.changed == nil {
+		st.changed = make(chan struct{})
+	}
+	return st.changed
+}
+
 type updateReceipt struct {
 	digest [32]byte
 	watch  v.Watch
@@ -160,8 +177,8 @@ func (s *Service) actor(ctx context.Context, current CurrentIdentity) (identity.
 	slices.Sort(i.Scopes)
 	return i, nil
 }
-func (s *Service) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) (v.SourcePage, string, error) {
-	var zero v.SourcePage
+func (s *Service) List(ctx context.Context, current CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) ([]v.Listed, string, error) {
+	var zero []v.Listed
 	i, err := s.actor(ctx, current)
 	if err != nil {
 		return zero, "", err
@@ -188,7 +205,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 	if err != nil || !sameLiveIdentity(i, final) {
 		return zero, "", fmt.Errorf("%w: service:168", v.ErrDenied)
 	}
-	out := v.SourcePage{Sources: make([]v.SourceRow, 0, len(sources))}
+	out := make([]v.Listed, 0, len(sources))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.cfg.Now()
@@ -209,7 +226,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 		if e != nil {
 			return zero, "", e
 		}
-		out.Sources = append(out.Sources, v.SourceRow{Handle: id, ID: source.ID(), WorkloadUID: source.Target.WorkloadUID, PodUID: source.Target.PodUID, ActionID: source.Action(), OwnerKind: source.OwnerKind, OwnerID: source.OwnerID, State: source.State, Projections: append([]string{}, source.Projections...), Eligible: eligible, Blockers: blockers, SaveVia: source.SaveVia, LeaseUntil: source.LeaseUntil})
+		out = append(out, v.Listed{Handle: id, Source: source.Clone(), Live: eligible, Blockers: blockers})
 	}
 	return out, next, nil
 }
@@ -549,6 +566,36 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		}
 		return zero, err
 	}
+	if r.Cursor == v.HeadCursor {
+		// The head read discloses no rows: it returns the current cursor, the
+		// state and the spend so far, for a stream that starts or resyncs.
+		now := s.cfg.Now()
+		b := v.Batch{DisclosureUntil: end, WatchID: st.watch.ID, Revision: st.watch.Revision, ID: s.cfg.NewID(), State: st.watch.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: []v.Gap{}, From: now, Until: now, ReceivedAt: now, Spent: st.control.Spent, Handling: v.Notices()}
+		if st.watch.Cursor != nil && !v.Terminal(st.watch.State) {
+			b.Cursor = *st.watch.Cursor
+		}
+		return b, nil
+	}
+	if st.watch.State == "Paused" && r.WaitMS > 0 && st.watch.Cursor != nil && r.Cursor == *st.watch.Cursor {
+		// A paused view has nothing to read until an update or its end.
+		changed := st.changes()
+		wait := min(time.Duration(r.WaitMS)*time.Millisecond, max(0, end.Sub(s.cfg.Now())-liveReplyMarginMS*time.Millisecond))
+		st.mu.Unlock()
+		timer := time.NewTimer(wait)
+		select {
+		case <-changed:
+		case <-timer.C:
+		case <-ctx.Done():
+		}
+		timer.Stop()
+		st.mu.Lock()
+		if end, err = s.current(ctx, current, st, i); err != nil {
+			if !errors.Is(err, v.ErrTransient) {
+				s.clear(st, "AccessLost")
+			}
+			return zero, err
+		}
+	}
 	now := s.cfg.Now()
 	for c, p := range st.replay {
 		if !now.Before(p.until) {
@@ -879,6 +926,7 @@ func (s *Service) clear(st *session, state string) {
 	clear(st.replay)
 	st.paid = nil
 	st.gap = nil
+	st.signal()
 	if v.Terminal(state) && !st.reading {
 		s.eraseDetails(st)
 	}
@@ -992,6 +1040,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 	}
 	st.updates[r.Key] = updateReceipt{digest, cloneWatch(st.watch)}
 	s.armLocked(st)
+	st.signal()
 	return cloneWatch(st.watch), nil
 }
 

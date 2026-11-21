@@ -33,7 +33,12 @@ WITH scanned AS MATERIALIZED (
     AND r.cluster_id=p.cluster_id AND r.namespace_uid=p.namespace_uid AND r.workload_uid=p.workload_uid AND r.pod_uid=p.pod_uid
   JOIN custody_attempt a ON a.id=p.attempt_id AND a.artifact_id=p.artifact_id AND a.cluster_id=p.cluster_id
   WHERE $1::uuid IS NULL AND p.root_id=$2::uuid
-    AND p.cluster_id=$6::uuid AND p.namespace_uid=$7::text AND p.workload_uid=$8::text
+    AND p.cluster_id=$6::uuid
+    -- ADR-335 D4: the namespace by its recorded name, the workload by the
+    -- kind/name recorded for its UID, so a recreated workload matches too.
+    AND EXISTS(SELECT 1 FROM workload_name w WHERE w.cluster_id=p.cluster_id AND w.workload_uid=p.workload_uid AND split_part(w.ref,'/',2)=$7::text)
+    AND EXISTS(SELECT 1 FROM context_capture n WHERE n.root_id=p.root_id AND n.id=p.capture_id
+     AND convert_from(n.expectation_json,'UTF8')::jsonb->>'Namespace'=$8::text)
     AND p.anchor_at>=$9::timestamptz AND p.anchor_at<$10::timestamptz
     AND (p.anchor_at,p.artifact_id)>($9::timestamptz,$3::uuid)
     AND p.retire_by>$4::timestamptz AND a.state<>'deleted'
@@ -62,8 +67,8 @@ type ScanProcessingDiscoveryParams struct {
 	ObservedAt      pgtype.Timestamptz
 	ScanLimit       int32
 	ClusterID       pgtype.UUID
-	NamespaceUid    string
-	WorkloadUid     string
+	Workload        string
+	Namespace       string
 	AfterAnchorAt   pgtype.Timestamptz
 	AcquiredUntil   pgtype.Timestamptz
 }
@@ -102,8 +107,8 @@ func (q *Queries) ScanProcessingDiscovery(ctx context.Context, arg ScanProcessin
 		arg.ObservedAt,
 		arg.ScanLimit,
 		arg.ClusterID,
-		arg.NamespaceUid,
-		arg.WorkloadUid,
+		arg.Workload,
+		arg.Namespace,
 		arg.AfterAnchorAt,
 		arg.AcquiredUntil,
 	)

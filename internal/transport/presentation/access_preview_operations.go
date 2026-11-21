@@ -151,13 +151,9 @@ type accessPreviewData struct {
 
 var previewOperationNames = map[authorization.Operation]string{authorization.CollectContext: "capture", authorization.ReadApproved: "read", authorization.DownloadApproved: "download"}
 
-// The whole listed result (every page's rows) stays within REQ-PER-002's
-// 256 KiB result bound; each page stays inside the shared operation reply
-// limit with room for the envelope and the summary fields.
-const (
-	previewResultBudget = 256<<10 - 8<<10
-	previewPageBudget   = contracts.InvestigationOutputLimit - 6<<10
-)
+// A page ends at the shared reply size target (REQ-MCP-002), leaving room
+// for the envelope and the summary fields.
+const previewPageBudget = contracts.InvestigationOutputLimit - 6<<10
 
 func previewCell(t authorization.Target) previewCellData {
 	return previewCellData{ClusterID: t.ClusterID, NamespaceUID: t.NamespaceUID, WorkloadUID: t.WorkloadUID, OtherWorkloads: t.WorkloadUID == cfg.OtherWorkloads}
@@ -166,16 +162,13 @@ func previewCell(t authorization.Target) previewCellData {
 func previewBasis(rows []cfg.PreviewAssignment) []previewBasisData {
 	out := []previewBasisData{}
 	for _, r := range rows {
-		if len(out) == 8 {
-			break
-		}
 		a := r.Assignment
 		out = append(out, previewBasisData{r.Effect, a.Role, a.Kind, a.BasisKind, a.BasisUID, hex.EncodeToString(a.BasisDigest[:]), r.Proposed})
 	}
 	return out
 }
 
-func previewMessage(p cfg.AccessPreview, listed int) string {
+func previewMessage(p cfg.AccessPreview) string {
 	switch {
 	case len(p.NotEvaluated) > 0:
 		return "Some PermissionSource creations or edits are Indeterminate: the accepted namespace observation is unavailable (MetadataUnavailable) or does not record the source's selector or mapping keys yet (MetadataNotObserved; apply the source with enabled: false first, then preview enabling it), or the source is a kubernetesExec/kubernetesAccessReview source that is reviewed per user and Pod at request time (DecisionTimeSource; use explain_access after applying it). An edited source's current assignments stay in effect in the after state of every listed decision. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
@@ -183,8 +176,6 @@ func previewMessage(p cfg.AccessPreview, listed int) string {
 		return "Some targets could not be evaluated and are listed as Indeterminate; their access after the change is unknown. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	case p.DeltasTotal == 0:
 		return "No listed subject's Allow, Deny or Indeterminate decision would change on these targets. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
-	case p.DeltasTotal+len(p.Unavailable) > listed:
-		return "The result is limited to 256 KiB: only the first listed_rows rows are listed, and deltas_total counts every change. Preview fewer objects to see all of them. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	}
 	return "The listed decisions would change once the proposed objects are applied and accepted. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 }
@@ -193,8 +184,6 @@ func previewFailure(err error) OperationFailure {
 	switch {
 	case errors.Is(err, errPreviewChanged):
 		return OperationFailure{"PreviewChanged", "The permission data or the proposal changed since the first page. Preview again from the start.", true}
-	case errors.Is(err, cfg.ErrLimit):
-		return OperationFailure{"PreviewTooLarge", "The proposal exceeds the preview bounds: at most 16 objects and 1,000 workload targets. Preview fewer objects or narrower scopes.", false}
 	case errors.Is(err, cfg.ErrInvalid):
 		return OperationFailure{"InvalidProposal", "A proposed object is not a valid change. Create and update need a complete AccessBinding or PermissionSource spec (an AccessBinding also its cluster and namespace), update and delete the existing object's UID, and each object may appear once.", false}
 	case errors.Is(err, identity.ErrDenied):
@@ -315,23 +304,18 @@ func previewPage(i identity.Identity, in AccessPreviewInput, p cfg.AccessPreview
 		rows = append(rows, row)
 	}
 	sizes := make([]int, 0, len(rows))
-	total := 0
 	for _, r := range rows {
 		b, err := json.Marshal(r)
 		if err != nil {
 			return accessPreviewData{}, nil, value.ErrUnavailable
 		}
-		if total+len(b)+1 > previewResultBudget {
-			break
-		}
-		total += len(b) + 1
 		sizes = append(sizes, len(b)+1)
 	}
 	listed := len(sizes)
 	if offset > listed || offset > 0 && offset == listed {
 		return accessPreviewData{}, nil, errPreviewChanged
 	}
-	data := accessPreviewData{Complete: p.Complete(), Message: previewMessage(p, listed), TargetsEvaluated: p.Targets, DeltasTotal: p.DeltasTotal, UnavailableTotal: len(p.Unavailable),
+	data := accessPreviewData{Complete: p.Complete(), Message: previewMessage(p), TargetsEvaluated: p.Targets, DeltasTotal: p.DeltasTotal, UnavailableTotal: len(p.Unavailable),
 		ListedRows: listed, PageOffset: offset, Unavailable: []previewUnavailableData{}, Deltas: []previewDeltaData{}, NotEvaluated: []previewSourceData{}, Unmatched: []previewObjectData{}}
 	if !p.FreshUntil.IsZero() {
 		v := p.FreshUntil.UTC()

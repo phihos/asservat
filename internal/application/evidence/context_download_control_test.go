@@ -69,6 +69,13 @@ func (f *downloadControlFixture) ReserveDownload(_ context.Context, r DownloadRe
 	}
 	return f.session, f.step("reserve")
 }
+func (f *downloadControlFixture) RecordDownloadNativeFacts(_ context.Context, id string, size int64, sha artifact.Digest) error {
+	if id != f.session.ID {
+		return artifact.ErrDownloadUnavailable
+	}
+	f.session.NativeSize, f.session.NativeSHA256 = size, sha
+	return nil
+}
 func (f *downloadControlFixture) ObserveDownload(_ context.Context, id string, a artifact.DownloadAuthority, p *artifact.DownloadPreparation) (artifact.DownloadObservation, error) {
 	if id != f.session.ID || a.Scope != f.session.Scope {
 		return artifact.DownloadObservation{}, artifact.ErrDownloadUnavailable
