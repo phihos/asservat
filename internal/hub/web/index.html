@@ -459,6 +459,7 @@ async function loadWatches() {
 const marks = {Waiting: ['○', 'waits'], Running: ['●', 'runs'], Completed: ['✓', 'done'], Failed: ['✗', 'failed']};
 function progressOf(c) {
   if (c.state !== 'Running') return '';
+  if (c.stoppedAt) return '<div class="progress"><div class="muted">stopping: the recordings finish with what they have</div></div>';
   // The countdown runs in the browser from what the hub said was left.
   if (c.remainingSeconds == null) return '<div class="progress"><div class="muted">working…</div></div>';
   return `<div class="progress" data-ends="${Date.now() + c.remainingSeconds * 1000}" data-total="${c.durationSeconds}"><div class="track"><div class="bar"></div></div><div class="muted left"></div></div>`;
@@ -485,6 +486,7 @@ async function loadCaptures() {
       `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('');
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
     const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start') + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
+      : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Abandon it and delete what it recorded')
       : c.state === 'Running' ? button('stop', 'Stop and keep', 'End the recordings now and keep what they have recorded', true) + button('delete', 'Delete', 'Abandon it and delete what it recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
     const waiting = c.state === 'Running' && !c.artifacts.length ? '<div class="muted">Files appear here as each recording ends.</div>' : '';

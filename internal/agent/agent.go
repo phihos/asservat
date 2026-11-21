@@ -227,6 +227,9 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	frame, stop := context.WithCancel(ctx)
+	if t.Stopped {
+		stop() // stopped while this agent was away: nothing runs over time
+	}
 	a.running[key] = task{cancel, stop}
 	a.mu.Unlock()
 	go func() {

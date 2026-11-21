@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS artifacts (
   PRIMARY KEY (capture_id, name)
 );
 
+ALTER TABLE captures ADD COLUMN IF NOT EXISTS stopped_at timestamptz;
+
 -- The progress of each recording of the task, as the agent reports it.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recordings jsonb NOT NULL DEFAULT '[]';
 

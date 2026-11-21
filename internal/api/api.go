@@ -244,6 +244,9 @@ type Capture struct {
 	CreatedAt  time.Time  `json:"createdAt"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	ExpiresAt  time.Time  `json:"expiresAt"`
+	// StoppedAt is when a user stopped the capture; its recordings then
+	// finish with what they have.
+	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
 	// RemainingSeconds is how much of the time frame the running
 	// recordings still have, when the capture was read; absent when
 	// nothing runs over time.
@@ -470,6 +473,9 @@ type TaskAssignment struct {
 	// Started marks a task that the hub knows as running, sent again when
 	// the node's agent reconnects. An agent that does not run it lost it.
 	Started bool `json:"started,omitempty"`
+	// Stopped marks a task of a capture that a user stopped before the
+	// agent received it: its time frame has ended.
+	Stopped bool `json:"stopped,omitempty"`
 }
 
 // TaskStatus is an agent's report about its task.

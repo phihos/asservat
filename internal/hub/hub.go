@@ -614,12 +614,19 @@ func (h *Hub) stopCapture(w http.ResponseWriter, r *http.Request, u User) error 
 	if err != nil {
 		return err
 	}
-	if c.State != api.StateRunning {
+	// The stop is recorded first: an agent that is away, or receives its
+	// task only later, learns it with the task.
+	stopped, err := h.Store.Stop(r.Context(), c.ID)
+	if err != nil {
+		return err
+	}
+	if !stopped {
 		return errStatus{http.StatusConflict, "the capture is not running"}
 	}
 	for _, t := range c.Tasks {
 		h.agents.send(c.Cluster, t.Node, api.Command{Type: "stop", ID: c.ID})
 	}
+	h.notify(c.ID)
 	return h.Store.Audit(r.Context(), u.Name, "capture.stop", c.ID, nil)
 }
 

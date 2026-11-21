@@ -346,6 +346,13 @@ func TestOwnApprovalProgressAndStop(t *testing.T) {
 	if c := next("stop"); c.ID != mine.ID {
 		t.Fatal("the agent was told to stop", c)
 	}
+	// An agent that connects now learns with its task that the capture was stopped.
+	if open, err := store.OpenTasks(t.Context(), cluster, "node-a"); err != nil || len(open) != 1 || !open[0].Task.Stopped || !open[0].Task.Started {
+		t.Fatal("open task of a stopped capture", open, err)
+	}
+	if got := f.capture("root-token", mine.ID); got.StoppedAt == nil {
+		t.Fatal("the capture does not show that it was stopped")
+	}
 	// The agent ends the packet capture and completes the task: the capture
 	// is complete with what it has, and nothing remains of the time frame.
 	waiting[1].State, waiting[1].Message = api.StateCompleted, "stopped early"
