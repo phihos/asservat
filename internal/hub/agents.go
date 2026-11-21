@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -25,7 +26,7 @@ var errNoAgent = errors.New("no agent of this cluster is connected")
 type agents struct {
 	mu      sync.Mutex
 	streams map[string]map[string]chan api.Command // cluster -> node -> stream
-	replies map[string]chan api.Reply              // query ID -> waiting caller
+	replies map[string]chan api.Reply              // cluster + query ID -> waiting caller
 }
 
 func newAgents() *agents {
@@ -76,7 +77,8 @@ func (a *agents) nodes(cluster string) []string {
 }
 
 // send pushes a command to one node's agent and reports whether it is
-// connected.
+// connected. A stream that does not drain is closed: its agent reconnects
+// and learns the node's open tasks from the sync.
 func (a *agents) send(cluster, node string, c api.Command) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -88,6 +90,8 @@ func (a *agents) send(cluster, node string, c api.Command) bool {
 	case ch <- c:
 		return true
 	default:
+		close(ch)
+		delete(a.streams[cluster], node)
 		return false
 	}
 }
@@ -98,11 +102,11 @@ func (a *agents) query(ctx context.Context, cluster string, q api.Query) (api.Re
 	id := uuid.NewString()
 	wait := make(chan api.Reply, 1)
 	a.mu.Lock()
-	a.replies[id] = wait
+	a.replies[cluster+"/"+id] = wait
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
-		delete(a.replies, id)
+		delete(a.replies, cluster+"/"+id)
 		a.mu.Unlock()
 	}()
 	sent := false
@@ -125,10 +129,11 @@ func (a *agents) query(ctx context.Context, cluster string, q api.Query) (api.Re
 	}
 }
 
-func (a *agents) answer(id string, r api.Reply) {
+// answer delivers a reply from an agent of the cluster that was asked.
+func (a *agents) answer(cluster, id string, r api.Reply) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if ch := a.replies[id]; ch != nil {
+	if ch := a.replies[cluster+"/"+id]; ch != nil {
 		select {
 		case ch <- r:
 		default:
@@ -137,27 +142,26 @@ func (a *agents) answer(id string, r api.Reply) {
 }
 
 // agentStream is a node agent's long-lived connection: the hub writes one
-// JSON command per line. On connect the agent receives the node's open
-// tasks: those approved while it was away, and those it had started.
+// JSON command per line. The first is a sync with the node's open tasks:
+// those approved while the agent was away and those it had started.
 func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string) error {
 	node := r.URL.Query().Get("node")
 	if node == "" {
 		return errStatus{http.StatusBadRequest, "node is required"}
 	}
-	queued, err := h.Store.OpenTasks(r.Context(), cluster, node)
+	// Register first, so that a task dispatched from now on is not missed;
+	// one that is also in the sync is started once by the agent.
+	ch := h.agents.connect(cluster, node)
+	defer h.agents.disconnect(cluster, node, ch)
+	open, err := h.Store.OpenTasks(r.Context(), cluster, node)
 	if err != nil {
 		return err
 	}
-	ch := h.agents.connect(cluster, node)
-	defer h.agents.disconnect(cluster, node, ch)
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	rc := http.NewResponseController(w)
 	enc := json.NewEncoder(w)
-	rc.Flush()
-	for _, c := range queued {
-		if enc.Encode(c) != nil {
-			return nil
-		}
+	if enc.Encode(api.Command{Type: "sync", Tasks: open}) != nil {
+		return nil
 	}
 	rc.Flush()
 	for {
@@ -173,12 +177,12 @@ func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string
 	}
 }
 
-func (h *Hub) agentReply(w http.ResponseWriter, r *http.Request, _ string) error {
+func (h *Hub) agentReply(w http.ResponseWriter, r *http.Request, cluster string) error {
 	var in api.Reply
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		return errStatus{http.StatusBadRequest, "invalid JSON"}
 	}
-	h.agents.answer(r.PathValue("id"), in)
+	h.agents.answer(cluster, r.PathValue("id"), in)
 	return nil
 }
 
@@ -220,6 +224,11 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 	if c.State != api.StateQueued && c.State != api.StateRunning {
 		return errStatus{http.StatusConflict, "the capture has ended"}
 	}
+	// A file is "<pod>/<file>" of one of the capture's pods.
+	pod, file, _ := strings.Cut(r.PathValue("name"), "/")
+	if file == "" || strings.Contains(file, "/") || !slices.ContainsFunc(c.Tasks, func(t api.Task) bool { return t.Pod == pod }) {
+		return errStatus{http.StatusBadRequest, "the file name must be <pod>/<file> of a pod of the capture"}
+	}
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return err
@@ -245,8 +254,13 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 		return fmt.Errorf("store artifact: %w", err)
 	}
 	a := storedArtifact{Artifact: api.Artifact{Name: r.PathValue("name"), Size: body.n, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped}
-	if err := h.Store.AddArtifact(r.Context(), c.ID, a); err != nil {
+	added, err := h.Store.AddArtifact(r.Context(), c.ID, a)
+	if err != nil || !added {
+		// The capture ended or was deleted while the file streamed.
 		h.Blobs.Delete(context.WithoutCancel(r.Context()), blob)
+		if err == nil {
+			err = errStatus{http.StatusConflict, "the capture has ended"}
+		}
 		return err
 	}
 	h.notify(c.ID)

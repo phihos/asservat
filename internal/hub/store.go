@@ -244,9 +244,12 @@ type storedArtifact struct {
 	Key  []byte
 }
 
-func (s *Store) AddArtifact(ctx context.Context, capture string, a storedArtifact) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key) VALUES ($1::uuid,$2,$3,$4,$5,$6)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key)
-	return err
+// AddArtifact records a stored file of a capture that is still open. It
+// reports false when the capture has ended or is gone.
+func (s *Store) AddArtifact(ctx context.Context, capture string, a storedArtifact) (bool, error) {
+	tag, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key)
+ SELECT id, $2, $3, $4, $5, $6 FROM captures WHERE id = $1::uuid AND state IN ('Queued','Running') FOR SHARE`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key)
+	return tag.RowsAffected() == 1, err
 }
 
 func (s *Store) Artifact(ctx context.Context, capture, name string) (storedArtifact, error) {
@@ -265,6 +268,11 @@ func (s *Store) DeleteCapture(ctx context.Context, id string) ([]string, error) 
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	// The row lock waits for uploads that are recording an artifact, so the
+	// list below is complete; later ones find no capture and delete their blob.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM captures WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
+		return nil, err
+	}
 	rows, err := tx.Query(ctx, `SELECT blob FROM artifacts WHERE capture_id = $1::uuid`, id)
 	if err != nil {
 		return nil, err

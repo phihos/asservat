@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,25 +104,47 @@ func (a *Agent) stream(ctx context.Context) error {
 		if err := json.Unmarshal(line, &c); err != nil {
 			return err
 		}
-		switch c.Type {
-		case "query":
-			go func() {
-				r := a.answer(ctx, *c.Query)
-				if err := a.post(ctx, "/agent/replies/"+c.ID, r); err != nil {
-					slog.Error("reply", "error", err)
-				}
-			}()
-		case "task":
-			a.start(ctx, c.ID, *c.Task)
-		case "cancel":
-			a.mu.Lock()
-			for key, cancel := range a.running {
-				if len(key) > len(c.ID) && key[:len(c.ID)] == c.ID {
-					cancel()
-				}
-			}
-			a.mu.Unlock()
+		a.handle(ctx, c)
+	}
+}
+
+// handle acts on one command of the hub.
+func (a *Agent) handle(ctx context.Context, c api.Command) {
+	switch c.Type {
+	case "sync":
+		// Stop what is no longer open (cancelled or deleted while the
+		// stream was down), then start what was missed.
+		open := map[string]bool{}
+		for _, t := range c.Tasks {
+			open[t.ID+"/"+t.Task.Pod] = true
 		}
+		a.mu.Lock()
+		for key, cancel := range a.running {
+			if !open[key] {
+				cancel()
+			}
+		}
+		a.mu.Unlock()
+		for _, t := range c.Tasks {
+			a.start(ctx, t.ID, *t.Task)
+		}
+	case "query":
+		go func() {
+			r := a.answer(ctx, *c.Query)
+			if err := a.post(ctx, "/agent/replies/"+c.ID, r); err != nil {
+				slog.Error("reply", "error", err)
+			}
+		}()
+	case "task":
+		a.start(ctx, c.ID, *c.Task)
+	case "cancel":
+		a.mu.Lock()
+		for key, cancel := range a.running {
+			if strings.HasPrefix(key, c.ID+"/") {
+				cancel()
+			}
+		}
+		a.mu.Unlock()
 	}
 }
 

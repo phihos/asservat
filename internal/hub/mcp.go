@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -117,8 +118,9 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			var buf bytes.Buffer
-			// Decryption stops with an error once the window is full.
-			decrypt(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key)
+			if err := decrypt(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key); err != nil && !errors.Is(err, errWindowFull) {
+				return nil, fmt.Errorf("read %s: %w", a.Name, err)
+			}
 			if bytes.IndexByte(buf.Bytes(), 0) >= 0 {
 				return nil, fmt.Errorf("%s is binary; download /api/captures/%s/artifacts/%s", a.Name, c.ID, a.Name)
 			}
@@ -146,10 +148,13 @@ func (s *window) Write(p []byte) (int, error) {
 	s.max -= int64(len(p))
 	s.w.Write(p)
 	if s.max == 0 {
-		return n, io.EOF
+		return n, errWindowFull
 	}
 	return n, nil
 }
+
+// errWindowFull ends the decryption once the requested bytes are read.
+var errWindowFull = errors.New("window full")
 
 func (h *Hub) mcp(w http.ResponseWriter, r *http.Request, u User) error {
 	var req struct {

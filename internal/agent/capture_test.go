@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/api"
 )
 
 func TestMainPID(t *testing.T) {
@@ -59,5 +61,23 @@ func TestRecord(t *testing.T) {
 	time.AfterFunc(100*time.Millisecond, cancel)
 	if err := a.record(ctx, time.Minute, "out", up, "sh", "-c", "exec sleep 30"); err == nil {
 		t.Fatal("a cancelled recording reported success")
+	}
+}
+
+// A sync stops the tasks that are no longer open and keeps the others.
+func TestSyncStopsTasksThatAreNoLongerOpen(t *testing.T) {
+	stopped := map[string]bool{}
+	a := &Agent{running: map[string]context.CancelFunc{}}
+	for _, key := range []string{"capture-1/pod-a", "capture-2/pod-a", "capture-2/pod-b"} {
+		a.running[key] = func() { stopped[key] = true }
+	}
+	a.handle(t.Context(), api.Command{Type: "sync", Tasks: []api.Command{{Type: "task", ID: "capture-2", Task: &api.TaskAssignment{Pod: "pod-a", Started: true}}}})
+	if !stopped["capture-1/pod-a"] || stopped["capture-2/pod-a"] || !stopped["capture-2/pod-b"] || len(stopped) != 2 {
+		t.Fatal("stopped", stopped)
+	}
+	stopped = map[string]bool{}
+	a.handle(t.Context(), api.Command{Type: "cancel", ID: "capture-2"})
+	if !stopped["capture-2/pod-a"] || !stopped["capture-2/pod-b"] || len(stopped) != 2 {
+		t.Fatal("cancelled", stopped)
 	}
 }

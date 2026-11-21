@@ -170,12 +170,16 @@ type Pod struct {
 
 // Command is a message from the hub to a node agent on its stream.
 type Command struct {
-	// Type is "query", "task" or "cancel".
+	// Type is "sync", "query", "task" or "cancel".
 	Type string `json:"type"`
 	// ID is the query ID or the capture ID.
-	ID    string          `json:"id"`
+	ID    string          `json:"id,omitempty"`
 	Query *Query          `json:"query,omitempty"`
 	Task  *TaskAssignment `json:"task,omitempty"`
+	// Tasks of a sync are all open tasks of the agent's node. Sync is the
+	// first command of every stream: the agent starts the tasks it missed
+	// and stops those that are no longer open.
+	Tasks []Command `json:"tasks,omitempty"`
 }
 
 // Query asks one agent of a cluster for cluster-level information.

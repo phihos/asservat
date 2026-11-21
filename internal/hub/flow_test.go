@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -102,8 +103,9 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
+	blobDir := t.TempDir()
 	h, err := hub.New(hub.Config{
-		Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
+		Store: store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
@@ -135,7 +137,9 @@ func TestCaptureFlow(t *testing.T) {
 	elsewhere.Name, elsewhere.Spec.NodeName = "api-2", "node-b"
 	third := pod.DeepCopy()
 	third.Name, third.Spec.NodeName = "api-3", "node-c"
-	kube := fake.NewClientset(pod, elsewhere, third, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "payments"},
+	fourth := pod.DeepCopy()
+	fourth.Name, fourth.Spec.NodeName = "api-4", "node-d"
+	kube := fake.NewClientset(pod, elsewhere, third, fourth, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "payments"},
 		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}}})
 	// RBAC of the fake cluster: the payments group may exec in payments.
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -176,7 +180,7 @@ func TestCaptureFlow(t *testing.T) {
 	if code, _ := request("mallory-token", state); code != 403 {
 		t.Fatal("captured without the exec right", code)
 	}
-	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/workloads", nil); code != 200 || string(b) != `["Deployment/api","Pod/api-1","Pod/api-2","Pod/api-3"]`+"\n" {
+	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/workloads", nil); code != 200 || string(b) != `["Deployment/api","Pod/api-1","Pod/api-2","Pod/api-3","Pod/api-4"]`+"\n" {
 		t.Fatal("workloads", code, string(b))
 	}
 
@@ -280,6 +284,109 @@ func TestCaptureFlow(t *testing.T) {
 	go restarted.Run(ctx)
 	if got := f.wait("alice-token", running.ID, api.StateCompleted, api.StateFailed); got.State != api.StateFailed || !strings.Contains(got.Tasks[0].Message, "restarted") {
 		t.Fatal("task of a restarted agent", got.State, got.Tasks)
+	}
+
+	// Agent-side rules: files belong to a pod of the capture, replies to the
+	// asked cluster, and a connecting agent learns its node's open tasks.
+	agentCall := func(token, method, path string, body io.Reader) int {
+		req, _ := http.NewRequest(method, server.URL+path, body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	open := target
+	open.Kind, open.Pods = api.KindLogs, []string{"api-4"}
+	code, held := request("alice-token", open) // node-d has no agent: the task stays queued
+	if code != 201 {
+		t.Fatal(code, held)
+	}
+	for name, want := range map[string]int{"api-4/app.log": 200, "api-1/app.log": 400, "api-4/a/b": 400, "api-4": 400} {
+		if got := agentCall(joined.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/"+name, strings.NewReader("line\n")); got != want {
+			t.Errorf("upload %s: status %d, want %d", name, got, want)
+		}
+	}
+	_, b = f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster + "-other"})
+	var foreign struct{ Token string }
+	json.Unmarshal(b, &foreign)
+	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster+"-other", nil)
+	if got := agentCall(foreign.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/api-4/x.log", strings.NewReader("x")); got != 404 {
+		t.Error("another cluster's agent uploaded", got)
+	}
+	streamCtx, closeStream := context.WithCancel(t.Context())
+	req, _ := http.NewRequestWithContext(streamCtx, "GET", server.URL+"/agent/stream?node=node-d", nil)
+	req.Header.Set("Authorization", "Bearer "+joined.Token)
+	stream, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var first api.Command
+	if err := json.NewDecoder(stream.Body).Decode(&first); err != nil || first.Type != "sync" || len(first.Tasks) != 1 || first.Tasks[0].ID != held.ID || first.Tasks[0].Task.Pod != "api-4" {
+		t.Fatal("the stream does not start with the node's open tasks", first, err)
+	}
+	closeStream()
+	stream.Body.Close()
+
+	// A reply from another cluster's agent does not answer a cluster's query.
+	req, _ = http.NewRequestWithContext(t.Context(), "GET", server.URL+"/agent/stream?node=only", nil)
+	req.Header.Set("Authorization", "Bearer "+foreign.Token)
+	if stream, err = http.DefaultClient.Do(req); err != nil {
+		t.Fatal(err)
+	}
+	commands := json.NewDecoder(stream.Body)
+	if err := commands.Decode(&first); err != nil || first.Type != "sync" {
+		t.Fatal(first, err)
+	}
+	answered := make(chan int, 1)
+	go func() {
+		code, _ := f.call("mallory-token", "GET", "/api/clusters/"+cluster+"-other/namespaces/payments/workloads", nil)
+		answered <- code
+	}()
+	var query api.Command
+	if err := commands.Decode(&query); err != nil || query.Type != "query" || query.Query.Op != "review" || query.Query.User != "mallory" {
+		t.Fatal("review query", query, err)
+	}
+	agentCall(joined.Token, "POST", "/agent/replies/"+query.ID, strings.NewReader(`{"allowed":true}`))
+	select {
+	case code := <-answered:
+		t.Fatal("another cluster's agent answered the review", code)
+	case <-time.After(300 * time.Millisecond):
+	}
+	agentCall(foreign.Token, "POST", "/agent/replies/"+query.ID, strings.NewReader(`{"allowed":false}`))
+	if code := <-answered; code != 403 {
+		t.Fatal("review", code)
+	}
+	stream.Body.Close()
+
+	// After a cancellation the node's open tasks no longer include the task.
+	if code, _ := f.call("alice-token", "POST", "/api/captures/"+held.ID+"/cancel", nil); code != 200 {
+		t.Fatal("cancel", code)
+	}
+	if got := agentCall(joined.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/api-4/late.log", strings.NewReader("late")); got != 409 {
+		t.Error("upload into a cancelled capture", got)
+	}
+	req, _ = http.NewRequestWithContext(t.Context(), "GET", server.URL+"/agent/stream?node=node-d", nil)
+	req.Header.Set("Authorization", "Bearer "+joined.Token)
+	if stream, err = http.DefaultClient.Do(req); err != nil {
+		t.Fatal(err)
+	}
+	first = api.Command{}
+	if err := json.NewDecoder(stream.Body).Decode(&first); err != nil || first.Type != "sync" || len(first.Tasks) != 0 {
+		t.Fatal("a cancelled task is still open", first, err)
+	}
+	stream.Body.Close()
+
+	// A corrupt stored file is an error for MCP, not partial text.
+	if err := corrupt(blobDir); err != nil {
+		t.Fatal(err)
+	}
+	code, b = f.call("alice-token", "POST", "/mcp", map[string]any{"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+		"params": map[string]any{"name": "read_artifact", "arguments": map[string]any{"id": c.ID, "name": "api-1/pod.json"}}})
+	if code != 200 || !strings.Contains(string(b), `"isError":true`) {
+		t.Fatal("mcp read of a corrupt file", code, string(b))
 	}
 
 	// Cancel, delete and the audit trail.
@@ -386,4 +493,24 @@ func TestConcurrentTasksCompleteTheCapture(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+// corrupt flips the last byte of every stored blob.
+func corrupt(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		name := filepath.Join(dir, e.Name())
+		b, err := os.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		b[len(b)-1] ^= 1
+		if err := os.WriteFile(name, b, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
 }

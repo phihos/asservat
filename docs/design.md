@@ -27,9 +27,10 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
    pod's node.
 3. A sensitive capture waits in `PendingApproval` until an administrator
    approves or denies it. Any other capture is `Queued` at once.
-4. The hub pushes each task over the node agent's stream. An agent that is not
-   connected receives its queued tasks when it connects. A task that was
-   running when its agent restarted is reported as failed then.
+4. The hub pushes each task over the node agent's stream. Every stream starts
+   with the node's open tasks: the agent starts those it missed, stops those
+   that were cancelled or deleted meanwhile, and reports a task as failed
+   that was running when the agent restarted.
 5. The agent records, streams the files to the hub and reports the task as
    `Completed` or `Failed`. The capture is `Completed` if at least one pod
    succeeded.
@@ -75,8 +76,9 @@ cgroup whose parent is outside of it.
   administrator out of the Asservat namespaces. Whoever can write there, and
   any cluster administrator, is trusted.
 - **Agents** authenticate with their cluster's join token; the hub stores only
-  its SHA-256. A token can upload evidence and report status for captures of
-  its own cluster and nothing else. Use HTTPS between clusters.
+  its SHA-256. A token can upload files for the pods of open captures of its
+  own cluster, report their status and answer queries about that cluster,
+  and nothing else. Use HTTPS between clusters.
 - **Evidence at rest** is encrypted by the hub: AES-256-GCM in 64 KiB chunks
   with a random key per file, wrapped by the master key from the hub's Secret.
   Losing the master key loses the evidence.
