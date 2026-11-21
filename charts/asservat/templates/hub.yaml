@@ -161,6 +161,9 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-hub
   labels: {{- include "asservat.labels" . | nindent 4 }}
+  {{- with .Values.hub.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- with .Values.hub.ingress.className }}
   ingressClassName: {{ . }}
