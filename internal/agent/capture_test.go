@@ -48,28 +48,37 @@ func TestRecord(t *testing.T) {
 	var got bytes.Buffer
 	up := func(_ string, r io.Reader) error { _, err := io.Copy(&got, r); return err }
 	started := time.Now()
-	if err := a.record(t.Context(), 300*time.Millisecond, "out", up, "sh", "-c", "echo recorded; exec sleep 30"); err != nil {
+	if err := a.record(t.Context(), t.Context(), 300*time.Millisecond, "out", up, "sh", "-c", "echo recorded; exec sleep 30"); err != nil {
 		t.Fatal(err)
 	}
 	if got.String() != "recorded\n" || time.Since(started) > 5*time.Second {
 		t.Fatal("recording", got.String(), time.Since(started))
 	}
-	if err := a.record(t.Context(), time.Minute, "out", up, "sh", "-c", "echo broken filter >&2; exit 1"); err == nil || !strings.Contains(err.Error(), "broken filter") {
+	if err := a.record(t.Context(), t.Context(), time.Minute, "out", up, "sh", "-c", "echo broken filter >&2; exit 1"); err == nil || !strings.Contains(err.Error(), "broken filter") {
 		t.Fatal("tool failure", err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
-	if err := a.record(ctx, time.Minute, "out", up, "sh", "-c", "exec sleep 30"); err == nil {
+	if err := a.record(ctx, ctx, time.Minute, "out", up, "sh", "-c", "exec sleep 30"); err == nil {
 		t.Fatal("a cancelled recording reported success")
+	}
+	// Stopping ends the time frame: the recording keeps what it has.
+	frame, stop := context.WithCancel(t.Context())
+	time.AfterFunc(300*time.Millisecond, stop)
+	got.Reset()
+	started = time.Now()
+	if err := a.record(t.Context(), frame, time.Minute, "out", up, "sh", "-c", "echo recorded so far; exec sleep 30"); err != nil || got.String() != "recorded so far\n" || time.Since(started) > 5*time.Second {
+		t.Fatal("a stopped recording", err, got.String(), time.Since(started))
 	}
 }
 
 // A sync stops the tasks that are no longer open and keeps the others.
 func TestSyncStopsTasksThatAreNoLongerOpen(t *testing.T) {
 	stopped := map[string]bool{}
-	a := &Agent{running: map[string]context.CancelFunc{}}
+	ended := map[string]bool{}
+	a := &Agent{running: map[string]task{}}
 	for _, key := range []string{"capture-1/pod-a", "capture-2/pod-a", "capture-2/pod-b"} {
-		a.running[key] = func() { stopped[key] = true }
+		a.running[key] = task{cancel: func() { stopped[key] = true }, stop: func() { ended[key] = true }}
 	}
 	a.handle(t.Context(), api.Command{Type: "sync", Tasks: []api.Command{{Type: "task", ID: "capture-2", Task: &api.TaskAssignment{Pod: "pod-a", Started: true}}}})
 	if !stopped["capture-1/pod-a"] || stopped["capture-2/pod-a"] || !stopped["capture-2/pod-b"] || len(stopped) != 2 {
@@ -77,7 +86,13 @@ func TestSyncStopsTasksThatAreNoLongerOpen(t *testing.T) {
 	}
 	stopped = map[string]bool{}
 	a.handle(t.Context(), api.Command{Type: "cancel", ID: "capture-2"})
-	if !stopped["capture-2/pod-a"] || !stopped["capture-2/pod-b"] || len(stopped) != 2 {
-		t.Fatal("cancelled", stopped)
+	if !stopped["capture-2/pod-a"] || !stopped["capture-2/pod-b"] || len(stopped) != 2 || len(ended) != 0 {
+		t.Fatal("cancelled", stopped, ended)
+	}
+	// A stop ends the time frame of the capture's tasks without cancelling them.
+	stopped = map[string]bool{}
+	a.handle(t.Context(), api.Command{Type: "stop", ID: "capture-1"})
+	if !ended["capture-1/pod-a"] || len(ended) != 1 || len(stopped) != 0 {
+		t.Fatal("stopped", ended, stopped)
 	}
 }

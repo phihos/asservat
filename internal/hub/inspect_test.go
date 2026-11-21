@@ -85,41 +85,10 @@ func TestInspection(t *testing.T) {
 		}
 		return api.Reply{Error: "unexpected query " + q.Op}
 	}
-	req, _ := http.NewRequestWithContext(t.Context(), "GET", server.URL+"/agent/stream?node=node-a", nil)
-	req.Header.Set("Authorization", "Bearer "+joined.Token)
-	stream, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stream.Body.Close()
-	go func() {
-		lines := bufio.NewReader(stream.Body)
-		for {
-			line, err := lines.ReadBytes('\n')
-			if err != nil {
-				return
-			}
-			var c api.Command
-			if json.Unmarshal(line, &c) != nil || c.Type != "query" {
-				continue
-			}
-			asked <- *c.Query
-			body, _ := json.Marshal(answer(*c.Query))
-			reply, _ := http.NewRequest("POST", server.URL+"/agent/replies/"+c.ID, bytes.NewReader(body))
-			reply.Header.Set("Authorization", "Bearer "+joined.Token)
-			if res, err := http.DefaultClient.Do(reply); err == nil {
-				res.Body.Close()
-			}
-		}
-	}()
-	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
-		if _, b := f.call("alice-token", "GET", "/api/clusters", nil); strings.Contains(string(b), `"node-a"`) {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the agent did not connect")
-		}
-	}
+	scriptedAgent(t, f, joined.Token, "node-a", func(q api.Query) api.Reply {
+		asked <- q
+		return answer(q)
+	})
 	base := "/api/clusters/" + cluster + "/namespaces/payments"
 	get := func(token, method, path string) (int, api.Inspection) {
 		t.Helper()
@@ -211,6 +180,191 @@ func TestInspection(t *testing.T) {
 	}
 	_, b = f.call("root-token", "GET", "/api/audit?limit=20", nil)
 	for _, action := range []string{"traffic.sample", "profile.discover"} {
+		if !strings.Contains(string(b), `"`+action+`"`) {
+			t.Error("the audit log lacks", action)
+		}
+	}
+}
+
+// scriptedAgent connects as a node's agent, answers the hub's queries with
+// answer and returns the other commands that the hub sends.
+func scriptedAgent(t *testing.T, f fixture, token, node string, answer func(api.Query) api.Reply) <-chan api.Command {
+	t.Helper()
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", f.url+"/agent/stream?node="+node, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	stream, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { stream.Body.Close() })
+	commands := make(chan api.Command, 16)
+	go func() {
+		lines := bufio.NewReader(stream.Body)
+		for {
+			line, err := lines.ReadBytes('\n')
+			if err != nil {
+				return
+			}
+			var c api.Command
+			if json.Unmarshal(line, &c) != nil {
+				continue
+			}
+			if c.Type != "query" {
+				commands <- c
+				continue
+			}
+			body, _ := json.Marshal(answer(*c.Query))
+			reply, _ := http.NewRequest("POST", f.url+"/agent/replies/"+c.ID, bytes.NewReader(body))
+			reply.Header.Set("Authorization", "Bearer "+token)
+			if res, err := http.DefaultClient.Do(reply); err == nil {
+				res.Body.Close()
+			}
+		}
+	}()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		if _, b := f.call("root-token", "GET", "/api/clusters", nil); strings.Contains(string(b), `"`+node+`"`) {
+			return commands
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the agent did not connect")
+		}
+	}
+}
+
+// With self-approval allowed, an administrator's sensitive request starts at
+// once. A running capture shows the progress of its recordings and how much
+// of the time frame is left, and can be stopped with what it has.
+func TestOwnApprovalProgressAndStop(t *testing.T) {
+	dsn := os.Getenv("ASSERVAT_TEST_DSN")
+	if dsn == "" {
+		t.Skip("ASSERVAT_TEST_DSN is not set")
+	}
+	store, err := hub.OpenStore(t.Context(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, AllowSelfApproval: true,
+		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "mallory", Token: "mallory-token"}, {Name: "root", Token: "root-token", Groups: []string{"admins"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(h.Handler())
+	defer server.Close()
+	f := fixture{t, server.URL}
+	cluster := "own" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
+	_, b := f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster})
+	var joined struct{ Token string }
+	json.Unmarshal(b, &joined)
+	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster, nil)
+	commands := scriptedAgent(t, f, joined.Token, "node-a", func(q api.Query) api.Reply {
+		return api.Reply{Allowed: q.User == "alice", Pods: []api.Pod{{Name: "api-1", Node: "node-a"}}, Selector: "app=api"}
+	})
+
+	for token, own := range map[string]bool{"root-token": true, "alice-token": false} {
+		if _, b := f.call(token, "GET", "/api/me", nil); strings.Contains(string(b), `"selfApproval":true`) != own {
+			t.Fatal("self approval of", token, string(b))
+		}
+	}
+	sensitive := api.CaptureRequest{Cluster: cluster, Namespace: "payments", Workload: "Deployment/api", DurationSeconds: 60,
+		Recordings: []api.Recording{{Kind: api.KindCoredump}, {Kind: api.KindPcap}, {Kind: api.KindPodState}}}
+	var mine, theirs api.Capture
+	code, b := f.call("root-token", "POST", "/api/captures", sensitive)
+	json.Unmarshal(b, &mine)
+	if code != 201 || mine.State != api.StateQueued || mine.Approver != "root" || !mine.Sensitive {
+		t.Fatal("an administrator's own sensitive request", code, mine.State, mine.Approver)
+	}
+	code, b = f.call("alice-token", "POST", "/api/captures", sensitive)
+	json.Unmarshal(b, &theirs)
+	if code != 201 || theirs.State != api.StatePendingApproval || theirs.Approver != "" {
+		t.Fatal("a user's sensitive request", code, theirs.State)
+	}
+	var watch api.Watch
+	code, b = f.call("root-token", "POST", "/api/watches", sensitive)
+	json.Unmarshal(b, &watch)
+	if code != 201 || watch.Approver != "root" {
+		t.Fatal("an administrator's own sensitive watch", code, watch)
+	}
+	defer f.call("root-token", "DELETE", "/api/watches/"+watch.ID, nil)
+
+	// The task reaches the agent at once; its reports become the progress.
+	next := func(kind string) api.Command {
+		t.Helper()
+		for {
+			select {
+			case c := <-commands:
+				if c.Type == kind {
+					return c
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("no command", kind)
+			}
+		}
+	}
+	if c := next("task"); c.ID != mine.ID {
+		t.Fatal("task", c)
+	}
+	report := func(state string, recordings ...api.RecordingStatus) int {
+		t.Helper()
+		body, _ := json.Marshal(api.TaskStatus{Pod: "api-1", State: state, Recordings: recordings})
+		req, _ := http.NewRequest("POST", server.URL+"/agent/captures/"+mine.ID+"/status", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+joined.Token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if code, _ := f.call("root-token", "POST", "/api/captures/"+mine.ID+"/stop", nil); code != 409 {
+		t.Fatal("stopped a capture that does not run yet", code)
+	}
+	waiting := []api.RecordingStatus{{Kind: api.KindCoredump, State: api.StateRunning}, {Kind: api.KindPcap, State: api.StateRunning}, {Kind: api.KindPodState, State: api.StateRunning}}
+	if report(api.StateRunning, waiting...) != 200 {
+		t.Fatal("progress report")
+	}
+	waiting[2].State = api.StateCompleted
+	waiting[0].State, waiting[0].Message = api.StateFailed, "no such process"
+	if report(api.StateRunning, waiting...) != 200 {
+		t.Fatal("progress report")
+	}
+	got := f.capture("root-token", mine.ID)
+	recs := got.Tasks[0].Recordings
+	if got.State != api.StateRunning || len(recs) != 3 || recs[0].State != api.StateFailed || recs[0].Message != "no such process" || recs[1].State != api.StateRunning || recs[1].StartedAt == nil || recs[2].State != api.StateCompleted {
+		t.Fatalf("progress %+v", recs)
+	}
+	// The packet capture has just begun its 60 seconds.
+	if got.RemainingSeconds == nil || *got.RemainingSeconds < 55 || *got.RemainingSeconds > 60 {
+		t.Fatal("remaining", got.RemainingSeconds)
+	}
+	if code, _ := f.call("mallory-token", "POST", "/api/captures/"+mine.ID+"/stop", nil); code != 404 {
+		t.Fatal("another user stopped the capture", code)
+	}
+	if code, _ := f.call("root-token", "POST", "/api/captures/"+mine.ID+"/stop", nil); code != 200 {
+		t.Fatal("stop", code)
+	}
+	if c := next("stop"); c.ID != mine.ID {
+		t.Fatal("the agent was told to stop", c)
+	}
+	// An agent that connects now learns with its task that the capture was stopped.
+	if open, err := store.OpenTasks(t.Context(), cluster, "node-a"); err != nil || len(open) != 1 || !open[0].Task.Stopped || !open[0].Task.Started {
+		t.Fatal("open task of a stopped capture", open, err)
+	}
+	if got := f.capture("root-token", mine.ID); got.StoppedAt == nil {
+		t.Fatal("the capture does not show that it was stopped")
+	}
+	// The agent ends the packet capture and completes the task: the capture
+	// is complete with what it has, and nothing remains of the time frame.
+	waiting[1].State, waiting[1].Message = api.StateCompleted, "stopped early"
+	if report(api.StateCompleted, waiting...) != 200 {
+		t.Fatal("final report")
+	}
+	got = f.capture("root-token", mine.ID)
+	if got.State != api.StateCompleted || got.RemainingSeconds != nil || got.Tasks[0].Recordings[1].Message != "stopped early" {
+		t.Fatalf("stopped capture %+v", got)
+	}
+	_, b = f.call("root-token", "GET", "/api/audit?limit=30", nil)
+	for _, action := range []string{"capture.approve", "capture.stop", "watch.approve"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("the audit log lacks", action)
 		}

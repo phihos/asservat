@@ -25,8 +25,10 @@ import (
 
 // capture makes the request's recordings of one pod, all at once, and
 // uploads their files. It fails if no recording succeeded; otherwise it
-// names those that failed.
-func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (failures string, err error) {
+// names those that failed. The recordings that run over time end with
+// frame, which is the task's context until the user stops the capture, and
+// keep what they recorded until then.
+func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignment, report *progress) (failures string, err error) {
 	r := t.Request
 	pod, err := a.Kube.CoreV1().Pods(r.Namespace).Get(ctx, t.Pod, metav1.GetOptions{})
 	if err != nil {
@@ -49,14 +51,24 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (f
 			if rec.Kind == api.KindStrace {
 				select {
 				case <-dumped:
-				case <-ctx.Done():
-					errs[i] = ctx.Err()
+				case <-frame.Done():
+					errs[i] = errors.New("stopped before it began")
+					report.set(rec.Kind, api.StateFailed, errs[i].Error())
 					return
 				}
 			}
-			errs[i] = a.recording(ctx, id, t, pod, rec)
+			report.set(rec.Kind, api.StateRunning, "")
+			errs[i] = a.recording(ctx, frame, id, t, pod, rec)
 			if rec.Kind == api.KindCoredump && r.Watch == "" {
 				close(dumped)
+			}
+			switch {
+			case errs[i] != nil:
+				report.set(rec.Kind, api.StateFailed, errs[i].Error())
+			case frame.Err() != nil && rec.Timed(r.DurationSeconds > 0):
+				report.set(rec.Kind, api.StateCompleted, "stopped early")
+			default:
+				report.set(rec.Kind, api.StateCompleted, "")
 			}
 		})
 	}
@@ -84,7 +96,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (f
 type partialError struct{ error }
 
 // recording makes one recording of a pod.
-func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording) error {
+func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording) error {
 	r := t.Request
 	duration := time.Duration(r.DurationSeconds) * time.Second
 	up := func(name string, body io.Reader) error { return a.upload(ctx, id, t.Pod, name, body) }
@@ -103,7 +115,7 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 		}
 		return nil
 	case api.KindLogs:
-		return a.logs(ctx, pod, rec, r.Watch != "", duration, up)
+		return a.logs(ctx, frame, pod, rec, r.Watch != "", duration, up)
 	case api.KindPcap:
 		if r.Watch != "" {
 			// The packets before the crash, set aside when it was reported.
@@ -129,7 +141,7 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 			packets := up
 			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
-		return a.record(ctx, duration, "capture.pcap", up, "nsenter", args...)
+		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", args...)
 	case api.KindStrace:
 		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {
@@ -144,7 +156,7 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 		for _, pid := range pids {
 			args = append(args, "-p", strconv.Itoa(pid))
 		}
-		return a.record(ctx, duration, container+".strace", up, "strace", args...)
+		return a.record(ctx, frame, duration, container+".strace", up, "strace", args...)
 	case api.KindPprof:
 		pid, err := a.podPID(pod)
 		if err != nil {
@@ -160,13 +172,19 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 		var wg sync.WaitGroup
 		for i, target := range targets {
 			wg.Go(func() {
+				// A profile over time cannot be cut short: stopping the
+				// capture abandons it.
 				ctx := ctx
 				if target.Timed {
 					var cancel context.CancelFunc
-					ctx, cancel = context.WithTimeout(ctx, duration+30*time.Second)
+					ctx, cancel = context.WithTimeout(frame, duration+30*time.Second)
 					defer cancel()
 				}
-				if errs[i] = a.record(ctx, 0, target.File, up, "nsenter", profileRequest(pid, target, r.DurationSeconds)...); errs[i] != nil {
+				errs[i] = a.record(ctx, ctx, 0, target.File, up, "nsenter", profileRequest(pid, target, r.DurationSeconds)...)
+				if errs[i] != nil && target.Timed && frame.Err() != nil {
+					errs[i] = errors.New("stopped before it was complete")
+				}
+				if errs[i] != nil {
 					errs[i] = fmt.Errorf("%s on port %d: %w", target.Name, target.Port, errs[i])
 				}
 			})
@@ -231,7 +249,7 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 
 // logs uploads the containers' logs. After a crash they are those of both
 // instances of each container.
-func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, rec api.Recording, crashed bool, duration time.Duration, up func(string, io.Reader) error) error {
+func (a *Agent) logs(ctx, frame context.Context, pod *corev1.Pod, rec api.Recording, crashed bool, duration time.Duration, up func(string, io.Reader) error) error {
 	opts := corev1.PodLogOptions{Previous: rec.Params["previous"] == "true", Follow: duration > 0, Timestamps: true}
 	if v := rec.Params["tailLines"]; v != "" {
 		n, _ := strconv.ParseInt(v, 10, 64)
@@ -239,7 +257,7 @@ func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, rec api.Recording, cr
 	}
 	if duration > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, duration)
+		ctx, cancel = context.WithTimeout(frame, duration)
 		defer cancel()
 	}
 	type instance struct {
@@ -293,20 +311,20 @@ type untilDeadline struct {
 
 func (u untilDeadline) Read(p []byte) (int, error) {
 	n, err := u.r.Read(p)
-	if err != nil && errors.Is(u.ctx.Err(), context.DeadlineExceeded) {
+	if err != nil && u.ctx.Err() != nil { // the time frame ended, or the user stopped it
 		err = io.EOF
 	}
 	return n, err
 }
 
 // record runs a tool and uploads its standard output while it runs. With a
-// duration, the tool is interrupted after it and its output up to then is
-// the result.
-func (a *Agent) record(ctx context.Context, duration time.Duration, name string, up func(string, io.Reader) error, tool string, args ...string) error {
+// duration, the tool is interrupted after it, or when frame ends before,
+// and its output up to then is the result.
+func (a *Agent) record(ctx, frame context.Context, duration time.Duration, name string, up func(string, io.Reader) error, tool string, args ...string) error {
 	run := ctx
 	if duration > 0 {
 		var cancel context.CancelFunc
-		run, cancel = context.WithTimeout(ctx, duration)
+		run, cancel = context.WithTimeout(frame, duration)
 		defer cancel()
 	}
 	cmd := exec.CommandContext(run, tool, args...)
@@ -418,7 +436,7 @@ func containerPIDs(proc, containerID string) (all []int, main int, err error) {
 		}
 	}
 	if main == 0 {
-		return nil, 0, fmt.Errorf("no process of container %s found on this node", containerID)
+		return nil, 0, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
 	}
 	return all, main, nil
 }

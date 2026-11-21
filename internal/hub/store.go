@@ -109,14 +109,14 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 	return tx.Commit(ctx)
 }
 
-const captureColumns = `c.id::text, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at,
- coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
+const captureColumns = `c.id::text, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at,
+ coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message, 'recordings', recordings) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
  coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
 
 func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	var c api.Capture
 	var request, tasks, artifacts []byte
-	if err := r.Scan(&c.ID, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &tasks, &artifacts); err != nil {
+	if err := r.Scan(&c.ID, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &c.StoppedAt, &tasks, &artifacts); err != nil {
 		return c, err
 	}
 	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {
@@ -188,6 +188,13 @@ func (s *Store) Cancel(ctx context.Context, id string) (bool, error) {
 	return true, tx.Commit(ctx)
 }
 
+// Stop marks a running capture as stopped, so that tasks which reach their
+// agent later know it too. It reports false if the capture does not run.
+func (s *Store) Stop(ctx context.Context, id string) (bool, error) {
+	tag, err := s.db.Exec(ctx, `UPDATE captures SET stopped_at = coalesce(stopped_at, now()) WHERE id = $1::uuid AND state = 'Running'`, id)
+	return tag.RowsAffected() == 1, err
+}
+
 // SetTask records an agent's report and derives the capture's state from its
 // tasks: Running while any task runs, then Completed if at least one task
 // completed, otherwise Failed.
@@ -202,12 +209,36 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 	if _, err := tx.Exec(ctx, `SELECT 1 FROM captures WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
 		return err
 	}
-	tag, err := tx.Exec(ctx, `UPDATE tasks SET state = $3, message = $4 WHERE capture_id = $1::uuid AND pod = $2 AND state IN ('Queued','Running')`, id, st.Pod, st.State, st.Message)
+	var stored []byte
+	err = tx.QueryRow(ctx, `UPDATE tasks SET state = $3, message = $4 WHERE capture_id = $1::uuid AND pod = $2 AND state IN ('Queued','Running') RETURNING recordings`, id, st.Pod, st.State, st.Message).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+	if st.Recordings != nil {
+		// A recording keeps the time at which the hub first saw it run.
+		var before []api.RecordingStatus
+		if err := json.Unmarshal(stored, &before); err != nil {
+			return err
+		}
+		now := time.Now()
+		for i, rec := range st.Recordings {
+			st.Recordings[i].StartedAt = nil
+			for _, b := range before {
+				if b.Kind == rec.Kind {
+					st.Recordings[i].StartedAt = b.StartedAt
+				}
+			}
+			if st.Recordings[i].StartedAt == nil && rec.State != api.StateWaiting {
+				st.Recordings[i].StartedAt = &now
+			}
+		}
+		progress, _ := json.Marshal(st.Recordings)
+		if _, err := tx.Exec(ctx, `UPDATE tasks SET recordings = $3 WHERE capture_id = $1::uuid AND pod = $2`, id, st.Pod, progress); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec(ctx, `UPDATE captures c SET
   state = CASE WHEN t.open > 0 THEN 'Running' WHEN t.completed > 0 THEN 'Completed' ELSE 'Failed' END,
@@ -225,7 +256,7 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 // for delivery when its agent connects. A task that had already started is
 // marked so: its agent either still runs it or lost it in a restart.
 func (s *Store) OpenTasks(ctx context.Context, cluster, node string) ([]api.Command, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text, t.pod, t.state = 'Running', c.request FROM tasks t JOIN captures c ON c.id = t.capture_id
+	rows, err := s.db.Query(ctx, `SELECT c.id::text, t.pod, t.state = 'Running', c.stopped_at IS NOT NULL, c.request FROM tasks t JOIN captures c ON c.id = t.capture_id
  WHERE c.cluster = $1 AND t.node = $2 AND t.state IN ('Queued','Running') AND c.state IN ('Queued','Running')`, cluster, node)
 	if err != nil {
 		return nil, err
@@ -233,7 +264,7 @@ func (s *Store) OpenTasks(ctx context.Context, cluster, node string) ([]api.Comm
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (api.Command, error) {
 		cmd := api.Command{Type: "task", Task: &api.TaskAssignment{}}
 		var request []byte
-		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &cmd.Task.Started, &request); err != nil {
+		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &cmd.Task.Started, &cmd.Task.Stopped, &request); err != nil {
 			return cmd, err
 		}
 		if err := json.Unmarshal(request, &cmd.Task.Request); err != nil {
@@ -310,8 +341,8 @@ func (s *Store) Expired(ctx context.Context) (ids []string, next *time.Time, err
 func (s *Store) CreateWatch(ctx context.Context, w api.Watch, groups []string) error {
 	request, _ := json.Marshal(w.CaptureRequest)
 	g, _ := json.Marshal(groups)
-	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive)
+	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive, approver) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive, w.Approver)
 	return err
 }
 

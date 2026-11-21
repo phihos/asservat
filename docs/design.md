@@ -39,7 +39,15 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
 6. The requester or an administrator downloads the files. When the retention
    ends the hub deletes the capture and its files.
 
-A capture can be cancelled while it waits or runs, and deleted afterwards.
+While a capture runs, the agent reports how each recording of each pod gets
+on (waiting, running, completed, failed), and the hub says how much of the
+time frame is left. Files appear as their recordings end.
+
+A running capture can be **stopped**: the recordings that run over time end
+at once and keep what they have, and the capture completes. A profile that
+runs over time cannot be cut short and is abandoned. A capture can also be
+cancelled while it waits or runs, which abandons the recordings in progress,
+and deleted at any time.
 
 The recordings of a capture share everything but their kind and parameters:
 
@@ -204,7 +212,9 @@ cgroup whose parent is outside of it.
 - Members of the administrator groups may capture everywhere, approve or deny
   sensitive captures, manage clusters and read the audit log.
 - An administrator cannot approve their own request unless the installation
-  allows it (`hub.allowSelfApproval`, for a single administrator).
+  allows it (`hub.allowSelfApproval`, for a single administrator). Where it
+  does, an administrator's sensitive requests and watches start without a
+  separate approval and are recorded as approved by themselves.
 - A capture and its files are visible to its requester and to administrators.
 
 ## Security
@@ -220,8 +230,8 @@ cgroup whose parent is outside of it.
   with a random key per file, wrapped by the master key from the hub's Secret.
   Losing the master key loses the evidence.
 - **Audit.** Cluster changes, requests, watches and the captures they
-  trigger, approvals, denials, cancellations, deletions, expiries and every
-  download are recorded with the actor.
+  trigger, approvals, denials, stops, cancellations, deletions, expiries and
+  every download are recorded with the actor.
 - A core file rests unencrypted on the node until its upload ends, then it
   is deleted: in the agent's scratch volume, or for a crashed process in the
   core handler's directory.

@@ -35,11 +35,19 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 		return api.Watch{}, err
 	}
 	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
+	if w.Sensitive && h.approvesOwn(u) {
+		w.Approver = u.Name
+	}
 	if err := h.Store.CreateWatch(ctx, w, u.Groups); err != nil {
 		return w, err
 	}
 	if err := h.Store.Audit(ctx, u.Name, "watch.create", "", w); err != nil {
 		return w, err
+	}
+	if w.Approver != "" {
+		if err := h.Store.Audit(ctx, u.Name, "watch.approve", "", map[string]any{"id": w.ID, "own": true}); err != nil {
+			return w, err
+		}
 	}
 	h.pushWatches(ctx, w.Cluster)
 	w, _, err = h.Store.Watch(ctx, w.ID)
