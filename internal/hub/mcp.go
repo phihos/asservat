@@ -37,7 +37,7 @@ const captureProperties = `"cluster":{"type":"string"},"namespace":{"type":"stri
 "pods":{"type":"array","items":{"type":"string"},"description":"Restrict to these pods; default all pods of the workload"},
 "recordings":{"type":"array","description":"What to record, at most one of each kind. All recordings start together on the same pods, share durationSeconds and, if any needs approval, one approval.","items":{"type":"object","properties":{
  "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"]},
- "params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: port, path (default /debug/pprof/profile)."}},"required":["kind"]}},
+ "params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: endpoints, a comma-separated list of <port>/<endpoint> from find_profile_endpoints, fetched at once; or port and path for an endpoint the catalog does not know (needs approval)."}},"required":["kind"]}},
 "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"],"description":"Short form for a single recording, with params"},
 "params":{"type":"object","additionalProperties":{"type":"string"}},
 "durationSeconds":{"type":"integer","description":"The time frame of pcap, strace, pprof and followed logs; default 30"},
@@ -97,6 +97,15 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			return h.Traffic(ctx, u, in.Cluster, in.Namespace, in.Workload, in.Seconds)
+		}},
+	{Name: "find_profile_endpoints", Description: "Look for the profile endpoints that a workload's pods serve: Go net/http/pprof (also libraries for other languages that serve its paths), C or C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor. It asks each listening port of a pod for the index page of these; that starts no profiling. Use the found port and endpoint as <port>/<endpoint> in the endpoints parameter of a pprof recording. Endpoints marked sensitive return memory contents and need approval. Also returns the ports that the pod listens on.",
+		InputSchema: object(`"cluster":{"type":"string"},"namespace":{"type":"string"},"workload":{"type":"string"}`, "cluster", "namespace", "workload"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in struct{ Cluster, Namespace, Workload string }
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return h.Profiles(ctx, u, in.Cluster, in.Namespace, in.Workload)
 		}},
 	{Name: "request_capture", Description: "Record evidence from the pods of a workload: one or several recordings that run together. Captures that can contain memory or payload contents (coredump, pcap with payload, strace with strings) wait in state PendingApproval until an administrator approves them; follow the state with get_capture.",
 		InputSchema: object(captureProperties, "cluster", "namespace", "workload"),

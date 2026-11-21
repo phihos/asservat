@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -142,5 +143,56 @@ func TestPeers(t *testing.T) {
 	got, err = a.peers(t.Context(), api.Query{Namespace: "payments", IPs: ips, All: true})
 	if err != nil || len(got) != 4 || got["10.96.0.10"] != "Service kube-system/kube-dns" || got["10.0.1.8"] != "Pod billing/ledger-0" {
 		t.Fatal("peers of the cluster", got, err)
+	}
+}
+
+func TestProbeProfiles(t *testing.T) {
+	// What the applications on three ports answer.
+	pages := map[string]string{
+		"6060/debug/pprof/": `<html>Types of profiles available:<a href="goroutine?debug=1">goroutine</a></html>`,
+		// Spring Boot lists the enabled endpoints: here without the heap dump.
+		"8081/actuator": `{"_links":{"self":{"href":"http://localhost:8081/actuator"},"threaddump":{"href":"http://localhost:8081/actuator/threaddump"}}}`,
+		"8080/info":     `{"app":"shop"}`, // an application's own page, not dotnet-monitor
+	}
+	asked := map[string]bool{}
+	var mu sync.Mutex
+	found := probeProfiles([]int{6060, 8080, 8081}, func(port int, path string) string {
+		mu.Lock()
+		defer mu.Unlock()
+		asked[fmt.Sprint(port, path)] = true
+		return pages[fmt.Sprint(port, path)]
+	})
+	got := []string{}
+	for _, f := range found {
+		got = append(got, fmt.Sprint(f.Port, "/", f.ID))
+	}
+	want := "6060/go-cpu 6060/go-heap 6060/go-allocs 6060/go-goroutines 6060/go-block 6060/go-mutex 6060/go-trace 8081/java-threads"
+	if strings.Join(got, " ") != want {
+		t.Fatal("found", got)
+	}
+	// Only index and information pages are asked for, never a profile.
+	for request := range asked {
+		if strings.Contains(request, "profile") || strings.Contains(request, "dump") || strings.Contains(request, "trace") {
+			t.Fatal("the probe asked for", request)
+		}
+	}
+	if len(asked) != 3*len(api.ProfileFamilies) {
+		t.Fatal("probes", len(asked))
+	}
+}
+
+func TestProfileRequest(t *testing.T) {
+	target := func(list string) api.ProfileTarget {
+		targets, err := api.Recording{Kind: api.KindPprof, Params: map[string]string{"endpoints": list}}.ProfileTargets()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return targets[0]
+	}
+	if got := strings.Join(profileRequest(42, target("6060/go-cpu"), 20), " "); got != "-t 42 -n curl -sS --fail http://127.0.0.1:6060/debug/pprof/profile?seconds=20" {
+		t.Fatal(got)
+	}
+	if got := strings.Join(profileRequest(42, target("8081/java-threads"), 20), " "); got != "-t 42 -n curl -sS --fail -H Accept: text/plain http://127.0.0.1:8081/actuator/threaddump" {
+		t.Fatal(got)
 	}
 }

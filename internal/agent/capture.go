@@ -144,15 +144,29 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 		if err != nil {
 			return err
 		}
-		path := rec.Params["path"]
-		if path == "" {
-			path = "/debug/pprof/profile?seconds=" + strconv.Itoa(r.DurationSeconds)
+		targets, err := rec.ProfileTargets()
+		if err != nil {
+			return err
 		}
-		// The request runs inside the pod's network namespace, so endpoints
-		// bound to localhost work and no NetworkPolicy applies.
-		ctx, cancel := context.WithTimeout(ctx, duration+30*time.Second)
-		defer cancel()
-		return a.record(ctx, 0, "profile.pprof", up, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "http://127.0.0.1:"+rec.Params["port"]+path)
+		// The endpoints are fetched at once, so that their profiles cover
+		// the same time.
+		errs := make([]error, len(targets))
+		var wg sync.WaitGroup
+		for i, target := range targets {
+			wg.Go(func() {
+				ctx := ctx
+				if target.Timed {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, duration+30*time.Second)
+					defer cancel()
+				}
+				if errs[i] = a.record(ctx, 0, target.File, up, "nsenter", profileRequest(pid, target, r.DurationSeconds)...); errs[i] != nil {
+					errs[i] = fmt.Errorf("%s on port %d: %w", target.Name, target.Port, errs[i])
+				}
+			})
+		}
+		wg.Wait()
+		return errors.Join(errs...)
 	case api.KindCoredump:
 		if r.Watch != "" {
 			// The core of the crashed process, not one of its successor.
@@ -174,6 +188,18 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 		return nil
 	}
 	return fmt.Errorf("unknown kind %q", rec.Kind)
+}
+
+// profileRequest returns the arguments of nsenter for an HTTP GET of a
+// profile endpoint. The request runs inside the pod's network namespace, so
+// endpoints bound to localhost work and no NetworkPolicy applies.
+func profileRequest(pid int, target api.ProfileTarget, seconds int) []string {
+	args := []string{"-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail"}
+	if target.Accept != "" {
+		args = append(args, "-H", "Accept: "+target.Accept)
+	}
+	path := strings.ReplaceAll(target.Path, "{seconds}", strconv.Itoa(seconds))
+	return append(args, "http://127.0.0.1:"+strconv.Itoa(target.Port)+path)
 }
 
 // gcore dumps a running process. gcore cannot write to a pipe: the core

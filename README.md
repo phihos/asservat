@@ -25,7 +25,7 @@ tools.
 | Logs | Container logs: the last lines, the previous instance, or followed for a duration | No |
 | Packet capture | A pcap file for Wireshark, filtered with tcpdump syntax | Only with payload; headers alone do not |
 | System call trace | `strace` output with timing, following child processes | Only with buffer contents |
-| Profile | Any HTTP profile endpoint of the pod, such as Go's `/debug/pprof/profile` | No |
+| Profile | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
 | Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running | Yes |
 
 A capture that can contain memory or payload contents waits until an

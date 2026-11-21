@@ -128,6 +128,7 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/containers", h.listContainers)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/processes", h.listProcesses)
 	user("POST /api/clusters/{cluster}/namespaces/{namespace}/traffic", h.sampleTraffic)
+	user("POST /api/clusters/{cluster}/namespaces/{namespace}/profiles", h.findProfiles)
 	user("POST /api/captures", h.createCapture)
 	user("GET /api/captures", h.listCaptures)
 	user("GET /api/captures/{id}", h.getCapture)

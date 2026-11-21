@@ -184,6 +184,41 @@ func (h *Hub) Traffic(ctx context.Context, u User, cluster, namespace, workload 
 	return in, nil
 }
 
+// Profiles looks for the profile endpoints that the workload's pods serve:
+// those of the catalog, on the ports that a pod listens on. One pod per node
+// is asked, since the replicas of a workload serve the same.
+func (h *Hub) Profiles(ctx context.Context, u User, cluster, namespace, workload string) (api.Inspection, error) {
+	var found []api.ProfileTarget
+	var ports []int
+	in, err := h.inspect(ctx, u, cluster, namespace, workload, api.Query{Op: "profiles"}, func(r api.Reply) {
+		for _, p := range r.Profiles {
+			// The agent names the endpoint; what it is comes from the catalog.
+			endpoint, known := api.FindProfileEndpoint(p.ID)
+			if known && !slices.ContainsFunc(found, func(f api.ProfileTarget) bool { return f.Port == p.Port && f.ID == p.ID }) {
+				found = append(found, api.ProfileTarget{Port: p.Port, ProfileEndpoint: endpoint})
+			}
+		}
+		for _, port := range r.Ports {
+			if !slices.Contains(ports, port) {
+				ports = append(ports, port)
+			}
+		}
+	})
+	if err != nil {
+		return in, err
+	}
+	if err := h.Store.Audit(ctx, u.Name, "profile.discover", "", map[string]any{"cluster": cluster, "namespace": namespace, "workload": workload}); err != nil {
+		return in, err
+	}
+	slices.SortStableFunc(found, func(a, b api.ProfileTarget) int { return cmp.Compare(a.Port, b.Port) })
+	slices.Sort(ports)
+	in.Profiles, in.Ports = found, ports
+	if in.Profiles == nil {
+		in.Profiles = []api.ProfileTarget{}
+	}
+	return in, nil
+}
+
 // usualProtocols names what commonly runs on a port. It is a hint for the
 // reader, not a finding: the sample holds headers only.
 var usualProtocols = map[int]string{
@@ -219,6 +254,14 @@ func describeFlow(f api.Flow) (label, filter string) {
 
 func (h *Hub) listProcesses(w http.ResponseWriter, r *http.Request, u User) error {
 	in, err := h.Processes(r.Context(), u, r.PathValue("cluster"), r.PathValue("namespace"), r.URL.Query().Get("workload"))
+	if err != nil {
+		return err
+	}
+	return reply(w, in)
+}
+
+func (h *Hub) findProfiles(w http.ResponseWriter, r *http.Request, u User) error {
+	in, err := h.Profiles(r.Context(), u, r.PathValue("cluster"), r.PathValue("namespace"), r.URL.Query().Get("workload"))
 	if err != nil {
 		return err
 	}
