@@ -281,6 +281,7 @@ async function loadProfiles() {
   }
   if (of !== target()) return; // another workload was chosen meanwhile
   const ports = found.ports || [];
+  found.profiles ||= []; // left out when nothing was found
   $('profilePort').innerHTML = options(ports);
   // One group per runtime and port; the first profile over time is ticked.
   const groups = {};
@@ -324,6 +325,7 @@ async function loadProcesses() {
   let found = {pods: [], processes: []}, problem = '';
   try { found = await call('GET', namespacePath() + '/processes?' + workloadQuery()); } catch (err) { problem = err.message; }
   if (of !== target()) return; // another workload was chosen meanwhile
+  found.processes ||= []; // left out when nothing runs
   const groups = [];
   for (const container of found.processes.length ? [...new Set(found.processes.map(p => p.container))] : containers) {
     const programs = found.processes.filter(p => p.container === container);
