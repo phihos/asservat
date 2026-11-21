@@ -81,10 +81,10 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		if pod.Spec.NodeName != a.Node {
 			return
 		}
-		if w.Kind == api.KindPcap {
-			a.buffer(ctx, w, pod)
+		if packets := w.Recording(api.KindPcap); packets != nil {
+			a.buffer(ctx, w, *packets, pod)
 		}
-		if w.Kind == api.KindCoredump && a.Cores != "" && !marked[string(pod.UID)] {
+		if w.Recording(api.KindCoredump) != nil && a.Cores != "" && !marked[string(pod.UID)] {
 			// From now on the node's core handler keeps this pod's cores.
 			if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
 				slog.Error("core handler marker", "pod", pod.Name, "error", err)
@@ -162,7 +162,7 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 // processes are set aside for that task.
 func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, message string) {
 	id, pod := uuid.NewString(), crashed.Name
-	if w.Kind == api.KindCoredump && a.Cores != "" {
+	if w.Recording(api.KindCoredump) != nil && a.Cores != "" {
 		a.Cores.take(string(crashed.UID), id)
 	}
 	a.mu.Lock()
@@ -187,7 +187,7 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 // from tcpdump in the pod's network namespace, unless it already does. If no
 // container of the pod runs yet, or after tcpdump ended, the pod's next
 // change tries again.
-func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
+func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, pod *corev1.Pod) {
 	key := w.ID + "/" + pod.Name
 	a.mu.Lock()
 	_, buffering := a.rings[key]
@@ -201,7 +201,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
 	}
 	ctx, stop := context.WithCancel(ctx)
 	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
-	if f := w.Params["filter"]; f != "" {
+	if f := packets.Params["filter"]; f != "" {
 		args = append(args, f)
 	}
 	cmd := exec.CommandContext(ctx, "nsenter", args...)
@@ -217,7 +217,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
 		return
 	}
 	// Payload is kept only for a watch that asked for it and was approved.
-	r := &ring{window: time.Duration(w.DurationSeconds) * time.Second, limit: ringBytes, payload: w.Params["payload"] == "true", stop: stop}
+	r := &ring{window: time.Duration(w.DurationSeconds) * time.Second, limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
 	a.mu.Lock()
 	a.rings[key] = r
 	a.mu.Unlock()

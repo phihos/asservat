@@ -29,7 +29,14 @@ const (
 	StateCancelled       = "Cancelled"
 )
 
-// CaptureRequest is what a user submits.
+// Recording is one kind of evidence to record, with its parameters.
+type Recording struct {
+	Kind   string            `json:"kind"`
+	Params map[string]string `json:"params,omitempty"`
+}
+
+// CaptureRequest is what a user submits: one or more recordings of the same
+// pods that start together, share one time frame and one approval.
 type CaptureRequest struct {
 	Cluster   string `json:"cluster"`
 	Namespace string `json:"namespace"`
@@ -37,15 +44,38 @@ type CaptureRequest struct {
 	Workload string `json:"workload"`
 	// Pods restricts the capture to these pods of the workload; empty means all.
 	Pods []string `json:"pods,omitempty"`
-	Kind string   `json:"kind"`
-	// DurationSeconds bounds pcap, strace, pprof and followed logs.
-	DurationSeconds int               `json:"durationSeconds,omitempty"`
-	Params          map[string]string `json:"params,omitempty"`
-	Reason          string            `json:"reason,omitempty"`
+	// Recordings holds at most one recording of each kind.
+	Recordings []Recording `json:"recordings,omitempty"`
+	// Kind and Params are a short form for a request with one recording.
+	// Normalize moves them into Recordings.
+	Kind   string            `json:"kind,omitempty"`
+	Params map[string]string `json:"params,omitempty"`
+	// DurationSeconds is the time frame of the recordings that run over
+	// time: pcap, strace, pprof and followed logs.
+	DurationSeconds int    `json:"durationSeconds,omitempty"`
+	Reason          string `json:"reason,omitempty"`
 	// Watch is the watch that created the capture and Trigger the agent's
 	// report of the crash. Only the hub sets them.
 	Watch   string `json:"watch,omitempty"`
 	Trigger string `json:"trigger,omitempty"`
+}
+
+// Normalize turns the short form with one kind into a recording.
+func (r *CaptureRequest) Normalize() {
+	if r.Kind != "" {
+		r.Recordings = append(r.Recordings, Recording{Kind: r.Kind, Params: r.Params})
+	}
+	r.Kind, r.Params = "", nil
+}
+
+// Recording returns the request's recording of a kind, or nil.
+func (r *CaptureRequest) Recording(kind string) *Recording {
+	for i := range r.Recordings {
+		if r.Recordings[i].Kind == kind {
+			return &r.Recordings[i]
+		}
+	}
+	return nil
 }
 
 var (
@@ -69,13 +99,10 @@ var params = map[string][]string{
 	KindPprof:    {"port", "path"},
 }
 
-// Validate checks the request's shape. Durations default to 30 seconds for
-// the kinds that record over time.
+// Validate normalizes the request and checks its shape. The time frame
+// defaults to 30 seconds if a recording runs over time.
 func (r *CaptureRequest) Validate() error {
-	allowed, ok := params[r.Kind]
-	if !ok {
-		return fmt.Errorf("unknown kind %q", r.Kind)
-	}
+	r.Normalize()
 	if !namePattern.MatchString(r.Cluster) || !namePattern.MatchString(r.Namespace) || !workloadPattern.MatchString(r.Workload) {
 		return fmt.Errorf("cluster, namespace and workload (Kind/name) are required")
 	}
@@ -84,58 +111,94 @@ func (r *CaptureRequest) Validate() error {
 			return fmt.Errorf("invalid pod name %q", p)
 		}
 	}
-	for k := range r.Params {
-		found := false
-		for _, a := range allowed {
-			found = found || a == k
-		}
-		if !found {
-			return fmt.Errorf("kind %s has no parameter %q", r.Kind, k)
-		}
+	if len(r.Recordings) == 0 {
+		return fmt.Errorf("choose at least one kind of evidence")
 	}
-	for _, k := range []string{"previous", "payload", "strings"} {
-		if v, ok := r.Params[k]; ok && v != "true" && v != "false" {
-			return fmt.Errorf("parameter %s must be true or false", k)
+	timed := false
+	for i, rec := range r.Recordings {
+		if err := rec.validate(); err != nil {
+			return err
 		}
-	}
-	for _, k := range []string{"port", "tailLines"} {
-		if v, ok := r.Params[k]; ok {
-			if n, err := strconv.Atoi(v); err != nil || n < 1 {
-				return fmt.Errorf("parameter %s must be a positive number", k)
+		// Two recordings of one kind would write the same files.
+		for _, earlier := range r.Recordings[:i] {
+			if earlier.Kind == rec.Kind {
+				return fmt.Errorf("kind %s is requested twice", rec.Kind)
 			}
 		}
-	}
-	if v, ok := r.Params["container"]; ok && !namePattern.MatchString(v) {
-		return fmt.Errorf("invalid container name")
-	}
-	if v, ok := r.Params["path"]; ok && !pathPattern.MatchString(v) {
-		return fmt.Errorf("invalid path")
-	}
-	if v, ok := r.Params["process"]; ok && !executablePattern.MatchString(v) {
-		return fmt.Errorf("process must be the path of an executable, as the process list shows it")
-	}
-	if r.Kind == KindPprof && r.Params["port"] == "" {
-		return fmt.Errorf("pprof needs the port parameter")
+		timed = timed || rec.Kind == KindPcap || rec.Kind == KindStrace || rec.Kind == KindPprof
 	}
 	if r.DurationSeconds < 0 {
 		return fmt.Errorf("durationSeconds must not be negative")
 	}
-	if r.DurationSeconds == 0 && (r.Kind == KindPcap || r.Kind == KindStrace || r.Kind == KindPprof) {
+	if r.DurationSeconds == 0 && timed {
 		r.DurationSeconds = 30
 	}
 	return nil
 }
 
-// Sensitive reports whether the capture can contain memory or payload
-// contents and therefore needs an administrator's approval.
-func (r *CaptureRequest) Sensitive() bool {
-	switch r.Kind {
+func (rec Recording) validate() error {
+	allowed, ok := params[rec.Kind]
+	if !ok {
+		return fmt.Errorf("unknown kind %q", rec.Kind)
+	}
+	for k := range rec.Params {
+		found := false
+		for _, a := range allowed {
+			found = found || a == k
+		}
+		if !found {
+			return fmt.Errorf("kind %s has no parameter %q", rec.Kind, k)
+		}
+	}
+	for _, k := range []string{"previous", "payload", "strings"} {
+		if v, ok := rec.Params[k]; ok && v != "true" && v != "false" {
+			return fmt.Errorf("parameter %s must be true or false", k)
+		}
+	}
+	for _, k := range []string{"port", "tailLines"} {
+		if v, ok := rec.Params[k]; ok {
+			if n, err := strconv.Atoi(v); err != nil || n < 1 {
+				return fmt.Errorf("parameter %s must be a positive number", k)
+			}
+		}
+	}
+	if v, ok := rec.Params["container"]; ok && !namePattern.MatchString(v) {
+		return fmt.Errorf("invalid container name")
+	}
+	if v, ok := rec.Params["path"]; ok && !pathPattern.MatchString(v) {
+		return fmt.Errorf("invalid path")
+	}
+	if v, ok := rec.Params["process"]; ok && !executablePattern.MatchString(v) {
+		return fmt.Errorf("process must be the path of an executable, as the process list shows it")
+	}
+	if rec.Kind == KindPprof && rec.Params["port"] == "" {
+		return fmt.Errorf("pprof needs the port parameter")
+	}
+	return nil
+}
+
+// Sensitive reports whether the recording can contain memory or payload
+// contents.
+func (rec Recording) Sensitive() bool {
+	switch rec.Kind {
 	case KindCoredump:
 		return true
 	case KindPcap:
-		return r.Params["payload"] == "true"
+		return rec.Params["payload"] == "true"
 	case KindStrace:
-		return r.Params["strings"] == "true"
+		return rec.Params["strings"] == "true"
+	}
+	return false
+}
+
+// Sensitive reports whether any recording of the request is sensitive: the
+// request then needs an administrator's approval, once for all of it.
+func (r *CaptureRequest) Sensitive() bool {
+	r.Normalize()
+	for _, rec := range r.Recordings {
+		if rec.Sensitive() {
+			return true
+		}
 	}
 	return false
 }
