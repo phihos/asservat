@@ -51,6 +51,7 @@ hub:
   ingress:
     enabled: false
     className: ""
+    annotations: {}
     host: ""
     tlsSecretName: ""
   resources: {}
