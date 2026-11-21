@@ -246,7 +246,8 @@ log "progress, and stopping a capture with what it has (edge)"
 id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")
 for _ in $(seq 30); do
   running=$(ok "$ALICE" GET "/api/captures/$id")
-  [ "$(jq -c '[.tasks[].recordings[]? | select(.kind == "pcap") | .state] | unique' <<<"$running")" = '["Running"]' ] && break
+  # Until the packet captures run and the pod states, which take no time, are done.
+  [ "$(jq -c '[([.tasks[].recordings[]? | select(.kind == "pcap") | .state] | unique), ([.tasks[].recordings[]? | select(.kind == "pod-state") | .state] | unique)]' <<<"$running")" = '[["Running"],["Completed"]]' ] && break
   sleep 1
 done
 # Each pod shows how its recordings get on, and most of the five minutes are left.
