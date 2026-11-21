@@ -12,7 +12,7 @@ what is deliberately left out. Change it together with the code.
 | Component | Runs as | Does |
 | --- | --- | --- |
 | Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, serves console, REST API and MCP |
-| Node agent | Privileged DaemonSet in every cluster | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
+| Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
 | PostgreSQL | Bundled or external | Clusters, captures, tasks, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
 
@@ -28,7 +28,8 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
 3. A sensitive capture waits in `PendingApproval` until an administrator
    approves or denies it. Any other capture is `Queued` at once.
 4. The hub pushes each task over the node agent's stream. An agent that is not
-   connected receives its queued tasks when it connects.
+   connected receives its queued tasks when it connects. A task that was
+   running when its agent restarted is reported as failed then.
 5. The agent records, streams the files to the hub and reports the task as
    `Completed` or `Failed`. The capture is `Completed` if at least one pod
    succeeded.
@@ -46,7 +47,7 @@ own format and nothing is injected into the pod:
 | --- | --- | --- |
 | `pod-state` | Kubernetes API: pod object and events | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
-| `pcap` | `tcpdump` in the pod's network namespace; `filter`; 128 bytes per packet unless `payload=true` | With `payload=true` |
+| `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true` | With `payload=true` |
 | `strace` | `strace -f` on the container's main process; buffer contents omitted unless `strings=true` | With `strings=true` |
 | `pprof` | HTTP GET inside the pod's network namespace on `port` and `path` | No |
 | `coredump` | `gcore` on the container's main process; the process pauses while the core is written | Yes |

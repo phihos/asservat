@@ -137,14 +137,14 @@ func (a *agents) answer(id string, r api.Reply) {
 }
 
 // agentStream is a node agent's long-lived connection: the hub writes one
-// JSON command per line. On connect the agent receives the node's tasks that
-// were approved while it was away.
+// JSON command per line. On connect the agent receives the node's open
+// tasks: those approved while it was away, and those it had started.
 func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string) error {
 	node := r.URL.Query().Get("node")
 	if node == "" {
 		return errStatus{http.StatusBadRequest, "node is required"}
 	}
-	queued, err := h.Store.QueuedTasks(r.Context(), cluster, node)
+	queued, err := h.Store.OpenTasks(r.Context(), cluster, node)
 	if err != nil {
 		return err
 	}

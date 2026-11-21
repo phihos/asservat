@@ -6,14 +6,17 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -130,7 +133,9 @@ func TestCaptureFlow(t *testing.T) {
 		Status: corev1.PodStatus{Phase: corev1.PodRunning}}
 	elsewhere := pod.DeepCopy()
 	elsewhere.Name, elsewhere.Spec.NodeName = "api-2", "node-b"
-	kube := fake.NewClientset(pod, elsewhere, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "payments"},
+	third := pod.DeepCopy()
+	third.Name, third.Spec.NodeName = "api-3", "node-c"
+	kube := fake.NewClientset(pod, elsewhere, third, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "payments"},
 		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}}})
 	// RBAC of the fake cluster: the payments group may exec in payments.
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -171,7 +176,7 @@ func TestCaptureFlow(t *testing.T) {
 	if code, _ := request("mallory-token", state); code != 403 {
 		t.Fatal("captured without the exec right", code)
 	}
-	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/workloads", nil); code != 200 || string(b) != `["Deployment/api","Pod/api-1","Pod/api-2"]`+"\n" {
+	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/workloads", nil); code != 200 || string(b) != `["Deployment/api","Pod/api-1","Pod/api-2","Pod/api-3"]`+"\n" {
 		t.Fatal("workloads", code, string(b))
 	}
 
@@ -203,6 +208,11 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("mcp read_artifact", code, string(b))
 	}
 
+	code, b = f.call("alice-token", "POST", "/mcp", map[string]any{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": map[string]any{"name": "list_captures"}})
+	if code != 200 || !strings.Contains(string(b), c.ID) {
+		t.Fatal("mcp list_captures", code, string(b))
+	}
+
 	// A core dump waits for another administrator.
 	core := target
 	core.Kind, core.Reason = api.KindCoredump, "deadlock in production"
@@ -225,6 +235,9 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	if code, _ := f.call("root2-token", "POST", "/api/captures/"+mine.ID+"/deny", nil); code != 200 {
 		t.Fatal("deny", code)
+	}
+	if got := f.capture("root-token", mine.ID); got.State != api.StateDenied || got.Tasks[0].State != api.StateCancelled {
+		t.Fatal("denied capture", got.State, got.Tasks)
 	}
 	if code, _ := f.call("root2-token", "POST", "/api/captures/"+mine.ID+"/approve", nil); code != 409 {
 		t.Fatal("a denied capture was approved", code)
@@ -250,6 +263,23 @@ func TestCaptureFlow(t *testing.T) {
 	go other.Run(ctx)
 	if got := f.wait("alice-token", queued.ID, api.StateCompleted, api.StateFailed); got.State != api.StateCompleted || got.Artifacts[0].Name != "api-2/app.log" {
 		t.Fatal("task queued for a reconnecting agent", got)
+	}
+
+	// A task whose agent restarted while it ran is reported as failed when
+	// the node's agent connects again, instead of staying Running.
+	lost := target
+	lost.Kind, lost.Pods = api.KindLogs, []string{"api-3"}
+	code, running := request("alice-token", lost)
+	if code != 201 || running.Tasks[0].Node != "node-c" {
+		t.Fatal(code, running)
+	}
+	if err := store.SetTask(t.Context(), running.ID, api.TaskStatus{Pod: "api-3", State: api.StateRunning}); err != nil {
+		t.Fatal(err)
+	}
+	restarted := &agent.Agent{HubURL: server.URL, Token: joined.Token, Node: "node-c", Kube: kube, HTTP: http.DefaultClient}
+	go restarted.Run(ctx)
+	if got := f.wait("alice-token", running.ID, api.StateCompleted, api.StateFailed); got.State != api.StateFailed || !strings.Contains(got.Tasks[0].Message, "restarted") {
+		t.Fatal("task of a restarted agent", got.State, got.Tasks)
 	}
 
 	// Cancel, delete and the audit trail.
@@ -315,6 +345,45 @@ func TestRetention(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("the expired capture was kept")
+		}
+	}
+}
+
+// Pods that finish at the same moment still complete the capture.
+func TestConcurrentTasksCompleteTheCapture(t *testing.T) {
+	dsn := os.Getenv("ASSERVAT_TEST_DSN")
+	if dsn == "" {
+		t.Skip("ASSERVAT_TEST_DSN is not set")
+	}
+	store, err := hub.OpenStore(t.Context(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	for round := range 20 {
+		c := api.Capture{ID: uuid.NewString(), Requester: "alice", State: api.StateQueued, ExpiresAt: time.Now().Add(time.Hour),
+			CaptureRequest: api.CaptureRequest{Cluster: "concurrent", Namespace: "n", Workload: "Deployment/d", Kind: api.KindLogs}}
+		for i := range 8 {
+			c.Tasks = append(c.Tasks, api.Task{Pod: fmt.Sprint("pod-", i), Node: "node", State: api.StateQueued})
+		}
+		if err := store.CreateCapture(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		for _, task := range c.Tasks {
+			wg.Go(func() {
+				if err := store.SetTask(t.Context(), c.ID, api.TaskStatus{Pod: task.Pod, State: api.StateCompleted}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		wg.Wait()
+		got, err := store.Capture(t.Context(), c.ID)
+		if err != nil || got.State != api.StateCompleted || got.FinishedAt == nil {
+			t.Fatal("round", round, got.State, err)
+		}
+		if _, err := store.DeleteCapture(t.Context(), c.ID); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

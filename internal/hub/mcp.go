@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"asservat.local/asservat/internal/api"
 )
@@ -75,12 +76,7 @@ var mcpTools = []mcpTool{
 		}},
 	{Name: "list_captures", Description: "List your most recent captures with their state and files.", InputSchema: object(""),
 		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) {
-			requester := u.Name
-			if u.Admin {
-				requester = ""
-			}
-			before, limit, _ := page(&http.Request{})
-			return h.Store.Captures(ctx, requester, before, limit)
+			return h.captures(ctx, u, time.Now().Add(time.Hour), defaultPage)
 		}},
 	{Name: "get_capture", Description: "Read one capture: its state, per-pod tasks and the stored files.", InputSchema: object(`"id":{"type":"string"}`, "id"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {

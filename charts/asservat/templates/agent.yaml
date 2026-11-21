@@ -57,7 +57,7 @@ spec:
     spec:
       serviceAccountName: {{ .Release.Name }}-agent
       # The agent enters the network namespace of the node's pods and attaches
-      # to their processes: it needs the node's PID namespace and privileges.
+      # to their processes: it needs the node's PID namespace.
       hostPID: true
       tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
       containers:
@@ -77,7 +77,18 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           securityContext:
-            privileged: true
+            runAsUser: 0
+            # setns into a pod's network namespace (SYS_ADMIN), capture there
+            # (NET_ADMIN, NET_RAW), and attach to processes for strace and
+            # gcore (SYS_PTRACE). The default seccomp and AppArmor profiles
+            # block setns and ptrace of other containers' processes.
+            capabilities:
+              drop: [ALL]
+              add: [SYS_ADMIN, SYS_PTRACE, NET_ADMIN, NET_RAW, DAC_READ_SEARCH, DAC_OVERRIDE]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
           resources: {{- toYaml .Values.agent.resources | nindent 12 }}
           volumeMounts:
             - name: agent

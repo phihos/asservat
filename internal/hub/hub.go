@@ -372,9 +372,12 @@ func (h *Hub) visible(ctx context.Context, u User, id string) (api.Capture, erro
 	return c, nil
 }
 
+// defaultPage is the length of a list page unless the caller sets limit.
+const defaultPage = 50
+
 // page reads the before and limit query parameters of a list request.
 func page(r *http.Request) (time.Time, int, error) {
-	before, limit := time.Now().Add(time.Hour), 50
+	before, limit := time.Now().Add(time.Hour), defaultPage
 	if v := r.URL.Query().Get("before"); v != "" {
 		t, err := time.Parse(time.RFC3339Nano, v)
 		if err != nil {
@@ -397,18 +400,24 @@ func (h *Hub) listCaptures(w http.ResponseWriter, r *http.Request, u User) error
 	if err != nil {
 		return err
 	}
+	list, err := h.captures(r.Context(), u, before, limit)
+	if err != nil {
+		return err
+	}
+	return reply(w, list)
+}
+
+// captures lists the user's captures, or everyone's for an administrator.
+func (h *Hub) captures(ctx context.Context, u User, before time.Time, limit int) ([]api.Capture, error) {
 	requester := u.Name
 	if u.Admin {
 		requester = ""
 	}
-	list, err := h.Store.Captures(r.Context(), requester, before, limit)
-	if err != nil {
-		return err
-	}
+	list, err := h.Store.Captures(ctx, requester, before, limit)
 	if list == nil {
 		list = []api.Capture{}
 	}
-	return reply(w, list)
+	return list, err
 }
 
 func (h *Hub) getCapture(w http.ResponseWriter, r *http.Request, u User) error {

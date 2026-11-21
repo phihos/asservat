@@ -152,8 +152,21 @@ func (s *Store) Captures(ctx context.Context, requester string, before time.Time
 // Decide moves a capture out of PendingApproval. It reports false when the
 // capture was already decided.
 func (s *Store) Decide(ctx context.Context, id, approver, state string) (bool, error) {
-	tag, err := s.db.Exec(ctx, `UPDATE captures SET state = $3, approver = $2, finished_at = CASE WHEN $3 = 'Denied' THEN now() END WHERE id = $1::uuid AND state = 'PendingApproval'`, id, approver, state)
-	return tag.RowsAffected() == 1, err
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE captures SET state = $3, approver = $2, finished_at = CASE WHEN $3 = 'Denied' THEN now() END WHERE id = $1::uuid AND state = 'PendingApproval'`, id, approver, state)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	if state == api.StateDenied {
+		if _, err := tx.Exec(ctx, `UPDATE tasks SET state = 'Cancelled' WHERE capture_id = $1::uuid`, id); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
 }
 
 // Cancel ends a capture that has not finished and returns whether it did.
@@ -182,6 +195,11 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 		return err
 	}
 	defer tx.Rollback(ctx)
+	// Reports of several pods serialize on the capture row, so each one sees
+	// the others' task states when it derives the capture's state.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM captures WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
+		return err
+	}
 	tag, err := tx.Exec(ctx, `UPDATE tasks SET state = $3, message = $4 WHERE capture_id = $1::uuid AND pod = $2 AND state IN ('Queued','Running')`, id, st.Pod, st.State, st.Message)
 	if err != nil {
 		return err
@@ -201,18 +219,19 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 	return tx.Commit(ctx)
 }
 
-// QueuedTasks returns the approved tasks of a node that have not started,
-// for delivery when its agent connects.
-func (s *Store) QueuedTasks(ctx context.Context, cluster, node string) ([]api.Command, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text, t.pod, c.request FROM tasks t JOIN captures c ON c.id = t.capture_id
- WHERE c.cluster = $1 AND t.node = $2 AND t.state = 'Queued' AND c.state IN ('Queued','Running')`, cluster, node)
+// OpenTasks returns a node's tasks that are approved and have not finished,
+// for delivery when its agent connects. A task that had already started is
+// marked so: its agent either still runs it or lost it in a restart.
+func (s *Store) OpenTasks(ctx context.Context, cluster, node string) ([]api.Command, error) {
+	rows, err := s.db.Query(ctx, `SELECT c.id::text, t.pod, t.state = 'Running', c.request FROM tasks t JOIN captures c ON c.id = t.capture_id
+ WHERE c.cluster = $1 AND t.node = $2 AND t.state IN ('Queued','Running') AND c.state IN ('Queued','Running')`, cluster, node)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (api.Command, error) {
 		cmd := api.Command{Type: "task", Task: &api.TaskAssignment{}}
 		var request []byte
-		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &request); err != nil {
+		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &cmd.Task.Started, &request); err != nil {
 			return cmd, err
 		}
 		return cmd, json.Unmarshal(request, &cmd.Task.Request)

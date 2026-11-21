@@ -58,8 +58,9 @@ postgres:
   size: 2Gi
   storageClassName: ""
 
-# The node agent: one privileged pod per node that records evidence from the
-# node's pods and uploads it to the hub.
+# The node agent: one pod per node that records evidence from the node's pods
+# and uploads it to the hub. It uses the node's PID namespace and the
+# capabilities SYS_ADMIN, SYS_PTRACE, NET_ADMIN and NET_RAW.
 agent:
   enabled: true
   # URL of the hub. Empty: the hub of this release.

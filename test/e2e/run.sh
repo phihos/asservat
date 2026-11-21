@@ -72,6 +72,7 @@ if [ -z "${SKIP_BUILD:-}" ]; then
   log "build image"
   docker build -q -t "$IMAGE" .
 fi
+rm -f "$WORK/image.tar"
 docker save "$IMAGE" -o "$WORK/image.tar"
 
 log "create clusters"
@@ -180,12 +181,19 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/capture.pcap"
 magic=$(od -An -tx1 -N4 "$WORK/capture.pcap" | tr -d ' ')
 case "$magic" in d4c3b2a1|a1b2c3d4|4d3cb2a1|a1b23c4d) ;; *) fail "not a pcap file: $magic" ;; esac
 [ "$(stat -c %s "$WORK/capture.pcap")" -gt 1000 ] || fail "pcap holds no packets"
-if command -v tcpdump >/dev/null; then tcpdump -nn -r "$WORK/capture.pcap" 2>/dev/null | grep -q '\.8080' || fail "pcap lacks the filtered traffic"; fi
+grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
+if command -v tcpdump >/dev/null; then tcpdump -nn -r "$WORK/capture.pcap" 2>/dev/null | grep '\.8080' >/dev/null || fail "pcap lacks the filtered traffic"; fi
 
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/web.strace"
 grep -Eq '(wait4|nanosleep|clock_nanosleep|execve|read)\(' "$WORK/web.strace" || fail "strace content: $(head -3 "$WORK/web.strace")"
+
+log "HTTP profile endpoint, fetched inside the pod's network namespace (edge)"
+# The demo serves no real profile; any localhost-only endpoint shows the path.
+id=$(capture "$ALICE" "$(target edge pprof '{"durationSeconds":1,"params":{"port":"8080","path":"/index.html"}}')"); completed "$ALICE" "$id"
+fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/profile.pprof"
+[ "$(cat "$WORK/profile.pprof")" = hello ] || fail "profile endpoint content"
 
 log "core dump (edge) waits for an administrator"
 id=$(capture "$ALICE" "$(target edge coredump '{"reason":"e2e","pods":[]}')")
@@ -200,7 +208,13 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/core.web"
 [ "$(od -An -tu2 -j16 -N2 "$WORK/core.web" | tr -d ' ')" = 4 ] || fail "ELF file is not a core (ET_CORE)"
 edge -n shop get pods -o json | jq -e '[.items[].status.containerStatuses[].restartCount] | add == 0' >/dev/null || fail "a captured pod restarted"
 
-log "a denied capture never runs; MCP; audit"
+log "packet capture with payload (edge) waits for an administrator; a denied capture never runs"
+id=$(capture "$ALICE" "$(target edge pcap '{"durationSeconds":3,"params":{"payload":"true"}}')")
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .state)" = PendingApproval ] || fail "payload capture did not wait for approval"
+ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+completed "$ALICE" "$id"
+fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/payload.pcap"
+grep -q 'GET / HTTP' "$WORK/payload.pcap" || fail "approved payload capture lacks the payload"
 id=$(capture "$ALICE" "$(target edge pcap '{"params":{"payload":"true"}}')")
 ok "$ROOT" POST "/api/captures/$id/deny" >/dev/null
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, (.artifacts | length)] | @csv')" = '"Denied",0' ] || fail "denied capture"

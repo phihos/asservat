@@ -125,13 +125,24 @@ func (a *Agent) stream(ctx context.Context) error {
 	}
 }
 
-// start runs one task in the background. A task that is already running (the
-// hub sends queued tasks again after a reconnect) is not started twice.
+// start runs one task in the background. The hub sends a node's open tasks
+// again after a reconnect: one that is running here is not started twice,
+// and one that had started before this agent did is reported as lost.
 func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 	key := id + "/" + t.Pod
 	a.mu.Lock()
 	if _, ok := a.running[key]; ok {
 		a.mu.Unlock()
+		return
+	}
+	if t.Started {
+		a.mu.Unlock()
+		lost := api.TaskStatus{Pod: t.Pod, State: api.StateFailed, Message: "the node agent restarted during the capture, or its result did not reach the hub"}
+		go func() {
+			if err := a.post(ctx, "/agent/captures/"+id+"/status", lost); err != nil {
+				slog.Warn("task status", "capture", id, "pod", t.Pod, "error", err)
+			}
+		}()
 		return
 	}
 	ctx, cancel := context.WithCancel(ctx)

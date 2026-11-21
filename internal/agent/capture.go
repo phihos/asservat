@@ -54,14 +54,14 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		if err != nil {
 			return err
 		}
-		// Headers only unless payload was requested (and approved).
-		snap := "128"
-		if r.Params["payload"] == "true" {
-			snap = "0"
-		}
-		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-i", "any", "-U", "-s", snap, "-w", "-"}
+		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
 		if f := r.Params["filter"]; f != "" {
 			args = append(args, f)
+		}
+		// Headers only unless payload was requested (and approved).
+		if r.Params["payload"] != "true" {
+			packets := up
+			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
 		return a.record(ctx, duration, "capture.pcap", up, "nsenter", args...)
 	case api.KindStrace:

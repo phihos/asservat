@@ -201,6 +201,9 @@ type Reply struct {
 type TaskAssignment struct {
 	Pod     string         `json:"pod"`
 	Request CaptureRequest `json:"request"`
+	// Started marks a task that the hub knows as running, sent again when
+	// the node's agent reconnects. An agent that does not run it lost it.
+	Started bool `json:"started,omitempty"`
 }
 
 // TaskStatus is an agent's report about its task.
