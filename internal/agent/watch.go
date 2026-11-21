@@ -30,9 +30,9 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 	for _, w := range list {
 		wanted[w.ID] = true
 		if _, ok := a.watching[w.ID]; !ok {
-			ctx, cancel := context.WithCancel(ctx)
+			watching, cancel := context.WithCancel(ctx)
 			a.watching[w.ID] = cancel
-			go a.observe(ctx, w)
+			go a.observe(ctx, watching, w)
 		}
 	}
 	for id, cancel := range a.watching {
@@ -46,7 +46,9 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 // observe follows the watched workload's pods on this node through a
 // Kubernetes watch until ctx ends. It reports a pod whose container crashed
 // to the hub and, for a packet watch, keeps a buffer of each pod's packets.
-func (a *Agent) observe(ctx context.Context, w api.Watch) {
+// A report continues under the agent's context: the hub ends the watch
+// while it answers the report of its last crash.
+func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	options := func(o metav1.ListOptions) metav1.ListOptions {
 		selected := podOptions(w.Workload, w.Selector)
 		o.LabelSelector = selected.LabelSelector
@@ -76,7 +78,7 @@ func (a *Agent) observe(ctx context.Context, w api.Watch) {
 			a.buffer(ctx, w, pod)
 		}
 		if message := crashes(pod, seen); message != "" && known {
-			go a.trigger(ctx, w, pod.Name, message)
+			go a.trigger(agent, w, pod.Name, message)
 		}
 	}
 	_, informer := cache.NewInformerWithOptions(cache.InformerOptions{ListerWatcher: source, ObjectType: &corev1.Pod{}, Handler: cache.ResourceEventHandlerFuncs{

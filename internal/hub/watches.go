@@ -153,14 +153,17 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	}
 	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger"); err != nil {
 		// The crash was not recorded, so it does not count.
-		h.Store.RefundWatch(context.WithoutCancel(r.Context()), id)
+		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
+			slog.Error("watch crash not given back", "watch", id, "error", e)
+		}
 		return err
 	}
 	if remaining > 0 {
 		return nil
 	}
+	// The capture exists: a failed cleanup is no failed report.
 	if err := h.Store.DeleteWatch(r.Context(), id); err != nil {
-		return err
+		slog.Error("ended watch not deleted", "watch", id, "error", err)
 	}
 	h.pushWatches(r.Context(), cluster)
 	return nil
