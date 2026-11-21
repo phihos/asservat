@@ -13,7 +13,7 @@ what is deliberately left out. Change it together with the code.
 | --- | --- | --- |
 | Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, serves console, REST API and MCP |
 | Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
-| PostgreSQL | Bundled or external | Clusters, captures, tasks, artifact index, audit log |
+| PostgreSQL | Bundled or external | Captures, tasks, watches, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
 
 Both components are the same binary and image (`asservat hub`, `asservat agent`).
@@ -222,14 +222,15 @@ cgroup whose parent is outside of it.
 - **Threat model.** Operators keep everyone who is not an Asservat
   administrator out of the Asservat namespaces. Whoever can write there, and
   any cluster administrator, is trusted.
-- **Agents** authenticate with their cluster's join token; the hub stores only
-  its SHA-256. A token can upload files for the pods of open captures of its
+- **Clusters** are configuration of the hub (`hub.clusters`: a name and a
+  join token each), like its users. Nothing registers a cluster at run time.
+- **Agents** authenticate with their cluster's join token. A token can upload files for the pods of open captures of its
   own cluster, report their status and answer queries about that cluster,
   and nothing else. Use HTTPS between clusters.
 - **Evidence at rest** is encrypted by the hub: AES-256-GCM in 64 KiB chunks
   with a random key per file, wrapped by the master key from the hub's Secret.
   Losing the master key loses the evidence.
-- **Audit.** Cluster changes, requests, watches and the captures they
+- **Audit.** Requests, watches and the captures they
   trigger, approvals, denials, stops, cancellations, deletions, expiries and
   every download are recorded with the actor.
 - A core file rests unencrypted on the node until its upload ends, then it

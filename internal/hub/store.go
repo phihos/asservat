@@ -61,33 +61,10 @@ func (s *Store) AuditLog(ctx context.Context, before time.Time, limit int) ([]Au
 	})
 }
 
-func (s *Store) AddCluster(ctx context.Context, name string, tokenHash []byte) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO clusters(name, token_sha256) VALUES ($1,$2) ON CONFLICT (name) DO UPDATE SET token_sha256 = excluded.token_sha256`, name, tokenHash)
+// KeepWatches deletes the watches of clusters that are no longer configured.
+func (s *Store) KeepWatches(ctx context.Context, clusters []string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM watches WHERE NOT cluster = ANY($1)`, clusters)
 	return err
-}
-
-// DeleteCluster removes a cluster and its watches. Its captures stay.
-func (s *Store) DeleteCluster(ctx context.Context, name string) error {
-	_, err := s.db.Exec(ctx, `WITH w AS (DELETE FROM watches WHERE cluster = $1) DELETE FROM clusters WHERE name = $1`, name)
-	return err
-}
-
-func (s *Store) Clusters(ctx context.Context) ([]string, error) {
-	rows, err := s.db.Query(ctx, `SELECT name FROM clusters ORDER BY name`)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, pgx.RowTo[string])
-}
-
-// ClusterByToken returns the cluster whose join token has this hash.
-func (s *Store) ClusterByToken(ctx context.Context, tokenHash []byte) (string, error) {
-	var name string
-	err := s.db.QueryRow(ctx, `SELECT name FROM clusters WHERE token_sha256 = $1`, tokenHash).Scan(&name)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNotFound
-	}
-	return name, err
 }
 
 func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {

@@ -96,9 +96,20 @@ capabilities, so their namespace must allow Pod Security `privileged`.
 
 ### Join another cluster
 
-1. In the console, add the cluster under **Clusters** (or
-   `POST /api/clusters {"name": "<cluster-name>"}`). The join token is shown once.
-2. Install only the agents in that cluster:
+Clusters are part of the hub's configuration, not something to click
+together.
+
+1. Make a join token (`openssl rand -hex 32`) and list the cluster in the
+   hub's values, then upgrade the hub's release:
+
+```yaml
+hub:
+  clusters:
+    - name: <cluster-name>
+      token: <join-token>
+```
+
+2. Install only the agents in that cluster, with the same token:
 
 ```sh
 helm install asservat charts/asservat -n asservat --create-namespace \
