@@ -88,10 +88,10 @@ configure an external database (`hub.database.existingSecret`) or an S3 bucket
 OIDC issuer (`hub.oidc`). The agent pods run as root with the node's PID namespace and extra
 capabilities, so their namespace must allow Pod Security `privileged`.
 
-!!! note
-    A release image is not published yet. Build it with
-    `docker build -t <registry>/asservat:<tag> .` and set `image.repository`
-    and `image.tag`.
+> [!NOTE]
+> A release image is not published yet. Build it with
+> `docker build -t <registry>/asservat:<tag> .` and set `image.repository`
+> and `image.tag`.
 
 ### Join another cluster
 
@@ -123,10 +123,10 @@ curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/a
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
 get tools to list workloads, request captures and read text evidence.
 
-!!! warning
-    A downloaded file is outside Asservat's control: it is not deleted when
-    the retention ends. A core dump pauses the process while it is written,
-    and `strace` slows the traced process.
+> [!WARNING]
+> A downloaded file is outside Asservat's control: it is not deleted when
+> the retention ends. A core dump pauses the process while it is written,
+> and `strace` slows the traced process.
 
 ## Develop
 
