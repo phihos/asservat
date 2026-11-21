@@ -1,410 +1,77 @@
-# One hub release per installation; one cluster release per workload cluster.
-# combined is the single-cluster topology (hub and region in one cluster).
-mode: hub
-
-# The exact product image. Every product workload and hook Job uses it.
 image:
-  repository: ""
-  # sha256:<64 hex>; the chart references the image only by digest.
-  digest: ""
+  repository: ghcr.io/phihos/asservat
+  tag: ""          # defaults to the chart's appVersion
   pullPolicy: IfNotPresent
-  # Existing dockerconfigjson Secrets in the release namespace.
-  pullSecrets: []
 
-installation:
-  # Prefix of every object name; a DNS label of at most 30 characters.
-  name: asservat
-
-# The browser origin of the console and API, for example
-# https://asservat.example.org. Ingress/HTTPRoute hosts are derived from it.
-origin: ""
-
-# Browser/MCP OpenID Connect identity of the hub (ADR-185). Clients, subjects
-# and groups are stable issuer IDs. With bundled Keycloak, issuer and the
-# console client are derived from services.identity.keycloak.
-identity:
-  issuer: ""
-  clientID: ""
-  # Audience of the console's access tokens; empty uses clientID.
-  browserAudience: ""
-  # Public PEM roots of the issuer (hub-api verifies its TLS and keys with
-  # them). Required with an external provider; bundled Keycloak uses the
-  # ca.crt of services.identity.keycloak.tlsSecretName.
-  providerRootsPEM: ""
-  # External identity provider: existing Secret with the console client's
-  # OIDC secret. Bundled Keycloak uses `<name>-keycloak-state`.
-  clientSecret:
+# The hub: API, console, approvals and evidence storage. Install it in one
+# cluster; set hub.enabled=false in the other clusters.
+hub:
+  enabled: true
+  # Members of these groups approve sensitive captures and manage clusters.
+  adminGroups: [asservat-admins]
+  # How long evidence is kept (Go duration).
+  retention: 168h
+  # Let an administrator approve their own sensitive capture. Enable it only
+  # for installations with a single administrator.
+  allowSelfApproval: false
+  # Name under which this cluster's own agents join. Empty: do not register it.
+  localCluster: local
+  # Users with fixed bearer tokens. The names and groups are the subjects that
+  # each cluster's RBAC is asked about (pods/exec in the namespace).
+  #   - name: alice
+  #     token: <at least 32 random characters>
+  #     groups: [payments-devs]
+  users: []
+  # Accept ID tokens of an OIDC issuer as bearer tokens.
+  oidc:
+    issuer: ""
+    clientID: ""
+    usernameClaim: preferred_username
+    groupsClaim: groups
+  database:
+    # Secret with the key "dsn" holding a PostgreSQL connection string.
+    # Empty: the chart runs its own single PostgreSQL instance.
     existingSecret: ""
-    key: client-secret
-  clients: []
-  # Token claim with group names, and the claim shown for people.
-  groupsClaim: groups
-  usernameClaim: preferred_username
-  # Optional: only members of one of these groups may sign in.
-  requiredGroups: []
-  # Installation administrators by group name or subject. Bundled Keycloak
-  # defaults to its /asservat-admins group.
-  administrators:
-    groups: []
-    subjects: []
-  # Browser sessions end at creation plus maxLifetimeSeconds or after
-  # inactivityTimeoutSeconds without a request, whichever comes first.
-  maxLifetimeSeconds: 604800
-  inactivityTimeoutSeconds: 86400
-  # Optional approval settings. Step-up is off by default; ACR values are
-  # provider-specific. Policy grants default to 90 days (maximum 365 days).
-  # approvals:
-  #   stepUp: { acrValues: ["2"], maxAgeSeconds: 300 }
-  #   policyGrants: { defaultAgeSeconds: 7776000 }
-  # Optional: identities allowed to restrict and release processing.
-  # Processing is initialized automatically when the hub creates its root.
-  # processingOperators:
-  #   - { clientID: asservat-console, issuer: https://id.example/realms/org, kind: Group, id: GROUP-ID }
-
-# Optional operator-declared organizations for privacy inventory reports.
-# Omitted means undeclared; an explicit empty list declares none.
-# processors:
-#   - id: evidence-provider
-#     name: Example organization
-#     activities: ["Evidence storage"]
-#     regions: []
-
-# Optional lower history view/cache ceilings. Both values are required.
-# captureHistory:
-#   perSelector: 200
-#   perInstallation: 10000
-
-# How the console/API (hub-api, Service port 9445) is reached.
-exposure:
+  storage:
+    # Evidence is encrypted by the hub before it is stored. Either a volume ...
+    size: 20Gi
+    storageClassName: ""
+    # ... or an S3-compatible bucket (then no volume is created).
+    s3:
+      endpoint: ""          # host[:port]
+      bucket: ""
+      insecure: false       # plain HTTP
+      existingSecret: ""    # keys "accessKey" and "secretKey"
   service:
     type: ClusterIP
-    # Only with type NodePort.
+    port: 80
     nodePort: null
-    annotations: {}
-  # ADR-327: pod terminates browser TLS in hub-api with tlsSecret; proxy lets
-  # an Ingress/Gateway terminate it and forward to the Service.
-  tls:
-    mode: pod
-  # Existing kubernetes.io/tls Secret for the origin (pod mode), for example
-  # issued by cert-manager.
-  tlsSecret: ""
   ingress:
     enabled: false
     className: ""
-    annotations: {}
-    # TLS blocks copied verbatim; hosts default to the origin host.
-    tls: []
-  httpRoute:
-    enabled: false
-    # Gateway parentRefs copied verbatim.
-    parentRefs: []
-    annotations: {}
+    host: ""
+    tlsSecretName: ""
+  resources: {}
 
-# Workload clusters installed with `mode: cluster` (hub or combined
-# releases). Their connectors authenticate with their own ServiceAccount
-# tokens (ADR-334); the hub verifies them against the issuer below and
-# derives each cluster's ID from its name. Nothing is copied between
-# clusters.
-clusters: []
-# - name: payments-eu        # DNS label; how people and policies name it
-#                            # ("local" is the hub's own cluster in combined mode)
-#   issuer: https://eu-apiserver.example  # its ServiceAccount issuer
-#   # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
-#   # connector: asservat-system/asservat-connector  # default <namespace>/<name>-connector
-#   # revoked: true          # refuse its tokens
-#   namespace: ""            # its release namespace; default: this one
+postgres:
+  image: docker.io/library/postgres:17-alpine
+  size: 2Gi
+  storageClassName: ""
 
-# Evidence capacity (specs/capacity.md). Every field is optional and
-# changes apply on helm upgrade; an external object store needs
-# evidenceStorage. Namespaces labelled asservat.io/evidence: disabled, system
-# namespaces and the release namespace take no part.
-capacity: {}
-#   evidenceStorage: 128Gi     # default: the bundled store's volume size;
-#                              # required for an external store
-#   storageAssurance: bestEffort   # or qualifiedReservedBackend
-#   capturesPerCluster: 8      # default: larger of 8 and the node count
-#   namespaceLimit: 25%        # default: no namespace cap
-#   workload:
-#     share: 16Gi              # protected per workload; default the rest ÷ max(8, enrolled workloads)
-#     limit: 10%               # protected share plus burst; at least the share
-#     dump: {burst: 1, minimumIntervalSeconds: 900}
-#     maxConcurrentExpensive: 1  # concurrent profiles per workload
-
-# Deployment/StatefulSet label and annotation keys only administrators may
-# set (ADR-247), for workloadMetadata PermissionSources.
-workloadKeys: {}
-#   labels: []
-#   annotations: []
-
-# The hub's baseline retention policy (the former
-# bootstrap.continuation.public.retentionBaseline: purposeRef, defaults,
-# maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
-retention: {}
-
-# Regional connector (mode=cluster or mode=combined). mode=cluster: set
-# hub.url to the hub to join and register this cluster in the hub's
-# `clusters` values. The connector authenticates with its ServiceAccount
-# token (ADR-334); the hub sends its IDs and settings on connect.
-region:
-  enabled: false
-  # Regional context start (ADR-171).
-  executor:
-    enabled: true
-    concurrency: 4
-    # Secret in this namespace with profile-authorization.json (ADR-302).
-    profileAuthorization: ""
-    # ADR-231: in-cluster Alertmanager base URL for alert policies.
-    alertmanager: ""
-    # ADR-245: identity mapping records (adds SubjectAccessReview create).
-    identityMappings: []
-    # ADR-285: administrator Go pprof endpoint templates and profiles.
-    profileEndpoints: []
-  resources:
-    requests: {cpu: 100m, memory: 64Mi}
-    limits: {cpu: 500m, memory: 256Mi}
-  nodeSelector: {}
-  tolerations: []
-
-# ADR-246: the `asservat node` collector DaemonSet, with mode=cluster or
-# mode=combined. Its namespace is the only one with the privileged Pod
-# Security exception. Until the collector is qualified, every collector Pod
-# mounts the host file /etc/asservat-disposable-host and checks it again.
-collector:
-  enabled: false
-  namespace: asservat-collector
-  # Collector-wide ceilings per node (bytes).
-  ceilings:
-    maxActiveSources: 16
-    inputBytesPerSecond: 16777216
-    inputBurstBytes: 16777216
-    ringBytes: 268435456
-    frozenBytes: 268435456
-    uploadBytesPerSecond: 33554432
-    uploadBurstBytes: 67108864
-  # Node live-projection processing ceilings; null disables the mechanism.
-  live: null
-
-# Hub workloads (mode hub or combined). Every hub component renders in the
-# release namespace; replicas: 0 stops one.
-hub:
-  # The hub URL connectors dial (one HTTPS endpoint, REQ-FED-002).
-  # mode=cluster: the hub to join. Hub releases with `clusters`: the URL
-  # workload clusters use; its host is added to the federation's generated
-  # serving certificate. Today it reaches the federation Service
-  # (hub.federation.service), not the console's Ingress.
-  url: ""
-  # mode=cluster: PEM roots for hub.url when the system roots do not
-  # verify it.
-  caBundle: ""
-  hub-api:
-    replicas: 1
-    connections: 4
-    concurrency: 2
-    resources:
-      requests: {cpu: 100m, memory: 128Mi}
-      limits: {cpu: "1", memory: 512Mi}
-    nodeSelector: {}
-    tolerations: []
-    # Owner native/operation listener for connectors and download workers.
-    # Workload clusters reach it through hub.url.
-    nativeService:
-      type: ClusterIP
-      annotations: {}
-      nodePorts: {}
-      # nodePorts: {native: 31447, operation: 31449}
-    # Download-worker namespaces in the hub cluster; empty uses <name>-downloads.
-    workerNamespaces: []
-    # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
-    peers: []
-    public:
-      previewSeconds: 120
-      operationConcurrency: 8
-      mcpPerIdentity: 2
-      # Concurrent download responses per hub-api replica; each runs one
-      # download-worker Pod (download-worker.cpuMillis/memoryBytes).
-      downloadConcurrency: 4
-      # Retention comes from the capacity qualification.
-      operationAudit:
-        normalConcurrency: 8
-        resolutionConcurrency: 2
-        perPrincipalConcurrency: 2
-        normalPerSecond: 50
-        resolutionPerSecond: 10
-      downloadPlan:
-        outputLimit: 268435456
-        readLimit: 311164928
-      # Read the capacity processing source <name>-processing-source.
-      processing: false
-  hub-worker:
-    replicas: 1
-    resources:
-      requests: {cpu: 100m, memory: 64Mi}
-      limits: {cpu: 500m, memory: 256Mi}
-    nodeSelector: {}
-    tolerations: []
-    # The permission child always runs: the hub cluster's AccessBindings in
-    # every namespace (written by namespace RBAC, ADR-329), PermissionSources
-    # of the release namespace, the browser/identity settings projections
-    # and, with `retention`, the hub retention source.
-    # Capacity, operation audit cleanup and expired context evidence deletion
-    # run with `capacity`.
-    permission:
-      # Accounts that may write PermissionSource/AccessBinding status; empty
-      # is the hub-worker's own account.
-      statusUsers: []
-  federation:
-    replicas: 1
-    concurrency: 4
-    resources:
-      requests: {cpu: 100m, memory: 128Mi}
-      limits: {cpu: "1", memory: 512Mi}
-    nodeSelector: {}
-    tolerations: []
-    # NodePort or LoadBalancer to expose hub.url to workload clusters.
-    service:
-      type: ClusterIP
-      nodePort: null
-      annotations: {}
-    # Serving certificate (Secret `<name>-federation-tls`, keys tls.crt,
-    # tls.key, ca.crt). existingSecret wins; else cert-manager issues it
-    # when issuerRef.name is set; else the chart generates a CA and
-    # certificate once and keeps them on upgrade.
-    tls:
-      existingSecret: ""
-      # Extra serving names (the external endpoint regions dial).
-      dnsNames: []
-      issuerRef:
-        name: ""
-        kind: Issuer
-        group: cert-manager.io
-  # Artifact key service (9447); the only Pod with `<name>-artifact-key`.
-  key-service:
-    replicas: 1
-    concurrency: 8
-    resources:
-      requests: {cpu: 50m, memory: 64Mi}
-      limits: {cpu: 500m, memory: 256Mi}
-    nodeSelector: {}
-    tolerations: []
-    service:
-      type: ClusterIP
-      nodePort: null
-      annotations: {}
-    # As hub.federation.tls (Secret `<name>-key-service-tls`).
-    tls:
-      existingSecret: ""
-      dnsNames: []
-      issuerRef:
-        name: ""
-        kind: Issuer
-        group: cert-manager.io
-    # Acquisition unwraps for native downloads (ADR-204).
-    downloads:
-      # Native downloads need the key service to unwrap for the hub-local
-      # download workers (hub.download-worker, enabled by default).
-      enabled: true
-  # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
-  # dedicated `<name>-downloads` namespace; Helm renders the namespace,
-  # account, PriorityClass, the worker configuration and the dispatch Roles.
-  # Their store capability is the Secret `<name>-s3-download-read` (key
-  # credentials.json) in that namespace: generated with bundled SeaweedFS,
-  # created by the operator for an external object store.
-  download-worker:
-    enabled: true
-    cpuMillis: 500
-    memoryBytes: 402653184
-    # Runtime ceiling of one download-worker or query Job; worker certificate
-    # epochs (ADR-071) cover at most eight hours.
-    maxRuntimeSeconds: 3600
-
-# Generated Secrets (created once by the `secrets` hook, never rotated, kept
-# on uninstall). Override one with an existing Secret of the same keys:
-#   secrets:
-#     ids: { existingSecret: my-ids }
-#     sql-hub-api: { existingSecret: my-hub-api-sql }
-# Keys: ids, audit-mac, artifact-key, sql-<component>, s3-<principal>.
-secrets: {}
-
-# Independently selectable dependencies. External choices are never
-# provisioned or adopted by this chart.
-services:
-  keyService:
-    provider: external
-    # Used with provider external.
-    external:
-      endpoint: ""
-      rootsPEM: ""
-    openbao:
-      image: ghcr.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
-      persistence:
-        storageClass: ""
-        size: 8Gi
-      resources:
-        requests: {cpu: 100m, memory: 128Mi}
-        limits: {cpu: "2", memory: 512Mi}
-  postgres:
-    provider: external
-    # Used with provider external. adminSecret names an existing Secret with
-    # a `credentials.json` administrator login for `asservat setup`.
-    external:
-      host: ""
-      port: 5432
-      database: asservat
-      rootsPEM: ""
-      adminSecret: ""
-    bundled:
-      image: ""
-      storageClass: ""
-      dataSize: 64Gi
-      backupSize: 64Gi
-      resources:
-        requests: {cpu: 100m, memory: 256Mi}
-        limits: {cpu: "2", memory: 1Gi}
-      backupResources:
-        requests: {cpu: 20m, memory: 64Mi}
-        limits: {cpu: "1", memory: 256Mi}
-  objectStore:
-    provider: external
-    # Used with provider external; the operator creates the s3-* Secrets.
-    # bucket holds audit records; evidenceBucket (default: bucket) evidence.
-    external:
-      endpoint: ""
-      region: ""
-      bucket: ""
-      evidenceBucket: ""
-      rootsPEM: ""
-    seaweedfs:
-      image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
-      # The S3 Service. Workload clusters reach it through hub.url.
-      service:
-        type: ClusterIP
-        nodePort: null
-        annotations: {}
-      persistence:
-        storageClass: ""
-        size: 32Gi
-      resources:
-        requests: {cpu: 100m, memory: 128Mi}
-        limits: {cpu: "2", memory: 1Gi}
-  identity:
-    provider: external
-    keycloak:
-      image: quay.io/keycloak/keycloak@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
-      hostname: ""
-      realm: asservat
-      tlsSecretName: ""
-      mcpRedirectURIs: []
-      database:
-        host: ""
-        port: 5432
-        name: keycloak
-        user: keycloak
-        credentialsSecretName: ""
-        rootsSecretName: ""
-        maxConnections: 5
-      service:
-        type: ClusterIP
-        nodePort: 31451
-      resources:
-        requests: {cpu: 100m, memory: 256Mi}
-        limits: {cpu: "2", memory: 1Gi}
+# The node agent: one pod per node that records evidence from the node's pods
+# and uploads it to the hub. It uses the node's PID namespace and the
+# capabilities SYS_ADMIN, SYS_PTRACE, NET_ADMIN and NET_RAW.
+agent:
+  enabled: true
+  # URL of the hub. Empty: the hub of this release.
+  hubURL: ""
+  # Join token of this cluster, created in the hub (console or
+  # POST /api/clusters). Empty with hub.enabled: the local cluster's token.
+  token: ""
+  # Secret with the key "token", instead of agent.token.
+  existingSecret: ""
+  # PEM CA certificate of the hub, if its certificate is not publicly trusted.
+  caCert: ""
+  tolerations:
+    - operator: Exists
+  resources: {}

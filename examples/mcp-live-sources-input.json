@@ -1,9 +1,0 @@
-{
-  "limit": 20,
-  "target_ref": {
-    "cluster": "prod",
-    "namespace": "payments",
-    "kind": "Deployment",
-    "name": "checkout"
-  }
-}

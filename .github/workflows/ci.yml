@@ -1,250 +1,49 @@
 name: CI
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
-  workflow_dispatch:
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
 permissions:
   contents: read
-
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  # Documentation and the design prototype cannot change
-  # Go or console results; such pushes run only the checks job. The console
-  # generates contracts from docs/interfaces, so that folder always counts.
-  changes:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      code: ${{ steps.diff.outputs.code }}
-    steps:
-      - id: diff
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-          PR: ${{ github.event.number }}
-        run: |
-          files=""
-          endpoint=""
-          limit=300
-          filter='.files[] | (.filename, .previous_filename // empty)'
-          case $EVENT in
-            push)
-              [[ $BEFORE =~ ^0*$ ]] || endpoint="repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA"
-              ;;
-            pull_request)
-              endpoint="repos/$GITHUB_REPOSITORY/pulls/$PR/files?per_page=100"
-              limit=100
-              filter='.[] | (.filename, .previous_filename // empty)'
-              ;;
-          esac
-          if [[ -n $endpoint ]]; then
-            files=$(gh api "$endpoint" --jq "$filter") || {
-              echo "::warning::Changed-file lookup failed; running all code checks."
-              files=""
-            }
-          fi
-          code=true
-          # Read one bounded page only. A full PR page or compare response may
-          # omit code changes, so only shorter, successful lists can skip checks.
-          # Both paths of renames count; extra names only make this conservative.
-          if [[ -n $files ]] && (( $(wc -l <<< "$files") < limit )) &&
-             ! grep -qvE '^(docs/|design/|[^/]+\.md$)' <<< "$files" && ! grep -q '^docs/interfaces/' <<< "$files"; then
-            code=false
-          fi
-          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
-
-  checks:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with: { helm: "true" }
-      # docs/validation.md: openapi-check's validator is a development-only extra.
-      - run: pip install --disable-pip-version-check -q openapi-spec-validator==0.9.0
-      - name: Specification, architecture, schema and Helm gates
-        run: >-
-          make -k -j4 -O
-          spec-check architecture-check design-check openapi-check live-check download-check investigation-check
-          go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check
-          policy-schema-check permission-crd-check retention-crd-check
-          helm-check authority-window-check
-      - name: Harness and gate self-tests
-        run: for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-*-selection.py scripts/test-collector-provenance.py; do python3 "$f"; done
-
-  go:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-        with: { filter: "blob:none" }
-      - uses: ./.github/actions/setup
-        with: { sql-tools: "true" }
-      - run: go vet ./...
-      - run: make sql-check
-      # Warm every build the other jobs use: race test packages for the test
-      # shards, the static product binary and integration packages for native
-      # suites. Only main saves the cache, trimmed to entries this run used.
-      - name: Compile everything
-        run: |
-          go test -race -count=1 -run '^$' ./... >/dev/null
-          go test -count=1 -run '^$' ./test/integration ./internal/adapters/kms ./internal/adapters/kubernetes >/dev/null
-          CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /dev/null ./cmd/asservat
-      # ADR-243: the hub's pcap filter compiler links a pinned static libpcap
-      # (cgo, build tag libpcap). User space only: no capture or BPF load.
-      - id: libpcap
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/asservat-build/libpcap-1.11.0
-          key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
-      - if: steps.libpcap.outputs.cache-hit != 'true'
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
-      - run: make pcap-check
-      # ADR-246: the collector build links the pinned Inspektor Gadget runtime.
-      - run: make gadget-check
-      - if: github.ref == 'refs/heads/main'
-        run: find ~/.cache/go-build -type f -mmin +90 -delete
-      - if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
-
-  # scripts/check-go-tests.py --shard I/N: every shard discovers the same
-  # inventory (whole small packages, top-level tests of the SPLIT packages)
-  # and runs its part of one CI-weighted, disjoint partition. ci-ok checks
-  # the uploaded records: one plan, every unit executed exactly once.
-  # Refresh the weights: gh run download <run> -p 'go-test-shard-*' -D <dir>,
-  # then check-go-tests.py --update-weights <dir>.
   test:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-    name: test (${{ matrix.shard }}/${{ strategy.job-total }})
-    steps:
-      - uses: actions/checkout@v7
-        with: { filter: "blob:none" }
-      - uses: ./.github/actions/setup
-      # Whole packages run under -race two at a time, as the local gate
-      # (GOFLAGS=-p=2), not four, which starved timing-bound tests.
-      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
         env:
-          GOFLAGS: -p=2
-          ASSERVAT_GO_TEST_RECORD: ${{ runner.temp }}/go-test-shard-${{ matrix.shard }}.json
-      - uses: actions/upload-artifact@v7
-        with:
-          name: go-test-shard-${{ matrix.shard }}
-          path: ${{ runner.temp }}/go-test-shard-${{ matrix.shard }}.json
-          retention-days: 30
-
-  # console-check needs no Go; the browser check builds the console and the
-  # Go integration package, so it runs beside it on its own runner.
-  console:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+          POSTGRES_PASSWORD: pw
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 30
     steps:
-      - uses: actions/checkout@v7
-        with: { filter: "blob:none" }
-      - uses: ./.github/actions/setup
-        with: { go: "false", console: "true" }
-      - run: make console-check
-
-  console-browser:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+      # An S3-compatible store for the evidence store test; it starts while Go builds.
+      - run: docker run -d -p 127.0.0.1:8333:8333 docker.io/chrislusf/seaweedfs:latest server -s3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+        env:
+          ASSERVAT_TEST_DSN: postgres://postgres:pw@127.0.0.1:5432/postgres
+          ASSERVAT_TEST_S3: 127.0.0.1:8333,test,test-secret
+      - run: helm lint charts/asservat
+  e2e:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-        with: { filter: "blob:none" }
-      - uses: ./.github/actions/setup
-        with: { console: "true" }
-      - id: playwright
-        run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - run: cd web && npx playwright install --only-shell chromium
-      - run: make console-browser-check
-
-  # The smaller Go caches native.yml restores (setup go-cache: native-<kind>):
-  # only what one kind of native suite builds, compiled for this commit. Saved
-  # on main (and on a dispatch, for its branch); no required check needs them.
-  native-go-cache:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        kind: [race, collector]
-    name: native-go-cache (${{ matrix.kind }})
-    steps:
-      - uses: actions/checkout@v7
-        with: { filter: "blob:none" }
-      - uses: ./.github/actions/setup
-      - id: libpcap
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/asservat-build/libpcap-1.11.0
-          key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
-      - if: steps.libpcap.outputs.cache-hit != 'true'
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
-      - run: scripts/native-go-cache.sh ${{ matrix.kind }}
-      - uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-native-${{ matrix.kind }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
-
-  # The one check the branch ruleset requires (a skipped matrix job reports
-  # no per-shard checks). changes and checks must pass; go, test and the
-  # console jobs may be skipped only when changes classified the push as
-  # docs-only.
+          install_only: true
+      - run: test/e2e/run.sh
+  # The branch ruleset requires this one check.
   ci-ok:
     if: always()
-    needs: [changes, checks, go, test, console, console-browser]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
     steps:
-      - env:
-          CHANGES: ${{ needs.changes.result }}
-          CODE: ${{ needs.changes.outputs.code }}
-          CHECKS: ${{ needs.checks.result }}
-          GO: ${{ needs.go.result }}
-          TEST: ${{ needs.test.result }}
-          CONSOLE: ${{ needs.console.result }}
-          BROWSER: ${{ needs.console-browser.result }}
-        run: |
-          echo "changes=$CHANGES code=$CODE checks=$CHECKS go=$GO test=$TEST console=$CONSOLE console-browser=$BROWSER"
-          [[ $CHANGES == success && $CHECKS == success ]]
-          [[ $CODE == false ]] || [[ $GO == success && $TEST == success && $CONSOLE == success && $BROWSER == success ]]
-      - if: needs.test.result == 'success'
-        uses: actions/checkout@v7
-        with: { sparse-checkout: scripts/check-go-tests.py, sparse-checkout-cone-mode: false }
-      - if: needs.test.result == 'success'
-        uses: actions/download-artifact@v7
-        with: { pattern: go-test-shard-*, path: "${{ runner.temp }}/go-test-shards" }
-      # The shard count of the test matrix (test-go-shards.py checks it).
-      - if: needs.test.result == 'success'
-        run: python3 scripts/check-go-tests.py --verify-union 14 "$RUNNER_TEMP/go-test-shards"
+      - run: test "${{ needs.test.result }}" = success -a "${{ needs.e2e.result }}" = success

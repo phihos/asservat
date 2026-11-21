@@ -18,15 +18,18 @@ licence agreement.
 
 ## Before opening a pull request
 
-Read the [project guide](docs/project-guide.md) and the specification for the area
-you change. Behavior changes update the relevant `specs/` and, for consequential
-decisions, add a record under `docs/decisions/`. Tests use synthetic data only.
-CI runs the gates in [validation](docs/validation.md) on every pull request.
+Read the [design](docs/design.md). Behavior changes update it in the same pull
+request. Tests use synthetic data only.
 
 ## Run the checks
 
-Asservat is written in Go and React/TypeScript and stores its state in
-PostgreSQL. `make spec-check architecture-check` checks the specification and
-`make go-check` runs the Go checks. Suites such as `make context-integration`
-create and remove their own kind clusters and services. [Validation](docs/validation.md)
-lists every check.
+Asservat is written in Go and stores its state in PostgreSQL.
+
+```sh
+gofmt -l . && go vet ./...
+ASSERVAT_TEST_DSN=postgres://postgres:pw@127.0.0.1:5432/postgres go test -race ./...
+helm lint charts/asservat
+test/e2e/run.sh   # creates and removes two kind clusters
+```
+
+CI runs the same checks on every pull request.

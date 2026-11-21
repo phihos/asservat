@@ -1,8 +1,0 @@
-{
-  "schemaVersion": "browser-settings/v1",
-  "issuer": "https://id.example.invalid/realms/engineering",
-  "clientID": "asservat-console",
-  "origin": "https://asservat.example.invalid",
-  "maxLifetimeSeconds": 604800,
-  "inactivityTimeoutSeconds": 86400
-}

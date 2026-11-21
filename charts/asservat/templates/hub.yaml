@@ -1,0 +1,185 @@
+{{- if .Values.hub.enabled }}
+{{- $s3 := .Values.hub.storage.s3 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-hub
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+spec:
+  # One replica: connected agents and event streams are held in memory.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "asservat.labels" . | nindent 6 }}
+      app.kubernetes.io/component: hub
+  template:
+    metadata:
+      labels:
+        {{- include "asservat.labels" . | nindent 8 }}
+        app.kubernetes.io/component: hub
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hub
+          image: {{ include "asservat.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - hub
+            - --listen=:8080
+            - --dsn-file=/secrets/db/dsn
+            - --master-key-file=/secrets/hub/master-key
+            - --users-file=/secrets/hub/users.yaml
+            - --admin-groups={{ join "," .Values.hub.adminGroups }}
+            - --retention={{ .Values.hub.retention }}
+            - --allow-self-approval={{ .Values.hub.allowSelfApproval }}
+            {{- if $s3.endpoint }}
+            - --s3-endpoint={{ $s3.endpoint }}
+            - --s3-bucket={{ required "hub.storage.s3.bucket is required" $s3.bucket }}
+            - --s3-insecure={{ $s3.insecure }}
+            - --s3-access-key-file=/secrets/s3/accessKey
+            - --s3-secret-key-file=/secrets/s3/secretKey
+            {{- else }}
+            - --data-dir=/data
+            {{- end }}
+            {{- if and .Values.agent.enabled .Values.hub.localCluster }}
+            - --local-cluster={{ .Values.hub.localCluster }}
+            - --local-token-file=/secrets/agent/token
+            {{- end }}
+            {{- with .Values.hub.oidc }}
+            {{- if .issuer }}
+            - --oidc-issuer={{ .issuer }}
+            - --oidc-client-id={{ required "hub.oidc.clientID is required" .clientID }}
+            - --oidc-username-claim={{ .usernameClaim }}
+            - --oidc-groups-claim={{ .groupsClaim }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources: {{- toYaml .Values.hub.resources | nindent 12 }}
+          volumeMounts:
+            - name: hub
+              mountPath: /secrets/hub
+              readOnly: true
+            - name: db
+              mountPath: /secrets/db
+              readOnly: true
+            {{- if and .Values.agent.enabled .Values.hub.localCluster }}
+            - name: agent
+              mountPath: /secrets/agent
+              readOnly: true
+            {{- end }}
+            {{- if $s3.endpoint }}
+            - name: s3
+              mountPath: /secrets/s3
+              readOnly: true
+            {{- else }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+      volumes:
+        - name: hub
+          secret:
+            secretName: {{ .Release.Name }}-hub
+        - name: db
+          secret:
+            secretName: {{ .Values.hub.database.existingSecret | default (printf "%s-hub" .Release.Name) }}
+        {{- if and .Values.agent.enabled .Values.hub.localCluster }}
+        - name: agent
+          secret:
+            secretName: {{ include "asservat.agentSecret" . }}
+        {{- end }}
+        {{- if $s3.endpoint }}
+        - name: s3
+          secret:
+            secretName: {{ required "hub.storage.s3.existingSecret is required" $s3.existingSecret }}
+        {{- else }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-evidence
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-hub
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.hub.service.type }}
+  selector:
+    {{- include "asservat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hub
+  ports:
+    - name: http
+      port: {{ .Values.hub.service.port }}
+      targetPort: http
+      {{- with .Values.hub.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+{{- if not $s3.endpoint }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-evidence
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.hub.storage.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.hub.storage.size }}
+{{- end }}
+{{- if .Values.hub.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-hub
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.hub.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.hub.ingress.tlsSecretName }}
+  tls:
+    - hosts: [{{ $.Values.hub.ingress.host | quote }}]
+      secretName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ required "hub.ingress.host is required" .Values.hub.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-hub
+                port:
+                  name: http
+{{- end }}
+{{- end }}

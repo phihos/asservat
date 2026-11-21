@@ -1,3 +1,0 @@
-{{- /* Values of removed features fail with a pointer to their replacement. */ -}}
-{{- if hasKey .Values "fleet" }}{{ fail "fleet was removed; list administrators under identity.administrators" }}{{ end -}}
-{{- if hasKey .Values "federation" }}{{ fail "federation was removed; connectors authenticate with ServiceAccount tokens and need no connector limits (ADR-334)" }}{{ end -}}

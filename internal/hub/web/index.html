@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asservat</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --accent: #2b6cb0; }
+  body { font: 14px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 16px; }
+  h1 { font-size: 20px; margin: 0; } h2 { font-size: 16px; margin: 24px 0 8px; }
+  header { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header span { opacity: .75; }
+  form { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
+  label { display: grid; gap: 2px; font-size: 12px; }
+  input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+  button { cursor: pointer; } button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .state { font-weight: 600; } .PendingApproval { color: #b7791f; } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
+  .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
+  td button { padding: 2px 6px; margin: 0 4px 2px 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><h1>Asservat</h1><span id="me"></span><span id="clusters"></span><button id="signout" hidden>Sign out</button></header>
+<p id="error" class="error"></p>
+
+<section id="login" hidden>
+  <h2>Sign in</h2>
+  <form id="loginForm"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button class="primary">Sign in</button></form>
+</section>
+
+<section id="app" hidden>
+  <h2>New capture</h2>
+  <form id="captureForm">
+    <label>Cluster<select id="cluster" required></select></label>
+    <label>Namespace<input id="namespace" required></label>
+    <label>Workload<select id="workload" required></select></label>
+    <label>Evidence<select id="kind">
+      <option value="pod-state">Pod state and events</option>
+      <option value="logs">Logs</option>
+      <option value="pcap">Packet capture (pcap)</option>
+      <option value="pprof">Profile (pprof endpoint)</option>
+      <option value="strace">System call trace</option>
+      <option value="coredump">Core dump</option>
+    </select></label>
+    <label data-kinds="pcap strace pprof logs">Duration (seconds)<input id="duration" type="number" min="0" placeholder="30"></label>
+    <label data-kinds="logs coredump strace">Container<input data-param="container" placeholder="first container"></label>
+    <label data-kinds="logs">Last lines<input data-param="tailLines" type="number" min="1"></label>
+    <label data-kinds="logs">Previous instance<select data-param="previous"><option value="">no</option><option value="true">yes</option></select></label>
+    <label data-kinds="pcap">Filter (tcpdump syntax)<input data-param="filter" placeholder="tcp port 8080"></label>
+    <label data-kinds="pcap">Payload<select data-param="payload"><option value="">headers only</option><option value="true">full packets (needs approval)</option></select></label>
+    <label data-kinds="strace">Buffer contents<select data-param="strings"><option value="">omit</option><option value="true">include (needs approval)</option></select></label>
+    <label data-kinds="pprof">Port<input data-param="port" type="number" min="1" placeholder="6060"></label>
+    <label data-kinds="pprof">Path<input data-param="path" placeholder="/debug/pprof/profile"></label>
+    <label>Reason<input id="reason" placeholder="for the approver and the audit log"></label>
+    <button class="primary">Request capture</button>
+  </form>
+
+  <h2>Captures</h2>
+  <table><thead><tr><th>Requested</th><th>Target</th><th>Evidence</th><th>State</th><th>Files</th><th></th></tr></thead><tbody id="captures"></tbody></table>
+
+  <section id="admin" hidden>
+    <h2>Clusters</h2>
+    <form id="clusterForm"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
+    <p id="clusterToken" class="muted"></p>
+  </section>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+let me = null;
+const token = () => sessionStorage.getItem('token') || '';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+async function call(method, path, body) {
+  const res = await fetch(path, {method, headers: {Authorization: 'Bearer ' + token(), ...(body ? {'Content-Type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(data?.error || res.statusText);
+  return data;
+}
+const guard = f => async e => { e?.preventDefault(); $('error').textContent = ''; try { await f(e); } catch (err) { $('error').textContent = err.message; } };
+
+async function start() {
+  try { me = await call('GET', '/api/me'); } catch { me = null; }
+  $('login').hidden = !!me; $('app').hidden = !me; $('signout').hidden = !me;
+  if (!me) return;
+  // Downloads and the event stream cannot send a header.
+  document.cookie = 'asservat_token=' + token() + '; path=/; SameSite=Strict';
+  $('me').textContent = me.name + (me.admin ? ' (administrator)' : '');
+  $('admin').hidden = !me.admin;
+  await Promise.all([loadClusters(), loadCaptures()]);
+  new EventSource('/api/events').onmessage = guard(loadCaptures);
+}
+
+async function loadClusters() {
+  const clusters = await call('GET', '/api/clusters');
+  $('clusters').textContent = clusters.map(c => `${c.name}: ${c.nodes.length} node agent${c.nodes.length === 1 ? '' : 's'}`).join(' · ') || 'no clusters yet';
+  const selected = $('cluster').value;
+  $('cluster').innerHTML = clusters.map(c => `<option>${esc(c.name)}</option>`).join('');
+  if (selected) $('cluster').value = selected;
+}
+
+async function loadWorkloads() {
+  $('workload').innerHTML = '';
+  if (!$('cluster').value || !$('namespace').value) return;
+  const list = await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces/${encodeURIComponent($('namespace').value)}/workloads`);
+  $('workload').innerHTML = list.map(w => `<option>${esc(w)}</option>`).join('');
+}
+
+function showParams() {
+  for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').includes($('kind').value);
+}
+
+async function loadCaptures() {
+  const list = await call('GET', '/api/captures');
+  $('captures').innerHTML = list.map(c => {
+    const params = Object.entries(c.params || {}).map(([k, v]) => `${k}=${v}`).join(', ');
+    const tasks = c.tasks.map(t => `${esc(t.pod)}: ${esc(t.state)}${t.message ? ' – ' + esc(t.message) : ''}`).join('<br>');
+    const files = c.artifacts.map(a => `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name)}</a> <span class="muted">${a.size.toLocaleString()} B</span>`).join('<br>');
+    const open = ['PendingApproval', 'Queued', 'Running'].includes(c.state);
+    const actions = [
+      me.admin && c.state === 'PendingApproval' ? `<button data-act="approve" data-id="${c.id}">Approve</button><button data-act="deny" data-id="${c.id}">Deny</button>` : '',
+      open ? `<button data-act="cancel" data-id="${c.id}">Cancel</button>` : `<button data-act="delete" data-id="${c.id}">Delete</button>`,
+    ].join('');
+    return `<tr><td>${new Date(c.createdAt).toLocaleString()}<div class="muted">${esc(c.requester)}</div></td>
+      <td>${esc(c.cluster)} / ${esc(c.namespace)}<br>${esc(c.workload)}</td>
+      <td>${esc(c.kind)}${c.durationSeconds ? ` · ${c.durationSeconds}s` : ''}<div class="muted">${esc(params)}</div><div class="muted">${esc(c.reason)}</div></td>
+      <td><span class="state ${c.state}">${c.state}</span>${c.approver ? `<div class="muted">by ${esc(c.approver)}</div>` : ''}<div class="muted">${esc(c.message)}</div><div class="muted">${tasks}</div></td>
+      <td>${files}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></td><td>${actions}</td></tr>`;
+  }).join('');
+}
+
+$('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
+$('signout').onclick = () => { sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload(); };
+$('cluster').onchange = $('namespace').onchange = guard(loadWorkloads);
+$('kind').onchange = showParams;
+$('captureForm').onsubmit = guard(async () => {
+  const params = {};
+  for (const el of document.querySelectorAll('[data-param]')) if (!el.closest('label').hidden && el.value) params[el.dataset.param] = el.value;
+  await call('POST', '/api/captures', {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind: $('kind').value,
+    durationSeconds: $('duration').closest('label').hidden ? 0 : Number($('duration').value || 0), params, reason: $('reason').value});
+  await loadCaptures();
+});
+$('captures').onclick = guard(async e => {
+  const {act, id} = e.target.dataset;
+  if (!act) return;
+  await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
+  await loadCaptures();
+});
+$('clusterForm').onsubmit = guard(async () => {
+  const c = await call('POST', '/api/clusters', {name: $('clusterName').value});
+  $('clusterToken').innerHTML = `Join token for <b>${esc(c.name)}</b>, shown once: <code>${esc(c.token)}</code>`;
+  await loadClusters();
+});
+showParams();
+start();
+</script>
+</body>
+</html>

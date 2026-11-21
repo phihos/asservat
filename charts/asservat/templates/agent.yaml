@@ -1,0 +1,106 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-agent
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-agent-{{ .Release.Namespace }}
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+rules:
+  # Resolve workloads to pods and read pod state, events and logs.
+  - apiGroups: [""]
+    resources: [pods, pods/log, events]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [get, list]
+  # Ask the cluster's RBAC whether a user may exec into pods of a namespace.
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-agent-{{ .Release.Namespace }}
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-agent-{{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-agent
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-agent
+  labels: {{- include "asservat.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "asservat.labels" . | nindent 6 }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        {{- include "asservat.labels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-agent
+      # The agent enters the network namespace of the node's pods and attaches
+      # to their processes: it needs the node's PID namespace.
+      hostPID: true
+      tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
+      containers:
+        - name: agent
+          image: {{ include "asservat.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - agent
+            - --hub-url={{ .Values.agent.hubURL | default (printf "http://%s-hub.%s.svc:%v" .Release.Name .Release.Namespace .Values.hub.service.port) }}
+            - --token-file=/secrets/agent/token
+            {{- if .Values.agent.caCert }}
+            - --ca-file=/secrets/agent/ca.crt
+            {{- end }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            runAsUser: 0
+            # setns into a pod's network namespace (SYS_ADMIN), capture there
+            # (NET_ADMIN, NET_RAW), and attach to processes for strace and
+            # gcore (SYS_PTRACE). The default seccomp and AppArmor profiles
+            # block setns and ptrace of other containers' processes.
+            capabilities:
+              drop: [ALL]
+              add: [SYS_ADMIN, SYS_PTRACE, NET_ADMIN, NET_RAW, DAC_READ_SEARCH, DAC_OVERRIDE]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+          resources: {{- toYaml .Values.agent.resources | nindent 12 }}
+          volumeMounts:
+            - name: agent
+              mountPath: /secrets/agent
+              readOnly: true
+            - name: scratch
+              mountPath: /scratch
+      volumes:
+        - name: agent
+          secret:
+            secretName: {{ include "asservat.agentSecret" . }}
+        # A core file rests here until it is uploaded.
+        - name: scratch
+          emptyDir: {}
+{{- end }}

@@ -1,8 +1,6 @@
 apiVersion: v2
 name: asservat
-description: Asservat Kubernetes debugging platform
+description: Records evidence (packet captures, core dumps, traces, logs) from workloads of many Kubernetes clusters
 type: application
-version: 0.1.0-dev.1
-kubeVersion: ">=1.35.0-0"
-annotations:
-  asservat.io/installation-stage: configuration-foundation
+version: 0.1.0
+appVersion: "0.1.0"
