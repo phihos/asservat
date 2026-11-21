@@ -35,7 +35,7 @@
   <h2>New capture</h2>
   <form id="captureForm">
     <label>Cluster<select id="cluster" required></select></label>
-    <label>Namespace<input id="namespace" required></label>
+    <label>Namespace<select id="namespace" required></select></label>
     <label>Workload<select id="workload" required></select></label>
     <label>Evidence<select id="kind">
       <option value="pod-state">Pod state and events</option>
@@ -46,7 +46,7 @@
       <option value="coredump">Core dump</option>
     </select></label>
     <label data-kinds="pcap strace pprof logs">Duration (seconds)<input id="duration" type="number" min="0" placeholder="30"></label>
-    <label data-kinds="logs coredump strace">Container<input data-param="container" placeholder="first container"></label>
+    <label data-kinds="logs coredump strace">Container<select id="container" data-param="container"></select></label>
     <label data-kinds="logs">Last lines<input data-param="tailLines" type="number" min="1"></label>
     <label data-kinds="logs">Previous instance<select data-param="previous"><option value="">no</option><option value="true">yes</option></select></label>
     <label data-kinds="pcap">Filter (tcpdump syntax)<input data-param="filter" placeholder="tcp port 8080"></label>
@@ -110,13 +110,34 @@ async function loadClusters() {
   const selected = $('cluster').value;
   $('cluster').innerHTML = clusters.map(c => `<option>${esc(c.name)}</option>`).join('');
   if (selected) $('cluster').value = selected;
+  else await loadNamespaces();
+}
+
+// Namespaces, workloads and containers are offered, never typed: each list
+// follows the choice before it.
+const options = list => list.map(v => `<option>${esc(v)}</option>`).join('');
+const namespacePath = () => `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces/${encodeURIComponent($('namespace').value)}`;
+
+async function loadNamespaces() {
+  $('namespace').innerHTML = $('workload').innerHTML = $('container').innerHTML = '';
+  if (!$('cluster').value) return;
+  $('namespace').innerHTML = options(await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`));
+  await loadWorkloads();
 }
 
 async function loadWorkloads() {
-  $('workload').innerHTML = '';
-  if (!$('cluster').value || !$('namespace').value) return;
-  const list = await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces/${encodeURIComponent($('namespace').value)}/workloads`);
-  $('workload').innerHTML = list.map(w => `<option>${esc(w)}</option>`).join('');
+  $('workload').innerHTML = $('container').innerHTML = '';
+  if (!$('namespace').value) return;
+  $('workload').innerHTML = options(await call('GET', namespacePath() + '/workloads'));
+  await loadContainers();
+}
+
+async function loadContainers() {
+  $('container').innerHTML = '';
+  if (!$('workload').value) return;
+  const list = await call('GET', namespacePath() + '/containers?workload=' + encodeURIComponent($('workload').value));
+  // Logs cover every container unless one is chosen; a core dump or trace takes the first.
+  $('container').innerHTML = '<option value="">' + ($('kind').value === 'logs' ? 'all containers' : 'first container') + '</option>' + options(list);
 }
 
 function showParams() {
@@ -160,8 +181,11 @@ $('signout').onclick = async () => {
   await fetch('/auth/logout', {method: 'POST'}).catch(() => {}); // ends a single sign-on session, if any
   location.reload();
 };
-$('cluster').onchange = $('namespace').onchange = guard(loadWorkloads);
-$('kind').onchange = $('when').onchange = showParams;
+$('cluster').onchange = guard(loadNamespaces);
+$('namespace').onchange = guard(loadWorkloads);
+$('workload').onchange = guard(loadContainers);
+$('kind').onchange = guard(async () => { showParams(); await loadContainers(); });
+$('when').onchange = showParams;
 $('captureForm').onsubmit = guard(async () => {
   const params = {};
   for (const el of document.querySelectorAll('[data-param]')) if (!el.closest('label').hidden && el.value) params[el.dataset.param] = el.value;

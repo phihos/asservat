@@ -27,7 +27,7 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Watch{}, err
 	}
-	res, err := h.agents.query(ctx, in.Cluster, api.Query{Op: "selector", Namespace: in.Namespace, Workload: in.Workload})
+	res, err := h.agents.query(ctx, in.Cluster, api.Query{Op: "workload", Namespace: in.Namespace, Workload: in.Workload})
 	if err != nil {
 		return api.Watch{}, err
 	}

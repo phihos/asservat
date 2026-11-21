@@ -141,7 +141,9 @@ func TestCaptureFlow(t *testing.T) {
 	fourth := pod.DeepCopy()
 	fourth.Name, fourth.Spec.NodeName = "api-4", "node-d"
 	kube := fake.NewClientset(pod, elsewhere, third, fourth, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: "payments"},
-		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}}})
+		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}, {Name: "proxy"}}}}}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "payments"}}, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}})
 	// RBAC of the fake cluster: the payments group may exec in payments.
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
@@ -183,6 +185,20 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/workloads", nil); code != 200 || string(b) != `["Deployment/api","Pod/api-1","Pod/api-2","Pod/api-3","Pod/api-4"]`+"\n" {
 		t.Fatal("workloads", code, string(b))
+	}
+
+	// The console offers what the user may choose: the namespaces they may
+	// capture in, and the containers of a workload there.
+	for token, want := range map[string]string{"alice-token": `["payments"]`, "mallory-token": `[]`, "root-token": `["kube-system","payments"]`} {
+		if code, b := f.call(token, "GET", "/api/clusters/"+cluster+"/namespaces", nil); code != 200 || strings.TrimSpace(string(b)) != want {
+			t.Fatal("namespaces", token, code, string(b))
+		}
+	}
+	if code, b := f.call("alice-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/containers?workload=Deployment/api", nil); code != 200 || strings.TrimSpace(string(b)) != `["app","proxy"]` {
+		t.Fatal("containers", code, string(b))
+	}
+	if code, _ := f.call("mallory-token", "GET", "/api/clusters/"+cluster+"/namespaces/payments/containers?workload=Deployment/api", nil); code != 403 {
+		t.Fatal("containers listed without the exec right", code)
 	}
 
 	// An ordinary capture starts at once and its files download unchanged.
