@@ -17,6 +17,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"asservat.local/asservat/internal/api"
@@ -33,6 +34,9 @@ func (a *Agent) nodePods(ctx context.Context, namespace string, names []string) 
 	for _, name := range names {
 		pod, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil || pod.Spec.NodeName != a.Node {
+			if err != nil && !apierrors.IsNotFound(err) {
+				slog.Warn("inspection: pod not read", "pod", name, "error", err)
+			}
 			skipped = append(skipped, name)
 			continue
 		}
