@@ -6,6 +6,11 @@
 #
 #   test/e2e/run.sh          build the image, create the clusters, test, delete
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
+#   CORE_HANDLER=1 test/e2e/run.sh   also record the core of a crashed process
+#
+# CORE_HANDLER changes kernel.core_pattern of the machine that runs kind,
+# because kind nodes share its kernel. Use it only on a disposable machine
+# such as a CI runner; it needs sudo to create the spool directory.
 #
 # Needs docker (or podman as docker), kind, kubectl, helm, curl and jq.
 set -euo pipefail
@@ -80,9 +85,18 @@ fi
 rm -f "$WORK/image.tar"
 docker save "$IMAGE" -o "$WORK/image.tar"
 
+# The kernel runs the core handler from the machine's own file system, so
+# the spool is one directory at the same path there, in the kind node and in
+# the agent.
+SPOOL=/var/lib/asservat-e2e
+if [ -n "${CORE_HANDLER:-}" ]; then
+  sudo mkdir -p "$SPOOL"
+  printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n  - role: control-plane\n    extraMounts:\n      - {hostPath: %s, containerPath: %s}\n' "$SPOOL" "$SPOOL" >"$WORK/$EDGE.yaml"
+fi
+
 log "create clusters"
 for c in "$HUB" "$EDGE"; do
-  kind get clusters 2>/dev/null | grep -qx "$c" || kind create cluster --name "$c" --wait 120s >/dev/null
+  kind get clusters 2>/dev/null | grep -qx "$c" || kind create cluster --name "$c" --wait 120s $([ -f "$WORK/$c.yaml" ] && echo "--config $WORK/$c.yaml") >/dev/null
   kind load image-archive "$WORK/image.tar" --name "$c" >/dev/null
 done
 hub() { kubectl --context "kind-$HUB" "$@"; }
@@ -106,8 +120,9 @@ spec:
         - name: web
           image: docker.io/library/busybox:1.37
           # Serves a page and requests it over loopback, so the pod has traffic.
-          # It crashes when the file /tmp/crash appears.
-          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; exit 3"]
+          # It crashes when the file /tmp/crash appears, and after a child
+          # died of a segmentation fault when /tmp/segv appears.
+          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && sh -c 'kill -SEGV $$'; exit 3"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 ---
 # Members of the group "devs" may exec into pods of this namespace; that right
@@ -151,7 +166,8 @@ HUB_IP=$(docker inspect "$HUB-control-plane" --format '{{range .NetworkSettings.
 edge create namespace asservat --dry-run=client -o yaml | edge apply -f - >/dev/null
 helm --kube-context "kind-$EDGE" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
   --set image.repository=localhost/asservat,image.tag=e2e,image.pullPolicy=Never \
-  --set hub.enabled=false,agent.hubURL="http://$HUB_IP:30080",agent.token="$TOKEN" >/dev/null
+  --set hub.enabled=false,agent.hubURL="http://$HUB_IP:30080",agent.token="$TOKEN" \
+  ${CORE_HANDLER:+--set agent.coreHandler.enabled=true,agent.coreHandler.hostPath=$SPOOL} >/dev/null
 hub -n shop rollout status deployment/web --timeout 180s >/dev/null
 edge -n shop rollout status deployment/web --timeout 180s >/dev/null
 for _ in $(seq 60); do
@@ -227,7 +243,6 @@ ok "$ROOT" POST "/api/captures/$id/deny" >/dev/null
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, (.artifacts | length)] | @csv')" = '"Denied",0' ] || fail "denied capture"
 log "a crash watch records the crashed pod (edge): packets from before the crash and the crashed instance's logs"
 [ "$(status "$MALLORY" POST /api/watches "$(target edge pod-state)")" = 403 ] || fail "mallory watched"
-[ "$(status "$ALICE" POST /api/watches "$(target edge coredump)")" = 400 ] || fail "a watch for evidence that needs approval"
 packets=$(ok "$ALICE" POST /api/watches "$(target edge pcap '{"durationSeconds":20,"params":{"filter":"tcp port 8080"}}')" | jq -r .id)
 logs=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2}')" | jq -r .id)
 sleep 5 # the agents begin to buffer packets
@@ -260,6 +275,23 @@ grep -q crashing "$WORK/crash.log" || fail "the logs lack the crashed instance"
 # The packet watch ended with its one crash; the log watch waits for another.
 [ "$(ok "$ALICE" GET /api/watches | jq -c '[.[] | [.kind, .remaining]]')" = '[["logs",1]]' ] || fail "watches after the crash: $(ok "$ALICE" GET /api/watches)"
 [ "$(status "$ALICE" DELETE "/api/watches/$logs")" = 200 ] || fail "delete watch"
+
+if [ -n "${CORE_HANDLER:-}" ]; then
+  log "an approved core dump watch records the core of the crashed process (edge)"
+  cores=$(ok "$ALICE" POST /api/watches "$(target edge coredump)" | jq -r .id)
+  [ "$(status "$ALICE" POST "/api/watches/$cores/approve")" = 403 ] || fail "the requester approved the watch"
+  ok "$ROOT" POST "/api/watches/$cores/approve" >/dev/null
+  sleep 3 # the agent marks the pods for the node's core handler
+  victim=$(edge -n shop get pods -l app=web -o jsonpath='{.items[1].metadata.name}')
+  edge -n shop exec "$victim" -- touch /tmp/segv
+  id=$(triggered "$cores"); completed "$ALICE" "$id"
+  name=$(first_artifact "$ALICE" "$id")
+  case "$name" in "$victim"/core.web.*) ;; *) fail "core artifact name: $name" ;; esac
+  fetch "$ALICE" "$id" "$name" "$WORK/crash.core"
+  [ "$(od -An -tx1 -N4 "$WORK/crash.core" | tr -d ' ')" = 7f454c46 ] || fail "the crash core is not an ELF file"
+  [ "$(od -An -tu2 -j16 -N2 "$WORK/crash.core" | tr -d ' ')" = 4 ] || fail "the crash core is not a core (ET_CORE)"
+  [ -z "$(sudo find "$SPOOL/cores" -type f)" ] || fail "an uploaded core stayed on the node"
+fi
 
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')
 [ "$(jq -r '.result.content[0].text' <<<"$mcp")" = '["Deployment/web"]' ] || fail "MCP list_workloads: $mcp"

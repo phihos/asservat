@@ -39,7 +39,8 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           install_only: true
-      - run: test/e2e/run.sh
+      # The runner is a disposable machine: the test may change its core pattern.
+      - run: CORE_HANDLER=1 test/e2e/run.sh
   # Every commit on main is published as ghcr.io/<owner>/asservat:main and :<commit>.
   image:
     if: github.event_name == 'push'

@@ -21,10 +21,6 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := in.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
-	if in.Kind == api.KindCoredump {
-		// A capture after the crash would dump the restarted process.
-		return api.Watch{}, errStatus{http.StatusBadRequest, "core dumps of crashed processes are not built yet"}
-	}
 	if in.Count < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count must not be negative"}
 	}

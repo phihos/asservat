@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -69,6 +70,12 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	// The handlers run one at a time. A pod's first sighting only records
 	// the crashes it already had.
 	seen := map[string]string{}
+	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
+	defer func() {
+		for uid := range marked {
+			os.Remove(a.Cores.marker(uid, w.ID))
+		}
+	}()
 	changed := func(obj any, known bool) {
 		pod := obj.(*corev1.Pod)
 		if pod.Spec.NodeName != a.Node {
@@ -76,6 +83,13 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		}
 		if w.Kind == api.KindPcap {
 			a.buffer(ctx, w, pod)
+		}
+		if w.Kind == api.KindCoredump && a.Cores != "" && !marked[string(pod.UID)] {
+			// From now on the node's core handler keeps this pod's cores.
+			if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
+				slog.Error("core handler marker", "pod", pod.Name, "error", err)
+			}
+			marked[string(pod.UID)] = true
 		}
 		if message := crashes(pod, seen); message != "" && known {
 			go a.trigger(agent, w, pod.Name, message)
@@ -93,6 +107,11 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				if strings.HasPrefix(key, pod.Name+"/") {
 					delete(seen, key)
 				}
+			}
+			if marked[string(pod.UID)] {
+				os.Remove(a.Cores.marker(string(pod.UID), w.ID))
+				os.RemoveAll(a.Cores.cores(string(pod.UID)))
+				delete(marked, string(pod.UID))
 			}
 			a.mu.Lock()
 			// A new pod of the same name gets its own buffer at once.

@@ -133,6 +133,11 @@ curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d
 }'
 ```
 
+A watch for `coredump` records the core of the crashed process itself. It
+needs the agents' core handler (`agent.coreHandler.enabled=true`), which
+replaces the node's `kernel.core_pattern` while the agents run, and an
+administrator's approval of the watch.
+
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
 get tools to list workloads, request captures, watch for crashes and read
 text evidence.

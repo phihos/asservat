@@ -72,6 +72,9 @@ spec:
             {{- if .Values.agent.caCert }}
             - --ca-file=/secrets/agent/ca.crt
             {{- end }}
+            {{- if .Values.agent.coreHandler.enabled }}
+            - --core-spool={{ .Values.agent.coreHandler.hostPath }}
+            {{- end }}
           env:
             - name: NODE_NAME
               valueFrom:
@@ -97,6 +100,11 @@ spec:
               readOnly: true
             - name: scratch
               mountPath: /scratch
+            {{- if .Values.agent.coreHandler.enabled }}
+            # The kernel runs the handler from this path on the node.
+            - name: cores
+              mountPath: {{ .Values.agent.coreHandler.hostPath }}
+            {{- end }}
       volumes:
         - name: agent
           secret:
@@ -104,4 +112,10 @@ spec:
         # A core file rests here until it is uploaded.
         - name: scratch
           emptyDir: {}
+        {{- if .Values.agent.coreHandler.enabled }}
+        - name: cores
+          hostPath:
+            path: {{ .Values.agent.coreHandler.hostPath }}
+            type: DirectoryOrCreate
+        {{- end }}
 {{- end }}
