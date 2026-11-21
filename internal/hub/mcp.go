@@ -37,7 +37,7 @@ const captureProperties = `"cluster":{"type":"string"},"namespace":{"type":"stri
 "pods":{"type":"array","items":{"type":"string"},"description":"Restrict to these pods; default all pods of the workload"},
 "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"]},
 "durationSeconds":{"type":"integer","description":"For pcap, strace, pprof and followed logs; default 30"},
-"params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container. strace: container, strings (true needs approval). pprof: port, path (default /debug/pprof/profile)."},
+"params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: port, path (default /debug/pprof/profile)."},
 "reason":{"type":"string","description":"Shown to the approving administrator"}`
 
 // mcpReadLimit bounds one read_artifact result so that it fits a model's
@@ -71,8 +71,29 @@ var mcpTools = []mcpTool{
 			if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 				return nil, err
 			}
-			r, err := h.agents.query(ctx, in.Cluster, api.Query{Op: "workloads", Namespace: in.Namespace})
+			r, err := h.agents.query(ctx, in.Cluster, "", api.Query{Op: "workloads", Namespace: in.Namespace})
 			return r.Workloads, err
+		}},
+	{Name: "list_processes", Description: "List the programs that run in the pods of a workload, per container, with their process counts and memory. Use an executable as the process parameter of a coredump or strace capture to target that program instead of the container's main process.",
+		InputSchema: object(`"cluster":{"type":"string"},"namespace":{"type":"string"},"workload":{"type":"string"}`, "cluster", "namespace", "workload"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in struct{ Cluster, Namespace, Workload string }
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return h.Processes(ctx, u, in.Cluster, in.Namespace, in.Workload)
+		}},
+	{Name: "sample_traffic", Description: "Look at the packet headers of a workload's pods for a few seconds and list their connections: incoming ports, outgoing peers (named if they are Services or pods you may know) and traffic inside the pod. Every flow carries a filter for the filter parameter of a pcap capture or watch; join several with \"or\". An empty list means no packets in that time, not that the workload has no connections.",
+		InputSchema: object(`"cluster":{"type":"string"},"namespace":{"type":"string"},"workload":{"type":"string"},"seconds":{"type":"integer","description":"1 to 30; default 5"}`, "cluster", "namespace", "workload"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in struct {
+				Cluster, Namespace, Workload string
+				Seconds                      int
+			}
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return h.Traffic(ctx, u, in.Cluster, in.Namespace, in.Workload, in.Seconds)
 		}},
 	{Name: "request_capture", Description: "Record evidence from the pods of a workload. Captures that can contain memory or payload contents (coredump, pcap with payload, strace with strings) wait in state PendingApproval until an administrator approves them; follow the state with get_capture.",
 		InputSchema: object(captureProperties, "cluster", "namespace", "workload", "kind"),

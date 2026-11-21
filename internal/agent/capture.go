@@ -76,7 +76,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		}
 		return a.record(ctx, duration, "capture.pcap", up, "nsenter", args...)
 	case api.KindStrace:
-		pid, container, err := a.containerPID(pod, r.Params["container"])
+		pids, container, err := a.targets(pod, r.Params["container"], r.Params["process"])
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,11 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		if r.Params["strings"] == "true" {
 			size = "256"
 		}
-		return a.record(ctx, duration, container+".strace", up, "strace", "-f", "-tt", "-T", "-s", size, "-p", strconv.Itoa(pid), "-o", "/dev/stdout")
+		args := []string{"-f", "-tt", "-T", "-s", size, "-o", "/dev/stdout"}
+		for _, pid := range pids {
+			args = append(args, "-p", strconv.Itoa(pid))
+		}
+		return a.record(ctx, duration, container+".strace", up, "strace", args...)
 	case api.KindPprof:
 		pid, err := a.podPID(pod)
 		if err != nil {
@@ -105,26 +109,39 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 			// The core of the crashed process, not one of its successor.
 			return a.crashCores(pod, r.Trigger, up)
 		}
-		pid, container, err := a.containerPID(pod, r.Params["container"])
+		pids, container, err := a.targets(pod, r.Params["container"], r.Params["process"])
 		if err != nil {
 			return err
 		}
-		// gcore cannot write to a pipe: the core rests in the scratch
-		// directory until it is uploaded.
-		prefix := filepath.Join(a.Scratch, id+"-"+t.Pod)
-		file := prefix + "." + strconv.Itoa(pid)
-		defer os.Remove(file)
-		if out, err := exec.CommandContext(ctx, "gcore", "-o", prefix, strconv.Itoa(pid)).CombinedOutput(); err != nil {
-			return fmt.Errorf("gcore: %w: %s", err, tail(out))
+		for _, pid := range pids {
+			name := "core." + container
+			if r.Params["process"] != "" {
+				name += "." + strconv.Itoa(pid)
+			}
+			if err := a.gcore(ctx, id+"-"+t.Pod, pid, name, up); err != nil {
+				return err
+			}
 		}
-		f, err := os.Open(file)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		return up("core."+container, f)
+		return nil
 	}
 	return fmt.Errorf("unknown kind %q", r.Kind)
+}
+
+// gcore dumps a running process. gcore cannot write to a pipe: the core
+// rests in the scratch directory until it is uploaded.
+func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string, up func(string, io.Reader) error) error {
+	prefix := filepath.Join(a.Scratch, scratch)
+	file := prefix + "." + strconv.Itoa(pid)
+	defer os.Remove(file)
+	if out, err := exec.CommandContext(ctx, "gcore", "-o", prefix, strconv.Itoa(pid)).CombinedOutput(); err != nil {
+		return fmt.Errorf("gcore: %w: %s", err, tail(out))
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return up(name, f)
 }
 
 func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest, duration time.Duration, up func(string, io.Reader) error) error {
@@ -272,19 +289,25 @@ func (a *Agent) containerPID(pod *corev1.Pod, name string) (int, string, error) 
 	return 0, name, fmt.Errorf("pod %s has no container %s", pod.Name, name)
 }
 
-// mainPID finds a container's main process in the node's /proc: the oldest
-// process in the container's cgroup whose parent is outside of it (an exec
-// session also has such a parent, but started later).
+// mainPID finds a container's main process in the node's /proc.
 func mainPID(proc, containerID string) (int, error) {
+	_, main, err := containerPIDs(proc, containerID)
+	return main, err
+}
+
+// containerPIDs finds the processes of a container in the node's /proc and
+// its main process: the oldest one in the container's cgroup whose parent is
+// outside of it (an exec session also has such a parent, but started later).
+func containerPIDs(proc, containerID string) (all []int, main int, err error) {
 	inside := func(pid int) bool {
 		b, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "cgroup"))
 		return err == nil && bytes.Contains(b, []byte(containerID))
 	}
 	entries, err := os.ReadDir(proc)
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
-	found, oldest := 0, uint64(0)
+	oldest := uint64(0)
 	for _, e := range entries {
 		pid, err := strconv.Atoi(e.Name())
 		if err != nil || !inside(pid) {
@@ -294,6 +317,7 @@ func mainPID(proc, containerID string) (int, error) {
 		if err != nil {
 			continue
 		}
+		all = append(all, pid)
 		// "pid (comm) state ppid ... starttime ..."; comm may contain spaces
 		// and parentheses. After it, ppid is field 2 and starttime field 20.
 		fields := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
@@ -302,12 +326,42 @@ func mainPID(proc, containerID string) (int, error) {
 		}
 		ppid, err1 := strconv.Atoi(fields[1])
 		started, err2 := strconv.ParseUint(fields[19], 10, 64)
-		if err1 == nil && err2 == nil && !inside(ppid) && (found == 0 || started < oldest) {
-			found, oldest = pid, started
+		if err1 == nil && err2 == nil && !inside(ppid) && (main == 0 || started < oldest) {
+			main, oldest = pid, started
 		}
 	}
-	if found == 0 {
-		return 0, fmt.Errorf("no process of container %s found on this node", containerID)
+	if main == 0 {
+		return nil, 0, fmt.Errorf("no process of container %s found on this node", containerID)
 	}
-	return found, nil
+	return all, main, nil
+}
+
+// executable returns the path of a process's program, as the process sees it.
+func executable(proc string, pid int) string {
+	path, _ := os.Readlink(filepath.Join(proc, strconv.Itoa(pid), "exe"))
+	return strings.TrimSuffix(path, " (deleted)")
+}
+
+// targets returns the node PIDs to dump or trace in a container: its main
+// process, or with an executable every process that runs that program.
+func (a *Agent) targets(pod *corev1.Pod, container, program string) ([]int, string, error) {
+	main, container, err := a.containerPID(pod, container)
+	if err != nil || program == "" {
+		return []int{main}, container, err
+	}
+	var pids []int
+	for _, s := range pod.Status.ContainerStatuses {
+		if _, id, ok := strings.Cut(s.ContainerID, "://"); ok && s.Name == container {
+			all, _, _ := containerPIDs(a.Proc, id)
+			for _, pid := range all {
+				if executable(a.Proc, pid) == program {
+					pids = append(pids, pid)
+				}
+			}
+		}
+	}
+	if len(pids) == 0 {
+		return nil, container, fmt.Errorf("no process in container %s of pod %s runs %s", container, pod.Name, program)
+	}
+	return pids, container, nil
 }

@@ -5,20 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asservat</title>
 <style>
-  :root { color-scheme: light dark; --line: #8884; --accent: #2b6cb0; }
+  :root { color-scheme: light dark; --line: #8884; --accent: #2b6cb0; --soft: #8881; --warn: #b7791f; }
   body { font: 14px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 16px; }
   h1 { font-size: 20px; margin: 0; } h2 { font-size: 16px; margin: 24px 0 8px; }
   header { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
   header span { opacity: .75; }
-  form { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
+  form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
   input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+  select { max-width: 100%; }
   button { cursor: pointer; } button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .6; cursor: progress; }
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .state { font-weight: 600; } .PendingApproval { color: #b7791f; } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
+  .state { font-weight: 600; } .PendingApproval { color: var(--warn); } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
   .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
   td button { padding: 2px 6px; margin: 0 4px 2px 0; }
   [hidden] { display: none !important; }
+  /* The capture form: numbered steps, each a fieldset. */
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
+  legend { font-weight: 600; padding: 0 6px; }
+  .kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .kinds label, .choice label { display: block; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .kinds label:has(input:checked), .choice label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--soft); }
+  .kinds input, .choice input { margin: 0 6px 0 0; }
+  .kinds small, .choice small { display: block; opacity: .75; margin: 2px 0 0 20px; }
+  .choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .wide { grid-column: span 2; }
+  .badge { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 0 6px; margin-left: 6px; white-space: nowrap; }
+  .notice { border-left: 3px solid var(--warn); padding: 6px 10px; margin: 8px 0 0; background: var(--soft); }
+  .options > * + * { margin-top: 10px; }
+  #flows td { vertical-align: middle; } #flows tr { cursor: pointer; } #flows tr:has(input:checked) { background: var(--soft); }
+  #flows .arrow { font-size: 16px; text-align: center; }
+  #flowTable th:nth-child(-n+2) { width: 1.5em; }
+  .bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  details summary { cursor: pointer; font-size: 12px; opacity: .8; } details input { width: 100%; box-sizing: border-box; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -28,38 +49,96 @@
 <section id="login" hidden>
   <h2>Sign in</h2>
   <p id="sso" hidden><button class="primary" onclick="location.href='/auth/login'">Sign in with single sign-on</button></p>
-  <form id="loginForm"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button>Sign in with a token</button></form>
+  <form id="loginForm" class="row"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button>Sign in with a token</button></form>
 </section>
 
 <section id="app" hidden>
   <h2>New capture</h2>
   <form id="captureForm">
-    <label>Cluster<select id="cluster" required></select></label>
-    <label>Namespace<select id="namespace" required></select></label>
-    <label>Workload<select id="workload" required></select></label>
-    <label>Evidence<select id="kind">
-      <option value="pod-state">Pod state and events</option>
-      <option value="logs">Logs</option>
-      <option value="pcap">Packet capture (pcap)</option>
-      <option value="pprof">Profile (pprof endpoint)</option>
-      <option value="strace">System call trace</option>
-      <option value="coredump">Core dump</option>
-    </select></label>
-    <label data-kinds="pcap strace pprof logs">Duration (seconds)<input id="duration" type="number" min="0" placeholder="30"></label>
-    <label data-kinds="logs coredump strace">Container<select id="container" data-param="container"></select></label>
-    <label data-kinds="logs">Last lines<input data-param="tailLines" type="number" min="1"></label>
-    <label data-kinds="logs">Previous instance<select data-param="previous"><option value="">no</option><option value="true">yes</option></select></label>
-    <label data-kinds="pcap">Filter (tcpdump syntax)<input data-param="filter" placeholder="tcp port 8080"></label>
-    <label data-kinds="pcap">Payload<select data-param="payload"><option value="">headers only</option><option value="true">full packets (needs approval)</option></select></label>
-    <label data-kinds="strace">Buffer contents<select data-param="strings"><option value="">omit</option><option value="true">include (needs approval)</option></select></label>
-    <label data-kinds="pprof">Port<input data-param="port" type="number" min="1" placeholder="6060"></label>
-    <label data-kinds="pprof">Path<input data-param="path" placeholder="/debug/pprof/profile"></label>
-    <label>Reason<input id="reason" placeholder="for the approver and the audit log"></label>
-    <label>When<select id="when"><option value="now">now</option><option value="crash">when a container crashes</option></select></label>
-    <label id="countLabel" hidden>Crashes to record<input id="count" type="number" min="1" placeholder="1"></label>
-    <button class="primary" id="submit">Request capture</button>
+    <fieldset>
+      <legend>1 · Where</legend>
+      <div class="fields">
+        <label>Cluster<select id="cluster" required></select></label>
+        <label>Namespace<select id="namespace" required></select></label>
+        <label>Workload<select id="workload" required></select></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · What to record</legend>
+      <div class="kinds" id="kinds">
+        <label><input type="radio" name="kind" value="pod-state" checked>Pod state<small>The pod as Kubernetes sees it, and its events</small></label>
+        <label><input type="radio" name="kind" value="logs">Logs<small>What the containers wrote, also of the instance before a restart</small></label>
+        <label><input type="radio" name="kind" value="pcap">Network traffic<small>A packet capture for Wireshark, of all traffic or chosen connections</small></label>
+        <label><input type="radio" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
+        <label><input type="radio" name="kind" value="pprof">Profile<small>A profile endpoint of the application, such as Go's pprof</small></label>
+        <label><input type="radio" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
+      </div>
+    </fieldset>
+
+    <fieldset id="optionsSet">
+      <legend>3 · Details</legend>
+      <div class="options">
+        <!-- Logs -->
+        <div class="fields" data-kinds="logs">
+          <label>Container<select id="container" data-param="container"></select></label>
+          <label>Only the last lines<input data-param="tailLines" type="number" min="1" placeholder="all lines"></label>
+          <label id="instanceLabel">Instance<select data-param="previous"><option value="">the running one</option><option value="true">the one before the last restart</option></select></label>
+        </div>
+
+        <!-- Core dump and system calls: which process -->
+        <div data-kinds="coredump strace" id="processBlock">
+          <label>Process<select id="process"></select></label>
+          <p class="muted" id="processHint"></p>
+        </div>
+        <div class="choice" data-kinds="strace">
+          <label><input type="radio" name="strings" value="" checked>Calls and timing only<small>Leaves out what the process reads and writes</small></label>
+          <label><input type="radio" name="strings" value="true">With data read and written<span class="badge">needs approval</span><small>The first 256 bytes of every buffer; they can hold user data</small></label>
+        </div>
+
+        <!-- Network traffic: which connections, how much of each packet -->
+        <div data-kinds="pcap">
+          <div class="toolbar">
+            <button type="button" id="sample">Look at current traffic</button>
+            <label style="display:flex;align-items:center;gap:6px">for<select id="sampleSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option></select></label>
+            <span class="muted" id="sampleState">Choose connections from what the pods are doing right now, instead of writing a filter.</span>
+          </div>
+          <table id="flowTable" hidden><thead><tr><th></th><th></th><th>Connection</th><th>Packets</th><th style="width:22%">Share of traffic</th></tr></thead><tbody id="flows"></tbody></table>
+          <p id="chosen" class="muted">Records all traffic of the pods.</p>
+          <details><summary>As a tcpdump filter</summary><input id="filter" data-param="filter" placeholder="empty: all traffic" spellcheck="false" autocomplete="off"></details>
+        </div>
+        <div class="choice" data-kinds="pcap">
+          <label><input type="radio" name="payload" value="" checked>Headers only<small>Who talks to whom, when and how much. Every packet is cut after its transport header</small></label>
+          <label><input type="radio" name="payload" value="true">Full packets<span class="badge">needs approval</span><small>Includes the content, which can hold user data and credentials</small></label>
+        </div>
+
+        <!-- Profile -->
+        <div class="fields" data-kinds="pprof">
+          <label>Port of the profile endpoint<input data-param="port" type="number" min="1" placeholder="6060"></label>
+          <label>Path<input data-param="path" placeholder="/debug/pprof/profile"></label>
+        </div>
+
+        <div class="fields" data-kinds="pcap strace pprof logs">
+          <label><span id="durationLabel">Duration (seconds)</span><input id="duration" type="number" min="0" placeholder="30"></label>
+        </div>
+        <p class="muted" data-kinds="pod-state">Nothing to choose: the pod object and its events are saved as JSON.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4 · When</legend>
+      <div class="choice">
+        <label><input type="radio" name="when" value="now" checked>Now<small id="nowHint">Starts at once on every pod of the workload</small></label>
+        <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
+      </div>
+      <div class="fields">
+        <label id="countLabel" hidden>How many crashes to record<input id="count" type="number" min="1" placeholder="1"></label>
+        <label class="wide"><span id="reasonLabel">Reason</span><input id="reason" placeholder="what you are looking for"></label>
+      </div>
+      <p class="notice" id="approvalNotice" hidden></p>
+    </fieldset>
+    <div class="toolbar"><button class="primary" id="submit">Record now</button><span id="done" class="muted"></span></div>
   </form>
-  <p id="watchHint" class="muted" hidden>The capture is made for the crashed pod. A packet capture then holds the packets of the duration before the crash, and logs include the crashed instance. A core dump is that of the crashed process and needs the agents' core handler. Evidence that needs approval is approved once, for the watch.</p>
 
   <section id="watchSection" hidden>
     <h2>Waiting for crashes</h2>
@@ -71,7 +150,7 @@
 
   <section id="admin" hidden>
     <h2>Clusters</h2>
-    <form id="clusterForm"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
+    <form id="clusterForm" class="row"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
     <p id="clusterToken" class="muted"></p>
   </section>
 </section>
@@ -113,38 +192,142 @@ async function loadClusters() {
   else await loadNamespaces();
 }
 
-// Namespaces, workloads and containers are offered, never typed: each list
+// Everything that exists in the cluster is offered, never typed: each list
 // follows the choice before it.
 const options = list => list.map(v => `<option>${esc(v)}</option>`).join('');
 const namespacePath = () => `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces/${encodeURIComponent($('namespace').value)}`;
+const workloadQuery = () => 'workload=' + encodeURIComponent($('workload').value);
+const target = () => [$('cluster').value, $('namespace').value, $('workload').value].join('/');
+const picked = name => document.querySelector(`input[name=${name}]:checked`).value;
+const size = bytes => bytes >= 1 << 30 ? (bytes / (1 << 30)).toFixed(1) + ' GiB' : Math.max(1, Math.round(bytes / (1 << 20))) + ' MiB';
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 async function loadNamespaces() {
-  $('namespace').innerHTML = $('workload').innerHTML = $('container').innerHTML = '';
-  if (!$('cluster').value) return;
-  $('namespace').innerHTML = options(await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`));
+  $('namespace').innerHTML = $('workload').innerHTML = '';
+  if ($('cluster').value) $('namespace').innerHTML = options(await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`));
   await loadWorkloads();
 }
 
 async function loadWorkloads() {
-  $('workload').innerHTML = $('container').innerHTML = '';
-  if (!$('namespace').value) return;
-  $('workload').innerHTML = options(await call('GET', namespacePath() + '/workloads'));
-  await loadContainers();
+  $('workload').innerHTML = '';
+  if ($('namespace').value) $('workload').innerHTML = options(await call('GET', namespacePath() + '/workloads'));
+  await workloadChanged();
 }
 
-async function loadContainers() {
-  $('container').innerHTML = '';
+// What was learned about a workload belongs to that workload only.
+let containers = [], processesOf = '', flows = [];
+async function workloadChanged() {
+  containers = []; processesOf = '';
+  $('container').innerHTML = $('process').innerHTML = '';
+  showFlows(null);
   if (!$('workload').value) return;
-  const list = await call('GET', namespacePath() + '/containers?workload=' + encodeURIComponent($('workload').value));
-  // Logs cover every container unless one is chosen; a core dump or trace takes the first.
-  $('container').innerHTML = '<option value="">' + ($('kind').value === 'logs' ? 'all containers' : 'first container') + '</option>' + options(list);
+  containers = await call('GET', namespacePath() + '/containers?' + workloadQuery());
+  $('container').innerHTML = '<option value="">all containers</option>' + options(containers);
+  await loadProcesses();
+}
+
+// The process list is read from the pods when a core dump or trace is
+// chosen. If that fails, the containers' main processes remain as choices.
+async function loadProcesses() {
+  const of = target();
+  if (!['coredump', 'strace'].includes(picked('kind')) || !$('workload').value || processesOf === of) return;
+  processesOf = of;
+  $('process').innerHTML = '<option>Looking at the running processes…</option>';
+  $('process').disabled = true;
+  $('processHint').textContent = '';
+  let found = {pods: [], processes: []}, problem = '';
+  try { found = await call('GET', namespacePath() + '/processes?' + workloadQuery()); } catch (err) { problem = err.message; }
+  if (of !== target()) return; // another workload was chosen meanwhile
+  const groups = [];
+  for (const container of found.processes.length ? [...new Set(found.processes.map(p => p.container))] : containers) {
+    const programs = found.processes.filter(p => p.container === container);
+    const main = programs.find(p => p.main);
+    const choice = (value, text, p) => `<option value="${esc(JSON.stringify(value))}" data-bytes="${p?.largestResidentBytes || 0}" data-count="${p ? Math.ceil(p.processes / p.pods) : 1}">${esc(text)}</option>`;
+    let list = choice({container}, main ? `Main process: ${main.name}` : 'Main process', main && {...main, processes: main.pods});
+    for (const p of programs) {
+      // A program that only runs as the main process is that choice already.
+      if (p.main && p.processes === p.pods) continue;
+      const count = p.processes === p.pods ? 'one per pod' : p.pods === 1 ? plural(p.processes, 'process') + ' in the pod' : `${plural(p.processes, 'process')} in ${plural(p.pods, 'pod')}`;
+      list += choice({container, process: p.executable}, `Every ${p.name} process: ${p.executable} (${count})`, p);
+    }
+    groups.push(`<optgroup label="Container ${esc(container)}">${list}</optgroup>`);
+  }
+  $('process').innerHTML = groups.join('');
+  $('process').disabled = false;
+  $('process').dataset.note = problem ? `The processes could not be listed (${problem}), so only the main processes are offered. `
+    : found.notInspected?.length ? `${plural(found.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node. ` : '';
+  showParams();
+}
+
+function processHint() {
+  const chosen = $('process').selectedOptions[0];
+  let text = $('process').dataset.note || '';
+  if (picked('kind') === 'coredump' && chosen) {
+    const bytes = Number(chosen.dataset.bytes), count = Number(chosen.dataset.count);
+    if (bytes) text += `A core is about as large as the process's memory: ${size(bytes)}${count > 1 ? ` each, ${count} per pod` : ''}. `;
+    text += 'The process pauses while its core is written.';
+  }
+  if (picked('kind') === 'strace') text += 'Tracing slows the process down while it runs.';
+  return text;
+}
+
+// The traffic sample: what the pods talk to right now, as rows to tick.
+function showFlows(sample) {
+  flows = sample?.flows || [];
+  $('flowTable').hidden = !flows.length;
+  $('filter').value = '';
+  const most = Math.max(1, ...flows.map(f => f.bytes));
+  const arrows = {in: ['←', 'incoming'], out: ['→', 'outgoing'], local: ['↻', 'inside the pod']};
+  $('flows').innerHTML = flows.map((f, i) => {
+    const notes = [sample.pods.length > 1 ? `${f.pods} of ${sample.pods.length} pods` : '',
+      f.direction === 'out' && !f.peerName?.startsWith('Service') ? 'this address can change when the peer restarts' : ''].filter(Boolean).join(' · ');
+    return `<tr><td><input type="checkbox" data-flow="${i}" aria-label="${esc(f.label)}"></td><td class="arrow" title="${arrows[f.direction][1]}">${arrows[f.direction][0]}</td>
+      <td>${esc(f.label)}<div class="muted">${esc(notes)}</div></td><td>${f.packets.toLocaleString()}</td><td><div class="bar" style="width:${Math.round(100 * f.bytes / most)}%"></div></td></tr>`;
+  }).join('');
+  if (!sample) $('sampleState').textContent = 'Choose connections from what the pods are doing right now, instead of writing a filter.';
+  else {
+    const where = `in ${plural(sample.seconds, 'second')} on ${plural(sample.pods.length, 'pod')}`;
+    const missed = sample.notInspected?.length ? ` ${plural(sample.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node.` : '';
+    $('sampleState').textContent = (flows.length ? `Seen ${where}. Tick what you want to record.` : `No packets ${where}. That does not mean the workload has no connections: look again, or record all traffic.`) + missed;
+  }
+  filterChanged();
+}
+
+// Ticked rows become the filter. Typing a filter instead unticks them.
+function filterChanged(typed) {
+  const chosen = typed ? [] : [...document.querySelectorAll('#flows input:checked')].map(box => flows[box.dataset.flow]);
+  if (typed) for (const box of document.querySelectorAll('#flows input:checked')) box.checked = false;
+  else $('filter').value = chosen.length > 1 ? chosen.map(f => `(${f.filter})`).join(' or ') : chosen[0]?.filter || '';
+  $('chosen').textContent = chosen.length ? 'Records only: ' + chosen.map(f => f.label).join('; ') + '.'
+    : $('filter').value ? 'Records what the filter below selects.' : 'Records all traffic of the pods.';
 }
 
 function showParams() {
-  for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').includes($('kind').value);
-  const crash = $('when').value === 'crash';
-  $('countLabel').hidden = $('watchHint').hidden = !crash;
-  $('submit').textContent = crash ? 'Watch for crashes' : 'Request capture';
+  const kind = picked('kind'), crash = picked('when') === 'crash';
+  for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').includes(kind);
+  // The kernel dumps whichever process crashed, and a crash watch reads both log instances.
+  if (kind === 'coredump' && crash) $('processBlock').hidden = true;
+  $('instanceLabel').hidden = crash;
+  $('processHint').textContent = processHint();
+  $('durationLabel').textContent = {
+    pcap: crash ? 'Keep the packets of the last (seconds)' : 'Record for (seconds)',
+    strace: 'Trace for (seconds)', pprof: 'Profile for (seconds)', logs: 'Keep following for (seconds)'}[kind] || '';
+  $('duration').placeholder = kind === 'logs' ? '0: only what is there' : '30';
+  $('crashHint').textContent = {
+    pcap: 'Keeps the last packets of every pod in memory and saves those from before the crash',
+    logs: 'Saves the logs of the crashed instance and of its successor',
+    coredump: 'Saves the core of the process that crashed. The cluster\'s agents need the core handler',
+    'pod-state': 'Saves the pod with the reason of the crash and its events',
+  }[kind] || 'Runs for the crashed pod as soon as its container has restarted';
+  $('countLabel').hidden = !crash;
+  const sensitive = kind === 'coredump' || kind === 'pcap' && picked('payload') || kind === 'strace' && picked('strings');
+  $('approvalNotice').hidden = !sensitive;
+  $('approvalNotice').textContent = !sensitive ? '' : (crash
+    ? 'This can contain memory or user data: an administrator approves the watch once, before it starts. Its captures then need no further approval.'
+    : 'This can contain memory or user data: it starts when an administrator has approved it.');
+  $('reasonLabel').textContent = sensitive ? 'Reason, shown to the approver' : 'Reason';
+  $('submit').textContent = crash ? (sensitive ? 'Request approval for this watch' : 'Watch for crashes') : sensitive ? 'Request approval' : 'Record now';
+  $('done').textContent = '';
 }
 
 const describe = c => `${esc(c.kind)}${c.durationSeconds ? ` · ${c.durationSeconds}s` : ''}<div class="muted">${esc(Object.entries(c.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</div><div class="muted">${esc(c.reason)}</div>`;
@@ -183,17 +366,45 @@ $('signout').onclick = async () => {
 };
 $('cluster').onchange = guard(loadNamespaces);
 $('namespace').onchange = guard(loadWorkloads);
-$('workload').onchange = guard(loadContainers);
-$('kind').onchange = guard(async () => { showParams(); await loadContainers(); });
-$('when').onchange = showParams;
+$('workload').onchange = guard(workloadChanged);
+$('captureForm').onchange = guard(async e => { showParams(); if (e.target.name === 'kind') await loadProcesses(); });
+$('sample').onclick = guard(async () => {
+  if (!$('workload').value) return;
+  const of = target(), seconds = $('sampleSeconds').value;
+  $('sample').disabled = true;
+  $('sampleState').textContent = `Looking at the traffic for ${seconds} seconds…`;
+  try {
+    const sample = await call('POST', `${namespacePath()}/traffic?${workloadQuery()}&seconds=${seconds}`);
+    if (of === target()) showFlows(sample);
+  } catch (err) {
+    showFlows(null);
+    throw err;
+  } finally {
+    $('sample').disabled = false;
+    $('sample').textContent = 'Look again';
+  }
+});
+$('flows').onclick = e => {
+  const box = e.target.closest('tr')?.querySelector('input');
+  if (!box) return;
+  if (e.target !== box) box.checked = !box.checked;
+  filterChanged();
+};
+$('filter').oninput = () => filterChanged(true);
 $('captureForm').onsubmit = guard(async () => {
-  const params = {};
-  for (const el of document.querySelectorAll('[data-param]')) if (!el.closest('label').hidden && el.value) params[el.dataset.param] = el.value;
-  const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind: $('kind').value,
-    durationSeconds: $('duration').closest('label').hidden ? 0 : Number($('duration').value || 0), params, reason: $('reason').value};
-  if ($('when').value === 'crash') await call('POST', '/api/watches', {...request, count: Number($('count').value || 1)});
-  else await call('POST', '/api/captures', request);
+  const kind = picked('kind'), crash = picked('when') === 'crash', params = {};
+  const shown = el => !el.closest('[hidden]');
+  for (const el of document.querySelectorAll('[data-param]')) if (shown(el) && el.value) params[el.dataset.param] = el.value;
+  if (kind === 'pcap' && picked('payload')) params.payload = 'true';
+  if (kind === 'strace' && picked('strings')) params.strings = 'true';
+  if (shown($('process')) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
+  const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind,
+    durationSeconds: shown($('duration')) ? Number($('duration').value || 0) : 0, params, reason: $('reason').value};
+  const created = crash ? await call('POST', '/api/watches', {...request, count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
+  const waits = created.sensitive && !created.approver && created.state !== 'Queued';
+  $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
+    : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Its files appear below.';
 });
 $('watches').onclick = guard(async e => {
   if (!e.target.dataset.id) return;

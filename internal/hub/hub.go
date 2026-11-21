@@ -126,6 +126,8 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/workloads", h.listWorkloads)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/containers", h.listContainers)
+	user("GET /api/clusters/{cluster}/namespaces/{namespace}/processes", h.listProcesses)
+	user("POST /api/clusters/{cluster}/namespaces/{namespace}/traffic", h.sampleTraffic)
 	user("POST /api/captures", h.createCapture)
 	user("GET /api/captures", h.listCaptures)
 	user("GET /api/captures/{id}", h.getCapture)
@@ -247,7 +249,7 @@ func (h *Hub) allowed(ctx context.Context, u User, cluster, namespace string) er
 	if u.Admin {
 		return nil
 	}
-	r, err := h.agents.query(ctx, cluster, api.Query{Op: "review", Namespace: namespace, User: u.Name, Groups: u.Groups})
+	r, err := h.agents.query(ctx, cluster, "", api.Query{Op: "review", Namespace: namespace, User: u.Name, Groups: u.Groups})
 	if err != nil {
 		return err
 	}
@@ -320,7 +322,7 @@ func (h *Hub) namespaces(ctx context.Context, u User, cluster string) ([]string,
 	if u.Admin {
 		q.User, q.Groups = "", nil
 	}
-	res, err := h.agents.query(ctx, cluster, q)
+	res, err := h.agents.query(ctx, cluster, "", q)
 	if res.Namespaces == nil {
 		res.Namespaces = []string{}
 	}
@@ -333,7 +335,7 @@ func (h *Hub) listContainers(w http.ResponseWriter, r *http.Request, u User) err
 	if err := h.allowed(r.Context(), u, cluster, namespace); err != nil {
 		return err
 	}
-	res, err := h.agents.query(r.Context(), cluster, api.Query{Op: "workload", Namespace: namespace, Workload: r.URL.Query().Get("workload")})
+	res, err := h.agents.query(r.Context(), cluster, "", api.Query{Op: "workload", Namespace: namespace, Workload: r.URL.Query().Get("workload")})
 	if err != nil {
 		return err
 	}
@@ -345,7 +347,7 @@ func (h *Hub) listWorkloads(w http.ResponseWriter, r *http.Request, u User) erro
 	if err := h.allowed(r.Context(), u, cluster, namespace); err != nil {
 		return err
 	}
-	res, err := h.agents.query(r.Context(), cluster, api.Query{Op: "workloads", Namespace: namespace})
+	res, err := h.agents.query(r.Context(), cluster, "", api.Query{Op: "workloads", Namespace: namespace})
 	if err != nil {
 		return err
 	}
@@ -375,7 +377,7 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Capture{}, err
 	}
-	res, err := h.agents.query(ctx, in.Cluster, api.Query{Op: "resolve", Namespace: in.Namespace, Workload: in.Workload})
+	res, err := h.agents.query(ctx, in.Cluster, "", api.Query{Op: "resolve", Namespace: in.Namespace, Workload: in.Workload})
 	if err != nil {
 		return api.Capture{}, err
 	}

@@ -121,6 +121,11 @@ curl -H "Authorization: Bearer $TOKEN" https://<hub-host>/api/captures/<id>
 curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/artifacts/<pod>/capture.pcap
 ```
 
+You do not need to know process names or filter syntax. The console lists
+the programs that run in the workload's pods for a core dump or trace, and
+**Look at current traffic** shows whom the pods talk to right now; ticking
+connections there builds the packet filter.
+
 To catch a problem you cannot be present for, choose **when a container
 crashes** in the console or create a watch. The capture is then made for the
 crashed pod; a `pcap` holds the packet headers of the seconds before the
@@ -139,8 +144,8 @@ replaces the node's `kernel.core_pattern` while the agents run, and an
 administrator's approval of the watch.
 
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
-get tools to list workloads, request captures, watch for crashes and read
-text evidence.
+get tools to list workloads, look at their processes and traffic, request
+captures, watch for crashes and read text evidence.
 
 > [!WARNING]
 > A downloaded file is outside Asservat's control: it is not deleted when
