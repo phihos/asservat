@@ -273,6 +273,37 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("approved capture", done)
 	}
 
+	// One request with several recordings: they need a single approval, run
+	// together, and one that fails does not fail the others.
+	several := target
+	several.Recordings = []api.Recording{{Kind: api.KindPodState}, {Kind: api.KindLogs, Params: map[string]string{"container": "app"}}, {Kind: api.KindCoredump}}
+	several.Reason = "everything at once"
+	code, bundle := request("alice-token", several)
+	if code != 201 || bundle.State != api.StatePendingApproval || !bundle.Sensitive || len(bundle.Recordings) != 3 || bundle.Kind != "" || len(bundle.Tasks) != 1 {
+		t.Fatal("request with several recordings", code, bundle)
+	}
+	if got := f.capture("alice-token", bundle.ID); len(got.Artifacts) != 0 || got.Tasks[0].State != api.StateQueued {
+		t.Fatal("an ordinary recording of a sensitive request ran before the approval", got)
+	}
+	if code, _ := f.call("root-token", "POST", "/api/captures/"+bundle.ID+"/approve", nil); code != 200 {
+		t.Fatal("approve", code)
+	}
+	bundle = f.wait("alice-token", bundle.ID, api.StateCompleted, api.StateFailed)
+	names := []string{}
+	for _, a := range bundle.Artifacts {
+		names = append(names, a.Name)
+	}
+	// The fake node has no container process, so the core dump fails.
+	if bundle.State != api.StateCompleted || strings.Join(names, ",") != "api-1/app.log,api-1/events.json,api-1/pod.json" ||
+		!strings.HasPrefix(bundle.Tasks[0].Message, "coredump: ") || bundle.Tasks[0].State != api.StateCompleted {
+		t.Fatal("capture with several recordings", bundle.State, names, bundle.Tasks)
+	}
+	twice := target
+	twice.Recordings = []api.Recording{{Kind: api.KindLogs}, {Kind: api.KindLogs}}
+	if code, _ := request("alice-token", twice); code != 400 {
+		t.Fatal("a kind requested twice", code)
+	}
+
 	// A pod on a node without a connected agent stays queued until it connects.
 	away := target
 	away.Kind, away.Pods = api.KindLogs, []string{"api-2"}

@@ -39,4 +39,49 @@ func TestValidateAndSensitive(t *testing.T) {
 	if r.Validate() != nil || r.DurationSeconds != 30 {
 		t.Error("pcap duration does not default to 30 seconds")
 	}
+	// The short form with one kind becomes a recording.
+	if r.Kind != "" || r.Params != nil || len(r.Recordings) != 1 || r.Recordings[0].Kind != KindPcap {
+		t.Errorf("normalized request %+v", r)
+	}
+}
+
+// A request holds several recordings with one time frame; it is sensitive
+// if any of them is.
+func TestSeveralRecordings(t *testing.T) {
+	request := func(recordings ...Recording) CaptureRequest {
+		return CaptureRequest{Cluster: "prod", Namespace: "payments", Workload: "Deployment/api", Recordings: recordings}
+	}
+	logs, packets := Recording{Kind: KindLogs}, Recording{Kind: KindPcap, Params: map[string]string{"filter": "tcp port 5432"}}
+	r := request(logs, packets, Recording{Kind: KindPodState})
+	if err := r.Validate(); err != nil || r.Sensitive() || r.DurationSeconds != 30 {
+		t.Error("three ordinary recordings", err, r.Sensitive(), r.DurationSeconds)
+	}
+	if r.Recording(KindPcap).Params["filter"] != "tcp port 5432" || r.Recording(KindCoredump) != nil {
+		t.Error("recording by kind")
+	}
+	r = request(logs, Recording{Kind: KindPodState})
+	if err := r.Validate(); err != nil || r.DurationSeconds != 0 {
+		t.Error("recordings without a time frame", err, r.DurationSeconds)
+	}
+	r = request(logs, packets, Recording{Kind: KindCoredump})
+	if err := r.Validate(); err != nil || !r.Sensitive() {
+		t.Error("a request with a core dump is sensitive as a whole", err)
+	}
+	// The short form adds to the list.
+	r = request(logs)
+	r.Kind, r.Params = KindPcap, map[string]string{"payload": "true"}
+	if err := r.Validate(); err != nil || len(r.Recordings) != 2 || !r.Sensitive() {
+		t.Error("short form next to recordings", err, r.Recordings)
+	}
+	for name, r := range map[string]CaptureRequest{
+		"no recording":         request(),
+		"a kind twice":         request(logs, packets, logs),
+		"a bad recording":      request(logs, Recording{Kind: KindPprof}),
+		"a foreign parameter":  request(Recording{Kind: KindLogs, Params: map[string]string{"filter": "x"}}),
+		"twice via short form": {Cluster: "prod", Namespace: "payments", Workload: "Deployment/api", Kind: KindLogs, Recordings: []Recording{logs}},
+	} {
+		if r.Validate() == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
 }

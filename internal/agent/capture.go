@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,19 +22,61 @@ import (
 	"asservat.local/asservat/internal/api"
 )
 
-// capture records one pod and uploads the resulting files.
-func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) error {
+// capture makes the request's recordings of one pod, all at once, and
+// uploads their files. It fails if no recording succeeded; otherwise it
+// names those that failed.
+func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (failures string, err error) {
 	r := t.Request
 	pod, err := a.Kube.CoreV1().Pods(r.Namespace).Get(ctx, t.Pod, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if pod.Spec.NodeName != a.Node {
-		return fmt.Errorf("pod %s runs on node %s", t.Pod, pod.Spec.NodeName)
+		return "", fmt.Errorf("pod %s runs on node %s", t.Pod, pod.Spec.NodeName)
 	}
+	// A core dump and a trace both attach to the process, which only one
+	// can do at a time: the trace starts when the dump is written.
+	dumped := make(chan struct{})
+	if r.Recording(api.KindCoredump) == nil {
+		close(dumped)
+	}
+	errs := make([]error, len(r.Recordings))
+	var wg sync.WaitGroup
+	for i, rec := range r.Recordings {
+		wg.Go(func() {
+			if rec.Kind == api.KindStrace {
+				<-dumped
+			}
+			errs[i] = a.recording(ctx, id, t, pod, rec)
+			if rec.Kind == api.KindCoredump {
+				close(dumped)
+			}
+		})
+	}
+	wg.Wait()
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	var failed []string
+	for i, err := range errs {
+		if err != nil && len(errs) > 1 {
+			failed = append(failed, r.Recordings[i].Kind+": "+err.Error())
+		} else if err != nil {
+			failed = append(failed, err.Error())
+		}
+	}
+	if len(failed) == len(errs) {
+		return "", errors.New(strings.Join(failed, "; "))
+	}
+	return strings.Join(failed, "; "), nil
+}
+
+// recording makes one recording of a pod.
+func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording) error {
+	r := t.Request
 	duration := time.Duration(r.DurationSeconds) * time.Second
 	up := func(name string, body io.Reader) error { return a.upload(ctx, id, t.Pod, name, body) }
-	switch r.Kind {
+	switch rec.Kind {
 	case api.KindPodState:
 		events, err := a.Kube.CoreV1().Events(r.Namespace).List(ctx, metav1.ListOptions{FieldSelector: "involvedObject.name=" + t.Pod})
 		if err != nil {
@@ -48,7 +91,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		}
 		return nil
 	case api.KindLogs:
-		return a.logs(ctx, pod, r, duration, up)
+		return a.logs(ctx, pod, rec, r.Watch != "", duration, up)
 	case api.KindPcap:
 		if r.Watch != "" {
 			// The packets before the crash, set aside when it was reported.
@@ -66,23 +109,23 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 			return err
 		}
 		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
-		if f := r.Params["filter"]; f != "" {
+		if f := rec.Params["filter"]; f != "" {
 			args = append(args, f)
 		}
 		// Headers only unless payload was requested (and approved).
-		if r.Params["payload"] != "true" {
+		if rec.Params["payload"] != "true" {
 			packets := up
 			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
 		return a.record(ctx, duration, "capture.pcap", up, "nsenter", args...)
 	case api.KindStrace:
-		pids, container, err := a.targets(pod, r.Params["container"], r.Params["process"])
+		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {
 			return err
 		}
 		// Buffer contents are omitted unless strings was requested (and approved).
 		size := "0"
-		if r.Params["strings"] == "true" {
+		if rec.Params["strings"] == "true" {
 			size = "256"
 		}
 		args := []string{"-f", "-tt", "-T", "-s", size, "-o", "/dev/stdout"}
@@ -95,7 +138,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		if err != nil {
 			return err
 		}
-		path := r.Params["path"]
+		path := rec.Params["path"]
 		if path == "" {
 			path = "/debug/pprof/profile?seconds=" + strconv.Itoa(r.DurationSeconds)
 		}
@@ -103,19 +146,19 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		// bound to localhost work and no NetworkPolicy applies.
 		ctx, cancel := context.WithTimeout(ctx, duration+30*time.Second)
 		defer cancel()
-		return a.record(ctx, 0, "profile.pprof", up, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "http://127.0.0.1:"+r.Params["port"]+path)
+		return a.record(ctx, 0, "profile.pprof", up, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "http://127.0.0.1:"+rec.Params["port"]+path)
 	case api.KindCoredump:
 		if r.Watch != "" {
 			// The core of the crashed process, not one of its successor.
 			return a.crashCores(pod, r.Trigger, up)
 		}
-		pids, container, err := a.targets(pod, r.Params["container"], r.Params["process"])
+		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {
 			return err
 		}
 		for _, pid := range pids {
 			name := "core." + container
-			if r.Params["process"] != "" {
+			if rec.Params["process"] != "" {
 				name += "." + strconv.Itoa(pid)
 			}
 			if err := a.gcore(ctx, id+"-"+t.Pod, pid, name, up); err != nil {
@@ -124,7 +167,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		}
 		return nil
 	}
-	return fmt.Errorf("unknown kind %q", r.Kind)
+	return fmt.Errorf("unknown kind %q", rec.Kind)
 }
 
 // gcore dumps a running process. gcore cannot write to a pipe: the core
@@ -144,9 +187,11 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 	return up(name, f)
 }
 
-func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest, duration time.Duration, up func(string, io.Reader) error) error {
-	opts := corev1.PodLogOptions{Previous: r.Params["previous"] == "true", Follow: duration > 0, Timestamps: true}
-	if v := r.Params["tailLines"]; v != "" {
+// logs uploads the containers' logs. After a crash they are those of both
+// instances of each container.
+func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, rec api.Recording, crashed bool, duration time.Duration, up func(string, io.Reader) error) error {
+	opts := corev1.PodLogOptions{Previous: rec.Params["previous"] == "true", Follow: duration > 0, Timestamps: true}
+	if v := rec.Params["tailLines"]; v != "" {
 		n, _ := strconv.ParseInt(v, 10, 64)
 		opts.TailLines = &n
 	}
@@ -160,7 +205,7 @@ func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest,
 		suffix   string
 	}
 	instances := []instance{{opts.Previous, ".log"}}
-	if r.Watch != "" {
+	if crashed {
 		// The crashed instance is the current one until the kubelet restarts
 		// the container and the previous one from then on. Reading the
 		// current one first cannot miss it.
@@ -168,7 +213,7 @@ func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest,
 	}
 	uploaded := 0
 	for _, c := range pod.Spec.Containers {
-		if want := r.Params["container"]; want != "" && want != c.Name {
+		if want := rec.Params["container"]; want != "" && want != c.Name {
 			continue
 		}
 		for _, i := range instances {
@@ -176,7 +221,7 @@ func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest,
 			o.Container, o.Previous = c.Name, i.previous
 			stream, err := a.Kube.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &o).Stream(ctx)
 			if err != nil {
-				if i.previous || r.Watch != "" {
+				if i.previous || crashed {
 					continue // this container has no such instance
 				}
 				return err

@@ -33,7 +33,10 @@
   .wide { grid-column: span 2; }
   .badge { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 0 6px; margin-left: 6px; white-space: nowrap; }
   .notice { border-left: 3px solid var(--warn); padding: 6px 10px; margin: 8px 0 0; background: var(--soft); }
-  .options > * + * { margin-top: 10px; }
+  .pod { font-size: 12px; opacity: .7; margin-top: 4px; } .pod:first-child { margin-top: 0; }
+  .options > * + * { margin-top: 14px; }
+  h3 { font-size: 13px; margin: 0 0 6px; } .lead { margin: 0 0 8px; }
+  .options section > * + * { margin-top: 8px; }
   #flows td { vertical-align: middle; } #flows tr { cursor: pointer; } #flows tr:has(input:checked) { background: var(--soft); }
   #flows .arrow { font-size: 16px; text-align: center; }
   #flowTable th:nth-child(-n+2) { width: 1.5em; }
@@ -66,69 +69,80 @@
 
     <fieldset>
       <legend>2 · What to record</legend>
+      <p class="muted lead">Choose one or several. They start together on the same pods and share one time frame and, if needed, one approval.</p>
       <div class="kinds" id="kinds">
-        <label><input type="radio" name="kind" value="pod-state" checked>Pod state<small>The pod as Kubernetes sees it, and its events</small></label>
-        <label><input type="radio" name="kind" value="logs">Logs<small>What the containers wrote, also of the instance before a restart</small></label>
-        <label><input type="radio" name="kind" value="pcap">Network traffic<small>A packet capture for Wireshark, of all traffic or chosen connections</small></label>
-        <label><input type="radio" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
-        <label><input type="radio" name="kind" value="pprof">Profile<small>A profile endpoint of the application, such as Go's pprof</small></label>
-        <label><input type="radio" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
+        <label><input type="checkbox" name="kind" value="pod-state" checked>Pod state<small>The pod as Kubernetes sees it, and its events</small></label>
+        <label><input type="checkbox" name="kind" value="logs">Logs<small>What the containers wrote, also of the instance before a restart</small></label>
+        <label><input type="checkbox" name="kind" value="pcap">Network traffic<small>A packet capture for Wireshark, of all traffic or chosen connections</small></label>
+        <label><input type="checkbox" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
+        <label><input type="checkbox" name="kind" value="pprof">Profile<small>A profile endpoint of the application, such as Go's pprof</small></label>
+        <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
       </div>
     </fieldset>
 
     <fieldset id="optionsSet">
       <legend>3 · Details</legend>
       <div class="options">
-        <!-- Logs -->
-        <div class="fields" data-kinds="logs">
-          <label>Container<select id="container" data-param="container"></select></label>
-          <label>Only the last lines<input data-param="tailLines" type="number" min="1" placeholder="all lines"></label>
-          <label id="instanceLabel">Instance<select data-param="previous"><option value="">the running one</option><option value="true">the one before the last restart</option></select></label>
-        </div>
+        <section data-kinds="logs">
+          <h3>Logs</h3>
+          <div class="fields">
+            <label>Container<select id="container" data-param="container" data-of="logs"></select></label>
+            <label>Only the last lines<input data-param="tailLines" data-of="logs" type="number" min="1" placeholder="all lines"></label>
+            <label id="instanceLabel">Instance<select data-param="previous" data-of="logs"><option value="">the running one</option><option value="true">the one before the last restart</option></select></label>
+          </div>
+        </section>
 
-        <!-- Core dump and system calls: which process -->
-        <div data-kinds="coredump strace" id="processBlock">
-          <label>Process<select id="process"></select></label>
-          <p class="muted" id="processHint"></p>
-        </div>
-        <div class="choice" data-kinds="strace">
-          <label><input type="radio" name="strings" value="" checked>Calls and timing only<small>Leaves out what the process reads and writes</small></label>
-          <label><input type="radio" name="strings" value="true">With data read and written<span class="badge">needs approval</span><small>The first 256 bytes of every buffer; they can hold user data</small></label>
-        </div>
-
-        <!-- Network traffic: which connections, how much of each packet -->
-        <div data-kinds="pcap">
+        <section data-kinds="pcap">
+          <h3>Network traffic</h3>
           <div class="toolbar">
             <button type="button" id="sample">Look at current traffic</button>
             <label style="display:flex;align-items:center;gap:6px">for<select id="sampleSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option></select></label>
-            <span class="muted" id="sampleState">Choose connections from what the pods are doing right now, instead of writing a filter.</span>
+            <span class="muted" id="sampleState"></span>
           </div>
           <table id="flowTable" hidden><thead><tr><th></th><th></th><th>Connection</th><th>Packets</th><th style="width:22%">Share of traffic</th></tr></thead><tbody id="flows"></tbody></table>
           <p id="chosen" class="muted">Records all traffic of the pods.</p>
-          <details><summary>As a tcpdump filter</summary><input id="filter" data-param="filter" placeholder="empty: all traffic" spellcheck="false" autocomplete="off"></details>
-        </div>
-        <div class="choice" data-kinds="pcap">
-          <label><input type="radio" name="payload" value="" checked>Headers only<small>Who talks to whom, when and how much. Every packet is cut after its transport header</small></label>
-          <label><input type="radio" name="payload" value="true">Full packets<span class="badge">needs approval</span><small>Includes the content, which can hold user data and credentials</small></label>
-        </div>
+          <details><summary>As a tcpdump filter</summary><input id="filter" data-param="filter" data-of="pcap" placeholder="empty: all traffic" spellcheck="false" autocomplete="off"></details>
+          <div class="choice">
+            <label><input type="radio" name="payload" value="" checked>Headers only<small>Who talks to whom, when and how much. Every packet is cut after its transport header</small></label>
+            <label><input type="radio" name="payload" value="true">Full packets<span class="badge">needs approval</span><small>Includes the content, which can hold user data and credentials</small></label>
+          </div>
+        </section>
 
-        <!-- Profile -->
-        <div class="fields" data-kinds="pprof">
-          <label>Port of the profile endpoint<input data-param="port" type="number" min="1" placeholder="6060"></label>
-          <label>Path<input data-param="path" placeholder="/debug/pprof/profile"></label>
-        </div>
+        <section id="processBlock">
+          <h3 id="processTitle">Process</h3>
+          <label>Which process<select id="process"></select></label>
+          <p class="muted" id="processHint"></p>
+        </section>
 
-        <div class="fields" data-kinds="pcap strace pprof logs">
-          <label><span id="durationLabel">Duration (seconds)</span><input id="duration" type="number" min="0" placeholder="30"></label>
-        </div>
-        <p class="muted" data-kinds="pod-state">Nothing to choose: the pod object and its events are saved as JSON.</p>
+        <section data-kinds="strace">
+          <h3>System calls</h3>
+          <div class="choice">
+            <label><input type="radio" name="strings" value="" checked>Calls and timing only<small>Leaves out what the process reads and writes</small></label>
+            <label><input type="radio" name="strings" value="true">With data read and written<span class="badge">needs approval</span><small>The first 256 bytes of every buffer; they can hold user data</small></label>
+          </div>
+        </section>
+
+        <section data-kinds="pprof">
+          <h3>Profile</h3>
+          <div class="fields">
+            <label>Port of the profile endpoint<input data-param="port" data-of="pprof" type="number" min="1" placeholder="6060"></label>
+            <label>Path<input data-param="path" data-of="pprof" placeholder="/debug/pprof/profile"></label>
+          </div>
+        </section>
+
+        <section id="frameBlock">
+          <h3>Time frame</h3>
+          <div class="fields"><label>Seconds<input id="duration" type="number" min="0" placeholder="30"></label></div>
+          <p class="muted" id="frameHint"></p>
+        </section>
+        <p class="muted" id="nothing">Nothing to choose: the pod object and its events are saved as JSON.</p>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>4 · When</legend>
       <div class="choice">
-        <label><input type="radio" name="when" value="now" checked>Now<small id="nowHint">Starts at once on every pod of the workload</small></label>
+        <label><input type="radio" name="when" value="now" checked>Now<small>Starts at once on every pod of the workload</small></label>
         <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
       </div>
       <div class="fields">
@@ -200,6 +214,7 @@ const workloadQuery = () => 'workload=' + encodeURIComponent($('workload').value
 const target = () => [$('cluster').value, $('namespace').value, $('workload').value].join('/');
 const picked = name => document.querySelector(`input[name=${name}]:checked`).value;
 const size = bytes => bytes >= 1 << 30 ? (bytes / (1 << 30)).toFixed(1) + ' GiB' : Math.max(1, Math.round(bytes / (1 << 20))) + ' MiB';
+const fileSize = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1 << 20 ? Math.round(bytes / 1024) + ' KiB' : size(bytes);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 async function loadNamespaces() {
@@ -226,11 +241,17 @@ async function workloadChanged() {
   await loadProcesses();
 }
 
+const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].map(box => box.value);
+const kindNames = {'pod-state': 'pod state', logs: 'logs', pcap: 'network traffic', strace: 'system calls', pprof: 'profile', coredump: 'core dump'};
+const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).join(', ') + ' and ' + words.at(-1);
+// A core dump on a crash is that of the crashed process: nothing to choose.
+const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') === 'now';
+
 // The process list is read from the pods when a core dump or trace is
 // chosen. If that fails, the containers' main processes remain as choices.
 async function loadProcesses() {
   const of = target();
-  if (!['coredump', 'strace'].includes(picked('kind')) || !$('workload').value || processesOf === of) return;
+  if (!wantsProcess() || !$('workload').value || processesOf === of) return;
   processesOf = of;
   $('process').innerHTML = '<option>Looking at the running processes…</option>';
   $('process').disabled = true;
@@ -243,14 +264,14 @@ async function loadProcesses() {
     const programs = found.processes.filter(p => p.container === container);
     const main = programs.find(p => p.main);
     const choice = (value, text, p) => `<option value="${esc(JSON.stringify(value))}" data-bytes="${p?.largestResidentBytes || 0}" data-count="${p ? Math.ceil(p.processes / p.pods) : 1}">${esc(text)}</option>`;
-    let list = choice({container}, main ? `Main process: ${main.name}` : 'Main process', main && {...main, processes: main.pods});
+    let options = choice({container}, main ? `Main process: ${main.name}` : 'Main process', main && {...main, processes: main.pods});
     for (const p of programs) {
       // A program that only runs as the main process is that choice already.
       if (p.main && p.processes === p.pods) continue;
       const count = p.processes === p.pods ? 'one per pod' : p.pods === 1 ? plural(p.processes, 'process') + ' in the pod' : `${plural(p.processes, 'process')} in ${plural(p.pods, 'pod')}`;
-      list += choice({container, process: p.executable}, `Every ${p.name} process: ${p.executable} (${count})`, p);
+      options += choice({container, process: p.executable}, `Every ${p.name} process: ${p.executable} (${count})`, p);
     }
-    groups.push(`<optgroup label="Container ${esc(container)}">${list}</optgroup>`);
+    groups.push(`<optgroup label="Container ${esc(container)}">${options}</optgroup>`);
   }
   $('process').innerHTML = groups.join('');
   $('process').disabled = false;
@@ -260,14 +281,14 @@ async function loadProcesses() {
 }
 
 function processHint() {
-  const chosen = $('process').selectedOptions[0];
+  const chosen = $('process').selectedOptions[0], dump = kinds().includes('coredump') && picked('when') === 'now';
   let text = $('process').dataset.note || '';
-  if (picked('kind') === 'coredump' && chosen) {
+  if (dump && chosen) {
     const bytes = Number(chosen.dataset.bytes), count = Number(chosen.dataset.count);
     if (bytes) text += `A core is about as large as the process's memory: ${size(bytes)}${count > 1 ? ` each, ${count} per pod` : ''}. `;
-    text += 'The process pauses while its core is written.';
+    text += 'The process pauses while its core is written. ';
   }
-  if (picked('kind') === 'strace') text += 'Tracing slows the process down while it runs.';
+  if (kinds().includes('strace')) text += dump ? 'The trace starts when the core is written, and slows the process down while it runs.' : 'Tracing slows the process down while it runs.';
   return text;
 }
 
@@ -303,34 +324,43 @@ function filterChanged(typed) {
 }
 
 function showParams() {
-  const kind = picked('kind'), crash = picked('when') === 'crash';
-  for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').includes(kind);
-  // The kernel dumps whichever process crashed, and a crash watch reads both log instances.
-  if (kind === 'coredump' && crash) $('processBlock').hidden = true;
+  const chosen = kinds(), crash = picked('when') === 'crash', has = kind => chosen.includes(kind);
+  for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').some(has);
+  $('processBlock').hidden = !wantsProcess();
+  $('processTitle').textContent = 'Process for the ' + list(['coredump', 'strace'].filter(k => has(k) && (k !== 'coredump' || !crash)).map(k => kindNames[k]));
+  // A crash watch reads both log instances.
   $('instanceLabel').hidden = crash;
   $('processHint').textContent = processHint();
-  $('durationLabel').textContent = {
-    pcap: crash ? 'Keep the packets of the last (seconds)' : 'Record for (seconds)',
-    strace: 'Trace for (seconds)', pprof: 'Profile for (seconds)', logs: 'Keep following for (seconds)'}[kind] || '';
-  $('duration').placeholder = kind === 'logs' ? '0: only what is there' : '30';
-  $('crashHint').textContent = {
-    pcap: 'Keeps the last packets of every pod in memory and saves those from before the crash',
-    logs: 'Saves the logs of the crashed instance and of its successor',
-    coredump: 'Saves the core of the process that crashed. The cluster\'s agents need the core handler',
-    'pod-state': 'Saves the pod with the reason of the crash and its events',
-  }[kind] || 'Runs for the crashed pod as soon as its container has restarted';
+  // One time frame for everything that runs over time.
+  const timed = ['pcap', 'strace', 'pprof'].filter(has), follows = has('logs');
+  $('frameBlock').hidden = !timed.length && !follows;
+  $('duration').placeholder = timed.length ? '30' : '0';
+  // The packet buffer of a crash watch reaches back; everything else runs forward.
+  const running = timed.filter(k => !(k === 'pcap' && crash)).map(k => kindNames[k]);
+  $('frameHint').textContent = [
+    has('pcap') && crash ? 'The packets of this many seconds before the crash are kept.' : '',
+    running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : ''}.` : '',
+    follows ? (timed.length ? 'The logs are followed for the same time.' : 'With 0 the logs are saved as they are; otherwise they are followed this long.') : '',
+  ].filter(Boolean).join(' ');
+  $('nothing').hidden = !(chosen.length === 1 && has('pod-state'));
+  $('crashHint').textContent = !chosen.length ? '' : 'For the crashed pod: ' + list(chosen.map(k => ({
+    pcap: 'the packets from before the crash', logs: 'the logs of the crashed instance and its successor',
+    coredump: 'the core of the process that crashed (the agents need the core handler)', 'pod-state': 'the pod with the reason of the crash',
+    strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
   $('countLabel').hidden = !crash;
-  const sensitive = kind === 'coredump' || kind === 'pcap' && picked('payload') || kind === 'strace' && picked('strings');
-  $('approvalNotice').hidden = !sensitive;
-  $('approvalNotice').textContent = !sensitive ? '' : (crash
-    ? 'This can contain memory or user data: an administrator approves the watch once, before it starts. Its captures then need no further approval.'
-    : 'This can contain memory or user data: it starts when an administrator has approved it.');
-  $('reasonLabel').textContent = sensitive ? 'Reason, shown to the approver' : 'Reason';
-  $('submit').textContent = crash ? (sensitive ? 'Request approval for this watch' : 'Watch for crashes') : sensitive ? 'Request approval' : 'Record now';
-  $('done').textContent = '';
+  const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls'].filter(Boolean);
+  $('approvalNotice').hidden = !sensitive.length;
+  $('approvalNotice').textContent = !sensitive.length ? '' : `Needs approval because of ${list(sensitive)}. ` + (crash
+    ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
+    : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
+  $('reasonLabel').textContent = sensitive.length ? 'Reason, shown to the approver' : 'Reason';
+  $('submit').textContent = crash ? (sensitive.length ? 'Request approval for this watch' : 'Watch for crashes') : sensitive.length ? 'Request approval' : 'Record now';
+  $('submit').disabled = !chosen.length;
+  $('done').textContent = chosen.length ? '' : 'Choose at least one kind of evidence.';
 }
 
-const describe = c => `${esc(c.kind)}${c.durationSeconds ? ` · ${c.durationSeconds}s` : ''}<div class="muted">${esc(Object.entries(c.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</div><div class="muted">${esc(c.reason)}</div>`;
+const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</span></div>`).join('')
+  + `<div class="muted">${c.durationSeconds ? `${c.durationSeconds} s` : ''}${c.durationSeconds && c.reason ? ' · ' : ''}${esc(c.reason)}</div>`;
 
 async function loadWatches() {
   const list = await call('GET', '/api/watches');
@@ -344,7 +374,11 @@ async function loadCaptures() {
   const list = await call('GET', '/api/captures');
   $('captures').innerHTML = list.map(c => {
     const tasks = c.tasks.map(t => `${esc(t.pod)}: ${esc(t.state)}${t.message ? ' – ' + esc(t.message) : ''}`).join('<br>');
-    const files = c.artifacts.map(a => `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name)}</a> <span class="muted">${a.size.toLocaleString()} B</span>`).join('<br>');
+    // The files of each pod under the pod's name.
+    const pods = {};
+    for (const a of c.artifacts) (pods[a.name.split('/')[0]] ||= []).push(a);
+    const files = Object.entries(pods).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
+      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).join('<br>')).join('');
     const open = ['PendingApproval', 'Queued', 'Running'].includes(c.state);
     const actions = [
       me.admin && c.state === 'PendingApproval' ? `<button data-act="approve" data-id="${c.id}">Approve</button><button data-act="deny" data-id="${c.id}">Deny</button>` : '',
@@ -367,7 +401,7 @@ $('signout').onclick = async () => {
 $('cluster').onchange = guard(loadNamespaces);
 $('namespace').onchange = guard(loadWorkloads);
 $('workload').onchange = guard(workloadChanged);
-$('captureForm').onchange = guard(async e => { showParams(); if (e.target.name === 'kind') await loadProcesses(); });
+$('captureForm').onchange = guard(async e => { showParams(); if (['kind', 'when'].includes(e.target.name)) await loadProcesses(); });
 $('sample').onclick = guard(async () => {
   if (!$('workload').value) return;
   const of = target(), seconds = $('sampleSeconds').value;
@@ -392,14 +426,18 @@ $('flows').onclick = e => {
 };
 $('filter').oninput = () => filterChanged(true);
 $('captureForm').onsubmit = guard(async () => {
-  const kind = picked('kind'), crash = picked('when') === 'crash', params = {};
-  const shown = el => !el.closest('[hidden]');
-  for (const el of document.querySelectorAll('[data-param]')) if (shown(el) && el.value) params[el.dataset.param] = el.value;
-  if (kind === 'pcap' && picked('payload')) params.payload = 'true';
-  if (kind === 'strace' && picked('strings')) params.strings = 'true';
-  if (shown($('process')) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
-  const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind,
-    durationSeconds: shown($('duration')) ? Number($('duration').value || 0) : 0, params, reason: $('reason').value};
+  const crash = picked('when') === 'crash';
+  // Each chosen kind becomes a recording with the parameters of its section.
+  const recordings = kinds().map(kind => {
+    const params = {};
+    for (const el of document.querySelectorAll(`[data-of="${kind}"]`)) if (!el.closest('[hidden]') && el.value) params[el.dataset.param] = el.value;
+    if (kind === 'pcap' && picked('payload')) params.payload = 'true';
+    if (kind === 'strace' && picked('strings')) params.strings = 'true';
+    if (['coredump', 'strace'].includes(kind) && wantsProcess() && !(kind === 'coredump' && crash) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
+    return {kind, params};
+  });
+  const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, recordings,
+    durationSeconds: $('frameBlock').hidden ? 0 : Number($('duration').value || 0), reason: $('reason').value};
   const created = crash ? await call('POST', '/api/watches', {...request, count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';

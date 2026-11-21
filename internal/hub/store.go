@@ -122,6 +122,7 @@ func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {
 		return c, err
 	}
+	c.Normalize() // rows from before a request could hold several recordings
 	if err := json.Unmarshal(tasks, &c.Tasks); err != nil {
 		return c, err
 	}
@@ -235,7 +236,9 @@ func (s *Store) OpenTasks(ctx context.Context, cluster, node string) ([]api.Comm
 		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &cmd.Task.Started, &request); err != nil {
 			return cmd, err
 		}
-		return cmd, json.Unmarshal(request, &cmd.Task.Request)
+		err := json.Unmarshal(request, &cmd.Task.Request)
+		cmd.Task.Request.Normalize()
+		return cmd, err
 	})
 }
 
@@ -323,7 +326,9 @@ func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 	if err := json.Unmarshal(g, &groups); err != nil {
 		return w, nil, err
 	}
-	return w, groups, json.Unmarshal(request, &w.CaptureRequest)
+	err := json.Unmarshal(request, &w.CaptureRequest)
+	w.Normalize()
+	return w, groups, err
 }
 
 // Watches lists a requester's watches, or everyone's for an empty requester,

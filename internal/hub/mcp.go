@@ -35,9 +35,12 @@ func object(properties string, required ...string) json.RawMessage {
 const captureProperties = `"cluster":{"type":"string"},"namespace":{"type":"string"},
 "workload":{"type":"string","description":"Deployment/name, StatefulSet/name, DaemonSet/name or Pod/name"},
 "pods":{"type":"array","items":{"type":"string"},"description":"Restrict to these pods; default all pods of the workload"},
-"kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"]},
-"durationSeconds":{"type":"integer","description":"For pcap, strace, pprof and followed logs; default 30"},
-"params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: port, path (default /debug/pprof/profile)."},
+"recordings":{"type":"array","description":"What to record, at most one of each kind. All recordings start together on the same pods, share durationSeconds and, if any needs approval, one approval.","items":{"type":"object","properties":{
+ "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"]},
+ "params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: port, path (default /debug/pprof/profile)."}},"required":["kind"]}},
+"kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"],"description":"Short form for a single recording, with params"},
+"params":{"type":"object","additionalProperties":{"type":"string"}},
+"durationSeconds":{"type":"integer","description":"The time frame of pcap, strace, pprof and followed logs; default 30"},
 "reason":{"type":"string","description":"Shown to the approving administrator"}`
 
 // mcpReadLimit bounds one read_artifact result so that it fits a model's
@@ -95,8 +98,8 @@ var mcpTools = []mcpTool{
 			}
 			return h.Traffic(ctx, u, in.Cluster, in.Namespace, in.Workload, in.Seconds)
 		}},
-	{Name: "request_capture", Description: "Record evidence from the pods of a workload. Captures that can contain memory or payload contents (coredump, pcap with payload, strace with strings) wait in state PendingApproval until an administrator approves them; follow the state with get_capture.",
-		InputSchema: object(captureProperties, "cluster", "namespace", "workload", "kind"),
+	{Name: "request_capture", Description: "Record evidence from the pods of a workload: one or several recordings that run together. Captures that can contain memory or payload contents (coredump, pcap with payload, strace with strings) wait in state PendingApproval until an administrator approves them; follow the state with get_capture.",
+		InputSchema: object(captureProperties, "cluster", "namespace", "workload"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in api.CaptureRequest
 			if err := json.Unmarshal(args, &in); err != nil {
@@ -105,7 +108,7 @@ var mcpTools = []mcpTool{
 			return h.Request(ctx, u, in)
 		}},
 	{Name: "watch_crashes", Description: "Record evidence automatically when a container of the workload crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to the crashed pod. Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packets of the durationSeconds before the crash. A watch for evidence that needs approval waits until an administrator approves the watch; its captures then start without another approval. A coredump watch records the core of the crashed process and needs the core handler on the cluster's nodes. The captures appear in list_captures.",
-		InputSchema: object(captureProperties+`,"count":{"type":"integer","description":"How many crashes to record before the watch ends; default 1"}`, "cluster", "namespace", "workload", "kind"),
+		InputSchema: object(captureProperties+`,"count":{"type":"integer","description":"How many crashes to record before the watch ends; default 1"}`, "cluster", "namespace", "workload"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in api.WatchRequest
 			if err := json.Unmarshal(args, &in); err != nil {

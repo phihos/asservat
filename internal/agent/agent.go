@@ -190,12 +190,14 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 			a.mu.Unlock()
 		}()
 		status := api.TaskStatus{Pod: t.Pod, State: api.StateRunning}
-		if err := a.post(ctx, "/agent/captures/"+id+"/status", status); err != nil {
+		err := a.post(ctx, "/agent/captures/"+id+"/status", status)
+		if err != nil {
 			slog.Error("task not started", "capture", id, "pod", t.Pod, "error", err)
 			return
 		}
+		// A task with a recording that failed still completes, and says so.
 		status.State = api.StateCompleted
-		if err := a.capture(ctx, id, t); err != nil {
+		if status.Message, err = a.capture(ctx, id, t); err != nil {
 			status.State, status.Message = api.StateFailed, err.Error()
 		}
 		// A cancelled task still reports; the hub ignores it if the capture ended.

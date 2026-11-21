@@ -110,12 +110,19 @@ helm install asservat charts/asservat -n asservat --create-namespace \
 ## Use
 
 Open the console (`kubectl -n asservat port-forward svc/asservat-hub 8080:80`),
-sign in with your token and request a capture. The same with the API:
+sign in with your token and request a capture. One request can hold several
+recordings: they start together on the same pods, share the time frame and,
+if one of them needs approval, a single approval. The same with the API:
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/captures -d '{
   "cluster": "prod-eu", "namespace": "payments", "workload": "Deployment/api",
-  "kind": "pcap", "durationSeconds": 30, "params": {"filter": "tcp port 5432"}
+  "durationSeconds": 30,
+  "recordings": [
+    {"kind": "pcap", "params": {"filter": "tcp port 5432"}},
+    {"kind": "logs"},
+    {"kind": "coredump"}
+  ]
 }'
 curl -H "Authorization: Bearer $TOKEN" https://<hub-host>/api/captures/<id>
 curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/artifacts/<pod>/capture.pcap

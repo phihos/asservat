@@ -188,7 +188,8 @@ log "permissions follow the cluster's RBAC"
 [ "$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/containers?workload=Deployment/web')" = '["web"]' ] || fail "containers of the workload"
 [ "$(status "$MALLORY" GET /api/clusters/edge/namespaces/shop/workloads)" = 403 ] || fail "mallory listed workloads"
 [ "$(status "$ALICE" GET /api/clusters/edge/namespaces/kube-system/workloads)" = 403 ] || fail "alice listed kube-system"
-target() { jq -cn --arg c "$1" --arg k "$2" --argjson extra "${3:-{\}}" '{cluster: $c, namespace: "shop", workload: "Deployment/web", kind: $k} + $extra'; }
+# target CLUSTER KIND [JSON]: a request for the demo workload; an empty kind leaves the recordings to JSON.
+target() { jq -cn --arg c "$1" --arg k "$2" --argjson extra "${3:-{\}}" '{cluster: $c, namespace: "shop", workload: "Deployment/web"} + (if $k == "" then {} else {kind: $k} end) + $extra'; }
 [ "$(status "$MALLORY" POST /api/captures "$(target edge pod-state)")" = 403 ] || fail "mallory captured"
 
 log "pod state and logs (edge, both replicas)"
@@ -229,6 +230,17 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/sampled.pcap"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":2,"params":{"container":"web","process":"/bin/httpd"}}')"); completed "$ALICE" "$id"
 [ "$(status "$ALICE" POST /api/captures "$(target edge strace '{"params":{"process":"/usr/bin/absent"}}')")" = 201 ] || fail "a capture for a program that does not run is accepted and fails on the pods"
 
+log "one request with several recordings: same pods, same time frame, one approval (edge)"
+several='{"recordings":[{"kind":"pod-state"},{"kind":"logs","params":{"tailLines":"5"}},{"kind":"pcap","params":{"filter":"tcp port 8080"}},{"kind":"strace"},{"kind":"coredump"}],"durationSeconds":3,"pods":[],"reason":"all at once"}'
+id=$(capture "$ALICE" "$(target edge "" "$several")")
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, .sensitive, (.recordings | length), (.artifacts | length)] | @csv')" = '"PendingApproval",true,5,0' ] || fail "a request with a core dump did not wait as a whole"
+ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+completed "$ALICE" "$id"
+bundle=$(ok "$ALICE" GET "/api/captures/$id")
+# Each of the two pods delivers the files of all five recordings.
+[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
+[ "$(jq -c '[.artifacts | length, ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/web.strace"
@@ -265,7 +277,8 @@ ok "$ROOT" POST "/api/captures/$id/deny" >/dev/null
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, (.artifacts | length)] | @csv')" = '"Denied",0' ] || fail "denied capture"
 log "a crash watch records the crashed pod (edge): packets from before the crash and the crashed instance's logs"
 [ "$(status "$MALLORY" POST /api/watches "$(target edge pod-state)")" = 403 ] || fail "mallory watched"
-packets=$(ok "$ALICE" POST /api/watches "$(target edge pcap '{"durationSeconds":20,"params":{"filter":"tcp port 8080"}}')" | jq -r .id)
+# The packet watch also records the pod's state: one crash, one capture with both.
+packets=$(ok "$ALICE" POST /api/watches "$(target edge "" '{"durationSeconds":20,"recordings":[{"kind":"pcap","params":{"filter":"tcp port 8080"}},{"kind":"pod-state"}]}')" | jq -r .id)
 logs=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2}')" | jq -r .id)
 sleep 5 # the agents begin to buffer packets
 victim=$(edge -n shop get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
@@ -282,6 +295,7 @@ triggered() {
 }
 id=$(triggered "$packets"); completed "$ALICE" "$id"
 ok "$ALICE" GET "/api/captures/$id" | jq -e --arg p "$victim" '(.pods == [$p]) and (.reason | startswith("container web crashed: exit code 3"))' >/dev/null || fail "triggered capture: $(ok "$ALICE" GET "/api/captures/$id")"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.artifacts[].name | split("/")[1]]')" = '["capture.pcap","events.json","pod.json"]' ] || fail "files of a watch with two recordings"
 fetch "$ALICE" "$id" "$victim/capture.pcap" "$WORK/crash.pcap"
 [ "$(stat -c %s "$WORK/crash.pcap")" -gt 1000 ] || fail "the packet buffer holds no packets"
 grep -q 'GET /' "$WORK/crash.pcap" && fail "the packet buffer contains payload"
@@ -295,7 +309,7 @@ for name in $(ok "$ALICE" GET "/api/captures/$id" | jq -r '.artifacts[].name'); 
 done
 grep -q crashing "$WORK/crash.log" || fail "the logs lack the crashed instance"
 # The packet watch ended with its one crash; the log watch waits for another.
-[ "$(ok "$ALICE" GET /api/watches | jq -c '[.[] | [.kind, .remaining]]')" = '[["logs",1]]' ] || fail "watches after the crash: $(ok "$ALICE" GET /api/watches)"
+[ "$(ok "$ALICE" GET /api/watches | jq -c '[.[] | [.recordings[0].kind, .remaining]]')" = '[["logs",1]]' ] || fail "watches after the crash: $(ok "$ALICE" GET /api/watches)"
 [ "$(status "$ALICE" DELETE "/api/watches/$logs")" = 200 ] || fail "delete watch"
 
 if [ -n "${CORE_HANDLER:-}" ]; then

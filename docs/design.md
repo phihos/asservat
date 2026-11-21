@@ -20,24 +20,42 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
 
 ## Capture lifecycle
 
-1. A user requests a capture: cluster, namespace, workload, evidence kind and
-   its parameters.
+1. A user requests a capture: cluster, namespace, workload and one or more
+   **recordings**, each an evidence kind with its parameters.
 2. The hub checks the permission and asks an agent of the cluster for the
    workload's running pods. Each pod becomes a **task** for the agent on the
    pod's node.
-3. A sensitive capture waits in `PendingApproval` until an administrator
-   approves or denies it. Any other capture is `Queued` at once.
+3. A capture with a sensitive recording waits in `PendingApproval` until an
+   administrator approves or denies it, as a whole. Any other capture is
+   `Queued` at once.
 4. The hub pushes each task over the node agent's stream. Every stream starts
    with the node's open tasks: the agent starts those it missed, stops those
    that were cancelled or deleted meanwhile, and reports a task as failed
    that was running when the agent restarted.
-5. The agent records, streams the files to the hub and reports the task as
-   `Completed` or `Failed`. The capture is `Completed` if at least one pod
-   succeeded.
+5. The agent makes all recordings of the pod at once, streams the files to
+   the hub and reports the task as `Completed` or `Failed`. A task is
+   `Completed` if at least one recording succeeded and names those that
+   failed. The capture is `Completed` if at least one pod succeeded.
 6. The requester or an administrator downloads the files. When the retention
    ends the hub deletes the capture and its files.
 
 A capture can be cancelled while it waits or runs, and deleted afterwards.
+
+The recordings of a capture share everything but their kind and parameters:
+
+- the same pods and the same start;
+- one time frame, `durationSeconds`, for those that run over time (`pcap`,
+  `strace`, `pprof` and followed `logs`); it defaults to 30 seconds if one
+  of the first three is requested;
+- one approval, needed if any recording is sensitive, before which none of
+  them starts;
+- one trigger, when they belong to a crash watch.
+
+A capture holds at most one recording of each kind, because two would write
+the same files. A core dump and a system call trace both attach to the
+process, which only one can do at a time: the trace starts when the core is
+written. A request with a single `kind` and `params` is the short form of
+one recording.
 
 ## Crash watches
 
@@ -45,8 +63,9 @@ A watch is a standing capture request for problems nobody is present for:
 whenever a container of the workload crashes, the capture is made for the
 crashed pod.
 
-1. A user creates a watch: a capture request plus the number of crashes to
-   record (default 1). The permission is the same as for a capture. A watch
+1. A user creates a watch: a capture request, with one or more recordings,
+   plus the number of crashes to record (default 1). The permission is the
+   same as for a capture. A watch
    for evidence that needs approval waits until an administrator approves
    it, by the same rules as a capture. The approval precedes the crash, so
    it covers the captures that the watch creates.
