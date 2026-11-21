@@ -1,75 +1,232 @@
+// Command asservat runs the hub or a node agent.
 package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
+	"errors"
+	"flag"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
-	"slices"
+	"strings"
 	"syscall"
+	"time"
 
-	"asservat.local/asservat/internal/bootstrap"
-	"asservat.local/asservat/internal/contracts"
+	"github.com/coreos/go-oidc/v3/oidc"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
+
+	"asservat.local/asservat/internal/agent"
+	"asservat.local/asservat/internal/hub"
 )
 
-// Commands taking arguments; all others take none.
-var withArguments = []string{"download-worker", "setup"}
-
-// One-shot commands report a cancellation as a failure.
-var oneShot = []string{"secrets", "setup"}
-
-var commands = []string{"secrets", "setup", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "node"}
-
-func main() { os.Exit(run()) }
-func run() int {
-	if len(os.Args) < 2 || !slices.Contains(commands, os.Args[1]) || !slices.Contains(withArguments, os.Args[1]) && len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | node")
-		return 2
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: asservat hub|agent [flags]")
+		os.Exit(2)
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	var err error
 	switch os.Args[1] {
-	case "secrets":
-		err = bootstrap.RunSecrets(ctx)
-	case "setup":
-		err = bootstrap.RunSetup(ctx, os.Args[2:], os.Stdout)
-	case "hub-api":
-		err = bootstrap.RunHubAPI(ctx, os.Getenv(contracts.OwnerPodUIDEnvironment))
-	case "connector":
-		err = bootstrap.RunRegional(ctx, os.Getenv(contracts.RegionalPodUIDEnvironment))
-	case "hub-federation":
-		err = bootstrap.RunFederation(ctx)
-	case "key-service":
-		err = bootstrap.RunKeyService(ctx)
-	case "node":
-		err = bootstrap.RunNode(ctx, os.Getenv(contracts.NodePodUIDEnvironment))
-	case "hub-worker":
-		err = bootstrap.RunHubWorker(ctx)
+	case "hub":
+		err = runHub(ctx, os.Args[2:])
+	case "agent":
+		err = runAgent(ctx, os.Args[2:])
 	default:
-		err = bootstrap.RunDownloadWorker(ctx, os.Args[2:], os.Getenv(contracts.WorkerPodUIDEnvironment), os.Stdout)
+		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
-	if ctx.Err() != nil && !slices.Contains(oneShot, os.Args[1]) {
-		return 0
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
-	if err == nil {
-		return 0
+}
+
+func secret(file string) (string, error) {
+	b, err := os.ReadFile(file)
+	return strings.TrimSpace(string(b)), err
+}
+
+func runHub(ctx context.Context, args []string) error {
+	f := flag.NewFlagSet("hub", flag.ExitOnError)
+	listen := f.String("listen", ":8080", "address to serve HTTP on")
+	dsnFile := f.String("dsn-file", "", "file with the PostgreSQL connection string")
+	keyFile := f.String("master-key-file", "", "file with the 32-byte master key as 64 hex digits")
+	dataDir := f.String("data-dir", "", "directory for encrypted evidence (instead of S3)")
+	s3Endpoint := f.String("s3-endpoint", "", "S3 endpoint host[:port] for encrypted evidence")
+	s3Bucket := f.String("s3-bucket", "", "S3 bucket")
+	s3AccessKeyFile := f.String("s3-access-key-file", "", "file with the S3 access key")
+	s3SecretKeyFile := f.String("s3-secret-key-file", "", "file with the S3 secret key")
+	s3Insecure := f.Bool("s3-insecure", false, "use HTTP for the S3 endpoint")
+	usersFile := f.String("users-file", "", "YAML list of static users: name, token, groups")
+	adminGroups := f.String("admin-groups", "asservat-admins", "comma-separated groups whose members are administrators")
+	retention := f.Duration("retention", 7*24*time.Hour, "how long evidence is kept")
+	selfApproval := f.Bool("allow-self-approval", false, "let an administrator approve their own sensitive capture")
+	localCluster := f.String("local-cluster", "", "register this cluster name with the token of local-token-file at startup")
+	localTokenFile := f.String("local-token-file", "", "file with the join token of local-cluster")
+	oidcIssuer := f.String("oidc-issuer", "", "OIDC issuer URL; accepts its ID tokens as bearer tokens")
+	oidcClient := f.String("oidc-client-id", "", "expected audience of OIDC tokens")
+	oidcUser := f.String("oidc-username-claim", "preferred_username", "claim with the user name, as the clusters' RBAC knows it")
+	oidcGroups := f.String("oidc-groups-claim", "groups", "claim with the user's groups")
+	f.Parse(args)
+
+	dsn, err := secret(*dsnFile)
+	if err != nil {
+		return fmt.Errorf("dsn-file: %w", err)
 	}
-	switch os.Args[1] {
-	case "secrets":
-		fmt.Fprintln(os.Stderr, bootstrap.SecretsDiagnostic(err))
-	case "setup":
-		// A fixed step name and error class only, no provider response bodies.
-		fmt.Fprintln(os.Stderr, err)
-	case "hub-api":
-		fmt.Fprintln(os.Stderr, bootstrap.OwnerStartupDiagnostic(err))
-	case "download-worker":
-		fmt.Fprintln(os.Stderr, bootstrap.DownloadWorkerDiagnostic(err))
-	case "node":
-		fmt.Fprintln(os.Stderr, bootstrap.NodeDiagnostic(err))
+	keyHex, err := secret(*keyFile)
+	if err != nil {
+		return fmt.Errorf("master-key-file: %w", err)
+	}
+	key, err := hex.DecodeString(keyHex)
+	if err != nil {
+		return fmt.Errorf("master-key-file: %w", err)
+	}
+	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval}
+	switch {
+	case *dataDir != "":
+		if err := os.MkdirAll(*dataDir, 0o700); err != nil {
+			return err
+		}
+		c.Blobs = hub.DirBlobs(*dataDir)
+	case *s3Endpoint != "":
+		access, err := secret(*s3AccessKeyFile)
+		if err != nil {
+			return fmt.Errorf("s3-access-key-file: %w", err)
+		}
+		secretKey, err := secret(*s3SecretKeyFile)
+		if err != nil {
+			return fmt.Errorf("s3-secret-key-file: %w", err)
+		}
+		if c.Blobs, err = hub.NewS3Blobs(*s3Endpoint, *s3Bucket, access, secretKey, !*s3Insecure); err != nil {
+			return err
+		}
 	default:
-		// The fixed failing step and error class, never provider bodies.
-		fmt.Fprintln(os.Stderr, bootstrap.HubWorkerDiagnostic(err))
+		return errors.New("set data-dir or s3-endpoint")
 	}
-	return 1
+	if *usersFile != "" {
+		b, err := os.ReadFile(*usersFile)
+		if err != nil {
+			return err
+		}
+		if err := yaml.Unmarshal(b, &c.Users); err != nil {
+			return fmt.Errorf("users-file: %w", err)
+		}
+	}
+	if *oidcIssuer != "" {
+		provider, err := oidc.NewProvider(ctx, *oidcIssuer)
+		if err != nil {
+			return fmt.Errorf("oidc-issuer: %w", err)
+		}
+		verifier := provider.Verifier(&oidc.Config{ClientID: *oidcClient})
+		c.Verify = func(ctx context.Context, token string) (hub.User, error) {
+			t, err := verifier.Verify(ctx, token)
+			if err != nil {
+				return hub.User{}, err
+			}
+			var claims map[string]any
+			if err := t.Claims(&claims); err != nil {
+				return hub.User{}, err
+			}
+			u := hub.User{}
+			u.Name, _ = claims[*oidcUser].(string)
+			if u.Name == "" {
+				return hub.User{}, fmt.Errorf("token has no %s claim", *oidcUser)
+			}
+			groups, _ := claims[*oidcGroups].([]any)
+			for _, g := range groups {
+				if s, ok := g.(string); ok {
+					u.Groups = append(u.Groups, s)
+				}
+			}
+			return u, nil
+		}
+	}
+	// The database may start at the same time as the hub.
+	for attempt := 1; ; attempt++ {
+		if c.Store, err = hub.OpenStore(ctx, dsn); err == nil {
+			break
+		}
+		if attempt == 30 || ctx.Err() != nil {
+			return fmt.Errorf("database: %w", err)
+		}
+		slog.Warn("database not reachable yet", "error", err)
+		select {
+		case <-ctx.Done():
+		case <-time.After(2 * time.Second):
+		}
+	}
+	defer c.Store.Close()
+	if *localCluster != "" {
+		token, err := secret(*localTokenFile)
+		if err != nil {
+			return fmt.Errorf("local-token-file: %w", err)
+		}
+		sum := sha256.Sum256([]byte(token))
+		if err := c.Store.AddCluster(ctx, *localCluster, sum[:]); err != nil {
+			return err
+		}
+	}
+	h, err := hub.New(c)
+	if err != nil {
+		return err
+	}
+	go h.RunRetention(ctx)
+	server := &http.Server{Addr: *listen, Handler: h.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		<-ctx.Done()
+		server.Close()
+	}()
+	slog.Info("hub listening", "address", *listen)
+	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func runAgent(ctx context.Context, args []string) error {
+	f := flag.NewFlagSet("agent", flag.ExitOnError)
+	hubURL := f.String("hub-url", "", "URL of the hub")
+	tokenFile := f.String("token-file", "", "file with the cluster's join token")
+	node := f.String("node", os.Getenv("NODE_NAME"), "name of this node")
+	caFile := f.String("ca-file", "", "PEM file with the CA of the hub's certificate, if it is not publicly trusted")
+	scratch := f.String("scratch", "/scratch", "directory for a core file until it is uploaded")
+	f.Parse(args)
+	if *hubURL == "" || *node == "" {
+		return errors.New("hub-url and node are required")
+	}
+	token, err := secret(*tokenFile)
+	if err != nil {
+		return fmt.Errorf("token-file: %w", err)
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if *caFile != "" {
+		pem, err := os.ReadFile(*caFile)
+		if err != nil {
+			return err
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return errors.New("ca-file contains no certificate")
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: pool}
+	}
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	kube, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	a := &agent.Agent{HubURL: strings.TrimRight(*hubURL, "/"), Token: token, Node: *node, Kube: kube, HTTP: &http.Client{Transport: transport}, Scratch: *scratch, Proc: "/proc"}
+	a.Run(ctx)
+	return nil
 }

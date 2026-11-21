@@ -1,19 +1,11 @@
-Asservat {{ .Chart.Version }} installed (mode: {{ .Values.mode }}, name: {{ .Values.installation.name }}).
-{{- if ne .Values.mode "cluster" }}
+{{- if .Values.hub.enabled }}
+The hub serves the console and API on service {{ .Release.Name }}-hub, port {{ .Values.hub.service.port }}:
 
-The `secrets` hook created any missing generated Secrets ({{ .Values.installation.name }}-ids,
--sql-*, -audit-mac, -artifact-key{{ if eq .Values.services.objectStore.provider "seaweedfs" }}, -s3-*{{ end }}). They are never rotated and are
-kept on uninstall together with PVCs and CRDs.
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-hub 8080:{{ .Values.hub.service.port }}
 
-Schema, roles and provider configuration are applied by the Job
-{{ .Values.installation.name }}-setup-*. Wait for it with:
-  kubectl -n {{ .Release.Namespace }} wait --for=condition=Complete --timeout=15m job -l app.kubernetes.io/component=setup
-Workloads wait until setup has applied the current schema.
-{{- if .Values.origin }}
-
-Console: {{ .Values.origin }}
+Sign in with a token from hub.users{{ if .Values.hub.oidc.issuer }} or an ID token of {{ .Values.hub.oidc.issuer }}{{ end }}.
+To join another cluster, add it in the console (Clusters) and install this
+chart there with hub.enabled=false, agent.hubURL and agent.token.
+{{- else }}
+The node agents connect to {{ .Values.agent.hubURL }}.
 {{- end }}
-{{- end }}
-
-Configuration changes are applied with `helm upgrade`; no reinstall is needed.
-Do not put credentials or evidence in Helm values.

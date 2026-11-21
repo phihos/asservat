@@ -1,5 +1,0 @@
-{
-  "scope": "Synthetic download DTO checks only; real streams/local tools NOT RUN",
-  "positiveChecks": 25,
-  "rejectedInvalidCases": 61
-}

@@ -1,9 +1,0 @@
-{
-  "target_ref": {
-    "cluster": "prod",
-    "namespace": "payments",
-    "kind": "Deployment",
-    "name": "api"
-  },
-  "limit": 20
-}
