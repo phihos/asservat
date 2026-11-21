@@ -236,9 +236,11 @@ func (s *Store) OpenTasks(ctx context.Context, cluster, node string) ([]api.Comm
 		if err := r.Scan(&cmd.ID, &cmd.Task.Pod, &cmd.Task.Started, &request); err != nil {
 			return cmd, err
 		}
-		err := json.Unmarshal(request, &cmd.Task.Request)
+		if err := json.Unmarshal(request, &cmd.Task.Request); err != nil {
+			return cmd, err
+		}
 		cmd.Task.Request.Normalize()
-		return cmd, err
+		return cmd, nil
 	})
 }
 
@@ -326,9 +328,11 @@ func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 	if err := json.Unmarshal(g, &groups); err != nil {
 		return w, nil, err
 	}
-	err := json.Unmarshal(request, &w.CaptureRequest)
+	if err := json.Unmarshal(request, &w.CaptureRequest); err != nil {
+		return w, nil, err
+	}
 	w.Normalize()
-	return w, groups, err
+	return w, groups, nil
 }
 
 // Watches lists a requester's watches, or everyone's for an empty requester,

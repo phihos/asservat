@@ -35,9 +35,10 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (f
 		return "", fmt.Errorf("pod %s runs on node %s", t.Pod, pod.Spec.NodeName)
 	}
 	// A core dump and a trace both attach to the process, which only one
-	// can do at a time: the trace starts when the dump is written.
+	// can do at a time: the trace starts when the dump is written. After a
+	// crash the core is the kernel's and nothing attaches for it.
 	dumped := make(chan struct{})
-	if r.Recording(api.KindCoredump) == nil {
+	if r.Recording(api.KindCoredump) == nil || r.Watch != "" {
 		close(dumped)
 	}
 	errs := make([]error, len(r.Recordings))
@@ -45,10 +46,15 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (f
 	for i, rec := range r.Recordings {
 		wg.Go(func() {
 			if rec.Kind == api.KindStrace {
-				<-dumped
+				select {
+				case <-dumped:
+				case <-ctx.Done():
+					errs[i] = ctx.Err()
+					return
+				}
 			}
 			errs[i] = a.recording(ctx, id, t, pod, rec)
-			if rec.Kind == api.KindCoredump {
+			if rec.Kind == api.KindCoredump && r.Watch == "" {
 				close(dumped)
 			}
 		})

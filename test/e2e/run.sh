@@ -239,7 +239,7 @@ completed "$ALICE" "$id"
 bundle=$(ok "$ALICE" GET "/api/captures/$id")
 # Each of the two pods delivers the files of all five recordings.
 [ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
-[ "$(jq -c '[.artifacts | length, ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"
