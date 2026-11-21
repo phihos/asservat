@@ -24,8 +24,10 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 		r.Workloads, err = a.workloads(ctx, q.Namespace)
 	case "resolve":
 		r.Pods, err = a.resolve(ctx, q.Namespace, q.Workload)
-	case "selector":
-		r.Selector, err = a.selector(ctx, q.Namespace, q.Workload)
+	case "workload":
+		r.Selector, r.Containers, err = a.workload(ctx, q.Namespace, q.Workload)
+	case "namespaces":
+		r.Namespaces, err = a.namespaces(ctx, q)
 	default:
 		err = fmt.Errorf("unknown query %q", q.Op)
 	}
@@ -84,37 +86,71 @@ func (a *Agent) workloads(ctx context.Context, namespace string) ([]string, erro
 	return out, nil
 }
 
-// selector returns the label selector of a workload's pods, which is empty
-// for a single pod. The workload must exist.
-func (a *Agent) selector(ctx context.Context, namespace, workload string) (string, error) {
+// namespaces lists the namespaces in which the user may exec into pods, or
+// all of them without a user.
+func (a *Agent) namespaces(ctx context.Context, q api.Query) ([]string, error) {
+	list, err := a.Kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, n := range list.Items {
+		if q.User != "" {
+			q.Namespace = n.Name
+			if ok, err := a.review(ctx, q); err != nil {
+				return nil, err
+			} else if !ok {
+				continue
+			}
+		}
+		out = append(out, n.Name)
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+// workload returns the label selector of a workload's pods, which is empty
+// for a single pod, and the names of its containers. The workload must exist.
+func (a *Agent) workload(ctx context.Context, namespace, workload string) (string, []string, error) {
 	kind, name, _ := strings.Cut(workload, "/")
 	var selector *metav1.LabelSelector
+	var spec corev1.PodSpec
 	switch kind {
 	case "Pod":
-		_, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		return "", err
+		p, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", nil, err
+		}
+		spec = p.Spec
 	case "Deployment":
 		d, err := a.Kube.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
-		selector = d.Spec.Selector
+		selector, spec = d.Spec.Selector, d.Spec.Template.Spec
 	case "StatefulSet":
 		s, err := a.Kube.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
-		selector = s.Spec.Selector
+		selector, spec = s.Spec.Selector, s.Spec.Template.Spec
 	case "DaemonSet":
 		d, err := a.Kube.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
-		selector = d.Spec.Selector
+		selector, spec = d.Spec.Selector, d.Spec.Template.Spec
 	default:
-		return "", fmt.Errorf("unsupported workload kind %q", kind)
+		return "", nil, fmt.Errorf("unsupported workload kind %q", kind)
 	}
-	return metav1.FormatLabelSelector(selector), nil
+	containers := []string{}
+	for _, c := range spec.Containers {
+		containers = append(containers, c.Name)
+	}
+	if selector == nil {
+		return "", containers, nil
+	}
+	return metav1.FormatLabelSelector(selector), containers, nil
 }
 
 // podOptions selects a workload's pods, given the label selector of its pods.
@@ -127,7 +163,7 @@ func podOptions(workload, selector string) metav1.ListOptions {
 
 // resolve returns the running pods of a workload.
 func (a *Agent) resolve(ctx context.Context, namespace, workload string) ([]api.Pod, error) {
-	selector, err := a.selector(ctx, namespace, workload)
+	selector, _, err := a.workload(ctx, namespace, workload)
 	if err != nil {
 		return nil, err
 	}

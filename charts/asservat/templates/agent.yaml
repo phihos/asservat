@@ -19,6 +19,10 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets]
     verbs: [get, list]
+  # Offer the namespaces of the cluster.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [list]
   # Ask the cluster's RBAC whether a user may exec into pods of a namespace.
   - apiGroups: [authorization.k8s.io]
     resources: [subjectaccessreviews]

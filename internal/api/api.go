@@ -225,9 +225,11 @@ type Command struct {
 
 // Query asks one agent of a cluster for cluster-level information.
 type Query struct {
-	// Op is "resolve" (the pods of a workload), "selector" (the label selector
-	// of its pods), "workloads" (the workloads of a namespace) or "review"
-	// (may the user exec into pods of the namespace).
+	// Op is "resolve" (the pods of a workload), "workload" (the label selector
+	// of its pods and its containers), "workloads" (the workloads of a
+	// namespace), "namespaces" (the namespaces in which the user may exec
+	// into pods, or all without a user) or "review" (may the user exec into
+	// pods of the namespace).
 	Op        string   `json:"op"`
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload,omitempty"`
@@ -237,11 +239,13 @@ type Query struct {
 
 // Reply answers a Query.
 type Reply struct {
-	Error     string   `json:"error,omitempty"`
-	Pods      []Pod    `json:"pods,omitempty"`
-	Workloads []string `json:"workloads,omitempty"`
-	Allowed   bool     `json:"allowed,omitempty"`
-	Selector  string   `json:"selector,omitempty"`
+	Error      string   `json:"error,omitempty"`
+	Pods       []Pod    `json:"pods,omitempty"`
+	Workloads  []string `json:"workloads,omitempty"`
+	Allowed    bool     `json:"allowed,omitempty"`
+	Selector   string   `json:"selector,omitempty"`
+	Containers []string `json:"containers,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // TaskAssignment tells an agent to capture one pod on its node.

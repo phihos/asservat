@@ -121,6 +121,9 @@ cgroup whose parent is outside of it.
   The hub verifies the ID token and keeps the name and groups in a session
   cookie that it signs with a key derived from the master key. The session
   lasts 12 hours, so the groups are at most that old.
+- The console and the MCP tools offer namespaces, workloads and containers
+  from the cluster; nothing of that is typed. A user is offered the
+  namespaces in which they may capture.
 - A user may list and capture the workloads of a namespace if a
   `SubjectAccessReview` in that cluster allows them to create `pods/exec` in
   the namespace. Exec already exposes memory, files and traffic of a pod, so

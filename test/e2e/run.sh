@@ -182,7 +182,10 @@ ok "$ALICE" GET /api/clusters | jq -c .
 [ "$(ok "$ALICE" GET /api/clusters | jq '[.[] | select(.nodes | length > 0)] | length')" = 2 ] || fail "agents of both clusters did not connect"
 
 log "permissions follow the cluster's RBAC"
+[ "$(ok "$ALICE" GET /api/clusters/edge/namespaces)" = '["shop"]' ] || fail "namespaces that alice may capture in"
+[ "$(ok "$MALLORY" GET /api/clusters/edge/namespaces)" = '[]' ] || fail "namespaces offered to mallory"
 [ "$(ok "$ALICE" GET /api/clusters/edge/namespaces/shop/workloads)" = '["Deployment/web"]' ] || fail "workloads of edge/shop"
+[ "$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/containers?workload=Deployment/web')" = '["web"]' ] || fail "containers of the workload"
 [ "$(status "$MALLORY" GET /api/clusters/edge/namespaces/shop/workloads)" = 403 ] || fail "mallory listed workloads"
 [ "$(status "$ALICE" GET /api/clusters/edge/namespaces/kube-system/workloads)" = 403 ] || fail "alice listed kube-system"
 target() { jq -cn --arg c "$1" --arg k "$2" --argjson extra "${3:-{\}}" '{cluster: $c, namespace: "shop", workload: "Deployment/web", kind: $k} + $extra'; }

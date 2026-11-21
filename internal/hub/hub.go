@@ -123,7 +123,9 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/clusters", h.listClusters)
 	admin("POST /api/clusters", h.addCluster)
 	admin("DELETE /api/clusters/{cluster}", h.deleteCluster)
+	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/workloads", h.listWorkloads)
+	user("GET /api/clusters/{cluster}/namespaces/{namespace}/containers", h.listContainers)
 	user("POST /api/captures", h.createCapture)
 	user("GET /api/captures", h.listCaptures)
 	user("GET /api/captures/{id}", h.getCapture)
@@ -301,6 +303,41 @@ func (h *Hub) deleteCluster(w http.ResponseWriter, r *http.Request, u User) erro
 	}
 	h.agents.drop(name)
 	return h.Store.Audit(r.Context(), u.Name, "cluster.delete", "", map[string]string{"name": name})
+}
+
+func (h *Hub) listNamespaces(w http.ResponseWriter, r *http.Request, u User) error {
+	list, err := h.namespaces(r.Context(), u, r.PathValue("cluster"))
+	if err != nil {
+		return err
+	}
+	return reply(w, list)
+}
+
+// namespaces lists the namespaces of a cluster whose workloads the user may
+// capture: all for an administrator.
+func (h *Hub) namespaces(ctx context.Context, u User, cluster string) ([]string, error) {
+	q := api.Query{Op: "namespaces", User: u.Name, Groups: u.Groups}
+	if u.Admin {
+		q.User, q.Groups = "", nil
+	}
+	res, err := h.agents.query(ctx, cluster, q)
+	if res.Namespaces == nil {
+		res.Namespaces = []string{}
+	}
+	return res.Namespaces, err
+}
+
+// listContainers names the containers of the workload in the query.
+func (h *Hub) listContainers(w http.ResponseWriter, r *http.Request, u User) error {
+	cluster, namespace := r.PathValue("cluster"), r.PathValue("namespace")
+	if err := h.allowed(r.Context(), u, cluster, namespace); err != nil {
+		return err
+	}
+	res, err := h.agents.query(r.Context(), cluster, api.Query{Op: "workload", Namespace: namespace, Workload: r.URL.Query().Get("workload")})
+	if err != nil {
+		return err
+	}
+	return reply(w, res.Containers)
 }
 
 func (h *Hub) listWorkloads(w http.ResponseWriter, r *http.Request, u User) error {

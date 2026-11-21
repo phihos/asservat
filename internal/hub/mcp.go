@@ -54,6 +54,14 @@ var mcpTools = []mcpTool{
 			}
 			return out, err
 		}},
+	{Name: "list_namespaces", Description: "List the namespaces of a cluster whose workloads you may capture.", InputSchema: object(`"cluster":{"type":"string"}`, "cluster"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in struct{ Cluster string }
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return h.namespaces(ctx, u, in.Cluster)
+		}},
 	{Name: "list_workloads", Description: "List the workloads (Kind/name) of a namespace you may capture.", InputSchema: object(`"cluster":{"type":"string"},"namespace":{"type":"string"}`, "cluster", "namespace"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in struct{ Cluster, Namespace string }
