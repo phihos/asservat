@@ -182,7 +182,8 @@ magic=$(od -An -tx1 -N4 "$WORK/capture.pcap" | tr -d ' ')
 case "$magic" in d4c3b2a1|a1b2c3d4|4d3cb2a1|a1b23c4d) ;; *) fail "not a pcap file: $magic" ;; esac
 [ "$(stat -c %s "$WORK/capture.pcap")" -gt 1000 ] || fail "pcap holds no packets"
 grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
-if command -v tcpdump >/dev/null; then tcpdump -nn -r "$WORK/capture.pcap" 2>/dev/null | grep '\.8080' >/dev/null || fail "pcap lacks the filtered traffic"; fi
+# Port 8080 (0x1f90) appears in the TCP headers.
+LC_ALL=C grep -q $'\x1f\x90' "$WORK/capture.pcap" || fail "pcap lacks the filtered traffic"
 
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"

@@ -19,6 +19,8 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 30
     steps:
+      # An S3-compatible store for the evidence store test; it starts while Go builds.
+      - run: docker run -d -p 127.0.0.1:8333:8333 docker.io/chrislusf/seaweedfs:latest server -s3
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
@@ -28,6 +30,7 @@ jobs:
       - run: go test -race ./...
         env:
           ASSERVAT_TEST_DSN: postgres://postgres:pw@127.0.0.1:5432/postgres
+          ASSERVAT_TEST_S3: 127.0.0.1:8333,test,test-secret
       - run: helm lint charts/asservat
   e2e:
     runs-on: ubuntu-latest

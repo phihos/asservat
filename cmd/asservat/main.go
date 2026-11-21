@@ -18,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
@@ -121,32 +120,8 @@ func runHub(ctx context.Context, args []string) error {
 		}
 	}
 	if *oidcIssuer != "" {
-		provider, err := oidc.NewProvider(ctx, *oidcIssuer)
-		if err != nil {
+		if c.Verify, err = hub.OIDCVerifier(ctx, *oidcIssuer, *oidcClient, *oidcUser, *oidcGroups); err != nil {
 			return fmt.Errorf("oidc-issuer: %w", err)
-		}
-		verifier := provider.Verifier(&oidc.Config{ClientID: *oidcClient})
-		c.Verify = func(ctx context.Context, token string) (hub.User, error) {
-			t, err := verifier.Verify(ctx, token)
-			if err != nil {
-				return hub.User{}, err
-			}
-			var claims map[string]any
-			if err := t.Claims(&claims); err != nil {
-				return hub.User{}, err
-			}
-			u := hub.User{}
-			u.Name, _ = claims[*oidcUser].(string)
-			if u.Name == "" {
-				return hub.User{}, fmt.Errorf("token has no %s claim", *oidcUser)
-			}
-			groups, _ := claims[*oidcGroups].([]any)
-			for _, g := range groups {
-				if s, ok := g.(string); ok {
-					u.Groups = append(u.Groups, s)
-				}
-			}
-			return u, nil
 		}
 	}
 	// The database may start at the same time as the hub.
