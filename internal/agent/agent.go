@@ -32,6 +32,8 @@ type Agent struct {
 	Scratch string
 	// Proc is the node's /proc.
 	Proc string
+	// Cores is the spool of the node's core handler; empty without it.
+	Cores CoreSpool
 
 	mu       sync.Mutex
 	running  map[string]context.CancelFunc // capture ID + pod -> cancel

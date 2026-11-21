@@ -68,9 +68,33 @@ Two kinds behave differently in a triggered capture:
 | `pcap` | The packets of the `durationSeconds` before the crash, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
 | `logs` | The current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
 
+| `coredump` | The core that the kernel wrote of the crashed process, see below |
+
 An agent that starts or reconnects takes the pods' state at that moment as
 its baseline: crashes while it was away are not recorded, and its packet
 buffers start empty.
+
+### Cores of crashed processes
+
+The kernel hands the core of every process that dies of a fatal signal to
+one program per node, named by the sysctl `kernel.core_pattern`. With
+`agent.coreHandler.enabled`, the agent makes a copy of its binary in a
+directory on the node (`agent.coreHandler.hostPath`) that program while it
+runs, and restores the previous setting when it stops. It also raises
+`kernel.core_pipe_limit` from 0 to 16, so that the kernel waits for the
+handler.
+
+- The handler keeps a core only if the process belongs to a pod of an
+  approved `coredump` watch; the agent marks those pods in the directory.
+  Every other core on the node is dropped while the agent's handler is
+  installed, including those the node's own handler would have stored.
+- A later core of the same container replaces the earlier one. The handler
+  stops writing when less than 10 % of the node's disk is free, which is the
+  kubelet's default eviction threshold.
+- The capture that the crash triggers uploads the pod's cores and deletes
+  them from the node. Until then they rest there unencrypted.
+- A process that the kernel kills for exceeding a memory limit leaves no
+  core, and neither does one that exits by itself.
 
 ## Evidence kinds
 
@@ -122,8 +146,9 @@ cgroup whose parent is outside of it.
 - **Audit.** Cluster changes, requests, watches and the captures they
   trigger, approvals, denials, cancellations, deletions, expiries and every
   download are recorded with the actor.
-- A core file rests unencrypted in the agent's scratch volume on the node
-  until its upload ends, then it is deleted.
+- A core file rests unencrypted on the node until its upload ends, then it
+  is deleted: in the agent's scratch volume, or for a crashed process in the
+  core handler's directory.
 
 ## Mechanisms
 
@@ -144,7 +169,8 @@ cgroup whose parent is outside of it.
 These are known gaps, in rough order of value:
 
 - Other triggers than a crash (alerts, failing probes, a log line).
-- Core dumps of crashed processes (needs a node-level core handler).
+- Passing the cores of unwatched processes on to the node's previous core
+  handler.
 - Sharing a capture with other users or teams.
 - Server-side analysis of binary evidence for AI agents (packet summaries,
   profile summaries).

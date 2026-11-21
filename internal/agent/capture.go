@@ -101,6 +101,10 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		defer cancel()
 		return a.record(ctx, 0, "profile.pprof", up, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "http://127.0.0.1:"+r.Params["port"]+path)
 	case api.KindCoredump:
+		if r.Watch != "" {
+			// The core of the crashed process, not one of its successor.
+			return a.crashCores(pod, r.Trigger, up)
+		}
 		pid, container, err := a.containerPID(pod, r.Params["container"])
 		if err != nil {
 			return err

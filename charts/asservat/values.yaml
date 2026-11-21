@@ -84,6 +84,13 @@ agent:
   existingSecret: ""
   # PEM CA certificate of the hub, if its certificate is not publicly trusted.
   caCert: ""
+  # Core dumps of crashed processes, for core dump watches. The agent then
+  # replaces the node's kernel.core_pattern while it runs and restores it
+  # when it stops: other crashes on the node leave no core meanwhile.
+  coreHandler:
+    enabled: false
+    # Directory on the node for the handler and for cores until their upload.
+    hostPath: /var/lib/asservat
   tolerations:
     - operator: Exists
   resources: {}

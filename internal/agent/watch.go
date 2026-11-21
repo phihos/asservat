@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -69,6 +70,12 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	// The handlers run one at a time. A pod's first sighting only records
 	// the crashes it already had.
 	seen := map[string]string{}
+	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
+	defer func() {
+		for uid := range marked {
+			a.Cores.unmark(uid, w.ID)
+		}
+	}()
 	changed := func(obj any, known bool) {
 		pod := obj.(*corev1.Pod)
 		if pod.Spec.NodeName != a.Node {
@@ -77,8 +84,15 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		if w.Kind == api.KindPcap {
 			a.buffer(ctx, w, pod)
 		}
+		if w.Kind == api.KindCoredump && a.Cores != "" && !marked[string(pod.UID)] {
+			// From now on the node's core handler keeps this pod's cores.
+			if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
+				slog.Error("core handler marker", "pod", pod.Name, "error", err)
+			}
+			marked[string(pod.UID)] = true
+		}
 		if message := crashes(pod, seen); message != "" && known {
-			go a.trigger(agent, w, pod.Name, message)
+			go a.trigger(agent, w, pod, message)
 		}
 	}
 	_, informer := cache.NewInformerWithOptions(cache.InformerOptions{ListerWatcher: source, ObjectType: &corev1.Pod{}, Handler: cache.ResourceEventHandlerFuncs{
@@ -93,6 +107,10 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				if strings.HasPrefix(key, pod.Name+"/") {
 					delete(seen, key)
 				}
+			}
+			if marked[string(pod.UID)] {
+				a.Cores.unmark(string(pod.UID), w.ID)
+				delete(marked, string(pod.UID))
 			}
 			a.mu.Lock()
 			// A new pod of the same name gets its own buffer at once.
@@ -140,9 +158,13 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 }
 
 // trigger reports a crash to the hub, which answers with a capture task for
-// the pod. The packets before the crash are set aside for that task.
-func (a *Agent) trigger(ctx context.Context, w api.Watch, pod, message string) {
-	id := uuid.NewString()
+// the pod. The packets before the crash and the cores of the crashed
+// processes are set aside for that task.
+func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, message string) {
+	id, pod := uuid.NewString(), crashed.Name
+	if w.Kind == api.KindCoredump && a.Cores != "" {
+		a.Cores.take(string(crashed.UID), id)
+	}
 	a.mu.Lock()
 	if r := a.rings[w.ID+"/"+pod]; r != nil {
 		a.snapshots[id] = r.snapshot()
@@ -155,6 +177,9 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, pod, message string) {
 		a.mu.Lock()
 		delete(a.snapshots, id)
 		a.mu.Unlock()
+		if a.Cores != "" {
+			os.RemoveAll(a.Cores.taken(id))
+		}
 	}
 }
 

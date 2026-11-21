@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -40,6 +41,8 @@ func main() {
 		err = runHub(ctx, os.Args[2:])
 	case "agent":
 		err = runAgent(ctx, os.Args[2:])
+	case "core-handler":
+		err = handleCore(os.Args[2:])
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -186,6 +189,8 @@ func runAgent(ctx context.Context, args []string) error {
 	node := f.String("node", os.Getenv("NODE_NAME"), "name of this node")
 	caFile := f.String("ca-file", "", "PEM file with the CA of the hub's certificate, if it is not publicly trusted")
 	scratch := f.String("scratch", "/scratch", "directory for a core file until it is uploaded")
+	coreSpool := f.String("core-spool", "", "directory at the same path on the node and in this container; set to make this agent the node's core handler, which keeps the cores of crashed processes in watched pods")
+	corePattern := f.String("core-pattern-file", "/proc/1/root/proc/sys/kernel/core_pattern", "the node's kernel.core_pattern")
 	f.Parse(args)
 	if *hubURL == "" || *node == "" {
 		return errors.New("hub-url and node are required")
@@ -215,6 +220,33 @@ func runAgent(ctx context.Context, args []string) error {
 		return err
 	}
 	a := &agent.Agent{HubURL: strings.TrimRight(*hubURL, "/"), Token: token, Node: *node, Kube: kube, HTTP: &http.Client{Transport: transport}, Scratch: *scratch, Proc: "/proc"}
+	if *coreSpool != "" {
+		a.Cores = agent.CoreSpool(*coreSpool)
+		restore, err := a.Cores.Install(*corePattern)
+		if err != nil {
+			return fmt.Errorf("core handler: %w", err)
+		}
+		defer restore()
+		slog.Info("this agent is the node's core handler", "spool", *coreSpool)
+	}
 	a.Run(ctx)
 	return nil
+}
+
+// handleCore is run by the kernel on the node, as "core-handler <pid>
+// <time>" with a core on standard input. The spool is the directory of the
+// binary. Nobody reads its output, so what it did with the last core goes
+// to a file there.
+func handleCore(args []string) error {
+	self, err := os.Executable()
+	if err != nil || len(args) != 2 {
+		return errors.New("usage: core-handler <pid> <time>, run by the kernel")
+	}
+	spool := filepath.Dir(self)
+	outcome, err := agent.CoreSpool(spool).Handle("/proc", args[0], args[1], os.Stdin)
+	if err != nil {
+		outcome = "failed: " + err.Error()
+	}
+	os.WriteFile(filepath.Join(spool, "last-core"), []byte(time.Now().Format(time.RFC3339)+" pid "+args[0]+": "+outcome+"\n"), 0o600)
+	return err
 }
