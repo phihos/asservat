@@ -24,10 +24,19 @@ hub:
   #     token: <at least 32 random characters>
   #     groups: [payments-devs]
   users: []
-  # Accept ID tokens of an OIDC issuer as bearer tokens.
+  # Accept ID tokens of an OIDC issuer as bearer tokens. With hub.ingress
+  # enabled or a redirectURL, the console also offers to sign in there.
   oidc:
     issuer: ""
     clientID: ""
+    # Only for a confidential client. A public client needs none.
+    clientSecret: ""
+    # Scopes of the console's sign-in. Add the scope your issuer needs to put
+    # the groups claim into the ID token, often "groups". Some issuers refuse
+    # scopes they do not know.
+    scopes: [openid, profile]
+    # Register this URL at the issuer. Empty: https://<hub.ingress.host>/auth/callback
+    redirectURL: ""
     usernameClaim: preferred_username
     groupsClaim: groups
   database:

@@ -5,15 +5,17 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"golang.org/x/oauth2"
 )
 
 // OIDCVerifier accepts ID tokens of an issuer for one client. The user name
 // and groups come from the given claims and must be the subjects that the
-// clusters' RBAC knows.
-func OIDCVerifier(ctx context.Context, issuer, clientID, userClaim, groupsClaim string) (func(context.Context, string) (User, error), error) {
+// clusters' RBAC knows. It also returns the issuer's endpoints for the
+// browser sign-in.
+func OIDCVerifier(ctx context.Context, issuer, clientID, userClaim, groupsClaim string) (func(context.Context, string) (User, error), oauth2.Endpoint, error) {
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
-		return nil, err
+		return nil, oauth2.Endpoint{}, err
 	}
 	verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 	return func(ctx context.Context, token string) (User, error) {
@@ -37,5 +39,5 @@ func OIDCVerifier(ctx context.Context, issuer, clientID, userClaim, groupsClaim 
 			}
 		}
 		return u, nil
-	}, nil
+	}, provider.Endpoint(), nil
 }

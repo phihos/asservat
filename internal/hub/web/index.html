@@ -27,7 +27,8 @@
 
 <section id="login" hidden>
   <h2>Sign in</h2>
-  <form id="loginForm"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button class="primary">Sign in</button></form>
+  <p id="sso" hidden><button class="primary" onclick="location.href='/auth/login'">Sign in with single sign-on</button></p>
+  <form id="loginForm"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button>Sign in with a token</button></form>
 </section>
 
 <section id="app" hidden>
@@ -82,7 +83,8 @@ const token = () => sessionStorage.getItem('token') || '';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
 async function call(method, path, body) {
-  const res = await fetch(path, {method, headers: {Authorization: 'Bearer ' + token(), ...(body ? {'Content-Type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
+  // Without a token the browser's single sign-on session applies.
+  const res = await fetch(path, {method, headers: {...(token() ? {Authorization: 'Bearer ' + token()} : {}), ...(body ? {'Content-Type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) throw new Error(data?.error || res.statusText);
@@ -93,9 +95,9 @@ const guard = f => async e => { e?.preventDefault(); $('error').textContent = ''
 async function start() {
   try { me = await call('GET', '/api/me'); } catch { me = null; }
   $('login').hidden = !!me; $('app').hidden = !me; $('signout').hidden = !me;
-  if (!me) return;
+  if (!me) { $('sso').hidden = !(await call('GET', '/api/login')).oidc; return; }
   // Downloads and the event stream cannot send a header.
-  document.cookie = 'asservat_token=' + token() + '; path=/; SameSite=Strict';
+  if (token()) document.cookie = 'asservat_token=' + token() + '; path=/; SameSite=Strict';
   $('me').textContent = me.name + (me.admin ? ' (administrator)' : '');
   $('admin').hidden = !me.admin;
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
@@ -153,7 +155,11 @@ async function loadCaptures() {
 }
 
 $('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
-$('signout').onclick = () => { sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload(); };
+$('signout').onclick = async () => {
+  sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0';
+  await fetch('/auth/logout', {method: 'POST'}).catch(() => {}); // ends a single sign-on session, if any
+  location.reload();
+};
 $('cluster').onchange = $('namespace').onchange = guard(loadWorkloads);
 $('kind').onchange = $('when').onchange = showParams;
 $('captureForm').onsubmit = guard(async () => {

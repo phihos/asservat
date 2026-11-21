@@ -91,6 +91,10 @@ cgroup whose parent is outside of it.
 
 - A user is identified by a name and groups, from a static token or an OIDC ID
   token. These are the subjects that the clusters' RBAC knows.
+- A browser signs in at the OIDC issuer (authorization code flow with PKCE).
+  The hub verifies the ID token and keeps the name and groups in a session
+  cookie that it signs with a key derived from the master key. The session
+  lasts 12 hours, so the groups are at most that old.
 - A user may list and capture the workloads of a namespace if a
   `SubjectAccessReview` in that cluster allows them to create `pods/exec` in
   the namespace. Exec already exposes memory, files and traffic of a pod, so
@@ -140,7 +144,6 @@ These are known gaps, in rough order of value:
 - Other triggers than a crash (alerts, failing probes, a log line), and
   watches for evidence that needs approval (packet payload before a crash).
 - Core dumps of crashed processes (needs a node-level core handler).
-- Browser sign-in through OIDC (the API already accepts OIDC tokens).
 - Sharing a capture with other users or teams.
 - Server-side analysis of binary evidence for AI agents (packet summaries,
   profile summaries).
