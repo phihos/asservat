@@ -50,7 +50,19 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 	case api.KindLogs:
 		return a.logs(ctx, pod, r, duration, up)
 	case api.KindPcap:
-		pid, _, err := a.containerPID(pod, "")
+		if r.Watch != "" {
+			// The packets before the crash, set aside when it was reported.
+			key := r.Watch + "/" + t.Pod
+			a.mu.Lock()
+			packets := a.snapshots[key]
+			delete(a.snapshots, key)
+			a.mu.Unlock()
+			if packets == nil {
+				return errors.New("the node agent holds no packets of this pod from before the crash")
+			}
+			return up("capture.pcap", bytes.NewReader(packets))
+		}
+		pid, err := a.podPID(pod)
 		if err != nil {
 			return err
 		}
@@ -76,7 +88,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 		}
 		return a.record(ctx, duration, container+".strace", up, "strace", "-f", "-tt", "-T", "-s", size, "-p", strconv.Itoa(pid), "-o", "/dev/stdout")
 	case api.KindPprof:
-		pid, _, err := a.containerPID(pod, "")
+		pid, err := a.podPID(pod)
 		if err != nil {
 			return err
 		}
@@ -123,28 +135,41 @@ func (a *Agent) logs(ctx context.Context, pod *corev1.Pod, r api.CaptureRequest,
 		ctx, cancel = context.WithTimeout(ctx, duration)
 		defer cancel()
 	}
+	type instance struct {
+		previous bool
+		suffix   string
+	}
+	instances := []instance{{opts.Previous, ".log"}}
+	if r.Watch != "" {
+		// The crashed instance is the current one until the kubelet restarts
+		// the container and the previous one from then on. Reading the
+		// current one first cannot miss it.
+		instances = []instance{{false, ".log"}, {true, ".previous.log"}}
+	}
 	uploaded := 0
 	for _, c := range pod.Spec.Containers {
 		if want := r.Params["container"]; want != "" && want != c.Name {
 			continue
 		}
-		o := opts
-		o.Container = c.Name
-		stream, err := a.Kube.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &o).Stream(ctx)
-		if err != nil {
-			if opts.Previous {
-				continue // this container has not restarted
+		for _, i := range instances {
+			o := opts
+			o.Container, o.Previous = c.Name, i.previous
+			stream, err := a.Kube.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &o).Stream(ctx)
+			if err != nil {
+				if i.previous || r.Watch != "" {
+					continue // this container has no such instance
+				}
+				return err
 			}
-			return err
+			// A followed stream ends with the duration; what arrived until
+			// then is the result.
+			err = up(c.Name+i.suffix, untilDeadline{stream, ctx})
+			stream.Close()
+			if err != nil {
+				return err
+			}
+			uploaded++
 		}
-		// A followed stream ends with the duration; what arrived until then
-		// is the result.
-		err = up(c.Name+".log", untilDeadline{stream, ctx})
-		stream.Close()
-		if err != nil {
-			return err
-		}
-		uploaded++
 	}
 	if uploaded == 0 {
 		return errors.New("no container has such logs")
@@ -209,6 +234,19 @@ func tail(b []byte) string {
 		b = b[len(b)-400:]
 	}
 	return string(b)
+}
+
+// podPID returns the node PID of a process in the pod's network namespace:
+// the main process of its first running container.
+func (a *Agent) podPID(pod *corev1.Pod) (int, error) {
+	err := fmt.Errorf("pod %s has no running container", pod.Name)
+	for _, c := range pod.Spec.Containers {
+		var pid int
+		if pid, _, err = a.containerPID(pod, c.Name); err == nil {
+			return pid, nil
+		}
+	}
+	return 0, err
 }
 
 // containerPID returns the node PID of a container's main process. An empty

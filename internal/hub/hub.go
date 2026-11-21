@@ -122,6 +122,9 @@ func (h *Hub) Handler() http.Handler {
 	admin("POST /api/captures/{id}/deny", h.decide(api.StateDenied))
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
+	user("POST /api/watches", h.createWatch)
+	user("GET /api/watches", h.listWatches)
+	user("DELETE /api/watches/{id}", h.deleteWatch)
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
 	user("POST /mcp", h.mcp)
@@ -143,6 +146,7 @@ func (h *Hub) Handler() http.Handler {
 	agent("POST /agent/replies/{id}", h.agentReply)
 	agent("POST /agent/captures/{id}/status", h.agentStatus)
 	agent("PUT /agent/captures/{id}/artifacts/{name...}", h.agentUpload)
+	agent("POST /agent/watches/{id}/trigger", h.agentTrigger)
 	return mux
 }
 
@@ -207,8 +211,14 @@ func (h *Hub) authenticate(r *http.Request) (User, error) {
 			return User{}, err
 		}
 	}
+	return h.withAdmin(u), nil
+}
+
+// withAdmin marks the user as administrator if a group of theirs is one of
+// the administrator groups.
+func (h *Hub) withAdmin(u User) User {
 	u.Admin = slices.ContainsFunc(u.Groups, func(g string) bool { return slices.Contains(h.AdminGroups, g) })
-	return u, nil
+	return u
 }
 
 // allowed reports whether the user may capture workloads of the namespace:
@@ -304,6 +314,7 @@ func (h *Hub) createCapture(w http.ResponseWriter, r *http.Request, u User) erro
 // Request validates and records a capture. A sensitive capture waits for an
 // administrator; any other starts at once.
 func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.Capture, error) {
+	in.Watch = ""
 	if err := in.Validate(); err != nil {
 		return api.Capture{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
@@ -314,22 +325,27 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 	if err != nil {
 		return api.Capture{}, err
 	}
+	pods := slices.DeleteFunc(res.Pods, func(p api.Pod) bool { return len(in.Pods) > 0 && !slices.Contains(in.Pods, p.Name) })
+	if len(pods) == 0 {
+		return api.Capture{}, errStatus{http.StatusUnprocessableEntity, "the workload has no matching running pods"}
+	}
+	return h.record(ctx, u, in, pods, "capture.request")
+}
+
+// record stores a checked capture for the pods, under the audit action, and
+// starts it unless it needs approval.
+func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action string) (api.Capture, error) {
 	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, ExpiresAt: time.Now().Add(h.Retention)}
 	if c.Sensitive {
 		c.State = api.StatePendingApproval
 	}
-	for _, p := range res.Pods {
-		if len(in.Pods) == 0 || slices.Contains(in.Pods, p.Name) {
-			c.Tasks = append(c.Tasks, api.Task{Pod: p.Name, Node: p.Node, State: api.StateQueued})
-		}
-	}
-	if len(c.Tasks) == 0 {
-		return api.Capture{}, errStatus{http.StatusUnprocessableEntity, "the workload has no matching running pods"}
+	for _, p := range pods {
+		c.Tasks = append(c.Tasks, api.Task{Pod: p.Name, Node: p.Node, State: api.StateQueued})
 	}
 	if err := h.Store.CreateCapture(ctx, c); err != nil {
 		return api.Capture{}, err
 	}
-	if err := h.Store.Audit(ctx, u.Name, "capture.request", c.ID, in); err != nil {
+	if err := h.Store.Audit(ctx, u.Name, action, c.ID, in); err != nil {
 		return api.Capture{}, err
 	}
 	if c.State == api.StateQueued {
@@ -566,7 +582,7 @@ func (h *Hub) auditLog(w http.ResponseWriter, r *http.Request, _ User) error {
 	return reply(w, list)
 }
 
-// notify tells the event streams that a capture changed.
+// notify tells the event streams that a capture or the watches changed.
 func (h *Hub) notify(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

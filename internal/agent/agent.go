@@ -33,14 +33,20 @@ type Agent struct {
 	// Proc is the node's /proc.
 	Proc string
 
-	mu      sync.Mutex
-	running map[string]context.CancelFunc // capture ID + pod -> cancel
+	mu       sync.Mutex
+	running  map[string]context.CancelFunc // capture ID + pod -> cancel
+	watching map[string]context.CancelFunc // watch ID -> cancel
+	// Packet buffers of watched pods, and the packets set aside at a crash
+	// until the hub's task for it arrives; both by watch ID + pod.
+	rings     map[string]*ring
+	snapshots map[string][]byte
 }
 
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
 // growing delay after a failure.
 func (a *Agent) Run(ctx context.Context) {
-	a.running = map[string]context.CancelFunc{}
+	a.running, a.watching = map[string]context.CancelFunc{}, map[string]context.CancelFunc{}
+	a.rings, a.snapshots = map[string]*ring{}, map[string][]byte{}
 	delay := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()
@@ -128,6 +134,9 @@ func (a *Agent) handle(ctx context.Context, c api.Command) {
 		for _, t := range c.Tasks {
 			a.start(ctx, t.ID, *t.Task)
 		}
+		a.setWatches(ctx, c.Watches)
+	case "watches":
+		a.setWatches(ctx, c.Watches)
 	case "query":
 		go func() {
 			r := a.answer(ctx, *c.Query)

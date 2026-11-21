@@ -39,6 +39,37 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
 
 A capture can be cancelled while it waits or runs, and deleted afterwards.
 
+## Crash watches
+
+A watch is a standing capture request for problems nobody is present for:
+whenever a container of the workload crashes, the capture is made for the
+crashed pod.
+
+1. A user creates a watch: a capture request plus the number of crashes to
+   record (default 1). The permission is the same as for a capture. Evidence
+   that needs approval cannot be watched for.
+2. The hub sends the cluster's watches to its agents, and again whenever they
+   change or an agent connects. Each agent follows the workload's pods on its
+   node through a Kubernetes watch.
+3. A crash is a container that terminated with an exit code other than zero,
+   which includes being killed for exceeding its memory limit. Containers of
+   a pod that is being deleted do not count. The agent reports the crash and
+   the hub creates the capture for that pod, as the user who created the
+   watch, after checking that user's permission again.
+4. The watch ends after its last crash, or when its creator or an
+   administrator deletes it.
+
+Two kinds behave differently in a triggered capture:
+
+| Kind | Triggered capture holds |
+| --- | --- |
+| `pcap` | The packet headers of the `durationSeconds` before the crash. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packets), oldest dropped first |
+| `logs` | The current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
+
+An agent that starts or reconnects takes the pods' state at that moment as
+its baseline: crashes while it was away are not recorded, and its packet
+buffers start empty.
+
 ## Evidence kinds
 
 The agent runs standard tools from the node, so the files are in each tool's
@@ -82,30 +113,32 @@ cgroup whose parent is outside of it.
 - **Evidence at rest** is encrypted by the hub: AES-256-GCM in 64 KiB chunks
   with a random key per file, wrapped by the master key from the hub's Secret.
   Losing the master key loses the evidence.
-- **Audit.** Cluster changes, requests, approvals, denials, cancellations,
-  deletions, expiries and every download are recorded with the actor.
+- **Audit.** Cluster changes, requests, watches and the captures they
+  trigger, approvals, denials, cancellations, deletions, expiries and every
+  download are recorded with the actor.
 - A core file rests unencrypted in the agent's scratch volume on the node
   until its upload ends, then it is deleted.
 
 ## Mechanisms
 
 - **No polling.** The hub pushes commands on the agents' open streams and
-  change hints to browsers over Server-Sent Events. The retention loop sleeps
-  until the next expiry.
+  change hints to browsers over Server-Sent Events. Agents learn of crashes
+  from a Kubernetes watch. The retention loop sleeps until the next expiry.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves.
 - **Limits.** `read_artifact` over MCP returns 64 KiB per call so that a
-  result fits a model's context. A capture's duration is what the user
-  requests. There are no other built-in limits; add one only with a measured
-  reason.
+  result fits a model's context. A watch's packet buffer is 16 MiB per pod
+  because it lives in the agent's memory. A capture's duration is what the
+  user requests. There are no other built-in limits; add one only with a
+  measured reason.
 
 ## Not built yet
 
 These are known gaps, in rough order of value:
 
-- Automatic captures on triggers (crash, restart, alert), with a rolling
-  packet buffer that also saves the seconds before the trigger.
+- Other triggers than a crash (alerts, failing probes, a log line), and
+  watches for evidence that needs approval (packet payload before a crash).
 - Core dumps of crashed processes (needs a node-level core handler).
 - Browser sign-in through OIDC (the API already accepts OIDC tokens).
 - Sharing a capture with other users or teams.

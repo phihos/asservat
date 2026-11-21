@@ -16,55 +16,84 @@ func headersOnly(src io.Reader) io.Reader {
 }
 
 func stripPayload(dst io.Writer, src io.Reader) error {
-	header := make([]byte, 24)
-	if _, err := io.ReadFull(src, header); err != nil {
-		if err == io.EOF {
-			return nil // the tool wrote nothing
-		}
+	packets, err := newHeaderReader(src)
+	if err != nil || packets == nil {
 		return err
 	}
-	var order binary.ByteOrder
-	switch binary.LittleEndian.Uint32(header) {
-	case 0xa1b2c3d4, 0xa1b23c4d:
-		order = binary.LittleEndian
-	case 0xd4c3b2a1, 0x4d3cb2a1:
-		order = binary.BigEndian
-	default:
-		return errors.New("not a pcap stream")
-	}
-	linkType := order.Uint32(header[20:])
-	if _, err := dst.Write(header); err != nil {
+	if _, err := dst.Write(packets.header); err != nil {
 		return err
 	}
-	record := make([]byte, 16)
-	var packet []byte
 	for {
-		if _, err := io.ReadFull(src, record); err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				return nil // interrupted between or within records
-			}
+		record, packet, err := packets.next()
+		if err != nil || record == nil {
 			return err
 		}
-		n := order.Uint32(record[8:])
-		if n > 1<<18 { // tcpdump's largest snap length
-			return errors.New("corrupt pcap record")
-		}
-		if cap(packet) < int(n) {
-			packet = make([]byte, n)
-		}
-		packet = packet[:n]
-		if _, err := io.ReadFull(src, packet); err != nil {
-			return nil
-		}
-		keep := min(headerLength(linkType, packet), len(packet))
-		order.PutUint32(record[8:], uint32(keep))
 		if _, err := dst.Write(record); err != nil {
 			return err
 		}
-		if _, err := dst.Write(packet[:keep]); err != nil {
+		if _, err := dst.Write(packet); err != nil {
 			return err
 		}
 	}
+}
+
+// headerReader reads a pcap stream packet by packet, each cut after its
+// transport header.
+type headerReader struct {
+	src      io.Reader
+	header   []byte // the file header
+	order    binary.ByteOrder
+	linkType uint32
+	record   []byte
+	packet   []byte
+}
+
+// newHeaderReader returns nil for a stream that ends before its file header:
+// the tool wrote nothing.
+func newHeaderReader(src io.Reader) (*headerReader, error) {
+	r := &headerReader{src: src, header: make([]byte, 24), record: make([]byte, 16)}
+	if _, err := io.ReadFull(src, r.header); err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
+		return nil, err
+	}
+	switch binary.LittleEndian.Uint32(r.header) {
+	case 0xa1b2c3d4, 0xa1b23c4d:
+		r.order = binary.LittleEndian
+	case 0xd4c3b2a1, 0x4d3cb2a1:
+		r.order = binary.BigEndian
+	default:
+		return nil, errors.New("not a pcap stream")
+	}
+	r.linkType = r.order.Uint32(r.header[20:])
+	return r, nil
+}
+
+// next returns the next packet's record header and its bytes up to the end
+// of the transport header, both valid until the following call. It returns
+// nil at the end of the stream, also when that interrupts a packet.
+func (r *headerReader) next() (record, packet []byte, err error) {
+	if _, err := io.ReadFull(r.src, r.record); err != nil {
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	n := r.order.Uint32(r.record[8:])
+	if n > 1<<18 { // tcpdump's largest snap length
+		return nil, nil, errors.New("corrupt pcap record")
+	}
+	if cap(r.packet) < int(n) {
+		r.packet = make([]byte, n)
+	}
+	r.packet = r.packet[:n]
+	if _, err := io.ReadFull(r.src, r.packet); err != nil {
+		return nil, nil, nil
+	}
+	keep := min(headerLength(r.linkType, r.packet), len(r.packet))
+	r.order.PutUint32(r.record[8:], uint32(keep))
+	return r.record, r.packet[:keep], nil
 }
 
 // headerLength returns how many bytes of a packet are link, network and

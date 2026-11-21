@@ -75,6 +75,25 @@ var mcpTools = []mcpTool{
 			}
 			return h.Request(ctx, u, in)
 		}},
+	{Name: "watch_crashes", Description: "Record evidence automatically when a container of the workload crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to the crashed pod. Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packet headers of the durationSeconds before the crash. Kinds that need approval are not possible. The captures appear in list_captures.",
+		InputSchema: object(captureProperties+`,"count":{"type":"integer","description":"How many crashes to record before the watch ends; default 1"}`, "cluster", "namespace", "workload", "kind"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in api.WatchRequest
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return h.Watch(ctx, u, in)
+		}},
+	{Name: "list_watches", Description: "List your watches that still wait for crashes.", InputSchema: object(""),
+		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) { return h.watches(ctx, u) }},
+	{Name: "delete_watch", Description: "End a watch.", InputSchema: object(`"id":{"type":"string"}`, "id"),
+		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
+			var in struct{ ID string }
+			if err := json.Unmarshal(args, &in); err != nil {
+				return nil, err
+			}
+			return "deleted", h.Unwatch(ctx, u, in.ID)
+		}},
 	{Name: "list_captures", Description: "List your most recent captures with their state and files.", InputSchema: object(""),
 		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) {
 			return h.captures(ctx, u, time.Now().Add(time.Hour), defaultPage)

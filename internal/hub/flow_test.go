@@ -379,6 +379,103 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	stream.Body.Close()
 
+	// A watch records the pod whose container crashes, as the user who
+	// created it, and ends after the requested number of crashes.
+	watch := func(token string, r api.WatchRequest) (int, api.Watch) {
+		t.Helper()
+		code, b := f.call(token, "POST", "/api/watches", r)
+		var w api.Watch
+		json.Unmarshal(b, &w)
+		return code, w
+	}
+	watches := func(token string) []api.Watch {
+		t.Helper()
+		code, b := f.call(token, "GET", "/api/watches", nil)
+		var list []api.Watch
+		if code != 200 || json.Unmarshal(b, &list) != nil {
+			t.Fatal("list watches", code, string(b))
+		}
+		return list
+	}
+	onCrash := api.WatchRequest{CaptureRequest: api.CaptureRequest{Cluster: cluster, Namespace: "payments", Workload: "Deployment/api", Kind: api.KindPodState, Reason: "flaky"}}
+	if code, _ := watch("mallory-token", onCrash); code != 403 {
+		t.Fatal("watched without the exec right", code)
+	}
+	sensitive := onCrash
+	sensitive.Kind = api.KindCoredump
+	if code, _ := watch("alice-token", sensitive); code != 400 {
+		t.Fatal("a watch for evidence that needs approval", code)
+	}
+	missing := onCrash
+	missing.Workload = "Deployment/none"
+	if code, _ := watch("alice-token", missing); code != 502 {
+		t.Fatal("a watch for a workload that does not exist", code)
+	}
+	code, standing := watch("alice-token", onCrash)
+	if code != 201 || standing.Remaining != 1 || standing.Selector != "app=api" {
+		t.Fatal("watch", code, standing)
+	}
+	if len(watches("mallory-token")) != 0 || len(watches("alice-token")) != 1 {
+		t.Fatal("watches are listed for their creator only")
+	}
+	if code, _ := f.call("mallory-token", "DELETE", "/api/watches/"+standing.ID, nil); code != 404 {
+		t.Fatal("another user deleted the watch", code)
+	}
+	if got := agentCall(foreign.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"pod":"api-1","node":"node-a"}`)); got != 404 {
+		t.Error("another cluster's agent triggered the watch", got)
+	}
+	// The agent's first sighting of the pod is its baseline, so the pod
+	// crashes until the watch has fired.
+	triggered := func() *api.Capture {
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		var list []api.Capture
+		json.Unmarshal(b, &list)
+		for _, c := range list {
+			if c.Watch == standing.ID {
+				return &c
+			}
+		}
+		return nil
+	}
+	for i := 0; triggered() == nil; i++ {
+		if i == 200 {
+			t.Fatal("the crash created no capture")
+		}
+		crashed := pod.DeepCopy()
+		crashed.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "app", State: corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{ContainerID: fmt.Sprint("containerd://", i), ExitCode: 137, Reason: "OOMKilled"}}}}
+		if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), crashed, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	fired := f.wait("alice-token", triggered().ID, api.StateCompleted, api.StateFailed)
+	if fired.State != api.StateCompleted || fired.Requester != "alice" || fired.Reason != "container app crashed: exit code 137, OOMKilled (flaky)" ||
+		len(fired.Tasks) != 1 || fired.Tasks[0].Pod != "api-1" || len(fired.Artifacts) != 2 {
+		t.Fatal("triggered capture", fired)
+	}
+	if len(watches("alice-token")) != 0 {
+		t.Fatal("the watch outlived its last crash")
+	}
+	if got := agentCall(joined.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"pod":"api-1","node":"node-a"}`)); got != 404 {
+		t.Error("an ended watch fired", got)
+	}
+	// A user cannot make a capture look like a watch's, which would hand
+	// them the watch's packet buffer.
+	forged := state
+	forged.Watch = standing.ID
+	if code, c := request("alice-token", forged); code != 201 || c.Watch != "" {
+		t.Fatal("a requested capture names a watch", code, c.Watch)
+	}
+	onCrash.Count = 3
+	code, standing = watch("alice-token", onCrash)
+	if code != 201 || standing.Remaining != 3 {
+		t.Fatal("watch", code, standing)
+	}
+	if code, _ := f.call("alice-token", "DELETE", "/api/watches/"+standing.ID, nil); code != 200 || len(watches("root-token")) != 0 {
+		t.Fatal("delete watch", code)
+	}
+
 	// A corrupt stored file is an error for MCP, not partial text.
 	if err := corrupt(blobDir); err != nil {
 		t.Fatal(err)
@@ -410,7 +507,7 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("a user read the audit log", code)
 	}
 	_, b = f.call("root-token", "GET", "/api/audit?limit=200", nil)
-	for _, action := range []string{"cluster.add", "capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read"} {
+	for _, action := range []string{"cluster.add", "capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read", "watch.create", "capture.trigger", "watch.delete"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("audit log lacks", action)
 		}
