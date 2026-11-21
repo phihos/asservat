@@ -123,10 +123,11 @@ spec:
         - name: web
           image: docker.io/library/busybox:1.37
           # Serves a page and requests it over loopback, so the pod has traffic.
+          # It also serves stand-ins for Go's profile endpoints.
           # It crashes when the file /tmp/crash appears, and after a child
           # died of a segmentation fault when /tmp/segv appears. Kubernetes
           # turns $$$$ into $$, the shell's own process ID.
-          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && sh -c 'kill -SEGV $$$$'; exit 3"]
+          command: [sh, -c, "mkdir -p /tmp/www/debug/pprof; cd /tmp/www; echo hello > index.html; echo goroutine > debug/pprof/index.html; echo cpu-profile > debug/pprof/profile; echo heap-profile > debug/pprof/heap; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && sh -c 'kill -SEGV $$$$'; exit 3"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 ---
 # Members of the group "devs" may exec into pods of this namespace; that right
@@ -248,9 +249,22 @@ grep -Eq '(wait4|nanosleep|clock_nanosleep|execve|read)\(' "$WORK/web.strace" ||
 
 log "HTTP profile endpoint, fetched inside the pod's network namespace (edge)"
 # The demo serves no real profile; any localhost-only endpoint shows the path.
-id=$(capture "$ALICE" "$(target edge pprof '{"durationSeconds":1,"params":{"port":"8080","path":"/index.html"}}')"); completed "$ALICE" "$id"
-fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/profile.pprof"
-[ "$(cat "$WORK/profile.pprof")" = hello ] || fail "profile endpoint content"
+# The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
+found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')
+[ "$(jq -c '[.ports, [.profiles[] | select(.endpoint == "go-cpu" or .endpoint == "go-heap") | [.port, .endpoint, .timed, .sensitive]]]' <<<"$found")" = '[[8080],[[8080,"go-cpu",true,false],[8080,"go-heap",false,false]]]' ] || fail "profile endpoints: $found"
+id=$(capture "$ALICE" "$(target edge pprof '{"durationSeconds":1,"params":{"endpoints":"8080/go-cpu,8080/go-heap"}}')"); completed "$ALICE" "$id"
+pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, (.artifacts | length)] | @csv')" = 'false,4' ] || fail "profiles of two endpoints on two pods"
+fetch "$ALICE" "$id" "$pod/cpu.pprof" "$WORK/cpu.pprof"; fetch "$ALICE" "$id" "$pod/heap.pprof" "$WORK/heap.pprof"
+[ "$(cat "$WORK/cpu.pprof" "$WORK/heap.pprof" | tr '\n' ' ')" = 'cpu-profile heap-profile ' ] || fail "profile contents"
+# An endpoint that Asservat does not know can return anything: it needs approval.
+id=$(capture "$ALICE" "$(target edge pprof '{"params":{"port":"8080","path":"/index.html"}}')")
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .state)" = PendingApproval ] || fail "an unknown endpoint did not wait for approval"
+ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+completed "$ALICE" "$id"
+fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/profile.out"
+[ "$(cat "$WORK/profile.out")" = hello ] || fail "content of the unknown endpoint"
+[ "$(status "$ALICE" POST /api/captures "$(target edge pprof)")" = 400 ] || fail "a profile without an endpoint was accepted"
 
 log "core dump (edge) waits for an administrator"
 id=$(capture "$ALICE" "$(target edge coredump '{"reason":"e2e","pods":[]}')")

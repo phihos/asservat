@@ -15,7 +15,7 @@ const (
 	KindPcap     = "pcap"      // packet capture (tcpdump)
 	KindCoredump = "coredump"  // core of the container's main process (gcore)
 	KindStrace   = "strace"    // system call trace
-	KindPprof    = "pprof"     // HTTP profile endpoint, e.g. Go net/http/pprof
+	KindPprof    = "pprof"     // HTTP profile endpoints of the application's runtime
 )
 
 // Capture states.
@@ -96,7 +96,7 @@ var params = map[string][]string{
 	KindPcap:     {"filter", "payload"},
 	KindCoredump: {"container", "process"},
 	KindStrace:   {"container", "strings", "process"},
-	KindPprof:    {"port", "path"},
+	KindPprof:    {"endpoints", "port", "path"},
 }
 
 // Validate normalizes the request and checks its shape. The time frame
@@ -171,8 +171,9 @@ func (rec Recording) validate() error {
 	if v, ok := rec.Params["process"]; ok && !executablePattern.MatchString(v) {
 		return fmt.Errorf("process must be the path of an executable, as the process list shows it")
 	}
-	if rec.Kind == KindPprof && rec.Params["port"] == "" {
-		return fmt.Errorf("pprof needs the port parameter")
+	if rec.Kind == KindPprof {
+		_, err := rec.ProfileTargets()
+		return err
 	}
 	return nil
 }
@@ -187,6 +188,13 @@ func (rec Recording) Sensitive() bool {
 		return rec.Params["payload"] == "true"
 	case KindStrace:
 		return rec.Params["strings"] == "true"
+	case KindPprof:
+		targets, _ := rec.ProfileTargets()
+		for _, t := range targets {
+			if t.Sensitive {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -301,8 +309,9 @@ type Query struct {
 	// user), "review" (may the user exec into pods of the namespace) or
 	// "peers" (what the IPs belong to: Services and pods of the namespace,
 	// or of all namespaces with All). About Pods of the agent's node:
-	// "processes" (what runs in them) or "traffic" (their connections,
-	// from the packet headers of Seconds).
+	// "processes" (what runs in them), "traffic" (their connections, from
+	// the packet headers of Seconds) or "profiles" (the profile endpoints
+	// that the first of them serves).
 	Op        string   `json:"op"`
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload,omitempty"`
@@ -356,6 +365,10 @@ type Inspection struct {
 	// Seconds and Flows of a traffic sample, most bytes first.
 	Seconds int    `json:"seconds,omitempty"`
 	Flows   []Flow `json:"flows,omitempty"`
+	// Profiles are the profile endpoints found in a pod and Ports the TCP
+	// ports that it listens on.
+	Profiles []ProfileTarget `json:"profiles,omitempty"`
+	Ports    []int           `json:"ports,omitempty"`
 }
 
 // Flow directions, seen from the pod.
@@ -401,6 +414,9 @@ type Reply struct {
 	Processes  []Process `json:"processes,omitempty"`
 	// Flows of one pod each.
 	Flows []Flow `json:"flows,omitempty"`
+	// Profiles and Ports answer a "profiles" query.
+	Profiles []ProfileTarget `json:"profiles,omitempty"`
+	Ports    []int           `json:"ports,omitempty"`
 	// Skipped names the pods of a "processes" or "traffic" query that the
 	// agent could not look at, for example because they are gone.
 	Skipped []string `json:"skipped,omitempty"`

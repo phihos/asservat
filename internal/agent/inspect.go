@@ -156,6 +156,69 @@ func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.D
 	return table.flows(), err
 }
 
+// profiles looks for the profile endpoints that the first of the pods
+// serves: it asks every TCP port that the pod listens on for the index or
+// information page of each known family. That starts no profiling.
+func (a *Agent) profiles(ctx context.Context, q api.Query) (found []api.ProfileTarget, ports []int, skipped []string) {
+	pods, skipped := a.nodePods(ctx, q.Namespace, q.Pods)
+	if len(pods) == 0 {
+		return nil, nil, skipped
+	}
+	pid, err := a.podPID(pods[0])
+	if err != nil {
+		return nil, nil, append(skipped, pods[0].Name)
+	}
+	for port := range listeningPorts(a.Proc, pid) {
+		ports = append(ports, int(port))
+	}
+	slices.Sort(ports)
+	return probeProfiles(ports, func(port int, path string) string {
+		// Two seconds: a port that speaks no HTTP may never answer.
+		out, _ := exec.CommandContext(ctx, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "-m", "2", "--max-filesize", "1048576",
+			"http://127.0.0.1:"+strconv.Itoa(port)+path).Output()
+		return string(out)
+	}), ports, skipped
+}
+
+// probeProfiles asks every port for the probe page of every family, all at
+// once, and returns the endpoints of the families that answered, in the
+// order of the ports and the catalog.
+func probeProfiles(ports []int, get func(port int, path string) string) []api.ProfileTarget {
+	answers := make([][]string, len(ports))
+	// Each probe is a process on the node: at most 32 at a time, so that a
+	// pod with hundreds of ports cannot exhaust the agent's process limit.
+	running := make(chan struct{}, 32)
+	var wg sync.WaitGroup
+	for i, port := range ports {
+		answers[i] = make([]string, len(api.ProfileFamilies))
+		for j, family := range api.ProfileFamilies {
+			wg.Go(func() {
+				running <- struct{}{}
+				defer func() { <-running }()
+				answers[i][j] = get(port, family.Probe)
+			})
+		}
+	}
+	wg.Wait()
+	var found []api.ProfileTarget
+	for i, port := range ports {
+		for j, family := range api.ProfileFamilies {
+			body := answers[i][j]
+			if !strings.Contains(body, family.Marker) {
+				continue
+			}
+			for _, e := range family.Endpoints {
+				// A listed endpoint appears as the end of a link in the page.
+				path, _, _ := strings.Cut(e.Path, "?")
+				if !family.Listed || strings.Contains(body, path+`"`) {
+					found = append(found, api.ProfileTarget{Port: port, ProfileEndpoint: e})
+				}
+			}
+		}
+	}
+	return found
+}
+
 // listeningPorts reads the TCP ports that the network namespace of a
 // process accepts connections on.
 func listeningPorts(proc string, pid int) map[uint16]bool {

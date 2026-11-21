@@ -1,6 +1,9 @@
 package api
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateAndSensitive(t *testing.T) {
 	base := func(kind string, params map[string]string) CaptureRequest {
@@ -19,8 +22,15 @@ func TestValidateAndSensitive(t *testing.T) {
 		{"core dump", base(KindCoredump, nil), true, true},
 		{"strace", base(KindStrace, nil), true, false},
 		{"strace with strings", base(KindStrace, map[string]string{"strings": "true"}), true, true},
-		{"pprof", base(KindPprof, map[string]string{"port": "6060"}), true, false},
-		{"pprof without port", base(KindPprof, nil), false, false},
+		{"profile endpoints", base(KindPprof, map[string]string{"endpoints": "6060/go-cpu,6060/go-heap"}), true, false},
+		{"profile endpoint with memory", base(KindPprof, map[string]string{"endpoints": "8081/java-threads,8081/java-heapdump"}), true, true},
+		{"unknown profile endpoint", base(KindPprof, map[string]string{"port": "8080", "path": "/admin/export"}), true, true},
+		{"profile without endpoint", base(KindPprof, nil), false, false},
+		{"profile with port only", base(KindPprof, map[string]string{"port": "6060"}), false, false},
+		{"profile endpoint not in the catalog", base(KindPprof, map[string]string{"endpoints": "6060/go-everything"}), false, false},
+		{"profile endpoint without port", base(KindPprof, map[string]string{"endpoints": "go-cpu"}), false, false},
+		{"profile endpoint twice", base(KindPprof, map[string]string{"endpoints": "6060/go-cpu,6060/go-cpu"}), false, false},
+		{"profile endpoints and a path", base(KindPprof, map[string]string{"endpoints": "6060/go-cpu", "port": "1", "path": "/x"}), false, false},
 		{"unknown kind", base("memory", nil), false, false},
 		{"foreign parameter", base(KindPodState, map[string]string{"filter": "x"}), false, false},
 		{"bad boolean", base(KindPcap, map[string]string{"payload": "yes"}), false, false},
@@ -82,6 +92,38 @@ func TestSeveralRecordings(t *testing.T) {
 	} {
 		if r.Validate() == nil {
 			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+// The same endpoint on two ports gets two file names.
+func TestProfileTargets(t *testing.T) {
+	names := func(list string) string {
+		targets, err := Recording{Kind: KindPprof, Params: map[string]string{"endpoints": list}}.ProfileTargets()
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := ""
+		for _, target := range targets {
+			out += target.File + " "
+		}
+		return out
+	}
+	if got := names("6060/go-cpu,6060/go-goroutines"); got != "cpu.pprof goroutines.txt " {
+		t.Error(got)
+	}
+	if got := names("6060/go-cpu,6061/go-cpu"); got != "6060-cpu.pprof 6061-cpu.pprof " {
+		t.Error(got)
+	}
+	// Every endpoint of the catalog has a distinct ID and file within its family.
+	seen := map[string]bool{}
+	for _, f := range ProfileFamilies {
+		files := map[string]bool{}
+		for _, e := range f.Endpoints {
+			if seen[e.ID] || files[e.File] || e.File == "" || e.Timed != (len(e.Path) != len(strings.ReplaceAll(e.Path, "{seconds}", ""))) {
+				t.Errorf("catalog entry %+v", e)
+			}
+			seen[e.ID], files[e.File] = true, true
 		}
 	}
 }

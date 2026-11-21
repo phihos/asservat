@@ -72,6 +72,10 @@ func TestInspection(t *testing.T) {
 				{Direction: api.FlowOut, Protocol: "udp", Port: 53, Peer: "10.96.0.10", Packets: 4, Bytes: 400},
 				{Direction: api.FlowLocal, Protocol: "tcp", Port: 9000, Packets: 2, Bytes: 120},
 			}}
+		case "profiles":
+			return api.Reply{Ports: []int{6060, 8080}, Profiles: []api.ProfileTarget{
+				{Port: 6060, ProfileEndpoint: api.ProfileEndpoint{ID: "go-cpu"}}, {Port: 6060, ProfileEndpoint: api.ProfileEndpoint{ID: "go-heap"}},
+				{Port: 8080, ProfileEndpoint: api.ProfileEndpoint{ID: "java-heapdump"}}, {Port: 8080, ProfileEndpoint: api.ProfileEndpoint{ID: "made-up"}}}}
 		case "peers":
 			names := map[string]string{"10.96.0.12": "Service db"}
 			if q.All {
@@ -191,7 +195,24 @@ func TestInspection(t *testing.T) {
 	if in.Seconds != 5 || in.Flows[2].Label != "To Service kube-system/kube-dns (10.96.0.10) on UDP port 53 (usually DNS)" {
 		t.Fatalf("an administrator's sample %+v", in.Flows)
 	}
-	if _, b := f.call("root-token", "GET", "/api/audit?limit=20", nil); !strings.Contains(string(b), `"traffic.sample"`) {
-		t.Error("the audit log lacks the traffic sample")
+	// Profile endpoints: what the agent found, described by the catalog.
+	if code, _ := get("mallory-token", "POST", "/profiles?workload=Deployment/api"); code != 403 {
+		t.Fatal("profile endpoints looked for without the exec right", code)
+	}
+	code, in = get("alice-token", "POST", "/profiles?workload=Deployment/api")
+	if code != 200 || len(in.Profiles) != 3 || len(in.Ports) != 2 {
+		t.Fatalf("profiles %d %+v", code, in)
+	}
+	if p := in.Profiles[0]; p.Port != 6060 || p.ID != "go-cpu" || p.Name != "CPU profile" || !p.Timed || p.Sensitive || p.File != "cpu.pprof" || !strings.HasPrefix(p.Runtime, "Go") {
+		t.Fatalf("profile endpoint %+v", p)
+	}
+	if p := in.Profiles[2]; p.Port != 8080 || p.ID != "java-heapdump" || !p.Sensitive {
+		t.Fatalf("profile endpoint %+v", p)
+	}
+	_, b = f.call("root-token", "GET", "/api/audit?limit=20", nil)
+	for _, action := range []string{"traffic.sample", "profile.discover"} {
+		if !strings.Contains(string(b), `"`+action+`"`) {
+			t.Error("the audit log lacks", action)
+		}
 	}
 }

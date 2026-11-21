@@ -32,7 +32,11 @@
   .choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-bottom: 8px; }
   .wide { grid-column: span 2; }
   .badge { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 0 6px; margin-left: 6px; white-space: nowrap; }
+  .problem { color: #c53030; margin: 4px 0 0; } .problem:empty { display: none; }
+  .group { margin-top: 6px; } .group > div { font-size: 12px; opacity: .8; margin-bottom: 2px; }
+  .group label { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 0; cursor: pointer; }
   .notice { border-left: 3px solid var(--warn); padding: 6px 10px; margin: 8px 0 0; background: var(--soft); }
+  .file { white-space: nowrap; }
   .pod { font-size: 12px; opacity: .7; margin-top: 4px; } .pod:first-child { margin-top: 0; }
   .options > * + * { margin-top: 14px; }
   h3 { font-size: 13px; margin: 0 0 6px; } .lead { margin: 0 0 8px; }
@@ -65,6 +69,7 @@
         <label>Namespace<select id="namespace" required></select></label>
         <label>Workload<select id="workload" required></select></label>
       </div>
+      <p class="problem" id="whereProblem"></p>
     </fieldset>
 
     <fieldset>
@@ -100,6 +105,7 @@
             <span class="muted" id="sampleState"></span>
           </div>
           <table id="flowTable" hidden><thead><tr><th></th><th></th><th>Connection</th><th>Packets</th><th style="width:22%">Share of traffic</th></tr></thead><tbody id="flows"></tbody></table>
+          <p class="problem" id="sampleProblem"></p>
           <p id="chosen" class="muted">Records all traffic of the pods.</p>
           <details><summary>As a tcpdump filter</summary><input id="filter" data-param="filter" data-of="pcap" placeholder="empty: all traffic" spellcheck="false" autocomplete="off"></details>
           <div class="choice">
@@ -122,12 +128,18 @@
           </div>
         </section>
 
-        <section data-kinds="pprof">
+        <section data-kinds="pprof" id="profileSection">
           <h3>Profile</h3>
-          <div class="fields">
-            <label>Port of the profile endpoint<input data-param="port" data-of="pprof" type="number" min="1" placeholder="6060"></label>
-            <label>Path<input data-param="path" data-of="pprof" placeholder="/debug/pprof/profile"></label>
-          </div>
+          <p class="muted" id="profileState"></p>
+          <div id="profileChoices"></div>
+          <details id="otherEndpoint"><summary>Another endpoint</summary>
+            <div class="fields">
+              <label>Port<select id="profilePort"></select></label>
+              <label class="wide">Path<input id="profilePath" placeholder="/debug/profile" spellcheck="false" autocomplete="off"></label>
+            </div>
+            <p class="muted">Asservat does not know what such an endpoint returns, so it needs approval.</p>
+          </details>
+          <p class="problem" id="profileProblem"></p>
         </section>
 
         <section id="frameBlock">
@@ -151,20 +163,23 @@
       </div>
       <p class="notice" id="approvalNotice" hidden></p>
     </fieldset>
-    <div class="toolbar"><button class="primary" id="submit">Record now</button><span id="done" class="muted"></span></div>
+    <div class="toolbar"><button class="primary" id="submit">Record now</button><span id="done" class="muted"></span><span class="problem" id="formProblem"></span></div>
   </form>
 
   <section id="watchSection" hidden>
     <h2>Waiting for crashes</h2>
+    <p class="problem" id="watchesProblem"></p>
     <table><thead><tr><th>Created</th><th>Target</th><th>Evidence</th><th>Crashes left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
   </section>
 
   <h2>Captures</h2>
+  <p class="problem" id="capturesProblem"></p>
   <table><thead><tr><th>Requested</th><th>Target</th><th>Evidence</th><th>State</th><th>Files</th><th></th></tr></thead><tbody id="captures"></tbody></table>
 
   <section id="admin" hidden>
     <h2>Clusters</h2>
     <form id="clusterForm" class="row"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
+    <p class="problem" id="clusterProblem"></p>
     <p id="clusterToken" class="muted"></p>
   </section>
 </section>
@@ -183,7 +198,13 @@ async function call(method, path, body) {
   if (!res.ok) throw new Error(data?.error || res.statusText);
   return data;
 }
-const guard = f => async e => { e?.preventDefault(); $('error').textContent = ''; try { await f(e); } catch (err) { $('error').textContent = err.message; } };
+// A failure is shown where it happened: every action names the element for
+// its message, next to what the user just used.
+const guard = (f, at = 'error') => async e => {
+  e?.preventDefault();
+  $(at).textContent = '';
+  try { await f(e); } catch (err) { $(at).textContent = err.message; $(at).scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+};
 
 async function start() {
   try { me = await call('GET', '/api/me'); } catch { me = null; }
@@ -230,15 +251,59 @@ async function loadWorkloads() {
 }
 
 // What was learned about a workload belongs to that workload only.
-let containers = [], processesOf = '', flows = [];
+let containers = [], processesOf = '', profilesOf = '', flows = [];
 async function workloadChanged() {
-  containers = []; processesOf = '';
-  $('container').innerHTML = $('process').innerHTML = '';
+  containers = []; processesOf = profilesOf = '';
+  $('container').innerHTML = $('process').innerHTML = $('profileChoices').innerHTML = $('profilePort').innerHTML = '';
+  $('profileState').textContent = $('profilePath').value = '';
   showFlows(null);
   if (!$('workload').value) return;
   containers = await call('GET', namespacePath() + '/containers?' + workloadQuery());
   $('container').innerHTML = '<option value="">all containers</option>' + options(containers);
-  await loadProcesses();
+  await Promise.all([loadProcesses(), loadProfiles()]);
+}
+
+// The profile endpoints are looked for in a pod when a profile is chosen.
+async function loadProfiles() {
+  const of = target();
+  if (!kinds().includes('pprof') || !$('workload').value || profilesOf === of) return;
+  profilesOf = of;
+  $('profileChoices').innerHTML = '';
+  $('profileState').className = 'muted';
+  $('profileState').textContent = 'Looking for profile endpoints on the pod\'s ports…';
+  let found;
+  try { found = await call('POST', namespacePath() + '/profiles?' + workloadQuery()); } catch (err) {
+    if (of !== target()) return;
+    $('profileState').className = 'problem';
+    $('profileState').textContent = `The profile endpoints could not be looked for: ${err.message}`;
+    $('otherEndpoint').open = true;
+    return showParams();
+  }
+  if (of !== target()) return; // another workload was chosen meanwhile
+  const ports = found.ports || [];
+  $('profilePort').innerHTML = options(ports);
+  // One group per runtime and port; the first profile over time is ticked.
+  const groups = {};
+  for (const p of found.profiles) (groups[`${p.runtime} on port ${p.port}`] ||= []).push(p);
+  const first = found.profiles.find(p => p.timed && !p.sensitive) || found.profiles.find(p => !p.sensitive);
+  $('profileChoices').innerHTML = Object.entries(groups).map(([title, list]) => `<div class="group"><div>${esc(title)}</div>${list.map(p =>
+    `<label><input type="checkbox" data-endpoint="${p.port}/${esc(p.endpoint)}" ${p.timed ? 'data-timed' : ''} ${p.sensitive ? 'data-sensitive' : ''} ${p === first ? 'checked' : ''}>${esc(p.name)}${
+      p.sensitive ? '<span class="badge">needs approval</span>' : ''}${p.timed ? '<span class="muted">for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
+  $('profileState').textContent = found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
+    : `No profile endpoint that Asservat knows answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod: it listens on no TCP port'}. `
+      + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor.'
+      + (ports.length ? ' If the application serves another one, give it below.' : '');
+  $('otherEndpoint').open = !found.profiles.length && ports.length > 0;
+  showParams();
+}
+const profileBoxes = () => [...document.querySelectorAll('#profileChoices input:checked')];
+// What the profile recording asks for: found endpoints, or another one.
+function profileParams() {
+  const ticked = profileBoxes(), path = $('profilePath').value.trim();
+  if (ticked.length && path) throw new Error('Either tick endpoints above or give another endpoint, not both.');
+  if (ticked.length) return {endpoints: ticked.map(box => box.dataset.endpoint).join(',')};
+  if (path && $('profilePort').value) return {port: $('profilePort').value, path};
+  throw new Error($('profileChoices').innerHTML ? 'Tick at least one profile, or untick Profile above.' : 'No profile endpoint is chosen. Give one under "Another endpoint", or untick Profile above.');
 }
 
 const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].map(box => box.value);
@@ -332,7 +397,9 @@ function showParams() {
   $('instanceLabel').hidden = crash;
   $('processHint').textContent = processHint();
   // One time frame for everything that runs over time.
-  const timed = ['pcap', 'strace', 'pprof'].filter(has), follows = has('logs');
+  const otherProfile = has('pprof') && !profileBoxes().length && $('profilePath').value.trim();
+  const profileRuns = has('pprof') && (otherProfile || profileBoxes().some(box => 'timed' in box.dataset));
+  const timed = ['pcap', 'strace', 'pprof'].filter(k => has(k) && (k !== 'pprof' || profileRuns)), follows = has('logs');
   $('frameBlock').hidden = !timed.length && !follows;
   $('duration').placeholder = timed.length ? '30' : '0';
   // The packet buffer of a crash watch reaches back; everything else runs forward.
@@ -348,7 +415,8 @@ function showParams() {
     coredump: 'the core of the process that crashed (the agents need the core handler)', 'pod-state': 'the pod with the reason of the crash',
     strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
   $('countLabel').hidden = !crash;
-  const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls'].filter(Boolean);
+  const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
+    has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
   $('approvalNotice').textContent = !sensitive.length ? '' : `Needs approval because of ${list(sensitive)}. ` + (crash
     ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
@@ -356,7 +424,9 @@ function showParams() {
   $('reasonLabel').textContent = sensitive.length ? 'Reason, shown to the approver' : 'Reason';
   $('submit').textContent = crash ? (sensitive.length ? 'Request approval for this watch' : 'Watch for crashes') : sensitive.length ? 'Request approval' : 'Record now';
   $('submit').disabled = !chosen.length;
-  $('done').textContent = chosen.length ? '' : 'Choose at least one kind of evidence.';
+  $('done').textContent = '';
+  $('formProblem').textContent = chosen.length ? '' : 'Choose at least one kind of evidence.';
+  $('profileProblem').textContent = '';
 }
 
 const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</span></div>`).join('')
@@ -378,7 +448,7 @@ async function loadCaptures() {
     const pods = {};
     for (const a of c.artifacts) (pods[a.name.split('/')[0]] ||= []).push(a);
     const files = Object.entries(pods).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
-      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).join('<br>')).join('');
+      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('');
     const open = ['PendingApproval', 'Queued', 'Running'].includes(c.state);
     const actions = [
       me.admin && c.state === 'PendingApproval' ? `<button data-act="approve" data-id="${c.id}">Approve</button><button data-act="deny" data-id="${c.id}">Deny</button>` : '',
@@ -398,10 +468,11 @@ $('signout').onclick = async () => {
   await fetch('/auth/logout', {method: 'POST'}).catch(() => {}); // ends a single sign-on session, if any
   location.reload();
 };
-$('cluster').onchange = guard(loadNamespaces);
-$('namespace').onchange = guard(loadWorkloads);
-$('workload').onchange = guard(workloadChanged);
-$('captureForm').onchange = guard(async e => { showParams(); if (['kind', 'when'].includes(e.target.name)) await loadProcesses(); });
+$('cluster').onchange = guard(loadNamespaces, 'whereProblem');
+$('namespace').onchange = guard(loadWorkloads, 'whereProblem');
+$('workload').onchange = guard(workloadChanged, 'whereProblem');
+$('captureForm').onchange = guard(async e => { showParams(); if (['kind', 'when'].includes(e.target.name)) await Promise.all([loadProcesses(), loadProfiles()]); }, 'formProblem');
+$('profilePath').oninput = showParams;
 $('sample').onclick = guard(async () => {
   if (!$('workload').value) return;
   const of = target(), seconds = $('sampleSeconds').value;
@@ -417,7 +488,7 @@ $('sample').onclick = guard(async () => {
     $('sample').disabled = false;
     $('sample').textContent = 'Look again';
   }
-});
+}, 'sampleProblem');
 $('flows').onclick = e => {
   const box = e.target.closest('tr')?.querySelector('input');
   if (!box) return;
@@ -427,12 +498,17 @@ $('flows').onclick = e => {
 $('filter').oninput = () => filterChanged(true);
 $('captureForm').onsubmit = guard(async () => {
   const crash = picked('when') === 'crash';
+  // What is missing is said at its own section, not after a round trip.
+  if (!$('workload').value) return problemAt('whereProblem', 'Choose a workload.');
+  let profile = {};
+  if (kinds().includes('pprof')) try { profile = profileParams(); } catch (err) { return problemAt('profileProblem', err.message); }
   // Each chosen kind becomes a recording with the parameters of its section.
   const recordings = kinds().map(kind => {
     const params = {};
     for (const el of document.querySelectorAll(`[data-of="${kind}"]`)) if (!el.closest('[hidden]') && el.value) params[el.dataset.param] = el.value;
     if (kind === 'pcap' && picked('payload')) params.payload = 'true';
     if (kind === 'strace' && picked('strings')) params.strings = 'true';
+    if (kind === 'pprof') Object.assign(params, profile);
     if (['coredump', 'strace'].includes(kind) && wantsProcess() && !(kind === 'coredump' && crash) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
     return {kind, params};
   });
@@ -443,24 +519,29 @@ $('captureForm').onsubmit = guard(async () => {
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
     : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Its files appear below.';
-});
+}, 'formProblem');
+function problemAt(id, message) {
+  $(id).textContent = message;
+  $(id).closest('section, fieldset').scrollIntoView({block: 'center', behavior: 'smooth'});
+  $('formProblem').textContent = 'Something is missing above.';
+}
 $('watches').onclick = guard(async e => {
   if (!e.target.dataset.id) return;
   if (e.target.dataset.act === 'approve') await call('POST', `/api/watches/${e.target.dataset.id}/approve`);
   else await call('DELETE', `/api/watches/${e.target.dataset.id}`);
   await loadWatches();
-});
+}, 'watchesProblem');
 $('captures').onclick = guard(async e => {
   const {act, id} = e.target.dataset;
   if (!act) return;
   await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
-});
+}, 'capturesProblem');
 $('clusterForm').onsubmit = guard(async () => {
   const c = await call('POST', '/api/clusters', {name: $('clusterName').value});
   $('clusterToken').innerHTML = `Join token for <b>${esc(c.name)}</b>, shown once: <code>${esc(c.token)}</code>`;
   await loadClusters();
-});
+}, 'clusterProblem');
 showParams();
 start();
 </script>
