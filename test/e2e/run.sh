@@ -34,7 +34,9 @@ cleanup() {
     done
     if [ -n "${CORE_HANDLER:-}" ]; then
       log "core handler"; cat /proc/sys/kernel/core_pattern /proc/sys/kernel/core_pipe_limit; sudo ls -laR "$SPOOL"; sudo cat "$SPOOL/last-core" 2>/dev/null
-      sudo dmesg 2>/dev/null | grep -i -E 'core|usermodehelper|asservat' | tail -10
+      # Does the kernel run the handler for a process of this machine?
+      sh -c 'kill -SEGV $$' || true; sleep 1; sudo cat "$SPOOL/last-core" 2>&1 || true
+      sudo dmesg | tail -15 || true
     fi
   fi
   [ -n "${FORWARD:-}" ] && kill "$FORWARD" 2>/dev/null || true
@@ -126,7 +128,7 @@ spec:
           # Serves a page and requests it over loopback, so the pod has traffic.
           # It crashes when the file /tmp/crash appears, and after a child
           # died of a segmentation fault when /tmp/segv appears.
-          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && sh -c 'kill -SEGV $$'; exit 3"]
+          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && { sh -c 'kill -SEGV $$'; echo child ended with status $?; }; exit 3"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 ---
 # Members of the group "devs" may exec into pods of this namespace; that right
