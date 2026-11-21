@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS artifacts (
   PRIMARY KEY (capture_id, name)
 );
 
+-- The progress of each recording of the task, as the agent reports it.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recordings jsonb NOT NULL DEFAULT '[]';
+
 -- A watch creates a capture when a container of its workload crashes, with
 -- the identity of the user who created it.
 CREATE TABLE IF NOT EXISTS watches (

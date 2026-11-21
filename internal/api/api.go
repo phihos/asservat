@@ -27,6 +27,9 @@ const (
 	StateFailed          = "Failed"
 	StateDenied          = "Denied"
 	StateCancelled       = "Cancelled"
+	// StateWaiting is the state of a recording that starts after another
+	// one of its capture.
+	StateWaiting = "Waiting"
 )
 
 // Recording is one kind of evidence to record, with its parameters.
@@ -66,6 +69,24 @@ func (r *CaptureRequest) Normalize() {
 		r.Recordings = append(r.Recordings, Recording{Kind: r.Kind, Params: r.Params})
 	}
 	r.Kind, r.Params = "", nil
+}
+
+// Timed reports whether the recording runs for the request's time frame.
+func (rec Recording) Timed(followLogs bool) bool {
+	switch rec.Kind {
+	case KindPcap, KindStrace:
+		return true
+	case KindLogs:
+		return followLogs
+	case KindPprof:
+		targets, _ := rec.ProfileTargets()
+		for _, t := range targets {
+			if t.Timed {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Recording returns the request's recording of a kind, or nil.
@@ -223,8 +244,12 @@ type Capture struct {
 	CreatedAt  time.Time  `json:"createdAt"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	ExpiresAt  time.Time  `json:"expiresAt"`
-	Tasks      []Task     `json:"tasks"`
-	Artifacts  []Artifact `json:"artifacts"`
+	// RemainingSeconds is how much of the time frame the running
+	// recordings still have, when the capture was read; absent when
+	// nothing runs over time.
+	RemainingSeconds *int       `json:"remainingSeconds,omitempty"`
+	Tasks            []Task     `json:"tasks"`
+	Artifacts        []Artifact `json:"artifacts"`
 }
 
 // Task is the capture on one pod, run by the agent on the pod's node.
@@ -233,6 +258,18 @@ type Task struct {
 	Node    string `json:"node"`
 	State   string `json:"state"`
 	Message string `json:"message,omitempty"`
+	// Recordings is the progress of each recording on the pod.
+	Recordings []RecordingStatus `json:"recordings,omitempty"`
+}
+
+// RecordingStatus is the progress of one recording on one pod.
+type RecordingStatus struct {
+	Kind string `json:"kind"`
+	// State is Waiting, Running, Completed or Failed.
+	State   string `json:"state"`
+	Message string `json:"message,omitempty"`
+	// StartedAt is when the hub learned that the recording runs.
+	StartedAt *time.Time `json:"startedAt,omitempty"`
 }
 
 // Artifact is one stored file of a capture.
@@ -284,7 +321,9 @@ type Pod struct {
 
 // Command is a message from the hub to a node agent on its stream.
 type Command struct {
-	// Type is "sync", "query", "task", "cancel" or "watches".
+	// Type is "sync", "query", "task", "stop", "cancel" or "watches". A stop
+	// ends the recordings of a capture that run over time and keeps what
+	// they recorded; a cancel abandons them.
 	Type string `json:"type"`
 	// ID is the query ID or the capture ID.
 	ID    string          `json:"id,omitempty"`
@@ -438,4 +477,7 @@ type TaskStatus struct {
 	Pod     string `json:"pod"`
 	State   string `json:"state"`
 	Message string `json:"message,omitempty"`
+	// Recordings is the state of every recording of the task; absent in a
+	// report that does not know them.
+	Recordings []RecordingStatus `json:"recordings,omitempty"`
 }

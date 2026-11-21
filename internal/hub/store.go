@@ -110,7 +110,7 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 }
 
 const captureColumns = `c.id::text, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at,
- coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
+ coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message, 'recordings', recordings) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
  coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
 
 func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
@@ -202,12 +202,36 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 	if _, err := tx.Exec(ctx, `SELECT 1 FROM captures WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
 		return err
 	}
-	tag, err := tx.Exec(ctx, `UPDATE tasks SET state = $3, message = $4 WHERE capture_id = $1::uuid AND pod = $2 AND state IN ('Queued','Running')`, id, st.Pod, st.State, st.Message)
+	var stored []byte
+	err = tx.QueryRow(ctx, `UPDATE tasks SET state = $3, message = $4 WHERE capture_id = $1::uuid AND pod = $2 AND state IN ('Queued','Running') RETURNING recordings`, id, st.Pod, st.State, st.Message).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+	if st.Recordings != nil {
+		// A recording keeps the time at which the hub first saw it run.
+		var before []api.RecordingStatus
+		if err := json.Unmarshal(stored, &before); err != nil {
+			return err
+		}
+		now := time.Now()
+		for i, rec := range st.Recordings {
+			st.Recordings[i].StartedAt = nil
+			for _, b := range before {
+				if b.Kind == rec.Kind {
+					st.Recordings[i].StartedAt = b.StartedAt
+				}
+			}
+			if st.Recordings[i].StartedAt == nil && rec.State != api.StateWaiting {
+				st.Recordings[i].StartedAt = &now
+			}
+		}
+		progress, _ := json.Marshal(st.Recordings)
+		if _, err := tx.Exec(ctx, `UPDATE tasks SET recordings = $3 WHERE capture_id = $1::uuid AND pod = $2`, id, st.Pod, progress); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec(ctx, `UPDATE captures c SET
   state = CASE WHEN t.open > 0 THEN 'Running' WHEN t.completed > 0 THEN 'Completed' ELSE 'Failed' END,
@@ -310,8 +334,8 @@ func (s *Store) Expired(ctx context.Context) (ids []string, next *time.Time, err
 func (s *Store) CreateWatch(ctx context.Context, w api.Watch, groups []string) error {
 	request, _ := json.Marshal(w.CaptureRequest)
 	g, _ := json.Marshal(groups)
-	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive)
+	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive, approver) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive, w.Approver)
 	return err
 }
 

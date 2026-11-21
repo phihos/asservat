@@ -242,6 +242,25 @@ bundle=$(ok "$ALICE" GET "/api/captures/$id")
 [ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
 [ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
+log "progress, and stopping a capture with what it has (edge)"
+id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")
+for _ in $(seq 30); do
+  running=$(ok "$ALICE" GET "/api/captures/$id")
+  [ "$(jq -c '[.tasks[].recordings[]? | select(.kind == "pcap") | .state] | unique' <<<"$running")" = '["Running"]' ] && break
+  sleep 1
+done
+# Each pod shows how its recordings get on, and most of the five minutes are left.
+[ "$(jq -c '[.state, ([.tasks[].recordings[] | select(.kind == "pod-state") | .state] | unique), (.remainingSeconds > 250)]' <<<"$running")" = '["Running",["Completed"],true]' ] || fail "progress of a running capture: $(jq -c '[.state, .remainingSeconds, .tasks]' <<<"$running")"
+[ "$(status "$MALLORY" POST "/api/captures/$id/stop")" = 404 ] || fail "mallory stopped a capture"
+sleep 2
+ok "$ALICE" POST "/api/captures/$id/stop" >/dev/null
+completed "$ALICE" "$id"
+stopped=$(ok "$ALICE" GET "/api/captures/$id")
+[ "$(jq -c '[([.tasks[].recordings[] | select(.kind == "pcap" or .kind == "logs") | .message] | unique), ([.artifacts[].name | split("/")[1]] | unique)]' <<<"$stopped")" = '[["stopped early"],["capture.pcap","events.json","pod.json","web.log"]]' ] || fail "stopped capture: $(jq -c '[.tasks, [.artifacts[].name]]' <<<"$stopped")"
+fetch "$ALICE" "$id" "$(jq -r '.artifacts[] | select(.name | endswith("capture.pcap")) | .name' <<<"$stopped" | head -1)" "$WORK/stopped.pcap"
+[ "$(stat -c %s "$WORK/stopped.pcap")" -gt 1000 ] || fail "the stopped packet capture kept no packets"
+[ "$(status "$ALICE" POST "/api/captures/$id/stop")" = 409 ] || fail "stopped a finished capture"
+
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/web.strace"
@@ -346,7 +365,7 @@ fi
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')
 [ "$(jq -r '.result.content[0].text' <<<"$mcp")" = '["Deployment/web"]' ] || fail "MCP list_workloads: $mcp"
 audit=$(ok "$ROOT" GET '/api/audit?limit=500' | jq -r '[.[].action] | unique | join(" ")')
-for action in cluster.add capture.request capture.approve capture.deny artifact.download watch.create capture.trigger watch.delete; do
+for action in cluster.add capture.request capture.approve capture.deny capture.stop artifact.download watch.create capture.trigger watch.delete; do
   case " $audit " in *" $action "*) ;; *) fail "audit lacks $action" ;; esac
 done
 

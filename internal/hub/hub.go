@@ -119,7 +119,13 @@ func (h *Hub) Handler() http.Handler {
 			return f(w, r, u)
 		})
 	}
-	user("GET /api/me", func(w http.ResponseWriter, r *http.Request, u User) error { return reply(w, u) })
+	user("GET /api/me", func(w http.ResponseWriter, r *http.Request, u User) error {
+		// SelfApproval tells the console that this user's sensitive requests start at once.
+		return reply(w, struct {
+			User
+			SelfApproval bool `json:"selfApproval"`
+		}{u, h.approvesOwn(u)})
+	})
 	user("GET /api/clusters", h.listClusters)
 	admin("POST /api/clusters", h.addCluster)
 	admin("DELETE /api/clusters/{cluster}", h.deleteCluster)
@@ -135,6 +141,7 @@ func (h *Hub) Handler() http.Handler {
 	user("DELETE /api/captures/{id}", h.deleteCapture)
 	admin("POST /api/captures/{id}/approve", h.decide(api.StateQueued))
 	admin("POST /api/captures/{id}/deny", h.decide(api.StateDenied))
+	user("POST /api/captures/{id}/stop", h.stopCapture)
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
 	user("POST /api/watches", h.createWatch)
@@ -395,7 +402,12 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action, approver string) (api.Capture, error) {
 	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, Approver: approver, ExpiresAt: time.Now().Add(h.Retention)}
 	if c.Sensitive && approver == "" {
-		c.State = api.StatePendingApproval
+		if h.approvesOwn(u) {
+			// Asking this user for their own approval would add nothing.
+			c.Approver = u.Name
+		} else {
+			c.State = api.StatePendingApproval
+		}
 	}
 	for _, p := range pods {
 		c.Tasks = append(c.Tasks, api.Task{Pod: p.Name, Node: p.Node, State: api.StateQueued})
@@ -405,6 +417,11 @@ func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []
 	}
 	if err := h.Store.Audit(ctx, u.Name, action, c.ID, in); err != nil {
 		return api.Capture{}, err
+	}
+	if c.Sensitive && c.Approver == u.Name && approver == "" {
+		if err := h.Store.Audit(ctx, u.Name, "capture.approve", c.ID, map[string]bool{"own": true}); err != nil {
+			return api.Capture{}, err
+		}
 	}
 	if c.State == api.StateQueued {
 		h.dispatch(c)
@@ -443,7 +460,34 @@ func (h *Hub) visible(ctx context.Context, u User, id string) (api.Capture, erro
 	if !u.Admin && c.Requester != u.Name {
 		return c, ErrNotFound
 	}
+	c.RemainingSeconds = remaining(c, time.Now())
 	return c, nil
+}
+
+// remaining returns how many seconds of the time frame the capture's
+// running recordings still have, or nil if none runs over time.
+func remaining(c api.Capture, now time.Time) *int {
+	if c.State != api.StateRunning {
+		return nil
+	}
+	frame := time.Duration(c.DurationSeconds) * time.Second
+	var most *int
+	for _, t := range c.Tasks {
+		for _, status := range t.Recordings {
+			rec := c.Recording(status.Kind)
+			if rec == nil || !rec.Timed(frame > 0) || status.State != api.StateRunning && status.State != api.StateWaiting {
+				continue
+			}
+			left := frame // a waiting recording has all of it ahead
+			if status.StartedAt != nil {
+				left = max(0, frame-now.Sub(*status.StartedAt))
+			}
+			if seconds := int(left.Round(time.Second) / time.Second); most == nil || seconds > *most {
+				most = &seconds
+			}
+		}
+	}
+	return most
 }
 
 // defaultPage is the length of a list page unless the caller sets limit.
@@ -491,6 +535,9 @@ func (h *Hub) captures(ctx context.Context, u User, before time.Time, limit int)
 	if list == nil {
 		list = []api.Capture{}
 	}
+	for i := range list {
+		list[i].RemainingSeconds = remaining(list[i], time.Now())
+	}
 	return list, err
 }
 
@@ -511,6 +558,10 @@ func (h *Hub) decide(state string) func(http.ResponseWriter, *http.Request, User
 		return reply(w, c)
 	}
 }
+
+// approvesOwn reports whether the user's sensitive requests need nobody
+// else: an administrator of an installation that allows self-approval.
+func (h *Hub) approvesOwn(u User) bool { return u.Admin && h.AllowSelfApproval }
 
 // mayApprove refuses an administrator's approval of their own request,
 // unless the installation allows it.
@@ -554,6 +605,22 @@ func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture
 	}
 	h.notify(id)
 	return h.Store.Capture(ctx, id)
+}
+
+// stopCapture ends the recordings that run over time now and keeps what
+// they recorded: the capture then completes as if its time frame had ended.
+func (h *Hub) stopCapture(w http.ResponseWriter, r *http.Request, u User) error {
+	c, err := h.visible(r.Context(), u, r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	if c.State != api.StateRunning {
+		return errStatus{http.StatusConflict, "the capture is not running"}
+	}
+	for _, t := range c.Tasks {
+		h.agents.send(c.Cluster, t.Node, api.Command{Type: "stop", ID: c.ID})
+	}
+	return h.Store.Audit(r.Context(), u.Name, "capture.stop", c.ID, nil)
 }
 
 func (h *Hub) cancelCapture(w http.ResponseWriter, r *http.Request, u User) error {

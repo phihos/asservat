@@ -19,7 +19,7 @@
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .state { font-weight: 600; } .PendingApproval { color: var(--warn); } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
   .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
-  td button { padding: 2px 6px; margin: 0 4px 2px 0; }
+  td button { padding: 2px 6px; margin: 0 0 4px; display: block; white-space: nowrap; }
   [hidden] { display: none !important; }
   /* The capture form: numbered steps, each a fieldset. */
   fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
@@ -37,6 +37,11 @@
   .group label { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 0; cursor: pointer; }
   .notice { border-left: 3px solid var(--warn); padding: 6px 10px; margin: 8px 0 0; background: var(--soft); }
   .file { white-space: nowrap; }
+  .rec { font-size: 12px; white-space: nowrap; } .rec.Completed { color: #2f855a; } .rec.Failed { color: #c53030; white-space: normal; } .rec.Waiting { opacity: .6; }
+  .rec .muted { color: inherit; }
+  .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .track .bar { width: 0; transition: width 1s linear; }
+  tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #2b6cb033; } to { background: transparent; } }
   .pod { font-size: 12px; opacity: .7; margin-top: 4px; } .pod:first-child { margin-top: 0; }
   .options > * + * { margin-top: 14px; }
   h3 { font-size: 13px; margin: 0 0 6px; } .lead { margin: 0 0 8px; }
@@ -213,6 +218,9 @@ async function start() {
   // Downloads and the event stream cannot send a header.
   if (token()) document.cookie = 'asservat_token=' + token() + '; path=/; SameSite=Strict';
   $('me').textContent = me.name + (me.admin ? ' (administrator)' : '');
+  // For someone who approves their own requests, the badges only inform.
+  document.body.classList.toggle('own', !!me.selfApproval);
+  for (const badge of document.querySelectorAll('.badge')) badge.textContent = badgeText();
   $('admin').hidden = !me.admin;
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
   new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
@@ -236,6 +244,7 @@ const target = () => [$('cluster').value, $('namespace').value, $('workload').va
 const picked = name => document.querySelector(`input[name=${name}]:checked`).value;
 const size = bytes => bytes >= 1 << 30 ? (bytes / (1 << 30)).toFixed(1) + ' GiB' : Math.max(1, Math.round(bytes / (1 << 20))) + ' MiB';
 const fileSize = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1 << 20 ? Math.round(bytes / 1024) + ' KiB' : size(bytes);
+const badgeText = () => me?.selfApproval ? 'sensitive' : 'needs approval';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 async function loadNamespaces() {
@@ -289,7 +298,7 @@ async function loadProfiles() {
   const first = found.profiles.find(p => p.timed && !p.sensitive) || found.profiles.find(p => !p.sensitive);
   $('profileChoices').innerHTML = Object.entries(groups).map(([title, list]) => `<div class="group"><div>${esc(title)}</div>${list.map(p =>
     `<label><input type="checkbox" data-endpoint="${p.port}/${esc(p.endpoint)}" ${p.timed ? 'data-timed' : ''} ${p.sensitive ? 'data-sensitive' : ''} ${p === first ? 'checked' : ''}>${esc(p.name)}${
-      p.sensitive ? '<span class="badge">needs approval</span>' : ''}${p.timed ? '<span class="muted">for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
+      p.sensitive ? `<span class="badge">${badgeText()}</span>` : ''}${p.timed ? '<span class="muted">for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
   $('profileState').textContent = found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
     : `No profile endpoint that Asservat knows answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod: it listens on no TCP port'}. `
       + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor.'
@@ -420,11 +429,15 @@ function showParams() {
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
-  $('approvalNotice').textContent = !sensitive.length ? '' : `Needs approval because of ${list(sensitive)}. ` + (crash
-    ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
-    : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
-  $('reasonLabel').textContent = sensitive.length ? 'Reason, shown to the approver' : 'Reason';
-  $('submit').textContent = crash ? (sensitive.length ? 'Request approval for this watch' : 'Watch for crashes') : sensitive.length ? 'Request approval' : 'Record now';
+  // Someone who may approve their own requests is not asked to.
+  const asks = sensitive.length && !me?.selfApproval;
+  $('approvalNotice').textContent = !sensitive.length ? '' : !asks
+    ? `Sensitive because of ${list(sensitive)}. It starts at once, because you may approve your own requests; the audit log records it as approved by you.`
+    : `Needs approval because of ${list(sensitive)}. ` + (crash
+      ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
+      : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
+  $('reasonLabel').textContent = asks ? 'Reason, shown to the approver' : 'Reason';
+  $('submit').textContent = crash ? (asks ? 'Request approval for this watch' : 'Watch for crashes') : asks ? 'Request approval' : 'Record now';
   $('submit').disabled = !chosen.length;
   $('done').textContent = '';
   $('formProblem').textContent = chosen.length ? '' : 'Choose at least one kind of evidence.';
@@ -442,26 +455,46 @@ async function loadWatches() {
     <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
+// How a recording gets on, as a mark before its name.
+const marks = {Waiting: ['○', 'waits'], Running: ['●', 'runs'], Completed: ['✓', 'done'], Failed: ['✗', 'failed']};
+function progressOf(c) {
+  if (c.state !== 'Running') return '';
+  // The countdown runs in the browser from what the hub said was left.
+  if (c.remainingSeconds == null) return '<div class="progress"><div class="muted">working…</div></div>';
+  return `<div class="progress" data-ends="${Date.now() + c.remainingSeconds * 1000}" data-total="${c.durationSeconds}"><div class="track"><div class="bar"></div></div><div class="muted left"></div></div>`;
+}
+function countdown() {
+  for (const el of document.querySelectorAll('.progress[data-ends]')) {
+    const left = Math.max(0, Math.round((el.dataset.ends - Date.now()) / 1000)), total = Number(el.dataset.total) || 1;
+    el.querySelector('.bar').style.width = Math.min(100, 100 * (1 - left / total)) + '%';
+    el.querySelector('.left').textContent = left ? `about ${left} s left` : 'finishing: writing the files';
+  }
+}
+setInterval(countdown, 1000);
+
 async function loadCaptures() {
   const list = await call('GET', '/api/captures');
   $('captures').innerHTML = list.map(c => {
-    const tasks = c.tasks.map(t => `${esc(t.pod)}: ${esc(t.state)}${t.message ? ' – ' + esc(t.message) : ''}`).join('<br>');
+    const tasks = c.tasks.map(t => `<div class="pod">${esc(t.pod)}${t.recordings?.length ? '' : ': ' + esc(t.state)}</div>`
+      + (t.recordings || []).map(r => `<div class="rec ${r.state}" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''} ${esc(kindNames[r.kind] || r.kind)}${r.message ? ` <span class="muted">${esc(r.message)}</span>` : ''}</div>`).join('')
+      + (t.message && !t.recordings?.some(r => r.message) ? `<div class="muted">${esc(t.message)}</div>` : '')).join('');
     // The files of each pod under the pod's name.
     const pods = {};
     for (const a of c.artifacts) (pods[a.name.split('/')[0]] ||= []).push(a);
     const files = Object.entries(pods).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
       `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('');
-    const open = ['PendingApproval', 'Queued', 'Running'].includes(c.state);
-    const actions = [
-      me.admin && c.state === 'PendingApproval' ? `<button data-act="approve" data-id="${c.id}">Approve</button><button data-act="deny" data-id="${c.id}">Deny</button>` : '',
-      open ? `<button data-act="cancel" data-id="${c.id}">Cancel</button>` : `<button data-act="delete" data-id="${c.id}">Delete</button>`,
-    ].join('');
-    return `<tr><td>${new Date(c.createdAt).toLocaleString()}<div class="muted">${esc(c.requester)}</div></td>
+    const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
+    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start') + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
+      : c.state === 'Running' ? button('stop', 'Stop and keep', 'End the recordings now and keep what they have recorded', true) + button('delete', 'Delete', 'Abandon it and delete what it recorded')
+      : button('delete', 'Delete', 'Delete the capture and its files');
+    const waiting = c.state === 'Running' && !c.artifacts.length ? '<div class="muted">Files appear here as each recording ends.</div>' : '';
+    return `<tr data-capture="${c.id}"><td>${new Date(c.createdAt).toLocaleString()}<div class="muted">${esc(c.requester)}</div></td>
       <td>${esc(c.cluster)} / ${esc(c.namespace)}<br>${esc(c.workload)}</td>
       <td>${describe(c)}</td>
-      <td><span class="state ${c.state}">${c.state}</span>${c.approver ? `<div class="muted">by ${esc(c.approver)}</div>` : ''}<div class="muted">${esc(c.message)}</div><div class="muted">${tasks}</div></td>
-      <td>${files}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></td><td>${actions}</td></tr>`;
+      <td><span class="state ${c.state}">${{PendingApproval: 'Waits for approval'}[c.state] || c.state}</span>${c.approver ? `<div class="muted">${c.approver === c.requester ? 'no approval needed' : 'approved by ' + esc(c.approver)}</div>` : ''}${progressOf(c)}<div class="muted">${esc(c.message)}</div>${tasks}</td>
+      <td>${files}${waiting}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></td><td>${actions}</td></tr>`;
   }).join('');
+  countdown();
 }
 
 $('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
@@ -520,7 +553,11 @@ $('captureForm').onsubmit = guard(async () => {
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
-    : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Its files appear below.';
+    : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
+  // Show where it went.
+  const row = crash ? $('watchSection') : document.querySelector(`tr[data-capture="${created.id}"]`);
+  row?.classList.add('fresh');
+  row?.scrollIntoView({block: 'center', behavior: 'smooth'});
 }, 'formProblem');
 function problemAt(id, message) {
   $(id).textContent = message;
@@ -536,6 +573,8 @@ $('watches').onclick = guard(async e => {
 $('captures').onclick = guard(async e => {
   const {act, id} = e.target.dataset;
   if (!act) return;
+  const running = e.target.closest('tr').querySelector('.state.Running');
+  if (act === 'delete' && running && !confirm('Abandon this capture and delete what it has recorded? "Stop and keep" ends it and keeps the files.')) return;
   await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
 }, 'capturesProblem');

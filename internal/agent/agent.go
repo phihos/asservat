@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +37,7 @@ type Agent struct {
 	Cores CoreSpool
 
 	mu       sync.Mutex
-	running  map[string]context.CancelFunc // capture ID + pod -> cancel
+	running  map[string]task               // capture ID + pod -> the running task
 	watching map[string]context.CancelFunc // watch ID -> cancel
 	// Packet buffers of watched pods by watch ID + pod, and the packets set
 	// aside at a crash, by trigger ID, until the hub's task for it arrives.
@@ -47,7 +48,7 @@ type Agent struct {
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
 // growing delay after a failure.
 func (a *Agent) Run(ctx context.Context) {
-	a.running, a.watching = map[string]context.CancelFunc{}, map[string]context.CancelFunc{}
+	a.running, a.watching = map[string]task{}, map[string]context.CancelFunc{}
 	a.rings, a.snapshots = map[string]*ring{}, map[string][]byte{}
 	delay := time.Second
 	for ctx.Err() == nil {
@@ -127,9 +128,9 @@ func (a *Agent) handle(ctx context.Context, c api.Command) {
 			open[t.ID+"/"+t.Task.Pod] = true
 		}
 		a.mu.Lock()
-		for key, cancel := range a.running {
+		for key, t := range a.running {
 			if !open[key] {
-				cancel()
+				t.cancel()
 			}
 		}
 		a.mu.Unlock()
@@ -148,15 +149,60 @@ func (a *Agent) handle(ctx context.Context, c api.Command) {
 		}()
 	case "task":
 		a.start(ctx, c.ID, *c.Task)
-	case "cancel":
+	case "stop", "cancel":
 		a.mu.Lock()
-		for key, cancel := range a.running {
-			if strings.HasPrefix(key, c.ID+"/") {
-				cancel()
+		for key, t := range a.running {
+			if !strings.HasPrefix(key, c.ID+"/") {
+				continue
+			}
+			if c.Type == "stop" {
+				t.stop()
+			} else {
+				t.cancel()
 			}
 		}
 		a.mu.Unlock()
 	}
+}
+
+// task is a capture of one pod while it runs. cancel abandons it; stop ends
+// its time frame, so that what runs over time finishes with what it has.
+type task struct{ cancel, stop context.CancelFunc }
+
+// progress is the state of a task's recordings. Each change wakes the
+// task's reporter, which sends the whole state to the hub.
+type progress struct {
+	mu      sync.Mutex
+	states  []api.RecordingStatus
+	changed chan struct{}
+}
+
+func newProgress(r api.CaptureRequest) *progress {
+	p := &progress{changed: make(chan struct{}, 1)}
+	for _, rec := range r.Recordings {
+		p.states = append(p.states, api.RecordingStatus{Kind: rec.Kind, State: api.StateWaiting})
+	}
+	return p
+}
+
+func (p *progress) set(kind, state, message string) {
+	p.mu.Lock()
+	for i := range p.states {
+		if p.states[i].Kind == kind {
+			p.states[i].State, p.states[i].Message = state, message
+		}
+	}
+	p.mu.Unlock()
+	select {
+	case p.changed <- struct{}{}:
+	default: // a report is already due and will carry this change
+	}
+}
+
+func (p *progress) snapshot() []api.RecordingStatus {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.states)
 }
 
 // start runs one task in the background. The hub sends a node's open tasks
@@ -180,7 +226,8 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 		return
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	a.running[key] = cancel
+	frame, stop := context.WithCancel(ctx)
+	a.running[key] = task{cancel, stop}
 	a.mu.Unlock()
 	go func() {
 		defer func() {
@@ -189,15 +236,36 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 			delete(a.running, key)
 			a.mu.Unlock()
 		}()
-		status := api.TaskStatus{Pod: t.Pod, State: api.StateRunning}
+		report := newProgress(t.Request)
+		status := api.TaskStatus{Pod: t.Pod, State: api.StateRunning, Recordings: report.snapshot()}
 		err := a.post(ctx, "/agent/captures/"+id+"/status", status)
 		if err != nil {
 			slog.Error("task not started", "capture", id, "pod", t.Pod, "error", err)
 			return
 		}
+		// The reporter tells the hub how the recordings get on, one report
+		// at a time, until the capture ends.
+		captured, reported := make(chan struct{}), make(chan struct{})
+		go func() {
+			defer close(reported)
+			for {
+				select {
+				case <-captured:
+					return
+				case <-report.changed:
+					running := api.TaskStatus{Pod: t.Pod, State: api.StateRunning, Recordings: report.snapshot()}
+					if err := a.post(ctx, "/agent/captures/"+id+"/status", running); err != nil && ctx.Err() == nil {
+						slog.Warn("task progress", "capture", id, "pod", t.Pod, "error", err)
+					}
+				}
+			}
+		}()
 		// A task with a recording that failed still completes, and says so.
 		status.State = api.StateCompleted
-		if status.Message, err = a.capture(ctx, id, t); err != nil {
+		status.Message, err = a.capture(ctx, frame, id, t, report)
+		close(captured)
+		<-reported
+		if status.Recordings = report.snapshot(); err != nil {
 			status.State, status.Message = api.StateFailed, err.Error()
 		}
 		// A cancelled task still reports; the hub ignores it if the capture ended.
