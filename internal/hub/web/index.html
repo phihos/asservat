@@ -8,8 +8,36 @@
   :root { color-scheme: light dark; --line: #8884; --accent: #2b6cb0; --soft: #8881; --warn: #b7791f; }
   body { font: 14px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 16px; }
   h1 { font-size: 20px; margin: 0; } h2 { font-size: 16px; margin: 24px 0 8px; }
-  header { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
-  header span { opacity: .75; }
+  header { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  header #me { opacity: .75; } .spacer { flex: 1; }
+  nav { display: flex; gap: 4px; } nav a { padding: 5px 10px; border-radius: 4px; text-decoration: none; color: inherit; }
+  nav a.on { background: var(--soft); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+  .count { font-size: 11px; background: var(--accent); color: #fff; border-radius: 8px; padding: 0 6px; margin-left: 6px; } .count:empty { display: none; }
+  a.button { font: inherit; padding: 5px 10px; border-radius: 4px; text-decoration: none; } a.button.primary { background: var(--accent); color: #fff; }
+  .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 24px; text-align: center; opacity: .85; }
+  .head { justify-content: space-between; } .head h2 { margin: 16px 0 8px; }
+  .chips button { border-radius: 12px; padding: 2px 10px; font-size: 12px; margin-left: 4px; } .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  /* The steps of a new capture, one at a time. */
+  #steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 8px 0; flex-wrap: wrap; }
+  #steps li { padding: 4px 12px 4px 6px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; font-size: 13px; opacity: .7; }
+  #steps li b { display: inline-block; width: 1.6em; height: 1.6em; line-height: 1.6em; text-align: center; border-radius: 50%; background: var(--line); margin-right: 4px; font-size: 12px; }
+  #steps li.on { opacity: 1; border-color: var(--accent); } #steps li.on b, #steps li.done b { background: var(--accent); color: #fff; } #steps li.done { opacity: 1; }
+  #steps li.skip { text-decoration: line-through; cursor: default; }
+  #summary { min-height: 1.4em; margin: 0 0 8px; }
+  .footer { margin-top: 4px; }
+  /* A capture: one line, opened for its recordings and files. */
+  .capture { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+  .capture > .line { display: grid; grid-template-columns: 9.5em minmax(0, 1.2fr) minmax(0, 1fr) 11em 13.5em 1.2em; gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer; }
+  .capture > .line:hover { background: var(--soft); }
+  .capture .what { font-weight: 600; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { padding: 2px 8px; }
+  .capture .chev { transition: transform .15s; opacity: .6; } .capture.open .chev { transform: rotate(90deg); }
+  .capture > .more { display: none; padding: 4px 12px 12px; border-top: 1px solid var(--line); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
+  .capture.open > .more { display: grid; }
+  .capture h4 { margin: 8px 0 4px; font-size: 12px; opacity: .7; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; }
+  .capture.fresh { animation: fresh 4s ease-out; }
+  @media (max-width: 760px) { .capture > .line { grid-template-columns: 1fr auto 1.2em; } .capture .where, .capture .when { grid-column: 1 / -1; } }
   form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
   input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
@@ -19,7 +47,7 @@
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .state { font-weight: 600; } .PendingApproval { color: var(--warn); } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
   .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
-  td button { padding: 2px 6px; margin: 0 0 4px; display: block; white-space: nowrap; }
+  td button { padding: 2px 6px; margin: 0 4px 2px 0; white-space: nowrap; }
   [hidden] { display: none !important; }
   /* The capture form: numbered steps, each a fieldset. */
   fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
@@ -55,7 +83,17 @@
 </style>
 </head>
 <body>
-<header><h1>Asservat</h1><span id="me"></span><span id="clusters"></span><button id="signout" hidden>Sign out</button></header>
+<header>
+  <h1>Asservat</h1>
+  <nav id="nav" hidden>
+    <a href="#captures" data-nav="captures">Captures<span class="count" id="captureCount"></span></a>
+    <a href="#watches" data-nav="watches">Watches<span class="count" id="watchCount"></span></a>
+    <a href="#clusters" data-nav="clusters">Clusters</a>
+  </nav>
+  <span class="spacer"></span>
+  <a href="#new" class="button primary" id="newButton" hidden>New capture</a>
+  <span id="me"></span><button id="signout" hidden>Sign out</button>
+</header>
 <p id="error" class="error"></p>
 
 <section id="login" hidden>
@@ -65,9 +103,14 @@
 </section>
 
 <section id="app" hidden>
+ <section data-view="new" hidden>
   <h2>New capture</h2>
+  <ol id="steps">
+    <li data-go="1"><b>1</b> Where</li><li data-go="2"><b>2</b> What to record</li><li data-go="3"><b>3</b> Details</li><li data-go="4"><b>4</b> When</li>
+  </ol>
+  <p id="summary" class="muted"></p>
   <form id="captureForm">
-    <fieldset>
+    <fieldset data-step="1">
       <legend>1 · Where</legend>
       <div class="fields">
         <label>Cluster<select id="cluster" required></select></label>
@@ -77,7 +120,7 @@
       <p class="problem" id="whereProblem"></p>
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="2">
       <legend>2 · What to record</legend>
       <p class="muted lead">Choose one or several. They start together on the same pods and share one time frame and, if needed, one approval.</p>
       <div class="kinds" id="kinds">
@@ -88,9 +131,10 @@
         <label><input type="checkbox" name="kind" value="pprof">Profile<small>A profile endpoint of the application, such as Go's pprof</small></label>
         <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
       </div>
+      <p class="problem" id="kindProblem"></p>
     </fieldset>
 
-    <fieldset id="optionsSet">
+    <fieldset id="optionsSet" data-step="3">
       <legend>3 · Details</legend>
       <div class="options">
         <section data-kinds="logs">
@@ -156,7 +200,7 @@
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset data-step="4">
       <legend>4 · When</legend>
       <div class="choice">
         <label><input type="radio" name="when" value="now" checked>Now<small>Starts at once on every pod of the workload</small></label>
@@ -168,25 +212,45 @@
       </div>
       <p class="notice" id="approvalNotice" hidden></p>
     </fieldset>
-    <div class="toolbar"><button class="primary" id="submit">Record now</button><span id="done" class="muted"></span><span class="problem" id="formProblem"></span></div>
+    <div class="toolbar footer">
+      <button type="button" id="back">Back</button>
+      <button type="button" class="primary" id="next">Next</button>
+      <button class="primary" id="submit">Record now</button>
+      <span id="done" class="muted"></span><span class="problem" id="formProblem"></span>
+    </div>
   </form>
+ </section>
 
-  <section id="watchSection" hidden>
-    <h2>Waiting for crashes</h2>
-    <p class="problem" id="watchesProblem"></p>
-    <table><thead><tr><th>Created</th><th>Target</th><th>Evidence</th><th>Crashes left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
-  </section>
-
-  <h2>Captures</h2>
+ <section data-view="captures" hidden>
+  <div class="toolbar head">
+    <h2>Captures</h2>
+    <span class="chips" id="states">
+      <button type="button" data-filter="all" class="on">All</button><button type="button" data-filter="active">In progress</button><button type="button" data-filter="done">Finished</button>
+    </span>
+  </div>
   <p class="problem" id="capturesProblem"></p>
-  <table><thead><tr><th>Requested</th><th>Target</th><th>Evidence</th><th>State</th><th>Files</th><th></th></tr></thead><tbody id="captures"></tbody></table>
+  <div id="captures"></div>
+  <p class="empty" id="noCaptures" hidden></p>
+ </section>
 
+ <section data-view="watches" hidden>
+  <h2>Watches</h2>
+  <p class="muted lead">A watch waits for a container of its workload to crash and then records the crashed pod. Its captures appear under Captures.</p>
+  <p class="problem" id="watchesProblem"></p>
+  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Records</th><th>Crashes left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
+  <p class="empty" id="noWatches" hidden>No watch is waiting. To create one, start a <a href="#new">new capture</a> and choose "When a container crashes" in the last step.</p>
+ </section>
+
+ <section data-view="clusters" hidden>
+  <h2>Clusters</h2>
+  <table><thead><tr><th>Cluster</th><th>Node agents connected</th></tr></thead><tbody id="clusterList"></tbody></table>
   <section id="admin" hidden>
-    <h2>Clusters</h2>
+    <h3>Add a cluster</h3>
     <form id="clusterForm" class="row"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
     <p class="problem" id="clusterProblem"></p>
     <p id="clusterToken" class="muted"></p>
   </section>
+ </section>
 </section>
 
 <script>
@@ -222,13 +286,27 @@ async function start() {
   document.body.classList.toggle('own', !!me.selfApproval);
   for (const badge of document.querySelectorAll('.badge')) badge.textContent = badgeText();
   $('admin').hidden = !me.admin;
+  $('nav').hidden = $('newButton').hidden = false;
+  route();
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
   new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
 }
 
+// One view at a time, named by the address: #captures, #new, #watches, #clusters.
+function route() {
+  const views = [...document.querySelectorAll('[data-view]')].map(v => v.dataset.view);
+  const view = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'captures';
+  for (const v of document.querySelectorAll('[data-view]')) v.hidden = v.dataset.view !== view;
+  for (const a of document.querySelectorAll('[data-nav]')) a.classList.toggle('on', a.dataset.nav === view);
+  $('newButton').hidden = !me || view === 'new';
+  if (view === 'new') showStep(step);
+}
+window.onhashchange = route;
+
 async function loadClusters() {
   const clusters = await call('GET', '/api/clusters');
-  $('clusters').textContent = clusters.map(c => `${c.name}: ${c.nodes.length} node agent${c.nodes.length === 1 ? '' : 's'}`).join(' · ') || 'no clusters yet';
+  $('clusterList').innerHTML = clusters.map(c => `<tr><td>${esc(c.name)}</td><td>${c.nodes.length ? c.nodes.map(esc).join(', ') : '<span class="muted">none: no agent of this cluster is connected</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="2" class="muted">No cluster yet.</td></tr>';
   const selected = $('cluster').value;
   $('cluster').innerHTML = clusters.map(c => `<option>${esc(c.name)}</option>`).join('');
   if (selected) $('cluster').value = selected;
@@ -438,10 +516,9 @@ function showParams() {
       : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
   $('reasonLabel').textContent = asks ? 'Reason, shown to the approver' : 'Reason';
   $('submit').textContent = crash ? (asks ? 'Request approval for this watch' : 'Watch for crashes') : asks ? 'Request approval' : 'Record now';
-  $('submit').disabled = !chosen.length;
-  $('done').textContent = '';
-  $('formProblem').textContent = chosen.length ? '' : 'Choose at least one kind of evidence.';
-  $('profileProblem').textContent = '';
+  $('done').textContent = $('formProblem').textContent = $('profileProblem').textContent = $('kindProblem').textContent = '';
+  $('submit').disabled = false;
+  if (!$('app').hidden) showStep(step);
 }
 
 const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</span></div>`).join('')
@@ -449,8 +526,9 @@ const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind
 
 async function loadWatches() {
   const list = await call('GET', '/api/watches');
-  $('watchSection').hidden = !list.length;
-  $('watches').innerHTML = list.map(w => `<tr><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
+  $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
+  $('watchCount').textContent = list.length || '';
+  $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
     <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
     <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
@@ -459,7 +537,7 @@ async function loadWatches() {
 const marks = {Waiting: ['○', 'waits'], Running: ['●', 'runs'], Completed: ['✓', 'done'], Failed: ['✗', 'failed']};
 function progressOf(c) {
   if (c.state !== 'Running') return '';
-  if (c.stoppedAt) return '<div class="progress"><div class="muted">stopping: the recordings finish with what they have</div></div>';
+  if (c.stoppedAt) return '<div class="progress"><div class="muted">stopping…</div></div>';
   // The countdown runs in the browser from what the hub said was left.
   if (c.remainingSeconds == null) return '<div class="progress"><div class="muted">working…</div></div>';
   return `<div class="progress" data-ends="${Date.now() + c.remainingSeconds * 1000}" data-total="${c.durationSeconds}"><div class="track"><div class="bar"></div></div><div class="muted left"></div></div>`;
@@ -473,31 +551,57 @@ function countdown() {
 }
 setInterval(countdown, 1000);
 
+// What was just created is highlighted for a few seconds, also when the list is drawn again meanwhile.
+let fresh = {id: '', until: 0};
+const freshClass = id => id === fresh.id && Date.now() < fresh.until ? ' fresh' : '';
+
+// Which captures are opened: those in progress by themselves, any other by a click.
+const toggled = new Map();
+let captureFilter = 'all';
+const inProgress = c => ['PendingApproval', 'Queued', 'Running'].includes(c.state);
+
 async function loadCaptures() {
-  const list = await call('GET', '/api/captures');
+  const all = await call('GET', '/api/captures');
+  $('captureCount').textContent = all.filter(inProgress).length || '';
+  const list = all.filter(c => captureFilter === 'all' || (captureFilter === 'active') === inProgress(c));
+  $('noCaptures').hidden = !!list.length;
+  $('noCaptures').innerHTML = captureFilter === 'active' ? 'No capture is in progress.' : captureFilter === 'done' ? 'No capture has finished yet.'
+    : 'Nothing here yet. <a href="#new">Record something</a>: pick a workload, choose what to record, and its files appear in this list.';
   $('captures').innerHTML = list.map(c => {
-    const tasks = c.tasks.map(t => `<div class="pod">${esc(t.pod)}${t.recordings?.length ? '' : ': ' + esc(t.state)}</div>`
+    const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
+    const pods = c.tasks.map(t => `<div class="pod">${esc(t.pod)}${t.recordings?.length ? '' : ': ' + esc(t.state)}</div>`
       + (t.recordings || []).map(r => `<div class="rec ${r.state}" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''} ${esc(kindNames[r.kind] || r.kind)}${r.message ? ` <span class="muted">${esc(r.message)}</span>` : ''}</div>`).join('')
       + (t.message && !t.recordings?.some(r => r.message) ? `<div class="muted">${esc(t.message)}</div>` : '')).join('');
     // The files of each pod under the pod's name.
-    const pods = {};
-    for (const a of c.artifacts) (pods[a.name.split('/')[0]] ||= []).push(a);
-    const files = Object.entries(pods).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
-      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('');
+    const byPod = {};
+    for (const a of c.artifacts) (byPod[a.name.split('/')[0]] ||= []).push(a);
+    const files = Object.entries(byPod).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
+      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('')
+      || `<div class="muted">${c.state === 'Running' ? 'Files appear here as each recording ends.' : inProgress(c) ? 'Nothing yet.' : 'No files.'}</div>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
-    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start') + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
+    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
       : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Abandon it and delete what it recorded')
       : c.state === 'Running' ? button('stop', 'Stop and keep', 'End the recordings now and keep what they have recorded', true) + button('delete', 'Delete', 'Abandon it and delete what it recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
-    const waiting = c.state === 'Running' && !c.artifacts.length ? '<div class="muted">Files appear here as each recording ends.</div>' : '';
-    return `<tr data-capture="${c.id}"><td>${new Date(c.createdAt).toLocaleString()}<div class="muted">${esc(c.requester)}</div></td>
-      <td>${esc(c.cluster)} / ${esc(c.namespace)}<br>${esc(c.workload)}</td>
-      <td>${describe(c)}</td>
-      <td><span class="state ${c.state}">${{PendingApproval: 'Waits for approval'}[c.state] || c.state}</span>${c.approver ? `<div class="muted">${c.approver === c.requester ? 'no approval needed' : 'approved by ' + esc(c.approver)}</div>` : ''}${progressOf(c)}<div class="muted">${esc(c.message)}</div>${tasks}</td>
-      <td>${files}${waiting}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></td><td>${actions}</td></tr>`;
+    const state = {PendingApproval: 'Waits for approval'}[c.state] || c.state;
+    const count = c.artifacts.length ? ` · ${plural(c.artifacts.length, 'file')}` : '';
+    return `<div class="capture${open ? ' open' : ''}${freshClass(c.id)}" data-capture="${c.id}">
+      <div class="line">
+        <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted">${inProgress(c) ? '' : count.slice(3)}</div>`}</span>
+        <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}</span>
+        <span class="where" title="${esc(c.cluster)} / ${esc(c.namespace)} / ${esc(c.workload)}">${esc(c.workload)}<div class="muted">${esc(c.cluster)} / ${esc(c.namespace)}</div></span>
+        <span class="when muted">${new Date(c.createdAt).toLocaleString()}<div>${esc(c.requester)}</div></span>
+        <span class="acts">${actions}</span><span class="chev">▸</span>
+      </div>
+      <div class="more">
+        <div><h4>Recordings</h4>${pods}<div class="muted">${esc(c.message)}</div></div>
+        <div><h4>Files</h4>${files}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></div>
+        <div><h4>Request</h4>${describe(c)}${c.approver ? `<div class="muted">${c.approver === c.requester ? 'no separate approval needed' : 'approved by ' + esc(c.approver)}</div>` : ''}</div>
+      </div></div>`;
   }).join('');
   countdown();
 }
+const list2 = words => words.length > 3 ? `${words.slice(0, 3).join(', ')} +${words.length - 3}` : words.join(', ');
 
 $('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
 $('signout').onclick = async () => {
@@ -535,10 +639,12 @@ $('flows').onclick = e => {
 $('filter').oninput = () => filterChanged(true);
 $('captureForm').onsubmit = guard(async () => {
   const crash = picked('when') === 'crash';
-  // What is missing is said at its own section, not after a round trip.
-  if (!$('workload').value) return problemAt('whereProblem', 'Choose a workload.');
-  let profile = {};
-  if (kinds().includes('pprof')) try { profile = profileParams(); } catch (err) { return problemAt('profileProblem', err.message); }
+  // What is missing is said at its own step, not after a round trip.
+  for (const n of [1, 2, 3]) {
+    const problem = stepProblem(n);
+    if (problem) return problemAt(...problem);
+  }
+  const profile = kinds().includes('pprof') ? profileParams() : {};
   // Each chosen kind becomes a recording with the parameters of its section.
   const recordings = kinds().map(kind => {
     const params = {};
@@ -556,15 +662,63 @@ $('captureForm').onsubmit = guard(async () => {
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
     : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
-  // Show where it went.
-  const row = crash ? $('watchSection') : document.querySelector(`tr[data-capture="${created.id}"]`);
-  row?.classList.add('fresh');
-  row?.scrollIntoView({block: 'center', behavior: 'smooth'});
+  // Show where it went: the new capture, opened, in its list.
+  if (!crash) toggled.set(created.id, true);
+  fresh = {id: created.id, until: Date.now() + 4000};
+  captureFilter = 'all';
+  for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
+  await Promise.all([loadCaptures(), loadWatches()]);
+  location.hash = crash ? '#watches' : '#captures';
+  showStep(1);
+  document.querySelector(crash ? `tr[data-watch="${created.id}"]` : `.capture[data-capture="${created.id}"]`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }, 'formProblem');
 function problemAt(id, message) {
+  showStep(Number($(id).closest('[data-step]').dataset.step));
   $(id).textContent = message;
-  $(id).closest('section, fieldset').scrollIntoView({block: 'center', behavior: 'smooth'});
-  $('formProblem').textContent = 'Something is missing above.';
+  $(id).scrollIntoView({block: 'center', behavior: 'smooth'});
+}
+
+// The form is filled one step at a time. A step without anything to choose is passed over.
+let step = 1;
+const stepNeeded = n => n !== 3 || $('nothing').hidden;
+function showStep(n) {
+  step = n;
+  for (const f of document.querySelectorAll('[data-step]')) f.hidden = Number(f.dataset.step) !== step;
+  for (const li of $('steps').children) {
+    const k = Number(li.dataset.go);
+    li.className = k === step ? 'on' : !stepNeeded(k) ? 'skip' : k < step ? 'done' : '';
+  }
+  $('back').hidden = step === 1;
+  $('next').hidden = step === 4;
+  $('submit').hidden = step !== 4;
+  summarize();
+}
+// What the step needs before the next one; the message appears at the step.
+function stepProblem(n) {
+  if (n === 1 && !$('workload').value) return ['whereProblem', 'Choose a cluster, a namespace and a workload.'];
+  if (n === 2 && !kinds().length) return ['kindProblem', 'Choose at least one kind of evidence.'];
+  if (n === 3 && kinds().includes('pprof')) try { profileParams(); } catch (err) { return ['profileProblem', err.message]; }
+  return null;
+}
+function go(to) {
+  // Going forward checks every step on the way.
+  for (let n = step; n < to; n++) {
+    const problem = stepProblem(n);
+    if (problem) return problemAt(...problem);
+  }
+  while (!stepNeeded(to)) to += to > step ? 1 : -1;
+  showStep(to);
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+$('next').onclick = () => go(step + 1);
+$('back').onclick = () => go(step - 1);
+$('steps').onclick = e => { const li = e.target.closest('li'); if (li && stepNeeded(Number(li.dataset.go))) go(Number(li.dataset.go)); };
+// The choices so far, in one line above the steps.
+function summarize() {
+  const where = $('workload').value ? `${$('workload').value} in ${$('cluster').value} / ${$('namespace').value}` : '';
+  const what = kinds().length ? list(kinds().map(k => kindNames[k])) : '';
+  const when = step === 4 ? (picked('when') === 'crash' ? 'when a container crashes' : 'now') : '';
+  $('summary').textContent = [where, what, when].filter(Boolean).join('  ·  ');
 }
 $('watches').onclick = guard(async e => {
   if (!e.target.dataset.id) return;
@@ -572,10 +726,20 @@ $('watches').onclick = guard(async e => {
   else await call('DELETE', `/api/watches/${e.target.dataset.id}`);
   await loadWatches();
 }, 'watchesProblem');
+$('states').onclick = guard(async e => {
+  if (!e.target.dataset.filter) return;
+  captureFilter = e.target.dataset.filter;
+  for (const b of $('states').children) b.classList.toggle('on', b === e.target);
+  await loadCaptures();
+}, 'capturesProblem');
 $('captures').onclick = guard(async e => {
-  const {act, id} = e.target.dataset;
-  if (!act) return;
-  const running = e.target.closest('tr').querySelector('.state.Running');
+  const {act, id} = e.target.dataset, card = e.target.closest('.capture');
+  if (!act) {
+    // A click on the line opens or closes the capture; links and text selection in the details are left alone.
+    if (card && e.target.closest('.line')) toggled.set(card.dataset.capture, card.classList.toggle('open'));
+    return;
+  }
+  const running = card.querySelector('.state.Running');
   if (act === 'delete' && running && !confirm('Abandon this capture and delete what it has recorded? "Stop and keep" ends it and keeps the files.')) return;
   await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
