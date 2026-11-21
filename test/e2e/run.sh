@@ -128,8 +128,9 @@ spec:
           image: docker.io/library/busybox:1.37
           # Serves a page and requests it over loopback, so the pod has traffic.
           # It crashes when the file /tmp/crash appears, and after a child
-          # died of a segmentation fault when /tmp/segv appears.
-          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && { sh -c 'kill -SEGV $$'; echo child ended with status $? core limit $(ulimit -c) $(grep -i -E 'Seccomp:|NoNewPrivs|CoreDumping' /proc/self/status); }; exit 3"]
+          # died of a segmentation fault when /tmp/segv appears. Kubernetes
+          # turns $$$$ into $$, the shell's own process ID.
+          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ] && [ ! -e /tmp/segv ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; [ -e /tmp/segv ] && sh -c 'kill -SEGV $$$$'; exit 3"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 ---
 # Members of the group "devs" may exec into pods of this namespace; that right
