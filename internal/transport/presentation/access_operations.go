@@ -98,6 +98,8 @@ type accessExplanationData struct {
 	AssignmentsTotal int                    `json:"assignments_total"`
 }
 
+const accessExplanationRows = 64
+
 // accessMessage is fixed reviewed text per condition; it never includes a
 // caller-supplied or Kubernetes-supplied value.
 func accessMessage(e authorization.Explanation) string {
@@ -171,6 +173,11 @@ func (s *AccessOperations) CallWithContext(ctx context.Context, current identiti
 		data.Target = &accessTargetData{ClusterID: e.Target.ClusterID, NamespaceUID: e.Target.NamespaceUID, WorkloadUID: e.Target.WorkloadUID, PodUID: e.Target.PodUID}
 	}
 	for _, a := range e.Assignments {
+		// The reply fits the 24 KiB result frame (about 250 bytes per row);
+		// assignments_total reports the full count.
+		if len(data.Assignments) == accessExplanationRows {
+			break
+		}
 		x := a.Assignment
 		data.Assignments = append(data.Assignments, accessAssignmentData{Effect: a.Effect, AssignmentID: x.AssignmentID, Role: x.Role, SubjectKind: x.Kind, BasisKind: x.BasisKind, BasisUID: x.BasisUID, Revision: hex.EncodeToString(x.BasisDigest[:])})
 	}

@@ -88,7 +88,6 @@ type OwnerPublicDeployment struct {
 	// entries of the guarded cluster catalog, read at process start, because
 	// regional clusters enroll after the owner's one launch.
 	ClusterCatalog OwnerPublicGuardedSource `json:"clusterCatalog"`
-	Standby        int                      `json:"standby"`
 	Captures       int                      `json:"captures"`
 	// PreviewSeconds is the reviewed preview lifetime.
 	PreviewSeconds int `json:"previewSeconds"`

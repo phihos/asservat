@@ -32,7 +32,7 @@ import (
 // the service and by SQL, exact children after verified commit, one finite
 // pool under concurrent use, concurrent use against revocation, spend that
 // survives a restart, expiry and the audit-lane registration.
-func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, publishAuthority func() error, releasePermissionBurst func()) {
+func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, releasePermissionBurst func()) {
 	t.Helper()
 	// The concurrent phases grow the shared permission reader's pool; release
 	// its idle connections so later suites keep their connection budget.
@@ -53,11 +53,6 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		t.Fatal("approver binding", err)
 	}
 	batch.ExpectedSequence = accepted.Sequence
-	for i := 0; i < 2; i++ {
-		if err := publishAuthority(); err != nil {
-			t.Fatal(err)
-		}
-	}
 	refresh := func() {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)

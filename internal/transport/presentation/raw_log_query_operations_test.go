@@ -60,6 +60,7 @@ func logBridgePage(f *bridgeFixture, data []byte) value.LogPage {
 	o := artifact.LogOrigin{Record: "origin", ContainerKind: "regular", ContainerName: "app", Source: "current", Stream: "combined"}
 	return value.LogPage{Version: f.a.Scope.Version, PodUID: f.a.Scope.PodUID, WindowStart: f.now.Add(-time.Hour), WindowEnd: f.now, Entries: []value.LogEntry{{Origin: o, Fragment: 0, Line: 1, EndLine: data[len(data)-1] == '\n', Data: base64.StdEncoding.EncodeToString(data)}}, OriginCount: 1, CompleteOrigins: 1, GappedOrigins: 1, UnknownTimestampOrigins: 1, TotalFragments: 1, SourceBytes: uint64(len(data))}
 }
+
 type fixedRawGrant struct{ id string }
 
 func (g fixedRawGrant) FindRawGrant(context.Context, identity.Identity, string, string, string, string) (string, error) {

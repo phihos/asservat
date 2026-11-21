@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"k8s.io/client-go/rest"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -31,10 +30,9 @@ type Regional struct {
 	nodes   *regionalNodes   // nil without the optional ADR-246 input
 	// bindings delivers this cluster's AccessBindings to the hub (ADR-329);
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
-	bindings    AccessBindingReader
-	lifecycle   *RegionalLifecycle
-	watchConfig *rest.Config
-	closers     []func()
+	bindings  regionalBindingSource
+	lifecycle *RegionalLifecycle
+	closers   []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
 	observerStats regionalAPIStats
@@ -167,8 +165,9 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	}
 	process := value.ConnectorProcessIdentity{Binding: c.binding, PodUID: podUID, ProcessEpoch: uuid.NewString()}
 	lifecycle := &RegionalLifecycle{Client: channel, Process: process, RootID: c.rootID(), Now: time.Now, Timing: r.lifecycleTiming()}
+	r.lifecycle = lifecycle
 	if raw.Mode == contracts.ConnectorModeCluster {
-		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
+		r.bindings = observer
 	}
 	if c.executor {
 		var closers []func()
@@ -240,10 +239,36 @@ func (r *Regional) Run(ctx context.Context) error {
 		}
 	}()
 	// ADR-329/330: watch-driven deliveries beside the context starts.
+	var resync chan struct{}
 	if r.bindings != nil {
-		ready := make(chan struct{})
-		close(ready)
-		wait := goJoined(func() { r.runDeliveries(contextCtx, ready) })
+		resync = make(chan struct{}, 1)
+		wait := goJoined(func() { r.runDeliveries(contextCtx, resync) })
+		defer func() { stopContext(); wait() }()
+	}
+	connected := func(ctx context.Context) error {
+		if r.context != nil {
+			if err := r.context.refreshStorageKeys(ctx); err != nil {
+				return err
+			}
+		}
+		select {
+		case resync <- struct{}{}:
+		default:
+		}
+		return nil
+	}
+	watch := func(ctx context.Context, receive func(connectorlifecycle.WorkHint)) (bool, error) {
+		return r.lifecycle.Client.WatchWork(ctx, connected, receive)
+	}
+	if r.context == nil && r.bindings != nil {
+		// A delivery-only connector observes a new hub through the same
+		// authenticated subscription as an executor. It opens no exchanges.
+		report := eventLog(os.Stderr, "regional binding subscription")
+		wait := goJoined(func() {
+			reconnectRegional(contextCtx, func() (bool, error) {
+				return watch(contextCtx, func(connectorlifecycle.WorkHint) {})
+			}, func(err error) { report(regionalCause(err)) })
+		})
 		defer func() { stopContext(); wait() }()
 	}
 	var attemptAt time.Time
@@ -256,7 +281,7 @@ func (r *Regional) Run(ctx context.Context) error {
 		attemptAt = time.Now()
 		observerAt, observerTime = r.observerStats.load()
 		contextRunning = true
-		go func() { contextDone <- r.context.run(contextCtx) }()
+		go func() { contextDone <- r.context.run(contextCtx, watch) }()
 	}
 	for {
 		startContext()

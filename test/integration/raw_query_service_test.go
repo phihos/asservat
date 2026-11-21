@@ -31,7 +31,7 @@ func (f rawQueryServiceSelection) ResolveRawQuery(ctx context.Context, current i
 // and public mapper. The exact output/version/length was actually published by
 // the context fixture; its raw classification and selection are explicitly
 // synthetic. This does not qualify the raw catalog or an installed collector.
-func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissionScenario, store *postgres.AccessGrants, e artifact.ContextExpectation, output value.VerifiedOutput, nativeBytes int64, publishAuthority func() error, releasePermissionBurst func()) {
+func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissionScenario, store *postgres.AccessGrants, e artifact.ContextExpectation, output value.VerifiedOutput, nativeBytes int64, releasePermissionBurst func()) {
 	t.Helper()
 	t.Cleanup(releasePermissionBurst)
 	approver := s.batch.Bases[0]
@@ -49,11 +49,6 @@ func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissio
 		t.Fatal("raw service approver binding", err)
 	}
 	batch.ExpectedSequence = accepted.Sequence
-	for n := 0; n < 2; n++ {
-		if err = publishAuthority(); err != nil {
-			t.Fatal("raw service permission audit", err)
-		}
-	}
 	as := func(lead bool) identities.CurrentIdentity {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)

@@ -44,7 +44,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	ca, key := connectorSQLCA(t)
 	ownerPool := fleet.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444}
 	config := fleet.OwnerConfiguration{Pool: ownerPool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
-	lab := ownerConfigurationLab(t, ctx, f, config)
+	lab := ownerEnrollmentLab(t, ctx, f, config)
 	owners := newContextStartOwnerSQL(t, ctx, lab, config, contextStartOwnerIssuer{ca, key})
 	if _, err = owners.refresh(ctx, 5*time.Second); err != nil {
 		t.Fatal(err)

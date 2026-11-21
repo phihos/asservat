@@ -158,11 +158,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		t.Fatal("public reviewer acceptance", e)
 	}
 	batch.ExpectedSequence = accepted.Sequence
-	for range 2 {
-		if e = (auditapp.AuthorityPublisher{Ledger: permissions, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx); e != nil {
-			t.Fatal(e)
-		}
-	}
+
 	hubRole := narrowRole(t, ctx, admin, "policy_public_hub_", "synthetic-public-policy", func(role string) []string {
 		g, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {
@@ -368,7 +364,8 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 				t.Fatal(e)
 			}
 			defer tx.Rollback(context.Background())
-			if _, e = tx.Exec(ctx, "SELECT id FROM access_grant WHERE id=$1 FOR UPDATE", pending.ID); e != nil {
+			var holder int32
+			if e = tx.QueryRow(ctx, "SELECT pg_backend_pid() FROM access_grant WHERE id=$1 FOR UPDATE", pending.ID).Scan(&holder); e != nil {
 				t.Fatal(e)
 			}
 			until := make(chan time.Time, 1)
@@ -390,7 +387,7 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 			seen := false
 			observeEnd := time.Now().Add(400 * time.Millisecond)
 			for time.Now().Before(observeEnd) {
-				if e := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename=$1 AND wait_event_type='Lock' AND query LIKE '%access_grant%')", hubRole).Scan(&seen); e != nil {
+				if e := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename=$1 AND $2=ANY(pg_blocking_pids(pid)))", hubRole, holder).Scan(&seen); e != nil {
 					t.Fatal(e)
 				}
 				if seen {
@@ -399,9 +396,14 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 				time.Sleep(10 * time.Millisecond)
 			}
 			if !seen {
-				t.Fatal("decision did not reach actual held-row SQL wait")
+				select {
+				case err := <-done:
+					t.Fatal("decision returned before blocking on its grant", err)
+				default:
+					t.Fatal("decision did not reach the transaction holding its grant row")
+				}
 			}
-			timer := time.NewTimer(time.Until(deadline.Add(1200 * time.Millisecond)))
+			timer := time.NewTimer(time.Until(deadline))
 			defer timer.Stop()
 			select {
 			case <-timer.C:

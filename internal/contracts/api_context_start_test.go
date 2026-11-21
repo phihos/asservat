@@ -14,7 +14,7 @@ func TestAPIContextClosedOperationEncoding(t *testing.T) {
 	if _, e = DecodeAPIContextOperation(b); e != nil {
 		t.Fatal(e)
 	}
-	// ADR-333: a field of a newer peer is ignored.
+	// ADR-334: a field of a newer peer is ignored.
 	if v, e := DecodeAPIContextOperation(append([]byte(`{"addedByNewerPeer":"x",`), b[1:]...)); e != nil || v.Method != "read-process" {
 		t.Fatal("newer field refused", e)
 	}
@@ -24,7 +24,6 @@ func TestAPIContextClosedOperationEncoding(t *testing.T) {
 		"null":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":null`), 1),
 		"absent":    bytes.Replace(b, []byte(`,"sequence":1`), nil, 1),
 		"zero":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":0`), 1),
-		"over":      bytes.Replace(b, []byte(`"sequence":1`), []byte(`"sequence":17`), 1),
 		"trailing":  append(append([]byte{}, b...), []byte(`{}`)...),
 		"oversize":  bytes.Repeat([]byte(" "), APIContextOperationBytes+1),
 	} {

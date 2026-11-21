@@ -18,7 +18,7 @@ import (
 // connector authenticated with its ServiceAccount token (ADR-334); the hello
 // must name the cluster and peer that token was attributed to. The executor's
 // startup and image digests in Hello are provenance only: a connector of
-// another release is admitted (ADR-333 version skew).
+// another release is admitted (ADR-334 version skew).
 type ContextStartIngress struct {
 	rootID string
 	local  *OwnerCredentials

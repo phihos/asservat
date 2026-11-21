@@ -27,35 +27,46 @@ import (
 // unreadable source list keeps every row without renewing it, so none
 // grants until a current list is accepted.
 func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, b cfg.PermissionBatch, record *audit.AuthorityRecord) error {
+	if b.SourcesUnavailable {
+		return q.MarkReviewSourcesUnavailable(ctx, s.ID)
+	}
 	rows, err := q.ListPermissionReviewSources(ctx, s.ID)
 	if err != nil {
 		return err
 	}
-	next := map[string]cfg.ReviewSource{}
+	unseen := map[string]cfg.ReviewSource{}
 	for _, r := range b.ReviewSources {
-		next[r.Resource.UID] = r
+		unseen[r.Resource.UID] = r
 	}
-	kept := map[string]bool{}
 	upsert := func(r cfg.ReviewSource, accepted string) error {
 		data, err := json.Marshal(r)
 		if err != nil {
 			return err
 		}
-		return q.UpsertPermissionReviewSource(ctx, custodydb.UpsertPermissionReviewSourceParams{StreamID: s.ID, Uid: r.Resource.UID, Epoch: id(b.Epoch), SeenSequence: record.Sequence, Generation: r.Resource.Generation, ResourceVersion: r.Resource.ResourceVersion, SpecDigest: r.Resource.SpecDigest[:], AuthorityDigest: reviewAuthorityDigest(r), ClusterID: id(r.ClusterID), Role: r.Role, SourceJson: data, AcceptedAuditID: id(accepted)})
+		return q.UpsertPermissionReviewSource(ctx, custodydb.UpsertPermissionReviewSourceParams{StreamID: s.ID, Uid: r.Resource.UID, Epoch: s.Epoch, Generation: r.Resource.Generation, ResourceVersion: r.Resource.ResourceVersion, SpecDigest: r.Resource.SpecDigest[:], AuthorityDigest: reviewAuthorityDigest(r), ClusterID: id(r.ClusterID), Role: r.Role, SourceJson: data, AcceptedAuditID: id(accepted)})
 	}
 	for _, row := range rows {
-		n, present := next[row.Uid]
-		if !present && b.SourcesUnavailable {
-			continue
-		}
-		var old cfg.ReviewSource
-		if present && json.Unmarshal(row.SourceJson, &old) == nil && cfg.EquivalentReview(old, n) {
-			if err = upsert(n, uid(row.AcceptedAuditID)); err != nil {
+		n, present := unseen[row.Uid]
+		if present {
+			delete(unseen, row.Uid)
+			var old cfg.ReviewSource
+			if json.Unmarshal(row.SourceJson, &old) == nil && cfg.EquivalentReview(old, n) {
+				if row.Epoch == s.Epoch && old.Resource == n.Resource {
+					continue
+				}
+				if err = upsert(n, uid(row.AcceptedAuditID)); err != nil {
+					return err
+				}
+				continue
+			}
+			if err = upsert(n, record.ID); err != nil {
 				return err
 			}
-			kept[row.Uid] = true
-			continue
+		} else if err = q.DeletePermissionReviewSource(ctx, custodydb.DeletePermissionReviewSourceParams{StreamID: s.ID, Uid: row.Uid}); err != nil {
+			return err
 		}
+		// Replacing or deleting the source locks it before scanning assignments.
+		// Any first-time decision for its old role has now finished.
 		retired, err := q.RetirePermissionReviewSource(ctx, custodydb.RetirePermissionReviewSourceParams{StreamID: s.ID, SourceUid: row.Uid, RetirementAuditID: id(record.ID)})
 		if err != nil {
 			return err
@@ -63,16 +74,8 @@ func acceptReviewSources(ctx context.Context, q *custodydb.Queries, s custodydb.
 		if retired > 0 {
 			record.ReviewRetirements = append(record.ReviewRetirements, audit.ReviewRetirement{SourceUID: row.Uid, Retired: retired})
 		}
-		if !present {
-			if err = q.DeletePermissionReviewSource(ctx, custodydb.DeletePermissionReviewSourceParams{StreamID: s.ID, Uid: row.Uid}); err != nil {
-				return err
-			}
-		}
 	}
-	for _, r := range b.ReviewSources {
-		if kept[r.Resource.UID] {
-			continue
-		}
+	for _, r := range unseen {
 		if err = upsert(r, record.ID); err != nil {
 			return err
 		}
@@ -92,11 +95,7 @@ func reviewAuthorityDigest(r cfg.ReviewSource) []byte {
 
 // retireReviewStream retires every decision-time assignment of a stream whose
 // trust root changed, and forgets its sources.
-func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, record *audit.AuthorityRecord) error {
-	rows, err := q.ListPermissionReviewSources(ctx, id(root))
-	if err != nil {
-		return err
-	}
+func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, rows []custodydb.PermissionReviewSource, record *audit.AuthorityRecord) error {
 	for _, row := range rows {
 		retired, err := q.RetirePermissionReviewSource(ctx, custodydb.RetirePermissionReviewSourceParams{StreamID: id(root), SourceUid: row.Uid, RetirementAuditID: id(record.ID)})
 		if err != nil {
@@ -108,7 +107,7 @@ func retireReviewStream(ctx context.Context, q *custodydb.Queries, root string, 
 	}
 	// A source row without a current assignment may remain from an older
 	// stream generation; retire anything left and forget the sources.
-	if _, err = q.RetirePermissionReviewStream(ctx, custodydb.RetirePermissionReviewStreamParams{StreamID: id(root), RetirementAuditID: id(record.ID)}); err != nil {
+	if _, err := q.RetirePermissionReviewStream(ctx, custodydb.RetirePermissionReviewStreamParams{StreamID: id(root), RetirementAuditID: id(record.ID)}); err != nil {
 		return err
 	}
 	return q.DeletePermissionReviewSources(ctx, id(root))
@@ -141,7 +140,7 @@ func NewAccessReviews(ctx context.Context, pool *pgxpool.Pool, root string) (*Ac
 }
 
 // currentReviewStream is the stream under a share lock, current for reviews.
-func currentReviewStream(ctx context.Context, q *custodydb.Queries, root string) (custodydb.PermissionStream, error) {
+func currentReviewStream(ctx context.Context, q *custodydb.Queries, root, cluster string) (custodydb.PermissionStream, error) {
 	s, err := q.SharePermissionStream(ctx, id(root))
 	if err != nil {
 		return s, err
@@ -150,7 +149,7 @@ func currentReviewStream(ctx context.Context, q *custodydb.Queries, root string)
 	if err != nil {
 		return s, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+	if slices.Contains(s.UnavailableClusters, cluster) || s.Sequence < 1 || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return s, cfg.ErrUnavailable
 	}
 	return s, nil
@@ -162,19 +161,16 @@ func (r *AccessReviews) ReviewSources(ctx context.Context, cluster string) ([]cf
 		return nil, cfg.ErrInvalid
 	}
 	err := permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := currentReviewStream(ctx, q, r.root)
+		s, err := currentReviewStream(ctx, q, r.root, cluster)
 		if err != nil {
 			return err
 		}
-		rows, err := q.CurrentPermissionReviewSources(ctx, custodydb.CurrentPermissionReviewSourcesParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(cluster)})
+		rows, err := q.CurrentPermissionReviewSources(ctx, custodydb.CurrentPermissionReviewSourcesParams{StreamID: s.ID, Epoch: s.Epoch, ClusterID: id(cluster)})
 		if err != nil {
 			return err
 		}
 		for _, row := range rows {
 			var src cfg.ReviewSource
-			if !currentAuthorityAuditReceipt(uid(s.ID), uid(row.AcceptedAuditID), row.AcknowledgedAt.Valid, row.ObjectKey, row.ObjectVersion, row.ObjectEtag, row.ObjectBytes, row.ObjectSha256) {
-				continue
-			}
 			if json.Unmarshal(row.SourceJson, &src) != nil || !src.Valid() || src.Resource.UID != row.Uid || src.ClusterID != cluster || src.Resource.Generation != row.Generation {
 				return cfg.ErrUnavailable
 			}
@@ -234,15 +230,18 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		return cfg.ErrInvalid
 	}
 	return permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		s, err := currentReviewStream(ctx, q, r.root)
+		row, err := q.LockPermissionReviewSource(ctx, custodydb.LockPermissionReviewSourceParams{StreamID: id(r.root), Uid: src.Resource.UID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return cfg.ErrChanged
+		}
 		if err != nil {
 			return err
 		}
-		row, err := q.LockPermissionReviewSource(ctx, custodydb.LockPermissionReviewSourceParams{StreamID: s.ID, Uid: src.Resource.UID})
+		s, err := currentReviewStream(ctx, q, r.root, t.ClusterID)
 		if err != nil {
 			return err
 		}
-		if row.Epoch != s.Epoch || row.SeenSequence != s.Sequence || row.Generation != src.Resource.Generation || string(row.SpecDigest) != string(src.Resource.SpecDigest[:]) {
+		if row.Epoch != s.Epoch || row.Generation != src.Resource.Generation || string(row.SpecDigest) != string(src.Resource.SpecDigest[:]) {
 			return cfg.ErrChanged
 		}
 		n, err := q.CurrentTime(ctx)
@@ -341,8 +340,7 @@ func reviewOutcome(d authapp.ReviewDecision) string {
 }
 
 // recordReviewChange appends one immutable decision-change event to the
-// stream's authority audit outbox (REQ-PER-006, ADR-245). The hub-worker's
-// authority publisher encrypts and acknowledges it like every other event.
+// PostgreSQL permission history in the transaction changing the decision.
 // A review that confirms the current state writes no event.
 func recordReviewChange(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, now time.Time, change, outcome string, src cfg.ReviewSource, p identity.Principal, assignment string, t targets.Request, decided, until time.Time) error {
 	c := audit.ReviewDecisionChange{Change: change, Outcome: outcome, SourceUID: src.Resource.UID, SourceGeneration: src.Resource.Generation, SourceDigest: src.Resource.SpecDigest, IdentityMapping: src.IdentityMappingRef,

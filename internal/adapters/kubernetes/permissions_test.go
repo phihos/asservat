@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -61,7 +62,7 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 		if (r.Method != "GET" && !(r.Method == "POST" && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews")) || r.Header.Get("Authorization") != "Bearer synthetic-only" {
 			t.Error("unexpected request method/credential")
 		}
-		if r.URL.Query().Has("resourceVersion") || r.URL.Query().Has("labelSelector") || r.URL.Query().Has("fieldSelector") {
+		if (r.URL.Query().Get("watch") != "true" && r.URL.Query().Has("resourceVersion")) || (r.URL.Query().Has("labelSelector") && r.URL.Path != "/api/v1/namespaces") || (r.URL.Query().Has("fieldSelector") && !strings.HasSuffix(r.URL.Path, "/configmaps")) {
 			t.Error("authority list was cached or filtered")
 		}
 		if extra != nil && extra(w, r) {
@@ -92,6 +93,21 @@ func newPermissionFixture(t *testing.T, extra func(http.ResponseWriter, *http.Re
 	return permissionFixture{c, cfg, clock}
 }
 
+func TestClusterBindingChangeReadsOnlyItsOwnCollection(t *testing.T) {
+	var calls atomic.Int64
+	f := newPermissionFixture(t, func(_ http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path != "/apis/asservat.io/v1alpha1/clusteraccessbindings" {
+			t.Errorf("cluster change read %s", r.URL.Path)
+		}
+		calls.Add(1)
+		return false
+	})
+	got, err := f.client.ClusterAccessBindings(t.Context())
+	if err != nil || calls.Load() != 1 || got.ClusterBindingResourceVersion != "opaque:cabs" || len(got.ClusterBindings) != 1 || len(got.Bindings) != 0 {
+		t.Fatal("cluster collection", got, err, calls.Load())
+	}
+}
+
 func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	f := newPermissionFixture(t, nil)
 	s, err := f.client.PermissionSnapshot(context.Background())
@@ -101,7 +117,11 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	if c := s.ClusterBindings; len(c) != 1 || c[0].Invalid || c[0].Scope.ClusterID != permissionCluster || c[0].Scope.Namespace != value.AllNamespaces || c[0].NamespaceSelector["example.invalid/managed"] != "true" || len(c[0].Roles) != 1 || c[0].Subjects[0].Issuer != "" {
 		t.Fatalf("cluster binding %+v", c)
 	}
-	if len(s.Bindings) != 1 || len(s.Sources) != 1 || s.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || s.SourceResourceVersion != "opaque:sources" || s.FreshUntil.Sub(s.ObservedAt) != 5*time.Second {
+	sources, err := f.client.PermissionSources(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Bindings) != 1 || len(sources.Sources) != 1 || sources.Sources[0].ClusterID != permissionCluster || s.BindingResourceVersion != "opaque:bindings" || sources.SourceResourceVersion != "opaque:sources" || !s.FreshUntil.IsZero() {
 		t.Fatal("incomplete snapshot")
 	}
 	b := s.Bindings[0]
@@ -123,7 +143,7 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 	target := value.Target{ClusterID: permissionCluster, Namespace: ns.Namespace, Workload: value.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload-uid"}}
 	observation := &value.NamespaceObservation{ClusterID: permissionCluster, Keys: value.NamespaceKeys{Labels: []string{"example.invalid/managed"}, Annotations: []string{"example.invalid/owner"}},
 		Namespaces: []value.ObservedNamespace{{Name: ns.Namespace.Name, UID: ns.Namespace.UID, Labels: map[string]string{"example.invalid/managed": port.ValueDigest(ns.Labels["example.invalid/managed"])}, Annotations: map[string]string{"example.invalid/owner": port.ValueDigest(ns.Annotations["example.invalid/owner"])}}}}
-	if grants, reason := port.NamespaceGrants(s.Sources[0], permissionCluster, observation); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
+	if grants, reason := port.NamespaceGrants(sources.Sources[0], permissionCluster, observation); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
 		t.Fatal("mapping did not preserve multiple teams", reason)
 	}
 	if p := value.ProposeBinding(b, target, s.ObservedAt); len(p.Candidates) != 1 || p.Reason != "RequiresAcceptance" {
@@ -143,7 +163,8 @@ func TestUnavailableAllowSourcesDoNotDiscardCompleteBindings(t *testing.T) {
 	if err != nil || len(s.Bindings) != 1 {
 		t.Fatal("unavailable allow-only sources discarded complete explicit bindings")
 	}
-	if s.SourcesComplete || len(s.Sources) != 0 || s.SourceResourceVersion != "" {
+	sources, err := f.client.PermissionSources(t.Context())
+	if err == nil || sources.SourcesComplete || len(sources.Sources) != 0 || sources.SourceResourceVersion != "" {
 		t.Fatal("failed source list presented as current")
 	}
 }
@@ -156,7 +177,6 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 				if !strings.HasSuffix(r.URL.Path, "/accessbindings") {
 					return false
 				}
-				// A first LIST places the bindings, a second is the snapshot.
 				if r.URL.Query().Get("continue") == "" {
 					calls.Store(0)
 				}
@@ -219,7 +239,14 @@ func TestPermissionPaginationIsCompleteOrUnavailable(t *testing.T) {
 				permissionReply(w, permissionList("AccessBinding", rv, next, item))
 				return true
 			})
-			s, err := f.client.PermissionSnapshot(context.Background())
+			ctx := t.Context()
+			if mode == "overflow" {
+				// This API never ends its LIST. Only the caller's deadline ends it.
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+			}
+			s, err := f.client.PermissionSnapshot(ctx)
 			if mode == "complete" || mode == "emptyMiddle" {
 				if err != nil || len(s.Bindings) != 2 {
 					t.Fatalf("complete list: %v", err)
@@ -274,8 +301,8 @@ func TestPermissionInvalidSpecGrantsNothing(t *testing.T) {
 		"empty subjects": func(o map[string]any) { o["spec"].(map[string]any)["subjects"] = []any{} },
 		"wildcard role":  func(o map[string]any) { o["spec"].(map[string]any)["roles"] = []string{"*"} },
 		"null roles":     func(o map[string]any) { o["spec"].(map[string]any)["roles"] = nil },
-		"http issuer": func(o map[string]any) {
-			o["spec"].(map[string]any)["subjects"] = []any{map[string]any{"kind": "Group", "issuer": "http://id.example.invalid", "id": "team-a"}}
+		"explicit empty issuer": func(o map[string]any) {
+			o["spec"].(map[string]any)["subjects"] = []any{map[string]any{"kind": "Group", "issuer": "", "id": "team-a"}}
 		},
 		"invalid workload name": func(o map[string]any) {
 			o["spec"].(map[string]any)["workloads"] = []any{map[string]any{"kind": "Deployment", "name": "../other", "uid": "uid"}}
@@ -305,14 +332,34 @@ func TestPermissionInvalidSpecGrantsNothing(t *testing.T) {
 }
 
 // ADR-329: bindings in other namespaces are listed cluster-wide; each
-// namespace UID is read once per binding and remembered.
+// namespace UID is read once per namespace per LIST.
 func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
-	var reads atomic.Int64
+	var reads, named atomic.Int64
+	var getOnly atomic.Bool
 	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 		switch r.URL.Path {
-		case "/api/v1/namespaces/orders":
+		case "/api/v1/namespaces":
 			reads.Add(1)
-			permissionReply(w, permissionNamespace("orders", "orders-uid"))
+			if getOnly.Load() {
+				http.Error(w, "LIST denied", http.StatusForbidden)
+				return true
+			}
+			if r.URL.Query().Get("labelSelector") != "kubernetes.io/metadata.name in (orders,payments)" {
+				t.Error("unexpected namespaces", r.URL.Query())
+			}
+			switch r.URL.Query().Get("continue") {
+			case "":
+				permissionReply(w, permissionNamespacePage("more", permissionNamespace("orders", "orders-uid")))
+			case "more":
+				permissionReply(w, permissionNamespacePage("", permissionNamespace("payments", "payments-uid")))
+			default:
+				t.Error("unexpected cursor", r.URL.Query())
+			}
+			return true
+		case "/api/v1/namespaces/orders", "/api/v1/namespaces/payments":
+			named.Add(1)
+			name := strings.TrimPrefix(r.URL.Path, "/api/v1/namespaces/")
+			permissionReply(w, permissionNamespace(name, name+"-uid"))
 			return true
 		case "/apis/asservat.io/v1alpha1/accessbindings":
 			other := permissionBinding(2)
@@ -334,8 +381,13 @@ func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
 			}
 		}
 	}
-	if reads.Load() != 1 {
-		t.Fatalf("namespace read %d times", reads.Load())
+	if reads.Load() != 4 {
+		t.Fatalf("unexpected namespace page count %d", reads.Load())
+	}
+	getOnly.Store(true)
+	d, err := f.client.AccessBindingDelivery(t.Context())
+	if err != nil || len(d.Items) != 3 || named.Load() != 2 || reads.Load() != 4 {
+		t.Fatal("get-only connector required namespace LIST", len(d.Items), named.Load(), reads.Load(), err)
 	}
 }
 
@@ -343,20 +395,24 @@ func TestPermissionBindingsAcrossNamespaces(t *testing.T) {
 // binding or lacks timestamps grants and denies nothing; the snapshot of the
 // other bindings still completes.
 func TestUnplaceableBindingGrantsNothing(t *testing.T) {
-	for _, mode := range []string{"missing", "younger", "noTimestamp"} {
+	for _, mode := range []string{"emptyList", "missing", "younger", "noTimestamp"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				switch r.URL.Path {
-				case "/api/v1/namespaces/orders":
-					if mode == "missing" {
-						http.Error(w, `{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"NotFound","code":404}`, http.StatusNotFound)
+				case "/api/v1/namespaces":
+					if mode == "emptyList" {
+						permissionReply(w, permissionNamespacePage(""))
 						return true
 					}
-					ns := permissionNamespace("orders", "orders-uid")
-					if mode == "younger" {
-						ns["metadata"].(map[string]any)["creationTimestamp"] = "2026-10-10T11:30:00Z"
+					names := []map[string]any{permissionNamespace("payments", "payments-uid")}
+					if mode != "missing" {
+						ns := permissionNamespace("orders", "orders-uid")
+						if mode == "younger" {
+							ns["metadata"].(map[string]any)["creationTimestamp"] = "2026-10-10T11:30:00Z"
+						}
+						names = append(names, ns)
 					}
-					permissionReply(w, ns)
+					permissionReply(w, permissionNamespacePage("", names...))
 					return true
 				case "/apis/asservat.io/v1alpha1/accessbindings":
 					other := permissionBinding(2)
@@ -370,13 +426,14 @@ func TestUnplaceableBindingGrantsNothing(t *testing.T) {
 				return false
 			})
 			s, err := f.client.PermissionSnapshot(context.Background())
-			if err != nil || len(s.Bindings) != 2 {
-				t.Fatal(err, len(s.Bindings))
-			}
-			for _, b := range s.Bindings {
-				if (b.Resource.Namespace == "orders") != b.Invalid {
-					t.Fatalf("%s invalid=%v", b.Resource.Namespace, b.Invalid)
+			if mode == "emptyList" {
+				if err != nil || len(s.Bindings) != 0 {
+					t.Fatal("empty metadata response contributed a binding", err, len(s.Bindings))
 				}
+				return
+			}
+			if err != nil || len(s.Bindings) != 1 || s.Bindings[0].Resource.Namespace != "payments" || s.Bindings[0].Invalid {
+				t.Fatal("old incarnation entered hub baseline", err, len(s.Bindings))
 			}
 		})
 	}
@@ -385,7 +442,6 @@ func TestUnplaceableBindingGrantsNothing(t *testing.T) {
 func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 	for _, mode := range []string{"advance", "rollback", "replaceControl", "deletingControl", "replaceTarget", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
-			var count atomic.Int64
 			var f permissionFixture
 			f = newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				if strings.HasSuffix(r.URL.Path, "/permissionsources") {
@@ -396,7 +452,7 @@ func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 						f.clock.Add(-int64(time.Second))
 					}
 				}
-				if r.URL.Path == "/api/v1/namespaces/asservat-system" && count.Add(1) == 2 {
+				if r.URL.Path == "/api/v1/namespaces/asservat-system" {
 					if mode == "replaceControl" {
 						permissionReply(w, permissionNamespace(permissionControl.Name, "replacement"))
 						return true
@@ -421,6 +477,13 @@ func TestPermissionSourceClockAndNamespaceReplacement(t *testing.T) {
 			defer cancel()
 			if mode == "cancel" {
 				cancel()
+			}
+			if mode == "advance" || mode == "rollback" {
+				_, err := f.client.PermissionSources(ctx)
+				if (err != nil) != (mode == "rollback") {
+					t.Fatal("source list with clock change", mode, err)
+				}
+				return
 			}
 			if s, err := f.client.PermissionSnapshot(ctx); err == nil || len(s.Bindings) != 0 {
 				t.Fatal("stale/replaced source accepted")
@@ -548,4 +611,83 @@ func FuzzPermissionJSON(f *testing.F) {
 			_, _, _ = listEnvelope(b, "AccessBinding")
 		}
 	})
+}
+
+// The Kubernetes metadata endpoint may encode no items as JSON null.
+func permissionNamespacePage(next string, namespaces ...map[string]any) map[string]any {
+	var items []map[string]any
+	for _, ns := range namespaces {
+		items = append(items, map[string]any{"metadata": ns["metadata"]})
+	}
+	return map[string]any{"apiVersion": "meta.k8s.io/v1", "kind": "PartialObjectMetadataList", "metadata": map[string]string{"resourceVersion": "namespaces", "continue": next}, "items": items}
+}
+
+func TestColdHubBaselinePlaces700NamespacesWithinItsLease(t *testing.T) {
+	const distinct = 700
+	var namedGets, selectedLists, bindingPages atomic.Int64
+	nsName := func(i int) string { return fmt.Sprintf("app-%03d", i) }
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Path {
+		case "/apis/asservat.io/v1alpha1/accessbindings":
+			bindingPages.Add(1)
+			first, _ := strconv.Atoi(r.URL.Query().Get("continue"))
+			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+			end := min(first+limit, distinct)
+			var page []map[string]any
+			for i := first; i < end; i++ {
+				o := permissionBinding(i)
+				o["metadata"].(map[string]any)["namespace"] = nsName(i)
+				page = append(page, o)
+			}
+			next := ""
+			if end < distinct {
+				next = strconv.Itoa(end)
+			}
+			permissionReply(w, permissionList("AccessBinding", "bindings", next, page...))
+		case "/api/v1/namespaces":
+			selectedLists.Add(1)
+			selector := r.URL.Query().Get("labelSelector")
+			raw, ok := strings.CutPrefix(selector, "kubernetes.io/metadata.name in (")
+			if !ok || !strings.HasSuffix(raw, ")") {
+				t.Error("unscoped namespace list", selector)
+				http.Error(w, "forbidden", 403)
+				return true
+			}
+			if !strings.Contains(r.Header.Get("Accept"), "as=PartialObjectMetadataList") {
+				t.Error("full namespace bodies requested")
+			}
+			var page []map[string]any
+			names := strings.Split(strings.TrimSuffix(raw, ")"), ",")
+			if len(names) > permissionPageSize {
+				t.Error("placement crossed binding-page boundary")
+				http.Error(w, "unexpected selector", http.StatusBadRequest)
+				return true
+			}
+			for _, name := range names {
+				page = append(page, permissionNamespace(name, name+"-uid"))
+			}
+			permissionReply(w, permissionNamespacePage("", page...))
+		default:
+			name, ok := strings.CutPrefix(r.URL.Path, "/api/v1/namespaces/")
+			if !ok || name == permissionControl.Name {
+				return false
+			}
+			namedGets.Add(1)
+			permissionReply(w, permissionNamespace(name, name+"-uid"))
+		}
+		return true
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	start := time.Now()
+	s, err := f.client.PermissionSnapshot(ctx)
+	t.Logf("cold baseline: %s, %d binding pages, %d targeted namespace pages, %d namespace GETs", time.Since(start), bindingPages.Load(), selectedLists.Load(), namedGets.Load())
+	if err != nil || len(s.Bindings) != distinct || selectedLists.Load() != bindingPages.Load() || namedGets.Load() != 0 {
+		t.Fatal("incomplete or unbatched baseline", len(s.Bindings), err)
+	}
+	for i, b := range s.Bindings {
+		if b.Resource.NamespaceUID != nsName(i)+"-uid" {
+			t.Fatal("wrong incarnation", i, b.Resource)
+		}
+	}
 }

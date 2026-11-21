@@ -240,3 +240,21 @@ func TestRetainedMultipleTeamsAndNewMembers(t *testing.T) {
 		t.Fatal("creator identity manufactured entitlement")
 	}
 }
+
+func TestCompleteProjectionChecksDenyAfterManyUnrelatedAssignments(t *testing.T) {
+	i, p, _, now := fixture()
+	deny := p.Allows[0]
+	for n := range 257 {
+		row := deny
+		row.Audience.SubjectID = fmt.Sprintf("foreign-%d", n)
+		row.Audience.AssignmentID = fmt.Sprintf("00000000-0000-4000-8000-%012d", n)
+		p.Denies = append(p.Denies, row)
+	}
+	if got := ContextEligibility(i, p, p.Target, now); !got.Eligible {
+		t.Fatal("unrelated denies obscured independent allow", got.Reason)
+	}
+	p.Denies = append(p.Denies, deny)
+	if got := ContextEligibility(i, p, p.Target, now); got.Eligible || got.Reason != "ExplicitDeny" {
+		t.Fatal("late matching deny lost", got.Reason)
+	}
+}

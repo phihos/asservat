@@ -15,10 +15,9 @@ import (
 // UIDs are read by name at startup and provider-produced keys and roots are
 // read from OpenBao, the mounted CA files and SQL.
 const (
-	HubAPIConfigFormat   = "asservat-hub-api-config/v1"
-	HubAPIConfigRoot     = "/run/asservat/hub-api"
-	HubAPIConfigFile     = "config.json"
-	HubAPIConfigMaxBytes = 128 << 10
+	HubAPIConfigFormat = "asservat-hub-api-config/v1"
+	HubAPIConfigRoot   = "/run/asservat/hub-api"
+	HubAPIConfigFile   = "config.json"
 	// HubAPIWorkerControlsFile is the hub-api config ConfigMap's second key,
 	// mounted into OwnerObservationProjectionRoot: the download-worker control
 	// catalog (OwnerWorkerTrust), empty in a Helm-rendered install.
@@ -72,7 +71,6 @@ type HubAPIConfig struct {
 type RemoteCluster struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
-	Standby   int    `json:"standby"`
 	Captures  int    `json:"captures"`
 }
 
@@ -151,7 +149,6 @@ type HubAPIPublic struct {
 	// Processing reads the capacity processing source <name>-processing-source.
 	Processing     bool                  `json:"processing,omitempty"`
 	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
-	Standby        int                   `json:"standby"`
 	Captures       int                   `json:"captures"`
 	// WorkloadRate is capacity.workload.dump: each workload's token bucket.
 	WorkloadRate         *CapacityDumpValues     `json:"workloadRate,omitempty"`

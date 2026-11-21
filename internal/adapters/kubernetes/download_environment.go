@@ -42,7 +42,7 @@ type DownloadEnvironmentSource struct {
 }
 
 func NewDownloadEnvironmentSource(c *PermissionClient, p *DownloadEnvironmentProtection, name, uid, root, installation string, installed []privacy.DownloadPath) (*DownloadEnvironmentSource, error) {
-	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(root) || !authorization.UUID(installation) || installed == nil || len(installed) > 32 {
+	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(root) || !authorization.UUID(installation) || installed == nil {
 		return nil, privacy.ErrInvalid
 	}
 	s := &DownloadEnvironmentSource{client: c, protection: p, name: name, uid: uid, root: root, installation: installation, paths: make(map[string]privacy.DownloadPath, len(installed))}

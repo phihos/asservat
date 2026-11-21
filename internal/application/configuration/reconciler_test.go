@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -31,6 +33,9 @@ type reconciliationFixture struct {
 
 func (f *reconciliationFixture) PermissionSnapshot(context.Context) (value.Snapshot, error) {
 	return f.snapshot, nil
+}
+func (f *reconciliationFixture) ClusterAccessBindings(context.Context) (value.Snapshot, error) {
+	return value.Snapshot{ClusterID: f.snapshot.ClusterID, ClusterBindings: f.snapshot.ClusterBindings, ObservedAt: f.snapshot.ObservedAt, FreshUntil: f.snapshot.FreshUntil}, nil
 }
 func (f *reconciliationFixture) PermissionTrust(context.Context) (PermissionTrust, error) {
 	f.trustCalls++
@@ -180,19 +185,93 @@ func TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner(t *testing.T) {
 		}
 	}
 }
-func TestBindingReconcilerListCannotSkipPendingOwner(t *testing.T) {
+func TestBindingReconcilerReadsPlatformTrustOncePerEpoch(t *testing.T) {
 	f, r := reconciliationTest(t)
-	s := &bindingRun{r: r}
-	if err := s.start(context.Background()); err != nil {
-		t.Fatal(err)
+	f.trust.FreshUntil, f.snapshot.FreshUntil = time.Time{}, time.Time{}
+	for epoch := 1; epoch <= 2; epoch++ {
+		s := &bindingRun{r: r}
+		f.storeFence.Sequence = 0
+		if err := s.start(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		for range 3 {
+			if err := s.refreshClusterBindings(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.accept(t.Context(), true); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.firstWatch.Close()
+		if f.trustCalls != epoch {
+			t.Fatalf("after %d epochs: %d trust reads", epoch, f.trustCalls)
+		}
 	}
-	f.snapshot.Bindings[0].Resource.ResourceVersion = "future-rv"
-	f.snapshot.ObservedAt = f.snapshot.ObservedAt.Add(time.Microsecond)
-	if err := s.refresh(context.Background()); !errors.Is(err, errWatchBehind) {
-		t.Fatal(err)
-	}
-	if len(f.accepted) != 1 || s.journal.Cursor() != f.snapshot.BindingResourceVersion {
-		t.Fatal("full list skipped watch history")
+}
+
+func TestBindingReconcilerIndependentBindingChangesAfterIdle(t *testing.T) {
+	for _, clusterFirst := range []bool{true, false} {
+		t.Run(fmt.Sprintf("cluster-first-%t", clusterFirst), func(t *testing.T) {
+			f, r := reconciliationTest(t)
+			clock := f.snapshot.ObservedAt
+			r.Now = func() time.Time { return clock }
+			s := &bindingRun{r: r}
+			if err := s.start(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			// Keep the original controller lease live while the watched bindings
+			// stay idle, as the running reconciler does between events.
+			for range 3 {
+				clock = clock.Add(20 * time.Second)
+				if !clock.Before(s.fence.LeaseUntil) {
+					t.Fatal("fixture missed the controller lease renewal")
+				}
+				f.storeFence.LeaseUntil = clock.Add(30 * time.Second)
+				renewed, err := f.RenewPermissions(t.Context(), s.fence)
+				if err != nil {
+					t.Fatal(err)
+				}
+				s.fence = renewed
+			}
+			f.snapshot.ObservedAt, f.snapshot.FreshUntil = clock, clock.Add(5*time.Second)
+			f.trust.ObservedAt, f.trust.FreshUntil = clock, clock.Add(5*time.Second)
+			direct := cloneBinding(f.snapshot.Bindings[0])
+			direct.Resource.ResourceVersion = "changed-direct"
+			direct.Resource.Generation++
+			direct.Resource.SpecDigest[0]++
+			direct.Subjects[0].ID = "new-direct-owner"
+			f.snapshot.Bindings = []value.Binding{direct}
+			cluster := value.Binding{Resource: value.Resource{ClusterID: f.snapshot.ClusterID, Kind: value.ClusterAccessBindingKind, Name: "fleet-deny", UID: "cluster-deny", Generation: 1, ResourceVersion: "1", SpecDigest: artifact.Digest{7}}, Effect: "Deny", Subjects: []value.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "group"}}, Roles: []string{"evidence-reader"}, Scope: value.Scope{ClusterID: f.snapshot.ClusterID, Namespace: value.AllNamespaces}}
+			f.snapshot.ClusterBindings = []value.Binding{cluster}
+			changeDirect := func() {
+				t.Helper()
+				if err := s.journal.Apply(value.BindingEvent{Type: "MODIFIED", ResourceVersion: direct.Resource.ResourceVersion, Binding: &direct}); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.accept(t.Context(), false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			changeCluster := func() {
+				t.Helper()
+				if err := s.refreshClusterBindings(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if clusterFirst {
+				changeCluster()
+				changeDirect()
+			} else {
+				changeDirect()
+				changeCluster()
+			}
+			if len(f.accepted) != 3 || f.accepted[2].ExpectedSequence != 2 || len(f.accepted[2].Bases) != 2 || f.accepted[2].Epoch != f.accepted[0].Epoch {
+				t.Fatal("independent changes lost or fenced", f.accepted)
+			}
+			if clusterFirst && (f.accepted[1].Bases[0].Subjects[0].ID == "new-direct-owner" || len(f.accepted[1].Bases) != 2) {
+				t.Fatal("cluster LIST skipped a direct watch transition")
+			}
+		})
 	}
 }
 
@@ -216,4 +295,185 @@ func TestBindingReconcilerNamesTheStoppingPhase(t *testing.T) {
 			}
 		})
 	}
+}
+
+type expiryPermissionStore struct {
+	*reconciliationFixture
+	transitions chan value.PermissionBatch
+}
+
+func (s expiryPermissionStore) AcceptPermissions(ctx context.Context, b value.PermissionBatch) (value.PermissionAcceptance, error) {
+	a, err := s.reconciliationFixture.AcceptPermissions(ctx, b)
+	if err == nil {
+		s.transitions <- b
+	}
+	return a, err
+}
+
+func TestBindingExpiresDuringQuietWatch(t *testing.T) {
+	f, r := reconciliationTest(t)
+	start := time.Now()
+	base := r.Now()
+	r.Now = func() time.Time { return base.Add(time.Since(start)) }
+	f.snapshot.Bindings[0].NotAfter = base.Add(150 * time.Millisecond)
+	store := expiryPermissionStore{f, make(chan value.PermissionBatch, 2)}
+	r.Store = store
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- r.Run(ctx) }()
+	for _, want := range []int{1, 0} {
+		select {
+		case b := <-store.transitions:
+			if len(b.Bases) != want {
+				t.Fatal("accepted bases", len(b.Bases), "want", want)
+			}
+		case <-ctx.Done():
+			t.Fatal("missing expiry transition", ctx.Err())
+		}
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}
+
+func TestReconcilerRetriesIncompleteSourcesWithoutAnotherChange(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f, r := reconciliationTest(t)
+		store := expiryPermissionStore{f, make(chan value.PermissionBatch, 4)}
+		r.Store = store
+		var reads atomic.Int32
+		r.ReadSources = func(context.Context) (value.Snapshot, error) {
+			if reads.Add(1) == 2 {
+				return value.Snapshot{}, value.ErrUnavailable
+			}
+			return value.Snapshot{Sources: []value.Source{inheritanceSource()}, SourcesComplete: true, SourceResourceVersion: "1"}, nil
+		}
+		changes := make(chan struct{}, 1)
+		r.WatchConfiguration = func(_ context.Context, resource, rv string) (SettingsWatch, error) {
+			if resource == "permissionsources" {
+				return SettingsWatch{Changed: changes}, nil
+			}
+			return SettingsWatch{}, nil
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+		defer cancel()
+		s := &bindingRun{r: r}
+		if err := s.start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		assertBatch := func(incomplete bool) {
+			t.Helper()
+			select {
+			case b := <-store.transitions:
+				if b.SourcesUnavailable != incomplete || len(b.Bases) != 1 {
+					t.Fatal("unexpected source or explicit binding state", b.SourcesUnavailable, len(b.Bases))
+				}
+			case <-ctx.Done():
+				t.Fatal("no source transition")
+			}
+		}
+		assertBatch(true)
+		renewal := time.NewTimer(time.Hour)
+		defer renewal.Stop()
+		done := make(chan error, 1)
+		go func() { done <- s.consume(ctx, &fixtureWatch{}, renewal) }()
+		defer func() { cancel(); <-done }()
+		assertBatch(false)
+		changes <- struct{}{}
+		assertBatch(true)
+		renewal.Reset(0)
+		assertBatch(false)
+		// After the source LIST succeeds, another renewal performs no LIST.
+		for range 2 {
+			renewal.Reset(0)
+			synctest.Wait()
+		}
+
+		if reads.Load() != 3 {
+			t.Fatalf("observed %d snapshots; want initial, incomplete, and recovery", reads.Load())
+		}
+	})
+}
+
+type blockedBindingOpen struct {
+	opening chan struct{}
+	release chan struct{}
+}
+
+func (w blockedBindingOpen) WatchBindings(ctx context.Context, _ string) (BindingWatch, error) {
+	close(w.opening)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-w.release:
+		return nil, value.ErrDenied
+	}
+}
+
+func TestReplacementBindingListCannotGrantBeforeItsWatchOpens(t *testing.T) {
+	f, r := reconciliationTest(t)
+	w := blockedBindingOpen{make(chan struct{}), make(chan struct{})}
+	r.Watcher = w
+	done := make(chan PermissionEpochResult, 1)
+	go func() { done <- r.RunEpoch(t.Context()) }()
+	<-w.opening
+	f.mu.Lock()
+	accepted := len(f.accepted)
+	f.mu.Unlock()
+	close(w.release)
+	result := <-done
+	if accepted != 0 || !result.Suspended || !errors.Is(result.Err, value.ErrDenied) {
+		t.Fatal("listed grant before watch admission", accepted, result)
+	}
+}
+
+type slowFirstPublication struct {
+	*reconciliationFixture
+	renewals chan time.Time
+}
+
+func (f *slowFirstPublication) AcceptPermissions(ctx context.Context, b value.PermissionBatch) (value.PermissionAcceptance, error) {
+	time.Sleep(12 * time.Second)
+	return f.reconciliationFixture.AcceptPermissions(ctx, b)
+}
+func (f *slowFirstPublication) RenewPermissions(ctx context.Context, fence value.PermissionFence) (value.PermissionFence, error) {
+	f.renewals <- time.Now()
+	if !time.Now().Before(fence.LeaseUntil) {
+		return value.PermissionFence{}, value.ErrChanged
+	}
+	f.storeFence.LeaseUntil = time.Now().Add(30 * time.Second)
+	return f.storeFence, nil
+}
+func TestFirstPermissionLeaseRenewalAfterSlowPublication(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f, r := reconciliationTest(t)
+		start := time.Now()
+		r.Now = time.Now
+		f.storeFence.LeaseUntil = start.Add(30 * time.Second)
+		f.trust.ObservedAt, f.trust.FreshUntil = start, time.Time{}
+		f.snapshot.ObservedAt, f.snapshot.FreshUntil = start, time.Time{}
+		store := &slowFirstPublication{f, make(chan time.Time, 2)}
+		r.Store = store
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- r.Run(ctx) }()
+		for _, want := range []time.Duration{20 * time.Second, 40 * time.Second} {
+			select {
+			case got := <-store.renewals:
+				if got.Sub(start) != want {
+					t.Errorf("renewal after %s; want %s", got.Sub(start), want)
+					cancel()
+					<-done
+					return
+				}
+			case err := <-done:
+				t.Fatalf("reconciliation ended before renewal: %v", err)
+			}
+		}
+		cancel()
+		<-done
+	})
 }

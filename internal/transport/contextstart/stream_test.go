@@ -60,7 +60,7 @@ func TestContextStreamSpendsFiniteFrameBudgetAcrossDirections(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer s.Close()
-	for n := 0; n < contracts.APIContextMaximumFrames; n++ {
+	for n := 0; n < contracts.APIContextMaximumWorkFrames; n++ {
 		if n%2 == 0 {
 			written := make(chan error, 1)
 			go func() {

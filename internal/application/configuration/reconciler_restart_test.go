@@ -34,13 +34,13 @@ func (s *restartPermissionStore) BeginPermissions(ctx context.Context, root, epo
 }
 func (s *restartPermissionStore) PermissionSnapshot(ctx context.Context) (value.Snapshot, error) {
 	s.snapshots++
-	// Each controlled complete LIST is a new observation of the same object
-	// versions; a fixed timestamp would correctly wait for watch catch-up.
-	s.snapshot.ObservedAt = s.snapshot.ObservedAt.Add(time.Microsecond)
 	return s.reconciliationFixture.PermissionSnapshot(ctx)
 }
-func (s *restartPermissionStore) RefreshPermissions(context.Context, value.PermissionBatch) error {
-	return s.refreshErr
+func (s *restartPermissionStore) ClusterAccessBindings(ctx context.Context) (value.Snapshot, error) {
+	if s.refreshErr != nil {
+		return value.Snapshot{}, s.refreshErr
+	}
+	return s.reconciliationFixture.ClusterAccessBindings(ctx)
 }
 func (s *restartPermissionStore) SuspendPermissions(ctx context.Context, fence value.PermissionFence) error {
 	if len(s.begun) == 0 || fence.Epoch != s.begun[len(s.begun)-1].Epoch {
@@ -107,9 +107,14 @@ func TestPermissionEpochRestartRebuildsGuardListAndJournal(t *testing.T) {
 	f, r := reconciliationTest(t)
 	store := &restartPermissionStore{reconciliationFixture: f, refreshErr: value.ErrUnavailable}
 	r.Store, r.Reader = store, store
+	changes := make(chan struct{}, 1)
+	changes <- struct{}{}
+	r.WatchConfiguration = func(context.Context, string, string) (SettingsWatch, error) {
+		return SettingsWatch{Changed: changes}, nil
+	}
 	firstCtx, stopFirst := context.WithTimeout(t.Context(), 3*time.Second)
 	defer stopFirst()
-	first := r.RunEpoch(firstCtx) // Existing one-second tick reaches refresh.
+	first := r.RunEpoch(firstCtx)
 	if !first.Suspended || !errors.Is(first.Err, value.ErrUnavailable) || len(f.accepted) != 1 || len(store.begun) != 1 {
 		t.Fatal("failed original refresh did not close its epoch", first)
 	}

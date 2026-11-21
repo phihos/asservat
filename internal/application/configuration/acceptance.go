@@ -13,9 +13,6 @@ type PermissionStore interface {
 	BeginPermissions(context.Context, string, string, artifact.Digest) (value.PermissionFence, error)
 	RenewPermissions(context.Context, value.PermissionFence) (value.PermissionFence, error)
 	AcceptPermissions(context.Context, value.PermissionBatch) (value.PermissionAcceptance, error)
-	// Refresh renews only a freshly re-observed identical complete projection.
-	// It does not append a new assignment or audit event for polling heartbeats.
-	RefreshPermissions(context.Context, value.PermissionBatch) error
 	SuspendPermissions(context.Context, value.PermissionFence) error
 }
 

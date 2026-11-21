@@ -67,14 +67,28 @@ spec:
         apiVersions: ["*"]
         operations: [CREATE, UPDATE]
         resources: [accessbindings, clusteraccessbindings]
+  variables:
+    # ClusterAccessBinding admission requests omit namespace. An empty RBAC
+    # namespace asks for a cluster-wide bind, as for a ClusterRoleBinding.
+    - name: bindingNamespace
+      expression: "has(request.namespace) ? request.namespace : ''"
+    - name: unchangedSpec
+      expression: "request.operation == 'UPDATE' && object.spec == oldObject.spec"
   validations:
-    # Only roles and automation that a write adds or changes need bind, as for
-    # RoleBindings; metadata-only updates (finalizers, labels) pass.
-    - expression: "!has(object.spec.roles) || object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind').allowed())"
-      messageExpression: "'granting ' + (has(object.spec.roles) ? object.spec.roles.join(', ') : '') + ' needs the bind verb on accessroles.asservat.io with each role name in namespace ' + request.namespace"
+    # Match the permission_assignment byte bounds and verified identity text.
+    - expression: >-
+        variables.unchangedSpec || object.spec.subjects.all(s,
+          size(bytes(s.id)) <= 256 && !s.id.matches(r'\p{Cc}') &&
+          (!has(s.issuer) || (size(bytes(s.issuer)) <= 2048 && !s.issuer.matches(r'\p{Cc}'))))
+      message: "Subject IDs must fit 256 UTF-8 bytes and issuers 2048 bytes. Both must be free of control characters."
+      reason: Invalid
+    # Like RoleBinding admission, recheck bind at this scope when a writer
+    # changes the grant. Metadata-only updates can finish without it.
+    - expression: "variables.unchangedSpec || !has(object.spec.roles) || object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind').allowed())"
+      messageExpression: "'granting ' + (has(object.spec.roles) ? object.spec.roles.join(', ') : '') + ' needs the bind verb on accessroles.asservat.io with each role name at the binding scope'"
       reason: Forbidden
-    - expression: "!has(object.spec.automation) || (request.operation == 'UPDATE' && has(oldObject.spec.automation) && object.spec.automation == oldObject.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name('automation').check('bind').allowed()"
-      messageExpression: "'spec.automation needs the bind verb on accessroles.asservat.io named automation in namespace ' + request.namespace"
+    - expression: "variables.unchangedSpec || !has(object.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name('automation').check('bind').allowed()"
+      messageExpression: "'spec.automation needs the bind verb on accessroles.asservat.io named automation at the binding scope'"
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

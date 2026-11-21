@@ -57,7 +57,7 @@ func BuildHubWorkerWorkload(p HubWorkerWorkloadPlan) (*HubWorkerWorkload, error)
 	labels := map[string]string{"app.kubernetes.io/name": "asservat", "asservat.io/private-role": "hub-worker", "asservat.io/workload": p.Name}
 	selector := map[string]string{"asservat.io/private-role": "hub-worker", "asservat.io/workload": p.Name}
 	files := []core.KeyToPath{}
-	for _, name := range []string{"sql-fleet.json", "sql-configuration.json", "sql-audit.json", "audit-storage.json", "audit-wrap.token", "audit-unwrap.token"} {
+	for _, name := range []string{"sql-fleet.json", "sql-configuration.json", "audit-storage.json", "audit-wrap.token", "audit-unwrap.token"} {
 		files = append(files, core.KeyToPath{Key: name, Path: name})
 	}
 	projections := []core.VolumeProjection{

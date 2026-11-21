@@ -36,7 +36,7 @@ type Subject struct{ Kind, Issuer, ID string }
 // ClusterAccessBindingKind is the cluster-scoped AccessBinding (ADR-335 D14).
 // Its bases cover AllNamespaces of each cluster it names, or each namespace
 // its NamespaceSelector matches.
-const ClusterAccessBindingKind = "ClusterAccessBinding"
+const ClusterAccessBindingKind = authorization.ClusterAccessBindingKind
 
 // AllNamespaces is the namespace of a ClusterAccessBinding basis.
 var AllNamespaces = NamespaceRef{Name: "*", UID: "*"}
@@ -65,6 +65,9 @@ type Binding struct {
 	// Invalid marks a stored binding whose spec failed validation: it grants
 	// and denies nothing and only keeps its identity in the journal.
 	Invalid bool `json:",omitempty"`
+	// UnavailableDeny retains the scope and identity of a legacy Deny whose
+	// subjects cannot be represented. Other clusters remain evaluable.
+	UnavailableDeny bool `json:",omitempty"`
 }
 type Protection struct{ Mode, ReviewRef, GuardRef string }
 type Mapping struct {
@@ -100,11 +103,11 @@ type AdmissionParity struct{ Mode, ReviewRef, AdapterRef string }
 // resource kinds, an admission receipt, or a SQL accepted projection. RVs are
 // opaque. Status/field managers/writer annotations are deliberately absent.
 type Snapshot struct {
-	ClusterID                                     string
-	ControlNamespace                              NamespaceRef
-	BindingResourceVersion, SourceResourceVersion string
-	ObservedAt, FreshUntil                        time.Time
-	Bindings                                      []Binding
+	ClusterID                                                                    string
+	ControlNamespace                                                             NamespaceRef
+	BindingResourceVersion, ClusterBindingResourceVersion, SourceResourceVersion string
+	ObservedAt, FreshUntil                                                       time.Time
+	Bindings                                                                     []Binding
 	// ClusterBindings are the hub cluster's ClusterAccessBindings, one
 	// binding per cluster each covers (ADR-335 D14).
 	ClusterBindings []Binding

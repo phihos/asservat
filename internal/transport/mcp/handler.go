@@ -33,8 +33,8 @@ const (
 	MaxResponseBytes = 64 << 10
 	// Only the16-source preview has a larger SDK text+structured result frame.
 	MaxResultBoundResponseBytes = presentation.OperationResultBoundFrameLimit
-	MaxGrantReviewResponseBytes          = presentation.OperationGrantReviewFrameLimit
-	maxNesting                           = 32
+	MaxGrantReviewResponseBytes = presentation.OperationGrantReviewFrameLimit
+	maxNesting                  = 32
 	// toolsListBudget bounds the encoded tools of one tools/list page. The
 	// rest of MaxResponseBytes covers the JSON-RPC envelope, cursor and cache
 	// fields; every single descriptor must fit it (tested).

@@ -41,3 +41,49 @@ func TestPlanDigestStableAcrossPreviewsAndRequest(t *testing.T) {
 		t.Fatal("request scope recomputed another plan or reused preview IDs", err)
 	}
 }
+
+// Lookup precedes recomputation so an exact retry also works after the target disappears.
+func TestReviewedReplayBindsSubmittedInput(t *testing.T) {
+	f := newInvestigationFixture()
+	ctx := t.Context()
+	source := f.source(t, ctx)
+	scoped, digest := WithPlanScope(ctx)
+	r, err := f.svc.Preview(scoped, source, f.intent())
+	if err != nil {
+		t.Fatal(err)
+	}
+	recompute := func(ctx context.Context) (value.ContextPreview, error) {
+		r, err := f.svc.Preview(ctx, source, f.intent())
+		return r.Preview, err
+	}
+	const body = `{"preview":{"requested_retention_seconds":60}}`
+	request := CaptureRequest{Key: "same-key", Plan: digest(r.Preview), Submission: []byte(body), Preview: recompute}
+	original, err := f.svc.Request(ctx, source, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Preview = func(context.Context) (value.ContextPreview, error) {
+		t.Fatal("replay recomputed the plan")
+		return value.ContextPreview{}, nil
+	}
+	replay, err := f.svc.Request(ctx, source, request)
+	if err != nil || !replay.Replay || replay.CaptureID != original.CaptureID {
+		t.Fatal(replay, err)
+	}
+	for _, body := range []string{`{"preview":{"requested_retention_seconds":61}}`, `{"preview":{"requested_retention_seconds":60},"result_access":{"operations":["download"]}}`} {
+		request.Submission = []byte(body)
+		if _, err = f.svc.Request(ctx, source, request); !errors.Is(err, value.ErrConflict) {
+			t.Fatalf("changed input under accepted key: %v", err)
+		}
+	}
+	// Pre-fingerprint admissions used only the plan and key and cannot establish
+	// an exact match. Their key remains occupied on upgrade.
+	request.Key, request.Submission, request.Preview = "old-key", nil, recompute
+	if _, err = f.svc.Request(ctx, source, request); err != nil {
+		t.Fatal(err)
+	}
+	request.Submission = []byte(body)
+	if _, err = f.svc.Request(ctx, source, request); !errors.Is(err, value.ErrConflict) || f.admissions.Load() != 2 {
+		t.Fatal("pre-fingerprint admission replay", err, f.admissions.Load())
+	}
+}

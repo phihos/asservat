@@ -54,7 +54,7 @@ func TestSourceBatchOneRouterQueryPreservesOrderPartialRefusalAndOriginalAsOf(t 
 	now := values[0].Recorder.Target.ObservedAt
 	work := workFixture()
 	cluster := requests[0].Target.ClusterID
-	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 	if err != nil {
 		t.Fatal(err)
 	}

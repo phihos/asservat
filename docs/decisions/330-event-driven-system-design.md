@@ -51,10 +51,8 @@ remotedialer.
 
 - One installation CA (cert-manager or Helm-generated) issues the hub
   replicas' serving/client certificates; replicas use plain mTLS.
-- Each cluster has one connector identity: a bootstrap token issues the
-  first certificate, then the connector rotates it with a certificate
-  signing request before expiry. Precedent: kubelet TLS bootstrapping, OCM
-  cluster registration.
+- Each cluster has one standing connector registration. Its connector presents
+  a projected ServiceAccount token to the hub. [ADR-334](334-connector-workload-identity.md).
 - In-cluster Asservat workloads (collector, download/query readers)
   authenticate with an audience-bound projected ServiceAccount token
   checked once per connection by TokenReview, then mTLS or the established

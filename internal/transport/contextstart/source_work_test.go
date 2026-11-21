@@ -138,7 +138,7 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			recordings := &sourceRecordingCanceller{fail: mode == "recording-cancel-refused"}
 			region.sourceWork = &SourceLocal{Recordings: recordings, Queue: queue, Snapshots: snapshots, Profiles: profiles}
 			cluster := r.Channel.Connector.Binding.ClusterID
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{cluster, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

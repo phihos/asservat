@@ -101,11 +101,22 @@ func TestDownloadPathTemplateRejects(t *testing.T) {
 			t.Fatal(name, "pinned path ID accepted beside the derived path")
 		}
 	}
-	many := make([]string, 33)
+}
+
+func TestDownloadPathForEveryRegisteredCluster(t *testing.T) {
+	installation, hub := pathID(1), pathID(2)
+	tmpl := syntheticPathTemplate(hub)
+	many := make([]string, 65)
 	for i := range many {
 		many[i] = pathID(100 + i)
 	}
-	if _, err := downloadEnvironmentPaths(installation, hub, []contracts.DownloadEnvironmentPath{}, &tmpl, many); err == nil {
-		t.Fatal("more than 32 paths accepted")
+	paths, err := downloadEnvironmentPaths(installation, hub, []contracts.DownloadEnvironmentPath{}, &tmpl, many)
+	if err != nil || len(paths) != len(many) {
+		t.Fatalf("derived %d paths for %d targets: %v", len(paths), len(many), err)
+	}
+	for i, target := range many {
+		if paths[i].TargetClusterID != target || paths[i].ID != contracts.DownloadPathFor(installation, tmpl, target).ID {
+			t.Fatalf("wrong path for target %s", target)
+		}
 	}
 }

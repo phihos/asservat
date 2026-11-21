@@ -137,11 +137,18 @@ func hubRoots(ctx context.Context, in *providerInputs) (*x509.CertPool, error) {
 // completes c with them.
 func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c contracts.ConnectorConfig) (regionalConfig, error) {
 	out := regionalConfig{ConnectorConfig: c}
-	frame, err := channel.Run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeSettings, OperationID: uuid.NewString()}, nil)
+	frame, err := channel.Run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeSettings, Protocol: contracts.ConnectorProtocolMajor, OperationID: uuid.NewString()}, nil)
+	var mismatch *connectorlifecycle.ProtocolMismatch
+	if errors.As(err, &mismatch) {
+		return out, &fixedStepError{"hub-settings", mismatch}
+	}
 	if err != nil || frame.Kind != "result" || frame.Settings == nil {
 		return out, &fixedStepError{"hub-settings", errors.Join(mounts.ErrUnavailable, errRegionalChannel)}
 	}
 	s := *frame.Settings
+	if s.Protocol != contracts.ConnectorProtocolMajor {
+		return out, &fixedStepError{"hub-settings", &connectorlifecycle.ProtocolMismatch{Required: s.Protocol, Announced: contracts.ConnectorProtocolMajor}}
+	}
 	o := s.Offer
 	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) || s.ClusterID == s.PeerID {
 		return out, &fixedStepError{"hub-settings/fields", mounts.ErrUnavailable}
@@ -162,7 +169,7 @@ func readHubSettings(ctx context.Context, channel *connectorlifecycle.Client, c 
 	out.evidence, out.history = s.Evidence, s.History
 	st, k := out.store, out.keys
 	if !ownerEndpoint(st.Endpoint) || !identity.Text(st.Region, 128) || !identity.Text(st.Bucket, 63) || !authorization.UUID(st.StoreID) || !ownerEndpoint(k.Endpoint) ||
-		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() || !ownerDialAddress(out.owners.Address) {
+		!(authorization.KeyScope{InstallationID: o.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() {
 		return out, &fixedStepError{"hub-settings/executor", mounts.ErrUnavailable}
 	}
 	for _, x := range []contracts.OwnerStorageCredential{out.evidence, out.history} {

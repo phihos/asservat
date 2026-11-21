@@ -11,9 +11,11 @@ import (
 const (
 	APIContextStartPath  = "/internal/v1/context/start-exchange"
 	APIContextStartMedia = "application/vnd.asservat.api-context-exchange.v1"
-	// Hello, work, at most sixteen ADR-171 operation pairs, result, receipt,
-	// the ADR-178 source frames and the ADR-179 query pairs.
-	APIContextMaximumFrames        = 36 + APIContextMaximumSourceFrames + 2*APIContextMaximumQueries
+	// A capture uses Hello, work, at most sixteen operation pairs, result,
+	// receipt and six source identity frames. Each pre-work query has its
+	// own source and query pairs within the same exchange byte budget.
+	APIContextMaximumWorkFrames    = 4 + 2*APIContextMaximumOperations + 6
+	APIContextFramesPerQuery       = 4
 	APIContextMaximumExchangeBytes = 2 << 20
 )
 
@@ -47,17 +49,7 @@ const (
 	HistoryReceiptFrame
 )
 
-// ADR-178 source frames per exchange: one after Hello, a request and reply at
-// attach and at work send, one immediately before the result, and a request
-// and reply before each ADR-179 query.
-const (
-	APIContextMaximumSourceFrames = 6 + 2*APIContextMaximumQueries
-	APIContextSourceBytes         = 64 << 10
-)
-
-// ADR-179 pre-work target queries reuse the operation and reply DTOs; their
-// sequence counts queries, 1 to APIContextMaximumQueries.
-const APIContextMaximumQueries = 8
+const APIContextSourceBytes = 64 << 10
 
 // ADR-171 hub-run execution: one regional operation per request/response.
 const (
@@ -135,7 +127,7 @@ type APIContextHello struct {
 	// Original connector conversation end; availability only, never authority.
 	StandbyUntil time.Time `json:"standbyUntil"`
 	// Protocol is the connector's ConnectorProtocolMajor and Capabilities the
-	// operations and queries it answers (ADR-333). The hub sends only announced
+	// operations and queries it answers (ADR-334). The hub sends only announced
 	// ones; they are availability facts, never authority.
 	Protocol     int      `json:"protocol,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
@@ -181,7 +173,7 @@ func EncodeAPIContextOperation(v APIContextOperation) ([]byte, error) {
 }
 func DecodeAPIContextOperation(b []byte) (APIContextOperation, error) {
 	v, e := decodeOpenRPC[APIContextOperation](bytes.NewReader(b), APIContextOperationBytes)
-	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence > APIContextMaximumOperations || v.Method == "" || len(v.Method) > 32 {
+	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Method == "" || len(v.Method) > 32 {
 		return APIContextOperation{}, ErrAPIContextProtocol
 	}
 	return v, nil
@@ -191,7 +183,7 @@ func EncodeAPIContextOperationReply(v APIContextOperationReply) ([]byte, error) 
 }
 func DecodeAPIContextOperationReply(b []byte) (APIContextOperationReply, error) {
 	v, e := decodeOpenRPC[APIContextOperationReply](bytes.NewReader(b), APIContextOperationBytes)
-	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence > APIContextMaximumOperations || v.Method == "" || len(v.Failure) > 32 {
+	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Method == "" || len(v.Failure) > 32 {
 		return APIContextOperationReply{}, ErrAPIContextProtocol
 	}
 	return v, nil
@@ -251,7 +243,7 @@ func EncodeAPIContextSourceRequest(v APIContextSourceRequest) ([]byte, error) {
 }
 func DecodeAPIContextSourceRequest(b []byte) (APIContextSourceRequest, error) {
 	v, e := decodeOpenRPC[APIContextSourceRequest](bytes.NewReader(b), 1024)
-	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 || v.Sequence >= APIContextMaximumSourceFrames {
+	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 1 {
 		return APIContextSourceRequest{}, ErrAPIContextProtocol
 	}
 	return v, nil
@@ -261,7 +253,7 @@ func EncodeAPIContextSource(v APIContextSource) ([]byte, error) {
 }
 func DecodeAPIContextSource(b []byte) (APIContextSource, error) {
 	v, e := decodeOpenRPC[APIContextSource](bytes.NewReader(b), APIContextSourceBytes)
-	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 0 || v.Sequence >= APIContextMaximumSourceFrames || len(v.Source) == 0 {
+	if e != nil || v.Format != APIContextExchangeFormat || v.Sequence < 0 || len(v.Source) == 0 {
 		return APIContextSource{}, ErrAPIContextProtocol
 	}
 	return v, nil

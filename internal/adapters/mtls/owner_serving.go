@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/identity"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -186,8 +187,17 @@ func (p *OwnerRequestPeers) CheckNativeHub(ctx context.Context, operation permis
 		return time.Time{}, answerStep("serving/"+refused, value.ErrDenied, nil)
 	case !operation.CurrentValid(p.Authenticator.Now()):
 		return time.Time{}, answerStep("operation"+app.RemainingBucket(ctx, p.Authenticator.Now()), value.ErrDenied, nil)
-	case observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration || observed.Certificate.Binding.PodUID != operation.HubPodUID || observed.Certificate.Binding.ProcessEpoch != operation.HubProcessEpoch:
+	case observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration:
 		return time.Time{}, answerStep("placement", value.ErrDenied, nil)
+	}
+	binding := observed.Certificate.Binding
+	if binding.PodUID != operation.HubPodUID || binding.ProcessEpoch != operation.HubProcessEpoch {
+		binding.PodUID, binding.ProcessEpoch = operation.HubPodUID, operation.HubProcessEpoch
+		route, err := p.Authenticator.Routes.CurrentOwnerRoute(ctx, binding)
+		if err != nil || !route.Valid(p.Authenticator.Now()) || route.Endpoint.Binding != binding || route.Endpoint.Pool != observed.Pool {
+			return time.Time{}, answerStep("placement", value.ErrDenied, nil)
+		}
+		return time.Time{}, &contracts.NativeOwnerRoute{Addresses: route.Endpoint.Addresses}
 	}
 	return identity.Earlier(identity.Earlier(observed.ValidUntil, p.Authenticator.Now().Add(5*time.Second)), operation.Until), nil
 }

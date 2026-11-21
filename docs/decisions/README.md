@@ -628,13 +628,9 @@ all start operations until its original deadline, never renewed; capacity, guard
 CAS checks stay current. The connector-Deployment executor's local start now passes
 natively in 2.57 s of 5 s.
 
-[ADR-172 — Delegated owner discovery](172-delegated-owner-discovery.md) lets the
-regional process discover and authenticate hub owners without hub SQL. The federation
-channel answers owner candidates and the hub's own authentication facts; the region
-verifies its actual TLS session against them and dials one pinned endpoint with exact
-owner names. The federation process composes the hub-api's owner reads under a
-read-only role (ordinal 56) and the identical guard plan. Component-tested;
-installer projection, regional composition and native qualification pending.
+[ADR-172 — Authenticate the hub owner reached by a regional connector](172-delegated-owner-discovery.md)
+binds the connector's actual TLS session to the owner's current registration
+and route. Work notifications identify the owner that requested the exchange.
 
 [ADR-171 — Hub-run context execution](171-hub-run-context-execution.md) moves the
 API context runner and all its SQL/authority ports to the hub. The region answers
@@ -1209,12 +1205,6 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-330 — Event-driven system design](330-event-driven-system-design.md) replaces polling, expiring caches, per-request Jobs, private PKI layers, object-store audit pairs and spent-on-uncertain accounting with watches, pushes, LISTEN/NOTIFY, one connector connection, long-running readers, SQL audit rows and idempotency keys.
 
-- [ADR-331 — Joining workload clusters with `mode: cluster`](331-remote-cluster-join.md) registers clusters in the hub's values; the hub-api issues each one's join Secret (IDs, offer with external addresses and in-cluster server names, its own object-store capabilities, a one-use bootstrap), derives its context-start entry and topology, and the connector delivers its capacity observation over the lifecycle channel.
-
-- [ADR-332 — Standing connector identity](332-standing-connector-identity.md) makes the connector backing valid until replaced (no `validSeconds`), lets a cohort admit processes until the backing is replaced, stops counting earlier connector processes against retained/serving limits, removes the install-time connector counts (`accounts`, `profiles`, `sourceTransitions`, `recordsPerAccount`) and stops capping identity-lane audit records, so a connector enrolls at any time after install and clusters join without a reinstall; hub-api retries a not-yet-current owner configuration in-process.
-
-- [ADR-333 — Hub and connector version skew](333-connector-version-skew.md) removes the executor image/startup digest pin; the connector's Hello announces protocol major and capabilities, the hub refuses only unannounced requests ("connector too old for …"), cross-release decoders ignore unknown fields, and a connector may be one minor release older or newer than the hub.
-
-- [ADR-334 — Connectors authenticate with their cluster's ServiceAccount tokens](334-connector-workload-identity.md) removes join Secrets and connector certificate enrollment: the hub trusts each workload cluster's ServiceAccount issuer (discovery or public JWKS), connectors use one HTTPS endpoint through ordinary Ingress, with a kubeadm-style join token only as fallback.
+- [ADR-334 — Workload cluster registration and compatibility](334-connector-workload-identity.md) consolidates ADR-331 through ADR-334. The hub registers clusters by name and ServiceAccount issuer. Connectors authenticate over HTTPS, push cluster state and negotiate work by protocol major and capabilities.
 
 - [ADR-335 — Usable by default](335-usable-by-default.md) makes a default install work, removes install-time-fixed values, UUID entry, unnecessary second approvals and step-up, short human-facing deadlines and tiny caps, and adds off-cluster backup/restore, standard external-service setup and zero-downtime upgrades. It supersedes in part ADR-053, 059, 060, 228, 229, 232, 235, 236, 239, 245, 247, 249, 252, 253, 259, 291, 293, 304 and 305; each carries a note under its title.

@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -95,12 +94,6 @@ func ownerEndpoint(endpoint string) bool {
 	return err == nil && len(endpoint) <= 2048 && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Opaque == "" && u.RawQuery == "" && !u.ForceQuery && !strings.Contains(endpoint, "#") && u.RawPath == "" && (u.Path == "" || u.Path == "/")
 }
 
-// ownerDialAddress is a plain host:port a regional process dials.
-func ownerDialAddress(s string) bool {
-	host, port, err := net.SplitHostPort(s)
-	number, perr := strconv.Atoi(port)
-	return err == nil && perr == nil && host != "" && len(host) <= 253 && number >= 1 && number <= 65535 && !strings.ContainsAny(host, "/\\@?#% \t\r\n")
-}
 func ownerHTTP(endpoint string, raw [][]byte) (*http.Client, error) {
 	return ownerHTTPNamed(endpoint, "", raw)
 }

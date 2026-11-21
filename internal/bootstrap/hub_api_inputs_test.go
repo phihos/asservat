@@ -62,7 +62,7 @@ func hubAPIConfigFixture() contracts.HubAPIConfig {
 		Observation: contracts.HubAPIObservation{LocalCapacity: &contracts.HubAPILocalCapacity{Keys: []string{"asservat-trial"}}},
 		Native:      contracts.HubAPINative{WorkerNamespaces: []string{"asservat-downloads"}},
 		Public: &contracts.HubAPIPublic{Origin: "https://asservat.example.test", BrowserAudience: "asservat-api",
-			Standby: 2, Captures: 1, PreviewSeconds: 120, DownloadPlan: contracts.OwnerPublicDownloadPlan{OutputLimit: 1 << 28, ReadLimit: 1 << 28},
+			Captures: 1, PreviewSeconds: 120, DownloadPlan: contracts.OwnerPublicDownloadPlan{OutputLimit: 1 << 28, ReadLimit: 1 << 28},
 			ProxyTLS: true, Version: "test", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4,
 			OperationAudit: contracts.OwnerPublicOperationAudit{NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10}}}
 }

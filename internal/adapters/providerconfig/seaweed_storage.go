@@ -11,10 +11,11 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const SeaweedConfigKey = "s3.json"
-const SeaweedConfigLimit = 768 << 10 // Below the existing Kubernetes Secret data limit.
+const SeaweedConfigLimit = corev1.MaxSecretSize // s3.json is mounted from a Kubernetes Secret.
 var ErrSeaweedStorage = errors.New("bundled object store configuration unavailable")
 var seaweedBucket = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 var seaweedPurposes = []string{"admin", "initial-audit", "configuration-audit", "owner-audit", "federation-audit", "download-read", "evidence-delete", "regional-write", "regional-history"}
@@ -52,11 +53,35 @@ func ValidateSeaweedCredential(c contracts.SeaweedCredential) error {
 type seaweedIdentity struct {
 	Name        string       `json:"name"`
 	Credentials []seaweedKey `json:"credentials"`
-	Actions     []string     `json:"actions"`
+	Actions     []string     `json:"actions,omitempty"`
+	PolicyNames []string     `json:"policyNames,omitempty"`
 }
 type seaweedKey struct {
 	Access string `json:"accessKey"`
 	Secret string `json:"secretKey"`
+}
+
+// ActiveSeaweedKeys recovers the keys from the hook's own installed IAM
+// document, including documents written before named policies were introduced.
+func ActiveSeaweedKeys(raw []byte) (map[string]contracts.OwnerStorageCredential, error) {
+	var doc struct{ Identities []seaweedIdentity }
+	if json.Unmarshal(raw, &doc) != nil || len(doc.Identities) == 0 {
+		return nil, ErrSeaweedStorage
+	}
+	keys := make(map[string]contracts.OwnerStorageCredential, len(doc.Identities))
+	for _, id := range doc.Identities {
+		if len(id.Credentials) != 1 {
+			return nil, ErrSeaweedStorage
+		}
+		key := id.Credentials[0]
+		keys[id.Name] = contracts.OwnerStorageCredential{AccessKeyID: key.Access, SecretAccessKey: key.Secret}
+	}
+	return keys, nil
+}
+
+type seaweedNamedPolicy struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 type seaweedPolicy struct {
 	Version   string           `json:"Version"`
@@ -75,14 +100,15 @@ type CompiledSeaweedStorage struct {
 // separately qualified exact Seaweed version.
 func CompileSeaweedStorage(admin contracts.SeaweedCredential, grants []contracts.SeaweedGrant) (CompiledSeaweedStorage, error) {
 	zero := CompiledSeaweedStorage{}
-	if ValidateSeaweedCredential(admin) != nil || admin.Principal.Purpose != "admin" || len(grants) > 4096 {
+	if ValidateSeaweedCredential(admin) != nil || admin.Principal.Purpose != "admin" {
 		return zero, ErrSeaweedStorage
 	}
 	name, _ := SeaweedPrincipalName(admin.Principal)
 	identities := []seaweedIdentity{{Name: name, Credentials: []seaweedKey{{admin.AccessKeyID, admin.SecretAccessKey}}, Actions: []string{"Admin", "Read", "Write", "List"}}}
 	names := map[string]bool{name: true}
 	keys := map[string]bool{admin.AccessKeyID: true}
-	policies := map[string]seaweedPolicy{}
+	bucketPolicies := map[string]seaweedPolicy{}
+	var identityPolicies []seaweedNamedPolicy
 	installation := ""
 	ordered := slices.Clone(grants)
 	slices.SortFunc(ordered, func(a, b contracts.SeaweedGrant) int {
@@ -104,21 +130,32 @@ func CompileSeaweedStorage(admin contracts.SeaweedCredential, grants []contracts
 			return zero, ErrSeaweedStorage
 		}
 		names[principal], keys[credential.AccessKeyID] = true, true
-		identities = append(identities, seaweedIdentity{Name: principal, Credentials: []seaweedKey{{credential.AccessKeyID, credential.SecretAccessKey}}, Actions: actions})
-		policy := policies[grant.Bucket]
-		policy.Version = "2012-10-17"
-		policy.Statement = append(policy.Statement, statements...)
-		policies[grant.Bucket] = policy
+		id := seaweedIdentity{Name: principal, Credentials: []seaweedKey{{credential.AccessKeyID, credential.SecretAccessKey}}, Actions: actions}
+		if regionalSeaweedPurpose(credential.Principal.Purpose) {
+			content, err := json.Marshal(seaweedPolicy{Version: "2012-10-17", Statement: statements})
+			if err != nil {
+				return zero, err
+			}
+			identityPolicies = append(identityPolicies, seaweedNamedPolicy{Name: principal, Content: string(content)})
+			id.PolicyNames = []string{principal}
+		} else {
+			policy := bucketPolicies[grant.Bucket]
+			policy.Version = "2012-10-17"
+			policy.Statement = append(policy.Statement, statements...)
+			bucketPolicies[grant.Bucket] = policy
+		}
+		identities = append(identities, id)
 	}
 	raw, err := json.Marshal(struct {
-		Identities []seaweedIdentity `json:"identities"`
-	}{identities})
+		Identities []seaweedIdentity    `json:"identities"`
+		Policies   []seaweedNamedPolicy `json:"policies,omitempty"`
+	}{identities, identityPolicies})
 	if err != nil || len(raw) > SeaweedConfigLimit {
 		clear(raw)
 		return zero, ErrSeaweedStorage
 	}
 	out := CompiledSeaweedStorage{Config: raw, Policies: map[string]json.RawMessage{}}
-	for bucket, policy := range policies {
+	for bucket, policy := range bucketPolicies {
 		b, err := json.Marshal(policy)
 		if err != nil || len(b) > SeaweedConfigLimit {
 			clear(out.Config)
@@ -127,6 +164,26 @@ func CompileSeaweedStorage(admin contracts.SeaweedCredential, grants []contracts
 		out.Policies[bucket] = b
 	}
 	return out, nil
+}
+
+func regionalSeaweedPurpose(purpose string) bool {
+	return purpose == "regional-write" || purpose == "regional-history"
+}
+
+// The bundled server evaluates attached identity policies from s3.json with
+// IAM HTTP disabled. Include every allowed operation here: unmatched requests
+// are denied. A regional principal adds no bytes to the shared bucket policy.
+func regionalSeaweedStatements(purpose, bucket, prefix string) []map[string]any {
+	resource := "arn:aws:s3:::" + bucket
+	objects := []string{"s3:PutObject", "s3:AbortMultipartUpload"}
+	if purpose == "regional-history" {
+		objects = append(objects, "s3:GetObject", "s3:GetObjectVersion", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:ListMultipartUploadParts")
+	}
+	statements := []map[string]any{{"Effect": "Allow", "Action": objects, "Resource": resource + "/" + prefix + "*"}}
+	if purpose == "regional-history" {
+		statements = append(statements, map[string]any{"Effect": "Allow", "Action": []string{"s3:ListBucket", "s3:ListBucketVersions", "s3:ListBucketMultipartUploads"}, "Resource": resource, "Condition": map[string]any{"StringLike": map[string]string{"s3:prefix": prefix + "*"}}})
+	}
+	return statements
 }
 
 func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) {
@@ -139,13 +196,16 @@ func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) 
 		}
 	}
 	purpose := g.Credential.Principal.Purpose
-	regional := purpose == "regional-write" || purpose == "regional-history"
+	regional := regionalSeaweedPurpose(purpose)
 	if regional && g.Credential.Principal.ScopeID != g.ClusterID || !regional && g.Credential.Principal.ScopeID != g.InstallationID {
 		return nil, nil, ErrSeaweedStorage
 	}
 	prefixes, read, write, list, err := seaweedScope(g)
 	if err != nil {
 		return nil, nil, err
+	}
+	if regional {
+		return nil, regionalSeaweedStatements(purpose, g.Bucket, prefixes[0]), nil
 	}
 	var actions []string
 	for _, prefix := range prefixes {
@@ -191,8 +251,6 @@ func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) 
 	switch purpose {
 	case "evidence-delete":
 		statements = append(statements, statement("Delete", "Allow", []string{"s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload"}, resources, nil), statement("Read", "Deny", []string{"s3:GetObject", "s3:GetObjectVersion"}, resource+"/*", nil), statement("Write", "Deny", []string{"s3:PutObject"}, resource+"/*", map[string]any{"StringNotEquals": map[string]any{"s3:RequestMethod": "DELETE"}}))
-	case "regional-history":
-		statements = append(statements, statement("History", "Allow", []string{"s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, resources, nil), statement("Evidence", "Deny", []string{"s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, resource+"/v1/*", nil))
 	default:
 		denied := []string{"s3:DeleteObject", "s3:DeleteObjectVersion"}
 		if !write {

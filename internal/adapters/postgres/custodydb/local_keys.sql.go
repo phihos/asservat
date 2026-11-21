@@ -33,26 +33,26 @@ func (q *Queries) InsertLocalKeyConfiguration(ctx context.Context, arg InsertLoc
 	return err
 }
 
-const insertLocalKeyVersion = `-- name: InsertLocalKeyVersion :exec
+const insertLocalKeyVersions = `-- name: InsertLocalKeyVersions :exec
 INSERT INTO local_key_version(installation_id,purpose,key_id,version,fingerprint)
-VALUES($1,$2,$3,$4,$5)
+SELECT $1, $2, $3, unnest($4::integer[]), unnest($5::bytea[])
 `
 
-type InsertLocalKeyVersionParams struct {
+type InsertLocalKeyVersionsParams struct {
 	InstallationID pgtype.UUID
 	Purpose        string
 	KeyID          string
-	Version        int32
-	Fingerprint    []byte
+	Versions       []int32
+	Fingerprints   [][]byte
 }
 
-func (q *Queries) InsertLocalKeyVersion(ctx context.Context, arg InsertLocalKeyVersionParams) error {
-	_, err := q.db.Exec(ctx, insertLocalKeyVersion,
+func (q *Queries) InsertLocalKeyVersions(ctx context.Context, arg InsertLocalKeyVersionsParams) error {
+	_, err := q.db.Exec(ctx, insertLocalKeyVersions,
 		arg.InstallationID,
 		arg.Purpose,
 		arg.KeyID,
-		arg.Version,
-		arg.Fingerprint,
+		arg.Versions,
+		arg.Fingerprints,
 	)
 	return err
 }
@@ -77,7 +77,7 @@ func (q *Queries) LockLocalKeyConfiguration(ctx context.Context, arg LockLocalKe
 
 const readLocalKeyVersions = `-- name: ReadLocalKeyVersions :many
 SELECT version,fingerprint FROM local_key_version
-WHERE installation_id=$1 AND purpose=$2 AND key_id=$3 ORDER BY version LIMIT 17
+WHERE installation_id=$1 AND purpose=$2 AND key_id=$3 ORDER BY version
 `
 
 type ReadLocalKeyVersionsParams struct {

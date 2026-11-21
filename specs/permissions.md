@@ -2,7 +2,43 @@
 
 This specification defines application permissions inside one organization; there is no tenant model. Read with [authorization](authorization.md), [targets](targets.md), [ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md), [ADR-335](../docs/decisions/335-usable-by-default.md) D4/D14 and the [research](../docs/research/permission-automation.md).
 
-Permission state reaches the evaluator through events ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1): the hub watches its own cluster with informers, and each remote connector watches its cluster and pushes changes. The hub keeps each cluster's last delivered set until the connector replaces it. Nothing here expires because time passed.
+The hub watches its own cluster. Each remote connector watches its cluster and
+pushes changed bindings. The evaluator includes every cluster that has delivered
+bindings. An empty replacement or registration withdrawal removes that cluster’s
+bindings. A remote cluster can author both AccessBindings in application namespaces
+and ClusterAccessBindings scoped to that cluster. Only the hub can target other
+clusters. Before its first complete observation, including after re-registration,
+a remote cluster cannot authorize fresh access even from an overlapping hub Allow.
+The connector reduces its Kubernetes LIST page size when a page exceeds its
+response budget. Each page has its own request timeout. The connector follows
+continuation tokens at the same list revision until completion or caller cancellation.
+Both hub and connector process each page as it arrives. Each reader looks up a
+namespace's identity and creation time once within the binding list. The hub
+batches new names on each page using Kubernetes' immutable namespace-name
+label. Connectors can use named GETs with their existing permissions. Both
+readers omit bindings from an earlier incarnation. An ordered hub
+watch event for such a binding retires its prior grant and advances the cursor.
+The connector counts the encoded envelope and both collections against the
+8 MiB transfer budget as it reads. Crossing it stops the read and reports the
+cluster unavailable. The connector waits on both metadata watches for changes
+before reading the oversized collection again. The hub applies the complete
+binding set within that budget.
+A connector starts with its cluster's delivery revision from the authenticated
+hub and uses each acknowledgement as the predecessor for its next read. Publication and digest confirmation
+require that exact predecessor. This applies to unavailable observations as well as complete snapshots. A competing update forces a fresh source read.
+The Kubernetes LIST holds neither a database connection nor a federation slot.
+Persisted assignments and recorded artifact audiences represent a subject
+ID in up to 256 UTF-8 bytes and its optional issuer in up to 2,048. Both fields
+exclude control characters. All proposed binding subjects must fit these fields,
+including during change preview. When reading previously stored bindings, an
+Allow retains every representable subject. A Deny
+with an unrepresentable subject makes its target clusters unavailable until
+correction or removal. A namespaced binding affects only its own cluster. A hub
+ClusterAccessBinding affects the registered clusters it names. Other clusters
+continue to use their own complete observations. If a connected cluster reports that its binding list cannot be read or
+exceeds the transfer budget, fresh operations in that cluster fail closed until a
+complete replacement arrives. Other clusters remain usable. Losing a connection leaves its last accepted delivery in effect.
+[ADR-330 D1](../docs/decisions/330-event-driven-system-design.md).
 
 ## REQ-PER-001 — Canonical permission configuration
 
@@ -14,7 +50,7 @@ A `ClusterAccessBinding` is the cluster-scoped equivalent, like a ClusterRoleBin
 
 A `PermissionSource` is an administrator-managed derivation rule for one cluster in the hub control namespace: `namespaceMetadata`, `workloadMetadata`, `kubernetesExec` or `kubernetesAccessReview`. Effective decisions are computed, never stored as grants per Pod or member. Existing objects take effect when first observed.
 
-Kubernetes RBAC decides who writes AccessBindings; the Asservat namespaces are administrator-only ([ADR-328](../docs/decisions/328-administrator-only-namespaces.md)). A Helm-rendered ValidatingAdmissionPolicy requires, on CREATE and UPDATE of an AccessBinding or ClusterAccessBinding, `bind` on the virtual resource `accessroles.asservat.io` named after each added or changed role (and `automation` for a changed `spec.automation`), as Kubernetes does for RoleBindings ([RBAC escalation prevention](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#privilege-escalation-prevention-and-bootstrapping)). The chart ships one `asservat-bind-<role>` ClusterRole per role plus `asservat-bind-automation`, and aggregates binding write access into the namespace `admin` ClusterRole and read access into `view`, `edit` and `admin`; `permissions.aggregateAutomation` also aggregates `asservat-bind-automation` into `admin`. DELETE is not checked. Denies override all allows, including shares. Optional `CollectionCeiling` rules restrict collection further; without them every namespace outside the chart's excluded system namespaces is collectable.
+Kubernetes RBAC decides who writes AccessBindings; the Asservat namespaces are administrator-only ([ADR-328](../docs/decisions/328-administrator-only-namespaces.md)). A Helm-rendered ValidatingAdmissionPolicy requires, when creating or changing the spec of an AccessBinding or ClusterAccessBinding, `bind` on the virtual resource `accessroles.asservat.io` for every role in the resulting grant (and `automation` if the grant includes it), as Kubernetes does for RoleBindings ([RBAC escalation prevention](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#privilege-escalation-prevention-and-bootstrapping)). The check uses the binding's scope. A namespaced RoleBinding can authorize an AccessBinding in that namespace. A ClusterAccessBinding requires cluster-wide bind authority. The chart aggregates ordinary binding writes and ordinary role delegation into namespace `admin`, and reads into `view`, `edit` and `admin`. Automation delegation is separately bindable. Operator-selectable aggregation of automation delegation is planned. DELETE is not checked. Denies override all allows, including shares. Optional `CollectionCeiling` rules restrict collection further; without them every namespace outside the chart's excluded system namespaces is collectable.
 
 | Role | Operations granted within scope |
 | --- | --- |
@@ -60,7 +96,12 @@ Each source names a protection mode:
 - `administratorManaged`: the administrator states that only trusted administrators or provisioners write namespaces and the relevant metadata.
 - `admissionEnforced`: the Helm-rendered namespace label ValidatingAdmissionPolicy stops non-administrators from creating namespaces with, or changing, the source's selector and mapping keys. Labels only; an annotation key is `SourceUnsupported`.
 
-The hub-worker and each connector watch namespaces with informers and push changed key values (as SHA-256 digests). A source grants nothing until its cluster's namespace metadata has reached the hub.
+The hub worker observes namespace metadata locally. Joined connectors are intended
+to deliver changed ownership key values as SHA-256 digests. Installed connectors
+currently deliver bindings only. Until a cluster's metadata arrives, its
+namespace-derived sources and selector-narrowed Allows grant nothing, and a
+selector-narrowed Deny covers that cluster. An unfiltered ClusterAccessBinding
+takes effect independently of namespace metadata.
 
 ### SC-PER-003
 
@@ -97,7 +138,7 @@ Given a user who can `create pods/exec` only for Pod A, when a selector resolves
 
 ## REQ-PER-005 — Workload ownership and integration adapters
 
-`workloadMetadata` applies the same mapping to Deployment/StatefulSet metadata in shared namespaces. It requires `admissionEnforced` (the chart renders the workload label ValidatingAdmissionPolicy when workload keys are configured) and a non-empty `workloadSelector`. Connectors watch matching workloads and push key values. Pods are never matched by labels: the workload is derived through the Pod's validated controller chain.
+`workloadMetadata` applies the same mapping to Deployment/StatefulSet metadata in shared namespaces. It requires `admissionEnforced` (the chart renders the workload label ValidatingAdmissionPolicy when workload keys are configured) and a non-empty `workloadSelector`. Connectors watch matching workloads and push key values. Pods are never matched by labels: the workload is derived through the Pod's validated controller chain. The evaluator supports this mapping. The installed connector does not yet deliver workload metadata, so these sources currently grant nothing.
 
 GitOps, Terraform, provisioners and service catalogs MAY manage AccessBindings through the Kubernetes API within their RBAC. Catalog ownership, CODEOWNERS, field managers and arbitrary labels are not permission evidence. No external catalog, policy engine or SCIM service is required.
 
@@ -109,9 +150,60 @@ Given two applications owned by different teams in one namespace, when protected
 
 An operation requires an eligible identity, a current allow, no deny, local ceilings and all grant/share conditions. Independent allows are unioned; no failure falls back to a broader role.
 
-The evaluator reads one snapshot: the hub cluster's informer caches and each remote cluster's last delivered state. It stays valid until an event replaces it. State that is not yet available (during a hub relist, or before a connector's first delivery) grants nothing and fails closed for that cluster. An operation reuses its snapshot for at most 30 s ([ADR-311](../docs/decisions/311-operation-authority-recheck.md)).
+The evaluator combines observed hub configuration and each remote cluster's
+last accepted bindings in one snapshot. An operation may reuse that snapshot
+for up to 30 seconds within its original deadlines. A failed database read
+cannot produce a partial fleet snapshot. [ADR-311](../docs/decisions/311-operation-authority-recheck.md).
+
+A healthy Kubernetes watch stays current while idle. Its total lifetime, bytes
+received across events and number of bindings do not invalidate the observation.
+After a normal watch restart, the hub can resume from the last resource version.
+If Kubernetes denies the watch or its history is lost, the hub withdraws access
+that depended on that observation until it has a new baseline and watch. Loss of
+namespace or PermissionSource history leaves independent explicit grants usable.
+Without a complete ClusterAccessBinding observation the hub cannot rule out a
+cluster-wide deny. It suspends the permission epoch. Incomplete sources are
+retried even if the objects have stayed unchanged.
+
+Concurrent deliveries from one connector must preserve the latest accepted
+observation. A connector whose original comparison has become stale rereads
+the cluster before retrying. Wall-clock differences between replicas cannot
+discard a committed change. Readers see assignment additions and retirements
+together. The hub processes namespaced AccessBinding events in order and reads
+the ClusterAccessBinding collection independently when it changes. The writer
+epoch and sequence order accepted changes. The writer schedules renewal from the
+accepted lease and projection deadlines, including time spent publishing the first
+batch. Idle lease renewal maintains
+freshness without rebuilding the fleet or advancing its sequence. PostgreSQL
+validates the lease on its own clock. A reader on a slower clock consumes the
+remaining lifetime without extending any lease, grant or review deadline.
+
+A permission mutation and its audit event commit in the same PostgreSQL transaction.
+An assignment keeps its ID, subject, issuer, role and source digest, together
+with its activation and retirement event IDs. Indexed source history preserves
+the binding revision, original scope, effect and automation envelope at a change,
+including when a binding is replaced or removed. Acceptance returns the controller
+lease deadline committed with that publication. A retry returns the same result
+and deadline even if the controller has renewed since then. Acceptances written
+before schema 7 have no recorded lease deadline. Replaying one returns its
+historical outcome with an unknown deadline. Migration suspends the old epoch.
+A decision recorded against a PermissionSource before its role changes retires
+with that revision. A new review uses the replacement role. During a bulk change,
+capture admission and download reservation in a healthy peer use the complete
+committed projection, including when the caller needs a first-time review
+against an unchanged PermissionSource. Publication and the operation's final
+authority check serialize at commit.
+
+Bindings watched from a Kubernetes resource version remain current until a
+replacement or definitive loss of watch history. A five-second Kubernetes or
+PostgreSQL I/O timeout applies to an individual operation. A multi-binding
+reconciliation, including the initial SQL read of joined-cluster deliveries,
+remains subject to its actual controller lease, earlier source or caller
+deadline, and each binding's expiry.
 
 Collection admits each source start once under one snapshot, bounded by every hard end (policy grant, binding `notAfter`, observation grant, local ceiling). When authority is removed the hub pushes a stop; a disconnected connector's source runs to its admitted hard end and gets the stop on reconnect.
+
+A labels-only or status update to a direct binding preserves its assignment IDs and access to earlier captures. The binding UID, generation, authority scope and spec still identify the same grant. Kubernetes advances the generation on a spec edit. [Custom resource generation](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#status-subresource).
 
 An artifact records its complete audience (REQ-PER-008). The audit row records the deciding bindings or sources with their generations.
 
@@ -127,7 +219,7 @@ Accepted executions live in SQL; CRD status is a projection. A controller never 
 
 ### SC-PER-007
 
-Given a developer who can create DebugCapture objects, when they set a forged requester or name a powerful service account, then no collection starts. A valid admission dry-run starts nothing. A GitOps edit of a DebugPolicy is attributed to the controller's identity, runs only within its envelope and needs review again when its intrusive execution scope changes. After a team policy's author leaves, that person cannot manage or read through former membership, while the team policy remains eligible. A deleted envelope, a sponsoring group without a current allow, a deny or a forged executor blocks execution. A namespace writer without `bind` on `automation` cannot add, change or remove an envelope.
+Given a developer who can create DebugCapture objects, when they set a forged requester or name a powerful service account, then no collection starts. A valid admission dry-run starts nothing. A GitOps edit of a DebugPolicy is attributed to the controller's identity, runs only within its envelope and needs review again when its intrusive execution scope changes. After a team policy's author leaves, that person cannot manage or read through former membership, while the team policy remains eligible. A deleted envelope, a sponsoring group without a current allow, a deny or a forged executor blocks execution. Adding or editing an envelope requires `bind` on `automation`. Removing the envelope withdraws the delegation and requires `bind` for the ordinary roles remaining in the binding.
 
 ## REQ-PER-008 — Ownership changes and retained evidence
 

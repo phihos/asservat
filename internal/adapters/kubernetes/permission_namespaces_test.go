@@ -95,7 +95,7 @@ func TestNamespaceListRejectsInconsistentPages(t *testing.T) {
 func TestNamespaceWatchDeliversOrderedReducedTransitions(t *testing.T) {
 	c := namespaceTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		if q.Get("watch") != "true" || q.Get("resourceVersion") != "100" || q.Get("timeoutSeconds") != "2" {
+		if q.Get("watch") != "true" || q.Get("resourceVersion") != "100" || q.Has("timeoutSeconds") || q.Has("timeout") {
 			t.Error("watch not resumed from the cursor", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")

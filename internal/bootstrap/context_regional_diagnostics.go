@@ -17,7 +17,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 		return
 	}
 	switch stage {
-	case "candidates", "candidates-empty", "open", "exchange":
+	case "work-stream", "open", "exchange":
 	default:
 		return
 	}
@@ -43,7 +43,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 	if cause != nil {
 		stage += " (" + regionalCause(cause) + ")"
 	}
-	// ADR-333: the hub's own explanation of a protocol refusal.
+	// ADR-334: the hub's own explanation of a protocol refusal.
 	var refusal *mtls.HubProtocolRefusal
 	if errors.As(cause, &refusal) {
 		stage += ": hub says: " + refusal.Message
@@ -71,7 +71,7 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 // The event is already restricted by reportFailure. Durations never enter the
 // count map: many differently timed refusals still share one bounded key.
 func contextStartOpeningLog(out io.Writer) func(string, time.Duration, time.Duration, string) {
-	log := timedEventLog(out, "regional context standby refused")
+	log := timedEventLog(out, "regional context exchange refused")
 	return func(event string, elapsed, remaining time.Duration, trace string) {
 		if trace != "" {
 			trace = " setup=[" + trace + "]"

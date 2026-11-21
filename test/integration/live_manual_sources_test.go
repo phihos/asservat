@@ -46,7 +46,7 @@ func TestLiveManualArgumentsSourceWithRealServices(t *testing.T) {
 }
 
 func withLiveManualSourceFixture(t *testing.T, mode string) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		hook := &liveManualStartedFixture{run: qualifyLiveManualStartedSource}
 		ctx = context.WithValue(ctx, liveManualFixtureKey{}, hook)
 		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, func(t *testing.T, _ *queryLedgerFixture) {

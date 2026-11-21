@@ -9,10 +9,10 @@ import "slices"
 const PublicRuntimeRetainedWorkerProcesses = 2
 const PublicRuntimeWorkerRoleConnections = PublicRuntimeRetainedWorkerProcesses + 1
 
-// ADR-170: connector-facing hub duties run in a separate federation process
-// kind, so they never count against the 32-connection hub replica budget.
-const PublicRuntimeRetainedFederationProcesses = 2
-const PublicRuntimeFederationRoleConnections = PublicRuntimeRetainedFederationProcesses + 1
+// Federation logins are shared by all replicas, including overlapping rollout
+// Pods. A process opens one pool connection per purpose and one LISTEN session
+// for work. PostgreSQL's -1 leaves the installation-wide capacity to the server.
+const PublicRuntimeFederationRoleConnections = -1
 
 func PublicRuntimeFederationPurposes() []string {
 	return []string{"connector-delivery", "connector-owner-read"}

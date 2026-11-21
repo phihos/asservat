@@ -1,110 +1,107 @@
-# ADR-334 — Connectors authenticate with their cluster's ServiceAccount tokens
+# ADR-334 — Workload cluster registration and compatibility
 
-Date: 2026-11-14. Status: accepted (maintainer decision: copying a Secret
-from the hub to a workload cluster is a no-go; "Let's go with your
-recommendation"; amended 2026-11-14: "Why do we need a UI for that or an API
-endpoint? We already have the JWT service account token setup. Why do we need
-a second way to accomplish that?"). Supersedes the join Secret, the one-use bootstrap record and
-connector certificate enrollment of ADR-331 and ADR-330 D3's connector
-bootstrap, and the four separately exposed connector endpoints of ADR-331.
+Accepted, 2026-11-14. Consolidates ADR-331 through ADR-334 before the first
+release. The maintainer requires clusters to join and reconnect without a
+copied Secret, a separate enrollment interface or lockstep image upgrades.
 
-## Decision
+## Registration
 
-1. **Credential.** A connector authenticates every request on its hub
-   connection with a projected ServiceAccount token of its own cluster
-   (audience: the hub URL, kubelet-rotated, short-lived). Nothing is copied
-   from the hub to the workload cluster.
-2. **Trust.** The hub's values register each workload cluster with public
-   data only:
+An administrator adds each workload cluster's name and ServiceAccount issuer
+to the hub's `clusters` Helm values. The hub derives its cluster ID from the
+name. Registration survives restarts and failed connections. The installation
+can add or remove clusters on upgrade. Removing a registration or marking it
+revoked closes its connections and refuses its tokens. Registration needs no
+bootstrap slot or per-process identity.
 
-   ```yaml
-   clusters:
-     - name: eu
-       issuer: https://eu-apiserver.example     # the member's ServiceAccount issuer
-       # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
-       # connector: asservat-system/asservat-connector  # default namespace/ServiceAccount
-   ```
+The workload release receives `hub.url` and, for a private CA, `hub.caBundle`.
+Its connector presents a kubelet-rotated ServiceAccount token for that URL.
+The hub verifies signature, issuer, audience, expiry and the configured
+namespace/ServiceAccount subject. The hub can discover the issuer's public
+keys and refresh on an unknown key ID. For an unreachable issuer, supply its
+public JWKS in the hub values and update it on signing-key rotation. This is
+the same trust arrangement as Vault's [Kubernetes JWT authentication](https://developer.hashicorp.com/vault/docs/auth/jwt/oidc-providers/kubernetes).
 
-   The hub verifies signature (OIDC discovery of the issuer, or the static
-   JWKS), `iss`, `aud`, expiry and `sub =
-   system:serviceaccount:<namespace>:<account>`, and attributes the
-   connection to that cluster. A token from any other subject, issuer or
-   audience is refused. JWKS from discovery are cached and refreshed on an
-   unknown `kid` (ADR-330 D1); static JWKS change with the values.
-3. **One endpoint behind ordinary exposure.** The connector reaches the hub at
-   one HTTPS URL (`hub.url`), the same public endpoint as the console or a
-   separate host name, through any Ingress or Gateway, including one that
-   terminates TLS. Commands, cluster-state pushes, live rows and evidence
-   uploads are streams on that one multiplexed HTTP/2 connection (ADR-330 D2);
-   the hub writes uploaded evidence to the object store. The connector trusts
-   the hub's certificate through the system roots or a public `hub.caBundle`
-   value.
-4. **Settings from the hub.** On connect the connector receives the hub's
-   settings it needs (installation and cluster IDs, protocol capabilities,
-   limits); later changes are pushed on the connection. No offer is copied
-   and no restart is needed.
-5. **One way to register.** The hub's values are the only way to register,
-   change or revoke (`revoked: true` or removal) a cluster. There is no
-   console page, API operation, CLI command or join token for it. A cluster
-   whose issuer the hub cannot reach is registered with its public JWKS,
-   which an administrator copies from the member
-   (`kubectl get --raw /openid/v1/jwks`); this is public key material, not a
-   secret.
-6. **Optional mTLS.** Where the hub is exposed by TLS passthrough, connectors
-   may additionally use client certificates the hub signs for a CSR
-   authenticated by the ServiceAccount token (kubelet TLS bootstrapping
-   pattern). It adds no copied material and is not required.
+## Connection and local state
 
-## Why not mTLS by default
+A connector uses one outbound HTTPS endpoint behind an HTTP/2 Ingress or
+Gateway. TLS may terminate at the proxy. The hub sends installation and
+cluster IDs, settings and the connector's own regional object-store
+capabilities. The bundled store scopes each regional credential to its
+cluster. The design allows optional client certificates with TLS passthrough
+using a CSR authenticated by the same token. [Optional certificate design](../architecture/enrollment-activation.md).
 
-A client certificate authenticates the connector only when the hub itself
-terminates TLS. A TLS-terminating Ingress or Gateway stops it, and forwarding
-it is proxy-specific (nginx-ingress `auth-tls-pass-certificate-to-upstream`,
-Envoy XFCC). The maintainer requires that the proxy may terminate TLS.
-Bearer tokens pass through any proxy.
+The bundled SeaweedFS gateway limits each bucket policy to 20,480 bytes.
+Putting every connector's statements in the evidence bucket reached 210,581
+bytes for 65 registrations and stopped installation. Instead, each regional
+write and history identity carries its own prefix-scoped policy in the existing
+private IAM Secret. Adding a cluster changes that Secret without growing the
+shared bucket policy. Withdrawing a regional identity and registering it again
+issues new keys so a former holder cannot access the reactivated prefixes.
+[AWS access-key guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/securing_access-keys.html).
 
-## Precedent
+This uses the gateway's static configuration and requires
+no IAM API service or additional credential. [SeaweedFS policy size](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/s3api/policy_engine/bucket_policy.go#L7-L11),
+[static identity policies](https://github.com/seaweedfs/seaweedfs/blob/4ab66fb76da83700739f5839e62fcaf15fb7d02a/weed/pb/iam.proto#L170-L192).
 
-- Vault/OpenBao JWT auth with a Kubernetes cluster as OIDC provider: discovery
-  URL or static public keys
-  ([Vault docs](https://developer.hashicorp.com/vault/docs/auth/jwt/oidc-providers/kubernetes)).
-- Cloud workload identity federation (EKS IRSA, GKE fleet workload identity)
-  trusts a cluster's ServiceAccount issuer instead of distributing secrets.
-- kubelet TLS bootstrapping and Open Cluster Management registration for the
-  optional certificate path.
+The connector watches AccessBindings in its cluster's application namespaces.
+On a change or reconnect it compares the current digest with the hub and
+delivers the bindings if they differ. The hub attributes the delivery to the
+authenticated cluster. Each change and confirmation commits against its original
+database revision. An overlapping writer with a stale revision retries from
+a new cluster observation. An idle disconnect preserves the last accepted binding
+set, and an explicit withdrawal invalidates it. The hub worker applies capture
+capacity from the installation's Helm values.
+[Permission contract](../../specs/permissions.md).
 
-## Consequences
+### Work dispatch
 
-- Removed: join Secrets, the bootstrap record and its five-minute validity,
-  bootstrap reservations/issuance for connectors, connector certificate
-  enrollment and renewal, the regional offer ConfigMap/Secret copy, the
-  `remote.*` endpoint list and the federation, hub-api native, key-service and
-  object-store exposure for connectors; the console "Enroll a cluster" page,
-  the `POST /api/v1/fleet/cluster-bootstraps` route and the `enroll_cluster`
-  and `revoke_cluster` console operations.
-- Limitation: a cluster whose issuer is unreachable from the hub (for example
-  k3s' default in-cluster issuer) needs its public JWKS in the hub's values,
-  updated when that cluster rotates its ServiceAccount signing key.
-- The hub verifies tokens locally; no TokenReview against the member's API
-  server and no hub access to member clusters.
+The former connector looked up owners every second and renewed two idle exchanges
+per owner every 30 seconds. With 65 active connectors, that would mean 65 owner
+lookups per second before any user started work. Protocol major 2 keeps one
+outbound HTTP/2 work subscription per connector. A waiting owner sends a
+PostgreSQL notification when it needs an exchange. The connector opens that
+exchange through its existing connection. Federation resolves the requesting
+owner's binding to a ready Pod address in the installed Service's EndpointSlice
+and uses the configured native port. If the endpoint lists both IP families,
+federation can try either address within the original dial deadline. The connector verifies the TLS identity
+of that exact owner process. Ordinary Service load balancing could select a
+different replica with no waiting request. [Kubernetes EndpointSlice API](https://kubernetes.io/docs/reference/kubernetes-api/discovery/endpoint-slice-v1/).
+An available exchange can serve further work within its original lifetime.
 
-## Complexity gate
+One database listener per federation replica receives work notifications. One
+per hub-api replica hears subscriptions and reannounces its still-waiting
+callers after reconnect. Neither notification persists a request, carries
+credentials or grants collection authority. This uses the existing database
+credentials and service endpoints. The shared federation SQL logins use one pooled
+connection per purpose per process, plus the work listener. PostgreSQL enforces
+the server connection budget across replicas. A replica releases an idle
+exchange when another replica needs the same connector. After listener
+reconnection it yields any potentially contested slot once its current request
+finishes. History waits within the caller's original deadline until the
+connector handshake flushes successfully. An idle fleet sends no owner lookups
+or exchange renewals. Upgrade a development installation's hub and connectors
+together when crossing from the old standby protocol to major 2. Registering before resynchronization
+follows PostgreSQL’s documented startup ordering. [PostgreSQL LISTEN](https://www.postgresql.org/docs/18/sql-listen.html#SQL-LISTEN-NOTES).
 
-1. Every multi-cluster install needed a hand-copied Secret, four exposed
-   ports and a restart after hub changes (maintainer: no-go).
-2. Not accepted; the maintainer rejected it.
-3. All multi-cluster deployments; combined mode uses the same path in-cluster.
-4. Above.
-5. Fewer credentials: no bootstrap record, connector CA or certificates; the
-   hub needs network access to member issuers only when it uses discovery.
-6. One degraded state: unknown `kid` with an unreachable issuer (connection
-   refused until the JWKS refresh succeeds or the values are updated).
-7. Configuration describes topology only (`issuer`, optional `jwks`).
-8. Depends on standard Kubernetes ServiceAccount token projection and
-   issuer discovery.
-9. One signature check per connection setup and token rotation; JWKS cached
-   per cluster.
-10. Unreleased product: replace the ADR-331 join path without compatibility.
-11. A longer-lived bootstrap record would still be a copied Secret. A join
-    token as a fallback would be a second registration path for the case the
-    static JWKS already covers.
+## Compatibility
+
+The hub checks the protocol major on every lifecycle opening, before handing out settings, accepting a binding observation or confirming an unchanged digest. The hub returns HTTP 426 with both values for a missing or incompatible major.
+The connector also checks the major in a successful reply. Within a
+major the hub sends only advertised operations and queries. A missing
+capability refuses that request while other supported work remains available.
+The Hello frame's byte limit bounds its capability announcement. A newer
+release can introduce names without reserving slots in older releases.
+
+Additional optional fields are ignored. Any field that changes the meaning
+of a request needs its own advertised capability. A change that cannot be
+ignored or refused per request requires a new protocol major. Image and
+startup digests identify the executing build for provenance. The cluster
+and hub can upgrade independently when they speak the same major and support
+the required work. The release qualification target covers adjacent minors
+in both directions. Each additional supported pairing costs a mixed-version
+test. [Federation contract](../../specs/federation.md).
+
+The context-start tests exercise HTTP/2 major negotiation and requests with
+missing capabilities. The 2026-11-14 combined-mode Kind run used the same
+binary in images with different digests and completed a pod-status capture
+and download. Mixed-release installed qualification remains open.

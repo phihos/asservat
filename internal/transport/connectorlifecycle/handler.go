@@ -2,6 +2,7 @@ package connectorlifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,10 +14,9 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
-// Services answers the presenting connector's read-only owner questions.
+// Services verifies the owner certificate the connector observed.
 type Services interface {
-	OwnerCandidates(context.Context, *Region) (value.APIContextOwnerCandidates, error)
-	AuthenticateOwner(context.Context, *Region, value.OwnerCertificate) (OwnerAuthentication, error)
+	AuthenticateOwner(context.Context, value.OwnerCertificate) (OwnerAuthentication, error)
 }
 
 // TokenVerifier attributes a connector's projected ServiceAccount token to
@@ -34,7 +34,8 @@ type SettingsService interface {
 // presented cluster (ADR-329). The Region reads the delivery; the service
 // must attribute it to region.Presented().ClusterID only.
 type AccessBindingsService interface {
-	AccessBindings(context.Context, *Region) error
+	AccessBindings(context.Context, *Region, string) (string, error)
+	AccessBindingRevision(context.Context, value.ConnectorCluster) (string, error)
 }
 
 type Handler struct {
@@ -71,7 +72,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusUnauthorized)
 		return
 	}
-	verifiedAt := time.Now()
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
@@ -94,6 +94,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusBadRequest)
 		return
 	}
+	if opening.Protocol != contracts.ConnectorProtocolMajor {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_ = json.NewEncoder(w).Encode(ProtocolMismatch{Required: contracts.ConnectorProtocolMajor, Announced: opening.Protocol})
+		return
+	}
 	if !admit(opening, presented) {
 		fail(http.StatusForbidden)
 		return
@@ -103,17 +109,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if control.Flush() != nil {
 		return
 	}
-	region := &Region{conn: conn, presented: presented, verifiedAt: verifiedAt, process: opening.Process}
+	region := &Region{conn: conn, presented: presented, process: opening.Process}
 	defer region.closeChannel()
 	result := HubFrame{Kind: "result"}
 	switch opening.Purpose {
-	case PurposeOwnerCandidates:
-		var owners value.APIContextOwnerCandidates
-		owners, err = h.services.OwnerCandidates(ctx, region)
-		result.Owners = &owners
 	case PurposeOwnerAuthentication:
 		var owner OwnerAuthentication
-		owner, err = h.services.AuthenticateOwner(ctx, region, *opening.Owner)
+		owner, err = h.services.AuthenticateOwner(ctx, *opening.Owner)
 		if err == nil && owner.Owner.Certificate != *opening.Owner {
 			err = ErrChannel // only the observed certificate, never another owner
 		}
@@ -125,10 +127,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			err = ErrChannel
 		}
+		settings.Protocol = contracts.ConnectorProtocolMajor
 		result.Settings = &settings
 	case PurposeAccessBindings:
+		if sink, ok := h.services.(AccessBindingsService); ok && authorization.UUID(opening.BindingRevision) {
+			result.BindingRevision, err = sink.AccessBindings(ctx, region, opening.BindingRevision)
+		} else {
+			err = ErrChannel
+		}
+	case PurposeBindingRevision:
 		if sink, ok := h.services.(AccessBindingsService); ok {
-			err = sink.AccessBindings(ctx, region)
+			result.BindingRevision, err = sink.AccessBindingRevision(ctx, presented)
 		} else {
 			err = ErrChannel
 		}
@@ -154,7 +163,7 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 		return false
 	}
 	switch o.Purpose {
-	case PurposeOwnerCandidates, PurposeAccessBindings:
+	case PurposeAccessBindings, PurposeBindingRevision:
 		if o.Owner != nil {
 			return false
 		}
@@ -172,11 +181,10 @@ func admit(o Opening, p value.ConnectorCluster) bool {
 // Region is one conversation's presenting connector: its token's cluster and
 // at most one delivery read.
 type Region struct {
-	conn       *Conn
-	presented  value.ConnectorCluster
-	verifiedAt time.Time
-	process    value.ConnectorProcessIdentity
-	closed     bool
+	conn      *Conn
+	presented value.ConnectorCluster
+	process   value.ConnectorProcessIdentity
+	closed    bool
 	// delivered marks the conversation's one AccessBinding or capacity
 	// request.
 	delivered bool
@@ -184,9 +192,6 @@ type Region struct {
 
 // Presented is the cluster the conversation's token was attributed to.
 func (r *Region) Presented() value.ConnectorCluster { return r.presented }
-
-// VerifiedAt is when the token was verified; deliveries are observed no later.
-func (r *Region) VerifiedAt() time.Time { return r.verifiedAt }
 
 // Binding is the presenting process's peer binding, checked against the cluster.
 func (r *Region) Binding() value.PeerBinding { return r.process.Binding }
@@ -243,13 +248,6 @@ func (r *Region) closeChannel() {
 	r.closed = true
 }
 
-// OwnerReads are the hub's shared read-only owner facts for regional
-// exchanges (ADR-172): the candidate set and the unchanged authenticator.
-type OwnerReads struct {
-	Candidates    app.APIContextOwnerCandidatesReader
-	Authenticator *app.OwnerAuthenticator
-}
-
 // presentedOwner lets the hub's authenticator check a certificate the region
 // observed. It cannot see that TLS session, so its verify step only requires
 // the identical certificate and records the configuration for the region.
@@ -270,24 +268,11 @@ func (p presentedOwner) VerifyCurrentOwner(c value.OwnerConfigurationObservation
 	return p.certificate, nil
 }
 
-// Duties are the hub's read-only answers for every presenting connector.
-type Duties struct {
-	Owners OwnerReads
-}
-
-func (d Duties) OwnerCandidates(ctx context.Context, _ *Region) (value.APIContextOwnerCandidates, error) {
-	if d.Owners.Candidates == nil {
-		return value.APIContextOwnerCandidates{}, ErrChannel
-	}
-	return d.Owners.Candidates.ReadContextStartOwners(ctx)
-}
-
-func (d Duties) AuthenticateOwner(ctx context.Context, _ *Region, c value.OwnerCertificate) (OwnerAuthentication, error) {
-	if d.Owners.Authenticator == nil {
-		return OwnerAuthentication{}, ErrChannel
-	}
+// AuthenticateOwner checks the presented certificate against the hub registry
+// and returns the configuration the connector must verify on its actual TLS session.
+func AuthenticateOwner(ctx context.Context, authenticator *app.OwnerAuthenticator, c value.OwnerCertificate) (OwnerAuthentication, error) {
 	var configuration value.OwnerConfigurationObservation
-	owner, err := d.Owners.Authenticator.AuthenticateOwner(ctx, presentedOwner{c, &configuration})
+	owner, err := authenticator.AuthenticateOwner(ctx, presentedOwner{c, &configuration})
 	if err != nil {
 		return OwnerAuthentication{}, err
 	}

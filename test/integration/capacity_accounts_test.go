@@ -22,7 +22,7 @@ import (
 // qualifyCapacityAccountsSQL covers capacity_apply, on-demand enrollment,
 // burst charges within the hard limit and the pool, and release back to the
 // protected share.
-func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+func qualifyCapacityAccountsSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 	if !t.Run("lifecycle-policy-timestamp-wire", func(t *testing.T) { qualifyCapacityPolicyTimestampSQL(t, ctx, admin) }) {
 		t.FailNow()
 	}

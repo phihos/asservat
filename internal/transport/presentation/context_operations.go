@@ -188,13 +188,13 @@ type PresetReference struct {
 	Version string `json:"version"`
 }
 type ContextOperationInput struct {
-	Target           TargetRef         `json:"target_ref"`
-	TargetHandle     string            `json:"target_handle,omitempty"`
-	DiagnosticHandle string            `json:"diagnostic_handle,omitempty"`
-	Preset           PresetReference   `json:"preset_ref"`
-	RequestedSeconds int64             `json:"requested_retention_seconds"`
-	IdempotencyKey   string            `json:"idempotency_key"`
-	CaptureID        string            `json:"capture_id"`
+	Target           TargetRef       `json:"target_ref"`
+	TargetHandle     string          `json:"target_handle,omitempty"`
+	DiagnosticHandle string          `json:"diagnostic_handle,omitempty"`
+	Preset           PresetReference `json:"preset_ref"`
+	RequestedSeconds int64           `json:"requested_retention_seconds"`
+	IdempotencyKey   string          `json:"idempotency_key"`
+	CaptureID        string          `json:"capture_id"`
 	// ADR-330 D9: request_capture submits the reviewed preview request and
 	// the plan digest its preview returned.
 	Preview            *ContextOperationInput `json:"preview,omitempty"`
@@ -496,9 +496,9 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 type OperationReply struct {
 	// get_capture and preview_capture replies may use the MCP result bound.
 	resultBound bool
-	grantReview          bool // Only the authenticated get_grant producer sets this budget.
-	Body                 []byte
-	ValidUntil           time.Time
+	grantReview bool // Only the authenticated get_grant producer sets this budget.
+	Body        []byte
+	ValidUntil  time.Time
 
 	// These closed private facts preserve decisions through the intentionally
 	// nondisclosing public error projection. They are never JSON fields and do
@@ -929,7 +929,13 @@ func (s *ContextOperations) request(ctx context.Context, current identities.Curr
 	if err != nil {
 		return value.Accepted{}, value.ErrInvalid
 	}
-	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: preview.ResultAccess.access(), Submission: submission, Preview: func(ctx context.Context) (value.ContextPreview, error) {
+	// Profile overrides may contain raw objects whose member order changes
+	// across transports or a round trip through PostgreSQL jsonb.
+	normalized := jsontext.Value(submission)
+	if err := normalized.Format(jsontext.ReorderRawObjects(true)); err != nil {
+		return value.Accepted{}, value.ErrInvalid
+	}
+	return s.captures.Request(ctx, current, app.CaptureRequest{Key: in.IdempotencyKey, Plan: artifact.Digest(plan), Access: preview.ResultAccess.access(), Submission: normalized, Preview: func(ctx context.Context) (value.ContextPreview, error) {
 		_, _, p, err := s.previewCapture(ctx, current, preview)
 		return p, err
 	}})

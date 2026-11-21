@@ -18,7 +18,7 @@ func TestRuntimeRolesCoverAllCompiledPlansWithUniqueNames(t *testing.T) {
 	seen := map[string]bool{}
 	var pub, configuration, owner int
 	for _, r := range roles {
-		if seen[r.Name] || !strings.HasPrefix(r.Name, prefix) || len(r.Name) > 63 || r.Connections < 1 || len(r.grants) == 0 {
+		if seen[r.Name] || !strings.HasPrefix(r.Name, prefix) || len(r.Name) > 63 || r.Connections == 0 || r.Connections < -1 || len(r.grants) == 0 {
 			t.Fatalf("invalid runtime role %+v", r)
 		}
 		seen[r.Name] = true
@@ -31,7 +31,7 @@ func TestRuntimeRolesCoverAllCompiledPlansWithUniqueNames(t *testing.T) {
 			owner++
 		}
 	}
-	if pub == 0 || configuration != 3 || owner != 1 {
+	if pub == 0 || configuration != len(contracts.ConfigurationRuntimeRolePurposes()) || owner != 1 {
 		t.Fatal("inventory", pub, configuration, owner)
 	}
 	if _, err = RuntimeRoles("not-a-uuid"); err == nil {

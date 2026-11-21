@@ -289,6 +289,7 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 	}
 	return s.viewAuthority(ctx, current, i, session, until, pending, &a)
 }
+
 // continuePreparing runs the next bounded step of an admitted Preparing
 // session under the caller's current authority: prepare and status both drive
 // it, so a status read that waits for the next revision resumes preparation

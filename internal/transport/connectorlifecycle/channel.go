@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -23,16 +24,14 @@ const (
 	Path        = "/v1/connector-lifecycle"
 	ContentType = "application/x-ndjson"
 	// MaxRegionFrame bounds the connector's frames in one conversation.
-	MaxFrameBytes  = 256 << 10
-	MaxRegionFrame = 2
-	// ADR-172 read-only owner purposes: the current context-start owner set,
-	// and the hub's authentication facts for one observed owner certificate.
-	PurposeOwnerCandidates     Purpose = "owner-candidates"
+	MaxFrameBytes                      = 256 << 10
+	MaxRegionFrame                     = 2
 	PurposeOwnerAuthentication Purpose = "owner-authentication"
 	// PurposeAccessBindings delivers the connector's complete AccessBinding
 	// LIST of its cluster (ADR-329). The hub asks for it only after the
 	// presentation verified; the delivery is attributed to that cluster.
-	PurposeAccessBindings Purpose = "access-bindings"
+	PurposeAccessBindings  Purpose = "access-bindings"
+	PurposeBindingRevision Purpose = "binding-revision"
 	// PurposeSettings returns the settings the connector needs from the hub
 	// (REQ-FED-001): its cluster and peer IDs, the hub's offer and its
 	// cluster's object-store capabilities. It is the first conversation of
@@ -43,6 +42,7 @@ const (
 // Settings are the hub's answer to PurposeSettings. Evidence and History are
 // the cluster's own object-store capabilities, scoped to its cluster ID.
 type Settings struct {
+	Protocol          int
 	ClusterID, PeerID string
 	Offer             contracts.RegionalOffer
 	Evidence, History contracts.OwnerStorageCredential
@@ -61,19 +61,33 @@ var ErrChannel = errors.New("connector lifecycle channel unavailable")
 // Opening is the connector's first frame. Process names the connector
 // process; its binding must name the token's cluster and peer.
 type Opening struct {
-	Purpose     Purpose
-	OperationID string
-	Process     value.ConnectorProcessIdentity
-	Owner       *value.OwnerCertificate `json:",omitempty"` // owner authentication only
+	Protocol        int `json:",omitempty"` // advertised on every opening
+	Purpose         Purpose
+	OperationID     string
+	Process         value.ConnectorProcessIdentity
+	BindingRevision string                  `json:",omitempty"` // Predecessor sampled before the workload LIST.
+	Owner           *value.OwnerCertificate `json:",omitempty"` // owner authentication only
 }
+
+// ProtocolMismatch is the lifecycle endpoint's HTTP 426 response.
+type ProtocolMismatch struct {
+	Required  int
+	Announced int
+}
+
+func (m *ProtocolMismatch) Error() string {
+	return fmt.Sprintf("hub requires connector protocol major %d, connector announced %d (0 means unspecified)", m.Required, m.Announced)
+}
+
+func (m *ProtocolMismatch) FixedStep() string { return m.Error() }
 
 // HubFrame drives the conversation; exactly one of its payloads is set.
 type HubFrame struct {
-	Kind     string                           // access-bindings, result, failure
-	Owners   *value.APIContextOwnerCandidates `json:",omitempty"`
-	Owner    *OwnerAuthentication             `json:",omitempty"`
-	Settings *Settings                        `json:",omitempty"`
-	Failure  string                           `json:",omitempty"`
+	Kind            string               // access-bindings, result, failure
+	BindingRevision string               `json:",omitempty"`
+	Owner           *OwnerAuthentication `json:",omitempty"`
+	Settings        *Settings            `json:",omitempty"`
+	Failure         string               `json:",omitempty"`
 	// Digest is the hub's stored delivery digest of an "access-bindings"
 	// request; the connector answers Unchanged when its current delivery has
 	// the same digest (ADR-329).
@@ -87,12 +101,6 @@ type RegionFrame struct {
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
 	// Unchanged answers a delivery request whose digest matches.
 	Unchanged bool `json:",omitempty"`
-}
-
-// AccessBindingsLocal is the regional reader of the connector's own
-// AccessBinding LIST (ADR-329), offered only by a delivering conversation.
-type AccessBindingsLocal interface {
-	ReadAccessBindings(context.Context) (contracts.AccessBindingDelivery, error)
 }
 
 // Conn is one decoded/encoded frame stream with a per-read deadline control.
@@ -109,7 +117,7 @@ type Conn struct {
 func NewConn(r io.Reader, w io.Writer, flush func() error, deadline func(time.Time) error) *Conn {
 	limit := &frameLimit{r: r, n: int64(MaxRegionFrame+1) * MaxFrameBytes}
 	d := json.NewDecoder(limit)
-	// Unknown fields of a newer peer are ignored (ADR-333).
+	// Unknown fields of a newer peer are ignored (ADR-334).
 	return &Conn{limit: limit, dec: d, enc: json.NewEncoder(w), flush: flush, deadline: deadline}
 }
 

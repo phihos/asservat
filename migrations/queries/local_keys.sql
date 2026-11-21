@@ -12,8 +12,8 @@ WHERE installation_id=$1 AND purpose=$2 AND key_id=$3;
 
 -- name: ReadLocalKeyVersions :many
 SELECT version,fingerprint FROM local_key_version
-WHERE installation_id=$1 AND purpose=$2 AND key_id=$3 ORDER BY version LIMIT 17;
+WHERE installation_id=$1 AND purpose=$2 AND key_id=$3 ORDER BY version;
 
--- name: InsertLocalKeyVersion :exec
+-- name: InsertLocalKeyVersions :exec
 INSERT INTO local_key_version(installation_id,purpose,key_id,version,fingerprint)
-VALUES($1,$2,$3,$4,$5);
+SELECT $1, $2, $3, unnest(sqlc.arg(versions)::integer[]), unnest(sqlc.arg(fingerprints)::bytea[]);

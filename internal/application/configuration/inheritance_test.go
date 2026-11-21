@@ -107,11 +107,7 @@ func TestNamespaceJournalAppliesEveryTransition(t *testing.T) {
 	if live := j.Observation(true); live.Namespaces[0].ResourceVersion != "11" {
 		t.Fatal("live observation lost the namespace version")
 	}
-	j.Fresh(now.Add(-time.Second))
-	j.Fresh(now.Add(time.Second))
-	if !j.ObservedAt().Equal(now.Add(time.Second)) {
-		t.Fatal("freshness moved backwards or not forward")
-	}
+
 	renamed := observedNamespace("other", "p", "13", "payments")
 	if err = j.Apply(value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: "13", Namespace: &renamed}); err == nil || j.Observation(false) != nil {
 		t.Fatal("inconsistent transition did not poison the journal")
@@ -239,31 +235,16 @@ func TestReconcilerAcceptsEveryInheritedOwnershipTransition(t *testing.T) {
 	}
 }
 
-func TestReconcilerDropsContinuityWhenATransitionCannotBeAccepted(t *testing.T) {
+func TestReconcilerRechecksTrustForALaterWatchEvent(t *testing.T) {
 	payroll := observedNamespace("payments", "payments-uid", "2", "payroll")
 	f, _, s, ctx := inheritanceRun(t, value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: "2", Namespace: &payroll})
 	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); err != nil {
 		t.Fatal(err)
 	}
-	// The binding list is no longer current: the transition cannot be
-	// committed now, so the next acceptance must not claim continuity.
-	s.trustUntil = time.Time{}
-	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); err != nil {
-		t.Fatal(err)
-	}
-	if len(f.accepted) != 2 {
-		t.Fatal("transition accepted without a current binding list")
-	}
-	s.trustUntil = s.r.Now().Add(5 * time.Second)
-	back := observedNamespace("payments", "payments-uid", "3", "payments")
-	if err := s.namespaces.Apply(value.NamespaceEvent{Type: "MODIFIED", ResourceVersion: "3", Namespace: &back}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.accept(ctx, false); err != nil {
-		t.Fatal(err)
-	}
-	if owners, continuous := inheritedOwners(f.accepted[2]); len(owners) != 2 || continuous {
-		t.Fatal("skipped transition still claimed continuity", owners)
+	s.journal.until = s.r.Now()
+	f.drift = true
+	if err := s.namespaceItem(ctx, nextNamespaceItem(t, s)); !errors.Is(err, value.ErrChanged) || len(f.accepted) != 2 {
+		t.Fatal("watch event accepted after trust changed", err, len(f.accepted))
 	}
 }
 
@@ -276,7 +257,7 @@ func TestInheritanceUnavailableStatesKeepNothingCurrent(t *testing.T) {
 		t.Fatal("observed source not granted")
 	}
 	// Nothing expires because time passed (REQ-PER-006).
-	if later := s.inheritance(s.namespaces.ObservedAt().Add(time.Hour)); len(later.Bases) == 0 {
+	if later := s.inheritance(s.r.Now().Add(time.Hour)); len(later.Bases) == 0 {
 		t.Fatal("an older observation stopped granting")
 	}
 	// An unreadable source list keeps every source unavailable.

@@ -44,13 +44,32 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		"/apis/apps/v1/namespaces/asservat-system/deployments/asservat-hub-api": "a0000000-0000-4000-8000-000000000006",
 		"/api/v1/namespaces/asservat-system/serviceaccounts/asservat-hub-api":   "a0000000-0000-4000-8000-000000000007"}
 	source := ownerSourceJSON
-	var uidReads atomic.Int32
+	var uidReads, watchEvents atomic.Int32
 	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 		switch r.URL.Path {
 		case "/api/v1/namespaces/" + ns:
 			permissionReply(w, permissionNamespace(ns, nsUID))
-		case "/api/v1/namespaces/" + ns + "/configmaps/asservat-owner-source":
-			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "asservat-owner-source", "namespace": ns, "uid": cmUID, "resourceVersion": "1"}, "data": map[string]string{"owner-pool.json": source}})
+		case "/api/v1/namespaces/" + ns + "/configmaps":
+			if r.URL.Query().Get("fieldSelector") != "metadata.name=asservat-owner-source" {
+				t.Error("unfiltered list/watch")
+				return true
+			}
+			if r.URL.Query().Get("watch") == "true" {
+				if r.URL.Query().Get("resourceVersion") != "12" {
+					t.Error("wrong watch cursor")
+				}
+				kind := "MODIFIED"
+				metadata := map[string]string{"resourceVersion": "13"}
+				switch watchEvents.Add(1) {
+				case 2:
+					kind = "DELETED"
+				case 3:
+					metadata["deletionTimestamp"] = "2026-10-10T12:00:00Z"
+				}
+				permissionReply(w, map[string]any{"type": kind, "object": map[string]any{"kind": "PartialObjectMetadata", "metadata": metadata}})
+				return true
+			}
+			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMapList", "metadata": map[string]string{"resourceVersion": "12"}, "items": []any{map[string]any{"metadata": map[string]any{"name": "asservat-owner-source", "namespace": ns, "uid": cmUID, "resourceVersion": "1"}, "data": map[string]string{"owner-pool.json": source}}}})
 		default:
 			uid, ok := uids[r.URL.Path]
 			if !ok {
@@ -74,8 +93,14 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range 2 {
-		o, err := reader.ReadOwnerConfiguration(context.Background())
+	for _, wantDeletion := range []string{"", "13", "13"} {
+		o, rv, err := reader.OwnerSourceSnapshot(context.Background())
+		if err != nil || rv != "12" || !o.FreshUntil.Equal(f.client.now().Add(24*time.Hour).Truncate(time.Second)) {
+			t.Fatal("original CA cutoff or cursor lost", o.FreshUntil, rv, err)
+		}
+		if deletion, err := reader.WaitOwnerChange(t.Context(), rv); err != nil || deletion != wantDeletion {
+			t.Fatal("owner watch deletion cursor", deletion, wantDeletion, err)
+		}
 		p := o.Configuration.Pool
 		if err != nil || p.InstallationID != installation || p.ClusterID != permissionCluster || p.IssuerEpoch != epoch || p.NamespaceUID != nsUID ||
 			p.ServiceUID != uids["/api/v1/namespaces/asservat-system/services/asservat-hub-api-owner"] || p.DeploymentUID != uids["/apis/apps/v1/namespaces/asservat-system/deployments/asservat-hub-api"] ||
@@ -94,7 +119,7 @@ func TestOwnerSourceReaderCompletesHelmSource(t *testing.T) {
 		"port":         strings.Replace(ownerSourceJSON, `"port":9443`, `"port":80`, 1),
 	} {
 		source = bad
-		if _, err := reader.ReadOwnerConfiguration(context.Background()); err == nil {
+		if o, rv, err := reader.OwnerSourceSnapshot(context.Background()); err != nil || rv != "12" || o.CurrentSource(f.client.now()) {
 			t.Fatal("accepted", name)
 		}
 	}

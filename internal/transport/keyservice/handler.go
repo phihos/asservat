@@ -42,9 +42,6 @@ func NewHandler(services []app.KeyService, peers PeerVerifier, now func() time.T
 	h := &Handler{services: make(map[value.KeyScope]app.KeyService), peers: peers, now: now, semaphore: make(chan struct{}, concurrency)}
 	installation := services[0].Scope.InstallationID
 	for _, service := range services {
-		if _, ok := service.Backend.(app.KeyConfigurationGuard); !ok {
-			return nil, app.ErrKeyUnavailable
-		}
 		if !service.Scope.Valid() || service.Scope.InstallationID != installation || service.Now == nil || service.Authority == nil || service.Backend == nil {
 			return nil, app.ErrKeyUnavailable
 		}

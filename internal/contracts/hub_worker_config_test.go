@@ -29,6 +29,19 @@ func TestDecodeHubWorkerConfigIgnoresKeyOrderAndRejectsUnknownFields(t *testing.
 	}
 }
 
+// Helm's hub configurations contain the registered fleet. The file reader
+// accepts the Kubernetes ConfigMap data limit and refuses the next byte.
+func TestHubWorkerConfigMapSize(t *testing.T) {
+	config := `{"format":"asservat-hub-worker-config/v1"}`
+	full := config + strings.Repeat(" ", ServiceConfigMaxBytes-len(config))
+	if _, err := DecodeHubWorkerConfig(strings.NewReader(full)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DecodeHubWorkerConfig(strings.NewReader(full + " ")); err == nil {
+		t.Fatal("accepted an oversized ConfigMap")
+	}
+}
+
 func TestReadInstallationIDs(t *testing.T) {
 	dir := t.TempDir()
 	keys := []string{"installationID", "clusterID", "issuerEpoch", "permissionRootID", "browserRootID", "sessionEpoch", "roleSetupID", "peerID"}

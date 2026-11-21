@@ -11,11 +11,11 @@ import (
 func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	const installation = "10000000-0000-4000-8000-000000000001"
 	wantHub := []string{"hub-runtime", "worker-config-read", "capacity-profile-read", "capture-admit"}
-	want := append(slices.Clone(wantHub), "connector-delivery", "connector-owner-read", "capacity", "capacity-capture", "permission-accept", "permission-audit", "retention-source", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-acquisition")
+	want := append(slices.Clone(wantHub), "connector-delivery", "connector-owner-read", "capacity", "capacity-capture", "permission-accept", "retention-source", "retention-lifecycle-audit", "worker-config-observe", "worker-config-audit", "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize", "key-configuration", "key-wrap", "key-acquisition")
 	// ADR-204 takes the next unused ordinals 86-88, ADR-205 89-91 and ADR-210
 	// 92; metadata uses 93 and execution 94; old facet ordinals (including the
 	// removed publisher 24-27 and 65 and key-verify 84) remain retired.
-	ordinals := []int{95, 20, 34, 40, 52, 56, 70, 71, 72, 73, 78, 81, 86, 87, 89, 90, 91, 82, 83, 88}
+	ordinals := []int{95, 20, 34, 40, 52, 56, 70, 71, 72, 78, 81, 86, 87, 89, 90, 91, 82, 83, 88}
 	for n, purpose := range want {
 		ordinal, known := contracts.PublicRuntimeRoleOrdinal(purpose)
 		name, valid := PublicRuntimeRoleName(installation, purpose)
@@ -29,6 +29,9 @@ func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 		}
 		if n >= len(wantHub) {
 			wantLimit = 3
+		}
+		if slices.Contains(contracts.PublicRuntimeFederationPurposes(), purpose) {
+			wantLimit = -1
 		}
 		if !known || limit != wantLimit {
 			t.Fatalf("wrong fixed connection compartment: %s", purpose)

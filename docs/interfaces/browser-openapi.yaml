@@ -6156,6 +6156,7 @@ components:
                       basis_kind:
                         enum:
                         - AccessBinding
+                        - ClusterAccessBinding
                         - PermissionSource
                       basis_uid:
                         type: string
@@ -6171,9 +6172,7 @@ components:
                     - basis_kind
                     - basis_uid
                     - revision
-                  description: All of the caller's contributing assignments; bounded
-                    by the caller's AccessBinding and PermissionSource objects, so
-                    the list is not paged.
+                  description: "The caller's contributing assignments from AccessBinding, ClusterAccessBinding and PermissionSource objects: the first 64, which fit one result frame; assignments_total counts all."
                 assignments_total:
                   type: integer
                   minimum: 0
@@ -10915,6 +10914,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string
@@ -10952,6 +10952,7 @@ components:
                             basis_kind:
                               enum:
                               - AccessBinding
+                              - ClusterAccessBinding
                               - PermissionSource
                             basis_uid:
                               type: string

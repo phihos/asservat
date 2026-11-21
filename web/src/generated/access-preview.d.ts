@@ -20,8 +20,9 @@ export interface components {
         Contract_permission_common_29c9711e543c29dd: {
             /** @enum {string} */
             kind: "User" | "Group" | "Workload";
-            /** Format: uri */
+            /** @description Compared literally with the verified issuer. PostgreSQL permission assignments store up to 2048 UTF-8 bytes. */
             issuer?: string;
+            /** @description PostgreSQL permission assignments store up to 256 UTF-8 bytes. */
             id: string;
         };
         /** @enum {string} */
@@ -221,7 +222,7 @@ export interface components {
                         /** @enum {unknown} */
                         subject_kind: "User" | "Group" | "Workload";
                         /** @enum {unknown} */
-                        basis_kind: "AccessBinding" | "PermissionSource";
+                        basis_kind: "AccessBinding" | "ClusterAccessBinding" | "PermissionSource";
                         basis_uid: string;
                         revision: string;
                         proposed: boolean;
@@ -233,7 +234,7 @@ export interface components {
                         /** @enum {unknown} */
                         subject_kind: "User" | "Group" | "Workload";
                         /** @enum {unknown} */
-                        basis_kind: "AccessBinding" | "PermissionSource";
+                        basis_kind: "AccessBinding" | "ClusterAccessBinding" | "PermissionSource";
                         basis_uid: string;
                         revision: string;
                         proposed: boolean;

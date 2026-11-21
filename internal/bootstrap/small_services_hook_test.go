@@ -224,6 +224,10 @@ func (a *secretsAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for k, v := range p.Data {
+			if v == nil {
+				delete(s.Data, k)
+				continue
+			}
 			s.Data[k] = v
 		}
 		a.patches = append(a.patches, name)
@@ -281,4 +285,24 @@ func TestSecretsHookHonoursExistingSecretOverrides(t *testing.T) {
 	if slices.Contains(api.creates, "trial-ids") || len(api.patches) != 0 || !strings.Contains(string(api.secrets["trial-sql-hub-worker"].Data["sql-permission-accept.json"]), "as_10000000000040008000000000000001_pub_") {
 		t.Fatal("override IDs not used", api.creates)
 	}
+	worker := api.secrets["trial-sql-hub-worker"]
+	before := string(worker.Data["sql-permission-accept.json"])
+	worker.Data["sql-configuration-audit.json"] = []byte("retired")
+	worker.Data["sql-permission-audit.json"] = []byte("retired")
+	worker.Data["operator-note"] = []byte("retain")
+	for range 2 {
+		if err := runSecrets(t.Context(), plan, config, contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: [][]byte{pemDER(t, ca)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, exists := worker.Data["sql-configuration-audit.json"]; exists {
+		t.Fatal("obsolete owner publisher login remains mounted")
+	}
+	if _, exists := worker.Data["sql-permission-audit.json"]; exists {
+		t.Fatal("obsolete permission publisher login remains mounted")
+	}
+	if string(worker.Data["sql-permission-accept.json"]) != before || string(worker.Data["operator-note"]) != "retain" || !slices.Equal(api.patches, []string{worker.Name}) {
+		t.Fatal("expected a single retirement patch retaining active credentials and unrelated keys", api.patches)
+	}
+
 }

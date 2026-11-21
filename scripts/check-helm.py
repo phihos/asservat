@@ -201,8 +201,12 @@ def check_accessbindings(render):
     # DELETE stays unchecked, like RoleBindings: the namespace controller
     # must be able to remove a deleted namespace's bindings.
     assert rule["operations"] == ["CREATE", "UPDATE"] and rule["resources"] == ["accessbindings", "clusteraccessbindings"] and policy["spec"]["failurePolicy"] == "Fail"
+    assert {v["name"]: v["expression"] for v in policy["spec"]["variables"]} == {
+        "bindingNamespace": "has(request.namespace) ? request.namespace : ''",
+        "unchangedSpec": "request.operation == 'UPDATE' && object.spec == oldObject.spec",
+    }
     expressions = [v["expression"] for v in policy["spec"]["validations"]]
-    assert any("object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind')" in e for e in expressions)
+    assert any("object.spec.roles.all(r, authorizer.group('asservat.io').resource('accessroles').namespace(variables.bindingNamespace).name(r).check('bind')" in e for e in expressions)
     assert any("name('automation').check('bind')" in e for e in expressions)
     assert named(docs, "ValidatingAdmissionPolicyBinding", base)["spec"] == {"policyName": base, "validationActions": ["Deny"]}
     # A workload-cluster release renders the same RBAC and policy: its
@@ -268,7 +272,7 @@ def check_collector(directory):
 
     docs = render(base)
     # ADR-329: the mode=cluster connector lists this cluster's AccessBindings.
-    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
+    assert {"apiGroups": ["asservat.io"], "resources": ["accessbindings", "clusteraccessbindings"], "verbs": ["list", "watch"]} in named(docs, "ClusterRole", "asservat-region-asservat-connector")["rules"]
     collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"]
     assert sorted(r["kind"] for r in collector) == ["ConfigMap", "ConfigMap", "DaemonSet", "Namespace", "Role", "RoleBinding", "ServiceAccount"], [r["kind"] for r in collector]
     namespace = next(r for r in collector if r["kind"] == "Namespace")
@@ -315,15 +319,25 @@ def check_collector(directory):
 
 
 def check_cluster_join(render):
-    # ADR-331: clusters[] in the hub's values: the offer and the regional
+    # ADR-334: clusters[] in the hub's values: the offer and the regional
     # capabilities exist in mode=hub, and the hub components know the
     # registered cluster names (IDs derive from them, ADR-335 D4).
     url = "https://hub.example:31446"
     v = bundled_values("hub")
     v.update({"clusters": [{"name": "eu", "issuer": "https://eu.example", "jwks": {"keys": [{"kty": "EC"}]}}], "hub": {**v.get("hub", {}), "url": url}})
     docs = render(v)
+    def iam_checksum(objects):
+        return named(objects, "StatefulSet", "asservat-objectstore")["spec"]["template"]["metadata"]["annotations"]["checksum/iam"]
+
+    larger = copy.deepcopy(v)
+    larger["clusters"].append({"name": "us", "issuer": "https://us.example"})
+    checksum = iam_checksum(render(larger))
+    assert checksum != iam_checksum(docs), "cluster membership must roll the object store"
+    larger["clusters"].reverse()
+    assert iam_checksum(render(larger)) == checksum, "unchanged principals must keep the rollout checksum"
+
     config = json.loads(named(docs, "ConfigMap", "asservat-hub-api-config")["data"]["config.json"])
-    assert config["clusters"][0] == {"name": "eu", "namespace": "asservat-system", "standby": 2, "captures": 8}, config.get("clusters")
+    assert config["clusters"][0] == {"name": "eu", "namespace": "asservat-system", "captures": 8}, config.get("clusters")
     # ADR-334: the federation registers clusters by public issuer data only.
     fed = json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])
     tokens = fed["connectorTokens"]
@@ -332,8 +346,25 @@ def check_cluster_join(render):
     assert "localStorage" not in fed, fed
     revoked = copy.deepcopy(v)
     revoked["clusters"][0]["revoked"] = True
-    tokens = json.loads(named(render(revoked), "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
+    withdrawn = render(revoked)
+    rollout = named(withdrawn, "Deployment", "asservat-federation")["spec"]
+    active_federation = named(docs, "Deployment", "asservat-federation")["spec"]["template"]
+    assert rollout["strategy"]["type"] == "Recreate"
+    assert rollout["template"]["metadata"]["annotations"]["checksum/config"] != active_federation["metadata"]["annotations"]["checksum/config"]
+    federation_container = next(c for c in rollout["template"]["spec"]["containers"] if c["name"] == "federation")
+    assert federation_container["readinessProbe"]["tcpSocket"]["port"] == "federation"
+    tokens = json.loads(named(withdrawn, "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]
     assert tokens["clusters"] == [], tokens
+    # Revocation and removal produce the same active IAM and retain the other cluster.
+    larger["clusters"][0]["revoked"] = True  # us
+    active = render(larger)
+    assert iam_checksum(active) == iam_checksum(docs) != checksum, "revocation must roll the store with only active identities"
+    active_plan = json.loads(named(active, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
+    assert active_plan["remoteClusters"] == ["eu"], active_plan
+    for name in ("asservat-federation", "asservat-secrets"):
+        secret_names = {n for rule in named(active, "Role", name)["rules"] for n in rule.get("resourceNames", [])}
+        for purpose in ("regional-write", "regional-history"):
+            assert f"asservat-s3-{purpose}-us" not in secret_names and f"asservat-s3-{purpose}-eu" in secret_names
     # The hub-api and the key service verify the same tokens.
     assert config["connectorTokens"]["audiences"] == json.loads(named(docs, "ConfigMap", "asservat-federation-config")["data"]["config.json"])["connectorTokens"]["audiences"]
     offer = config["public"]["regionalOffer"]

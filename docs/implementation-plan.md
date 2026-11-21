@@ -5,7 +5,7 @@ capability baseline and next complete user workflow. The checklist below retains
 the full scope; neither code volume nor component-test counts are a completion
 percentage.
 
-Mechanisms follow [ADR-330](decisions/330-event-driven-system-design.md): informers and connector pushes instead of polling, one multiplexed connector connection, standard identity (installation CA, connector bootstrap token plus CSR rotation, projected ServiceAccount tokens), a long-running regional reader, one authorization per operation (ADR-311), `audit_event` rows in the effect transaction, operation-ID idempotency with settle-on-known-outcome, SQL metadata, stateless previews, `observedGeneration` status and stored retention deadlines. Installation is Helm-native (ADR-327/328). Actual progress and qualification are recorded in [implementation progress](implementation-progress.md); no whole TASK or slice exit is complete.
+Mechanisms follow [ADR-330](decisions/330-event-driven-system-design.md): informers and connector pushes instead of polling, one multiplexed connector connection, standard identity (installation CA and projected ServiceAccount tokens), a long-running regional reader, one authorization per operation (ADR-311), `audit_event` rows in the effect transaction, operation-ID idempotency with settle-on-known-outcome, SQL metadata, stateless previews, `observedGeneration` status and stored retention deadlines. Installation is Helm-native (ADR-327/328). Actual progress and qualification are recorded in [implementation progress](implementation-progress.md); no whole TASK or slice exit is complete.
 
 
 ## Architecture and implementation sequence
@@ -36,7 +36,7 @@ Exit: risky mechanisms demonstrated or explicitly excluded, no unapproved paid r
 
 ### TASK-02 — Multi-cluster control foundation
 
-- [ ] Implement installation CA hub identity, connector bootstrap token and CSR rotation, local ceiling and N/N−1 version negotiation.
+- [ ] Implement installation CA hub identity, connector authentication with projected ServiceAccount tokens, the local ceiling and negotiation by wire protocol major and advertised capabilities. Qualify adjacent minor releases in both directions.
 - [ ] Implement configuration CRDs with `observedGeneration`/conditions, connector informers and change pushes with reconnect digest comparison, accepted SQL projections/executions, immutable IDs and the one multiplexed connector connection (`Queued → Sent → Running`, resend on reconnect, deduplication by work ID).
 - [ ] Implement bounded capture history projections, keyed selector/settings indexes and immutable SQL parameter snapshots with retained audience and independent expiry; no coupling of history eviction to active execution/accounting.
 - [ ] Implement REQ-DB-001 through REQ-DB-005 logical tables/migrations, query contracts, canonical lock order, transactions, `FOR UPDATE SKIP LOCKED` work claims woken by `LISTEN/NOTIFY`, outbox, `audit_event` rows in the effect transaction with batched export, and one SQL login and pool per process. Keep grants/shares/intents out of CRDs.

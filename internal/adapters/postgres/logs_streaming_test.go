@@ -16,6 +16,7 @@ import (
 )
 
 type logsStreamBindingDB struct {
+	custodydb.DBTX
 	row          custodydb.CustodyStream
 	reads, binds int
 }

@@ -67,3 +67,28 @@ func TestLiveReadRequiresIndependentOptInExactClientPathAndScope(t *testing.T) {
 		})
 	}
 }
+
+func TestLiveAndDownloadSelectWith129ClusterCeilings(t *testing.T) {
+	p, actor, now := downloadPolicyFixture()
+	limits := LiveLimits{64 << 10, 100, 1 << 20, 5}
+	live := &LiveRead{Root: LiveRootLimits{16, 4, 4, 1 << 20, 1 << 20}, Projections: []string{"packetMetadata"}}
+	p.LiveRead = live
+	path := p.Paths[0]
+	p.Paths = nil
+	p.Clients[0].PathIDs = nil
+	for i := range 129 {
+		path.ID = processingID(1000 + i)
+		path.TargetClusterID = processingID(2000 + i)
+		p.Paths = append(p.Paths, path)
+		p.Clients[0].PathIDs = append(p.Clients[0].PathIDs, path.ID)
+		live.Ceilings = append(live.Ceilings, LiveCeiling{ClusterID: path.TargetClusterID, Limits: limits})
+	}
+	live.Clients = []LiveClient{{Issuer: actor.Issuer, ID: actor.ClientID, Kind: actor.Kind, PathIDs: p.Clients[0].PathIDs}}
+	target := authorization.Target{ClusterID: path.TargetClusterID, NamespaceUID: processingID(20), WorkloadUID: processingID(21), PodUID: processingID(22)}
+	if selected, got, ok := p.SelectLive(actor, target, "packetMetadata", now); !ok || selected.ID != path.ID || got != limits {
+		t.Error("live view could not use its authorized cluster ceiling and path")
+	}
+	if selected, ok := p.Select(actor, target.ClusterID, path.StoreID, "diagnostics", "metadata", "potentialPersonalData", "context", now); !ok || selected.ID != path.ID {
+		t.Error("download could not use the authorized path")
+	}
+}

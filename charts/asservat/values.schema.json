@@ -342,11 +342,6 @@
             "maxLength": 63,
             "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
           },
-          "standby": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 16
-          },
           "issuer": {
             "type": "string",
             "pattern": "^https://",
@@ -1004,10 +999,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "standby": {
-                  "type": "integer",
-                  "minimum": 0
-                },
                 "previewSeconds": {
                   "type": "integer",
                   "minimum": 1,

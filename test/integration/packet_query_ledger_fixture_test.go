@@ -41,7 +41,7 @@ func TestPacketQueryRawLifecycleWithRealServices(t *testing.T) {
 // capacity fixture requires its own pristine database; no test resets product
 // state to make a second root fit the same database.
 func withPacketQueryManagedServices(t *testing.T, raw bool) {
-	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store) {
 		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, objects, qualifyPacketQueryManagedLifecycle, false, false, false, true, raw)
 	})
 }

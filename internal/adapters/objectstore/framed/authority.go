@@ -8,10 +8,7 @@ import (
 
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
 )
-
-const auditFormat = "asservat-authority-audit/v1"
 
 type authorityEnvelope struct {
 	Format     string             `json:"format"`
@@ -25,15 +22,6 @@ func controlAuditAAD(format, root, event string, plain []byte) []byte {
 		Digest                  artifact.Digest
 	}{format, root, event, digest(plain)})
 	return b
-}
-
-// SealAuthority uses a separate format, binding and KMS role from artifact
-// encryption. It accepts minimized control records, never arbitrary evidence.
-func SealAuthority(ctx context.Context, keys evidence.KeySealer, r audit.AuthorityRecord) ([]byte, error) {
-	if keys == nil || !r.Valid() {
-		return nil, artifact.ErrInvalid
-	}
-	return sealControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, 8<<20)
 }
 
 func sealControlAudit(ctx context.Context, keys evidence.KeySealer, format, root, event string, record any, maxPlain int) ([]byte, error) {
@@ -55,15 +43,6 @@ func sealControlAudit(ctx context.Context, keys evidence.KeySealer, format, root
 		return nil, err
 	}
 	return json.Marshal(authorityEnvelope{format, key, cipher})
-}
-
-// VerifyAuthority authenticates the complete encrypted record against the frozen
-// SQL outbox value. No ETag, HEAD response or unverified plaintext is sufficient.
-func VerifyAuthority(ctx context.Context, keys evidence.KeyOpener, r audit.AuthorityRecord, encoded []byte) error {
-	if keys == nil || !r.Valid() || len(encoded) == 0 || len(encoded) > 16<<20 {
-		return artifact.ErrInvalid
-	}
-	return verifyControlAudit(ctx, keys, auditFormat, r.RootID, r.ID, r, encoded, 8<<20)
 }
 
 func verifyControlAudit(ctx context.Context, keys evidence.KeyOpener, format, root, event string, record any, encoded []byte, maxPlain int) error {

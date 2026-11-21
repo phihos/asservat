@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-// ConnectorProtocolMajor is the hub↔connector protocol generation (ADR-333).
+// ConnectorProtocolMajor is the hub↔connector protocol generation (ADR-334).
 // A hub admits connectors of the same major only; within it, releases differ
 // by announced capabilities, and decoders ignore fields they do not know.
 // Raise it only for a change an older peer cannot ignore or refuse per
 // operation.
-const ConnectorProtocolMajor = 1
+const ConnectorProtocolMajor = 2
 
 // apiContextCapabilities is what this release's connector answers on the
 // context-start exchange: "operation/<method>", "query/<method>" and
@@ -34,23 +34,17 @@ var apiContextCapabilities = []string{
 // APIContextCapabilities returns this release's announcement (a copy).
 func APIContextCapabilities() []string { return append([]string(nil), apiContextCapabilities...) }
 
-// MaxConnectorCapabilities bounds a connector's announcement.
-const MaxConnectorCapabilities = 128
-
 // ConnectorCapabilities is a connector's announced capability set. A missing
 // capability means the connector is too old for that operation; it never
 // grants authority.
 type ConnectorCapabilities map[string]struct{}
 
-// NewConnectorCapabilities accepts at most MaxConnectorCapabilities short
-// names; nil means the announcement is unusable.
+// The Hello frame bounds the bytes in the announcement before decoding.
+// Empty capability names are malformed.
 func NewConnectorCapabilities(names []string) ConnectorCapabilities {
-	if len(names) > MaxConnectorCapabilities {
-		return nil
-	}
 	out := make(ConnectorCapabilities, len(names))
 	for _, n := range names {
-		if n == "" || len(n) > 64 {
+		if n == "" {
 			return nil
 		}
 		out[n] = struct{}{}
@@ -78,7 +72,7 @@ func (e *ConnectorTooOldError) FixedStep() string { return "connector-too-old/" 
 
 // decodeOpenRPC decodes one bounded JSON value of a cross-release channel.
 // Unknown members are ignored so a peer one release newer stays readable
-// (ADR-333); known members keep the closed decoder's rules (exact case, no
+// (ADR-334); known members keep the closed decoder's rules (exact case, no
 // duplicate, no null for a value, canonical spelling), checked by
 // SameKnownFields against the typed value's re-encoding.
 func decodeOpenRPC[T any](source io.Reader, limit int64) (T, error) {

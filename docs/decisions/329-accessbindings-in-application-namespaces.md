@@ -84,7 +84,12 @@ grant any role there. It adds no runtime component, request or state.
   namespace's UID.
 - The hub-worker LISTs and watches AccessBindings in every namespace of the
   hub cluster (ClusterRole `get/list/watch accessbindings`). It reads a
-  binding's namespace once per binding UID. A binding whose namespace is
+  namespace once per LIST of its bindings. For multiple new names on a page
+  it selects just those namespaces using the control plane's immutable
+  `kubernetes.io/metadata.name` label.
+  [Kubernetes namespace labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#automatic-labelling).
+  Each ordered watch change checks
+  the current incarnation before retaining the binding. A binding whose namespace is
   gone, lacks timestamps or was created after the binding (a later
   incarnation) grants and denies nothing; it does not stop the stream.
   PermissionSources stay in the release namespace.
@@ -93,9 +98,8 @@ grant any role there. It adds no runtime component, request or state.
   RoleBindings, whose roleRef is immutable.
 - Any namespace writer can store a binding the embedded schema refuses; it
   is kept as an invalid entry that grants and denies nothing instead of
-  stopping the whole stream. The shared bounds (1,024 bindings, 4,096 rows,
-  8 MiB) are a cluster-wide limitation; `count/accessbindings.asservat.io`
-  ResourceQuotas bound a namespace.
+  stopping the whole stream. Administrators can use Kubernetes
+  `count/accessbindings.asservat.io` ResourceQuotas in individual namespaces.
 - Removed: the delegation envelope (`identity.permissionDelegations`,
   hub-worker `delegations`, hub-api `permissionDelegations`), the permission
   admission policy builder and the delegated previewers. The permission
@@ -114,15 +118,22 @@ LIST to the hub over the existing connector lifecycle channel (ADR-169), as a
 new purpose `access-bindings`, whenever it changes (maintainer correction
 2026-11-14: no polling where an event source exists):
 
-- The connector watches AccessBindings (a metadata informer). An event
-  triggers a LIST with the hub cluster's LIST code (paginated, 1,024 objects,
-  8 MiB, each binding's namespace UID read once, a younger namespace
-  refused); bursts coalesce to at most one delivery per second, and a set
-  whose digest equals the last delivered one is not sent. A failed delivery is
-  retried after five seconds; nothing is resent periodically.
-- Every delivery conversation carries the hub's stored digest; the connector
-  answers "unchanged" when its set has it. The first conversation after a
-  connector (re)start is therefore a digest comparison.
+- The connector watches both binding collections. A change triggers a
+  paginated LIST through the same reader as the hub. The connector skips
+  bindings from an earlier namespace incarnation and enforces its 8 MiB wire
+  budget as each page arrives. An oversized set contributes no bindings.
+  Changes to either watched collection trigger its next complete read. Bursts coalesce to at most one observation per
+  second. Failed reads or deliveries retry after five seconds.
+- Before its first LIST, the authenticated connector reads its cluster's
+  delivery revision from the hub. Each acknowledged transfer returns the
+  revision for the next LIST. The connector submits against the revision it
+  held before that source read. Another
+  publication or confirmation makes a delayed submission retry from a new LIST.
+  The hub compares digests so an unchanged set only needs a confirmation.
+  Kubernetes pagination holds no federation slot or database connection.
+  An idle watch needs no hub requests.
+  Both binding kinds share the documented wire budget in
+  [the permission contract](../../specs/permissions.md).
 - The connector presents its cluster credential on that channel (ADR-168,
   exporter-bound signature, checked under the SQL lineage lock). The
   federation asks for the delivery only after that check and stores it under
@@ -131,8 +142,9 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
   grants `get/list/watch accessbindings` to the connector's ClusterRole in
   `mode: cluster` only.
 - The federation validates every spec with the same embedded schema: a
-  refused spec becomes an invalid entry that grants and denies nothing. A
-  delivery over 1,024 bindings or 4,096 subject-role rows is refused.
+  schema-invalid spec becomes an inert entry. A stored Deny with an
+  unrepresentable subject makes its scope unavailable as specified in
+  [permission management](../../specs/permissions.md).
 - It is stored in `remote_access_binding_delivery` (migration 00162), one row
   per cluster; an older delivery never replaces a newer one. A trigger
   (migration 00163) notifies `asservat_remote_bindings` in the writing
@@ -145,9 +157,8 @@ new purpose `access-bindings`, whenever it changes (maintainer correction
   stays in effect, allows included, until a newer delivery replaces it:
   connector liveness is a health signal, not authority; every new remote
   action needs the connector anyway, and expiring allows broke stored-evidence
-  reads during connector outages. A cluster whose bindings do not fit the
-  stream's remaining 1,024 bases and 4,096 rows contributes nothing rather
-  than a partial set.
+  reads during connector outages. A cluster reporting an incomplete or oversized
+  observation becomes unavailable until its next complete delivery.
 - The escalation ValidatingAdmissionPolicy and the aggregated ClusterRoles
   render in every mode.
 
@@ -171,17 +182,21 @@ Complexity gate:
 3. Typical deployments with more than one cluster.
 4. OCM and Karmada agents report per-cluster state under their own identity
    (above).
-5. Privilege: `get/list/watch accessbindings` on the workload-cluster
+5. Privilege: `list/watch accessbindings,clusteraccessbindings` on the workload-cluster
    connector; the federation's existing `cluster-credential` login gets
    SELECT/INSERT/UPDATE on one table, the hub-worker's `permission-accept`
    login SELECT. No new credential, endpoint, listener or exposure.
 6. Degraded states: one, an unreachable connector (its last delivered set
-   stays in effect until it delivers again); an over-budget cluster grants
-   nothing.
+   stays in effect until it delivers again). A connected reporter unable to send
+   a complete set names that condition in the same authenticated exchange.
+   The projection records just the unavailable cluster IDs beside its existing
+   revision. Fresh decisions for those clusters fail until a complete delivery
+   is accepted. This requires no additional credential, decision-time SQL
+   round trip or background reconciliation.
 7. No configuration.
 8. Depends on the connector reaching the federation, which every
    `mode: cluster` function already needs.
-9. Per cluster: one AccessBinding watch on the member's API server; one
+9. Per cluster: one watch per binding kind on the member's API server; one
    LIST and one lifecycle conversation per change (at most one per second,
    bounded by 8 MiB; typical deliveries are kilobytes), plus one digest
    comparison per connector start; one upsert and one notification per

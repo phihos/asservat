@@ -37,7 +37,7 @@ func TestNilHandlerReturnsUnavailable(t *testing.T) {
 }
 
 func TestHandlerReportsRefusalStage(t *testing.T) {
-	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
+	router, e := NewRouter(nil)
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -7,6 +7,7 @@ import (
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
@@ -43,24 +44,17 @@ func unavailable(cause error) error {
 	return errors.Join(value.ErrUnavailable, cause)
 }
 
-func (r *RegionalLifecycle) run(ctx context.Context, purpose connectorlifecycle.Purpose, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
-	return r.runLocal(ctx, purpose, nil, owner...)
-}
-
-func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifecycle.Purpose, local any, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+func (r *RegionalLifecycle) run(ctx context.Context, opening connectorlifecycle.Opening, delivery *contracts.AccessBindingDelivery) (connectorlifecycle.HubFrame, error) {
 	var zero connectorlifecycle.HubFrame
 	if r.Client == nil || r.Now == nil || ctx == nil || !r.Process.Valid() {
 		return zero, value.ErrInvalid
 	}
 	finished := func() {}
 	if r.Timing != nil {
-		finished = r.Timing(purpose)
+		finished = r.Timing(opening.Purpose)
 	}
-	o := connectorlifecycle.Opening{Purpose: purpose, OperationID: uuid.NewString(), Process: r.Process}
-	if len(owner) == 1 {
-		o.Owner = &owner[0]
-	}
-	frame, err := r.Client.Run(ctx, o, local)
+	opening.Protocol, opening.OperationID, opening.Process = contracts.ConnectorProtocolMajor, uuid.NewString(), r.Process
+	frame, err := r.Client.Run(ctx, opening, delivery)
 	if err != nil {
 		return zero, errRegionalChannel
 	}
@@ -69,16 +63,6 @@ func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose connectorlifec
 	}
 	finished()
 	return frame, nil
-}
-
-// ReadContextStartOwners asks the hub for its current context-start owner set
-// (ADR-172), presented by this process.
-func (r *RegionalLifecycle) ReadContextStartOwners(ctx context.Context) (value.APIContextOwnerCandidates, error) {
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerCandidates)
-	if err != nil || frame.Owners == nil || !frame.Owners.Valid(r.Now()) {
-		return value.APIContextOwnerCandidates{}, unavailable(err)
-	}
-	return *frame.Owners, nil
 }
 
 // AuthenticateOwner authenticates the owner of an actual TLS session: the hub
@@ -94,7 +78,7 @@ func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fl
 	if err != nil || certificate.Usage != "server" || !certificate.Valid(r.Now()) {
 		return zero, value.ErrDenied
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeOwnerAuthentication, certificate)
+	frame, err := r.run(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeOwnerAuthentication, Owner: &certificate}, nil)
 	if err != nil || frame.Owner == nil {
 		return zero, unavailable(err)
 	}
@@ -114,33 +98,18 @@ func (r *RegionalLifecycle) AuthenticateOwner(ctx context.Context, connection fl
 	return out, nil
 }
 
-// AccessBindingReader is the connector's own AccessBinding LIST (ADR-329).
-type AccessBindingReader interface {
-	AccessBindingDelivery(context.Context) (contracts.AccessBindingDelivery, error)
+func (r *RegionalLifecycle) bindingRevision(ctx context.Context) (string, error) {
+	return r.exchangeBindings(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeBindingRevision}, nil)
 }
 
-// deliveringLocal answers the hub's delivery request of one conversation
-// with a LIST taken after the hub verified the presentation.
-type deliveringLocal struct {
-	bindings AccessBindingReader
+func (r *RegionalLifecycle) deliverAccessBindings(ctx context.Context, revision string, delivery contracts.AccessBindingDelivery) (string, error) {
+	return r.exchangeBindings(ctx, connectorlifecycle.Opening{Purpose: connectorlifecycle.PurposeAccessBindings, BindingRevision: revision}, &delivery)
 }
 
-func (d deliveringLocal) ReadAccessBindings(ctx context.Context) (contracts.AccessBindingDelivery, error) {
-	out, err := d.bindings.AccessBindingDelivery(ctx)
-	regionalLocalFailed("access bindings", err)
-	return out, err
-}
-
-// DeliverAccessBindings sends this cluster's complete AccessBinding LIST to
-// the hub in one lifecycle conversation, presented by this process
-// (ADR-329). The hub attributes it to the cluster credential's cluster.
-func (r *RegionalLifecycle) DeliverAccessBindings(ctx context.Context, bindings AccessBindingReader) error {
-	if bindings == nil || ctx == nil {
-		return value.ErrUnavailable
+func (r *RegionalLifecycle) exchangeBindings(ctx context.Context, opening connectorlifecycle.Opening, delivery *contracts.AccessBindingDelivery) (string, error) {
+	frame, err := r.run(ctx, opening, delivery)
+	if err != nil || !authorization.UUID(frame.BindingRevision) {
+		return "", unavailable(err)
 	}
-	_, err := r.runLocal(ctx, connectorlifecycle.PurposeAccessBindings, deliveringLocal{bindings})
-	if err != nil {
-		return unavailable(err)
-	}
-	return nil
+	return frame.BindingRevision, nil
 }

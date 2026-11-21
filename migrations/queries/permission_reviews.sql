@@ -2,10 +2,21 @@
 -- ADR-245: every accepted decision-time source row of a stream, current or not.
 SELECT * FROM permission_review_source WHERE stream_id=$1 ORDER BY uid;
 
+-- name: LockReviewSourcesForTrustChange :many
+-- At epoch start only a change of trust
+-- retires review assignments. Lock sources before the final stream fence,
+-- in the same order used to record a decision.
+SELECT rs.* FROM permission_review_source rs JOIN permission_stream s ON s.id=rs.stream_id
+WHERE rs.stream_id=sqlc.arg(stream_id) AND s.trust_digest <> sqlc.arg(keeping_trust)::bytea
+ORDER BY rs.uid FOR NO KEY UPDATE OF rs;
+
 -- name: UpsertPermissionReviewSource :exec
-INSERT INTO permission_review_source(stream_id,uid,epoch,seen_sequence,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-ON CONFLICT(stream_id,uid) DO UPDATE SET epoch=EXCLUDED.epoch,seen_sequence=EXCLUDED.seen_sequence,generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,authority_digest=EXCLUDED.authority_digest,cluster_id=EXCLUDED.cluster_id,role=EXCLUDED.role,source_json=EXCLUDED.source_json,accepted_audit_id=EXCLUDED.accepted_audit_id;
+INSERT INTO permission_review_source(stream_id,uid,epoch,generation,resource_version,spec_digest,authority_digest,cluster_id,role,source_json,accepted_audit_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+ON CONFLICT(stream_id,uid) DO UPDATE SET epoch=EXCLUDED.epoch,generation=EXCLUDED.generation,resource_version=EXCLUDED.resource_version,spec_digest=EXCLUDED.spec_digest,authority_digest=EXCLUDED.authority_digest,cluster_id=EXCLUDED.cluster_id,role=EXCLUDED.role,source_json=EXCLUDED.source_json,accepted_audit_id=EXCLUDED.accepted_audit_id;
+
+-- name: MarkReviewSourcesUnavailable :exec
+UPDATE permission_review_source SET epoch=NULL WHERE stream_id=$1 AND epoch IS NOT NULL;
 
 -- name: DeletePermissionReviewSource :exec
 DELETE FROM permission_review_source WHERE stream_id=$1 AND uid=$2;
@@ -21,9 +32,9 @@ DELETE FROM permission_review_source WHERE stream_id=$1;
 
 -- name: CurrentPermissionReviewSources :many
 -- The current, acknowledged decision-time sources of one cluster.
-SELECT rs.*, au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256,au.acknowledged_at
+SELECT rs.*
 FROM permission_review_source rs JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.seen_sequence=$3 AND rs.cluster_id=$4 AND au.acknowledged_at IS NOT NULL
+WHERE rs.stream_id=$1 AND rs.epoch=$2 AND rs.cluster_id=$3
 ORDER BY rs.uid;
 
 -- name: LockPermissionReviewSource :one
@@ -56,13 +67,11 @@ DELETE FROM permission_review_decision x WHERE x.assignment_id=sqlc.arg(assignme
 
 -- name: SelectPermissionReviews :many
 -- The fresh decision-time allows of one exact Pod, newest first.
-SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until,rs.accepted_audit_id,
-au.acknowledged_at,au.object_key,au.object_version,au.object_etag,au.object_bytes,au.object_sha256
+SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,a.source_uid,d.decided_at,d.fresh_until
 FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
-LEFT JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2 AND rs.seen_sequence=$3
-AND d.cluster_id=$4 AND d.namespace_uid=$5 AND d.workload_uid=$6 AND d.pod_uid=$7 AND d.fresh_until>clock_timestamp()
+WHERE a.stream_id=$1 AND a.retired_at IS NULL AND rs.epoch=$2
+AND d.cluster_id=$3 AND d.namespace_uid=$4 AND d.workload_uid=$5 AND d.pod_uid=$6 AND d.fresh_until>clock_timestamp()
 ORDER BY d.decided_at DESC,a.id;
 
 -- name: SelectRecordedReviews :many
@@ -90,7 +99,7 @@ max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS
 FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
 JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
 JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
-WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3
 GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
 ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001;
 

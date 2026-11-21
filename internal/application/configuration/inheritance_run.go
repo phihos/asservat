@@ -3,8 +3,6 @@ package configuration
 import (
 	"cmp"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"io"
 	"maps"
@@ -17,10 +15,11 @@ import (
 
 // Inheritance is the source-derived part of one prepared permission batch.
 type Inheritance struct {
-	Bases              []value.PermissionBasis
-	UnavailableSources []string
-	SourcesUnavailable bool
-	Namespaces         *value.NamespaceObservation
+	UnavailableClusters []string `json:",omitempty"`
+	Bases               []value.PermissionBasis
+	UnavailableSources  []string
+	SourcesUnavailable  bool
+	Namespaces          *value.NamespaceObservation
 	// RemoteNamespaces are the minimized current observations of joined
 	// clusters other than the hub's (ADR-247), sorted by cluster.
 	RemoteNamespaces []value.NamespaceObservation `json:",omitempty"`
@@ -33,19 +32,19 @@ type Inheritance struct {
 }
 
 // namespaceItem is one ordered delivery of the namespace feed: a complete
-// LIST, a watch transition or the start time of a cleanly ended session.
+// LIST, a watch transition or definitive loss of the observed history.
 type namespaceItem struct {
-	list  *value.NamespaceList
-	event *value.NamespaceEvent
-	fresh time.Time
+	historyLost bool
+	list        *value.NamespaceList
+	event       *value.NamespaceEvent
 }
 
-// runNamespaceFeed lists the namespaces once, then follows them with finite
-// watch sessions resumed from the last delivered cursor. A transient watch
+// runNamespaceFeed lists the namespaces once, then follows them with a watch
+// resumed from the last delivered cursor. A transient watch
 // failure resumes from the same cursor, which keeps continuity; expired
 // history (value.ErrChanged) needs a new LIST and so a new journal. Items are
 // delivered in order and each is processed before the next is read.
-func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.NamespaceKeys, now func() time.Time, out chan<- namespaceItem) {
+func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.NamespaceKeys, out chan<- namespaceItem) {
 	send := func(it namespaceItem) bool {
 		select {
 		case out <- it:
@@ -72,14 +71,20 @@ func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.Names
 			}
 			continue
 		}
-		if !send(namespaceItem{list: &list}) {
-			return
-		}
 		cursor := list.ResourceVersion
 		for ctx.Err() == nil {
-			start := now()
 			w, err := o.WatchNamespaces(ctx, cursor, keys)
 			if err == nil {
+				if list.ResourceVersion != "" {
+					baseline := list
+					if !send(namespaceItem{list: &baseline}) {
+						w.Close()
+						return
+					}
+					// Publish a baseline only after its watch has opened.
+					// Reopening from the same cursor preserves that baseline.
+					list = value.NamespaceList{}
+				}
 				for {
 					var e value.NamespaceEvent
 					if e, err = w.Next(ctx); err != nil {
@@ -93,14 +98,20 @@ func runNamespaceFeed(ctx context.Context, o NamespaceObserver, keys value.Names
 				}
 				w.Close()
 				if errors.Is(err, io.EOF) {
-					if !send(namespaceItem{fresh: start}) {
-						return
-					}
 					continue
 				}
 			}
-			if errors.Is(err, value.ErrChanged) || !pause() {
+			if errors.Is(err, value.ErrChanged) || errors.Is(err, value.ErrDenied) {
+				if !send(namespaceItem{historyLost: true}) {
+					return
+				}
+				if errors.Is(err, value.ErrDenied) && !pause() {
+					return
+				}
 				break
+			}
+			if !pause() {
+				return
 			}
 		}
 	}
@@ -153,7 +164,7 @@ func (s *bindingRun) restartFeed(ctx context.Context, keys value.NamespaceKeys) 
 	f := &namespaceFeed{keys: keys, items: make(chan namespaceItem, 1), cancel: cancel, done: make(chan struct{})}
 	go func() {
 		defer close(f.done)
-		runNamespaceFeed(child, s.r.Namespaces, keys, s.r.Now, f.items)
+		runNamespaceFeed(child, s.r.Namespaces, keys, f.items)
 	}()
 	s.feed = f
 }
@@ -166,41 +177,35 @@ func (s *bindingRun) feedItems() <-chan namespaceItem {
 }
 
 // namespaceItem applies one feed delivery. A transition that changes the
-// derived inheritance is accepted before the next one is read; when that is
-// impossible now, continuity is dropped instead, so that the next acceptance
-// compares exact namespace resourceVersions and retires what changed.
+// derived inheritance is accepted before the next one is read. A trust or
+// storage error ends the epoch before any later transition is accepted.
 func (s *bindingRun) namespaceItem(ctx context.Context, it namespaceItem) error {
 	switch {
+	case it.historyLost:
+		if s.namespaces == nil {
+			return nil
+		}
+		s.namespaces = nil
 	case it.list != nil:
 		j, err := NewNamespaceJournal(*it.list)
 		if err != nil {
 			s.restartFeed(ctx, s.feed.keys)
-			return nil
+		} else {
+			s.namespaces, s.continuity = j, s.continuity+1
 		}
-		s.namespaces, s.continuity = j, s.continuity+1
 	case it.event != nil:
 		if s.namespaces == nil {
 			return nil
 		}
 		if err := s.namespaces.Apply(*it.event); err != nil {
 			s.restartFeed(ctx, s.feed.keys)
+		} else if it.event.Type == "BOOKMARK" {
 			return nil
 		}
 	default:
-		if s.namespaces != nil {
-			s.namespaces.Fresh(it.fresh)
-		}
 		return nil
 	}
-	now := s.r.Now()
-	if inheritanceDigest(s.inheritance(now)) == s.lastInheritance {
-		return nil
-	}
-	if !s.journal.Ready(now) || !now.Before(s.trustUntil) {
-		s.continuity++
-		return nil
-	}
-	return s.accept(ctx, false)
+	return s.accept(ctx, true)
 }
 
 type inheritanceState struct {
@@ -219,27 +224,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	s.remoteBindingBases(now, &out)
 	// ClusterAccessBindings are read with every LIST (ADR-335 D14).
 	for _, b := range s.clusterBindings {
-		p, ok := bindingBasis(b, now)
-		if !ok {
-			continue
-		}
-		if len(b.NamespaceSelector) == 0 {
-			out.Bases = append(out.Bases, p)
-			continue
-		}
-		// A selector-narrowed binding has one basis per selected namespace.
-		// While its cluster's labels are unknown an allow grants nothing
-		// and a deny covers every namespace.
-		namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID, now))
-		if !known && p.Effect == "Deny" {
-			out.Bases = append(out.Bases, p)
-		}
-		for _, ns := range namespaces {
-			q := p
-			q.Scope.Namespace = ns
-			q.ScopeDigest = PermissionScopeDigest(q)
-			out.Bases = append(out.Bases, q)
-		}
+		s.appendBindingBasis(&out, b, now)
 	}
 	if !s.sourcesComplete {
 		out.SourcesUnavailable = true
@@ -249,11 +234,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	var live *value.NamespaceObservation
 	if s.namespaces != nil {
 		live = s.namespaces.Observation(true)
-		// The recorded observation is what the preview evaluates against;
-		// it is withdrawn once older than the positive freshness interval.
-		if now.Before(s.namespaces.ObservedAt().Add(authorization.PermissionObservationInterval)) {
-			out.Namespaces = s.namespaces.Observation(false)
-		}
+		out.Namespaces = s.namespaces.Observation(false)
 	}
 	sources := slices.Clone(s.sources)
 	slices.SortFunc(sources, func(a, b value.Source) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
@@ -326,13 +307,18 @@ func (s *bindingRun) observation(cluster string, now time.Time) *value.Namespace
 // inheritanceDigest identifies the derived state independent of continuity
 // flags, which never change what is accepted.
 func inheritanceDigest(i inheritanceState) [32]byte {
-	v := i.Inheritance
-	v.Bases = slices.Clone(v.Bases)
-	for n := range v.Bases {
-		v.Bases[n].Continuous = false
+	d, _ := permissionInputDigest(i.Inheritance.withoutContinuity())
+	return d
+}
+
+// Continuity affects assignment retention during an acceptance, but does not
+// change the observed contents of the inputs.
+func (i Inheritance) withoutContinuity() Inheritance {
+	i.Bases = slices.Clone(i.Bases)
+	for n := range i.Bases {
+		i.Bases[n].Continuous = false
 	}
-	b, _ := json.Marshal(v)
-	return sha256.Sum256(b)
+	return i
 }
 
 // minimizedObservation drops the versions, as the accepted form does.
@@ -373,5 +359,34 @@ func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source) {
 	}
 	for _, g := range grants {
 		out.Bases = append(out.Bases, WorkloadBasis(src, g))
+	}
+}
+
+// appendBindingBasis applies the same namespace selector to local and delivered bindings.
+func (s *bindingRun) appendBindingBasis(out *inheritanceState, b value.Binding, now time.Time) {
+	if b.UnavailableDeny {
+		out.UnavailableClusters = append(out.UnavailableClusters, b.Scope.ClusterID)
+		return
+	}
+	p, ok := bindingBasis(b, now)
+	if !ok {
+		return
+	}
+	if len(b.NamespaceSelector) == 0 {
+		out.Bases = append(out.Bases, p)
+		return
+	}
+	// A selector-narrowed binding has one basis per selected namespace.
+	// While its cluster's labels are unknown an allow grants nothing
+	// and a deny covers every namespace.
+	namespaces, known := SelectedNamespaces(b.NamespaceSelector, s.observation(b.Scope.ClusterID, now))
+	if !known && p.Effect == "Deny" {
+		out.Bases = append(out.Bases, p)
+	}
+	for _, ns := range namespaces {
+		q := p
+		q.Scope.Namespace = ns
+		q.ScopeDigest = PermissionScopeDigest(q)
+		out.Bases = append(out.Bases, q)
 	}
 }

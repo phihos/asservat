@@ -42,9 +42,18 @@ func (c *PermissionClient) installationConfigMode(ctx context.Context, name, uid
 // Callers separately bracket namespace and native protection; decoded bytes
 // provide no freshness or authority and perform no implicit I/O.
 func (c *PermissionClient) decodeInstallationConfig(raw []byte, name, uid string, requireImmutable bool) (map[string]string, value.Resource, error) {
+	return c.decodeConfigMap(raw, name, uid, requireImmutable, false)
+}
+
+func (c *PermissionClient) decodeConfigMap(raw []byte, name, uid string, requireImmutable, fromTypedList bool) (map[string]string, value.Resource, error) {
 	var ref value.Resource
 	var object, metadata map[string]json.RawMessage
-	if json.Unmarshal(raw, &object) != nil || string(object["apiVersion"]) != `"v1"` || string(object["kind"]) != `"ConfigMap"` || json.Unmarshal(object["metadata"], &metadata) != nil {
+	if json.Unmarshal(raw, &object) != nil {
+		return nil, ref, value.ErrInvalid
+	}
+	// Kubernetes can omit TypeMeta in members of a typed v1 ConfigMapList.
+	typed := string(object["apiVersion"]) == `"v1"` && string(object["kind"]) == `"ConfigMap"`
+	if (!typed && !(fromTypedList && object["apiVersion"] == nil && object["kind"] == nil)) || json.Unmarshal(object["metadata"], &metadata) != nil {
 		return nil, ref, value.ErrInvalid
 	}
 	if requireImmutable {

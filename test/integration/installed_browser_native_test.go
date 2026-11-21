@@ -266,10 +266,49 @@ func installedBrowserSame(what string, mcp, browser map[string]any, required ...
 	return nil
 }
 
-// Per-call identities and clocks. Execution and plan digests bind the
-// preview's own capture ID and deadline, so they differ for two previews of
-// the same normalized plan; asOf is the read time of a handling notice.
-var installedBrowserPreviewVolatile = []string{"plan_digest", "expires_at", "execution_digest", "assessmentID", "planDigest", "generatedAt"}
+// Browser and MCP clients can have different client-bound plan digests. Each
+// assessment also names its own observation and validity interval.
+func installedBrowserComparablePreview(raw json.RawMessage) (map[string]any, error) {
+	preview, err := installedBrowserComparable(raw, "plan_digest", "expires_at", "execution_digest", "assessmentID", "planDigest")
+	if err != nil {
+		return nil, err
+	}
+	assessment, _ := preview["capture_assessment"].(map[string]any)
+	generated, _ := assessment["generatedAt"].(string)
+	deadline, _ := assessment["validUntil"].(string)
+	issued, e1 := time.Parse(time.RFC3339Nano, generated)
+	until, e2 := time.Parse(time.RFC3339Nano, deadline)
+	if e1 != nil || e2 != nil || issued.IsZero() || !issued.Before(until) {
+		return nil, errors.New("capture assessment needs a deadline after its generation")
+	}
+	delete(assessment, "generatedAt")
+	delete(assessment, "validUntil")
+	return preview, nil
+}
+
+func TestInstalledBrowserComparesEachAssessmentWithinItsOwnLifetime(t *testing.T) {
+	preview := func(generated, deadline string, bytes int) (map[string]any, error) {
+		return installedBrowserComparablePreview(json.RawMessage(fmt.Sprintf(`{"capture_assessment":{"generatedAt":%q,"validUntil":%q,"outputLimit":%d}}`, generated, deadline, bytes)))
+	}
+	const first, second, third = "2026-11-01T12:00:00Z", "2026-11-01T12:00:01Z", "2026-11-01T12:00:02Z"
+	left, err := preview(first, second, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	right, err := preview(second, third, 100)
+	if err != nil || installedBrowserSame("preview", left, right, "capture_assessment") != nil {
+		t.Fatal("equivalent previews differ", err)
+	}
+	changed, err := preview(second, third, 101)
+	if err != nil || installedBrowserSame("preview", left, changed, "capture_assessment") == nil {
+		t.Fatal("different output limits compared equal", err)
+	}
+	for _, deadline := range []string{"", "invalid", first, second} {
+		if _, err := preview(second, deadline, 100); err == nil {
+			t.Fatalf("invalid deadline %q accepted", deadline)
+		}
+	}
+}
 
 // qualifyInstalledBrowserJourney is the S-02 browser half after the MCP
 // capture is published and downloaded: as the same Keycloak user through the
@@ -320,8 +359,8 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 	mcpPreview := mcpRead("preview_capture", previewArguments)
 	var browserPreview json.RawMessage
 	b.read(ctx, "preview_capture", previewArguments, &browserPreview)
-	left, e1 := installedBrowserComparable(mcpPreview, installedBrowserPreviewVolatile...)
-	right, e2 := installedBrowserComparable(browserPreview, installedBrowserPreviewVolatile...)
+	left, e1 := installedBrowserComparablePreview(mcpPreview)
+	right, e2 := installedBrowserComparablePreview(browserPreview)
 	if e1 != nil || e2 != nil {
 		t.Fatal("browser journey preview data", e1, e2)
 	}
@@ -555,9 +594,9 @@ func installedBrowserExcerpt(t *testing.T, ctx context.Context, b *installedBrow
 
 // qualifyInstalledBrowserSubmission is the optional browser-submitted request:
 // a console preview, request_capture under its own idempotency key with the
-// same same-key retry as MCP, then the passive wait until the
+// same retry behavior as MCP, then the passive wait until the
 // capture is collected and its case publishes one artifact. It consumes one
-// more capture record, resolution-lane records and a full collection and
+// more capture record and a full collection and
 // publication (up to five minutes). Call it before the MCP capture so it does
 // not shorten the MCP artifact's 600-second window; it downloads nothing.
 func qualifyInstalledBrowserSubmission(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot *x509.Certificate, address, origin string, previewArguments map[string]any, diagnose func()) (captureID, caseID string) {
@@ -616,7 +655,7 @@ func qualifyInstalledBrowserSubmission(t *testing.T, ctx context.Context, identi
 		}
 		if code != "ReviewChanged" && code != "PreviewExpired" || attempt == 3 {
 			diagnose()
-			t.Fatal("browser capture request was not accepted", code)
+			t.Fatal("browser capture request failed", code)
 		}
 		if installedJourneyPause(ctx, 2*time.Second) != nil {
 			t.Fatal("browser capture request", ctx.Err())

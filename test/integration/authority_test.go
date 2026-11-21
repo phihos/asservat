@@ -3,23 +3,22 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -28,10 +27,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -53,6 +49,76 @@ func (k authorityTestKeys) Open(ctx context.Context, key artifact.SealedKey, ad 
 	}
 	return k.a.Open(nil, b[:k.a.NonceSize()], b[k.a.NonceSize():], ad)
 }
+
+// Delay each client write so a serial document query per cluster exceeds the
+// production reconciler's three-second refresh window.
+type delayedPermissionConn struct{ net.Conn }
+
+func (c delayedPermissionConn) Write(b []byte) (int, error) {
+	time.Sleep(20 * time.Millisecond)
+	return c.Conn.Write(b)
+}
+
+type remoteBindingHubFixture struct {
+	cluster  string
+	bindings []cfg.Binding
+}
+
+func (f remoteBindingHubFixture) PermissionSnapshot(context.Context) (cfg.Snapshot, error) {
+	now := time.Now()
+	return cfg.Snapshot{ClusterID: f.cluster, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: f.cluster}, BindingResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second), SourcesComplete: true, Bindings: f.bindings}, nil
+}
+
+func (f remoteBindingHubFixture) ClusterAccessBindings(ctx context.Context) (cfg.Snapshot, error) {
+	return f.PermissionSnapshot(ctx)
+}
+func (remoteBindingHubFixture) PermissionTrust(context.Context) (configapp.PermissionTrust, error) {
+	now := time.Now()
+	return configapp.PermissionTrust{Digest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
+}
+
+var errBaselineAccepted = errors.New("test stops at watch after initial acceptance")
+
+func (f remoteBindingHubFixture) WatchBindings(context.Context, string) (configapp.BindingWatch, error) {
+	return stopAfterBaseline{}, nil
+}
+
+type stopAfterBaseline struct{}
+
+func (stopAfterBaseline) Close() {}
+func (stopAfterBaseline) Next(context.Context) (cfg.BindingEvent, error) {
+	return cfg.BindingEvent{}, errBaselineAccepted
+}
+
+type observedPermissionWriter struct {
+	*postgres.Permissions
+	accepted  chan cfg.PermissionAcceptance
+	renewed   chan cfg.PermissionFence
+	refreshed chan struct{}
+}
+
+func (w *observedPermissionWriter) AcceptPermissions(ctx context.Context, b cfg.PermissionBatch) (cfg.PermissionAcceptance, error) {
+	a, err := w.Permissions.AcceptPermissions(ctx, b)
+	if err == nil {
+		w.accepted <- a
+	}
+	return a, err
+}
+func (w *observedPermissionWriter) RenewPermissions(ctx context.Context, f cfg.PermissionFence) (cfg.PermissionFence, error) {
+	next, err := w.Permissions.RenewPermissions(ctx, f)
+	if err == nil {
+		w.renewed <- next
+	}
+	return next, err
+}
+func (w *observedPermissionWriter) RefreshPermissions(ctx context.Context, b cfg.PermissionBatch) error {
+	select {
+	case w.refreshed <- struct{}{}:
+	default:
+	}
+	return w.Permissions.RefreshPermissions(ctx, b)
+}
+
 func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -93,35 +159,6 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	if _, err = pool.Exec(ctx, "DELETE FROM permission_assignment"); err == nil {
 		t.Fatal("permission role can delete history")
 	}
-	bridge := tlsBridge(t, fixture.S3)
-	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
-	s3admin := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
-	bucket := "authority-audit"
-	if _, err = s3admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s3admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
-	}
-	store, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw := make([]byte, 32)
-	if _, err = rand.Read(raw); err != nil {
-		t.Fatal(err)
-	}
-	block, err := aes.NewCipher(raw)
-	clear(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keys := authorityTestKeys{aead}
-	objects := &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}
 	type setup struct {
 		p      *postgres.Permissions
 		b      cfg.PermissionBatch
@@ -154,25 +191,13 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		t.Helper()
 		r, err := s.p.AcceptPermissions(ctx, s.b)
 		if err != nil {
+			var step interface{ FixedStep() string }
+			if errors.As(err, &step) {
+				t.Fatalf("accept: %s (%v)", step.FixedStep(), err)
+			}
 			t.Fatal(err)
 		}
 		s.b.ExpectedSequence = r.Sequence
-	}
-	flush := func(t *testing.T, p *postgres.Permissions) {
-		t.Helper()
-		for i := 0; i < 100; i++ {
-			rows, err := p.PendingAuthorityAudits(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(rows) == 0 {
-				return
-			}
-			if err = (auditapp.AuthorityPublisher{Ledger: p, Objects: objects}).PublishAuthority(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		t.Fatal("audit drain exceeded bound")
 	}
 	projection := func(t *testing.T, s setup) authorization.Projection {
 		t.Helper()
@@ -189,66 +214,303 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s.b.Bases[0].Resource.SpecDigest[0]++
 		s.b.InputDigest[0]++
 	}
-	for _, kind := range []string{"reset", "initial", "assignment"} {
-		for _, version := range []string{"", "null"} {
-			label := version
-			if label == "" {
-				label = "empty"
+	t.Run("cluster-wide-allow-deny-and-retirement", func(t *testing.T) {
+		s := create(t)
+		allow := s.b.Bases[0]
+		allow.Resource.Kind = cfg.ClusterAccessBindingKind
+		allow.Scope.Namespace = cfg.AllNamespaces
+		allow.ScopeDigest = configapp.PermissionScopeDigest(allow)
+		deny := allow
+		deny.Resource.UID = custodyID()
+		deny.Effect = "Deny"
+		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
+
+		check := func(want bool, reason string, bases ...cfg.PermissionBasis) {
+			t.Helper()
+			s.b = fresh(s.b)
+			s.b.InputDigest[0]++
+			s.b.Bases = bases
+			accept(t, &s)
+
+			now := time.Now()
+			who := identity.Identity{Principal: identity.Principal{Issuer: allow.Subjects[0].Issuer, Subject: "alice", ClientID: "console", Kind: identity.Human},
+				Groups: []string{allow.Subjects[0].ID}, Scopes: []string{"evidence:read", "evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			// Each decision targets a different namespace in the covered cluster.
+			s.target.NamespaceUID = custodyID()
+			got := authorization.ContextEligibility(who, projection(t, s), s.target, now)
+			if got.Eligible != want || (!want && got.Reason != reason) || (want && (len(got.DefaultAudience) != 1 || got.DefaultAudience[0].BasisKind != cfg.ClusterAccessBindingKind || got.DefaultAudience[0].BasisUID != allow.Resource.UID)) {
+				t.Fatalf("cluster-wide decision eligible=%v reason=%s audience=%v", got.Eligible, got.Reason, got.DefaultAudience)
 			}
-			t.Run("retained-audit-"+kind+"-"+label, func(t *testing.T) {
-				s := create(t)
-				accept(t, &s)
-				flush(t, s.p)
-				next(&s)
-				s.b.Bases[0].Subjects = []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "new-owner"}}
-				deny := s.b.Bases[0]
-				deny.Resource.UID = custodyID()
-				deny.Effect = "Deny"
-				deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
-				s.b.Bases = append(s.b.Bases, deny)
-				accept(t, &s)
-				flush(t, s.p)
-				original := projection(t, s)
-				if len(original.Allows) != 1 || len(original.Denies) != 1 || !original.DeniesComplete {
-					t.Fatal("original audited allow/deny baseline unavailable")
-				}
-				event := s.b.Epoch
-				if kind == "initial" {
-					if err := admin.QueryRow(ctx, "SELECT initial_audit_id FROM permission_stream WHERE id=$1", s.b.RootID).Scan(&event); err != nil {
-						t.Fatal(err)
-					}
-				} else if kind == "assignment" {
-					if err := admin.QueryRow(ctx, "SELECT a.activation_audit_id FROM permission_assignment a JOIN permission_basis b ON b.stream_id=a.stream_id AND b.basis_key=a.basis_key WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.effect='Allow'", s.b.RootID).Scan(&event); err != nil {
-						t.Fatal(err)
-					}
-				}
-				withHistoricalAuthorityVersion(t, ctx, admin, s.b.RootID, event, version, func() {
-					got := projection(t, s)
-					if len(got.Allows) != 0 || len(got.Denies) != 1 || !got.DeniesComplete || got.Denies[0].Audience != original.Denies[0].Audience {
-						t.Fatal("old receipt enabled access or hid a current deny")
-					}
-					// A genuine newer source observation cannot repair immutable audit history.
-					s.b = fresh(s.b)
-					if err := s.p.RefreshPermissions(ctx, s.b); err != nil {
-						t.Fatal(err)
-					}
-					got = projection(t, s)
-					if len(got.Allows) != 0 || len(got.Denies) != 1 || !got.DeniesComplete {
-						t.Fatal("source refresh repaired old audit authority")
-					}
-					if !time.Now().Before(s.b.FreshUntil) {
-						t.Fatal("audit denial crossed original source interval")
-					}
-				})
-				if got := projection(t, s); len(got.Allows) != 1 || len(got.Denies) != 1 || got.Allows[0].Audience != original.Allows[0].Audience {
-					t.Fatal("exact restored authority baseline changed")
-				}
-				if _, err := pool.Exec(ctx, "SET session_replication_role=replica"); err == nil {
-					t.Fatal("runtime can rewrite acknowledged audit history")
-				}
+		}
+		check(true, "", allow)
+		check(false, "ExplicitDeny", allow, deny)
+		check(true, "", allow)
+		check(false, "NoEntitlement")
+		var retired int
+		err := admin.QueryRow(ctx, `SELECT count(*) FROM permission_assignment a JOIN authority_audit e ON e.id=a.retirement_audit_id WHERE a.stream_id=$1 AND a.retired_at IS NOT NULL`, s.b.RootID).Scan(&retired)
+		if err != nil || retired != 2 {
+			t.Fatal("audited cluster-wide retirements", retired, err)
+		}
+	})
+
+	t.Run("decision-time-source-audit-readback", func(t *testing.T) {
+		s := create(t)
+		for range 65 {
+			s.b.ReviewSources = append(s.b.ReviewSources, cfg.ReviewSource{
+				Resource:  cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}},
+				ClusterID: s.target.ClusterID, Type: cfg.SourceKubernetesExec, Check: cfg.ReviewPodExec, Role: "workload-maintainer", IdentityMappingRef: "company",
 			})
 		}
-	}
+		accept(t, &s)
+
+		reviews, err := postgres.NewAccessReviews(ctx, pool, s.b.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := reviews.ReviewSources(ctx, s.target.ClusterID)
+		if err != nil || len(got) != len(s.b.ReviewSources) {
+			t.Fatal("committed decision sources", len(got), err)
+		}
+		for _, want := range s.b.ReviewSources {
+			if !slices.ContainsFunc(got, func(r cfg.ReviewSource) bool { return r.Resource == want.Resource && r.SameAuthority(want) }) {
+				t.Fatal("lost source", want.Resource.UID)
+			}
+		}
+	})
+
+	t.Run("fleet-automation-audit-readback", func(t *testing.T) {
+		s := create(t)
+		template := s.b.Bases[0]
+		template.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{"logs"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 1024}
+		s.b.Bases = nil
+		for i := 0; i < 1025; i++ {
+			b := template
+			b.Resource.UID = custodyID()
+			s.b.Bases = append(s.b.Bases, b)
+		}
+		s.b = fresh(s.b)
+		accept(t, &s)
+		var count int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM permission_basis_change WHERE event_id=$1 AND NOT retired AND automation_json IS NOT NULL", s.b.RequestID).Scan(&count); err != nil || count != 1025 {
+			t.Fatal("incomplete automation provenance", count, err)
+		}
+		// Long issuers remain on their own immutable assignment rows.
+		issuer := template.Subjects[0].Issuer + strings.Repeat("a", 1536)
+		for i := range s.b.Bases {
+			b := &s.b.Bases[i]
+			b.Subjects = slices.Clone(template.Subjects)
+			for j := 0; j < 4; j++ {
+				b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: issuer, ID: fmt.Sprintf("team-%d", j)})
+			}
+			b.Resource.Generation++
+			b.Resource.ResourceVersion = "v2"
+			b.Resource.SpecDigest[0]++
+			b.Continuous = true
+		}
+		s.b = fresh(s.b)
+		accept(t, &s)
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM permission_assignment WHERE activation_audit_id=$1 AND issuer=$2", s.b.RequestID, issuer).Scan(&count); err != nil || count != 4100 {
+			t.Fatal("incorrect added members", count, err)
+		}
+	})
+	t.Run("remote-bindings-after-fleet-grows", func(t *testing.T) {
+		root := custodyID()
+		slow := pool.Config()
+		dial := slow.ConnConfig.DialFunc
+		slow.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := dial(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			return delayedPermissionConn{conn}, nil
+		}
+		slowPool, err := pgxpool.NewWithConfig(ctx, slow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer slowPool.Close()
+		reader, err := postgres.NewRemoteAccessBindings(ctx, slowPool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store, err := postgres.NewPermissions(ctx, slowPool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		const cluster = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+		ns := cfg.NamespaceRef{Name: "payments", UID: custodyID()}
+		binding := cfg.Binding{
+			Resource: cfg.Resource{Kind: "AccessBinding", Name: "readers", UID: custodyID(), ClusterID: cluster, Namespace: ns.Name, NamespaceUID: ns.UID, ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{1}},
+			Scope:    cfg.Scope{ClusterID: cluster, Namespace: ns}, Effect: "Allow",
+			Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "payments"}}, Roles: []string{"evidence-reader"},
+		}
+		hub := remoteBindingHubFixture{cluster: custodyID()}
+		local := binding
+		local.Resource.ClusterID, local.Scope.ClusterID, local.Resource.UID = hub.cluster, hub.cluster, custodyID()
+		hub.bindings = []cfg.Binding{local}
+		reconciler := configapp.BindingReconciler{RootID: root, NamespaceClusterID: hub.cluster, Reader: hub, Watcher: hub, Trust: hub, RemoteBindings: reader, Store: store, NewID: custodyID, Now: time.Now}
+		reconcile := func() {
+			t.Helper()
+			result := reconciler.RunEpoch(ctx)
+			if !errors.Is(result.Err, errBaselineAccepted) || !result.Suspended {
+				t.Fatalf("reconcile remote deliveries: %v (suspended %t)", result.Err, result.Suspended)
+			}
+		}
+		body, err := json.Marshal([]cfg.Binding{binding})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3,false)`, root, cluster, body); err != nil {
+			t.Fatal(err)
+		}
+		// A v5 federation replica omits availability. Its upsert must fail
+		// even if a current replica already wrote an observation for this peer.
+		_, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings)
+			VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3)
+			ON CONFLICT(root_id,cluster_id) DO UPDATE SET digest=excluded.digest,bindings=excluded.bindings`, root, cluster, []byte("[]"))
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23502" || pgErr.ColumnName != "unavailable" {
+			t.Fatalf("accepted legacy delivery or wrong refusal: %v", err)
+		}
+		reconcile()
+		checkAssignments := func(cluster string, want int) {
+			t.Helper()
+			var count int
+			err := admin.QueryRow(ctx, `SELECT count(*) FROM permission_assignment a JOIN permission_basis b
+				ON b.stream_id=a.stream_id AND b.basis_key=a.basis_key WHERE a.stream_id=$1 AND b.cluster_id=$2 AND a.retired_at IS NULL`, root, cluster).Scan(&count)
+			if err != nil || count != want {
+				t.Fatalf("active assignments for %s: got %d, want %d: %v", cluster, count, want, err)
+			}
+		}
+		checkAssignments(cluster, 1)
+		// Each new cluster contributes a distinct binding and assignment.
+		for i := 1; i <= 200; i++ {
+			regional := fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
+			binding.Scope.ClusterID, binding.Resource.ClusterID = regional, regional
+			binding.Resource.UID, binding.Subjects[0].ID = custodyID(), regional
+			body, err = json.Marshal([]cfg.Binding{binding})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = admin.Exec(ctx, `INSERT INTO remote_access_binding_delivery(root_id,cluster_id,observed_at,digest,bindings,unavailable)
+				VALUES ($1,$2,clock_timestamp(),sha256($3::bytea),$3,false)`, root, regional, body); err != nil {
+				t.Fatal(err)
+			}
+		}
+		reconcile()
+		checkFleet := func(want int) {
+			t.Helper()
+			var count int
+			if err := admin.QueryRow(ctx, `SELECT count(*) FROM permission_assignment WHERE stream_id=$1 AND retired_at IS NULL`, root).Scan(&count); err != nil || count != want {
+				t.Fatalf("active fleet assignments: got %d, want %d: %v", count, want, err)
+			}
+		}
+		checkFleet(202)
+		checkAssignments(hub.cluster, 1)
+		if _, err = admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET observed_at=clock_timestamp(), digest=sha256('[]'::bytea), bindings='[]'::bytea
+			WHERE root_id=$1 AND cluster_id=$2`, root, cluster); err != nil {
+			t.Fatal(err)
+		}
+		const newlyJoined = "00000000-0000-4000-8000-000000000200"
+		// The second read is unchanged and must reuse the decoded documents.
+		for range 2 {
+			reconcile()
+			checkAssignments(cluster, 0)
+			checkAssignments(newlyJoined, 1)
+			checkFleet(201)
+			checkAssignments(hub.cluster, 1)
+		}
+		// Accept and reread more than 8 MiB of real binding scopes locally.
+		// Only the two hundred changed assignments belong to this audit event.
+		workloads := make([]cfg.WorkloadRef, 190)
+		for i := range workloads {
+			workloads[i] = cfg.WorkloadRef{Kind: "Deployment", Name: fmt.Sprintf("app-%03d.%s", i, strings.Repeat(strings.Repeat("a", 46)+".", 4)+"api")}
+		}
+		encodedWorkloads, err := json.Marshal(workloads)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `WITH revised AS (
+			SELECT cluster_id,convert_to(jsonb_set(jsonb_set(jsonb_set(jsonb_set(
+				convert_from(bindings,'UTF8')::jsonb,'{0,Scope,Workloads}',$3::jsonb),
+				'{0,Resource,Generation}','2'),'{0,Resource,ResourceVersion}','"2"'),'{0,Resource,SpecDigest,0}','2')::text,'UTF8') AS body
+			FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id<>$2)
+			UPDATE remote_access_binding_delivery AS d SET observed_at=clock_timestamp(),digest=sha256(r.body),bindings=r.body
+			FROM revised r WHERE d.root_id=$1 AND d.cluster_id=r.cluster_id`, root, cluster, encodedWorkloads); err != nil {
+			t.Fatal(err)
+		}
+		var fleetBytes int
+		if err := admin.QueryRow(ctx, `SELECT sum(octet_length(bindings)) FROM remote_access_binding_delivery WHERE root_id=$1`, root).Scan(&fleetBytes); err != nil || fleetBytes <= 8<<20 {
+			t.Fatalf("fleet contains %d bytes: %v", fleetBytes, err)
+		}
+		reconciler.RemoteBindings, err = postgres.NewRemoteAccessBindings(ctx, pool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reconciler.Store, err = postgres.NewPermissions(ctx, pool, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for range 2 {
+			reconcile()
+			checkFleet(201)
+		}
+		// Keep the real production watch active through a database renewal.
+		// The quiet fleet must not build, hash or write a new projection.
+		live, stop := context.WithTimeout(ctx, 45*time.Second)
+		defer stop()
+		writer := &observedPermissionWriter{reconciler.Store.(*postgres.Permissions), make(chan cfg.PermissionAcceptance, 4), make(chan cfg.PermissionFence, 2), make(chan struct{}, 1)}
+		reconciler.Watcher = idleKubernetesBindingWatch(t, hub.cluster)
+		reconciler.Store = writer
+		reconciler.RemoteBindingChanges = postgres.Listen(live, pool, postgres.RemoteBindingsChannel)
+		done := make(chan configapp.PermissionEpochResult, 1)
+		go func() { done <- reconciler.RunEpoch(live) }()
+		defer func() {
+			stop()
+			select {
+			case <-done:
+			case <-time.After(6 * time.Second):
+				t.Error("epoch did not stop")
+			}
+		}()
+		nextAcceptance := func() cfg.PermissionAcceptance {
+			t.Helper()
+			select {
+			case accepted := <-writer.accepted:
+				return accepted
+			case result := <-done:
+				done <- result
+				t.Fatalf("epoch stopped: %v", result.Err)
+			case <-live.Done():
+				t.Fatal(live.Err())
+			}
+			return cfg.PermissionAcceptance{}
+		}
+		baseline := nextAcceptance()
+		select {
+		case f := <-writer.renewed:
+			if f.Sequence != baseline.Sequence || len(writer.refreshed) != 0 || len(writer.accepted) != 0 {
+				t.Fatal("idle fleet recomputed its projection")
+			}
+		case result := <-done:
+			done <- result
+			t.Fatalf("epoch stopped before renewal: %v", result.Err)
+		case <-live.Done():
+			t.Fatal(live.Err())
+		}
+		// Leave observed_at untouched: the changed digest at PostgreSQL's
+		// original timestamp is the committed replacement.
+		if _, err := admin.Exec(ctx, `UPDATE remote_access_binding_delivery SET bindings='[]'::bytea,digest=sha256('[]'::bytea) WHERE root_id=$1 AND cluster_id=$2`, root, newlyJoined); err != nil {
+			t.Fatal(err)
+		}
+		changed := nextAcceptance()
+		if changed.Sequence != baseline.Sequence+1 || changed.Retired != 1 {
+			t.Fatal("equal-timestamp replacement did not retire the original assignment", changed)
+		}
+		checkAssignments(newlyJoined, 0)
+		checkFleet(200)
+	})
 	// ADR-237: the impact preview reads every workload cell of the affected
 	// namespace from the same accepted projection, and the real evaluator
 	// turns a removed allow into Deny and a proposed deny into ExplicitDeny.
@@ -258,14 +520,14 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "api", UID: named}}
 		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
 		accept(t, &s)
-		flush(t, s.p)
+
 		next(&s)
 		wide := s.b.Bases[0]
 		wide.Resource.UID, wide.Scope.Workloads = custodyID(), nil
 		wide.ScopeDigest = configapp.PermissionScopeDigest(wide)
 		s.b.Bases = append(s.b.Bases, wide)
 		accept(t, &s)
-		flush(t, s.p)
+
 		ns := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: wide.Scope.Namespace.UID}
 		proposed := custodyID()
 		snap, err := s.p.PreviewProjections(ctx, cfg.PreviewRead{Workloads: map[cfg.PreviewNamespace][]string{ns: {proposed}}, Bases: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: wide.Resource.UID}, {Kind: "AccessBinding", UID: "absent"}}})
@@ -309,7 +571,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	t.Run("permission-impact-preview-1000-targets", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		next(&s)
 		ns := s.b.Bases[0].Scope.Namespace
 		for range 16 {
@@ -324,7 +586,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			s.b.Bases = append(s.b.Bases, b)
 		}
 		accept(t, &s)
-		flush(t, s.p)
+
 		key := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: ns.UID}
 		var proposed []cfg.WorkloadRef
 		for range 7 {
@@ -353,45 +615,10 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatalf("worst-case preview took %v; it must fit the five-second request", total)
 		}
 	})
-	t.Run("foreign-audit-root-disables-allow-without-hiding-deny", func(t *testing.T) {
-		s := create(t)
-		foreign := create(t)
-		accept(t, &s)
-		flush(t, s.p)
-		next(&s)
-		s.b.Bases[0].Subjects = []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "new-owner"}}
-		deny := s.b.Bases[0]
-		deny.Resource.UID = custodyID()
-		deny.Effect = "Deny"
-		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
-		s.b.Bases = append(s.b.Bases, deny)
-		accept(t, &s)
-		flush(t, s.p)
-		original := projection(t, s)
-		if len(original.Allows) != 1 || len(original.Denies) != 1 || !original.DeniesComplete {
-			t.Fatal("original mixed authority unavailable")
-		}
-		var event string
-		if err := admin.QueryRow(ctx, "SELECT a.activation_audit_id FROM permission_assignment a JOIN permission_basis b ON b.stream_id=a.stream_id AND b.basis_key=a.basis_key WHERE a.stream_id=$1 AND a.retired_at IS NULL AND b.effect='Allow'", s.b.RootID).Scan(&event); err != nil {
-			t.Fatal(err)
-		}
-		withHistoricalAuthorityRoot(t, ctx, admin, event, s.b.RootID, foreign.b.RootID, func() {
-			got := projection(t, s)
-			if len(got.Allows) != 0 || len(got.Denies) != 1 || !got.DeniesComplete || got.Denies[0].Audience != original.Denies[0].Audience {
-				t.Fatal("foreign audit enabled access or hid an exact current deny")
-			}
-			if !time.Now().Before(original.FreshUntil) {
-				t.Fatal("foreign audit denial crossed original source interval")
-			}
-		})
-		if restored := projection(t, s); len(restored.Allows) != 1 || len(restored.Denies) != 1 || restored.Allows[0].Audience != original.Allows[0].Audience {
-			t.Fatal("exact restored authority scope changed baseline")
-		}
-	})
 	t.Run("first-acceptance-is-durable", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		f, err := s.p.BeginPermissions(ctx, s.b.RootID, s.b.Epoch, s.b.TrustDigest)
 		if err != nil || !f.Initialized {
 			t.Fatalf("initialization not durable: %v", err)
@@ -400,8 +627,8 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		f, err = s.p.BeginPermissions(ctx, s.b.RootID, custodyID(), s.b.TrustDigest)
-		if err != nil || !f.Initialized {
-			t.Fatalf("ordinary restart lost review: %v", err)
+		if err != nil || f.Initialized {
+			t.Fatalf("new epoch already had an accepted snapshot: %v", err)
 		}
 		if err = s.p.SuspendPermissions(ctx, f); err != nil {
 			t.Fatal(err)
@@ -413,96 +640,59 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatalf("new trust reused old review: %v", err)
 		}
 	})
-	t.Run("bootstrap-audit-cannot-be-skipped-by-out-of-order-publication", func(t *testing.T) {
+	t.Run("historical-acceptance-replay-after-upgrade", func(t *testing.T) {
+		qualifyHistoricalPermissionReplay(t, ctx, admin, pool)
+	})
+	t.Run("replay-preserves-original-controller-lease", func(t *testing.T) {
 		s := create(t)
-		accept(t, &s)
-		rows, err := s.p.PendingAuthorityAudits(ctx)
+		// The controller already consumed part of its initial lease before
+		// observing this change. Publication extends it on the database.
+		var initial time.Time
+		if err := admin.QueryRow(ctx, "UPDATE permission_stream SET lease_until=clock_timestamp()+interval '12 seconds' WHERE id=$1 RETURNING lease_until", s.b.RootID).Scan(&initial); err != nil {
+			t.Fatal(err)
+		}
+		s.b.ObservedAt = s.b.ObservedAt.Add(-2 * time.Second)
+		accepted, err := s.p.AcceptPermissions(ctx, s.b)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ack := func(r audit.AuthorityRecord) {
-			t.Helper()
-			receipt, e := objects.WriteAuthorityAudit(ctx, r)
-			if e != nil {
-				t.Fatal(e)
-			}
-			if e = s.p.AcknowledgeAuthorityAudit(ctx, r, receipt); e != nil {
-				t.Fatal(e)
-			}
+		var stream, recorded time.Time
+		if err = admin.QueryRow(ctx, `SELECT s.lease_until,a.lease_until FROM permission_acceptance a JOIN permission_stream s ON s.id=a.stream_id WHERE a.request_id=$1`, s.b.RequestID).Scan(&stream, &recorded); err != nil || !stream.After(initial) || !accepted.LeaseUntil.Equal(stream) || !recorded.Equal(stream) {
+			t.Fatalf("publication lease differs: initial %s, stream %s, receipt %s, result %s: %v", initial, stream, recorded, accepted.LeaseUntil, err)
 		}
-		for _, r := range rows {
-			if r.Kind == "permission-reset" {
-				ack(r)
-			}
+		renewed, err := s.p.RenewPermissions(ctx, accepted.PermissionFence)
+		if err != nil || !renewed.LeaseUntil.After(accepted.LeaseUntil) {
+			t.Fatalf("extend active controller lease: %v", err)
 		}
-		next(&s)
-		s.b.Bases[0].Subjects[0].ID = "replacement-owner"
-		accept(t, &s)
-		rows, err = s.p.PendingAuthorityAudits(ctx)
-		if err != nil || len(rows) != 2 {
-			t.Fatalf("expected initial and later audit: %v", err)
+		replay, err := s.p.AcceptPermissions(ctx, s.b)
+		if err != nil || replay != accepted {
+			t.Fatalf("acceptance changed after renewal and replay: %v", err)
 		}
-		ack(rows[1])
-		if len(projection(t, s).Allows) != 0 {
-			t.Fatal("new access bypassed the unacknowledged initial audit")
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		journal, err := configapp.NewBindingJournal(cfg.Snapshot{ClusterID: s.target.ClusterID, ControlNamespace: cfg.NamespaceRef{Name: "asservat", UID: custodyID()}, BindingResourceVersion: "2", ObservedAt: now}, now)
+		if err != nil {
+			t.Fatal(err)
 		}
-		flush(t, s.p)
-		if len(projection(t, s).Allows) != 1 {
-			t.Fatal("complete audit did not activate access")
+		batch, err := journal.Prepare(replay.PermissionFence, custodyID(), now, configapp.Inheritance{})
+		if err != nil || !batch.FreshUntil.Equal(accepted.LeaseUntil) {
+			t.Fatalf("next watched change lost original lease: %v", err)
+		}
+		next, err := s.p.AcceptPermissions(ctx, batch)
+		if err != nil || next.Sequence != accepted.Sequence+1 {
+			t.Fatalf("next watched change: %v", err)
 		}
 	})
-	t.Run("audit-gated-grants-and-encrypted-retry", func(t *testing.T) {
+	t.Run("atomic-grants-and-idempotent-audit", func(t *testing.T) {
 		s := create(t)
+		s.b.FreshUntil = s.b.ObservedAt.Add(time.Second)
 		original := s.b
 		accept(t, &s)
-		if len(projection(t, s).Allows) != 0 {
-			t.Fatal("unaudited grant exposed")
-		}
-		pending, err := s.p.PendingAuthorityAudits(ctx)
-		if err != nil || len(pending) != 2 {
-			t.Fatalf("pending audit %v", err)
-		}
-		for _, r := range pending {
-			receipt, err := objects.WriteAuthorityAudit(ctx, r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			again, err := objects.WriteAuthorityAudit(ctx, r)
-			if err != nil || again != receipt {
-				t.Fatalf("conditional audit retry %v", err)
-			}
-			o, err := s3admin.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &receipt.Key})
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, err := io.ReadAll(o.Body)
-			o.Body.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if bytes.Contains(body, []byte("team-a")) || bytes.Contains(body, []byte("workload-maintainer")) {
-				t.Fatal("plaintext assignment stored")
-			}
-			changed := r
-			changed.CreatedAt = changed.CreatedAt.Add(time.Second)
-			if _, err = objects.WriteAuthorityAudit(ctx, changed); err == nil {
-				t.Fatal("different record accepted at same key")
-			}
-			if err = s.p.AcknowledgeAuthorityAudit(ctx, r, receipt); err != nil {
-				t.Fatal(err)
-			}
-			if err = s.p.AcknowledgeAuthorityAudit(ctx, r, receipt); err != nil {
-				t.Fatal(err)
-			}
-			receipt.SHA256[0] ^= 1
-			if err = s.p.AcknowledgeAuthorityAudit(ctx, r, receipt); !errors.Is(err, cfg.ErrChanged) {
-				t.Fatalf("changed receipt %v", err)
-			}
-		}
 		before := projection(t, s)
 		if len(before.Allows) != 1 {
 			t.Fatal("audited grant missing")
 		}
+		// Replaying a committed request after its original end cannot create a new grant.
+		<-time.After(time.Until(original.FreshUntil))
 		replay, err := s.p.AcceptPermissions(ctx, original)
 		if err != nil || replay.Sequence != 1 {
 			t.Fatalf("idempotent acceptance %v", err)
@@ -520,22 +710,282 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("heartbeat appended audit")
 		}
 	})
+	t.Run("distinct-bases-commit-and-withdraw", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		healthy := projection(t, s).Allows[0].Audience
+		original := s.b.Bases[0]
+		remote := custodyID()
+		for range 24000 {
+			b := original
+			b.Resource.Kind = cfg.ClusterAccessBindingKind
+			b.Resource.UID = custodyID()
+			b.Scope = cfg.Scope{ClusterID: remote, Namespace: cfg.AllNamespaces}
+			b.ScopeDigest = configapp.PermissionScopeDigest(b)
+			s.b.Bases = append(s.b.Bases, b)
+		}
+		// While the writer holds its fleet mutation lock, an unrelated reader
+		// can still authorize against the last committed assignment.
+		tx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SELECT id FROM permission_stream WHERE id=$1 FOR UPDATE", s.b.RootID); err != nil {
+			t.Fatal(err)
+		}
+		if got := projection(t, s); len(got.Allows) != 1 || got.Allows[0].Audience != healthy {
+			t.Fatal("healthy peer blocked behind write")
+		}
+		if err = tx.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Apply the same grants as setup. The acceptor can append the event
+		// and its original scope, but cannot rewrite either after commit.
+		const role = "fixture_permission_history_writer"
+		roleTx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer roleTx.Rollback(ctx)
+		if _, err = roleTx.Exec(ctx, "CREATE ROLE "+role+" NOLOGIN"); err != nil {
+			t.Fatal(err)
+		}
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("permission-accept", role)
+		if !ok {
+			t.Fatal("unknown permission grant plan")
+		}
+		for _, grant := range grants {
+			if _, err = roleTx.Exec(ctx, grant); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, table := range []string{"authority_audit", "permission_basis_change"} {
+			var immutable bool
+			if err = roleTx.QueryRow(ctx, "SELECT has_table_privilege($1,$2,'INSERT') AND NOT has_any_column_privilege($1,$2,'UPDATE') AND NOT has_table_privilege($1,$2,'DELETE,TRUNCATE')", role, table).Scan(&immutable); err != nil || !immutable {
+				t.Fatal("mutable permission history", table, err)
+			}
+		}
+		if err = roleTx.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, retired := range []bool{false, true} {
+			if retired {
+				s.b.Bases = s.b.Bases[:1]
+			}
+			s.b = fresh(s.b)
+			f, err := s.p.BeginPermissions(ctx, s.b.RootID, s.b.Epoch, s.b.TrustDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.b.FreshUntil = f.LeaseUntil
+			started := time.Now()
+			accept(t, &s)
+			elapsed := time.Since(started)
+			var bases, members, events int
+			col := "activation_audit_id"
+			if retired {
+				col = "retirement_audit_id"
+			}
+			if err := admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM permission_basis_change WHERE event_id=$1 AND retired=$2),(SELECT count(*) FROM permission_assignment WHERE "+col+"=$1),(SELECT count(*) FROM authority_audit WHERE id=$1 AND octet_length(record::text)<2048)", s.b.RequestID, retired).Scan(&bases, &members, &events); err != nil || bases != 24000 || members != 24000 || events != 1 {
+				t.Fatal("incomplete atomic event", bases, members, events, err)
+			}
+			if got := projection(t, s); len(got.Allows) != 1 || got.Allows[0].Audience != healthy {
+				t.Fatal("healthy peer changed")
+			}
+			t.Logf("24000 distinct bindings retired=%t committed in %s", retired, elapsed)
+		}
+	})
+	t.Run("expanded-remote-change-retains-healthy-peer", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+
+		old := projection(t, s).Allows[0].Audience
+		remote := custodyID()
+		bases := s.b.Bases[:1:1]
+		for i := 0; i < 32; i++ {
+			b := s.b.Bases[0]
+			b.Resource.Kind = cfg.ClusterAccessBindingKind
+			b.Resource.UID = custodyID()
+			b.Scope = cfg.Scope{ClusterID: remote, Namespace: cfg.AllNamespaces}
+			b.ScopeDigest = configapp.PermissionScopeDigest(b)
+			b.Roles = cfg.Roles
+			b.Subjects = nil
+			for j := 0; j < 256; j++ {
+				b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: old.Issuer, ID: fmt.Sprintf("team-%d-%d", i, j)})
+			}
+			bases = append(bases, b)
+		}
+		s.b = fresh(s.b)
+		s.b.Bases = bases
+		s.b.Bases[0].Continuous = true
+		accept(t, &s)
+		healthy := func() {
+			t.Helper()
+			p := projection(t, s)
+			now := time.Now()
+			who := identity.Identity{Principal: identity.Principal{Issuer: old.Issuer, Subject: "alice", ClientID: "console", Kind: identity.Human}, Groups: []string{old.SubjectID}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			if got := authorization.ContextEligibility(who, p, s.target, now); !got.Eligible || len(got.DefaultAudience) != 1 || got.DefaultAudience[0] != old {
+				t.Fatal("healthy peer lost its existing assignment", got)
+			}
+		}
+		healthy()
+		activation := s.b.RequestID
+		var cnt int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM permission_assignment WHERE stream_id=$1 AND activation_audit_id=$2", s.b.RootID, activation).Scan(&cnt); err != nil || cnt != 32768 {
+			t.Fatal("incomplete atomic write", cnt, err)
+		}
+		remoteTarget := s.target
+		remoteTarget.ClusterID = remote
+		audited, err := s.p.Permissions(ctx, remoteTarget)
+		if err != nil || len(audited.Allows) != 32768 {
+			t.Fatal("audited assignments missing", len(audited.Allows), err)
+		}
+		var assignment string
+		first := bases[1]
+		if err := admin.QueryRow(ctx, `SELECT id FROM permission_assignment WHERE stream_id=$1 AND activation_audit_id=$2 AND basis_key=$3 AND subject_kind='Group' AND issuer=$4 AND subject_id='team-0-0' AND role='evidence-reader' AND basis_digest=$5`, s.b.RootID, activation, first.Key(), old.Issuer, first.Resource.SpecDigest[:]).Scan(&assignment); err != nil {
+			t.Fatal("cannot resolve original member from activation", err)
+		}
+		// Remove the whole remote set. No current basis is needed to recover
+		// the retired assignment's identity, source and original scope.
+		s.b = fresh(s.b)
+		s.b.Bases = s.b.Bases[:1]
+		accept(t, &s)
+		healthy()
+		var scope []byte
+		if err := admin.QueryRow(ctx, "SELECT scope_digest FROM permission_basis_change WHERE event_id=$1 AND basis_key=$2 AND retired", s.b.RequestID, first.Key()).Scan(&scope); err != nil || !bytes.Equal(scope, first.ScopeDigest[:]) {
+			t.Fatal("missing original retirement scope", err)
+		}
+		var provenance bool
+		if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM permission_assignment WHERE id=$1 AND stream_id=$2 AND activation_audit_id=$3 AND retirement_audit_id=$4 AND basis_key=$5 AND basis_digest=$6 AND role='evidence-reader' AND subject_id='team-0-0' AND retired_at IS NOT NULL)`, assignment, s.b.RootID, activation, s.b.RequestID, first.Key(), first.Resource.SpecDigest[:]).Scan(&provenance); err != nil || !provenance {
+			t.Fatal("lost event-linked original member after removal", err)
+		}
+
+		replacement := first
+		replacement.Resource.Generation++
+		replacement.Resource.ResourceVersion = "new"
+		replacement.Resource.SpecDigest[0]++
+		replacement.NotAfter = time.Now().UTC().Add(time.Hour)
+		replacement.ScopeDigest = configapp.PermissionScopeDigest(replacement)
+		replacement.Subjects = first.Subjects[:1]
+		s.b = fresh(s.b)
+		s.b.Bases = append(s.b.Bases, replacement)
+		accept(t, &s)
+		var current []byte
+		if err = admin.QueryRow(ctx, "SELECT scope_digest FROM permission_basis WHERE stream_id=$1 AND basis_key=$2", s.b.RootID, first.Key()).Scan(&current); err != nil || !bytes.Equal(current, replacement.ScopeDigest[:]) || bytes.Equal(current, first.ScopeDigest[:]) {
+			t.Fatal("scope replacement failed", err)
+		}
+		if err = admin.QueryRow(ctx, "SELECT scope_digest FROM permission_basis_change WHERE event_id=$1 AND basis_key=$2 AND NOT retired", activation, first.Key()).Scan(&scope); err != nil || !bytes.Equal(scope, first.ScopeDigest[:]) {
+			t.Fatal("lost original activation scope", err)
+		}
+
+	})
+	t.Run("post-renewal-api-clock-behind", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+
+		// This pool alone sees PostgreSQL half a second ahead of the API.
+		// Neither the host clock nor concurrent database sessions are changed.
+		_, err := admin.Exec(ctx, `CREATE SCHEMA permission_test_clock;
+CREATE FUNCTION permission_test_clock.clock_timestamp() RETURNS timestamptz LANGUAGE sql VOLATILE AS $$SELECT pg_catalog.clock_timestamp()+interval '500 milliseconds'$$;
+CREATE FUNCTION permission_test_clock.statement_timestamp() RETURNS timestamptz LANGUAGE sql STABLE AS $$SELECT pg_catalog.statement_timestamp()+interval '500 milliseconds'$$;
+GRANT USAGE ON SCHEMA permission_test_clock TO authority_runtime`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := admin.Exec(ctx, "DROP SCHEMA permission_test_clock CASCADE"); err != nil {
+				t.Error(err)
+			}
+		}()
+		config := pool.Config()
+		config.ConnConfig.RuntimeParams["search_path"] = "permission_test_clock, pg_catalog, public"
+		shifted, err := pgxpool.NewWithConfig(ctx, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer shifted.Close()
+		s.p, err = postgres.NewPermissions(ctx, shifted, s.b.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, TrustDigest: s.b.TrustDigest, Sequence: s.b.ExpectedSequence, Initialized: true}
+		if _, err = s.p.RenewPermissions(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		var stamp, until time.Time
+		if err = admin.QueryRow(ctx, "SELECT observed_at,fresh_until FROM permission_stream WHERE id=$1", s.b.RootID).Scan(&stamp, &until); err != nil {
+			t.Fatal(err)
+		}
+		p := projection(t, s)
+		now := time.Now()
+		if !stamp.After(now) {
+			t.Fatal("fixture did not exercise clock skew", stamp, now)
+		}
+		who := identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "alice", ClientID: "console", Kind: identity.Human}, Groups: []string{"team-a"}, Scopes: []string{"evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(time.Minute)}
+		workload := authorization.WorkloadTarget{ClusterID: s.target.ClusterID, NamespaceUID: s.target.NamespaceUID, WorkloadUID: s.target.WorkloadUID}
+		wp, err := s.p.WorkloadPermissions(ctx, workload)
+		if err != nil || !authorization.WorkloadScopeEligibility(who, wp, authorization.CollectContext, workload, time.Now()).Eligible {
+			t.Fatal("renewal disabled workload permissions", wp.ObservedAt, err)
+		}
+		got := authorization.ContextEligibility(who, p, s.target, now)
+		if !got.Eligible || p.FreshUntil.After(until.Add(-500*time.Millisecond)) || authorization.ContextEligibility(who, p, s.target, p.FreshUntil).Eligible {
+			t.Fatal("SQL-clock renewal changed the API decision or extended its deadline", got.Reason, p.ObservedAt, p.FreshUntil, until)
+		}
+	})
+	t.Run("post-renewal-worker-clock-behind", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		initial := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, Sequence: s.b.ExpectedSequence, TrustDigest: s.b.TrustDigest, Initialized: true}
+		if _, err := s.p.RenewPermissions(ctx, initial); err != nil {
+			t.Fatal(err)
+		}
+		var renewed time.Time
+		if err := admin.QueryRow(ctx, "SELECT observed_at FROM permission_stream WHERE id=$1", s.b.RootID).Scan(&renewed); err != nil {
+			t.Fatal(err)
+		}
+		next(&s)
+		s.b.Bases[0].Subjects[0].ID = "new-owner"
+		s.b.ObservedAt = renewed.Add(-500 * time.Millisecond)
+		s.b.FreshUntil = s.b.ObservedAt.Add(5 * time.Second)
+		accept(t, &s)
+		if s.b.ExpectedSequence != initial.Sequence+1 {
+			t.Fatal("change lost its sequence", s.b.ExpectedSequence)
+		}
+
+		got := projection(t, s)
+		if got.Revision.UID != initial.Epoch || got.Revision.Generation != s.b.ExpectedSequence || len(got.Allows) != 1 || got.Allows[0].Audience.SubjectID != "new-owner" {
+			t.Fatal("renewal disrupted the ordered edit", got)
+		}
+		stale := fresh(s.b)
+		stale.ExpectedSequence = initial.Sequence
+		if _, err := s.p.AcceptPermissions(ctx, stale); !errors.Is(err, cfg.ErrChanged) {
+			t.Fatal("stale sequence", err)
+		}
+		expired := fresh(s.b)
+		expired.ObservedAt = renewed.Add(-6 * time.Second)
+		expired.FreshUntil = expired.ObservedAt.Add(5 * time.Second)
+		if _, err := s.p.AcceptPermissions(ctx, expired); !errors.Is(err, cfg.ErrInvalid) {
+			t.Fatal("expired original deadline", err)
+		}
+
+	})
 	t.Run("ownership-A-B-A-does-not-resurrect", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		old := projection(t, s).Allows[0].Audience
 		next(&s)
 		s.b.Bases[0].Subjects[0].ID = "team-b"
 		accept(t, &s)
-		if len(projection(t, s).Allows) != 0 {
-			t.Fatal("old owner survived or unaudited owner active")
+		if a := projection(t, s).Allows; len(a) != 1 || a[0].Audience.SubjectID != "team-b" || a[0].Audience.AssignmentID == old.AssignmentID {
+			t.Fatal("ownership replacement failed to retire the original assignment")
 		}
-		flush(t, s.p)
+
 		next(&s)
 		s.b.Bases[0].Subjects[0].ID = "team-a"
 		accept(t, &s)
-		flush(t, s.p)
+
 		now := projection(t, s).Allows[0].Audience
 		if old.AssignmentID == now.AssignmentID {
 			t.Fatal("old audience resurrected")
@@ -571,7 +1021,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 				t.Fatal(err)
 			}
 			fence = accepted.PermissionFence
-			flush(t, s.p)
+
 		}
 		commit()
 		original := projection(t, s).Allows[0].Audience
@@ -601,15 +1051,18 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	t.Run("generation-gap-invalidates-even-identical-spec", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		old := projection(t, s).Allows[0].Audience
 		s.b = fresh(s.b)
 		s.b.Bases[0].Resource.Generation += 2
 		accept(t, &s)
-		flush(t, s.p)
+
 		if projection(t, s).Allows[0].Audience.AssignmentID == old.AssignmentID {
 			t.Fatal("missed history preserved")
 		}
+	})
+	t.Run("namespace-relist-withdraws-only-derived-access", func(t *testing.T) {
+		qualifyBlockedNamespaceRelist(t, pool)
 	})
 	t.Run("namespace-observation-is-separate-from-source-version", func(t *testing.T) {
 		s := create(t)
@@ -617,12 +1070,12 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s.b.Bases[0].ObservationVersion = "namespace-v1"
 		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
 		accept(t, &s)
-		flush(t, s.p)
+
 		old := projection(t, s).Allows[0].Audience
 		s.b = fresh(s.b)
 		s.b.Bases[0].ObservationVersion = "namespace-v9"
 		accept(t, &s)
-		flush(t, s.p)
+
 		if projection(t, s).Allows[0].Audience.AssignmentID == old.AssignmentID {
 			t.Fatal("namespace relist treated as continuous history")
 		}
@@ -635,7 +1088,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	t.Run("inherited-assignments-continuity-unavailability-and-preview", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		binding := s.b.Bases[0]
 		namespace := binding.Scope.Namespace
 		issuer := "https://id.example.test"
@@ -650,7 +1103,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			s.b.Bases, s.b.UnavailableSources, s.b.SourcesUnavailable, s.b.Namespaces = bases, unavailable, all, observation
 			s.b.InputDigest[1]++
 			accept(t, &s)
-			flush(t, s.p)
+
 		}
 		inherited := func(t *testing.T) string {
 			t.Helper()
@@ -778,7 +1231,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 	t.Run("decision-time-reviews-mint-expire-deny-and-retire", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		binding := s.b.Bases[0]
 		issuer := "https://id.example.test"
 		spec := cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: artifact.Digest{40}}, Enabled: true, Type: cfg.SourceKubernetesExec,
@@ -794,7 +1247,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			s.b.Bases, s.b.ReviewSources, s.b.SourcesUnavailable, s.b.UnavailableSources, s.b.Namespaces = bases, reviews, unavailable, nil, nil
 			s.b.InputDigest[2]++
 			accept(t, &s)
-			flush(t, s.p)
+
 		}
 		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{source}, false)
 		store, err := postgres.NewAccessReviews(ctx, pool, s.b.RootID)
@@ -869,7 +1322,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			t.Fatal("re-allowed review lost the assignment of an unchanged source", err)
 		}
 		// REQ-PER-006: one authority event per decision change, none for a
-		// confirming review; published and acknowledged like every event.
+		// confirming review. Read its transactionally committed event.
 		changes := func(t *testing.T) []string {
 			t.Helper()
 			rows, err := admin.Query(ctx, "SELECT record FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' ORDER BY created_at,id", s.b.RootID)
@@ -905,11 +1358,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if got := changes(t); !slices.Equal(got, []string{"alice:granted:Allowed", "bob:granted:Allowed", "alice:revoked:Denied", "alice:restored:Allowed", "alice:revoked:Denied", "alice:restored:Allowed"}) {
 			t.Fatalf("stale allow wrote a decision event: %v", got)
 		}
-		flush(t, s.p)
-		var pending int
-		if admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' AND acknowledged_at IS NULL", s.b.RootID).Scan(&pending) != nil || pending != 0 {
-			t.Fatal("review change events not published", pending)
-		}
+
 		// Preview of deleting the source: the persistent assignments it minted
 		// are removed (alice and bob hold current decisions: Allow -> Deny).
 		deleting := []cfg.AccessChange{{Action: "delete", Kind: "PermissionSource", UID: source.Resource.UID}}
@@ -933,6 +1382,18 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		}
 		if removed["alice"] != 3 || removed["bob"] != 3 {
 			t.Fatalf("deleting the source did not show the removed access: %+v", preview2.Deltas)
+		}
+		// Other principals' direct assignments do not displace this Pod's review.
+		approvers := binding
+		approvers.Resource.UID, approvers.Roles = custodyID(), []string{"action-approver"}
+		approvers.Subjects = make([]cfg.Subject, 257)
+		for i := range approvers.Subjects {
+			approvers.Subjects[i] = cfg.Subject{Kind: "User", Issuer: issuer, ID: fmt.Sprintf("approver-%d", i)}
+		}
+		approvers.ScopeDigest = configapp.PermissionScopeDigest(approvers)
+		step(t, []cfg.PermissionBasis{binding, approvers}, []cfg.ReviewSource{source}, false)
+		if got := eligible(t, alice); !got.Eligible || reviewed(t, alice) != first {
+			t.Fatal("unrelated direct assignments obscured decision-time grant", got.Reason)
 		}
 		// An explicit deny of the user wins over the fresh review.
 		deny := binding
@@ -990,11 +1451,68 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if err = record(t, alice, jumped, true); err != nil || reviewed(t, alice) == before {
 			t.Fatal("generation jump kept the assignment", err)
 		}
+		// A first decision can insert an assignment while a replacement is
+		// being staged. Hold the following Pod decision write uncommitted.
+		barrier, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer barrier.Rollback(ctx)
+		if _, err = barrier.Exec(ctx, "LOCK TABLE permission_review_decision IN SHARE MODE"); err != nil {
+			t.Fatal(err)
+		}
+		var blocker int
+		if err = barrier.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&blocker); err != nil {
+			t.Fatal(err)
+		}
+		carol := alice
+		carol.Principal.Subject = "carol"
+		decision := make(chan error, 1)
+		go func() { decision <- record(t, carol, jumped, true) }()
+		reviewer := waitForSQLBlocker(t, ctx, admin, blocker)
+		spec.Resource.Generation++
+		spec.Resource.SpecDigest[0]++
+		spec.Type, spec.AccessReviewCheck, spec.Role = cfg.SourceKubernetesAccessReview, cfg.ReviewWorkloadGet, "evidence-reader"
+		replacement, reason := cfg.ReviewSourceFor(spec)
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		batch := fresh(s.b)
+		batch.ReviewSources = []cfg.ReviewSource{replacement}
+		batch.InputDigest[0]++
+		applied := make(chan error, 1)
+		go func() {
+			_, err := s.p.AcceptPermissions(ctx, batch)
+			applied <- err
+		}()
+		waitForSQLBlocker(t, ctx, admin, reviewer)
+		if err = barrier.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-decision; err != nil {
+			t.Fatal("first review", err)
+		}
+		if err = <-applied; err != nil {
+			t.Fatal("downgrade", err)
+		}
+		if reviewed(t, carol) != "" || eligible(t, carol).Eligible {
+			t.Fatal("old role survived the source downgrade")
+		}
+		var retiredAtChange bool
+		if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT FROM permission_review_assignment
+			WHERE stream_id=$1 AND source_uid=$2 AND subject_id='carol' AND role='workload-maintainer'
+			AND retired_at IS NOT NULL AND retirement_audit_id=$3)`, batch.RootID, jumped.Resource.UID, batch.RequestID).Scan(&retiredAtChange); err != nil || !retiredAtChange {
+			t.Fatal("first assignment missing its source downgrade event", err)
+		}
+		if err = record(t, carol, replacement, true); err != nil || reviewed(t, carol) == "" || eligible(t, carol).Eligible {
+			t.Fatal("replacement review must grant only evidence-reader", err)
+		}
+
 	})
-	t.Run("scope-change-and-delete-retire-without-audit", func(t *testing.T) {
+	t.Run("scope-change-and-delete-retire", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		next(&s)
 		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "different", UID: custodyID()}}
 		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
@@ -1023,7 +1541,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
 		s.b.Bases = append(s.b.Bases, deny)
 		accept(t, &s)
-		flush(t, s.p)
+
 		if p := projection(t, s); len(p.Allows) != 0 || len(p.Denies) != 0 {
 			t.Fatal("unresolved workload matched a name")
 		}
@@ -1047,15 +1565,15 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "api", UID: custodyID()}}
 		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
 		accept(t, &s)
-		flush(t, s.p)
+
 		if p := projection(t, s); len(p.Allows) != 0 {
 			t.Fatal("pinned uid matched another instance by name")
 		}
 	})
-	t.Run("explicit-deny-precedes-audit", func(t *testing.T) {
+	t.Run("explicit-deny-effective-at-commit", func(t *testing.T) {
 		s := create(t)
 		accept(t, &s)
-		flush(t, s.p)
+
 		deny := s.b.Bases[0]
 		deny.Resource.UID = custodyID()
 		deny.Effect = "Deny"
@@ -1067,6 +1585,21 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if len(p.Denies) != 1 || len(p.Allows) != 1 {
 			t.Fatal("deny hidden behind audit")
 		}
+	})
+	t.Run("hub-local-unrepresentable-deny", func(t *testing.T) {
+		qualifyHubLegacyDeny(t, admin, pool)
+	})
+	t.Run("cold-remote-read-io-bounds", func(t *testing.T) {
+		testColdRemoteRead(t, admin, pool)
+	})
+	t.Run("withdrawn-registration", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+
+		if len(projection(t, s).Allows) != 1 {
+			t.Fatal("original audited Allow unavailable")
+		}
+		qualifyRegistrationWithdrawal(t, admin, pool, s.p, s.target, s.b)
 	})
 	t.Run("competing-reconcilers-and-restart", func(t *testing.T) {
 		s := create(t)
@@ -1095,7 +1628,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if success != 1 {
 			t.Fatal("sequence did not fence competing accepts")
 		}
-		flush(t, s.p)
+
 		old := projection(t, s).Allows[0].Audience
 		if _, err = admin.Exec(ctx, "UPDATE permission_stream SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1", s.b.RootID); err != nil {
 			t.Fatal(err)
@@ -1111,14 +1644,16 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s.b.ExpectedSequence = 0
 		s.b = fresh(s.b)
 		accept(t, &s)
-		flush(t, s.p)
+
 		if projection(t, s).Allows[0].Audience.AssignmentID != old.AssignmentID {
 			t.Fatal("routine restart discarded exact unchanged observation")
 		}
 		s.b = fresh(s.b)
+		// The same final spec can hide an intervening change and reversal.
+		s.b.Bases[0].Resource.Generation += 2
 		s.b.Bases[0].Resource.ResourceVersion = "changed-during-gap"
 		accept(t, &s)
-		flush(t, s.p)
+
 		if projection(t, s).Allows[0].Audience.AssignmentID == old.AssignmentID {
 			t.Fatal("changed version restored uncertain history")
 		}

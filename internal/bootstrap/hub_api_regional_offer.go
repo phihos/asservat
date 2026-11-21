@@ -25,9 +25,6 @@ type hubAPIRegionalOffer struct {
 	offer           contracts.RegionalOffer
 	// peerID is the local connector's generated peer (mode=combined).
 	peerID string
-	// ownersAddress is the hub-api native Service the regional executor
-	// dials; setOwners adds the accepted owner configuration at startup.
-	ownersAddress string
 	// release is the chart's object name prefix.
 	release string
 	// hubOnly is mode=hub (no local connector).
@@ -48,17 +45,16 @@ func (o *hubAPIRegionalOffer) addExecutor(ctx context.Context, files *os.Root, h
 	}
 	o.offer.KeyService = &contracts.RegionalWrapService{Endpoint: "https://" + contracts.HubAPIName(h.Name, "key-service") + "." + h.Namespace + ".svc:9447", Roots: keyRoots, KeyID: p.ArtifactKeyID}
 	o.offer.EvidenceStore = &contracts.RegionalEvidenceStore{Endpoint: h.ObjectStore.Endpoint, Roots: c.AuditStore.Roots, Region: h.ObjectStore.Region, Bucket: h.ObjectStore.EvidenceBucket, StoreID: storeID}
-	o.ownersAddress = contracts.HubAPIName(h.Name, "hub-api-native") + "." + h.Namespace + ".svc:9444"
 	return nil
 }
 
 // setOwners pins the accepted owner configuration (pool and issuer roots),
 // completing the executor section.
 func (o *hubAPIRegionalOffer) setOwners(pool value.OwnerPool, revision int64, roots [][]byte) error {
-	if o == nil || o.ownersAddress == "" || !pool.Valid() || pool.NativePort == 0 || len(roots) == 0 {
+	if o == nil || !pool.Valid() || pool.NativePort == 0 || len(roots) == 0 {
 		return mounts.ErrUnavailable
 	}
-	o.offer.Owners = &contracts.RegionalContextOwners{Address: o.ownersAddress, Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat,
+	o.offer.Owners = &contracts.RegionalContextOwners{Configuration: contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat,
 		InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, Revision: revision,
 		Namespace: contracts.WorkerObjectReference{Name: pool.Namespace, UID: pool.NamespaceUID}, Service: contracts.WorkerObjectReference{Name: pool.Service, UID: pool.ServiceUID},
 		Deployment: contracts.WorkerObjectReference{Name: pool.Deployment, UID: pool.DeploymentUID}, ServiceAccount: contracts.WorkerObjectReference{Name: pool.ServiceAccount, UID: pool.AccountUID},

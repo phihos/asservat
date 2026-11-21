@@ -26,16 +26,18 @@ import (
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It
-// answers the connectors' ADR-172 owner discovery and authentication
-// reads and stores their AccessBinding and capacity deliveries. It
+// authenticates the owner certificates observed by connectors, delivers work
+// hints and stores their AccessBindings. It
 // holds no browser, MCP, evidence, signing, audit or recovery-activation
 // authority.
 type Federation struct {
-	handler *connectorlifecycle.Handler
-	tunnel  *connectorlifecycle.TunnelHandler
-	tls     *tls.Config
-	port    int
-	closers []func()
+	handler  *connectorlifecycle.Handler
+	tunnel   *connectorlifecycle.TunnelHandler
+	work     *connectorlifecycle.WorkHandler
+	workPool *pgxpool.Pool
+	tls      *tls.Config
+	port     int
+	closers  []func()
 }
 
 // federationInputs are the Helm-rendered configuration plus the generated
@@ -133,7 +135,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 		pools[purpose] = pool
 		f.closers = append(f.closers, pool.Close)
 	}
-	owners, err := federationOwnerReads(startup, c, pools["connector-owner-read"])
+	owners, err := federationOwnerAuthenticator(startup, c, pools["connector-owner-read"])
 	if err != nil {
 		return f, err
 	}
@@ -153,12 +155,25 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, err
 	}
-	duties := connectorlifecycle.Duties{Owners: owners}
-	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{duties, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
+	active := make([]string, 0, len(settings.names)+1)
+	for cluster := range settings.names {
+		active = append(active, cluster)
+	}
+	if c.ConnectorTokens.LocalConnector != "" {
+		active = append(active, c.ClusterID)
+	}
+	if err = remote.WithdrawUnregistered(startup, active); err != nil {
+		return f, &fixedStepError{"sql/withdraw-remote-bindings", err}
+	}
+	f.handler, err = connectorlifecycle.NewHandler(tokens, federationServices{owners, c.ServiceIDs, &federationBindings{decoder, remote}, settings}, c.Concurrency)
 	if err != nil {
 		return f, mounts.ErrUnavailable
 	}
-	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
+	f.workPool = pools["connector-owner-read"]
+	f.work = &connectorlifecycle.WorkHandler{Tokens: tokens, Concurrency: c.Concurrency, Ready: func(ctx context.Context, cluster string) error {
+		return postgres.NotifyConnectorReady(ctx, f.workPool, cluster)
+	}}
+	f.tunnel = &connectorlifecycle.TunnelHandler{Tokens: tokens, Owners: settings.ownerEndpoints, Allowed: settings.allowed, Dial: (&net.Dialer{}).DialContext}
 	// The serving identity is deployment-provided server authentication only;
 	// connectors authenticate with their ServiceAccount tokens.
 	pair, err := readServingPair(startup, files)
@@ -213,7 +228,7 @@ func federationClass(err error) string {
 }
 
 type federationServices struct {
-	connectorlifecycle.Duties
+	owners   *fleetapp.OwnerAuthenticator
 	ids      contracts.ServiceIDs
 	bindings *federationBindings
 	*federationSettings
@@ -224,53 +239,67 @@ type federationServices struct {
 type federationBindings struct {
 	decoder *kube.AccessBindingSpecDecoder
 	store   interface {
-		StoreRemoteBindings(context.Context, configuration.RemoteBindings, string) error
-		RemoteBindingsDigest(context.Context, string) (string, error)
+		StoreRemoteBindings(context.Context, string, string, string, []configuration.Binding, bool) (string, error)
+		BeginRemoteBindings(context.Context, string) (string, error)
+		RemoteBindingsDigest(context.Context, string) (string, string, error)
 	}
 }
 
-// AccessBindings stores the presenting connector's delivery under its
-// authenticated cluster, observed no later than the presentation (ADR-329).
-// The payload names no cluster; a binding the schema refuses grants nothing.
-func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region) error {
-	if s.bindings == nil || region == nil {
-		return mounts.ErrUnavailable
+func (s federationServices) acceptsBindingsFrom(p value.ConnectorCluster) bool {
+	return s.bindings != nil && p.RootID == s.ids.PermissionRootID && p.InstallationID == s.ids.InstallationID && p.ClusterID != s.ids.ClusterID
+}
+
+// A connector's first LIST starts from this predecessor. Every successful
+// transfer returns the predecessor for its next LIST on the same watch.
+func (s federationServices) AccessBindingRevision(ctx context.Context, p value.ConnectorCluster) (string, error) {
+	if !s.acceptsBindingsFrom(p) {
+		return "", mounts.ErrUnavailable
 	}
-	p := region.Presented()
-	if p.RootID != s.ids.PermissionRootID || p.InstallationID != s.ids.InstallationID || p.ClusterID == s.ids.ClusterID {
-		return mounts.ErrUnavailable
+	return s.bindings.store.BeginRemoteBindings(ctx, p.ClusterID)
+}
+
+func (s federationServices) AccessBindings(ctx context.Context, region *connectorlifecycle.Region, previous string) (string, error) {
+	if region == nil || previous == "" || !s.acceptsBindingsFrom(region.Presented()) {
+		return "", mounts.ErrUnavailable
 	}
-	// The connector answers "unchanged" when its current LIST has the
-	// stored digest; the stored delivery then stays in effect.
-	stored, err := s.bindings.store.RemoteBindingsDigest(ctx, p.ClusterID)
+	cluster := region.Presented().ClusterID
+	stored, current, err := s.bindings.store.RemoteBindingsDigest(ctx, cluster)
 	if err != nil {
-		return err
+		return "", err
+	}
+	if current != previous {
+		return "", configuration.ErrChanged
 	}
 	delivery, unchanged, err := region.ReadAccessBindings(ctx, stored)
-	if err != nil || unchanged {
-		return err
-	}
-	bindings, err := s.bindings.decoder.DeliveredBindings(p.ClusterID, delivery)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "federation access bindings refused: invalid delivery")
-		return err
+		return "", err
 	}
-	d := configuration.RemoteBindings{ClusterID: p.ClusterID, ObservedAt: region.VerifiedAt(), Bindings: bindings}
-	if !d.Valid() {
-		fmt.Fprintln(os.Stderr, "federation access bindings refused: over the per-cluster bounds")
-		return configuration.ErrLimit
+	if unchanged {
+		return s.bindings.store.StoreRemoteBindings(ctx, cluster, previous, stored, nil, false)
 	}
-	if err = s.bindings.store.StoreRemoteBindings(ctx, d, delivery.Digest()); err != nil {
+	var bindings []configuration.Binding
+	unavailable := delivery.Unavailable
+	if !unavailable {
+		bindings, err = s.bindings.decoder.DeliveredBindings(cluster, delivery)
+		if err != nil {
+			// The previous Allow may have been removed in this replacement.
+			// An unrepresentable observation suspends this cluster.
+			unavailable, bindings = true, nil
+			fmt.Fprintln(os.Stderr, "federation access bindings unavailable: incomplete observation")
+		}
+	}
+	revision, err := s.bindings.store.StoreRemoteBindings(ctx, cluster, previous, delivery.Digest(), bindings, unavailable)
+	if err != nil && !errors.Is(err, configuration.ErrChanged) {
 		fmt.Fprintln(os.Stderr, "federation access bindings store failed: "+federationCause(err))
 	}
-	return err
+	return revision, err
 }
 
 // AuthenticateOwner logs the fixed refusal step of a failed owner
 // authentication (fleet.WithRefusalSteps); the result is unchanged.
-func (s federationServices) AuthenticateOwner(ctx context.Context, region *connectorlifecycle.Region, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
+func (s federationServices) AuthenticateOwner(ctx context.Context, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
 	var steps []string
-	out, err := s.Duties.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), region, c)
+	out, err := connectorlifecycle.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), s.owners, c)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation owner authentication refused: "+strings.Join(steps, ",")+" "+federationCause(err))
 	}
@@ -283,9 +312,13 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 		return mounts.ErrUnavailable
 	}
 	mux := http.NewServeMux()
+	if f.work != nil {
+		postgres.ListenPayloads(ctx, f.workPool, postgres.ConnectorWorkChannel, f.work.Publish)
+		mux.Handle(connectorlifecycle.WorkPath, f.work)
+	}
 	mux.Handle(connectorlifecycle.Path, f.handler)
 	mux.Handle(connectorlifecycle.TunnelPath, f.tunnel)
-	server := &http.Server{Handler: mux, TLSConfig: f.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
+	server := &http.Server{BaseContext: func(net.Listener) context.Context { return ctx }, Handler: mux, TLSConfig: f.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
 	select {
@@ -295,9 +328,11 @@ func (f *Federation) Serve(ctx context.Context, listener net.Listener) error {
 	}
 	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 35*time.Second)
 	defer cancel()
-	// Conversations are bounded at thirty seconds; tunnels end with the
-	// shutdown's deadline.
-	_ = server.Shutdown(stop)
+	// A peer blocked on an HTTP/2 flow-control window may still hold an
+	// active write after its request context ends. Close it at shutdown's bound.
+	if err := server.Shutdown(stop); err != nil {
+		_ = server.Close()
+	}
 	<-done
 	return nil
 }
@@ -312,49 +347,48 @@ func (f *Federation) Close() {
 	f.closers = nil
 }
 
-// federationOwnerReads composes the hub-api's unchanged owner registry and
+// federationOwnerAuthenticator composes the hub-api's unchanged owner registry and
 // route reads (ADR-172). The owner configuration and namespace UIDs key the
 // SQL rows and are read by name; the owner protection is the platform's
 // deterministic workload digest. Nothing here can sign, audit or activate an
 // owner.
-func federationOwnerReads(ctx context.Context, c federationInputs, pool *pgxpool.Pool) (connectorlifecycle.OwnerReads, error) {
-	var zero connectorlifecycle.OwnerReads
+func federationOwnerAuthenticator(ctx context.Context, c federationInputs, pool *pgxpool.Pool) (*fleetapp.OwnerAuthenticator, error) {
 	api, err := serviceKubernetes()
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
 	}
 	namespaceUID, err := kube.NamespaceUID(ctx, api, c.Namespace)
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
 	}
 	configurationUID, err := kube.ConfigMapUID(ctx, api, c.Namespace, c.Name+"-owner-source")
 	if err != nil {
-		return zero, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
+		return nil, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
 	}
 	configurations, err := postgres.NewOwnerConfigurations(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	registry, err := postgres.NewOwnerEnrollments(ctx, pool, c.InstallationID, c.ClusterID, namespaceUID, configurationUID, ownerRandomID)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	observer, err := kube.NewPermissionClient(api, c.ClusterID, configuration.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
 	// The hub-api accepts its owner configuration; until then the federation
 	// restarts rather than serving owner reads without a pool.
-	current, err := configurations.ReadOwnerConfiguration(ctx)
-	if err != nil || !current.Valid(time.Now()) || current.Configuration.Pool.Namespace != c.Namespace {
-		return zero, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
-	}
-	endpoints, err := kube.NewOwnerEndpoints(observer, current.Configuration.Pool)
+	current, err := fleetapp.StartupOwnerConfiguration(ctx, configurations, c.Namespace)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return nil, &fixedStepError{"owner-configuration", mounts.ErrUnavailable}
+	}
+	endpoints, err := kube.NewOwnerEndpoints(observer, current.Pool)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
 	}
 	routes := &fleetapp.OwnerRoutes{Configurations: configurations, Endpoints: endpoints, Now: time.Now}
-	return connectorlifecycle.OwnerReads{Candidates: registry, Authenticator: &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: platformOwnerProtection{time.Now}, Now: time.Now}}, nil
+	return &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: platformOwnerProtection{time.Now}, Now: time.Now}, nil
 }
 
 // platformOwnerProtection replaces the removed owner workload guard proof:

@@ -90,7 +90,11 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(s.Bindings) != 65 || len(s.Sources) != 1 || !s.SourcesComplete {
+		sources, err := reader.PermissionSources(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(s.Bindings) != 65 || len(sources.Sources) != 1 || !sources.SourcesComplete {
 			t.Fatal("real paginated snapshot incomplete")
 		}
 		n, err := reader.NamespaceMetadata(ctx, value.NamespaceQuery{Namespace: value.NamespaceRef{Name: ns.Name, UID: string(ns.UID)}, LabelKeys: []string{"example.invalid/managed"}, AnnotationKeys: []string{"example.invalid/owner"}})
@@ -104,7 +108,7 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		// to keeps only the selected keys' digests (ADR-242).
 		o := &value.NamespaceObservation{ClusterID: cluster, Keys: value.NamespaceKeys{Labels: []string{"example.invalid/managed"}, Annotations: []string{"example.invalid/owner"}},
 			Namespaces: []value.ObservedNamespace{{Name: n.Namespace.Name, UID: n.Namespace.UID, Labels: map[string]string{"example.invalid/managed": configapp.ValueDigest(n.Labels["example.invalid/managed"])}, Annotations: map[string]string{"example.invalid/owner": configapp.ValueDigest(n.Annotations["example.invalid/owner"])}}}}
-		if grants, reason := configapp.NamespaceGrants(s.Sources[0], cluster, o); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
+		if grants, reason := configapp.NamespaceGrants(sources.Sources[0], cluster, o); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
 			t.Fatal("namespace mapping lost an owner group", reason)
 		}
 	})

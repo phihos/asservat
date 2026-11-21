@@ -5,4 +5,5 @@ package configuration
 type BindingEvent struct {
 	Type, ResourceVersion string
 	Binding               *Binding
+	UnplacedUID           string // An observed object belonging to no current namespace incarnation.
 }

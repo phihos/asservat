@@ -2,6 +2,7 @@ package providerconfig
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -51,7 +52,7 @@ func TestSeaweedCompileRefusesIgnoredOrForeignAuthority(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if !strings.Contains(string(out.Policies["audit"]), "history/v1/"+swRoot+"/"+swCluster+"/*") || !strings.Contains(string(out.Policies["audit"]), "ForeignInventory") {
+	if !strings.Contains(string(out.Config), "history/v1/"+swRoot+"/"+swCluster+"/*") || len(out.Policies["audit"]) != 0 {
 		t.Fatal("missing history/inventory boundary")
 	}
 }
@@ -99,6 +100,51 @@ func TestSeaweedPolicyUsesProviderCanonicalSingletonShape(t *testing.T) {
 					check(value)
 				}
 			}
+		}
+	}
+}
+
+func TestSeaweedRegionalPoliciesDoNotGrowTheBucketPolicy(t *testing.T) {
+	admin := swCredential(t, "admin", swInstall)
+	ordinary := contracts.SeaweedGrant{Credential: swCredential(t, "download-read", swInstall), Bucket: "evidence", InstallationID: swInstall}
+	one, err := CompileSeaweedStorage(admin, []contracts.SeaweedGrant{ordinary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grants := []contracts.SeaweedGrant{ordinary}
+	for n := 1; n <= 65; n++ {
+		cluster := fmt.Sprintf("10000000-0000-4000-8000-%012d", n)
+		for _, role := range contracts.RemoteObjectStorePrincipals() {
+			grants = append(grants, contracts.SeaweedGrant{Credential: swCredential(t, role, cluster), Bucket: "evidence", InstallationID: swInstall, ClusterID: cluster, RootID: swRoot})
+		}
+	}
+	fleet, err := CompileSeaweedStorage(admin, grants)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fleet.Policies["evidence"]) != string(one.Policies["evidence"]) {
+		t.Fatal("regional principals changed the shared bucket policy")
+	}
+	var config struct {
+		Policies   []struct{ Name, Content string }
+		Identities []struct {
+			Name                 string
+			Actions, PolicyNames []string
+		}
+	}
+	if err := json.Unmarshal(fleet.Config, &config); err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Policies) != 130 {
+		t.Fatalf("got %d regional policies", len(config.Policies))
+	}
+	policies := map[string]string{}
+	for _, p := range config.Policies {
+		policies[p.Name] = p.Content
+	}
+	for _, id := range config.Identities {
+		if strings.HasPrefix(id.Name, "asservat-regional-") && (len(id.Actions) != 0 || len(id.PolicyNames) != 1 || id.PolicyNames[0] != id.Name || !json.Valid([]byte(policies[id.Name]))) {
+			t.Fatalf("regional identity %s lacks its own scoped policy", id.Name)
 		}
 	}
 }

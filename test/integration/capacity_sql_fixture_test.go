@@ -46,28 +46,28 @@ type capacityEnrollment struct {
 var capacityStanding = time.Date(9970, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type capacitySQLFixture struct {
-	ctx              context.Context
-	admin            *pgxpool.Pool
-	installed        capacityFixtureSetup
-	input            capacityFixtureInput
-	qualification    app.CapacityQualification
-	values           app.CapacityValues
-	permission       *postgres.Permissions
-	batch            cfg.PermissionBatch
-	roles            map[string]*pgxpool.Pool
-	accounts         *auditapp.OperationMAC
-	namespace        cfg.NamespaceRef
-	workloads        []cfg.WorkloadRef
-	legacy           *postgres.Ledger
-	registered       map[string]artifact.Registration
-	fixturePool      func(string, string) *pgxpool.Pool
-	store            *objectstore.Store
-	authority        *objectstore.AuthorityObjects
+	ctx           context.Context
+	admin         *pgxpool.Pool
+	installed     capacityFixtureSetup
+	input         capacityFixtureInput
+	qualification app.CapacityQualification
+	values        app.CapacityValues
+	permission    *postgres.Permissions
+	batch         cfg.PermissionBatch
+	roles         map[string]*pgxpool.Pool
+	accounts      *auditapp.OperationMAC
+	namespace     cfg.NamespaceRef
+	workloads     []cfg.WorkloadRef
+	legacy        *postgres.Ledger
+	registered    map[string]artifact.Registration
+	fixturePool   func(string, string) *pgxpool.Pool
+	store         *objectstore.Store
+
 	keys             authorityTestKeys
 	processingPolicy privacy.DownloadPolicy
 }
 
-func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
+func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, objects *objectstore.Store, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
 	t.Helper()
 	f := &capacitySQLFixture{ctx: ctx, admin: admin, installed: newCapacityFixtureSetup(t, scope), roles: map[string]*pgxpool.Pool{}, namespace: cfg.NamespaceRef{Name: "applications", UID: custodyID()}, workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "first", UID: custodyID()}, {Kind: "StatefulSet", Name: "second", UID: custodyID()}}}
 	for len(f.workloads) < capacityNativeAccounts {
@@ -92,11 +92,9 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		return out
 	}
 	f.fixturePool = poolFor
-	f.store = objects.Store
-	f.authority = objects
-	// The original installation activation above uses real OpenBao. These
-	// subsequent synthetic context fixtures share the existing test key port;
-	// their SQL roles, encrypted objects and independent verification are real.
+	f.store = objects
+	// Synthetic context fixtures share the existing test key port and use
+	// real SQL roles and encrypted objects.
 	raw := make([]byte, 32)
 	if _, e := rand.Read(raw); e != nil {
 		t.Fatal(e)
@@ -166,11 +164,6 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal("actual permission acceptance", err)
 	}
 	f.batch.ExpectedSequence = accepted.Sequence
-	for i := 0; i < 2; i++ {
-		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: objects}).PublishAuthority(ctx); err != nil {
-			t.Fatal("actual encrypted permission audit", err)
-		}
-	}
 	f.qualification, f.values = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, f.installed.mac.AccountVersion), capacityNativeValues()
 	for _, option := range configure {
 		option(f)

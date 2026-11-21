@@ -1,9 +1,11 @@
 package connectorlifecycle
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -34,12 +36,7 @@ type scriptedServices struct {
 	foreign bool
 }
 
-func (s *scriptedServices) OwnerCandidates(context.Context, *Region) (value.APIContextOwnerCandidates, error) {
-	now := time.Now().UTC()
-	return value.APIContextOwnerCandidates{ObservedAt: now, ValidUntil: now.Add(time.Second)}, nil
-}
-
-func (s *scriptedServices) AuthenticateOwner(_ context.Context, _ *Region, c value.OwnerCertificate) (OwnerAuthentication, error) {
+func (s *scriptedServices) AuthenticateOwner(_ context.Context, c value.OwnerCertificate) (OwnerAuthentication, error) {
 	if s.foreign {
 		c.Digest = artifact.Digest{0xee} // the hub answers for another owner
 	}
@@ -78,8 +75,20 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, opening := range []Opening{
+		{Purpose: PurposeSettings},
+		{Purpose: PurposeSettings, Protocol: contracts.ConnectorProtocolMajor + 1},
+		{Purpose: "owner-candidates", Protocol: 1, Process: testProcess()},
+	} {
+		opening.OperationID = "10000000-0000-4000-8000-000000000008"
+		frame, err := client.Run(t.Context(), opening, nil)
+		var mismatch *ProtocolMismatch
+		if !errors.As(err, &mismatch) || mismatch.Announced != opening.Protocol || mismatch.Required != contracts.ConnectorProtocolMajor || frame.Settings != nil {
+			t.Fatalf("%s negotiation for major %d: frame=%+v error=%v", opening.Purpose, opening.Protocol, frame, err)
+		}
+	}
 	process := testProcess()
-	base := Opening{Purpose: PurposeOwnerCandidates, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
+	base := Opening{Purpose: PurposeAccessBindings, Protocol: contracts.ConnectorProtocolMajor, OperationID: "10000000-0000-4000-8000-000000000008", Process: process}
 	// A token of another cluster never reaches the services.
 	if _, err = stranger.Run(context.Background(), base, nil); err == nil {
 		t.Fatal("foreign token accepted")
@@ -102,9 +111,6 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 		o.Purpose, o.Owner = purpose, owner
 		return o
 	}
-	if result, err = client.Run(context.Background(), ownerOpening(PurposeOwnerCandidates, nil), nil); err != nil || result.Kind != "result" || result.Owners == nil {
-		t.Fatal("owner candidates", result, err)
-	}
 	ownerCert := value.OwnerCertificate{Binding: value.OwnerBinding{InstallationID: process.Binding.InstallationID}, Usage: "server", Digest: artifact.Digest{7}}
 	if result, err = client.Run(context.Background(), ownerOpening(PurposeOwnerAuthentication, &ownerCert), nil); err != nil || result.Kind != "result" || result.Owner == nil || result.Owner.Owner.Certificate != ownerCert {
 		t.Fatal("owner authentication", result, err)
@@ -116,7 +122,7 @@ func TestDelegatedLifecycleChannelOverRealHTTP2(t *testing.T) {
 	services.foreign = false
 	clientCert := ownerCert
 	clientCert.Usage = "client"
-	for _, bad := range []Opening{ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeOwnerCandidates, &ownerCert)} {
+	for _, bad := range []Opening{ownerOpening(PurposeOwnerAuthentication, nil), ownerOpening(PurposeOwnerAuthentication, &clientCert), ownerOpening(PurposeAccessBindings, &ownerCert)} {
 		if _, err = client.Run(context.Background(), bad, nil); err == nil {
 			t.Fatal("owner opening without a server certificate, or one on another purpose, accepted")
 		}

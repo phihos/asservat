@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Registered workload clusters (2026-11-18)
+
+The connector subscribes over its existing HTTP/2 connection. The hub finds
+its serving endpoint on demand. Remove `clusters[].standby` and
+`hub.hub-api.public.standby` on development upgrades and upgrade both ends
+to protocol major 2. ADR-334 consolidates the federation contract.
+
+- Routing, permission reconciliation and downloads previously lost clusters
+  at 17, 65 and 33 entries respectively. PostgreSQL tests cover a 129-cluster
+  download policy, 201 populated deliveries with 20 ms injected SQL latency,
+  1,025 automation bindings, and addition and withdrawal of 32,768
+  assignments and 24,000 distinct bindings. A healthy peer completed capture
+  admission and download reservation while another transaction staged a
+  permission change. A first-time review and capture on an unchanged peer
+  completed in 0.22 seconds during staged publication. One audit header and
+  indexed source changes retain original scope and assignment identity for each committed change. A real
+  PostgreSQL race between a first access review and a downgrade retired the
+  old role before the replacement became visible.
+- Owner configuration and its audit commit together. A refused audit insert
+  rolls both back. Eight concurrent observations produced one event and a
+  database with 1,024 historical revisions accepted generation 1,025. Upgrading
+  disables the two retired publisher logins, revokes privileges from existing
+  sessions and removes their keys from the generated hub-worker Secret.
+  PostgreSQL tests also covered deletion during a Kubernetes API outage and
+  both startup readers with the database clock 500 ms ahead.
+- On `040e471ea`, a fresh two-cluster Kind run exercised one connected workload
+  cluster, 64 offline registrations, two public API replicas and two federation
+  replicas. The same connector withdrew and restored a remote binding across
+  two unattended Helm upgrades. Both owner revision digests matched in SQL.
+  Across 36 idle seconds the permission lease advanced without changing its
+  epoch or sequence, and neither owner opened a native exchange. Both public
+  endpoints replayed identical requests, refused conflicting input, and
+  downloaded 354 bytes from the selected Pod. A metadata-only change preserved
+  the original user grant. The same key-service process produced a v17 artifact
+  and returned all 354 original v1 bytes after one Secret update. Cleanup passed.
+- Bundled SeaweedFS rejected the original 210,581-byte evidence bucket policy.
+  Applying regional permissions to storage identities reduced the combined
+  policies to 5,626 bytes at 65 registrations. Withdrawal invalidated the
+  old credentials and retained evidence remained readable.
+- Migrations 00006–00008 cover delivery, permission projection and owner
+  audit. The previous connector received HTTP 426 on delivery and confirmation.
+  Already-prepared schema-5 SQL statements could neither read nor renew the
+  new permission projection. Installed connectors still lack remote namespace
+  and workload ownership metadata. Key rotation requires a mounted Secret
+  update, and a lost successful wrap response cannot be replayed.
+  [Qualification and remaining boundaries](https://github.com/phihos/asservat/pull/304).
+
 ## Processing cleanup (2026-11-17)
 
 Branch `codex/processing-cleanup`. Removed the dead manual processing

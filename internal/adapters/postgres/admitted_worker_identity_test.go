@@ -23,6 +23,7 @@ import (
 // Query-protocol regression only. It executes the production transaction body
 // against explicit rows; real PostgreSQL locking/commit qualification is separate.
 type admittedIdentityRows struct {
+	custodydb.DBTX
 	trust          custodydb.FleetCurrentTrust
 	parent         custodydb.ArtifactDownload
 	query          custodydb.ContextQuery

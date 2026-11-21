@@ -19,8 +19,7 @@ import (
 // for the remaining independent lifecycle cases; this is not product recovery.
 func exerciseOwnerHistoricalVersions(t *testing.T, ctx context.Context, l *ownerConfigLab, ledger, ack, activation, registry *postgres.OwnerEnrollments, attempt value.OwnerCertificateAttempt, certificate value.OwnerCertificate, proof func() value.OwnerEnrollmentProof) {
 	t.Helper()
-	c := attempt.Permit.Configuration.Configuration
-	for _, kind := range []string{"configuration", "enrollment", "certificate"} {
+	for _, kind := range []string{"enrollment", "certificate"} {
 		for _, version := range []string{"", "null"} {
 			name := version
 			if name == "" {
@@ -31,10 +30,6 @@ func exerciseOwnerHistoricalVersions(t *testing.T, ctx context.Context, l *owner
 				var readSQL, writeSQL string
 				var args []any
 				switch kind {
-				case "configuration":
-					readSQL = "SELECT audit_receipt_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4"
-					writeSQL = "UPDATE hub_owner_configuration_revision SET audit_receipt_json=$5 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4"
-					args = []any{c.Pool.InstallationID, c.Pool.ClusterID, c.Revision.UID, c.Revision.Generation}
 				case "enrollment":
 					readSQL = "SELECT audit_receipt_json FROM hub_owner_enrollment WHERE id=$1"
 					writeSQL = "UPDATE hub_owner_enrollment SET audit_receipt_json=$2 WHERE id=$1"
@@ -88,11 +83,6 @@ func exerciseOwnerHistoricalVersions(t *testing.T, ctx context.Context, l *owner
 				})
 				if err = setFixtureReceipt(ctx, historical); err != nil {
 					t.Fatal(err)
-				}
-				if kind == "configuration" {
-					if _, err = l.reader.ReadOwnerConfiguration(ctx); err == nil {
-						t.Fatal("unversioned acknowledged configuration became current")
-					}
 				}
 				if kind != "certificate" {
 					if _, _, _, err = ledger.ClaimOwnerEnrollment(ctx, p); err == nil {

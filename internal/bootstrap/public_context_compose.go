@@ -29,7 +29,9 @@ import (
 	audit "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -140,7 +142,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
 	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
-		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
+		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Captures < 1 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
 	historyBounds, err := captureHistoryBounds(p.CaptureHistory)
@@ -169,7 +171,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	capabilities := publicCapabilities{}
-	limits := contextstart.RouterLimits{Standby: p.Standby, Captures: p.Captures}
+	var reservations []contextstart.ClusterLimit
 	// ADR-185: the regional clusters come from the guarded catalog, read once
 	// at start before the native configuration (ADR-196 decision 7). Each
 	// entry still passes the SQL registry and guard checks below; an empty
@@ -185,7 +187,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// admit adds one cluster's capability and limits.
 	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource) {
 		capabilities[v.ClusterID] = capability
-		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+		reservations = append(reservations, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
 	}
 	for _, v := range catalog.catalog.Clusters {
 		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Settings.InstallationID != installation {
@@ -223,22 +225,32 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		admit(v, capability)
 	}
-	// The installation-wide ceilings cover every joined cluster's own
-	// reservation; each cluster stays bounded by its catalog entry.
-	standby, captures := 0, 0
-	for _, v := range limits.Clusters {
-		standby, captures = standby+v.Standby, captures+v.Captures
-	}
-	limits.Standby, limits.Captures = max(limits.Standby, standby), max(limits.Captures, captures)
-	if limits.Standby > 64 || c.Native.Connections+limits.Standby > 64 {
-		return nil, mounts.ErrUnavailable
-	}
-	router, err := contextstart.NewRouter(limits)
+	router, err := contextstart.NewRouter(reservations)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	*closers = append(*closers, router.Close)
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: limits.Standby, Preflight: limits.Standby}
+	// Keep one listener slot on a hub with no registrations. Its empty router refuses starts.
+	connections := max(1, router.StandbyCapacity())
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Connections: connections, Preflight: connections, WatchWork: func(ctx context.Context, owner fleet.OwnerBinding, router *contextstart.Router) {
+		postgres.ListenPayloads(ctx, sql["hub-metadata-read"], postgres.ConnectorWorkChannel, func(payload string) {
+			if payload == "" || authorization.UUID(payload) {
+				router.ResendDemand(payload)
+				return
+			}
+			var hint connectorlifecycle.WorkHint
+			if json.Unmarshal([]byte(payload), &hint) == nil && hint.Owner != owner && time.Now().Before(hint.Until) {
+				router.YieldIdle(hint.Cluster)
+			}
+		})
+	}, Wake: func(ctx context.Context, cluster string, owner fleet.OwnerBinding) error {
+		until, _ := ctx.Deadline()
+		payload, err := json.Marshal(connectorlifecycle.WorkHint{Cluster: cluster, Owner: owner, Until: until})
+		if err != nil {
+			return err
+		}
+		return postgres.NotifyConnectorWork(ctx, sql["hub-metadata-read"], string(payload))
+	}}
 
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable

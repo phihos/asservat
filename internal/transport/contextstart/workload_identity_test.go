@@ -17,7 +17,7 @@ func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
 			now := time.Now().UTC()
 			work := workFixture()
 			request := targets.WorkloadRequest{ClusterID: work.Work.Channel.Connector.Binding.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}
-			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{request.ClusterID, 1, 1}}})
+			router, err := NewRouter([]ClusterLimit{{request.ClusterID, 1, 1}})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	wire "asservat.local/asservat/api/v1alpha1"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -104,7 +105,7 @@ func permissionJSON(b []byte, maxBytes, maxTokens int) error {
 		if err != nil {
 			return value.ErrUnavailable
 		}
-		if tokens >= maxTokens || d.StackDepth() > 32 {
+		if (maxTokens > 0 && tokens >= maxTokens) || d.StackDepth() > 32 {
 			return value.ErrLimit
 		}
 		if token.Kind() == '0' {
@@ -123,7 +124,9 @@ func permissionJSON(b []byte, maxBytes, maxTokens int) error {
 }
 
 func decodePermissionSpec(b []byte, s *jsonschema.Schema, out any) (artifact.Digest, error) {
-	if err := permissionJSON(b, 64<<10, 16384); err != nil {
+	// The Kubernetes read or authenticated delivery already bounds input bytes.
+	// A smaller per-spec limit could silently discard a valid Deny.
+	if err := permissionJSON(b, contracts.AccessBindingDeliveryMaxBytes, 0); err != nil {
 		return artifact.Digest{}, err
 	}
 	v, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
@@ -254,7 +257,11 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	if ref.ClusterID != "" && (!authorization.UUID(b.Scope.ClusterID) || !namespaceRefValid(b.Scope.Namespace)) {
 		return value.Binding{}, value.ErrUnavailable
 	}
-	if b.Subjects, err = subjects(spec.Subjects); err != nil {
+	// Proposed specs have no Kubernetes UID. Admission requires all of their
+	// subjects to fit, including subjects of an Allow.
+	b.Subjects, err = subjects(spec.Subjects, spec.Effect == "Allow" && ref.UID != "")
+	b.UnavailableDeny = spec.Effect == "Deny" && err == value.ErrLimit
+	if err != nil && !b.UnavailableDeny {
 		return value.Binding{}, err
 	}
 	seen := map[string]bool{}
@@ -281,13 +288,23 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 
 // subjects decodes authored subjects; an omitted issuer stays empty and is
 // the installation's issuer (ADR-335 D4).
-func subjects(in []wire.Subject) ([]value.Subject, error) {
+func subjects(in []wire.Subject, skipUnrepresentable bool) ([]value.Subject, error) {
 	var out []value.Subject
 	for _, s := range in {
-		if s.Issuer != "" && !issuerValid(s.Issuer) || !identity.Text(s.ID, 256) {
-			return nil, value.ErrUnavailable
+		// A binding compares its issuer literally with a verified identity.
+		// Only the identity provider uses the issuer as a network endpoint.
+		if (s.Issuer != "" && !identity.Text(s.Issuer, 2048)) || !identity.Text(s.ID, 256) {
+			// Only an already-stored Allow may retain its representable siblings.
+			if !skipUnrepresentable {
+				return nil, value.ErrLimit
+			}
+			// Other subjects of an Allow keep their independent grant.
+			continue
 		}
 		out = append(out, value.Subject{Kind: s.Kind, Issuer: s.Issuer, ID: s.ID})
+	}
+	if len(out) == 0 {
+		return nil, value.ErrUnavailable
 	}
 	return out, nil
 }
@@ -307,7 +324,8 @@ func notAfter(s string) (time.Time, error) {
 // one binding per cluster it covers, each over AllNamespaces narrowed by its
 // namespaceSelector (ADR-335 D14). Omitted clusters are the binding's own
 // cluster; "*" is every known cluster. A spec that fails validation becomes
-// one invalid binding that grants and denies nothing.
+// one invalid binding that grants and denies nothing. A Deny that the
+// assignment store cannot represent makes the observation unavailable.
 func (v *permissionValidator) clusterBindings(object permissionObject, ref value.Resource) []value.Binding {
 	invalid := func() []value.Binding {
 		ref.SpecDigest = artifact.Digest(sha256.Sum256(object.Spec))
@@ -319,8 +337,9 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 		return invalid()
 	}
 	ref.SpecDigest = digest
-	subjects, err := subjects(spec.Subjects)
-	if err != nil {
+	subjects, err := subjects(spec.Subjects, spec.Effect == "Allow")
+	unavailableDeny := err == value.ErrLimit
+	if err != nil && !unavailableDeny {
 		return invalid()
 	}
 	expires, err := notAfter(spec.NotAfter)
@@ -350,7 +369,7 @@ func (v *permissionValidator) clusterBindings(object permissionObject, ref value
 	for _, cluster := range slices.Compact(clusters) {
 		r := ref
 		r.ClusterID = cluster
-		out = append(out, value.Binding{Resource: r, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
+		out = append(out, value.Binding{Resource: r, UnavailableDeny: unavailableDeny, Effect: spec.Effect, Subjects: subjects, Roles: spec.Roles, NotAfter: expires, NamespaceSelector: selector, Scope: value.Scope{ClusterID: cluster, Namespace: value.AllNamespaces}})
 	}
 	return out
 }
@@ -388,7 +407,7 @@ func (d *AccessBindingSpecDecoder) DecodeAccessBindingSpec(spec []byte) (value.B
 		return value.Binding{}, value.ErrUnavailable
 	}
 	b, err := d.validator.binding(permissionObject{Spec: spec}, value.Resource{Kind: "AccessBinding"})
-	if err != nil {
+	if err != nil || b.UnavailableDeny {
 		return value.Binding{}, value.ErrInvalid
 	}
 	return b, nil

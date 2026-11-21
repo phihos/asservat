@@ -21,6 +21,12 @@ type KeyConfigurationLedger interface {
 	// reuse, checking current source freshness after blocking locks.
 	ObserveLocalKeys(context.Context, value.LocalKeyConfiguration) (time.Time, error)
 }
+
+// KeyGeneration holds the immutable crypto backend for one accepted keyset.
+// Guards return the same generation until a different keyset is accepted.
+type KeyGeneration struct {
+	Operations KeyOperationBackend
+}
 type KeyConfigurationGuard interface {
-	CurrentKeyConfiguration(context.Context, value.KeyScope, string) (time.Time, error)
+	CurrentKeyConfiguration(context.Context, value.KeyScope, string) (*KeyGeneration, time.Time, error)
 }

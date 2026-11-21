@@ -66,7 +66,7 @@ them.
 | 6 | Failure/degraded states | 0 new; `Indeterminate` is a result value. |
 | 7 | Self-configuration | no. |
 | 8 | External dependencies | no new ones (same regional target query as `preview_capture`). |
-| 9 | Cost at scale | per call: 1 recovery read, 1 regional target query, 1 permission projection read, 2 audit writes; no watch, no background work; O(assignments on one target) ≤ 256 rows. |
+| 9 | Cost at scale | per call: 1 recovery read, 1 regional target query, 1 permission projection read, 2 audit writes; no watch, no background work; O(assignments on one target). |
 | 10 | Upgrade/rollback | additive; older binaries ignore the name; removing the route disables it. |
 | 11 | Smaller fix | Documenting the evaluator rules is not enough: users cannot see their own bindings or token scopes. A query over the existing evaluator is the smallest form. |
 

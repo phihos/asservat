@@ -58,7 +58,7 @@ export interface components {
                     workload_uid: string;
                     pod_uid: string;
                 };
-                /** @description All of the caller's contributing assignments; bounded by the caller's AccessBinding and PermissionSource objects, so the list is not paged. */
+                /** @description The caller's contributing assignments from AccessBinding, ClusterAccessBinding and PermissionSource objects: the first 64, which fit one result frame; assignments_total counts all. */
                 assignments: {
                     /** @enum {unknown} */
                     effect: "allow" | "deny";
@@ -69,7 +69,7 @@ export interface components {
                     /** @enum {unknown} */
                     subject_kind: "User" | "Group" | "Workload";
                     /** @enum {unknown} */
-                    basis_kind: "AccessBinding" | "PermissionSource";
+                    basis_kind: "AccessBinding" | "ClusterAccessBinding" | "PermissionSource";
                     basis_uid: string;
                     revision: string;
                 }[];

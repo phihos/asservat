@@ -179,7 +179,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return queryRefusal("fence-backing", nil)
 	case a.PermissionRevision.UID != uid(p.Epoch) || a.PermissionRevision.Generation != p.Sequence || !bytes.Equal(a.PermissionRevision.Digest[:], p.ProjectionDigest):
 		return queryRefusal("fence-permission-revision", nil)
-	case p.Suspended || !p.InitialAuditID.Valid:
+	case p.Suspended || p.Sequence < 1:
 		return queryRefusal("fence-permission-suspended", nil)
 	case !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, authorization.PermissionObservationInterval):
 		return queryRefusal("fence-permission-fresh", nil)
@@ -189,12 +189,6 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile.SharedBudget() || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
 		!b.HardUntil.Time.Equal(q.Plan.HardUntil) || !b.EffectsUntil.Time.Equal(q.Plan.EffectsUntil) || !b.CleanupUntil.Time.Equal(q.Plan.CleanupUntil) || !b.RetireBy.Time.Equal(q.Plan.RetireBy) || queryDecode(allocation.PoolSource, 4096, &pool) != nil || queryDecode(allocation.PolicySource, 4096, &policy) != nil || pool != q.Plan.PoolSource || policy != q.Plan.PolicySource || allocation.Revision != q.Plan.AllocationRevision || uid(allocation.ClusterID) != q.Scope.ClusterID || allocation.NamespaceUid != q.Scope.NamespaceUID || allocation.WorkloadUid != q.Scope.WorkloadUID {
 		return queryRefusal("fence-profile", nil)
-	}
-	for _, auditID := range []string{uid(p.Epoch), uid(p.InitialAuditID)} {
-		proof, e := tx.ReadAuthorityAudit(ctx, id(auditID))
-		if e != nil || !currentAuthorityAudit(proof, p.ID, id(auditID)) {
-			return queryRefusal("fence-audit", nil)
-		}
 	}
 	expected := a.Environment.Processing
 	snapshot, processing, e := readProcessingSnapshot(ctx, tx, s.root, q.Plan.InstallationID, q.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)

@@ -19,17 +19,17 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type groupProjectionSQL struct {
-	now                                  time.Time
-	loads, clocks, basis                 int
-	authority                            *custodydb.AuthorityAudit
-	automation                           *custodydb.SelectAutomationBasisRow
-	source                               *custodydb.PolicySource
-	accepted                             *custodydb.PolicyAcceptance
-	sourceReads, acceptReads, auditReads int
+	custodydb.DBTX
+	now                  time.Time
+	loads, clocks, basis int
+
+	automation               *custodydb.PermissionBasis
+	source                   *custodydb.PolicySource
+	accepted                 *custodydb.PolicyAcceptance
+	sourceReads, acceptReads int
 }
 type groupProjectionSQLRow struct {
 	now   time.Time
@@ -55,8 +55,7 @@ func (r groupProjectionSQLRow) Scan(dst ...any) error {
 		reflect.ValueOf(dst[0]).Elem().Set(reflect.ValueOf(ts(r.now)))
 		return nil
 	}
-	// Unacknowledged zero receipt is intentionally no authority. Projection
-	// loading still succeeds with an empty allow set; no positive grant is faked.
+	// Unpopulated synthetic columns represent an empty projection.
 	for _, d := range dst {
 		reflect.ValueOf(d).Elem().SetZero()
 	}
@@ -77,13 +76,6 @@ func (s *groupProjectionSQL) QueryRow(_ context.Context, sql string, _ ...any) p
 	if strings.HasPrefix(sql, "-- name: ReadPolicyAcceptance ") {
 		s.acceptReads++
 		return groupProjectionSQLRow{value: *s.accepted}
-	}
-	if strings.HasPrefix(sql, "-- name: ReadAuthorityAudit ") {
-		s.auditReads++
-		if s.authority != nil {
-			return groupProjectionSQLRow{value: *s.authority}
-		}
-		return groupProjectionSQLRow{}
 	}
 	panic("unexpected row query: " + sql)
 }
@@ -115,7 +107,7 @@ func groupProjectionFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Queri
 	now := previewTestValue(t).CreatedAt
 	db := &groupProjectionSQL{now: now}
 	q := custodydb.New(db)
-	stream := custodydb.PermissionStream{ID: id("11111111-1111-4111-8111-111111111111"), Epoch: id("22222222-2222-4222-8222-222222222222"), Sequence: 1, InitialAuditID: id("33333333-3333-4333-8333-333333333333"), ObservedAt: ts(now), FreshUntil: ts(now.Add(20 * time.Second)), LeaseUntil: ts(now.Add(30 * time.Second)), ProjectionDigest: append([]byte{1}, make([]byte, 31)...)}
+	stream := custodydb.PermissionStream{ID: id("11111111-1111-4111-8111-111111111111"), Epoch: id("22222222-2222-4222-8222-222222222222"), Sequence: 1, ObservedAt: ts(now), FreshUntil: ts(now.Add(20 * time.Second)), LeaseUntil: ts(now.Add(30 * time.Second)), ProjectionDigest: append([]byte{1}, make([]byte, 31)...)}
 	return db, q, stream, authorization.Target{ClusterID: "44444444-4444-4444-8444-444444444444", NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod"}
 }
 func TestRecordingGroupPermissionProjectionsLoadOncePerExactPod(t *testing.T) {
@@ -288,14 +280,13 @@ func groupAuditedBasisFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Que
 	envelope := authorization.AutomationEnvelope{AllowedActions: []string{"packetCapture"}, MaxLifetimeSeconds: 31536000, MaxExecutions: a.Limits.MaxExecutions, MaxBytes: a.Limits.MaxBytes, MaxObservedBytes: a.Limits.MaxObservedBytes}
 	event := "88888888-8888-4888-8888-888888888888"
 	d := artifact.Digest{3}
-	record := audit.AuthorityRecord{ID: event, RootID: uid(stream.ID), Epoch: uid(stream.Epoch), Kind: "permission-change", Sequence: stream.Sequence, InputDigest: artifact.Digest{1}, CreatedAt: db.now, Automation: []audit.AutomationDelegation{{BasisKey: "binding-key", Revision: a.Delegation, ScopeDigest: d, Envelope: envelope}}}
-	if !record.Valid() || !a.Valid(db.now) {
+
+	if !a.Valid(db.now) {
 		t.Fatal("invalid positive authority fixture")
 	}
-	raw, _ := json.Marshal(record)
 	env, _ := json.Marshal(envelope)
-	db.authority = &custodydb.AuthorityAudit{ID: id(event), StreamID: stream.ID, Epoch: stream.Epoch, Sequence: stream.Sequence, EventKind: record.Kind, Record: raw, EventDigest: digest(record), CreatedAt: ts(db.now), AcknowledgedAt: ts(db.now), ObjectKey: pgtype.Text{String: audit.AuthorityKey(uid(stream.ID), event), Valid: true}, ObjectVersion: pgtype.Text{String: "version", Valid: true}, ObjectEtag: pgtype.Text{String: "etag", Valid: true}, ObjectBytes: pgtype.Int8{Int64: 1, Valid: true}, ObjectSha256: append([]byte{1}, make([]byte, 31)...)}
-	db.automation = &custodydb.SelectAutomationBasisRow{StreamID: stream.ID, BasisKey: "binding-key", Uid: a.Delegation.UID, Kind: "AccessBinding", Generation: a.Delegation.Generation, ResourceVersion: "1", ObservationVersion: "1", SpecDigest: a.Delegation.Digest[:], ScopeDigest: d[:], ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUids: []string{a.WorkloadUID}, Effect: "Allow", NotAfter: ts(db.now.Add(10 * time.Second)), SeenSequence: stream.Sequence, AutomationJson: env, AutomationAuditID: id(event), AcknowledgedAt: ts(db.now)}
+
+	db.automation = &custodydb.PermissionBasis{StreamID: stream.ID, BasisKey: "binding-key", Uid: a.Delegation.UID, Kind: "AccessBinding", Generation: a.Delegation.Generation, ResourceVersion: "1", ObservationVersion: "1", SpecDigest: a.Delegation.Digest[:], ScopeDigest: d[:], ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUids: []string{a.WorkloadUID}, Effect: "Allow", NotAfter: ts(db.now.Add(10 * time.Second)), SeenSequence: stream.Sequence, AutomationJson: env, AutomationAuditID: id(event)}
 	return db, q, stream, a, target
 }
 
@@ -330,8 +321,8 @@ func groupAuditedPolicyFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Qu
 	if !record.Valid() {
 		t.Fatal("invalid accepted-policy fixture")
 	}
-	raw, _ := json.Marshal(record)
 	receipt, _ := json.Marshal(audit.Receipt{Key: audit.PolicyAcceptanceKey(record.RootID, record.ID), Version: "version", ETag: "etag", Bytes: 1, SHA256: artifact.Digest{1}})
+	raw, _ := json.Marshal(record)
 	db.source = &custodydb.PolicySource{RootID: stream.ID, PolicyUid: a.PolicyUID, InstallationID: id(a.InstallationID), ClusterID: id(src.ClusterID), NamespaceUid: src.NamespaceUID, Name: src.Name, Generation: src.Revision.Generation, SpecDigest: src.Revision.Digest[:], ResourceVersion: src.ResourceVersion, ObservedAt: ts(src.ObservedAt), FreshUntil: ts(src.FreshUntil), CollectionDigest: src.CollectionDigest[:], IntentVersion: 1, ActiveID: id(record.ID)}
 	db.accepted = &custodydb.PolicyAcceptance{ID: id(record.ID), RootID: stream.ID, PolicyUid: a.PolicyUID, Generation: src.Revision.Generation, Nonce: id(submission.Nonce), ScopeDigest: a.ScopeDigest[:], RequestDigest: policyRequestDigest(value.PolicyAdmission{Submission: submission, Authority: a}), RecordDigest: digest(record), Record: raw, AcceptedAt: ts(db.now), AcknowledgedAt: ts(db.now), ReceiptJson: receipt}
 	return db, q, stream, trust, a, target
@@ -443,10 +434,10 @@ func TestRecordingGroupSharedFactsStillEvaluateFullPolicyAtEveryBoundary(t *test
 			t.Fatal("valid full domain eligibility refused", got.Reason)
 		}
 	}
-	if db.sourceReads != 1 || db.acceptReads != 1 || db.basis != 1 || db.auditReads != 1 {
-		t.Fatalf("shared metadata calls source=%d acceptance=%d basis=%d audit=%d", db.sourceReads, db.acceptReads, db.basis, db.auditReads)
+	if db.sourceReads != 1 || db.acceptReads != 1 || db.basis != 1 {
+		t.Fatalf("shared metadata calls source=%d acceptance=%d basis=%d", db.sourceReads, db.acceptReads, db.basis)
 	}
-	t.Logf("actual_controlled_full_eligibility_calls=64 source_reads=%d acceptance_reads=%d basis_reads=%d basis_audit_reads=%d", db.sourceReads, db.acceptReads, db.basis, db.auditReads)
+	t.Logf("actual_controlled_full_eligibility_calls=64 source_reads=%d acceptance_reads=%d basis_reads=%d", db.sourceReads, db.acceptReads, db.basis)
 	changed := executor
 	changed.Principal.ClientID = "different"
 	if got := contextEligibilityInWithPermissions(t.Context(), q, stream, trust, uid(stream.ID), a.InstallationID, changed, projection, target, db.now, facts); got.Eligible {
@@ -456,7 +447,7 @@ func TestRecordingGroupSharedFactsStillEvaluateFullPolicyAtEveryBoundary(t *test
 	if got := contextEligibilityInWithPermissions(t.Context(), q, stream, trust, uid(stream.ID), a.InstallationID, executor, projection, target, db.now, facts); got.Eligible {
 		t.Fatal("original policy source expired but full evaluation stayed eligible")
 	}
-	if db.sourceReads != 1 || db.acceptReads != 1 || db.basis != 1 || db.auditReads != 1 {
+	if db.sourceReads != 1 || db.acceptReads != 1 || db.basis != 1 {
 		t.Fatal("changed/expired input caused fallback reload")
 	}
 }
@@ -472,8 +463,8 @@ func TestRecordingGroupNilFactsPreserveOrdinaryReadsAndClocks(t *testing.T) {
 			t.Fatal("ordinary path invented target permissions")
 		}
 	}
-	if db.sourceReads != 64 || db.acceptReads != 64 || db.basis != 64 || db.loads != 64 || db.auditReads != 192 || db.clocks != 448 {
-		t.Fatalf("ordinary protocol changed source=%d acceptance=%d basis=%d permissions=%d audit=%d clocks=%d", db.sourceReads, db.acceptReads, db.basis, db.loads, db.auditReads, db.clocks)
+	if db.sourceReads != 64 || db.acceptReads != 64 || db.basis != 64 || db.loads != 64 || db.clocks != 448 {
+		t.Fatalf("ordinary protocol changed source=%d acceptance=%d basis=%d permissions=%d clocks=%d", db.sourceReads, db.acceptReads, db.basis, db.loads, db.clocks)
 	}
 }
 

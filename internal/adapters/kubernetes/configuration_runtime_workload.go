@@ -11,7 +11,7 @@ import (
 )
 
 // BuildProvisionedHubWorkerWorkload reuses the existing inert Restricted
-// workload and its exact API permissions, but mounts the three SQL credentials
+// workload and its exact API permissions, but mounts the SQL credentials
 // only from the producer's immutable installation-derived projection. The
 // separately supplied provider Secret carries only storage and audit-key
 // credentials; it cannot substitute SQL role material or its receipt manifest.
@@ -37,7 +37,7 @@ func BuildProvisionedHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID s
 		{Key: "audit-unwrap.token", Path: "audit-unwrap.token"},
 	}
 	items := []core.KeyToPath{{Key: contracts.ConfigurationRuntimeRoleManifestFile, Path: contracts.ConfigurationRuntimeRoleManifestFile}}
-	for _, path := range []string{"sql-fleet.json", "sql-configuration.json", "sql-audit.json"} {
+	for _, path := range []string{"sql-fleet.json", "sql-configuration.json"} {
 		items = append(items, core.KeyToPath{Key: path, Path: path})
 	}
 	w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{

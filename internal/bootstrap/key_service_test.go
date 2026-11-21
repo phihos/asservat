@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func keyServiceTestConfig() contracts.KeyServiceConfig {
@@ -59,6 +61,8 @@ func TestKeyServiceInputsAreClosed(t *testing.T) {
 func TestMountedKeySourceDerivesRevisionFromVersions(t *testing.T) {
 	dir := t.TempDir()
 	payload := `{"format":"asservat-local-keys/v1","installationID":"` + serviceTestIDs.InstallationID + `","purpose":"artifact","keyID":"artifact","activeVersion":2,"keys":[{"version":1,"material":"AAAA"},{"version":2,"material":"AQEB"}]}`
+	// Kubernetes accepts a Secret with exactly 1 MiB of data, including JSON whitespace.
+	payload += strings.Repeat(" ", corev1.MaxSecretSize-len(payload))
 	if err := os.WriteFile(filepath.Join(dir, contracts.ArtifactKeyFile), []byte(payload), 0o400); err != nil {
 		t.Fatal(err)
 	}

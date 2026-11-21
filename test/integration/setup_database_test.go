@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,11 +49,21 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	rolePrefix := "as_" + strings.ReplaceAll(installation, "-", "")
+	retiredRoles := []struct{ name, grant, write string }{
+		{rolePrefix + "_pub_73", "UPDATE(acknowledged_at) ON authority_audit", "UPDATE authority_audit SET acknowledged_at=now() WHERE false"},
+		{rolePrefix + "_cfg_02", "UPDATE(source_uid) ON hub_owner_configuration", "UPDATE hub_owner_configuration SET source_uid=gen_random_uuid() WHERE false"},
+	}
 	t.Cleanup(func() {
 		bounded, stop := context.WithTimeout(context.Background(), 20*time.Second)
 		defer stop()
 		if _, e := admin.Exec(bounded, "DROP DATABASE "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); e != nil {
 			t.Error("owned database cleanup failed", e)
+		}
+		for _, role := range retiredRoles {
+			if _, err := admin.Exec(bounded, "DROP ROLE IF EXISTS "+pgx.Identifier{role.name}.Sanitize()); err != nil {
+				t.Error("retired role cleanup", err)
+			}
 		}
 		for _, r := range roles {
 			if _, e := admin.Exec(bounded, "DROP ROLE IF EXISTS "+pgx.Identifier{r.Name}.Sanitize()); e != nil {
@@ -90,15 +101,51 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal("rerun", from, to, e)
 	}
 
-	// P2: two runtime roles with mounted credentials; the rest are missing.
+	// Provision the hub and federation roles from their mounted credentials.
 	hub, _ := postgres.PublicRuntimeRoleName(installation, "hub-runtime")
 	fleetRole, _ := postgres.ConfigurationRuntimeRoleName(installation, "configuration-fleet")
 	password := strings.Repeat("Setup-0", 7)
-	logins := map[string]string{hub: password, fleetRole: password}
+	federation, _ := postgres.PublicRuntimeRoleName(installation, "connector-owner-read")
+	logins := map[string]string{hub: password, fleetRole: password, federation: password}
 	report, e := postgres.EnsureRuntimeRoles(ctx, config, installation, logins)
-	if e != nil || len(report.Created) != 2 || len(report.Updated) != 0 || len(report.Missing) != len(roles)-2 {
+	if e != nil || len(report.Created) != 3 || len(report.Updated) != 0 || len(report.Missing) != len(roles)-3 {
 		t.Fatal("first role reconciliation", report, e)
 	}
+	// Two serving federation replicas and one rolling replacement each need a
+	// persistent listener and an independent session for ordinary work.
+	t.Run("federation overlap", func(t *testing.T) {
+		login := config.Copy()
+		login.User, login.Password = federation, password
+		var listeners, queries []*pgx.Conn
+		for i := range 6 {
+			conn, err := pgx.ConnectConfig(ctx, login)
+			if err != nil {
+				t.Fatal("federation session", i, err)
+			}
+			defer conn.Close(ctx)
+			if i%2 == 0 {
+				if _, err = conn.Exec(ctx, "LISTEN asservat_connector_work"); err != nil {
+					t.Fatal(err)
+				}
+				listeners = append(listeners, conn)
+			} else {
+				queries = append(queries, conn)
+			}
+		}
+		for _, q := range queries {
+			if _, err := q.Exec(ctx, "SELECT pg_notify('asservat_connector_work','ready')"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, l := range listeners {
+			for range queries {
+				n, err := l.WaitForNotification(ctx)
+				if err != nil || n.Payload != "ready" {
+					t.Fatal("work dispatch", err)
+				}
+			}
+		}
+	})
 	// Drift: an extra grant is revoked again and the password follows the
 	// mounted credential.
 	owned, e := pgx.ConnectConfig(ctx, config)
@@ -110,8 +157,38 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	logins[hub] = strings.Repeat("Rotate-1", 6)
-	if report, e = postgres.EnsureRuntimeRoles(ctx, config, installation, logins); e != nil || len(report.Created) != 0 || len(report.Updated) != 2 {
+	retiredSessions := make([]*pgx.Conn, 0, len(retiredRoles))
+	for _, role := range retiredRoles {
+		name := pgx.Identifier{role.name}.Sanitize()
+		if _, err := owned.Exec(ctx, "CREATE ROLE "+name+" LOGIN PASSWORD 'synthetic-retired'; GRANT USAGE ON SCHEMA public TO "+name+"; GRANT "+role.grant+" TO "+name); err != nil {
+			t.Fatal(err)
+		}
+		old := config.Copy()
+		old.User, old.Password = role.name, "synthetic-retired"
+		session, err := pgx.ConnectConfig(ctx, old)
+		if err != nil {
+			t.Fatal("original login", err)
+		}
+		defer session.Close(context.Background())
+		if _, err := session.Exec(ctx, role.write); err != nil {
+			t.Fatal("original column grant", err)
+		}
+		retiredSessions = append(retiredSessions, session)
+	}
+	if report, e = postgres.EnsureRuntimeRoles(ctx, config, installation, logins); e != nil || len(report.Created) != 0 || len(report.Updated) != 3 {
 		t.Fatal("second role reconciliation", report, e)
+	}
+	for i, session := range retiredSessions {
+		var denied *pgconn.PgError
+		if _, err := session.Exec(ctx, retiredRoles[i].write); !errors.As(err, &denied) || denied.Code != "42501" {
+			t.Fatal("expected permission denied for previously authenticated publisher", err)
+		}
+		if retry, err := pgx.ConnectConfig(ctx, session.Config()); err == nil {
+			retry.Close(ctx)
+			t.Fatal("retired publisher password still accepted")
+		} else if !errors.As(err, &denied) || (denied.Code != "28P01" && denied.Code != "28000") {
+			t.Fatal("expected authentication refusal for retired publisher", err)
+		}
 	}
 	var extra bool
 	if e = owned.QueryRow(ctx, "SELECT has_table_privilege($1,'public.fleet_trust','DELETE')", hub).Scan(&extra); e != nil || extra {

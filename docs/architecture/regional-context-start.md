@@ -26,11 +26,10 @@ the regional half of a context start. Identities are defined in
   with cluster count, as in client-go/gRPC). There is one connection per
   cluster; no idle pools or periodic re-dials.
 - The first frame on the connection is `Hello`: cluster ID, connector
-  version and a capability list. The hub sends only commands whose capability
+  protocol major and a capability list. The hub sends only commands whose capability
   the connector announced. Decoders ignore unknown fields; a field whose
-  absence changes meaning is introduced behind a capability. This gives the
-  documented N−1 skew between hub, connector and node collectors (R-10; test
-  cost grows with each supported version, as in the Kubernetes skew policy).
+  absence changes meaning is introduced behind a capability. The Hello frame bounds the bytes in the list. Release
+  qualification targets adjacent minor versions in both directions.
 - Every stream has its own deadline from the operation that opened it and
   byte/frame ceilings derived from its message schema (see Ceilings). Cancelling the originating
   operation resets the stream; resetting a stream cancels the work it carried
