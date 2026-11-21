@@ -27,10 +27,10 @@
   .footer { margin-top: 4px; }
   /* A capture: one line, opened for its recordings and files. */
   .capture { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
-  .capture > .line { display: grid; grid-template-columns: 9.5em minmax(0, 1.2fr) minmax(0, 1fr) 11em auto 1.2em; gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer; }
+  .capture > .line { display: grid; grid-template-columns: 9.5em minmax(0, 1.2fr) minmax(0, 1fr) 11em 13.5em 1.2em; gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer; }
   .capture > .line:hover { background: var(--soft); }
   .capture .what { font-weight: 600; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .capture .acts { overflow: visible; display: flex; gap: 4px; } .capture .acts button { padding: 2px 8px; }
+  .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { padding: 2px 8px; }
   .capture .chev { transition: transform .15s; opacity: .6; } .capture.open .chev { transform: rotate(90deg); }
   .capture > .more { display: none; padding: 4px 12px 12px; border-top: 1px solid var(--line); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
   .capture.open > .more { display: grid; }
@@ -47,7 +47,7 @@
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .state { font-weight: 600; } .PendingApproval { color: var(--warn); } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
   .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
-  td button { padding: 2px 6px; margin: 0 0 4px; display: block; white-space: nowrap; }
+  td button { padding: 2px 6px; margin: 0 4px 2px 0; white-space: nowrap; }
   [hidden] { display: none !important; }
   /* The capture form: numbered steps, each a fieldset. */
   fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
@@ -224,13 +224,13 @@
  <section data-view="captures" hidden>
   <div class="toolbar head">
     <h2>Captures</h2>
-    <span class="chips" id="filter">
+    <span class="chips" id="states">
       <button type="button" data-filter="all" class="on">All</button><button type="button" data-filter="active">In progress</button><button type="button" data-filter="done">Finished</button>
     </span>
   </div>
   <p class="problem" id="capturesProblem"></p>
   <div id="captures"></div>
-  <p class="empty" id="noCaptures" hidden>Nothing here yet. <a href="#new">Record something</a>: pick a workload, choose what to record, and its files appear in this list.</p>
+  <p class="empty" id="noCaptures" hidden></p>
  </section>
 
  <section data-view="watches" hidden>
@@ -561,6 +561,8 @@ async function loadCaptures() {
   $('captureCount').textContent = all.filter(inProgress).length || '';
   const list = all.filter(c => captureFilter === 'all' || (captureFilter === 'active') === inProgress(c));
   $('noCaptures').hidden = !!list.length;
+  $('noCaptures').innerHTML = captureFilter === 'active' ? 'No capture is in progress.' : captureFilter === 'done' ? 'No capture has finished yet.'
+    : 'Nothing here yet. <a href="#new">Record something</a>: pick a workload, choose what to record, and its files appear in this list.';
   $('captures').innerHTML = list.map(c => {
     const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
     const pods = c.tasks.map(t => `<div class="pod">${esc(t.pod)}${t.recordings?.length ? '' : ': ' + esc(t.state)}</div>`
@@ -660,7 +662,7 @@ $('captureForm').onsubmit = guard(async () => {
   // Show where it went: the new capture, opened, in its list.
   if (!crash) toggled.set(created.id, true);
   captureFilter = 'all';
-  for (const b of $('filter').children) b.classList.toggle('on', b.dataset.filter === 'all');
+  for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
   await loadCaptures();
   location.hash = crash ? '#watches' : '#captures';
   showStep(1);
@@ -722,10 +724,10 @@ $('watches').onclick = guard(async e => {
   else await call('DELETE', `/api/watches/${e.target.dataset.id}`);
   await loadWatches();
 }, 'watchesProblem');
-$('filter').onclick = guard(async e => {
+$('states').onclick = guard(async e => {
   if (!e.target.dataset.filter) return;
   captureFilter = e.target.dataset.filter;
-  for (const b of $('filter').children) b.classList.toggle('on', b === e.target);
+  for (const b of $('states').children) b.classList.toggle('on', b === e.target);
   await loadCaptures();
 }, 'capturesProblem');
 $('captures').onclick = guard(async e => {

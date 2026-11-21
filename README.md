@@ -110,7 +110,9 @@ helm install asservat charts/asservat -n asservat --create-namespace \
 ## Use
 
 Open the console (`kubectl -n asservat port-forward svc/asservat-hub 8080:80`),
-sign in with your token and request a capture. One request can hold several
+sign in with your token and choose **New capture**: four steps take you from
+the workload to what to record and when. **Captures** lists what was
+recorded, with the progress and the files of each. One request can hold several
 recordings: they start together on the same pods, share the time frame and,
 if one of them needs approval, a single approval. The same with the API:
 
