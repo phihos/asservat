@@ -151,7 +151,7 @@ func TestProbeProfiles(t *testing.T) {
 	pages := map[string]string{
 		"6060/debug/pprof/": `<html>Types of profiles available:<a href="goroutine?debug=1">goroutine</a></html>`,
 		// Spring Boot lists the enabled endpoints: here without the heap dump.
-		"8081/actuator": `{"_links":{"self":{"href":"http://localhost:8081/actuator"},"threaddump":{"href":"http://localhost:8081/actuator/threaddump"}}}`,
+		"8081/actuator": `{"_links":{"self":{"href":"http://localhost:8081/actuator"},"threaddump":{"href":"http://localhost:8081/actuator/threaddump"},"heapdump-archive":{"href":"http://localhost:8081/actuator/heapdump-archive"}}}`,
 		"8080/info":     `{"app":"shop"}`, // an application's own page, not dotnet-monitor
 	}
 	asked := map[string]bool{}

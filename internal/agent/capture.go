@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -64,18 +65,23 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) (f
 		return "", ctx.Err()
 	}
 	var failed []string
+	delivered := false
 	for i, err := range errs {
+		delivered = delivered || err == nil || errors.As(err, &partialError{})
 		if err != nil && len(errs) > 1 {
 			failed = append(failed, r.Recordings[i].Kind+": "+err.Error())
 		} else if err != nil {
 			failed = append(failed, err.Error())
 		}
 	}
-	if len(failed) == len(errs) {
+	if !delivered {
 		return "", errors.New(strings.Join(failed, "; "))
 	}
 	return strings.Join(failed, "; "), nil
 }
+
+// partialError is the failure of a recording that still delivered files.
+type partialError struct{ error }
 
 // recording makes one recording of a pod.
 func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording) error {
@@ -166,7 +172,11 @@ func (a *Agent) recording(ctx context.Context, id string, t api.TaskAssignment, 
 			})
 		}
 		wg.Wait()
-		return errors.Join(errs...)
+		if err := errors.Join(errs...); err != nil && slices.Contains(errs, nil) {
+			return partialError{err} // the other endpoints delivered
+		} else {
+			return err
+		}
 	case api.KindCoredump:
 		if r.Watch != "" {
 			// The core of the crashed process, not one of its successor.

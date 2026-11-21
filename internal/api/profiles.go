@@ -95,7 +95,8 @@ type ProfileTarget struct {
 // ProfileTargets returns what a pprof recording fetches. Its "endpoints"
 // parameter lists catalog endpoints as "<port>/<id>", separated by commas.
 // Instead of it, "port" and "path" name an endpoint that the catalog does
-// not know; that one counts as sensitive, because it can return anything.
+// not know; that one counts as sensitive, because it can return anything,
+// and as running for the time frame, so that it is bounded by it.
 func (rec Recording) ProfileTargets() ([]ProfileTarget, error) {
 	list, path := rec.Params["endpoints"], rec.Params["path"]
 	switch {
@@ -105,7 +106,7 @@ func (rec Recording) ProfileTargets() ([]ProfileTarget, error) {
 		return nil, fmt.Errorf("pprof needs endpoints (<port>/<endpoint>, from the profile endpoints of the workload), or port and path")
 	case list == "":
 		port, _ := strconv.Atoi(rec.Params["port"])
-		return []ProfileTarget{{Port: port, ProfileEndpoint: ProfileEndpoint{ID: "custom", Name: "Endpoint " + path, Path: path, Sensitive: true, File: "profile.out"}}}, nil
+		return []ProfileTarget{{Port: port, ProfileEndpoint: ProfileEndpoint{ID: "custom", Name: "Endpoint " + path, Path: path, Timed: true, Sensitive: true, File: "profile.out"}}}, nil
 	}
 	var targets []ProfileTarget
 	ports := map[int]bool{}

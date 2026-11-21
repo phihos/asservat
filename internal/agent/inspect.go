@@ -185,11 +185,18 @@ func (a *Agent) profiles(ctx context.Context, q api.Query) (found []api.ProfileT
 // order of the ports and the catalog.
 func probeProfiles(ports []int, get func(port int, path string) string) []api.ProfileTarget {
 	answers := make([][]string, len(ports))
+	// Each probe is a process on the node: at most 32 at a time, so that a
+	// pod with hundreds of ports cannot exhaust the agent's process limit.
+	running := make(chan struct{}, 32)
 	var wg sync.WaitGroup
 	for i, port := range ports {
 		answers[i] = make([]string, len(api.ProfileFamilies))
 		for j, family := range api.ProfileFamilies {
-			wg.Go(func() { answers[i][j] = get(port, family.Probe) })
+			wg.Go(func() {
+				running <- struct{}{}
+				defer func() { <-running }()
+				answers[i][j] = get(port, family.Probe)
+			})
 		}
 	}
 	wg.Wait()
@@ -201,8 +208,9 @@ func probeProfiles(ports []int, get func(port int, path string) string) []api.Pr
 				continue
 			}
 			for _, e := range family.Endpoints {
+				// A listed endpoint appears as the end of a link in the page.
 				path, _, _ := strings.Cut(e.Path, "?")
-				if !family.Listed || strings.Contains(body, path) {
+				if !family.Listed || strings.Contains(body, path+`"`) {
 					found = append(found, api.ProfileTarget{Port: port, ProfileEndpoint: e})
 				}
 			}
