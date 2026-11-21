@@ -34,10 +34,6 @@ cleanup() {
     done
     if [ -n "${CORE_HANDLER:-}" ]; then
       log "core handler"; cat /proc/sys/kernel/core_pattern /proc/sys/kernel/core_pipe_limit; sudo ls -laR "$SPOOL"; sudo cat "$SPOOL/last-core" 2>&1 || true
-      kubectl --context "kind-$EDGE" -n shop logs -l app=web --previous --tail=2 --prefix 2>&1 || true
-      # Does the kernel run the handler for a process of this machine?
-      sh -c 'kill -SEGV $$' || true; sleep 1; sudo cat "$SPOOL/last-core" 2>&1 || true
-      sudo dmesg | tail -15 || true
     fi
   fi
   [ -n "${FORWARD:-}" ] && kill "$FORWARD" 2>/dev/null || true
