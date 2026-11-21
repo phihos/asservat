@@ -75,7 +75,7 @@ var mcpTools = []mcpTool{
 			}
 			return h.Request(ctx, u, in)
 		}},
-	{Name: "watch_crashes", Description: "Record evidence automatically when a container of the workload crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to the crashed pod. Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packet headers of the durationSeconds before the crash. Kinds that need approval are not possible. The captures appear in list_captures.",
+	{Name: "watch_crashes", Description: "Record evidence automatically when a container of the workload crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to the crashed pod. Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packets of the durationSeconds before the crash. A watch for evidence that needs approval waits until an administrator approves the watch; its captures then start without another approval. Core dumps cannot be watched for yet. The captures appear in list_captures.",
 		InputSchema: object(captureProperties+`,"count":{"type":"integer","description":"How many crashes to record before the watch ends; default 1"}`, "cluster", "namespace", "workload", "kind"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in api.WatchRequest

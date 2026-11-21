@@ -46,8 +46,10 @@ whenever a container of the workload crashes, the capture is made for the
 crashed pod.
 
 1. A user creates a watch: a capture request plus the number of crashes to
-   record (default 1). The permission is the same as for a capture. Evidence
-   that needs approval cannot be watched for.
+   record (default 1). The permission is the same as for a capture. A watch
+   for evidence that needs approval waits until an administrator approves
+   it, by the same rules as a capture. The approval precedes the crash, so
+   it covers the captures that the watch creates.
 2. The hub sends the cluster's watches to its agents, and again whenever they
    change or an agent connects. Each agent follows the workload's pods on its
    node through a Kubernetes watch.
@@ -63,7 +65,7 @@ Two kinds behave differently in a triggered capture:
 
 | Kind | Triggered capture holds |
 | --- | --- |
-| `pcap` | The packet headers of the `durationSeconds` before the crash. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packets), oldest dropped first |
+| `pcap` | The packets of the `durationSeconds` before the crash, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
 | `logs` | The current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
 
 An agent that starts or reconnects takes the pods' state at that moment as
@@ -141,8 +143,7 @@ cgroup whose parent is outside of it.
 
 These are known gaps, in rough order of value:
 
-- Other triggers than a crash (alerts, failing probes, a log line), and
-  watches for evidence that needs approval (packet payload before a crash).
+- Other triggers than a crash (alerts, failing probes, a log line).
 - Core dumps of crashed processes (needs a node-level core handler).
 - Sharing a capture with other users or teams.
 - Server-side analysis of binary evidence for AI agents (packet summaries,

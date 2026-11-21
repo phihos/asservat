@@ -93,6 +93,14 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	if n, first := count(r); n != 31 || first != 169 {
 		t.Fatal("window: packets", n, "from second", first)
 	}
+	// A watch that was approved for payload keeps whole packets.
+	r = &ring{window: 30 * time.Second, limit: 1 << 20, payload: true}
+	if err := r.fill(bytes.NewReader(stream)); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.snapshot(); len(got) != 24+31*(16+len(packet)) || !strings.Contains(string(got), "secret payload") {
+		t.Fatal("payload ring", len(got))
+	}
 	// The byte limit drops the oldest packets first.
 	r = &ring{window: time.Hour, limit: 10 * record}
 	if err := r.fill(bytes.NewReader(stream)); err != nil {

@@ -21,9 +21,9 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := in.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
-	if in.Sensitive() {
-		// An approval would have to precede the crash; that is not built.
-		return api.Watch{}, errStatus{http.StatusBadRequest, "a watch cannot record evidence that needs approval"}
+	if in.Kind == api.KindCoredump {
+		// A capture after the crash would dump the restarted process.
+		return api.Watch{}, errStatus{http.StatusBadRequest, "core dumps of crashed processes are not built yet"}
 	}
 	if in.Count < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count must not be negative"}
@@ -35,7 +35,7 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err != nil {
 		return api.Watch{}, err
 	}
-	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, Requester: u.Name, Selector: res.Selector, Remaining: max(in.Count, 1)}
+	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
 	if err := h.Store.CreateWatch(ctx, w, u.Groups); err != nil {
 		return w, err
 	}
@@ -53,7 +53,7 @@ func (h *Hub) watches(ctx context.Context, u User) ([]api.Watch, error) {
 	if u.Admin {
 		requester = ""
 	}
-	list, err := h.Store.Watches(ctx, requester, "")
+	list, err := h.Store.Watches(ctx, requester)
 	if list == nil {
 		list = []api.Watch{}
 	}
@@ -79,10 +79,38 @@ func (h *Hub) Unwatch(ctx context.Context, u User, id string) error {
 	return h.Store.Audit(ctx, u.Name, "watch.delete", "", map[string]string{"id": id})
 }
 
+// ApproveWatch lets a sensitive watch start. The approval precedes the crash,
+// so it covers the captures that the watch creates.
+func (h *Hub) ApproveWatch(ctx context.Context, u User, id string) (api.Watch, error) {
+	if uuid.Validate(id) != nil {
+		return api.Watch{}, ErrNotFound
+	}
+	w, _, err := h.Store.Watch(ctx, id)
+	if err != nil {
+		return w, err
+	}
+	if err := h.mayApprove(u, w.Requester); err != nil {
+		return w, err
+	}
+	ok, err := h.Store.ApproveWatch(ctx, id, u.Name)
+	if err != nil {
+		return w, err
+	}
+	if !ok {
+		return w, errStatus{http.StatusConflict, "the watch is not awaiting approval"}
+	}
+	if err := h.Store.Audit(ctx, u.Name, "watch.approve", "", map[string]string{"id": id}); err != nil {
+		return w, err
+	}
+	h.pushWatches(ctx, w.Cluster)
+	w, _, err = h.Store.Watch(ctx, id)
+	return w, err
+}
+
 // pushWatches sends the cluster's watches to its connected agents and tells
 // the event streams. An agent that is away receives them when it connects.
 func (h *Hub) pushWatches(ctx context.Context, cluster string) {
-	list, err := h.Store.Watches(ctx, "", cluster)
+	list, err := h.Store.ActiveWatches(ctx, cluster)
 	if err != nil {
 		// The agents keep their previous list until the next change or reconnect.
 		slog.Error("watches not sent", "cluster", cluster, "error", err)
@@ -115,6 +143,14 @@ func (h *Hub) listWatches(w http.ResponseWriter, r *http.Request, u User) error 
 	return reply(w, list)
 }
 
+func (h *Hub) approveWatch(w http.ResponseWriter, r *http.Request, u User) error {
+	watch, err := h.ApproveWatch(r.Context(), u, r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	return reply(w, watch)
+}
+
 func (h *Hub) deleteWatch(w http.ResponseWriter, r *http.Request, u User) error {
 	return h.Unwatch(r.Context(), u, r.PathValue("id"))
 }
@@ -132,7 +168,7 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 		return ErrNotFound
 	}
 	watch, groups, err := h.Store.Watch(r.Context(), id)
-	if err == nil && watch.Cluster != cluster {
+	if err == nil && (watch.Cluster != cluster || watch.Sensitive && watch.Approver == "") {
 		err = ErrNotFound
 	}
 	if err != nil {
@@ -151,7 +187,7 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	if watch.Reason != "" {
 		request.Reason += " (" + watch.Reason + ")"
 	}
-	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger"); err != nil {
+	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger", watch.Approver); err != nil {
 		// The crash was not recorded, so it does not count.
 		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
 			slog.Error("watch crash not given back", "watch", id, "error", e)

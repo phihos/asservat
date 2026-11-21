@@ -191,7 +191,8 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
 		stop()
 		return
 	}
-	r := &ring{window: time.Duration(w.DurationSeconds) * time.Second, limit: ringBytes, stop: stop}
+	// Payload is kept only for a watch that asked for it and was approved.
+	r := &ring{window: time.Duration(w.DurationSeconds) * time.Second, limit: ringBytes, payload: w.Params["payload"] == "true", stop: stop}
 	a.mu.Lock()
 	a.rings[key] = r
 	a.mu.Unlock()
@@ -212,15 +213,16 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
 
 // ringBytes bounds the packet buffer of one pod: it lives in the agent's
 // memory. Headers take about 100 bytes per packet, so this holds roughly
-// 150,000 packets; older ones are dropped first.
+// 150,000 packets, or fewer with payload; older ones are dropped first.
 const ringBytes = 16 << 20
 
 // ring holds the most recent packets of a pcap stream, cut after their
-// transport headers.
+// transport headers unless payload is set.
 type ring struct {
-	window time.Duration      // how far back the packets reach
-	limit  int                // bytes
-	stop   context.CancelFunc // ends the tool that fills the ring
+	payload bool
+	window  time.Duration      // how far back the packets reach
+	limit   int                // bytes
+	stop    context.CancelFunc // ends the tool that fills the ring
 
 	mu      sync.Mutex
 	header  []byte   // the pcap file header
@@ -231,10 +233,11 @@ type ring struct {
 
 // fill reads a pcap stream into the ring until the stream ends.
 func (r *ring) fill(src io.Reader) error {
-	packets, err := newHeaderReader(src)
+	packets, err := newPacketReader(src)
 	if err != nil || packets == nil {
 		return err
 	}
+	packets.payload = r.payload
 	r.mu.Lock()
 	r.header = packets.header
 	r.mu.Unlock()

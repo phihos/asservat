@@ -158,7 +158,7 @@ func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string
 	if err != nil {
 		return err
 	}
-	watches, err := h.Store.Watches(r.Context(), "", cluster)
+	watches, err := h.Store.ActiveWatches(r.Context(), cluster)
 	if err != nil {
 		return err
 	}
