@@ -152,7 +152,8 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string,
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
-	earlier, _ := filepath.Glob(filepath.Join(dir, container+".*"))
+	// Only finished ones: another process of the container may be dumping.
+	earlier, _ := filepath.Glob(filepath.Join(dir, container+".*.core"))
 	for _, name := range earlier {
 		os.Remove(name)
 	}
