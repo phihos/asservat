@@ -11,10 +11,11 @@ metadata:
   name: {{ .Release.Name }}-agent-{{ .Release.Namespace }}
   labels: {{- include "asservat.labels" . | nindent 4 }}
 rules:
-  # Resolve workloads to pods and read pod state, events and logs.
+  # Resolve workloads to pods, read pod state, events and logs, and watch
+  # the pods of watched workloads for crashes.
   - apiGroups: [""]
     resources: [pods, pods/log, events]
-    verbs: [get, list]
+    verbs: [get, list, watch]
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets]
     verbs: [get, list]

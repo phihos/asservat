@@ -42,6 +42,10 @@ type CaptureRequest struct {
 	DurationSeconds int               `json:"durationSeconds,omitempty"`
 	Params          map[string]string `json:"params,omitempty"`
 	Reason          string            `json:"reason,omitempty"`
+	// Watch is the watch that created the capture and Trigger the agent's
+	// report of the crash. Only the hub sets them.
+	Watch   string `json:"watch,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
 }
 
 var (
@@ -162,6 +166,36 @@ type Artifact struct {
 	SHA256 string `json:"sha256"`
 }
 
+// WatchRequest is what a user submits to record the next crashes of a
+// workload: the capture to make whenever one of its containers crashes.
+type WatchRequest struct {
+	CaptureRequest
+	// Count is how many crashes the watch records before it ends; default 1.
+	Count int `json:"count,omitempty"`
+}
+
+// Watch is a standing request. The node agents observe the workload's pods
+// and report a crash to the hub, which creates a capture for the pod.
+type Watch struct {
+	ID string `json:"id"`
+	CaptureRequest
+	Requester string `json:"requester"`
+	// Selector is the label selector of the workload's pods; empty for Pod/name.
+	Selector  string    `json:"selector,omitempty"`
+	Remaining int       `json:"remaining"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Trigger is an agent's report that a container of a watched pod crashed.
+type Trigger struct {
+	// ID is chosen by the agent. The capture's task carries it back, so the
+	// agent finds what it set aside at the crash.
+	ID      string `json:"id"`
+	Pod     string `json:"pod"`
+	Node    string `json:"node"`
+	Message string `json:"message"`
+}
+
 // Pod is a resolved capture target.
 type Pod struct {
 	Name string `json:"name"`
@@ -170,7 +204,7 @@ type Pod struct {
 
 // Command is a message from the hub to a node agent on its stream.
 type Command struct {
-	// Type is "sync", "query", "task" or "cancel".
+	// Type is "sync", "query", "task", "cancel" or "watches".
 	Type string `json:"type"`
 	// ID is the query ID or the capture ID.
 	ID    string          `json:"id,omitempty"`
@@ -180,12 +214,16 @@ type Command struct {
 	// first command of every stream: the agent starts the tasks it missed
 	// and stops those that are no longer open.
 	Tasks []Command `json:"tasks,omitempty"`
+	// Watches of a sync or a "watches" command are all watches of the
+	// agent's cluster; the agent stops observing any other.
+	Watches []Watch `json:"watches,omitempty"`
 }
 
 // Query asks one agent of a cluster for cluster-level information.
 type Query struct {
-	// Op is "resolve" (the pods of a workload), "workloads" (the workloads of
-	// a namespace) or "review" (may the user exec into pods of the namespace).
+	// Op is "resolve" (the pods of a workload), "selector" (the label selector
+	// of its pods), "workloads" (the workloads of a namespace) or "review"
+	// (may the user exec into pods of the namespace).
 	Op        string   `json:"op"`
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload,omitempty"`
@@ -199,6 +237,7 @@ type Reply struct {
 	Pods      []Pod    `json:"pods,omitempty"`
 	Workloads []string `json:"workloads,omitempty"`
 	Allowed   bool     `json:"allowed,omitempty"`
+	Selector  string   `json:"selector,omitempty"`
 }
 
 // TaskAssignment tells an agent to capture one pod on its node.

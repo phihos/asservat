@@ -41,6 +41,19 @@ CREATE TABLE IF NOT EXISTS artifacts (
   PRIMARY KEY (capture_id, name)
 );
 
+-- A watch creates a capture when a container of its workload crashes, with
+-- the identity of the user who created it.
+CREATE TABLE IF NOT EXISTS watches (
+  id         uuid PRIMARY KEY,
+  requester  text NOT NULL,
+  groups     jsonb NOT NULL,
+  cluster    text NOT NULL,
+  request    jsonb NOT NULL,
+  selector   text NOT NULL,
+  remaining  integer NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- The audit log outlives the captures it describes.
 CREATE TABLE IF NOT EXISTS audit (
   id         bigserial PRIMARY KEY,

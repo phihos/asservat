@@ -120,8 +120,21 @@ curl -H "Authorization: Bearer $TOKEN" https://<hub-host>/api/captures/<id>
 curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/artifacts/<pod>/capture.pcap
 ```
 
+To catch a problem you cannot be present for, choose **when a container
+crashes** in the console or create a watch. The capture is then made for the
+crashed pod; a `pcap` holds the packet headers of the seconds before the
+crash:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d '{
+  "cluster": "prod-eu", "namespace": "payments", "workload": "Deployment/api",
+  "kind": "pcap", "durationSeconds": 60, "count": 3
+}'
+```
+
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
-get tools to list workloads, request captures and read text evidence.
+get tools to list workloads, request captures, watch for crashes and read
+text evidence.
 
 > [!WARNING]
 > A downloaded file is outside Asservat's control: it is not deleted when

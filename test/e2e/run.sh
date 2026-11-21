@@ -2,7 +2,7 @@
 # End-to-end test with two kind clusters: "hub" runs the hub and its own node
 # agents, "edge" runs only agents that join the hub. It records every kind of
 # evidence from a demo workload, including a core dump that an administrator
-# approves, and checks the downloaded files.
+# approves and the captures of a crash watch, and checks the downloaded files.
 #
 #   test/e2e/run.sh          build the image, create the clusters, test, delete
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
@@ -23,6 +23,11 @@ log() { printf '\n== %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
+  if [ $? != 0 ] && [ -n "${FORWARD:-}" ]; then
+    for c in "$HUB" "$EDGE"; do
+      log "agent log of $c"; kubectl --context "kind-$c" -n asservat logs ds/asservat-agent --tail=30 2>&1 || true
+    done
+  fi
   [ -n "${FORWARD:-}" ] && kill "$FORWARD" 2>/dev/null || true
   if [ -z "${KEEP:-}" ]; then
     kind delete cluster --name "$HUB" >/dev/null 2>&1 || true
@@ -101,7 +106,8 @@ spec:
         - name: web
           image: docker.io/library/busybox:1.37
           # Serves a page and requests it over loopback, so the pod has traffic.
-          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while true; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done"]
+          # It crashes when the file /tmp/crash appears.
+          command: [sh, -c, "mkdir /tmp/www; echo hello > /tmp/www/index.html; httpd -p 8080 -h /tmp/www; while [ ! -e /tmp/crash ]; do wget -qO- http://127.0.0.1:8080/ >/dev/null; echo served a request; sleep 0.2; done; echo crashing; exit 3"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 ---
 # Members of the group "devs" may exec into pods of this namespace; that right
@@ -219,12 +225,48 @@ grep -q 'GET / HTTP' "$WORK/payload.pcap" || fail "approved payload capture lack
 id=$(capture "$ALICE" "$(target edge pcap '{"params":{"payload":"true"}}')")
 ok "$ROOT" POST "/api/captures/$id/deny" >/dev/null
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, (.artifacts | length)] | @csv')" = '"Denied",0' ] || fail "denied capture"
+log "a crash watch records the crashed pod (edge): packets from before the crash and the crashed instance's logs"
+[ "$(status "$MALLORY" POST /api/watches "$(target edge pod-state)")" = 403 ] || fail "mallory watched"
+[ "$(status "$ALICE" POST /api/watches "$(target edge coredump)")" = 400 ] || fail "a watch for evidence that needs approval"
+packets=$(ok "$ALICE" POST /api/watches "$(target edge pcap '{"durationSeconds":20,"params":{"filter":"tcp port 8080"}}')" | jq -r .id)
+logs=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2}')" | jq -r .id)
+sleep 5 # the agents begin to buffer packets
+victim=$(edge -n shop get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
+edge -n shop exec "$victim" -- touch /tmp/crash
+# triggered WATCH: waits for the capture that the watch created and prints its ID.
+triggered() {
+  local id
+  for _ in $(seq 60); do
+    id=$(ok "$ALICE" GET /api/captures | jq -r --arg w "$1" '[.[] | select(.watch == $w)][0].id // empty')
+    [ -n "$id" ] && { printf '%s' "$id"; return; }
+    sleep 1
+  done
+  fail "watch $1 created no capture"
+}
+id=$(triggered "$packets"); completed "$ALICE" "$id"
+ok "$ALICE" GET "/api/captures/$id" | jq -e --arg p "$victim" '(.pods == [$p]) and (.reason | startswith("container web crashed: exit code 3"))' >/dev/null || fail "triggered capture: $(ok "$ALICE" GET "/api/captures/$id")"
+fetch "$ALICE" "$id" "$victim/capture.pcap" "$WORK/crash.pcap"
+[ "$(stat -c %s "$WORK/crash.pcap")" -gt 1000 ] || fail "the packet buffer holds no packets"
+grep -q 'GET /' "$WORK/crash.pcap" && fail "the packet buffer contains payload"
+LC_ALL=C grep -q $'\x1f\x90' "$WORK/crash.pcap" || fail "the packet buffer lacks the filtered traffic"
+id=$(triggered "$logs"); completed "$ALICE" "$id"
+# The crashed instance is the current or the previous one, depending on
+# whether the container had restarted when the logs were read.
+: >"$WORK/crash.log"
+for name in $(ok "$ALICE" GET "/api/captures/$id" | jq -r '.artifacts[].name'); do
+  fetch "$ALICE" "$id" "$name" "$WORK/part.log"; cat "$WORK/part.log" >>"$WORK/crash.log"
+done
+grep -q crashing "$WORK/crash.log" || fail "the logs lack the crashed instance"
+# The packet watch ended with its one crash; the log watch waits for another.
+[ "$(ok "$ALICE" GET /api/watches | jq -c '[.[] | [.kind, .remaining]]')" = '[["logs",1]]' ] || fail "watches after the crash: $(ok "$ALICE" GET /api/watches)"
+[ "$(status "$ALICE" DELETE "/api/watches/$logs")" = 200 ] || fail "delete watch"
+
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')
 [ "$(jq -r '.result.content[0].text' <<<"$mcp")" = '["Deployment/web"]' ] || fail "MCP list_workloads: $mcp"
 audit=$(ok "$ROOT" GET '/api/audit?limit=500' | jq -r '[.[].action] | unique | join(" ")')
-for action in cluster.add capture.request capture.approve capture.deny artifact.download; do
+for action in cluster.add capture.request capture.approve capture.deny artifact.download watch.create capture.trigger watch.delete; do
   case " $audit " in *" $action "*) ;; *) fail "audit lacks $action" ;; esac
 done
 
 log "PASS"
-ls -l "$WORK"/pod.json "$WORK"/web.log "$WORK"/capture.pcap "$WORK"/web.strace "$WORK"/core.web
+ls -l "$WORK"/pod.json "$WORK"/web.log "$WORK"/capture.pcap "$WORK"/web.strace "$WORK"/core.web "$WORK"/crash.pcap "$WORK"/crash.log

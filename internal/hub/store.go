@@ -66,8 +66,9 @@ func (s *Store) AddCluster(ctx context.Context, name string, tokenHash []byte) e
 	return err
 }
 
+// DeleteCluster removes a cluster and its watches. Its captures stay.
 func (s *Store) DeleteCluster(ctx context.Context, name string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM clusters WHERE name = $1`, name)
+	_, err := s.db.Exec(ctx, `WITH w AS (DELETE FROM watches WHERE cluster = $1) DELETE FROM clusters WHERE name = $1`, name)
 	return err
 }
 
@@ -299,4 +300,71 @@ func (s *Store) Expired(ctx context.Context) (ids []string, next *time.Time, err
 	}
 	err = s.db.QueryRow(ctx, `SELECT min(expires_at) FROM captures WHERE expires_at > now()`).Scan(&next)
 	return ids, next, err
+}
+
+func (s *Store) CreateWatch(ctx context.Context, w api.Watch, groups []string) error {
+	request, _ := json.Marshal(w.CaptureRequest)
+	g, _ := json.Marshal(groups)
+	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining)
+	return err
+}
+
+const watchColumns = `id::text, requester, groups, request, selector, remaining, created_at`
+
+// scanWatch also returns the groups of the user who created the watch.
+func scanWatch(r pgx.Row) (api.Watch, []string, error) {
+	var w api.Watch
+	var groups []string
+	var request, g []byte
+	if err := r.Scan(&w.ID, &w.Requester, &g, &request, &w.Selector, &w.Remaining, &w.CreatedAt); err != nil {
+		return w, nil, err
+	}
+	if err := json.Unmarshal(g, &groups); err != nil {
+		return w, nil, err
+	}
+	return w, groups, json.Unmarshal(request, &w.CaptureRequest)
+}
+
+// Watches lists watches, newest first. An empty requester or cluster does
+// not filter.
+func (s *Store) Watches(ctx context.Context, requester, cluster string) ([]api.Watch, error) {
+	rows, err := s.db.Query(ctx, `SELECT `+watchColumns+` FROM watches WHERE ($1 = '' OR requester = $1) AND ($2 = '' OR cluster = $2) AND remaining > 0 ORDER BY created_at DESC`, requester, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (api.Watch, error) {
+		w, _, err := scanWatch(r)
+		return w, err
+	})
+}
+
+func (s *Store) Watch(ctx context.Context, id string) (api.Watch, []string, error) {
+	w, groups, err := scanWatch(s.db.QueryRow(ctx, `SELECT `+watchColumns+` FROM watches WHERE id = $1::uuid`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return w, nil, ErrNotFound
+	}
+	return w, groups, err
+}
+
+// FireWatch counts one crash against the watch and reports how many remain,
+// or ErrNotFound if none did. The caller deletes the watch after its last
+// crash is recorded, or gives the crash back with RefundWatch.
+func (s *Store) FireWatch(ctx context.Context, id string) (int, error) {
+	var remaining int
+	err := s.db.QueryRow(ctx, `UPDATE watches SET remaining = remaining - 1 WHERE id = $1::uuid AND remaining > 0 RETURNING remaining`, id).Scan(&remaining)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return remaining, err
+}
+
+func (s *Store) RefundWatch(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1 WHERE id = $1::uuid`, id)
+	return err
+}
+
+func (s *Store) DeleteWatch(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM watches WHERE id = $1::uuid`, id)
+	return err
 }

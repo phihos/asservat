@@ -142,8 +142,9 @@ func (a *agents) answer(cluster, id string, r api.Reply) {
 }
 
 // agentStream is a node agent's long-lived connection: the hub writes one
-// JSON command per line. The first is a sync with the node's open tasks:
-// those approved while the agent was away and those it had started.
+// JSON command per line. The first is a sync with the node's open tasks
+// (those approved while the agent was away and those it had started) and
+// the cluster's watches.
 func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string) error {
 	node := r.URL.Query().Get("node")
 	if node == "" {
@@ -157,10 +158,14 @@ func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string
 	if err != nil {
 		return err
 	}
+	watches, err := h.Store.Watches(r.Context(), "", cluster)
+	if err != nil {
+		return err
+	}
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	rc := http.NewResponseController(w)
 	enc := json.NewEncoder(w)
-	if enc.Encode(api.Command{Type: "sync", Tasks: open}) != nil {
+	if enc.Encode(api.Command{Type: "sync", Tasks: open, Watches: watches}) != nil {
 		return nil
 	}
 	rc.Flush()

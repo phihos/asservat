@@ -54,8 +54,16 @@
     <label data-kinds="pprof">Port<input data-param="port" type="number" min="1" placeholder="6060"></label>
     <label data-kinds="pprof">Path<input data-param="path" placeholder="/debug/pprof/profile"></label>
     <label>Reason<input id="reason" placeholder="for the approver and the audit log"></label>
-    <button class="primary">Request capture</button>
+    <label>When<select id="when"><option value="now">now</option><option value="crash">when a container crashes</option></select></label>
+    <label id="countLabel" hidden>Crashes to record<input id="count" type="number" min="1" placeholder="1"></label>
+    <button class="primary" id="submit">Request capture</button>
   </form>
+  <p id="watchHint" class="muted" hidden>The capture is made for the crashed pod. A packet capture then holds the packet headers of the duration before the crash, and logs include the crashed instance.</p>
+
+  <section id="watchSection" hidden>
+    <h2>Waiting for crashes</h2>
+    <table><thead><tr><th>Created</th><th>Target</th><th>Evidence</th><th>Crashes left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
+  </section>
 
   <h2>Captures</h2>
   <table><thead><tr><th>Requested</th><th>Target</th><th>Evidence</th><th>State</th><th>Files</th><th></th></tr></thead><tbody id="captures"></tbody></table>
@@ -90,8 +98,8 @@ async function start() {
   document.cookie = 'asservat_token=' + token() + '; path=/; SameSite=Strict';
   $('me').textContent = me.name + (me.admin ? ' (administrator)' : '');
   $('admin').hidden = !me.admin;
-  await Promise.all([loadClusters(), loadCaptures()]);
-  new EventSource('/api/events').onmessage = guard(loadCaptures);
+  await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
+  new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
 }
 
 async function loadClusters() {
@@ -111,12 +119,24 @@ async function loadWorkloads() {
 
 function showParams() {
   for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').includes($('kind').value);
+  const crash = $('when').value === 'crash';
+  $('countLabel').hidden = $('watchHint').hidden = !crash;
+  $('submit').textContent = crash ? 'Watch for crashes' : 'Request capture';
+}
+
+const describe = c => `${esc(c.kind)}${c.durationSeconds ? ` · ${c.durationSeconds}s` : ''}<div class="muted">${esc(Object.entries(c.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</div><div class="muted">${esc(c.reason)}</div>`;
+
+async function loadWatches() {
+  const list = await call('GET', '/api/watches');
+  $('watchSection').hidden = !list.length;
+  $('watches').innerHTML = list.map(w => `<tr><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
+    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}</td>
+    <td><button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
 async function loadCaptures() {
   const list = await call('GET', '/api/captures');
   $('captures').innerHTML = list.map(c => {
-    const params = Object.entries(c.params || {}).map(([k, v]) => `${k}=${v}`).join(', ');
     const tasks = c.tasks.map(t => `${esc(t.pod)}: ${esc(t.state)}${t.message ? ' – ' + esc(t.message) : ''}`).join('<br>');
     const files = c.artifacts.map(a => `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name)}</a> <span class="muted">${a.size.toLocaleString()} B</span>`).join('<br>');
     const open = ['PendingApproval', 'Queued', 'Running'].includes(c.state);
@@ -126,7 +146,7 @@ async function loadCaptures() {
     ].join('');
     return `<tr><td>${new Date(c.createdAt).toLocaleString()}<div class="muted">${esc(c.requester)}</div></td>
       <td>${esc(c.cluster)} / ${esc(c.namespace)}<br>${esc(c.workload)}</td>
-      <td>${esc(c.kind)}${c.durationSeconds ? ` · ${c.durationSeconds}s` : ''}<div class="muted">${esc(params)}</div><div class="muted">${esc(c.reason)}</div></td>
+      <td>${describe(c)}</td>
       <td><span class="state ${c.state}">${c.state}</span>${c.approver ? `<div class="muted">by ${esc(c.approver)}</div>` : ''}<div class="muted">${esc(c.message)}</div><div class="muted">${tasks}</div></td>
       <td>${files}<div class="muted">kept until ${new Date(c.expiresAt).toLocaleDateString()}</div></td><td>${actions}</td></tr>`;
   }).join('');
@@ -135,13 +155,20 @@ async function loadCaptures() {
 $('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
 $('signout').onclick = () => { sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload(); };
 $('cluster').onchange = $('namespace').onchange = guard(loadWorkloads);
-$('kind').onchange = showParams;
+$('kind').onchange = $('when').onchange = showParams;
 $('captureForm').onsubmit = guard(async () => {
   const params = {};
   for (const el of document.querySelectorAll('[data-param]')) if (!el.closest('label').hidden && el.value) params[el.dataset.param] = el.value;
-  await call('POST', '/api/captures', {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind: $('kind').value,
-    durationSeconds: $('duration').closest('label').hidden ? 0 : Number($('duration').value || 0), params, reason: $('reason').value});
-  await loadCaptures();
+  const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, kind: $('kind').value,
+    durationSeconds: $('duration').closest('label').hidden ? 0 : Number($('duration').value || 0), params, reason: $('reason').value};
+  if ($('when').value === 'crash') await call('POST', '/api/watches', {...request, count: Number($('count').value || 1)});
+  else await call('POST', '/api/captures', request);
+  await Promise.all([loadCaptures(), loadWatches()]);
+});
+$('watches').onclick = guard(async e => {
+  if (!e.target.dataset.id) return;
+  await call('DELETE', `/api/watches/${e.target.dataset.id}`);
+  await loadWatches();
 });
 $('captures').onclick = guard(async e => {
   const {act, id} = e.target.dataset;

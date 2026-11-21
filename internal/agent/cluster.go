@@ -24,6 +24,8 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 		r.Workloads, err = a.workloads(ctx, q.Namespace)
 	case "resolve":
 		r.Pods, err = a.resolve(ctx, q.Namespace, q.Workload)
+	case "selector":
+		r.Selector, err = a.selector(ctx, q.Namespace, q.Workload)
 	default:
 		err = fmt.Errorf("unknown query %q", q.Op)
 	}
@@ -82,48 +84,59 @@ func (a *Agent) workloads(ctx context.Context, namespace string) ([]string, erro
 	return out, nil
 }
 
+// selector returns the label selector of a workload's pods, which is empty
+// for a single pod. The workload must exist.
+func (a *Agent) selector(ctx context.Context, namespace, workload string) (string, error) {
+	kind, name, _ := strings.Cut(workload, "/")
+	var selector *metav1.LabelSelector
+	switch kind {
+	case "Pod":
+		_, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+		return "", err
+	case "Deployment":
+		d, err := a.Kube.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		selector = d.Spec.Selector
+	case "StatefulSet":
+		s, err := a.Kube.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		selector = s.Spec.Selector
+	case "DaemonSet":
+		d, err := a.Kube.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		selector = d.Spec.Selector
+	default:
+		return "", fmt.Errorf("unsupported workload kind %q", kind)
+	}
+	return metav1.FormatLabelSelector(selector), nil
+}
+
+// podOptions selects a workload's pods, given the label selector of its pods.
+func podOptions(workload, selector string) metav1.ListOptions {
+	if kind, name, _ := strings.Cut(workload, "/"); kind == "Pod" {
+		return metav1.ListOptions{FieldSelector: "metadata.name=" + name}
+	}
+	return metav1.ListOptions{LabelSelector: selector}
+}
+
 // resolve returns the running pods of a workload.
 func (a *Agent) resolve(ctx context.Context, namespace, workload string) ([]api.Pod, error) {
-	kind, name, _ := strings.Cut(workload, "/")
-	var pods []corev1.Pod
-	if kind == "Pod" {
-		p, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-		pods = []corev1.Pod{*p}
-	} else {
-		var selector *metav1.LabelSelector
-		switch kind {
-		case "Deployment":
-			d, err := a.Kube.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-			selector = d.Spec.Selector
-		case "StatefulSet":
-			s, err := a.Kube.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-			selector = s.Spec.Selector
-		case "DaemonSet":
-			d, err := a.Kube.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-			selector = d.Spec.Selector
-		default:
-			return nil, fmt.Errorf("unsupported workload kind %q", kind)
-		}
-		list, err := a.Kube.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(selector)})
-		if err != nil {
-			return nil, err
-		}
-		pods = list.Items
+	selector, err := a.selector(ctx, namespace, workload)
+	if err != nil {
+		return nil, err
+	}
+	pods, err := a.Kube.CoreV1().Pods(namespace).List(ctx, podOptions(workload, selector))
+	if err != nil {
+		return nil, err
 	}
 	out := []api.Pod{}
-	for _, p := range pods {
+	for _, p := range pods.Items {
 		if p.Status.Phase != corev1.PodRunning || p.Spec.NodeName == "" {
 			continue
 		}
