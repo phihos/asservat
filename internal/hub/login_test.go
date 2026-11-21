@@ -30,3 +30,36 @@ func TestSessionCookie(t *testing.T) {
 		}
 	}
 }
+
+// Clusters come from the configuration: each needs a usable name and a join
+// token that is long enough and its own.
+func TestClusterConfiguration(t *testing.T) {
+	token := func(c byte) string { return string(bytes.Repeat([]byte{c}, 32)) }
+	config := func(clusters ...Cluster) error {
+		_, err := New(Config{MasterKey: bytes.Repeat([]byte{1}, 32), Retention: time.Hour, Clusters: clusters})
+		return err
+	}
+	if err := config(Cluster{"local", token('a')}, Cluster{"prod-eu", token('b')}); err != nil {
+		t.Fatal(err)
+	}
+	for name, clusters := range map[string][]Cluster{
+		"a short token":        {{"edge", "short"}},
+		"a name with capitals": {{"Edge", token('a')}},
+		"a name twice":         {{"edge", token('a')}, {"edge", token('b')}},
+		"a token twice":        {{"edge", token('a')}, {"other", token('a')}},
+	} {
+		if config(clusters...) == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	h, _ := New(Config{MasterKey: bytes.Repeat([]byte{1}, 32), Retention: time.Hour, Clusters: []Cluster{{"local", token('a')}, {"edge", token('b')}}})
+	if name, ok := h.clusterOf(token('b')); !ok || name != "edge" {
+		t.Fatal("cluster of a token", name, ok)
+	}
+	if _, ok := h.clusterOf(token('c')); ok {
+		t.Fatal("an unknown token joined")
+	}
+	if _, ok := h.clusterOf(""); ok {
+		t.Fatal("an empty token joined")
+	}
+}
