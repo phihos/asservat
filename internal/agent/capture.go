@@ -103,7 +103,7 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 	case api.KindCoredump:
 		if r.Watch != "" {
 			// The core of the crashed process, not one of its successor.
-			return a.crashCores(pod, up)
+			return a.crashCores(pod, r.Trigger, up)
 		}
 		pid, container, err := a.containerPID(pod, r.Params["container"])
 		if err != nil {

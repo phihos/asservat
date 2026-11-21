@@ -35,12 +35,15 @@ func (s CoreSpool) marker(podUID, watch string) string {
 
 func (s CoreSpool) cores(podUID string) string { return filepath.Join(string(s), "cores", podUID) }
 
+// taken holds the cores of one crash report until its capture uploads them.
+func (s CoreSpool) taken(trigger string) string { return filepath.Join(string(s), "taken", trigger) }
+
 // Install copies the running binary into the spool and makes it the node's
 // core handler. The returned function restores the previous settings. While the
 // agent's handler is installed, processes outside of watched pods leave no
 // core.
 func (s CoreSpool) Install(patternFile string) (restore func(), err error) {
-	for _, dir := range []string{"watched", "cores"} {
+	for _, dir := range []string{"watched", "cores", "taken"} {
 		// Markers and cores of an earlier run are stale.
 		if err := os.RemoveAll(filepath.Join(string(s), dir)); err != nil {
 			return nil, err
@@ -176,31 +179,54 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) error {
 	return os.Rename(name+".part", name+".core")
 }
 
-// crashCores uploads the cores that the handler kept for the pod and
-// removes them.
-func (a *Agent) crashCores(pod *corev1.Pod, up func(string, io.Reader) error) error {
-	if a.Cores == "" {
-		return errors.New("this node's agent runs without the core handler (agent.coreHandler.enabled)")
+// unmark stops keeping the pod's cores for a watch and removes those kept
+// so far, unless another watch still wants them.
+func (s CoreSpool) unmark(podUID, watch string) {
+	os.Remove(s.marker(podUID, watch))
+	if others, _ := filepath.Glob(s.marker(podUID, "*")); len(others) == 0 {
+		os.RemoveAll(s.cores(podUID))
 	}
-	dir := a.Cores.cores(string(pod.UID))
-	// The handler may still be writing: the kernel reports the process as
-	// gone once the core is in its pipe. No event tells when the handler
-	// has finished, so this looks again for as long as a part file exists.
-	for deadline := time.Now().Add(time.Minute); ; time.Sleep(200 * time.Millisecond) {
-		if parts, _ := filepath.Glob(filepath.Join(dir, "*.part")); len(parts) == 0 || time.Now().After(deadline) {
+}
+
+// take sets the pod's cores aside for the capture of one crash report.
+// The handler may not have finished, or even begun, the core when the
+// kubelet reports the container as terminated, and no event tells when it
+// has. So this looks again while the handler writes, and for a few seconds
+// for a core to appear at all.
+func (s CoreSpool) take(podUID, trigger string) {
+	dir := s.cores(podUID)
+	for started := time.Now(); ; time.Sleep(200 * time.Millisecond) {
+		parts, _ := filepath.Glob(filepath.Join(dir, "*.part"))
+		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+		waited := time.Since(started)
+		if len(parts) == 0 && (len(cores) > 0 || waited > 5*time.Second) || waited > time.Minute {
 			break
 		}
 	}
+	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+	if len(cores) == 0 {
+		return
+	}
+	os.MkdirAll(s.taken(trigger), 0o700)
+	for _, file := range cores {
+		os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file)))
+	}
+}
+
+// crashCores uploads the cores that were set aside for a crash report and
+// removes them from the node, also if the upload fails.
+func (a *Agent) crashCores(pod *corev1.Pod, trigger string, up func(string, io.Reader) error) error {
+	if a.Cores == "" {
+		return errors.New("this node's agent runs without the core handler (agent.coreHandler.enabled)")
+	}
+	dir := a.Cores.taken(trigger)
+	defer os.RemoveAll(dir)
 	names := map[string]string{}
 	for _, status := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
-		for _, t := range []*corev1.ContainerStateTerminated{status.State.Terminated, status.LastTerminationState.Terminated} {
-			if t != nil {
-				_, id, _ := strings.Cut(t.ContainerID, "://")
-				names[id] = status.Name
-			}
+		for _, id := range []string{status.ContainerID, terminatedID(status.State), terminatedID(status.LastTerminationState)} {
+			_, id, _ = strings.Cut(id, "://")
+			names[id] = status.Name
 		}
-		_, id, _ := strings.Cut(status.ContainerID, "://")
-		names[id] = status.Name
 	}
 	files, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	if len(files) == 0 {
@@ -222,7 +248,13 @@ func (a *Agent) crashCores(pod *corev1.Pod, up func(string, io.Reader) error) er
 		if err != nil {
 			return err
 		}
-		os.Remove(file)
 	}
 	return nil
+}
+
+func terminatedID(s corev1.ContainerState) string {
+	if s.Terminated == nil {
+		return ""
+	}
+	return s.Terminated.ContainerID
 }

@@ -32,6 +32,10 @@ cleanup() {
     for c in "$HUB" "$EDGE"; do
       log "agent log of $c"; kubectl --context "kind-$c" -n asservat logs ds/asservat-agent --tail=30 2>&1 || true
     done
+    if [ -n "${CORE_HANDLER:-}" ]; then
+      log "core handler"; cat /proc/sys/kernel/core_pattern /proc/sys/kernel/core_pipe_limit; sudo ls -laR "$SPOOL"; sudo cat "$SPOOL/last-error" 2>/dev/null
+      sudo dmesg 2>/dev/null | grep -i -E 'core|usermodehelper|asservat' | tail -10
+    fi
   fi
   [ -n "${FORWARD:-}" ] && kill "$FORWARD" 2>/dev/null || true
   if [ -z "${KEEP:-}" ]; then
@@ -290,7 +294,7 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   fetch "$ALICE" "$id" "$name" "$WORK/crash.core"
   [ "$(od -An -tx1 -N4 "$WORK/crash.core" | tr -d ' ')" = 7f454c46 ] || fail "the crash core is not an ELF file"
   [ "$(od -An -tu2 -j16 -N2 "$WORK/crash.core" | tr -d ' ')" = 4 ] || fail "the crash core is not a core (ET_CORE)"
-  [ -z "$(sudo find "$SPOOL/cores" -type f)" ] || fail "an uploaded core stayed on the node"
+  [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "an uploaded core stayed on the node"
 fi
 
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')

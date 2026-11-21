@@ -73,7 +73,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
 	defer func() {
 		for uid := range marked {
-			os.Remove(a.Cores.marker(uid, w.ID))
+			a.Cores.unmark(uid, w.ID)
 		}
 	}()
 	changed := func(obj any, known bool) {
@@ -92,7 +92,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			marked[string(pod.UID)] = true
 		}
 		if message := crashes(pod, seen); message != "" && known {
-			go a.trigger(agent, w, pod.Name, message)
+			go a.trigger(agent, w, pod, message)
 		}
 	}
 	_, informer := cache.NewInformerWithOptions(cache.InformerOptions{ListerWatcher: source, ObjectType: &corev1.Pod{}, Handler: cache.ResourceEventHandlerFuncs{
@@ -109,8 +109,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				}
 			}
 			if marked[string(pod.UID)] {
-				os.Remove(a.Cores.marker(string(pod.UID), w.ID))
-				os.RemoveAll(a.Cores.cores(string(pod.UID)))
+				a.Cores.unmark(string(pod.UID), w.ID)
 				delete(marked, string(pod.UID))
 			}
 			a.mu.Lock()
@@ -159,9 +158,13 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 }
 
 // trigger reports a crash to the hub, which answers with a capture task for
-// the pod. The packets before the crash are set aside for that task.
-func (a *Agent) trigger(ctx context.Context, w api.Watch, pod, message string) {
-	id := uuid.NewString()
+// the pod. The packets before the crash and the cores of the crashed
+// processes are set aside for that task.
+func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, message string) {
+	id, pod := uuid.NewString(), crashed.Name
+	if w.Kind == api.KindCoredump && a.Cores != "" {
+		a.Cores.take(string(crashed.UID), id)
+	}
 	a.mu.Lock()
 	if r := a.rings[w.ID+"/"+pod]; r != nil {
 		a.snapshots[id] = r.snapshot()
@@ -174,6 +177,9 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, pod, message string) {
 		a.mu.Lock()
 		delete(a.snapshots, id)
 		a.mu.Unlock()
+		if a.Cores != "" {
+			os.RemoveAll(a.Cores.taken(id))
+		}
 	}
 }
 

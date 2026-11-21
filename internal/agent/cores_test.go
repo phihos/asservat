@@ -70,6 +70,26 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 		t.Fatalf("core content %q", b)
 	}
 
+	// A crash report takes the pod's cores; ending the last watch of the
+	// pod removes what is left.
+	spool.take(uid, "trigger-1")
+	if taken, _ := filepath.Glob(filepath.Join(spool.taken("trigger-1"), "*.core")); len(taken) != 1 || len(cores()) != 0 {
+		t.Fatal("taken cores", taken, cores())
+	}
+	handle("100", "a core that no crash report takes")
+	os.WriteFile(spool.marker(uid, "watch-2"), nil, 0o600)
+	spool.unmark(uid, "watch-1")
+	if len(cores()) != 1 {
+		t.Fatal("ending one watch removed the cores that another one keeps")
+	}
+	spool.unmark(uid, "watch-2")
+	handle("100", "a core after the last watch ended")
+	if len(cores()) != 0 {
+		t.Fatal("cores after the last watch ended:", cores())
+	}
+	os.WriteFile(spool.marker(uid, "watch-3"), nil, 0o600)
+	handle("100", "a core of the previous agent")
+
 	// An agent that ended without restoring finds its own pattern and still
 	// restores the one before it.
 	again, err := spool.Install(pattern)
