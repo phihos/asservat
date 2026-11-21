@@ -65,6 +65,7 @@ spec:
             {{- $redirect := .redirectURL | default (and $.Values.hub.ingress.enabled (printf "https://%s/auth/callback" $.Values.hub.ingress.host)) }}
             {{- if $redirect }}
             - --oidc-redirect-url={{ $redirect }}
+            - --oidc-scopes={{ join "," .scopes }}
             {{- if .clientSecret }}
             - --oidc-client-secret-file=/secrets/hub/oidc-client-secret
             {{- end }}

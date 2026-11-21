@@ -76,6 +76,7 @@ func runHub(ctx context.Context, args []string) error {
 	oidcUser := f.String("oidc-username-claim", "preferred_username", "claim with the user name, as the clusters' RBAC knows it")
 	oidcGroups := f.String("oidc-groups-claim", "groups", "claim with the user's groups")
 	oidcRedirect := f.String("oidc-redirect-url", "", "https://<hub-host>/auth/callback, registered at the issuer; enables the browser sign-in")
+	oidcScopes := f.String("oidc-scopes", "openid,profile", "comma-separated scopes of the browser sign-in; the issuer must return the user name and groups claims for them")
 	oidcSecretFile := f.String("oidc-client-secret-file", "", "file with the client secret, for a confidential client")
 	f.Parse(args)
 
@@ -128,7 +129,7 @@ func runHub(ctx context.Context, args []string) error {
 			return fmt.Errorf("oidc-issuer: %w", err)
 		}
 		if *oidcRedirect != "" {
-			c.OAuth = &oauth2.Config{ClientID: *oidcClient, Endpoint: endpoint, RedirectURL: *oidcRedirect, Scopes: []string{"openid", "profile"}}
+			c.OAuth = &oauth2.Config{ClientID: *oidcClient, Endpoint: endpoint, RedirectURL: *oidcRedirect, Scopes: strings.Split(*oidcScopes, ",")}
 			if *oidcSecretFile != "" {
 				if c.OAuth.ClientSecret, err = secret(*oidcSecretFile); err != nil {
 					return fmt.Errorf("oidc-client-secret-file: %w", err)

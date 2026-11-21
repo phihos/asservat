@@ -31,6 +31,10 @@ hub:
     clientID: ""
     # Only for a confidential client. A public client needs none.
     clientSecret: ""
+    # Scopes of the console's sign-in. Add the scope your issuer needs to put
+    # the groups claim into the ID token, often "groups". Some issuers refuse
+    # scopes they do not know.
+    scopes: [openid, profile]
     # Register this URL at the issuer. Empty: https://<hub.ingress.host>/auth/callback
     redirectURL: ""
     usernameClaim: preferred_username
