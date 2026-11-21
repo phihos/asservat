@@ -33,7 +33,7 @@ cleanup() {
       log "agent log of $c"; kubectl --context "kind-$c" -n asservat logs ds/asservat-agent --tail=30 2>&1 || true
     done
     if [ -n "${CORE_HANDLER:-}" ]; then
-      log "core handler"; cat /proc/sys/kernel/core_pattern /proc/sys/kernel/core_pipe_limit; sudo ls -laR "$SPOOL"; sudo cat "$SPOOL/last-core" 2>/dev/null
+      log "core handler"; cat /proc/sys/kernel/core_pattern /proc/sys/kernel/core_pipe_limit; sudo ls -laR "$SPOOL"; sudo cat "$SPOOL/last-core" 2>&1 || true
       # Does the kernel run the handler for a process of this machine?
       sh -c 'kill -SEGV $$' || true; sleep 1; sudo cat "$SPOOL/last-core" 2>&1 || true
       sudo dmesg | tail -15 || true
