@@ -46,7 +46,7 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 	}
 	handle := func(pid, content string) {
 		t.Helper()
-		if err := spool.Handle(proc, pid, "1700000000", strings.NewReader(content)); err != nil {
+		if _, err := spool.Handle(proc, pid, "1700000000", strings.NewReader(content)); err != nil {
 			t.Fatal(err)
 		}
 	}

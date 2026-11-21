@@ -134,19 +134,23 @@ const minFreePercent = 10
 
 // Handle is the core handler: the kernel runs it on the node with the core
 // of process pid on standard input. It keeps the core if the process
-// belongs to a watched pod, replacing an earlier core of the same container.
-func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) error {
+// belongs to a watched pod, replacing an earlier core of the same
+// container, and says what it did.
+func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string, err error) {
 	cgroup, err := os.ReadFile(filepath.Join(proc, pid, "cgroup"))
 	if err != nil {
-		return err
+		return "", err
 	}
 	podUID, container := cgroupPod(string(cgroup))
-	if watched, _ := filepath.Glob(s.marker(podUID, "*")); podUID == "" || len(watched) == 0 {
-		return nil
+	if podUID == "" {
+		return "dropped, not a process of a pod", nil
+	}
+	if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
+		return "dropped, no core dump watch for pod " + podUID, nil
 	}
 	dir := s.cores(podUID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
+		return "", err
 	}
 	earlier, _ := filepath.Glob(filepath.Join(dir, container+".*"))
 	for _, name := range earlier {
@@ -155,28 +159,28 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) error {
 	name := filepath.Join(dir, container+"."+pid+"."+at)
 	f, err := os.OpenFile(name+".part", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.Remove(name + ".part")
 	defer f.Close()
 	for {
 		var fs syscall.Statfs_t
 		if err := syscall.Statfs(dir, &fs); err != nil {
-			return err
+			return "", err
 		}
 		if fs.Bavail*100 < fs.Blocks*minFreePercent {
-			return errors.New("core dropped: the node's disk is nearly full")
+			return "dropped, the node's disk is nearly full", nil
 		}
 		if _, err := io.CopyN(f, core, 64<<20); err == io.EOF {
 			break
 		} else if err != nil {
-			return err
+			return "", err
 		}
 	}
 	if err := f.Close(); err != nil {
-		return err
+		return "", err
 	}
-	return os.Rename(name+".part", name+".core")
+	return "kept for pod " + podUID, os.Rename(name+".part", name+".core")
 }
 
 // unmark stops keeping the pod's cores for a watch and removes those kept

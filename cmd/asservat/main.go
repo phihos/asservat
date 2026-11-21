@@ -235,16 +235,18 @@ func runAgent(ctx context.Context, args []string) error {
 
 // handleCore is run by the kernel on the node, as "core-handler <pid>
 // <time>" with a core on standard input. The spool is the directory of the
-// binary. Nobody reads its output, so a failure goes to a file there.
+// binary. Nobody reads its output, so what it did with the last core goes
+// to a file there.
 func handleCore(args []string) error {
 	self, err := os.Executable()
 	if err != nil || len(args) != 2 {
 		return errors.New("usage: core-handler <pid> <time>, run by the kernel")
 	}
 	spool := filepath.Dir(self)
-	err = agent.CoreSpool(spool).Handle("/proc", args[0], args[1], os.Stdin)
+	outcome, err := agent.CoreSpool(spool).Handle("/proc", args[0], args[1], os.Stdin)
 	if err != nil {
-		os.WriteFile(filepath.Join(spool, "last-error"), []byte(time.Now().Format(time.RFC3339)+" pid "+args[0]+": "+err.Error()+"\n"), 0o600)
+		outcome = "failed: " + err.Error()
 	}
+	os.WriteFile(filepath.Join(spool, "last-core"), []byte(time.Now().Format(time.RFC3339)+" pid "+args[0]+": "+outcome+"\n"), 0o600)
 	return err
 }
