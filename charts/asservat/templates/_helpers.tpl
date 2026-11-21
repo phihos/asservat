@@ -1,5 +1,5 @@
 {{- define "asservat.image" -}}
-{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+{{ .Values.image.repository }}:{{ .Values.image.tag }}
 {{- end }}
 
 {{- define "asservat.labels" -}}

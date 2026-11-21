@@ -40,6 +40,22 @@ jobs:
         with:
           install_only: true
       - run: test/e2e/run.sh
+  # Every commit on main is published as ghcr.io/<owner>/asservat:main and :<commit>.
+  image:
+    if: github.event_name == 'push'
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          image=ghcr.io/${{ github.repository }}
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -t "$image:main" -t "$image:${{ github.sha }}" \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} .
+          docker push --all-tags "$image"
   # The branch ruleset requires this one check.
   ci-ok:
     if: always()

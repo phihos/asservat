@@ -89,9 +89,9 @@ OIDC issuer (`hub.oidc`). The agent pods run as root with the node's PID namespa
 capabilities, so their namespace must allow Pod Security `privileged`.
 
 > [!NOTE]
-> A release image is not published yet. Build it with
-> `docker build -t <registry>/asservat:<tag> .` and set `image.repository`
-> and `image.tag`.
+> There are no releases yet. The chart installs the image of the latest
+> commit on `main` (`ghcr.io/phihos/asservat:main`). Set `image.tag` to a full
+> commit hash to pin a version.
 
 ### Join another cluster
 
