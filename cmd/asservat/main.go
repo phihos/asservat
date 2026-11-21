@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
@@ -74,6 +75,8 @@ func runHub(ctx context.Context, args []string) error {
 	oidcClient := f.String("oidc-client-id", "", "expected audience of OIDC tokens")
 	oidcUser := f.String("oidc-username-claim", "preferred_username", "claim with the user name, as the clusters' RBAC knows it")
 	oidcGroups := f.String("oidc-groups-claim", "groups", "claim with the user's groups")
+	oidcRedirect := f.String("oidc-redirect-url", "", "https://<hub-host>/auth/callback, registered at the issuer; enables the browser sign-in")
+	oidcSecretFile := f.String("oidc-client-secret-file", "", "file with the client secret, for a confidential client")
 	f.Parse(args)
 
 	dsn, err := secret(*dsnFile)
@@ -120,8 +123,17 @@ func runHub(ctx context.Context, args []string) error {
 		}
 	}
 	if *oidcIssuer != "" {
-		if c.Verify, err = hub.OIDCVerifier(ctx, *oidcIssuer, *oidcClient, *oidcUser, *oidcGroups); err != nil {
+		var endpoint oauth2.Endpoint
+		if c.Verify, endpoint, err = hub.OIDCVerifier(ctx, *oidcIssuer, *oidcClient, *oidcUser, *oidcGroups); err != nil {
 			return fmt.Errorf("oidc-issuer: %w", err)
+		}
+		if *oidcRedirect != "" {
+			c.OAuth = &oauth2.Config{ClientID: *oidcClient, Endpoint: endpoint, RedirectURL: *oidcRedirect, Scopes: []string{"openid", "profile"}}
+			if *oidcSecretFile != "" {
+				if c.OAuth.ClientSecret, err = secret(*oidcSecretFile); err != nil {
+					return fmt.Errorf("oidc-client-secret-file: %w", err)
+				}
+			}
 		}
 	}
 	// The database may start at the same time as the hub.

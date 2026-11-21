@@ -62,6 +62,13 @@ spec:
             - --oidc-client-id={{ required "hub.oidc.clientID is required" .clientID }}
             - --oidc-username-claim={{ .usernameClaim }}
             - --oidc-groups-claim={{ .groupsClaim }}
+            {{- $redirect := .redirectURL | default (and $.Values.hub.ingress.enabled (printf "https://%s/auth/callback" $.Values.hub.ingress.host)) }}
+            {{- if $redirect }}
+            - --oidc-redirect-url={{ $redirect }}
+            {{- if .clientSecret }}
+            - --oidc-client-secret-file=/secrets/hub/oidc-client-secret
+            {{- end }}
+            {{- end }}
             {{- end }}
             {{- end }}
           ports:

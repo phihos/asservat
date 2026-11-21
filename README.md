@@ -84,8 +84,9 @@ hub:
 
 The chart runs its own PostgreSQL and stores evidence on a volume unless you
 configure an external database (`hub.database.existingSecret`) or an S3 bucket
-(`hub.storage.s3`). Instead of static users you can accept ID tokens of your
-OIDC issuer (`hub.oidc`). The agent pods run as root with the node's PID namespace and extra
+(`hub.storage.s3`). Instead of static users you can use your OIDC issuer
+(`hub.oidc`): the console then signs in there and the API accepts its ID
+tokens. Register `https://<hub-host>/auth/callback` as redirect URI. The agent pods run as root with the node's PID namespace and extra
 capabilities, so their namespace must allow Pod Security `privileged`.
 
 > [!NOTE]

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
 
 	"asservat.local/asservat/internal/api"
 )
@@ -53,6 +54,9 @@ type Config struct {
 	// Verify authenticates a bearer token that is no static token, for
 	// example an OIDC token. Nil accepts static tokens only.
 	Verify func(ctx context.Context, token string) (User, error)
+	// OAuth lets browsers sign in at the OIDC provider whose tokens Verify
+	// accepts. Nil offers no such sign-in.
+	OAuth *oauth2.Config
 	// AdminGroups names the groups whose members approve sensitive captures
 	// and manage clusters.
 	AdminGroups []string
@@ -89,6 +93,12 @@ func (h *Hub) Handler() http.Handler {
 		http.ServeFileFS(w, r, web, "web/index.html")
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("GET /api/login", h.loginInfo)
+	if h.OAuth != nil {
+		mux.HandleFunc("GET /auth/login", h.login)
+		mux.HandleFunc("GET /auth/callback", h.loginCallback)
+		mux.HandleFunc("POST /auth/logout", h.logout)
+	}
 	user := func(pattern string, f func(http.ResponseWriter, *http.Request, User) error) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 			u, err := h.authenticate(r)
@@ -180,7 +190,7 @@ func reply(w http.ResponseWriter, v any) error {
 }
 
 func bearer(r *http.Request) string {
-	if t, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+	if t, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && t != "" {
 		return t
 	}
 	// Browser downloads and EventSource cannot set headers.
@@ -193,7 +203,13 @@ func bearer(r *http.Request) string {
 func (h *Hub) authenticate(r *http.Request) (User, error) {
 	token := bearer(r)
 	if token == "" {
-		return User{}, errors.New("no token")
+		// A browser that signed in at the OIDC provider.
+		c, err := r.Cookie(sessionCookie)
+		if err != nil {
+			return User{}, errors.New("no token")
+		}
+		u, err := h.openSession(c.Value, time.Now())
+		return h.withAdmin(u), err
 	}
 	var u User
 	found := false
