@@ -97,8 +97,8 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `INSERT INTO captures(id, requester, cluster, request, sensitive, state, expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		c.ID, c.Requester, c.Cluster, spec, c.Sensitive, c.State, c.ExpiresAt); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO captures(id, requester, cluster, request, sensitive, state, approver, expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		c.ID, c.Requester, c.Cluster, spec, c.Sensitive, c.State, c.Approver, c.ExpiresAt); err != nil {
 		return err
 	}
 	for _, t := range c.Tasks {
@@ -305,19 +305,19 @@ func (s *Store) Expired(ctx context.Context) (ids []string, next *time.Time, err
 func (s *Store) CreateWatch(ctx context.Context, w api.Watch, groups []string) error {
 	request, _ := json.Marshal(w.CaptureRequest)
 	g, _ := json.Marshal(groups)
-	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining)
+	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive)
 	return err
 }
 
-const watchColumns = `id::text, requester, groups, request, selector, remaining, created_at`
+const watchColumns = `id::text, requester, groups, request, selector, remaining, created_at, sensitive, approver`
 
 // scanWatch also returns the groups of the user who created the watch.
 func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 	var w api.Watch
 	var groups []string
 	var request, g []byte
-	if err := r.Scan(&w.ID, &w.Requester, &g, &request, &w.Selector, &w.Remaining, &w.CreatedAt); err != nil {
+	if err := r.Scan(&w.ID, &w.Requester, &g, &request, &w.Selector, &w.Remaining, &w.CreatedAt, &w.Sensitive, &w.Approver); err != nil {
 		return w, nil, err
 	}
 	if err := json.Unmarshal(g, &groups); err != nil {
@@ -326,10 +326,20 @@ func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 	return w, groups, json.Unmarshal(request, &w.CaptureRequest)
 }
 
-// Watches lists watches, newest first. An empty requester or cluster does
-// not filter.
-func (s *Store) Watches(ctx context.Context, requester, cluster string) ([]api.Watch, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+watchColumns+` FROM watches WHERE ($1 = '' OR requester = $1) AND ($2 = '' OR cluster = $2) AND remaining > 0 ORDER BY created_at DESC`, requester, cluster)
+// Watches lists a requester's watches, or everyone's for an empty requester,
+// newest first.
+func (s *Store) Watches(ctx context.Context, requester string) ([]api.Watch, error) {
+	return s.watches(ctx, `($1 = '' OR requester = $1)`, requester)
+}
+
+// ActiveWatches lists the watches that a cluster's agents observe: those
+// that need no approval or have it.
+func (s *Store) ActiveWatches(ctx context.Context, cluster string) ([]api.Watch, error) {
+	return s.watches(ctx, `cluster = $1 AND (NOT sensitive OR approver <> '')`, cluster)
+}
+
+func (s *Store) watches(ctx context.Context, where, arg string) ([]api.Watch, error) {
+	rows, err := s.db.Query(ctx, `SELECT `+watchColumns+` FROM watches WHERE `+where+` AND remaining > 0 ORDER BY created_at DESC`, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -362,6 +372,13 @@ func (s *Store) FireWatch(ctx context.Context, id string) (int, error) {
 func (s *Store) RefundWatch(ctx context.Context, id string) error {
 	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1 WHERE id = $1::uuid`, id)
 	return err
+}
+
+// ApproveWatch records the approver of a sensitive watch that has none and
+// reports whether it did.
+func (s *Store) ApproveWatch(ctx context.Context, id, approver string) (bool, error) {
+	tag, err := s.db.Exec(ctx, `UPDATE watches SET approver = $2 WHERE id = $1::uuid AND sensitive AND approver = ''`, id, approver)
+	return tag.RowsAffected() == 1, err
 }
 
 func (s *Store) DeleteWatch(ctx context.Context, id string) error {

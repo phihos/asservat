@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -401,10 +402,40 @@ func TestCaptureFlow(t *testing.T) {
 	if code, _ := watch("mallory-token", onCrash); code != 403 {
 		t.Fatal("watched without the exec right", code)
 	}
+	// A watch for sensitive evidence waits for another administrator; its
+	// approval then covers the capture it creates.
 	sensitive := onCrash
-	sensitive.Kind = api.KindCoredump
-	if code, _ := watch("alice-token", sensitive); code != 400 {
-		t.Fatal("a watch for evidence that needs approval", code)
+	sensitive.Kind, sensitive.Params = api.KindStrace, map[string]string{"strings": "true"}
+	code, awaiting := watch("root-token", sensitive)
+	if code != 201 || !awaiting.Sensitive || awaiting.Approver != "" {
+		t.Fatal("sensitive watch", code, awaiting)
+	}
+	trigger := func(id string) int {
+		return agentCall(joined.Token, "POST", "/agent/watches/"+id+"/trigger", strings.NewReader(`{"id":"`+uuid.NewString()+`","pod":"api-1","node":"node-a"}`))
+	}
+	if got := trigger(awaiting.ID); got != 404 {
+		t.Fatal("a watch fired before its approval", got)
+	}
+	if code, _ := f.call("alice-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 403 {
+		t.Fatal("a user approved a watch", code)
+	}
+	if code, _ := f.call("root-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 403 {
+		t.Fatal("an administrator approved their own watch", code)
+	}
+	if code, _ := f.call("root2-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 200 {
+		t.Fatal("approve watch", code)
+	}
+	if code, _ := f.call("root2-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 409 {
+		t.Fatal("a watch approved twice", code)
+	}
+	if got := trigger(awaiting.ID); got != 200 {
+		t.Fatal("trigger of an approved watch", got)
+	}
+	_, b = f.call("root-token", "GET", "/api/captures", nil)
+	var all []api.Capture
+	json.Unmarshal(b, &all)
+	if i := slices.IndexFunc(all, func(c api.Capture) bool { return c.Watch == awaiting.ID }); i < 0 || !all[i].Sensitive || all[i].Approver != "root2" || all[i].State == api.StatePendingApproval {
+		t.Fatal("the capture of an approved watch waits for approval again", all)
 	}
 	missing := onCrash
 	missing.Workload = "Deployment/none"
@@ -507,7 +538,7 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("a user read the audit log", code)
 	}
 	_, b = f.call("root-token", "GET", "/api/audit?limit=200", nil)
-	for _, action := range []string{"cluster.add", "capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read", "watch.create", "capture.trigger", "watch.delete"} {
+	for _, action := range []string{"cluster.add", "capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read", "watch.create", "watch.approve", "capture.trigger", "watch.delete"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("audit log lacks", action)
 		}

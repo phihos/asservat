@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS watches (
   remaining  integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS sensitive boolean NOT NULL DEFAULT false;
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
 
 -- The audit log outlives the captures it describes.
 CREATE TABLE IF NOT EXISTS audit (

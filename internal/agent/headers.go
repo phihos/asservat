@@ -16,7 +16,7 @@ func headersOnly(src io.Reader) io.Reader {
 }
 
 func stripPayload(dst io.Writer, src io.Reader) error {
-	packets, err := newHeaderReader(src)
+	packets, err := newPacketReader(src)
 	if err != nil || packets == nil {
 		return err
 	}
@@ -37,9 +37,10 @@ func stripPayload(dst io.Writer, src io.Reader) error {
 	}
 }
 
-// headerReader reads a pcap stream packet by packet, each cut after its
-// transport header.
-type headerReader struct {
+// packetReader reads a pcap stream packet by packet, each cut after its
+// transport header unless payload is set.
+type packetReader struct {
+	payload  bool
 	src      io.Reader
 	header   []byte // the file header
 	order    binary.ByteOrder
@@ -48,10 +49,10 @@ type headerReader struct {
 	packet   []byte
 }
 
-// newHeaderReader returns nil for a stream that ends before its file header:
+// newPacketReader returns nil for a stream that ends before its file header:
 // the tool wrote nothing.
-func newHeaderReader(src io.Reader) (*headerReader, error) {
-	r := &headerReader{src: src, header: make([]byte, 24), record: make([]byte, 16)}
+func newPacketReader(src io.Reader) (*packetReader, error) {
+	r := &packetReader{src: src, header: make([]byte, 24), record: make([]byte, 16)}
 	if _, err := io.ReadFull(src, r.header); err != nil {
 		if err == io.EOF {
 			return nil, nil
@@ -70,10 +71,10 @@ func newHeaderReader(src io.Reader) (*headerReader, error) {
 	return r, nil
 }
 
-// next returns the next packet's record header and its bytes up to the end
-// of the transport header, both valid until the following call. It returns
+// next returns the next packet's record header and its kept bytes, both
+// valid until the following call. It returns
 // nil at the end of the stream, also when that interrupts a packet.
-func (r *headerReader) next() (record, packet []byte, err error) {
+func (r *packetReader) next() (record, packet []byte, err error) {
 	if _, err := io.ReadFull(r.src, r.record); err != nil {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil, nil, nil
@@ -90,6 +91,9 @@ func (r *headerReader) next() (record, packet []byte, err error) {
 	r.packet = r.packet[:n]
 	if _, err := io.ReadFull(r.src, r.packet); err != nil {
 		return nil, nil, nil
+	}
+	if r.payload {
+		return r.record, r.packet, nil
 	}
 	keep := min(headerLength(r.linkType, r.packet), len(r.packet))
 	r.order.PutUint32(r.record[8:], uint32(keep))

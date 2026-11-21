@@ -135,6 +135,7 @@ func (h *Hub) Handler() http.Handler {
 	user("POST /api/watches", h.createWatch)
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
+	admin("POST /api/watches/{id}/approve", h.approveWatch)
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
 	user("POST /mcp", h.mcp)
@@ -345,14 +346,15 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 	if len(pods) == 0 {
 		return api.Capture{}, errStatus{http.StatusUnprocessableEntity, "the workload has no matching running pods"}
 	}
-	return h.record(ctx, u, in, pods, "capture.request")
+	return h.record(ctx, u, in, pods, "capture.request", "")
 }
 
 // record stores a checked capture for the pods, under the audit action, and
-// starts it unless it needs approval.
-func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action string) (api.Capture, error) {
-	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, ExpiresAt: time.Now().Add(h.Retention)}
-	if c.Sensitive {
+// starts it unless it needs approval. The capture of an approved watch
+// carries the watch's approver and needs none.
+func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action, approver string) (api.Capture, error) {
+	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, Approver: approver, ExpiresAt: time.Now().Add(h.Retention)}
+	if c.Sensitive && approver == "" {
 		c.State = api.StatePendingApproval
 	}
 	for _, p := range pods {
@@ -470,6 +472,15 @@ func (h *Hub) decide(state string) func(http.ResponseWriter, *http.Request, User
 	}
 }
 
+// mayApprove refuses an administrator's approval of their own request,
+// unless the installation allows it.
+func (h *Hub) mayApprove(u User, requester string) error {
+	if requester == u.Name && !h.AllowSelfApproval {
+		return errStatus{http.StatusForbidden, "another administrator must approve your request"}
+	}
+	return nil
+}
+
 // Decide approves (Queued) or denies a capture that awaits approval.
 func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture, error) {
 	c, err := h.visible(ctx, u, id)
@@ -479,8 +490,10 @@ func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture
 	if !u.Admin {
 		return c, errStatus{http.StatusForbidden, "administrators only"}
 	}
-	if c.Requester == u.Name && state == api.StateQueued && !h.AllowSelfApproval {
-		return c, errStatus{http.StatusForbidden, "another administrator must approve your request"}
+	if state == api.StateQueued {
+		if err := h.mayApprove(u, c.Requester); err != nil {
+			return c, err
+		}
 	}
 	ok, err := h.Store.Decide(ctx, id, u.Name, state)
 	if err != nil {

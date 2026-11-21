@@ -180,6 +180,10 @@ type Watch struct {
 	ID string `json:"id"`
 	CaptureRequest
 	Requester string `json:"requester"`
+	// A sensitive watch waits until an administrator approves it. Its
+	// captures then need no further approval.
+	Sensitive bool   `json:"sensitive"`
+	Approver  string `json:"approver,omitempty"`
 	// Selector is the label selector of the workload's pods; empty for Pod/name.
 	Selector  string    `json:"selector,omitempty"`
 	Remaining int       `json:"remaining"`

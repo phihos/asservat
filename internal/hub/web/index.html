@@ -59,7 +59,7 @@
     <label id="countLabel" hidden>Crashes to record<input id="count" type="number" min="1" placeholder="1"></label>
     <button class="primary" id="submit">Request capture</button>
   </form>
-  <p id="watchHint" class="muted" hidden>The capture is made for the crashed pod. A packet capture then holds the packet headers of the duration before the crash, and logs include the crashed instance.</p>
+  <p id="watchHint" class="muted" hidden>The capture is made for the crashed pod. A packet capture then holds the packets of the duration before the crash, and logs include the crashed instance. Evidence that needs approval is approved once, for the watch.</p>
 
   <section id="watchSection" hidden>
     <h2>Waiting for crashes</h2>
@@ -132,8 +132,8 @@ async function loadWatches() {
   const list = await call('GET', '/api/watches');
   $('watchSection').hidden = !list.length;
   $('watches').innerHTML = list.map(w => `<tr><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
-    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}</td>
-    <td><button data-id="${w.id}">Delete</button></td></tr>`).join('');
+    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
+    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
 async function loadCaptures() {
@@ -173,7 +173,8 @@ $('captureForm').onsubmit = guard(async () => {
 });
 $('watches').onclick = guard(async e => {
   if (!e.target.dataset.id) return;
-  await call('DELETE', `/api/watches/${e.target.dataset.id}`);
+  if (e.target.dataset.act === 'approve') await call('POST', `/api/watches/${e.target.dataset.id}/approve`);
+  else await call('DELETE', `/api/watches/${e.target.dataset.id}`);
   await loadWatches();
 });
 $('captures').onclick = guard(async e => {
