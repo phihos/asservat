@@ -63,7 +63,8 @@ func TestInspection(t *testing.T) {
 			}
 			return api.Reply{Processes: out}
 		case "traffic":
-			return api.Reply{Flows: []api.Flow{
+			// The agent could not record the second pod.
+			return api.Reply{Skipped: []string{"api-2"}, Flows: []api.Flow{
 				{Direction: api.FlowIn, Protocol: "tcp", Port: 8080, Packets: 40, Bytes: 9000, PeerList: []string{"10.0.1.7", "10.0.1.8"}},
 				{Direction: api.FlowIn, Protocol: "tcp", Port: 8080, Packets: 10, Bytes: 1000, PeerList: []string{"10.0.1.8", "10.0.1.9"}},
 				{Direction: api.FlowOut, Protocol: "tcp", Port: 5432, Peer: "10.96.0.12", Packets: 30, Bytes: 5000},
@@ -153,7 +154,7 @@ func TestInspection(t *testing.T) {
 		<-asked
 	}
 	code, in = get("alice-token", "POST", "/traffic?workload=Deployment/api&seconds=3")
-	if code != 200 || in.Seconds != 3 || len(in.Flows) != 4 {
+	if code != 200 || in.Seconds != 3 || len(in.Flows) != 4 || strings.Join(in.Pods, ",") != "api-1" || strings.Join(in.NotInspected, ",") != "api-2,api-3" {
 		t.Fatalf("traffic %d %+v", code, in)
 	}
 	for q := range asked {

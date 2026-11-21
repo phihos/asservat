@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -26,27 +27,24 @@ import (
 // reads the node's /proc and the headers of a few seconds of packets, and
 // stores nothing.
 
-// nodePods returns the named pods that run on this node.
-func (a *Agent) nodePods(ctx context.Context, namespace string, names []string) ([]*corev1.Pod, error) {
-	var pods []*corev1.Pod
+// nodePods returns the named pods that run on this node, and the names of
+// those that do not, or no longer.
+func (a *Agent) nodePods(ctx context.Context, namespace string, names []string) (pods []*corev1.Pod, skipped []string) {
 	for _, name := range names {
 		pod, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
+		if err != nil || pod.Spec.NodeName != a.Node {
+			skipped = append(skipped, name)
+			continue
 		}
-		if pod.Spec.NodeName == a.Node {
-			pods = append(pods, pod)
-		}
+		pods = append(pods, pod)
 	}
-	return pods, nil
+	return pods, skipped
 }
 
-// processes lists the processes of the pods' running containers.
-func (a *Agent) processes(ctx context.Context, q api.Query) ([]api.Process, error) {
-	pods, err := a.nodePods(ctx, q.Namespace, q.Pods)
-	if err != nil {
-		return nil, err
-	}
+// processes lists the processes of the pods' running containers, and the
+// pods it could not look at.
+func (a *Agent) processes(ctx context.Context, q api.Query) ([]api.Process, []string) {
+	pods, skipped := a.nodePods(ctx, q.Namespace, q.Pods)
 	out := []api.Process{}
 	for _, pod := range pods {
 		for _, s := range pod.Status.ContainerStatuses {
@@ -86,33 +84,32 @@ func (a *Agent) processes(ctx context.Context, q api.Query) ([]api.Process, erro
 			}
 		}
 	}
-	return out, nil
+	return out, skipped
 }
 
 // traffic records the packet headers of the pods for some seconds and
-// returns each pod's flows.
-func (a *Agent) traffic(ctx context.Context, q api.Query) ([]api.Flow, error) {
-	pods, err := a.nodePods(ctx, q.Namespace, q.Pods)
-	if err != nil {
-		return nil, err
-	}
+// returns each pod's flows, and the pods it could not record.
+func (a *Agent) traffic(ctx context.Context, q api.Query) ([]api.Flow, []string) {
+	pods, skipped := a.nodePods(ctx, q.Namespace, q.Pods)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	out := []api.Flow{}
-	var failed error
 	for _, pod := range pods {
 		wg.Go(func() {
 			flows, err := a.podTraffic(ctx, pod, time.Duration(q.Seconds)*time.Second)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
-				failed = fmt.Errorf("pod %s: %w", pod.Name, err)
+				// For example a pod whose containers restart just now.
+				slog.Warn("traffic sample", "pod", pod.Name, "error", err)
+				skipped = append(skipped, pod.Name)
+				return
 			}
 			out = append(out, flows...)
 		})
 	}
 	wg.Wait()
-	return out, failed
+	return out, skipped
 }
 
 func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.Duration) ([]api.Flow, error) {

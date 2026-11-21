@@ -29,9 +29,9 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 	case "namespaces":
 		r.Namespaces, err = a.namespaces(ctx, q)
 	case "processes":
-		r.Processes, err = a.processes(ctx, q)
+		r.Processes, r.Skipped = a.processes(ctx, q)
 	case "traffic":
-		r.Flows, err = a.traffic(ctx, q)
+		r.Flows, r.Skipped = a.traffic(ctx, q)
 	case "peers":
 		r.Names, err = a.peers(ctx, q)
 	default:

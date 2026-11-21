@@ -255,7 +255,7 @@ async function loadProcesses() {
   $('process').innerHTML = groups.join('');
   $('process').disabled = false;
   $('process').dataset.note = problem ? `The processes could not be listed (${problem}), so only the main processes are offered. `
-    : found.notInspected?.length ? `${plural(found.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node. ` : '';
+    : found.notInspected?.length ? `${plural(found.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node, or the pod is restarting. ` : '';
   showParams();
 }
 
@@ -287,7 +287,7 @@ function showFlows(sample) {
   if (!sample) $('sampleState').textContent = 'Choose connections from what the pods are doing right now, instead of writing a filter.';
   else {
     const where = `in ${plural(sample.seconds, 'second')} on ${plural(sample.pods.length, 'pod')}`;
-    const missed = sample.notInspected?.length ? ` ${plural(sample.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node.` : '';
+    const missed = sample.notInspected?.length ? ` ${plural(sample.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node, or the pod is restarting.` : '';
     $('sampleState').textContent = (flows.length ? `Seen ${where}. Tick what you want to record.` : `No packets ${where}. That does not mean the workload has no connections: look again, or record all traffic.`) + missed;
   }
   filterChanged();

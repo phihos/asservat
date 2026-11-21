@@ -21,6 +21,9 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := in.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
+	if in.Kind == api.KindCoredump && in.Params["process"] != "" {
+		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch records whichever process crashes; it takes no process"}
+	}
 	if in.Count < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count must not be negative"}
 	}

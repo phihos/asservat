@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
@@ -51,7 +52,13 @@ func (h *Hub) inspect(ctx context.Context, u User, cluster, namespace, workload 
 			case err != nil:
 				failed = err
 			default:
-				in.Pods = append(in.Pods, pods...)
+				for _, pod := range pods {
+					if slices.Contains(reply.Skipped, pod) {
+						in.NotInspected = append(in.NotInspected, pod)
+					} else {
+						in.Pods = append(in.Pods, pod)
+					}
+				}
 				merge(reply)
 			}
 		})
@@ -97,7 +104,7 @@ func (h *Hub) Processes(ctx context.Context, u User, cluster, namespace, workloa
 			}
 			return 1
 		case a.LargestResidentBytes != b.LargestResidentBytes:
-			return int(b.LargestResidentBytes - a.LargestResidentBytes)
+			return cmp.Compare(b.LargestResidentBytes, a.LargestResidentBytes)
 		}
 		return strings.Compare(a.Executable, b.Executable)
 	})
@@ -170,7 +177,7 @@ func (h *Hub) Traffic(ctx context.Context, u User, cluster, namespace, workload 
 	}
 	slices.SortFunc(in.Flows, func(a, b api.Flow) int {
 		if a.Bytes != b.Bytes {
-			return int(b.Bytes - a.Bytes)
+			return cmp.Compare(b.Bytes, a.Bytes)
 		}
 		return strings.Compare(a.Label, b.Label)
 	})

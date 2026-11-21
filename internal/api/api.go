@@ -284,7 +284,8 @@ type ProcessChoice struct {
 
 // Inspection is what the hub learned from a workload's pods.
 type Inspection struct {
-	// Pods were inspected; NotInspected run on nodes without a connected agent.
+	// Pods were inspected. NotInspected were not: no agent is connected on
+	// their node, or the pod ended or restarted meanwhile.
 	Pods         []string `json:"pods"`
 	NotInspected []string `json:"notInspected,omitempty"`
 	// Processes of a process inspection.
@@ -337,6 +338,9 @@ type Reply struct {
 	Processes  []Process `json:"processes,omitempty"`
 	// Flows of one pod each.
 	Flows []Flow `json:"flows,omitempty"`
+	// Skipped names the pods of a "processes" or "traffic" query that the
+	// agent could not look at, for example because they are gone.
+	Skipped []string `json:"skipped,omitempty"`
 	// Names maps the IPs of a "peers" query to what they belong to.
 	Names map[string]string `json:"names,omitempty"`
 }
