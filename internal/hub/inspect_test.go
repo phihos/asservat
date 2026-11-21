@@ -28,19 +28,16 @@ func TestInspection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
+	cluster := "inspect" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
+	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-inspected-cluster-0123456789"}
+	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, Clusters: []hub.Cluster{joined},
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "mallory", Token: "mallory-token"}, {Name: "root", Token: "root-token", Groups: []string{"admins"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(h.Handler())
-	defer server.Close()
+	t.Cleanup(server.Close) // after the agent's stream, which is closed by a later cleanup
 	f := fixture{t, server.URL}
-	cluster := "inspect" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
-	_, b := f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster})
-	var joined struct{ Token string }
-	json.Unmarshal(b, &joined)
-	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster, nil)
 
 	// A scripted agent on node-a. The workload's third pod runs on node-b,
 	// which has no agent.
@@ -178,7 +175,7 @@ func TestInspection(t *testing.T) {
 	if p := in.Profiles[2]; p.Port != 8080 || p.ID != "java-heapdump" || !p.Sensitive {
 		t.Fatalf("profile endpoint %+v", p)
 	}
-	_, b = f.call("root-token", "GET", "/api/audit?limit=20", nil)
+	_, b := f.call("root-token", "GET", "/api/audit?limit=20", nil)
 	for _, action := range []string{"traffic.sample", "profile.discover"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("the audit log lacks", action)
@@ -244,19 +241,16 @@ func TestOwnApprovalProgressAndStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, AllowSelfApproval: true,
+	cluster := "own" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
+	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-administrator's-cluster-0123456789"}
+	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, AllowSelfApproval: true, Clusters: []hub.Cluster{joined},
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "mallory", Token: "mallory-token"}, {Name: "root", Token: "root-token", Groups: []string{"admins"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(h.Handler())
-	defer server.Close()
+	t.Cleanup(server.Close) // after the agent's stream, which is closed by a later cleanup
 	f := fixture{t, server.URL}
-	cluster := "own" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
-	_, b := f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster})
-	var joined struct{ Token string }
-	json.Unmarshal(b, &joined)
-	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster, nil)
 	commands := scriptedAgent(t, f, joined.Token, "node-a", func(q api.Query) api.Reply {
 		return api.Reply{Allowed: q.User == "alice", Pods: []api.Pod{{Name: "api-1", Node: "node-a"}}, Selector: "app=api"}
 	})

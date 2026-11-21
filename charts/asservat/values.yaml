@@ -16,8 +16,14 @@ hub:
   # Let an administrator approve their own sensitive capture. Enable it only
   # for installations with a single administrator.
   allowSelfApproval: false
-  # Name under which this cluster's own agents join. Empty: do not register it.
+  # Name under which this cluster's own agents join. Empty: they do not.
   localCluster: local
+  # The other clusters of the installation. The agents of each join with its
+  # token: install the chart there with hub.enabled=false, agent.hubURL and
+  # the same agent.token. Make one with "openssl rand -hex 32".
+  #   - name: prod-eu
+  #     token: <at least 32 random characters>
+  clusters: []
   # Users with fixed bearer tokens. The names and groups are the subjects that
   # each cluster's RBAC is asked about (pods/exec in the namespace).
   #   - name: alice
@@ -77,8 +83,8 @@ agent:
   enabled: true
   # URL of the hub. Empty: the hub of this release.
   hubURL: ""
-  # Join token of this cluster, created in the hub (console or
-  # POST /api/clusters). Empty with hub.enabled: the local cluster's token.
+  # Join token of this cluster, as the hub's values list it under
+  # hub.clusters. Empty with hub.enabled: the local cluster's token.
   token: ""
   # Secret with the key "token", instead of agent.token.
   existingSecret: ""

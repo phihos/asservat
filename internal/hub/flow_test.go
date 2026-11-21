@@ -105,8 +105,13 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	defer store.Close()
 	blobDir := t.TempDir()
+	// The clusters and their join tokens are configuration of the hub.
+	cluster := strings.ToLower("c" + strings.ReplaceAll(t.Name(), "/", "-") + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:8])
+	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-first-cluster-0123456789"}
+	foreign := hub.Cluster{Name: cluster + "-other", Token: "join-token-of-the-other-cluster-0123456789"}
 	h, err := hub.New(hub.Config{
-		Store: store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
+		Clusters: []hub.Cluster{joined, foreign},
+		Store:    store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
@@ -117,18 +122,13 @@ func TestCaptureFlow(t *testing.T) {
 	defer server.Close()
 	f := fixture{t, server.URL}
 
-	// An administrator registers the cluster; its token connects the agent.
-	cluster := "c" + strings.ReplaceAll(t.Name(), "/", "-") + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:8]
-	cluster = strings.ToLower(cluster)
-	if code, _ := f.call("alice-token", "POST", "/api/clusters", map[string]string{"name": cluster}); code != 403 {
-		t.Fatal("a user added a cluster", code)
+	// Nobody registers a cluster through the API.
+	if code, _ := f.call("root-token", "POST", "/api/clusters", map[string]string{"name": "another"}); code != 404 && code != 405 {
+		t.Fatal("a cluster was added through the API", code)
 	}
-	code, b := f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster})
-	var joined struct{ Token string }
-	if code != 200 || json.Unmarshal(b, &joined) != nil || len(joined.Token) != 64 {
-		t.Fatal("add cluster", code, string(b))
+	if code, b := f.call("alice-token", "GET", "/api/clusters", nil); code != 200 || !strings.Contains(string(b), `"`+cluster+`"`) || !strings.Contains(string(b), `"`+cluster+`-other"`) {
+		t.Fatal("configured clusters", code, string(b))
 	}
-	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster, nil)
 
 	labels := map[string]string{"app": "api"}
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: "payments", Labels: labels},
@@ -210,7 +210,7 @@ func TestCaptureFlow(t *testing.T) {
 	if c.State != api.StateCompleted || len(c.Artifacts) != 2 || c.Artifacts[1].Name != "api-1/pod.json" {
 		t.Fatal("pod-state capture", c.State, c.Message, c.Tasks, c.Artifacts)
 	}
-	code, b = f.call("alice-token", "GET", "/api/captures/"+c.ID+"/artifacts/api-1/pod.json", nil)
+	code, b := f.call("alice-token", "GET", "/api/captures/"+c.ID+"/artifacts/api-1/pod.json", nil)
 	sum := sha256.Sum256(b)
 	if code != 200 || !strings.Contains(string(b), `"nodeName": "node-a"`) || hex.EncodeToString(sum[:]) != c.Artifacts[1].SHA256 || int64(len(b)) != c.Artifacts[1].Size {
 		t.Fatal("download", code, string(b))
@@ -357,10 +357,6 @@ func TestCaptureFlow(t *testing.T) {
 			t.Errorf("upload %s: status %d, want %d", name, got, want)
 		}
 	}
-	_, b = f.call("root-token", "POST", "/api/clusters", map[string]string{"name": cluster + "-other"})
-	var foreign struct{ Token string }
-	json.Unmarshal(b, &foreign)
-	defer f.call("root-token", "DELETE", "/api/clusters/"+cluster+"-other", nil)
 	if got := agentCall(foreign.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/api-4/x.log", strings.NewReader("x")); got != 404 {
 		t.Error("another cluster's agent uploaded", got)
 	}
@@ -590,7 +586,7 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("a user read the audit log", code)
 	}
 	_, b = f.call("root-token", "GET", "/api/audit?limit=200", nil)
-	for _, action := range []string{"cluster.add", "capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read", "watch.create", "watch.approve", "capture.trigger", "watch.delete"} {
+	for _, action := range []string{"capture.request", "capture.approve", "capture.deny", "capture.cancel", "capture.delete", "artifact.download", "artifact.read", "watch.create", "watch.approve", "capture.trigger", "watch.delete"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("audit log lacks", action)
 		}

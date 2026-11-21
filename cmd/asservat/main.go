@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -72,7 +71,8 @@ func runHub(ctx context.Context, args []string) error {
 	adminGroups := f.String("admin-groups", "asservat-admins", "comma-separated groups whose members are administrators")
 	retention := f.Duration("retention", 7*24*time.Hour, "how long evidence is kept")
 	selfApproval := f.Bool("allow-self-approval", false, "let an administrator approve their own sensitive capture")
-	localCluster := f.String("local-cluster", "", "register this cluster name with the token of local-token-file at startup")
+	clustersFile := f.String("clusters-file", "", "YAML file with the clusters whose agents may join: a list of name and token")
+	localCluster := f.String("local-cluster", "", "name of the hub's own cluster, whose agents join with the token of local-token-file")
 	localTokenFile := f.String("local-token-file", "", "file with the join token of local-cluster")
 	oidcIssuer := f.String("oidc-issuer", "", "OIDC issuer URL; accepts its ID tokens as bearer tokens")
 	oidcClient := f.String("oidc-client-id", "", "expected audience of OIDC tokens")
@@ -126,6 +126,22 @@ func runHub(ctx context.Context, args []string) error {
 			return fmt.Errorf("users-file: %w", err)
 		}
 	}
+	if *clustersFile != "" {
+		b, err := os.ReadFile(*clustersFile)
+		if err != nil {
+			return err
+		}
+		if err := yaml.Unmarshal(b, &c.Clusters); err != nil {
+			return fmt.Errorf("clusters-file: %w", err)
+		}
+	}
+	if *localCluster != "" {
+		token, err := secret(*localTokenFile)
+		if err != nil {
+			return fmt.Errorf("local-token-file: %w", err)
+		}
+		c.Clusters = append(c.Clusters, hub.Cluster{Name: *localCluster, Token: token})
+	}
 	if *oidcIssuer != "" {
 		var endpoint oauth2.Endpoint
 		if c.Verify, endpoint, err = hub.OIDCVerifier(ctx, *oidcIssuer, *oidcClient, *oidcUser, *oidcGroups); err != nil {
@@ -155,18 +171,15 @@ func runHub(ctx context.Context, args []string) error {
 		}
 	}
 	defer c.Store.Close()
-	if *localCluster != "" {
-		token, err := secret(*localTokenFile)
-		if err != nil {
-			return fmt.Errorf("local-token-file: %w", err)
-		}
-		sum := sha256.Sum256([]byte(token))
-		if err := c.Store.AddCluster(ctx, *localCluster, sum[:]); err != nil {
-			return err
-		}
-	}
 	h, err := hub.New(c)
 	if err != nil {
+		return err
+	}
+	names := []string{}
+	for _, cluster := range c.Clusters {
+		names = append(names, cluster.Name)
+	}
+	if err := c.Store.KeepWatches(ctx, names); err != nil {
 		return err
 	}
 	go h.RunRetention(ctx)

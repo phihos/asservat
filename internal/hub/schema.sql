@@ -1,10 +1,7 @@
 -- Applied at every hub start; every statement must be repeatable.
 
-CREATE TABLE IF NOT EXISTS clusters (
-  name         text PRIMARY KEY,
-  token_sha256 bytea NOT NULL UNIQUE,
-  created_at   timestamptz NOT NULL DEFAULT now()
-);
+-- Clusters are configuration, not state: the table of an earlier version goes.
+DROP TABLE IF EXISTS clusters;
 
 CREATE TABLE IF NOT EXISTS captures (
   id          uuid PRIMARY KEY,

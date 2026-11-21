@@ -244,12 +244,7 @@
  <section data-view="clusters" hidden>
   <h2>Clusters</h2>
   <table><thead><tr><th>Cluster</th><th>Node agents connected</th></tr></thead><tbody id="clusterList"></tbody></table>
-  <section id="admin" hidden>
-    <h3>Add a cluster</h3>
-    <form id="clusterForm" class="row"><label>Name<input id="clusterName" required pattern="[a-z0-9]([-a-z0-9]*[a-z0-9])?"></label><button>Add cluster / new token</button></form>
-    <p class="problem" id="clusterProblem"></p>
-    <p id="clusterToken" class="muted"></p>
-  </section>
+  <p class="muted">Clusters are part of the hub's configuration (<code>hub.clusters</code> in its Helm values): a name and a join token each. The agents of a cluster are installed with the same token.</p>
  </section>
 </section>
 
@@ -285,7 +280,6 @@ async function start() {
   // For someone who approves their own requests, the badges only inform.
   document.body.classList.toggle('own', !!me.selfApproval);
   for (const badge of document.querySelectorAll('.badge')) badge.textContent = badgeText();
-  $('admin').hidden = !me.admin;
   $('nav').hidden = $('newButton').hidden = false;
   route();
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
@@ -744,11 +738,6 @@ $('captures').onclick = guard(async e => {
   await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
 }, 'capturesProblem');
-$('clusterForm').onsubmit = guard(async () => {
-  const c = await call('POST', '/api/clusters', {name: $('clusterName').value});
-  $('clusterToken').innerHTML = `Join token for <b>${esc(c.name)}</b>, shown once: <code>${esc(c.token)}</code>`;
-  await loadClusters();
-}, 'clusterProblem');
 showParams();
 start();
 </script>

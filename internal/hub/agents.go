@@ -55,16 +55,6 @@ func (a *agents) disconnect(cluster, node string, ch chan api.Command) {
 	}
 }
 
-// drop closes every stream of a removed cluster.
-func (a *agents) drop(cluster string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for _, ch := range a.streams[cluster] {
-		close(ch)
-	}
-	delete(a.streams, cluster)
-}
-
 func (a *agents) nodes(cluster string) []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()

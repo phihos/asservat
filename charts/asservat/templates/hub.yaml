@@ -40,6 +40,7 @@ spec:
             - --dsn-file=/secrets/db/dsn
             - --master-key-file=/secrets/hub/master-key
             - --users-file=/secrets/hub/users.yaml
+            - --clusters-file=/secrets/hub/clusters.yaml
             - --admin-groups={{ join "," .Values.hub.adminGroups }}
             - --retention={{ .Values.hub.retention }}
             - --allow-self-approval={{ .Values.hub.allowSelfApproval }}

@@ -152,6 +152,7 @@ EOF
 done
 
 log "install hub and local agents"
+TOKEN=edge-join-token-0123456789abcdef0123456789abcdef
 ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
 hub create namespace asservat --dry-run=client -o yaml | hub apply -f - >/dev/null
 helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
@@ -159,14 +160,15 @@ helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n as
   --set hub.service.type=NodePort,hub.service.nodePort=30080 \
   --set hub.users[0].name=alice,hub.users[0].token=$ALICE,hub.users[0].groups[0]=devs \
   --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
-  --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY >/dev/null
+  --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
+  --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
 hub -n asservat port-forward svc/asservat-hub "$PORT:80" >/dev/null 2>&1 &
 FORWARD=$!
 for _ in $(seq 50); do curl -s -o /dev/null "$URL/healthz" && break; sleep 0.2; done
 
 log "join the edge cluster"
-TOKEN=$(ok "$ROOT" POST /api/clusters '{"name":"edge"}' | jq -r .token)
-[ "$(status "$ALICE" POST /api/clusters '{"name":"other"}')" = 403 ] || fail "a user added a cluster"
+# The edge cluster and its join token are part of the hub's configuration.
+case "$(status "$ROOT" POST /api/clusters '{"name":"other"}')" in 404|405) ;; *) fail "a cluster was added through the API" ;; esac
 HUB_IP=$(docker inspect "$HUB-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 edge create namespace asservat --dry-run=client -o yaml | edge apply -f - >/dev/null
 helm --kube-context "kind-$EDGE" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
@@ -366,7 +368,7 @@ fi
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')
 [ "$(jq -r '.result.content[0].text' <<<"$mcp")" = '["Deployment/web"]' ] || fail "MCP list_workloads: $mcp"
 audit=$(ok "$ROOT" GET '/api/audit?limit=500' | jq -r '[.[].action] | unique | join(" ")')
-for action in cluster.add capture.request capture.approve capture.deny capture.stop artifact.download watch.create capture.trigger watch.delete; do
+for action in capture.request capture.approve capture.deny capture.stop artifact.download watch.create capture.trigger watch.delete; do
   case " $audit " in *" $action "*) ;; *) fail "audit lacks $action" ;; esac
 done
 

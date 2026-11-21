@@ -50,12 +50,11 @@ const mcpReadLimit = 64 << 10
 var mcpTools = []mcpTool{
 	{Name: "list_clusters", Description: "List the clusters of this installation and the nodes whose agent is connected.", InputSchema: object(""),
 		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) {
-			names, err := h.Store.Clusters(ctx)
 			out := map[string][]string{}
-			for _, n := range names {
+			for _, n := range h.clusterNames() {
 				out[n] = h.agents.nodes(n)
 			}
-			return out, err
+			return out, nil
 		}},
 	{Name: "list_namespaces", Description: "List the namespaces of a cluster whose workloads you may capture.", InputSchema: object(`"cluster":{"type":"string"}`, "cluster"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {

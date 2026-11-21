@@ -5,11 +5,8 @@ package hub
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +36,13 @@ type User struct {
 	Admin  bool     `json:"admin"`
 }
 
+// Cluster is a cluster of the installation: its name, and the token with
+// which its node agents join. Clusters are part of the hub's configuration.
+type Cluster struct {
+	Name  string `json:"name"`
+	Token string `json:"token"`
+}
+
 // StaticUser is a user with a fixed bearer token from the hub's configuration.
 type StaticUser struct {
 	Name   string   `json:"name"`
@@ -51,6 +55,7 @@ type Config struct {
 	Blobs     Blobs
 	MasterKey []byte // 32 bytes; wraps the per-artifact keys
 	Users     []StaticUser
+	Clusters  []Cluster
 	// Verify authenticates a bearer token that is no static token, for
 	// example an OIDC token. Nil accepts static tokens only.
 	Verify func(ctx context.Context, token string) (User, error)
@@ -83,6 +88,17 @@ func New(c Config) (*Hub, error) {
 	}
 	if c.Retention <= 0 {
 		return nil, errors.New("retention must be positive")
+	}
+	for i, cluster := range c.Clusters {
+		// A join token is a secret that agents present from other networks.
+		if !api.ValidName(cluster.Name) || len(cluster.Token) < 32 {
+			return nil, fmt.Errorf("cluster %q needs a name of lowercase letters, digits, dashes or dots and a join token of at least 32 characters", cluster.Name)
+		}
+		for _, other := range c.Clusters[:i] {
+			if other.Name == cluster.Name || other.Token == cluster.Token {
+				return nil, fmt.Errorf("cluster %q repeats the name or the join token of another cluster", cluster.Name)
+			}
+		}
 	}
 	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), watchers: map[chan string]struct{}{}}, nil
 }
@@ -127,8 +143,6 @@ func (h *Hub) Handler() http.Handler {
 		}{u, h.approvesOwn(u)})
 	})
 	user("GET /api/clusters", h.listClusters)
-	admin("POST /api/clusters", h.addCluster)
-	admin("DELETE /api/clusters/{cluster}", h.deleteCluster)
 	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/workloads", h.listWorkloads)
 	user("GET /api/clusters/{cluster}/namespaces/{namespace}/containers", h.listContainers)
@@ -154,9 +168,8 @@ func (h *Hub) Handler() http.Handler {
 
 	agent := func(pattern string, f func(http.ResponseWriter, *http.Request, string) error) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			sum := sha256.Sum256([]byte(bearer(r)))
-			cluster, err := h.Store.ClusterByToken(r.Context(), sum[:])
-			if err != nil {
+			cluster, known := h.clusterOf(bearer(r))
+			if !known {
 				fail(w, errStatus{http.StatusUnauthorized, "unknown cluster token"})
 				return
 			}
@@ -267,11 +280,29 @@ func (h *Hub) allowed(ctx context.Context, u User, cluster, namespace string) er
 	return nil
 }
 
-func (h *Hub) listClusters(w http.ResponseWriter, r *http.Request, _ User) error {
-	names, err := h.Store.Clusters(r.Context())
-	if err != nil {
-		return err
+// clusterOf returns the cluster whose agents join with the token.
+func (h *Hub) clusterOf(token string) (string, bool) {
+	name, known := "", false
+	for _, c := range h.Clusters {
+		if subtle.ConstantTimeCompare([]byte(c.Token), []byte(token)) == 1 {
+			name, known = c.Name, true
+		}
 	}
+	return name, known
+}
+
+// clusterNames lists the configured clusters by name.
+func (h *Hub) clusterNames() []string {
+	names := []string{}
+	for _, c := range h.Clusters {
+		names = append(names, c.Name)
+	}
+	slices.Sort(names)
+	return names
+}
+
+func (h *Hub) listClusters(w http.ResponseWriter, r *http.Request, _ User) error {
+	names := h.clusterNames()
 	type cluster struct {
 		Name  string   `json:"name"`
 		Nodes []string `json:"nodes"` // nodes whose agent is connected
@@ -281,38 +312,6 @@ func (h *Hub) listClusters(w http.ResponseWriter, r *http.Request, _ User) error
 		out = append(out, cluster{n, h.agents.nodes(n)})
 	}
 	return reply(w, out)
-}
-
-func (h *Hub) addCluster(w http.ResponseWriter, r *http.Request, u User) error {
-	var in struct {
-		Name string `json:"name"`
-	}
-	if json.NewDecoder(r.Body).Decode(&in) != nil || !api.ValidName(in.Name) {
-		return errStatus{http.StatusBadRequest, "name must be lowercase letters, digits, dashes or dots"}
-	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return err
-	}
-	token := hex.EncodeToString(raw)
-	sum := sha256.Sum256([]byte(token))
-	if err := h.Store.AddCluster(r.Context(), in.Name, sum[:]); err != nil {
-		return err
-	}
-	if err := h.Store.Audit(r.Context(), u.Name, "cluster.add", "", in); err != nil {
-		return err
-	}
-	// The token is shown once; adding the cluster again replaces it.
-	return reply(w, map[string]string{"name": in.Name, "token": token})
-}
-
-func (h *Hub) deleteCluster(w http.ResponseWriter, r *http.Request, u User) error {
-	name := r.PathValue("cluster")
-	if err := h.Store.DeleteCluster(r.Context(), name); err != nil {
-		return err
-	}
-	h.agents.drop(name)
-	return h.Store.Audit(r.Context(), u.Name, "cluster.delete", "", map[string]string{"name": name})
 }
 
 func (h *Hub) listNamespaces(w http.ResponseWriter, r *http.Request, u User) error {

@@ -4,8 +4,9 @@ The hub serves the console and API on service {{ .Release.Name }}-hub, port {{ .
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-hub 8080:{{ .Values.hub.service.port }}
 
 Sign in with a token from hub.users{{ if .Values.hub.oidc.issuer }} or an ID token of {{ .Values.hub.oidc.issuer }}{{ end }}.
-To join another cluster, add it in the console (Clusters) and install this
-chart there with hub.enabled=false, agent.hubURL and agent.token.
+To join another cluster, list it under hub.clusters with a join token and
+install this chart there with hub.enabled=false, agent.hubURL and the same
+agent.token.
 {{- else }}
 The node agents connect to {{ .Values.agent.hubURL }}.
 {{- end }}
