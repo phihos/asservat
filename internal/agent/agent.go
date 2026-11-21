@@ -36,8 +36,8 @@ type Agent struct {
 	mu       sync.Mutex
 	running  map[string]context.CancelFunc // capture ID + pod -> cancel
 	watching map[string]context.CancelFunc // watch ID -> cancel
-	// Packet buffers of watched pods, and the packets set aside at a crash
-	// until the hub's task for it arrives; both by watch ID + pod.
+	// Packet buffers of watched pods by watch ID + pod, and the packets set
+	// aside at a crash, by trigger ID, until the hub's task for it arrives.
 	rings     map[string]*ring
 	snapshots map[string][]byte
 }

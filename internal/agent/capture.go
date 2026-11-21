@@ -52,10 +52,9 @@ func (a *Agent) capture(ctx context.Context, id string, t api.TaskAssignment) er
 	case api.KindPcap:
 		if r.Watch != "" {
 			// The packets before the crash, set aside when it was reported.
-			key := r.Watch + "/" + t.Pod
 			a.mu.Lock()
-			packets := a.snapshots[key]
-			delete(a.snapshots, key)
+			packets := a.snapshots[r.Trigger]
+			delete(a.snapshots, r.Trigger)
 			a.mu.Unlock()
 			if packets == nil {
 				return errors.New("the node agent holds no packets of this pod from before the crash")

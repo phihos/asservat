@@ -421,7 +421,7 @@ func TestCaptureFlow(t *testing.T) {
 	if code, _ := f.call("mallory-token", "DELETE", "/api/watches/"+standing.ID, nil); code != 404 {
 		t.Fatal("another user deleted the watch", code)
 	}
-	if got := agentCall(foreign.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"pod":"api-1","node":"node-a"}`)); got != 404 {
+	if got := agentCall(foreign.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"id":"00000000-0000-4000-8000-000000000000","pod":"api-1","node":"node-a"}`)); got != 404 {
 		t.Error("another cluster's agent triggered the watch", got)
 	}
 	// The agent's first sighting of the pod is its baseline, so the pod
@@ -457,14 +457,14 @@ func TestCaptureFlow(t *testing.T) {
 	if len(watches("alice-token")) != 0 {
 		t.Fatal("the watch outlived its last crash")
 	}
-	if got := agentCall(joined.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"pod":"api-1","node":"node-a"}`)); got != 404 {
+	if got := agentCall(joined.Token, "POST", "/agent/watches/"+standing.ID+"/trigger", strings.NewReader(`{"id":"00000000-0000-4000-8000-000000000000","pod":"api-1","node":"node-a"}`)); got != 404 {
 		t.Error("an ended watch fired", got)
 	}
 	// A user cannot make a capture look like a watch's, which would hand
 	// them the watch's packet buffer.
 	forged := state
-	forged.Watch = standing.ID
-	if code, c := request("alice-token", forged); code != 201 || c.Watch != "" {
+	forged.Watch, forged.Trigger = standing.ID, fired.Trigger
+	if code, c := request("alice-token", forged); code != 201 || c.Watch != "" || c.Trigger != "" {
 		t.Fatal("a requested capture names a watch", code, c.Watch)
 	}
 	onCrash.Count = 3

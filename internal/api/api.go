@@ -42,8 +42,10 @@ type CaptureRequest struct {
 	DurationSeconds int               `json:"durationSeconds,omitempty"`
 	Params          map[string]string `json:"params,omitempty"`
 	Reason          string            `json:"reason,omitempty"`
-	// Watch is the watch that created the capture. Only the hub sets it.
-	Watch string `json:"watch,omitempty"`
+	// Watch is the watch that created the capture and Trigger the agent's
+	// report of the crash. Only the hub sets them.
+	Watch   string `json:"watch,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
 }
 
 var (
@@ -186,6 +188,9 @@ type Watch struct {
 
 // Trigger is an agent's report that a container of a watched pod crashed.
 type Trigger struct {
+	// ID is chosen by the agent. The capture's task carries it back, so the
+	// agent finds what it set aside at the crash.
+	ID      string `json:"id"`
 	Pod     string `json:"pod"`
 	Node    string `json:"node"`
 	Message string `json:"message"`

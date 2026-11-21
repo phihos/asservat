@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,8 +93,10 @@ func (a *Agent) observe(ctx context.Context, w api.Watch) {
 				}
 			}
 			a.mu.Lock()
+			// A new pod of the same name gets its own buffer at once.
 			if r := a.rings[w.ID+"/"+pod.Name]; r != nil {
 				r.stop()
+				delete(a.rings, w.ID+"/"+pod.Name)
 			}
 			a.mu.Unlock()
 		},
@@ -119,7 +122,12 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 		if t == nil || t.ExitCode == 0 {
 			continue
 		}
-		key, instance := pod.Name+"/"+s.Name, t.ContainerID+t.FinishedAt.String()
+		// The same termination shows first as the container's state and,
+		// after its restart, as its last state.
+		key, instance := pod.Name+"/"+s.Name, t.ContainerID
+		if instance == "" {
+			instance = t.FinishedAt.String()
+		}
 		if seen[key] == instance {
 			continue
 		}
@@ -132,17 +140,18 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 // trigger reports a crash to the hub, which answers with a capture task for
 // the pod. The packets before the crash are set aside for that task.
 func (a *Agent) trigger(ctx context.Context, w api.Watch, pod, message string) {
-	key := w.ID + "/" + pod
+	id := uuid.NewString()
 	a.mu.Lock()
-	if r := a.rings[key]; r != nil {
-		a.snapshots[key] = r.snapshot()
+	if r := a.rings[w.ID+"/"+pod]; r != nil {
+		a.snapshots[id] = r.snapshot()
 	}
 	a.mu.Unlock()
-	if err := a.post(ctx, "/agent/watches/"+w.ID+"/trigger", api.Trigger{Pod: pod, Node: a.Node, Message: message}); err != nil {
+	slog.Info("crash", "watch", w.ID, "pod", pod, "message", message)
+	if err := a.post(ctx, "/agent/watches/"+w.ID+"/trigger", api.Trigger{ID: id, Pod: pod, Node: a.Node, Message: message}); err != nil {
 		// Also when the watch ended with another pod's crash.
 		slog.Info("crash not recorded", "watch", w.ID, "pod", pod, "error", err)
 		a.mu.Lock()
-		delete(a.snapshots, key)
+		delete(a.snapshots, id)
 		a.mu.Unlock()
 	}
 }
@@ -192,7 +201,9 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, pod *corev1.Pod) {
 		}
 		stop()
 		a.mu.Lock()
-		delete(a.rings, key)
+		if a.rings[key] == r {
+			delete(a.rings, key)
+		}
 		a.mu.Unlock()
 	}()
 }

@@ -23,6 +23,11 @@ log() { printf '\n== %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
+  if [ $? != 0 ] && [ -n "${FORWARD:-}" ]; then
+    for c in "$HUB" "$EDGE"; do
+      log "agent log of $c"; kubectl --context "kind-$c" -n asservat logs ds/asservat-agent --tail=30 2>&1 || true
+    done
+  fi
   [ -n "${FORWARD:-}" ] && kill "$FORWARD" 2>/dev/null || true
   if [ -z "${KEEP:-}" ]; then
     kind delete cluster --name "$HUB" >/dev/null 2>&1 || true

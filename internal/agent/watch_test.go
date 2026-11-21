@@ -34,6 +34,11 @@ func TestCrashes(t *testing.T) {
 	if got := crashes(pod, seen); got != "" {
 		t.Fatal("one crash reported twice:", got)
 	}
+	// Also when the kubelet fills in the time of the termination later.
+	pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.FinishedAt = metav1.Now()
+	if got := crashes(pod, seen); got != "" {
+		t.Fatal("one crash reported twice:", got)
+	}
 	// The next crash of the same container, together with a sidecar's.
 	set(corev1.ContainerStatus{Name: "app", RestartCount: 2, State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"}},
 		LastTerminationState: corev1.ContainerState{Terminated: terminated("c2", 1, "Error")}},

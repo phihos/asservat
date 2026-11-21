@@ -17,7 +17,7 @@ import (
 
 // Watch validates and records a watch and hands it to the cluster's agents.
 func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch, error) {
-	in.Watch, in.Pods = "", nil
+	in.Watch, in.Trigger, in.Pods = "", "", nil
 	if err := in.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
@@ -124,7 +124,7 @@ func (h *Hub) deleteWatch(w http.ResponseWriter, r *http.Request, u User) error 
 // revoked since the watch was created.
 func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster string) error {
 	var in api.Trigger
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !api.ValidName(in.Pod) || in.Node == "" {
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !api.ValidName(in.Pod) || in.Node == "" || uuid.Validate(in.ID) != nil {
 		return errStatus{http.StatusBadRequest, "invalid trigger"}
 	}
 	id := r.PathValue("id")
@@ -146,14 +146,22 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	if err != nil {
 		return err
 	}
-	if remaining == 0 {
-		defer h.pushWatches(r.Context(), cluster)
-	}
 	request := watch.CaptureRequest
-	request.Watch, request.Pods, request.Reason = id, []string{in.Pod}, in.Message
+	request.Watch, request.Trigger, request.Pods, request.Reason = id, in.ID, []string{in.Pod}, in.Message
 	if watch.Reason != "" {
 		request.Reason += " (" + watch.Reason + ")"
 	}
-	_, err = h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger")
-	return err
+	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger"); err != nil {
+		// The crash was not recorded, so it does not count.
+		h.Store.RefundWatch(context.WithoutCancel(r.Context()), id)
+		return err
+	}
+	if remaining > 0 {
+		return nil
+	}
+	if err := h.Store.DeleteWatch(r.Context(), id); err != nil {
+		return err
+	}
+	h.pushWatches(r.Context(), cluster)
+	return nil
 }

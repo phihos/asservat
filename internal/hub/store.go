@@ -329,7 +329,7 @@ func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 // Watches lists watches, newest first. An empty requester or cluster does
 // not filter.
 func (s *Store) Watches(ctx context.Context, requester, cluster string) ([]api.Watch, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+watchColumns+` FROM watches WHERE ($1 = '' OR requester = $1) AND ($2 = '' OR cluster = $2) ORDER BY created_at DESC`, requester, cluster)
+	rows, err := s.db.Query(ctx, `SELECT `+watchColumns+` FROM watches WHERE ($1 = '' OR requester = $1) AND ($2 = '' OR cluster = $2) AND remaining > 0 ORDER BY created_at DESC`, requester, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -347,28 +347,21 @@ func (s *Store) Watch(ctx context.Context, id string) (api.Watch, []string, erro
 	return w, groups, err
 }
 
-// FireWatch counts one crash against the watch and deletes it with its last.
-// It reports how many crashes remain, or ErrNotFound if the watch has ended.
+// FireWatch counts one crash against the watch and reports how many remain,
+// or ErrNotFound if none did. The caller deletes the watch after its last
+// crash is recorded, or gives the crash back with RefundWatch.
 func (s *Store) FireWatch(ctx context.Context, id string) (int, error) {
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback(ctx)
 	var remaining int
-	err = tx.QueryRow(ctx, `UPDATE watches SET remaining = remaining - 1 WHERE id = $1::uuid RETURNING remaining`, id).Scan(&remaining)
+	err := s.db.QueryRow(ctx, `UPDATE watches SET remaining = remaining - 1 WHERE id = $1::uuid AND remaining > 0 RETURNING remaining`, id).Scan(&remaining)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrNotFound
 	}
-	if err != nil {
-		return 0, err
-	}
-	if remaining == 0 {
-		if _, err := tx.Exec(ctx, `DELETE FROM watches WHERE id = $1::uuid`, id); err != nil {
-			return 0, err
-		}
-	}
-	return remaining, tx.Commit(ctx)
+	return remaining, err
+}
+
+func (s *Store) RefundWatch(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1 WHERE id = $1::uuid`, id)
+	return err
 }
 
 func (s *Store) DeleteWatch(ctx context.Context, id string) error {
