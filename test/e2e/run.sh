@@ -214,6 +214,21 @@ grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
 # Port 8080 (0x1f90) appears in the TCP headers.
 LC_ALL=C grep -q $'\x1f\x90' "$WORK/capture.pcap" || fail "pcap lacks the filtered traffic"
 
+log "what runs and who talks: the choices for a process and a packet filter (edge)"
+processes=$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/processes?workload=Deployment/web')
+jq -e '(.pods | length == 2) and (.processes[0] | .container == "web" and .executable == "/bin/sh" and .main and .pods == 2 and .processes == 2) and ([.processes[].executable] | index("/bin/httpd") != null)' <<<"$processes" >/dev/null || fail "processes: $processes"
+[ "$(status "$MALLORY" POST '/api/clusters/edge/namespaces/shop/traffic?workload=Deployment/web')" = 403 ] || fail "mallory sampled traffic"
+sample=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/traffic?workload=Deployment/web&seconds=3')
+flow=$(jq -c '.flows[] | select(.direction == "local" and .port == 8080)' <<<"$sample")
+[ "$(jq -r .label <<<"$flow")" = "Inside the pod on TCP port 8080" ] || fail "traffic sample: $sample"
+# The filter of a sampled flow selects that traffic in a capture.
+id=$(capture "$ALICE" "$(target edge pcap "$(jq -c '{durationSeconds: 3, params: {filter: .filter}}' <<<"$flow")")"); completed "$ALICE" "$id"
+fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/sampled.pcap"
+[ "$(stat -c %s "$WORK/sampled.pcap")" -gt 1000 ] || fail "the sampled flow's filter matched no packets"
+# Every process of a program instead of the main process.
+id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":2,"params":{"container":"web","process":"/bin/httpd"}}')"); completed "$ALICE" "$id"
+[ "$(status "$ALICE" POST /api/captures "$(target edge strace '{"params":{"process":"/usr/bin/absent"}}')")" = 201 ] || fail "a capture for a program that does not run is accepted and fails on the pods"
+
 log "system call trace (edge)"
 id=$(capture "$ALICE" "$(target edge strace '{"durationSeconds":3}')"); completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/web.strace"

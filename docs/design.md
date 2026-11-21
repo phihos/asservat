@@ -96,6 +96,35 @@ handler.
 - A process that the kernel kills for exceeding a memory limit leaves no
   core, and neither does one that exits by itself.
 
+## Choosing without knowing
+
+A user picks what to record from what the cluster shows, and never has to
+know a name, a process ID or the syntax of a filter. The console offers
+namespaces, workloads and containers as lists, and two inspections of the
+chosen workload's pods. Both are answered by the pods' node agents, need the
+same permission as a capture and store nothing.
+
+- **Processes.** The programs that run in each container, with how many
+  processes run them and how much memory the largest one holds, read from the
+  nodes' `/proc`. A core dump or system call trace takes the container's main
+  process, or with `process=<executable>` every process that runs that
+  program. Arguments, environment and files are not read.
+- **Traffic.** The agents record the packet headers of the pods for 5 seconds
+  (at most 30, because the request stays open meanwhile) and sort them into
+  flows: traffic that comes in on a port of the pod, with the number of
+  peers; traffic that the pod sends to a peer's port; and traffic inside the
+  pod. The opening packet of a connection decides which side serves, then
+  the ports that the pod listens on, then the lower port. A peer is named if
+  it is a Service or pod that the user may know: of the same namespace, or
+  of any for an administrator. Every flow carries the packet filter that
+  selects it. The filter for incoming traffic names only the port, because
+  the peers change; the one for outgoing traffic names the peer's address
+  too. The console turns ticked flows into the capture's filter. The sample
+  is written to the audit log. No packets in a sample does not mean that the
+  workload has no connections.
+
+The same inspections are MCP tools (`list_processes`, `sample_traffic`).
+
 ## Evidence kinds
 
 The agent runs standard tools from the node, so the files are in each tool's
@@ -106,9 +135,9 @@ own format and nothing is injected into the pod:
 | `pod-state` | Kubernetes API: pod object and events | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
 | `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true` | With `payload=true` |
-| `strace` | `strace -f` on the container's main process; buffer contents omitted unless `strings=true` | With `strings=true` |
+| `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
 | `pprof` | HTTP GET inside the pod's network namespace on `port` and `path` | No |
-| `coredump` | `gcore` on the container's main process; the process pauses while the core is written | Yes |
+| `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written | Yes |
 
 The main process of a container is the oldest process in the container's
 cgroup whose parent is outside of it.

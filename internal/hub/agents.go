@@ -96,9 +96,9 @@ func (a *agents) send(cluster, node string, c api.Command) bool {
 	}
 }
 
-// query asks any connected agent of the cluster and waits for its reply or
-// the end of ctx.
-func (a *agents) query(ctx context.Context, cluster string, q api.Query) (api.Reply, error) {
+// query asks the agent of a node, or with an empty node any connected agent
+// of the cluster, and waits for its reply or the end of ctx.
+func (a *agents) query(ctx context.Context, cluster, node string, q api.Query) (api.Reply, error) {
 	id := uuid.NewString()
 	wait := make(chan api.Reply, 1)
 	a.mu.Lock()
@@ -109,9 +109,13 @@ func (a *agents) query(ctx context.Context, cluster string, q api.Query) (api.Re
 		delete(a.replies, cluster+"/"+id)
 		a.mu.Unlock()
 	}()
+	nodes := []string{node}
+	if node == "" {
+		nodes = a.nodes(cluster)
+	}
 	sent := false
-	for _, node := range a.nodes(cluster) {
-		if sent = a.send(cluster, node, api.Command{Type: "query", ID: id, Query: &q}); sent {
+	for _, n := range nodes {
+		if sent = a.send(cluster, n, api.Command{Type: "query", ID: id, Query: &q}); sent {
 			break
 		}
 	}

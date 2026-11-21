@@ -52,6 +52,8 @@ var (
 	workloadPattern = regexp.MustCompile(`^(Deployment|StatefulSet|DaemonSet|Pod)/[a-z0-9]([-a-z0-9.]*[a-z0-9])?$`)
 	namePattern     = regexp.MustCompile(`^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$`)
 	pathPattern     = regexp.MustCompile(`^/[A-Za-z0-9/_.?=&%-]*$`)
+	// An executable's path as the process list shows it.
+	executablePattern = regexp.MustCompile(`^/[^\x00-\x1f]*$`)
 )
 
 // ValidName reports whether s can name a cluster, namespace, pod or container.
@@ -62,8 +64,8 @@ var params = map[string][]string{
 	KindPodState: {},
 	KindLogs:     {"container", "previous", "tailLines"},
 	KindPcap:     {"filter", "payload"},
-	KindCoredump: {"container"},
-	KindStrace:   {"container", "strings"},
+	KindCoredump: {"container", "process"},
+	KindStrace:   {"container", "strings", "process"},
 	KindPprof:    {"port", "path"},
 }
 
@@ -108,6 +110,9 @@ func (r *CaptureRequest) Validate() error {
 	}
 	if v, ok := r.Params["path"]; ok && !pathPattern.MatchString(v) {
 		return fmt.Errorf("invalid path")
+	}
+	if v, ok := r.Params["process"]; ok && !executablePattern.MatchString(v) {
+		return fmt.Errorf("process must be the path of an executable, as the process list shows it")
 	}
 	if r.Kind == KindPprof && r.Params["port"] == "" {
 		return fmt.Errorf("pprof needs the port parameter")
@@ -223,29 +228,121 @@ type Command struct {
 	Watches []Watch `json:"watches,omitempty"`
 }
 
-// Query asks one agent of a cluster for cluster-level information.
+// Query asks an agent for information. Any agent of a cluster answers the
+// questions about the cluster; those about pods go to the agent of their node.
 type Query struct {
-	// Op is "resolve" (the pods of a workload), "workload" (the label selector
-	// of its pods and its containers), "workloads" (the workloads of a
-	// namespace), "namespaces" (the namespaces in which the user may exec
-	// into pods, or all without a user) or "review" (may the user exec into
-	// pods of the namespace).
+	// Op is, about the cluster: "resolve" (the pods of a workload),
+	// "workload" (the label selector of its pods and its containers),
+	// "workloads" (the workloads of a namespace), "namespaces" (the
+	// namespaces in which the user may exec into pods, or all without a
+	// user), "review" (may the user exec into pods of the namespace) or
+	// "peers" (what the IPs belong to: Services and pods of the namespace,
+	// or of all namespaces with All). About Pods of the agent's node:
+	// "processes" (what runs in them) or "traffic" (their connections,
+	// from the packet headers of Seconds).
 	Op        string   `json:"op"`
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload,omitempty"`
 	User      string   `json:"user,omitempty"`
 	Groups    []string `json:"groups,omitempty"`
+	Pods      []string `json:"pods,omitempty"`
+	Seconds   int      `json:"seconds,omitempty"`
+	IPs       []string `json:"ips,omitempty"`
+	All       bool     `json:"all,omitempty"`
+}
+
+// Process is a process of a pod's container.
+type Process struct {
+	Pod       string `json:"pod"`
+	Container string `json:"container"`
+	// PID is the process ID inside the pod.
+	PID        int    `json:"pid"`
+	Executable string `json:"executable"`
+	Name       string `json:"name"`
+	// Main marks the container's main process, the default target.
+	Main          bool  `json:"main"`
+	ResidentBytes int64 `json:"residentBytes"`
+	Threads       int   `json:"threads"`
+}
+
+// ProcessChoice is a program that runs in a container of a workload's pods:
+// what a core dump or trace can target instead of the main process.
+type ProcessChoice struct {
+	Container  string `json:"container"`
+	Executable string `json:"executable"`
+	Name       string `json:"name"`
+	// Main marks the program of the container's main process.
+	Main bool `json:"main"`
+	// Processes counts its processes in all inspected pods, Pods the pods
+	// in which it runs.
+	Processes int `json:"processes"`
+	Pods      int `json:"pods"`
+	// LargestResidentBytes is the memory of its largest process: about the
+	// size of that process's core.
+	LargestResidentBytes int64 `json:"largestResidentBytes"`
+}
+
+// Inspection is what the hub learned from a workload's pods.
+type Inspection struct {
+	// Pods were inspected. NotInspected were not: no agent is connected on
+	// their node, or the pod ended or restarted meanwhile.
+	Pods         []string `json:"pods"`
+	NotInspected []string `json:"notInspected,omitempty"`
+	// Processes of a process inspection.
+	Processes []ProcessChoice `json:"processes,omitempty"`
+	// Seconds and Flows of a traffic sample, most bytes first.
+	Seconds int    `json:"seconds,omitempty"`
+	Flows   []Flow `json:"flows,omitempty"`
+}
+
+// Flow directions, seen from the pod.
+const (
+	FlowIn    = "in"    // peers connect to a port of the pod
+	FlowOut   = "out"   // the pod connects to a peer's port
+	FlowLocal = "local" // inside the pod, over loopback
+)
+
+// Flow summarizes the packets that pods exchanged over one port: with all
+// peers for incoming traffic, with one peer for outgoing traffic.
+type Flow struct {
+	Direction string `json:"direction"`
+	Protocol  string `json:"protocol"` // "tcp" or "udp"
+	Port      int    `json:"port"`     // the port of the side that serves
+	// Peer is the address that the pod connects to; empty unless outgoing.
+	Peer string `json:"peer,omitempty"`
+	// PeerName is what the address belongs to, if the user may know.
+	PeerName string `json:"peerName,omitempty"`
+	// Peers counts the distinct addresses that connected to the pod.
+	Peers int `json:"peers,omitempty"`
+	// PeerList holds those addresses in an agent's reply, for the hub to
+	// count them across pods.
+	PeerList []string `json:"peerList,omitempty"`
+	Packets  int      `json:"packets"`
+	Bytes    int64    `json:"bytes"`
+	Pods     int      `json:"pods"`
+	// Label describes the flow in words and Filter selects it in a packet
+	// capture (tcpdump syntax).
+	Label  string `json:"label"`
+	Filter string `json:"filter"`
 }
 
 // Reply answers a Query.
 type Reply struct {
-	Error      string   `json:"error,omitempty"`
-	Pods       []Pod    `json:"pods,omitempty"`
-	Workloads  []string `json:"workloads,omitempty"`
-	Allowed    bool     `json:"allowed,omitempty"`
-	Selector   string   `json:"selector,omitempty"`
-	Containers []string `json:"containers,omitempty"`
-	Namespaces []string `json:"namespaces,omitempty"`
+	Error      string    `json:"error,omitempty"`
+	Pods       []Pod     `json:"pods,omitempty"`
+	Workloads  []string  `json:"workloads,omitempty"`
+	Allowed    bool      `json:"allowed,omitempty"`
+	Selector   string    `json:"selector,omitempty"`
+	Containers []string  `json:"containers,omitempty"`
+	Namespaces []string  `json:"namespaces,omitempty"`
+	Processes  []Process `json:"processes,omitempty"`
+	// Flows of one pod each.
+	Flows []Flow `json:"flows,omitempty"`
+	// Skipped names the pods of a "processes" or "traffic" query that the
+	// agent could not look at, for example because they are gone.
+	Skipped []string `json:"skipped,omitempty"`
+	// Names maps the IPs of a "peers" query to what they belong to.
+	Names map[string]string `json:"names,omitempty"`
 }
 
 // TaskAssignment tells an agent to capture one pod on its node.

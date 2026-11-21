@@ -28,6 +28,12 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 		r.Selector, r.Containers, err = a.workload(ctx, q.Namespace, q.Workload)
 	case "namespaces":
 		r.Namespaces, err = a.namespaces(ctx, q)
+	case "processes":
+		r.Processes, r.Skipped = a.processes(ctx, q)
+	case "traffic":
+		r.Flows, r.Skipped = a.traffic(ctx, q)
+	case "peers":
+		r.Names, err = a.peers(ctx, q)
 	default:
 		err = fmt.Errorf("unknown query %q", q.Op)
 	}

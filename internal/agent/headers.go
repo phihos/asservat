@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"net/netip"
 )
 
 // headersOnly rewrites a pcap stream so that every packet ends after its
@@ -102,41 +103,68 @@ func (r *packetReader) next() (record, packet []byte, err error) {
 
 // headerLength returns how many bytes of a packet are link, network and
 // transport headers. A packet it cannot parse keeps its link header only.
-func headerLength(linkType uint32, p []byte) int {
-	var link int
+func headerLength(linkType uint32, p []byte) int { return dissect(linkType, p).headers }
+
+// packetInfo is what the headers of a packet say.
+type packetInfo struct {
+	headers  int        // bytes of link, network and transport headers
+	protocol string     // "tcp" or "udp"; empty for anything else
+	src, dst netip.Addr // valid for IP packets
+	srcPort  uint16
+	dstPort  uint16
+	// opens marks a TCP packet that opens a connection: its sender is the client.
+	opens bool
+}
+
+func dissect(linkType uint32, p []byte) packetInfo {
+	var info packetInfo
 	var proto uint16
 	switch {
 	case linkType == 276 && len(p) >= 20: // Linux cooked v2 (tcpdump -i any)
-		link, proto = 20, binary.BigEndian.Uint16(p)
+		info.headers, proto = 20, binary.BigEndian.Uint16(p)
 	case linkType == 113 && len(p) >= 16: // Linux cooked v1
-		link, proto = 16, binary.BigEndian.Uint16(p[14:])
+		info.headers, proto = 16, binary.BigEndian.Uint16(p[14:])
 	case linkType == 1 && len(p) >= 14: // Ethernet
-		link, proto = 14, binary.BigEndian.Uint16(p[12:])
+		info.headers, proto = 14, binary.BigEndian.Uint16(p[12:])
 	default:
-		return 0
+		return info
 	}
-	ip := p[link:]
+	ip := p[info.headers:]
 	var network int
 	var next byte
 	switch {
 	case proto == 0x0800 && len(ip) >= 20:
 		network, next = int(ip[0]&0x0f)*4, ip[9]
+		info.src, info.dst = netip.AddrFrom4([4]byte(ip[12:16])), netip.AddrFrom4([4]byte(ip[16:20]))
 		if binary.BigEndian.Uint16(ip[6:])&0x1fff != 0 {
-			return link + network // a later fragment has no transport header
+			info.headers += network // a later fragment has no transport header
+			return info
 		}
 	case proto == 0x86dd && len(ip) >= 40:
 		network, next = 40, ip[6]
+		info.src, info.dst = netip.AddrFrom16([16]byte(ip[8:24])), netip.AddrFrom16([16]byte(ip[24:40]))
 	case proto == 0x0806:
-		return len(p) // ARP has no payload
+		info.headers = len(p) // ARP has no payload
+		return info
 	default:
-		return link
+		return info
 	}
 	transport := ip[min(network, len(ip)):]
+	info.headers += network
 	switch {
-	case next == 6 && len(transport) >= 13: // TCP: data offset
-		return link + network + int(transport[12]>>4)*4
+	case next == 6 && len(transport) >= 14: // TCP: data offset, flags
+		info.headers += int(transport[12]>>4) * 4
+		info.protocol, info.opens = "tcp", transport[13]&0x12 == 0x02 // SYN without ACK
+	case next == 6 && len(transport) >= 13:
+		info.headers += int(transport[12]>>4) * 4
+	case next == 17 && len(transport) >= 8:
+		info.headers += 8
+		info.protocol = "udp"
 	case next == 17 || next == 1 || next == 58: // UDP, ICMP, ICMPv6
-		return link + network + 8
+		info.headers += 8
 	}
-	return link + network
+	if info.protocol != "" {
+		info.srcPort, info.dstPort = binary.BigEndian.Uint16(transport), binary.BigEndian.Uint16(transport[2:])
+	}
+	return info
 }

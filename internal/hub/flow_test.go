@@ -453,6 +453,11 @@ func TestCaptureFlow(t *testing.T) {
 	if i := slices.IndexFunc(all, func(c api.Capture) bool { return c.Watch == awaiting.ID }); i < 0 || !all[i].Sensitive || all[i].Approver != "root2" || all[i].State == api.StatePendingApproval {
 		t.Fatal("the capture of an approved watch waits for approval again", all)
 	}
+	choosy := onCrash
+	choosy.Kind, choosy.Params = api.KindCoredump, map[string]string{"process": "/usr/bin/app"}
+	if code, _ := watch("alice-token", choosy); code != 400 {
+		t.Fatal("a core dump watch for a chosen process", code)
+	}
 	missing := onCrash
 	missing.Workload = "Deployment/none"
 	if code, _ := watch("alice-token", missing); code != 502 {
