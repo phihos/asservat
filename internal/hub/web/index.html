@@ -528,7 +528,7 @@ async function loadWatches() {
   const list = await call('GET', '/api/watches');
   $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
   $('watchCount').textContent = list.length || '';
-  $('watches').innerHTML = list.map(w => `<tr><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
+  $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
     <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
     <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
@@ -550,6 +550,10 @@ function countdown() {
   }
 }
 setInterval(countdown, 1000);
+
+// What was just created is highlighted for a few seconds, also when the list is drawn again meanwhile.
+let fresh = {id: '', until: 0};
+const freshClass = id => id === fresh.id && Date.now() < fresh.until ? ' fresh' : '';
 
 // Which captures are opened: those in progress by themselves, any other by a click.
 const toggled = new Map();
@@ -581,7 +585,7 @@ async function loadCaptures() {
       : button('delete', 'Delete', 'Delete the capture and its files');
     const state = {PendingApproval: 'Waits for approval'}[c.state] || c.state;
     const count = c.artifacts.length ? ` · ${plural(c.artifacts.length, 'file')}` : '';
-    return `<div class="capture${open ? ' open' : ''}" data-capture="${c.id}">
+    return `<div class="capture${open ? ' open' : ''}${freshClass(c.id)}" data-capture="${c.id}">
       <div class="line">
         <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted">${inProgress(c) ? '' : count.slice(3)}</div>`}</span>
         <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}</span>
@@ -658,17 +662,15 @@ $('captureForm').onsubmit = guard(async () => {
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
     : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
-  // Show where it went.
   // Show where it went: the new capture, opened, in its list.
   if (!crash) toggled.set(created.id, true);
+  fresh = {id: created.id, until: Date.now() + 4000};
   captureFilter = 'all';
   for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
-  await loadCaptures();
+  await Promise.all([loadCaptures(), loadWatches()]);
   location.hash = crash ? '#watches' : '#captures';
   showStep(1);
-  const row = crash ? $('watchTable') : document.querySelector(`.capture[data-capture="${created.id}"]`);
-  row?.classList.add('fresh');
-  row?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  document.querySelector(crash ? `tr[data-watch="${created.id}"]` : `.capture[data-capture="${created.id}"]`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }, 'formProblem');
 function problemAt(id, message) {
   showStep(Number($(id).closest('[data-step]').dataset.step));
