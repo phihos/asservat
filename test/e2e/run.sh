@@ -342,7 +342,7 @@ EOF
   view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
   graph=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/flamegraph")
   fetch "$ALICE" "$id" "$pod/sampled-memory.pprof" "$WORK/sampled-memory.pprof"
-  grep -q 'grow' <<<"$graph" && go tool pprof -top "$WORK/sampled-memory.pprof" 2>/dev/null | grep -q 'Total samples = [0-9.]*[MG]B' || fail "Python's functions in the profile of memory growth: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -150)"
+  grep -q 'grow' <<<"$graph" && go tool pprof -top "$WORK/sampled-memory.pprof" 2>/dev/null | grep -q 'Total samples = [0-9.]*[MG]B' || fail "Python's functions in the profile of memory growth: view $view, page of ${#graph} bytes with $(grep -c grow <<<"$graph") lines of grow: $(head -c 1500 <<<"$graph") ... $(go tool pprof -top "$WORK/sampled-memory.pprof" 2>&1 | head -12)"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
 fi
