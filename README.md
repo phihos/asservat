@@ -29,7 +29,8 @@ a stopped program in a debugger.
 | Logs | Container logs: the last lines, the previous instance, or followed for a duration | No |
 | Packet capture | A pcap file for Wireshark, filtered with tcpdump syntax | Only with payload; headers alone do not |
 | System call trace | `strace` output with timing, following child processes | Only with buffer contents |
-| Profile | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
+| CPU profile | Where the pod's processes spend CPU time, sampled from the node with eBPF. Needs no support in the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, Perl, .NET, Erlang | No |
+| Profile endpoint | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
 | Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running | Yes |
 
 A capture that can contain memory or payload contents waits until an

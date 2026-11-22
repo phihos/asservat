@@ -154,6 +154,8 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			args = append(args, "-p", strconv.Itoa(pid))
 		}
 		return a.record(ctx, frame, duration, container+".strace", up, "strace", args...)
+	case api.KindCPU:
+		return a.sample(ctx, frame, duration, pod, up)
 	case api.KindPprof:
 		pid, err := a.podPID(pod)
 		if err != nil {

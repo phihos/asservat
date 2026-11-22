@@ -139,3 +139,16 @@ func TestViewerOf(t *testing.T) {
 		}
 	}
 }
+
+// A sampled CPU profile runs for the time frame, takes no parameters and
+// holds no memory or payload.
+func TestSampledCPUProfile(t *testing.T) {
+	r := CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: KindCPU}
+	if err := r.Validate(); err != nil || r.DurationSeconds != 30 || !r.Recordings[0].Timed(false) || r.Recordings[0].Sensitive() {
+		t.Fatal(err, r)
+	}
+	r = CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: KindCPU, Params: map[string]string{"container": "web"}}
+	if err := r.Validate(); err == nil {
+		t.Fatal("a parameter was accepted")
+	}
+}

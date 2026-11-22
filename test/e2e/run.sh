@@ -7,10 +7,13 @@
 #   test/e2e/run.sh          build the image, create the clusters, test, delete
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
 #   CORE_HANDLER=1 test/e2e/run.sh   also record the core of a crashed process
+#   SAMPLE_CPU=1 test/e2e/run.sh     also sample a CPU profile
 #
 # CORE_HANDLER changes kernel.core_pattern of the machine that runs kind,
 # because kind nodes share its kernel. Use it only on a disposable machine
 # such as a CI runner; it needs sudo to create the spool directory.
+# SAMPLE_CPU=1 also samples a CPU profile. That loads eBPF programs into the
+# kernel of the machine that runs kind, which rootless containers cannot do.
 #
 # Needs docker (or podman as docker), kind, kubectl, helm, curl and jq.
 set -euo pipefail
@@ -297,6 +300,20 @@ for p in $(edge -n shop get pods -l app=web -o name); do
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/profile' <test/e2e/synthetic-cpu.pprof
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/trace' <test/e2e/synthetic-trace.out
 done
+# A CPU profile needs no endpoint: the agent samples the pods' processes from the node's kernel.
+if [ -n "${SAMPLE_CPU:-}" ]; then
+  id=$(capture "$ALICE" "$(target edge cpu '{"durationSeconds":10}')"); completed "$ALICE" "$id"
+  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, ([.artifacts[].name | select(endswith("/sampled-cpu.pprof"))] | length)] | @csv')" = 'false,2' ] || fail "sampled CPU profiles of two pods: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
+  : >"$WORK/view"
+  curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
+  viewer=$!
+  for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
+  view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
+  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
+  grep -q 'accounting for' <<<"$top" && ! grep -q 'accounting for 0,' <<<"$top" || fail "the sampled profile in pprof: $top"
+  kill "$viewer"
+fi
 # The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
 found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')
 [ "$(jq -c '[.ports, [.profiles[] | select(.endpoint == "go-cpu" or .endpoint == "go-heap") | [.port, .endpoint, .timed, .sensitive]]]' <<<"$found")" = '[[8080],[[8080,"go-cpu",true,false],[8080,"go-heap",false,false]]]' ] || fail "profile endpoints: $found"
