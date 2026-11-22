@@ -1,7 +1,7 @@
 // The log viewer follows the log panels of Lens and the Kubernetes
 // dashboard: a dark terminal with timestamps, search and a wrapped view of
 // the selected line.
-import {$, esc, loadText, truncatedNote, show, virtual} from './common.js';
+import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
   <div class="logbar">
@@ -78,6 +78,9 @@ export default async function (root) {
     if (/^\s*[{[]/.test(message)) try { shownText = JSON.stringify(JSON.parse(message), null, 2); } catch {}
     $('line').hidden = false;
     $('line').textContent = (time ? time + '\n' : '') + shownText;
+    spot.write({l: n + 1});
+    moment(time ? Date.parse(time) / 1000 : null);
+    list.reveal(visible ? visible.indexOf(n) : n);
     list.draw();
   };
 
@@ -95,7 +98,6 @@ export default async function (root) {
     const order = visible || null, pos = order ? order.indexOf(selected) : selected, to = pos + step;
     if (to < 0 || to >= (order ? order.length : lines.length)) return;
     select(order ? order[to] : to);
-    list.reveal(to);
   };
   const first = parts(0)[0], last = lines.length ? parts(lines.length - 1)[0] : '';
   $('span').textContent = `${lines.length} line${lines.length === 1 ? '' : 's'}` + (first && last ? ` · ${first.slice(0, 19).replace('T', ' ')} to ${last.slice(0, 19).replace('T', ' ')} UTC` : '');
@@ -103,4 +105,10 @@ export default async function (root) {
   if (!lines.length) { $('note').hidden = false; $('note').textContent = 'This log is empty.'; }
   show();
   count();
+  // The address names a line, or a moment: then the first line from that moment on.
+  const named = spot.read();
+  let to = named.l ? Number(named.l) - 1 : -1;
+  if (to < 0 && named.at) to = lines.findIndex((_, i) => { const time = parts(i)[0]; return time && Date.parse(time) / 1000 >= Number(named.at); });
+  if (to < 0 && named.at && lines.length) to = lines.length - 1;
+  if (to >= 0 && to < lines.length) select(to);
 }

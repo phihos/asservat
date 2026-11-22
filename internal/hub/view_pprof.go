@@ -26,7 +26,8 @@ var pprofPages = []string{"/", "/flamegraph", "/top", "/graph", "/peek", "/downl
 // package variables.
 var pprofStart sync.Mutex
 
-func (h *Hub) profilePages(ctx context.Context, a storedArtifact) (map[string]http.Handler, error) {
+// parsedProfile decrypts a profile into memory and parses it.
+func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Profile, error) {
 	var plain bytes.Buffer
 	if err := h.plain(ctx, a, &plain); err != nil {
 		return nil, fmt.Errorf("open artifact: %w", err)
@@ -35,15 +36,33 @@ func (h *Hub) profilePages(ctx context.Context, a storedArtifact) (map[string]ht
 	if err != nil {
 		return nil, errStatus{http.StatusUnprocessableEntity, "pprof cannot read this profile: " + err.Error()}
 	}
+	return parsed, nil
+}
+
+// profilePages returns pprof's pages for a profile; with a base, for the
+// difference of the profile to it (pprof's -diff_base).
+func (h *Hub) profilePages(ctx context.Context, a storedArtifact, base *storedArtifact) (map[string]http.Handler, error) {
+	sources := fetched{}
+	args := []string{"-http=localhost:0", "-no_browser", "-symbolize=none"}
+	var err error
+	if sources["profile"], err = h.parsedProfile(ctx, a); err != nil {
+		return nil, err
+	}
+	if base != nil {
+		if sources["base"], err = h.parsedProfile(ctx, *base); err != nil {
+			return nil, err
+		}
+		args = append(args, "-diff_base=base")
+	}
 	pprofStart.Lock()
 	defer pprofStart.Unlock()
 	var all map[string]http.Handler
 	err = driver.PProf(&driver.Options{
 		// -http makes pprof build its web interface; HTTPServer takes the
 		// pages instead of listening. The profile carries its symbols. The
-		// source is a fixed word: Fetch hands over the parsed profile.
-		Flagset: &pprofFlags{FlagSet: flag.NewFlagSet("pprof", flag.ContinueOnError), args: []string{"-http=localhost:0", "-no_browser", "-symbolize=none", "--", "profile"}},
-		Fetch:   fetched{parsed},
+		// sources are fixed words: Fetch hands over the parsed profiles.
+		Flagset: &pprofFlags{FlagSet: flag.NewFlagSet("pprof", flag.ContinueOnError), args: append(args, "--", "profile")},
+		Fetch:   sources,
 		UI:      pprofUI{},
 		HTTPServer: func(args *driver.HTTPServerArgs) error {
 			all = args.Handlers
@@ -60,11 +79,16 @@ func (h *Hub) profilePages(ctx context.Context, a storedArtifact) (map[string]ht
 	return pages, nil
 }
 
-// fetched hands pprof the profile that the hub already holds.
-type fetched struct{ p *profile.Profile }
+// fetched hands pprof the profiles that the hub already holds, by the
+// names its command line gives them.
+type fetched map[string]*profile.Profile
 
-func (f fetched) Fetch(string, time.Duration, time.Duration) (*profile.Profile, string, error) {
-	return f.p, "", nil
+func (f fetched) Fetch(source string, _, _ time.Duration) (*profile.Profile, string, error) {
+	if f[source] == nil {
+		return nil, "", fmt.Errorf("no profile %q", source)
+	}
+	// pprof changes what it is handed.
+	return f[source].Copy(), "", nil
 }
 
 // pprofFlags gives pprof its command line.

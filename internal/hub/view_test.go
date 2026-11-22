@@ -142,6 +142,15 @@ func TestPacketCaptureView(t *testing.T) {
 	if code, b := f.call("alice-token", "POST", "/api/views/"+view+"/check", map[string]string{"filter": "tcp.port =="}); code != 400 || !strings.Contains(string(b), "Filter invalid") {
 		t.Fatal("sharkd's refusal", code, string(b))
 	}
+	// Of sharkd's statistics, those that count packets pass.
+	if code, b := f.call("alice-token", "POST", "/api/views/"+view+"/tap", map[string]string{"tap0": "conv:TCP", "tap1": "expert", "filter": "tcp"}); code != 200 || !strings.Contains(string(b), `"tap0":"conv:TCP"`) {
+		t.Fatal("statistics", code, string(b))
+	}
+	for _, asked := range []map[string]any{{"tap0": "eo:http"}, {"tap0": "follow:TCP"}, {"tap0": 7}, {"file": "/etc/passwd"}} {
+		if code, _ := f.call("alice-token", "POST", "/api/views/"+view+"/tap", asked); code != 400 {
+			t.Fatal("other statistics", asked, code)
+		}
+	}
 	// Only questions about the loaded capture pass; "load" would open files.
 	if code, _ := f.call("alice-token", "POST", "/api/views/"+view+"/load", map[string]string{"file": "/etc/passwd"}); code != 400 {
 		t.Fatal("load", code)
@@ -232,7 +241,18 @@ func TestProfileView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/heap.pprof": []byte("not a profile")})
+	// The same workload later: twice the samples.
+	location.Line[0].Function.Name = "synthetic.Workload"
+	var later bytes.Buffer
+	err = (&profile.Profile{
+		SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}},
+		Sample:     []*profile.Sample{{Location: []*profile.Location{location}, Value: []int64{3000}}},
+		Location:   []*profile.Location{location}, Function: []*profile.Function{function},
+	}).Write(&later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/later.pprof": later.Bytes(), "api-1/heap.pprof": []byte("not a profile")})
 
 	view := openedView(t, f, capture, "api-1/cpu.pprof")
 	for _, page := range []string{"flamegraph", "top"} {
@@ -246,6 +266,16 @@ func TestProfileView(t *testing.T) {
 	}
 	if code, _ := f.call("root-token", "GET", "/api/views/"+view+"/pages/top", nil); code != 404 {
 		t.Fatal("another user's view", code)
+	}
+	// Against a base, pprof shows the difference: 3000 - 1000 nanoseconds are 2 microseconds.
+	diff := openedView(t, f, capture, "api-1/later.pprof?base="+capture+"/api-1/cpu.pprof")
+	if code, b := f.call("alice-token", "GET", "/api/views/"+diff+"/pages/top", nil); code != 200 || !strings.Contains(string(b), "accounting for 2us") {
+		t.Fatal("difference to the base", code, string(b))
+	}
+	for base, want := range map[string]int{capture + "/api-1/missing.pprof": 404, "00000000-0000-0000-0000-000000000000/api-1/cpu.pprof": 404, capture + "/api-1/heap.pprof": 422} {
+		if code, _ := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/later.pprof?base="+base, nil); code != want {
+			t.Fatal("base", base, code)
+		}
 	}
 	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/heap.pprof", nil); code != 422 || !strings.Contains(string(b), "pprof cannot read this profile") {
 		t.Fatal("a file that is no profile", code, string(b))

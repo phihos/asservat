@@ -17,8 +17,27 @@
 .pane { min-height: 40px; overflow: auto; background: #fff; }
 .splitter { height: 5px; flex: none; background: #d8d8d8; cursor: row-resize; }
 #list { flex: 5; position: relative; outline: none; }
+#lower { flex: 5; display: flex; flex-direction: column; min-height: 40px; }
 #details { flex: 3; padding: 2px 0; outline: none; }
 #bytes { flex: 2; display: flex; flex-direction: column; overflow: hidden; }
+#panes.beside #lower { flex-direction: row; }
+#panes.beside #lower > .pane { flex: 1; min-width: 40px; }
+#panes.beside #lower > .splitter { width: 5px; height: auto; cursor: col-resize; }
+.toolbar .grow { flex: 1; }
+#stat { width: min(1200px, 94vw); }
+#statTabs { display: flex; gap: 2px; padding: 6px 10px 0; background: #e8e8e8; border-bottom: 1px solid #c8c8c8; }
+#statTabs button { padding: 4px 12px; border: 1px solid #c0c0c0; border-bottom: 0; border-radius: 3px 3px 0 0; background: #dcdcdc; cursor: pointer; }
+#statTabs button.on { background: #fff; font-weight: 600; }
+#statBody { flex: 1; overflow: auto; padding: 0 0 8px; }
+#statBody table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+#statBody th { position: sticky; top: 0; padding: 4px 10px; background: #f0f0f0; border-bottom: 1px solid #c0c0c0; text-align: right; white-space: nowrap; }
+#statBody td { padding: 2px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid #eee; }
+#statBody th:first-child, #statBody td.text { text-align: left; }
+#statBody td.none { text-align: left; color: #666; padding: 12px 10px; }
+#statBody tr[data-filter] { cursor: pointer; }
+#statBody tr[data-filter]:hover { background: #eaf3fb; }
+#statBody td.Error { background: #ff5c5c; } #statBody td.Warn { background: #f7f240; } #statBody td.Note { background: #b7f774; } #statBody td.Chat { background: #80b7f7; }
+#statNote { color: #555; }
 #head, .row { display: grid; grid-template-columns: 70px 100px minmax(110px, 1.2fr) minmax(110px, 1.2fr) 80px 70px minmax(200px, 5fr); }
 #head { position: sticky; top: 0; z-index: 1; height: 22px; line-height: 22px; background: #f0f0f0; border-bottom: 1px solid #c0c0c0; font-weight: 600; }
 #head span { padding: 0 6px; border-right: 1px solid #d0d0d0; overflow: hidden; white-space: nowrap; }

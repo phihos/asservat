@@ -1,7 +1,7 @@
 // The trace viewer shows strace's output as a table of calls that can be
 // narrowed, and the summary that "strace -c" prints: time, calls and errors
 // per system call.
-import {$, esc, loadText, truncatedNote, show, virtual} from './common.js';
+import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
   <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span class="grow"></span><span id="shown"></span></div>
@@ -63,9 +63,15 @@ function finish(c, tail) {
 }
 const duration = s => s === undefined ? '' : s >= 1 ? s.toFixed(3) + ' s' : s >= 0.001 ? (s * 1000).toFixed(3) + ' ms' : Math.round(s * 1e6) + ' µs';
 
-export default async function (root) {
+export default async function (root, {capture}) {
   const {text, truncated} = await loadText();
   const calls = parse(text);
+  // strace prints the time of day, in UTC as the agent runs; the capture gives the day.
+  const requested = Date.parse(capture.createdAt) / 1000, midnight = Date.parse(capture.createdAt.slice(0, 10) + 'T00:00:00Z') / 1000;
+  const momentOf = c => {
+    const [h, m, s] = c.time.split(':').map(Number), at = midnight + h * 3600 + m * 60 + s;
+    return at < requested - 43200 ? at + 86400 : at; // past midnight
+  };
   root.innerHTML = markup;
   let visible = calls, selected = null;
 
@@ -89,6 +95,8 @@ export default async function (root) {
     selected = visible[i];
     $('call').hidden = false;
     $('call').textContent = `${selected.time}  process ${selected.pid}\n${selected.kind === 'call' ? `${selected.name}(${selected.args}) = ${selected.result}` : selected.args}${selected.seconds === undefined ? '' : `\ntook ${duration(selected.seconds)}`}`;
+    spot.write({e: calls.indexOf(selected) + 1});
+    moment(momentOf(selected));
     list.reveal(i, $('thead').offsetHeight);
     list.draw();
   };
@@ -129,4 +137,10 @@ export default async function (root) {
   if (!calls.length) { $('note').hidden = false; $('note').textContent = 'This trace holds no calls.'; }
   show();
   narrow();
+  // The address names an entry, or a moment: then the first entry from that moment on.
+  const named = spot.read();
+  let to = named.e ? Number(named.e) - 1 : -1;
+  if (to < 0 && named.at) to = calls.findIndex(c => momentOf(c) >= Number(named.at));
+  if (to < 0 && named.at && calls.length) to = calls.length - 1;
+  if (to >= 0 && to < calls.length) select(to);
 }

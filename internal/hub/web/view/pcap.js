@@ -1,6 +1,6 @@
 // The packet viewer follows Wireshark's main window. Wireshark's sharkd reads
 // the capture in the hub; this page asks it for what is in sight.
-import {$, esc, headers, notice, openView, show, virtual} from './common.js';
+import {$, esc, headers, moment, notice, openView, show, spot, virtual} from './common.js';
 
 const markup = `
   <div class="toolbar">
@@ -13,6 +13,13 @@ const markup = `
     <span class="sep"></span>
     <button id="follow" disabled title="Show the payload of this packet's stream">Follow stream</button>
     <button id="asFilter" disabled title="Filter by the field selected in the packet details">Apply as filter</button>
+    <span class="sep"></span>
+    <button data-stat="conv" title="Who talks to whom, per protocol">Conversations</button>
+    <button data-stat="endpt" title="The addresses and ports, per protocol">Endpoints</button>
+    <button data-stat="phs" title="The protocols in the capture and their share">Protocol hierarchy</button>
+    <button data-stat="expert" title="What Wireshark's dissectors found notable">Expert information</button>
+    <span class="grow"></span>
+    <button id="layout" title="Packet details and bytes side by side, or one above the other">Layout</button>
   </div>
   <form class="filter" id="filterForm">
     <input id="filter" list="fields" autocomplete="off" spellcheck="false" placeholder="Apply a display filter … for example  tcp.port == 8080 and http">
@@ -25,12 +32,14 @@ const markup = `
       <div id="head"></div>
       <div id="rows"></div>
     </div>
-    <div class="splitter" data-above="list" data-below="details"></div>
-    <div class="pane" id="details" tabindex="0"></div>
-    <div class="splitter" data-above="details" data-below="bytes"></div>
-    <div class="pane" id="bytes">
-      <div id="sources" hidden></div>
-      <pre id="hex"></pre>
+    <div class="splitter" data-above="list" data-below="lower"></div>
+    <div id="lower">
+      <div class="pane" id="details" tabindex="0"></div>
+      <div class="splitter" data-above="details" data-below="bytes"></div>
+      <div class="pane" id="bytes">
+        <div id="sources" hidden></div>
+        <pre id="hex"></pre>
+      </div>
     </div>
   </div>
   <footer><span id="field"></span><span id="counts"></span></footer>
@@ -38,6 +47,12 @@ const markup = `
   <h2 id="streamTitle"></h2>
   <pre id="streamText"></pre>
   <div class="bar"><span id="streamSides"></span><span class="grow"></span><button id="streamFilter">Filter on this stream</button><button id="streamClose">Close</button></div>
+</dialog>
+<dialog id="stat">
+  <h2 id="statTitle"></h2>
+  <div id="statTabs" hidden></div>
+  <div id="statBody"></div>
+  <div class="bar"><span id="statNote"></span><span class="grow"></span><button id="statClose">Close</button></div>
 </dialog>
 `;
 
@@ -52,7 +67,7 @@ async function ask(method, params = {}) {
 }
 
 const rowHeight = 20, pageSize = 200;
-let total = 0, shown = 0, applied = '', pages = new Map(), selected = -1, frame = null, sources = [], source = 0, node = null;
+let total = 0, shown = 0, applied = '', pages = new Map(), selected = -1, frame = null, number = 0, sources = [], source = 0, node = null;
 const expanded = new Set(); // subtree kinds that stay open from packet to packet, as in Wireshark
 
 function open() {
@@ -63,7 +78,14 @@ function open() {
     $('head').innerHTML = status.columns.map(c => `<span>${esc(c)}</span>`).join('');
     $('goto').max = total;
     show();
-    await applyFilter($('filter').value.trim());
+    // The address names a display filter and a packet, or a moment: then the first packet from that moment on.
+    const named = spot.read();
+    try { await applyFilter(named.f || ''); } catch { await applyFilter(''); }
+    if (named.p) await goTo(Number(named.p));
+    else if (named.at) {
+      const [first] = await ask('frames', {filter: (applied ? `(${applied}) and ` : '') + `frame.time_epoch >= ${Number(named.at)}`, limit: 1});
+      await (first ? goTo(first.num) : select(shown - 1));
+    }
   });
 }
 
@@ -113,7 +135,22 @@ async function select(i) {
   if (!r || selected !== i) return;
   draw();
   const f = await ask('frame', {frame: r.num, proto: true, bytes: true});
-  if (selected === i) showFrame(f);
+  if (selected !== i) return;
+  number = r.num;
+  showFrame(f);
+}
+// goTo selects the packet of a number, or the next one that the filter shows.
+async function goTo(wanted) {
+  // Without a filter a packet's number is its place in the list; with one, the list is searched.
+  if (!applied) return select(wanted - 1);
+  // Numbers rise along the list: halve the range until the first packet from that number on is found.
+  let low = 0, high = shown - 1;
+  while (low < high) {
+    const middle = (low + high) >> 1, r = await rowWhenLoaded(middle);
+    if (!r) return;
+    if (r.num >= wanted) high = middle; else low = middle + 1;
+  }
+  await select(low);
 }
 
 // Packet details and bytes.
@@ -123,6 +160,10 @@ function showFrame(f) {
   $('follow').disabled = !f?.fol?.length;
   $('follow').textContent = f?.fol?.length ? `Follow ${f.fol[0][0]} stream` : 'Follow stream';
   drawTree(); drawBytes(); showField();
+  spot.write({f: applied, p: f ? number : ''});
+  // The packet's arrival time, as the frame's own tree states it.
+  const arrival = f?.tree[0]?.n?.find(n => n.fn === 'frame.time_epoch');
+  moment(arrival ? Number(/== ([\d.]+)/.exec(arrival.f)?.[1]) : null);
 }
 const decode = b64 => Uint8Array.from(atob(b64 || ''), c => c.charCodeAt(0));
 const kindOf = n => n.e ?? n.l.split(':')[0];
@@ -178,6 +219,61 @@ async function follow() {
   $('stream').showModal();
 }
 
+// Statistics, as in Wireshark's Statistics and Analyze menus. They count the
+// packets that the display filter shows; a row's filter narrows the list.
+const count = n => Number(n).toLocaleString('en-US');
+const seconds = n => Number(n).toFixed(6);
+const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="none">None in these packets.</td></tr>`}</tbody></table>`;
+const cell = (value, text) => `<td${text ? ' class="text"' : ''}>${esc(value ?? '')}</td>`;
+const filtered = (filter, cells) => `<tr data-filter="${esc(filter)}" title="Show these packets">${cells.join('')}</tr>`;
+const statistics = {
+  conv: {title: 'Conversations', protocols: ['TCP', 'UDP', 'IPv4', 'IPv6', 'Ethernet'], draw: (t, ports) => table(
+    ['Address A', ...(ports ? ['Port A'] : []), 'Address B', ...(ports ? ['Port B'] : []), 'Packets', 'Bytes', 'Packets A → B', 'Bytes A → B', 'Packets B → A', 'Bytes B → A', 'Rel Start', 'Duration'],
+    (t.convs || []).map(c => filtered(c.filter, [cell(c.saddr, true), ...(ports ? [cell(c.sport)] : []), cell(c.daddr, true), ...(ports ? [cell(c.dport)] : []), cell(count(c.txf + c.rxf)), cell(count(c.txb + c.rxb)),
+      cell(count(c.txf)), cell(count(c.txb)), cell(count(c.rxf)), cell(count(c.rxb)), cell(seconds(c.start)), cell(seconds(c.stop - c.start))])))},
+  endpt: {title: 'Endpoints', protocols: ['TCP', 'UDP', 'IPv4', 'IPv6', 'Ethernet'], draw: (t, ports) => table(
+    ['Address', ...(ports ? ['Port'] : []), 'Packets', 'Bytes', 'Tx Packets', 'Tx Bytes', 'Rx Packets', 'Rx Bytes'],
+    (t.hosts || []).map(h => filtered(h.filter, [cell(h.host, true), ...(ports ? [cell(h.port)] : []), cell(count(h.txf + h.rxf)), cell(count(h.txb + h.rxb)), cell(count(h.txf)), cell(count(h.txb)), cell(count(h.rxf)), cell(count(h.rxb))])))},
+};
+function hierarchy(tap) {
+  const all = (tap.protos || []).reduce((sum, p) => ({frames: sum.frames + p.frames, bytes: sum.bytes + p.bytes}), {frames: 0, bytes: 0});
+  const percent = (part, whole) => whole ? (part * 100 / whole).toFixed(1) : '0.0';
+  const walk = (list, depth) => (list || []).flatMap(p => [filtered(p.proto, [`<td class="text" style="padding-left:${10 + depth * 18}px">${esc(p.proto)}</td>`, cell(percent(p.frames, all.frames)), cell(count(p.frames)), cell(percent(p.bytes, all.bytes)), cell(count(p.bytes))]), ...walk(p.protos, depth + 1)]);
+  return table(['Protocol', 'Percent Packets', 'Packets', 'Percent Bytes', 'Bytes'], walk(tap.protos, 0));
+}
+function expert(tap) {
+  // One line per finding, the gravest first, as Wireshark groups them.
+  const groups = new Map();
+  for (const d of tap.details || []) {
+    const key = [d.s, d.g, d.p, d.m].join('\n'), g = groups.get(key) || {...d, count: 0};
+    g.count++; groups.set(key, g);
+  }
+  const rank = ['Error', 'Warn', 'Note', 'Chat'];
+  return table(['Severity', 'Summary', 'Group', 'Protocol', 'Count'], [...groups.values()].sort((a, b) => rank.indexOf(a.s) - rank.indexOf(b.s) || b.count - a.count)
+    .map(g => filtered(`_ws.expert.message == "${g.m.replace(/[\\"]/g, '\\$&')}"`, [`<td class="text ${esc(g.s)}">${esc(g.s)}</td>`, cell(g.m, true), cell(g.g, true), cell(g.p, true), cell(count(g.count))])));
+}
+async function showStatistics(kind) {
+  const within = applied ? {filter: applied} : {}, named = statistics[kind];
+  $('statTitle').textContent = (named?.title || {phs: 'Protocol hierarchy', expert: 'Expert information'}[kind]) + (applied ? ` · display filter: ${applied}` : '');
+  $('statTabs').hidden = true; $('statBody').textContent = 'Counting …';
+  $('statNote').textContent = 'Select a row to show its packets.';
+  $('stat').showModal();
+  if (!named) {
+    const {taps} = await ask('tap', {tap0: kind, ...within});
+    $('statBody').innerHTML = kind === 'phs' ? hierarchy(taps[0]) : expert(taps[0]);
+    return;
+  }
+  const {taps} = await ask('tap', {...Object.fromEntries(named.protocols.map((p, i) => [`tap${i}`, `${kind}:${p}`])), ...within});
+  const sizes = taps.map(t => (t.convs || t.hosts || []).length);
+  const showTab = i => {
+    $('statTabs').innerHTML = named.protocols.map((p, n) => `<button data-n="${n}"${n === i ? ' class="on"' : ''}>${p} · ${sizes[n]}</button>`).join('');
+    $('statBody').innerHTML = named.draw(taps[i], i < 2);
+  };
+  $('statTabs').hidden = false;
+  $('statTabs').onclick = e => { if (e.target.dataset.n !== undefined) showTab(Number(e.target.dataset.n)); };
+  showTab(Math.max(0, sizes.findIndex(n => n)));
+}
+
 // Problems show in the status bar, where Wireshark shows them.
 const run = async f => { try { await f(); } catch (err) { if (err.message !== 'view ended') $('field').textContent = err.message; } };
 function wire() {
@@ -215,18 +311,7 @@ $('last').onclick = () => run(() => select(shown - 1));
 $('prev').onclick = () => run(() => select(selected - 1));
 $('next').onclick = () => run(() => select(selected + 1));
 $('goto').onchange = () => run(async () => {
-  const number = Number($('goto').value);
-  if (!number) return;
-  // Without a filter a packet's number is its place in the list; with one, the list is searched.
-  if (!applied) return select(number - 1);
-  // Numbers rise along the list: halve the range until the first packet from that number on is found.
-  let low = 0, high = shown - 1;
-  while (low < high) {
-    const middle = (low + high) >> 1, r = await rowWhenLoaded(middle);
-    if (!r) return;
-    if (r.num >= number) high = middle; else low = middle + 1;
-  }
-  await select(low);
+  if (Number($('goto').value)) await goTo(Number($('goto').value));
 });
 $('details').onclick = e => {
   const el = e.target.closest('.node');
@@ -250,12 +335,31 @@ $('sources').onclick = e => { if (e.target.dataset.source !== undefined) { sourc
 $('follow').onclick = () => run(follow);
 $('asFilter').onclick = () => run(() => applyFilter(node.f));
 $('streamClose').onclick = () => $('stream').close();
+for (const b of document.querySelectorAll('[data-stat]')) b.onclick = () => showStatistics(b.dataset.stat).catch(err => { if (err.message !== 'view ended') $('statBody').textContent = err.message; });
+$('statClose').onclick = () => $('stat').close();
+$('statBody').onclick = e => {
+  const row = e.target.closest('tr[data-filter]');
+  if (!row) return;
+  $('stat').close();
+  run(() => applyFilter(row.dataset.filter));
+};
+// Details and bytes side by side, as Wireshark has them, where the window is wide enough; the choice is remembered.
+const beside = on => { $('panes').classList.toggle('beside', on); for (const id of ['details', 'bytes']) $(id).style.flex = ''; draw(); };
+let stored = null;
+try { stored = localStorage.getItem('asservat.pcap.layout'); } catch {}
+beside(stored ? stored === 'beside' : window.innerWidth >= 1100);
+$('layout').onclick = () => {
+  beside(!$('panes').classList.contains('beside'));
+  try { localStorage.setItem('asservat.pcap.layout', $('panes').classList.contains('beside') ? 'beside' : 'stacked'); } catch {}
+};
 // The borders between the panes can be dragged.
 for (const s of document.querySelectorAll('.splitter')) s.onpointerdown = down => {
-  const above = $(s.dataset.above), below = $(s.dataset.below), a = above.offsetHeight, b = below.offsetHeight;
+  // A border moves along the direction in which its panes are laid out.
+  const across = getComputedStyle(s.parentElement).flexDirection === 'row', size = across ? 'offsetWidth' : 'offsetHeight', at = across ? 'clientX' : 'clientY';
+  const above = $(s.dataset.above), below = $(s.dataset.below), a = above[size], b = below[size];
   s.setPointerCapture(down.pointerId);
   s.onpointermove = move => {
-    const d = Math.max(40 - a, Math.min(b - 40, move.clientY - down.clientY));
+    const d = Math.max(40 - a, Math.min(b - 40, move[at] - down[at]));
     above.style.flex = `0 0 ${a + d}px`; below.style.flex = `0 0 ${b - d}px`;
     draw();
   };
