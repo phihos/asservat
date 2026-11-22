@@ -149,9 +149,12 @@ func (s *sampler) run() (stop func(), err error) {
 		KernelVersionCheck:     true,
 		ProbabilisticInterval:  time.Minute,
 		ProbabilisticThreshold: tracer.ProbabilisticThresholdMax, // every sample, not a share of them
+		// The agent sees the process IDs of the kernel on a node, but not
+		// where the node is itself a container (kind).
+		PIDNamespaceTranslationMode: tracer.PIDNamespaceTranslationModeAuto,
 	})
 	if err != nil {
-		return fail("load its programs (it needs Linux 5.10 or later)", err)
+		return fail("load its programs", err)
 	}
 	stop = func() { cancel(); trc.Close() }
 	trc.StartPIDEventProcessor(ctx)
