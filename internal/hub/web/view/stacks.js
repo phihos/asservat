@@ -29,7 +29,7 @@ export function parse(text) {
     const same = stack.map(l => l.replace(/0x[0-9a-f]+/g, '').replace(/^(\S.*)\(.*\)$/, '$1').replace(/ \+$/, '').replace(/<[^>]*>/g, '<>').trim())
       .filter(l => !l.startsWith('java.lang.Thread.State')).join('\n');
     const frames = stack.map(l => l.trim()).filter(l => go ? !l.startsWith('/') && !l.startsWith('created by') : l.startsWith('at '));
-    all.push({name: go ? `goroutine ${go[1]}` : java[1], state, waited: go?.[3] || '', top: (frames[0] || '').replace(/^at /, '').replace(/\(.*\)$/, ''), text: block.trim(), same});
+    all.push({name: go ? `goroutine ${go[1]}` : java[1], state, waited: go?.[3] || '', top: (frames[0] || '').replace(/^at /, '').replace(/\([^()]*\)$/, ''), text: block.trim(), same});
   }
   return all;
 }

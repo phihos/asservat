@@ -17,9 +17,10 @@ One **hub** serves a web console, a REST API and an MCP endpoint for AI agents.
 Every cluster runs a **node agent** on each node. The agents connect out to the
 hub, so workload clusters need no inbound access. You pick a workload, choose
 what to record and download the result in its standard format for your own
-tools. Packet captures, logs, pod state and system call traces also open
-in the console, in viewers that work like the usual tool for each: a packet
-capture looks like it does in Wireshark.
+tools. Packet captures, logs, pod state, system call traces, profiles and
+goroutine or thread dumps also open in the console, in viewers that work
+like the usual tool for each: a packet capture looks like it does in
+Wireshark, a profile is shown by pprof itself.
 
 | Evidence | What you get | Needs approval |
 | --- | --- | --- |
