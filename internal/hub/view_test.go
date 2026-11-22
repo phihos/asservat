@@ -529,6 +529,25 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 	if text := read(map[string]any{"name": "api-1/cpu.pprof", "sampleType": "heap"}); !strings.HasPrefix(text, "ERROR") || !strings.Contains(text, "samples, cpu") {
 		t.Fatal("a kind of value the profile has not", text)
 	}
+	// What one call chooses does not carry over to the next, although pprof
+	// keeps its options for the whole program: a .NET trace's stacks sorted
+	// by weight with callees put Main first, by own weight Burn, and the
+	// viewer's page is sorted by own weight as well.
+	first := func(text string) string {
+		_, rows, _ := strings.Cut(text, "cum%\n")
+		return strings.Fields(strings.SplitN(rows, "\n", 2)[0] + " -")[5]
+	}
+	if got := first(read(map[string]any{"name": "api-1/trace.nettrace", "cumulative": true, "sampleType": "samples"})); got != "Shop.Main" {
+		t.Fatal("sorted by weight with callees", got)
+	}
+	plain := read(map[string]any{"name": "api-1/trace.nettrace"})
+	if got := first(plain); got != "Shop.Burn" || !strings.Contains(plain, "Type: thread_time") {
+		t.Fatal("the call before changed this one", got, plain)
+	}
+	view := openedView(t, f, capture, "api-1/cpu.pprof")
+	if code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/top", nil); code != 200 || !strings.Contains(string(b), "of 10ms total") {
+		t.Fatal("the viewer after calls over MCP", code, string(b))
+	}
 	if text := read(map[string]any{"name": "api-1/trace.nettrace"}); !strings.Contains(text, "Shop.Burn") || !strings.Contains(text, "thread_time") {
 		t.Fatal("a .NET trace", text)
 	}
