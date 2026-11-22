@@ -33,11 +33,28 @@ func TestMainPID(t *testing.T) {
 	add(1300, 900, 90, "other", "/kubelet.slice/cri-containerd-ffff.scope")
 	os.WriteFile(filepath.Join(proc, "uptime"), nil, 0o644)
 
-	if pid, err := mainPID(proc, id); err != nil || pid != 1200 {
+	if pid, err := mainPID(proc, id, false); err != nil || pid != 1200 {
 		t.Fatal("main process", pid, err)
 	}
-	if _, err := mainPID(proc, "absent"); err == nil {
+	if _, err := mainPID(proc, "absent", false); err == nil {
 		t.Fatal("found a process of an absent container")
+	}
+	// The agent's own container: the kernel shows the agent the cgroup of
+	// its own processes as the root of its cgroup namespace, without the
+	// container's ID.
+	const own = "9999ffff"
+	os.MkdirAll(filepath.Join(proc, "self"), 0o755)
+	os.WriteFile(filepath.Join(proc, "self", "cgroup"), []byte("0::/\n"), 0o644)
+	add(2000, 900, 400, "asservat", "/")
+	add(2001, 2000, 410, "tcpdump", "/")
+	if _, err := mainPID(proc, own, false); err == nil {
+		t.Fatal("found the agent's processes for another pod's container")
+	}
+	if all, main, err := containerPIDs(proc, own, true); err != nil || main != 2000 || len(all) != 2 {
+		t.Fatal("the agent's own container", all, main, err)
+	}
+	if pid, err := mainPID(proc, id, true); err != nil || pid != 1200 {
+		t.Fatal("a container with its ID, asked as the agent's own", pid, err)
 	}
 }
 

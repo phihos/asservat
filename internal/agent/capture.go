@@ -393,25 +393,37 @@ func (a *Agent) containerPID(pod *corev1.Pod, name string) (int, string, error) 
 		if !ok || s.State.Running == nil {
 			return 0, name, fmt.Errorf("container %s is not running", name)
 		}
-		pid, err := mainPID(a.Proc, id)
+		pid, err := mainPID(a.Proc, id, a.own(pod))
 		return pid, name, err
 	}
 	return 0, name, fmt.Errorf("pod %s has no container %s", pod.Name, name)
 }
 
 // mainPID finds a container's main process in the node's /proc.
-func mainPID(proc, containerID string) (int, error) {
-	_, main, err := containerPIDs(proc, containerID)
+func mainPID(proc, containerID string, own bool) (int, error) {
+	_, main, err := containerPIDs(proc, containerID, own)
 	return main, err
 }
+
+// own tells whether a pod is the agent's own.
+func (a *Agent) own(pod *corev1.Pod) bool { return a.Pod != "" && pod.Name == a.Pod }
 
 // containerPIDs finds the processes of a container in the node's /proc and
 // its main process: the oldest one in the container's cgroup whose parent is
 // outside of it (an exec session also has such a parent, but started later).
-func containerPIDs(proc, containerID string) (all []int, main int, err error) {
+//
+// A cgroup is told by the container's ID in its path. Of its own container
+// (own) the agent sees no such path: the kernel shows a process its own
+// cgroup as the root of its cgroup namespace. There the processes are those
+// whose cgroup reads like the agent's own.
+func containerPIDs(proc, containerID string, own bool) (all []int, main int, err error) {
+	var mine []byte
+	if own {
+		mine, _ = os.ReadFile(filepath.Join(proc, "self", "cgroup"))
+	}
 	inside := func(pid int) bool {
 		b, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "cgroup"))
-		return err == nil && bytes.Contains(b, []byte(containerID))
+		return err == nil && (bytes.Contains(b, []byte(containerID)) || len(mine) > 0 && bytes.Equal(b, mine))
 	}
 	entries, err := os.ReadDir(proc)
 	if err != nil {
@@ -462,7 +474,7 @@ func (a *Agent) targets(pod *corev1.Pod, container, program string) ([]int, stri
 	var pids []int
 	for _, s := range pod.Status.ContainerStatuses {
 		if _, id, ok := strings.Cut(s.ContainerID, "://"); ok && s.Name == container {
-			all, _, _ := containerPIDs(a.Proc, id)
+			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
 			for _, pid := range all {
 				if executable(a.Proc, pid) == program {
 					pids = append(pids, pid)

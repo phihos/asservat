@@ -392,7 +392,7 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
 		if _, id, ok := strings.Cut(status.ContainerID, "://"); ok {
 			p.containers[id] = true
-			all, _, _ := containerPIDs(a.Proc, id)
+			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
 			for _, pid := range all {
 				p.pids[pid] = true
 			}

@@ -245,7 +245,10 @@ own format and nothing is injected into the pod:
 | `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
 
 The main process of a container is the oldest process in the container's
-cgroup whose parent is outside of it.
+cgroup whose parent is outside of it. The agent tells a container's
+cgroup by the container's ID in its path, except for its own container,
+whose cgroup the kernel shows it without one: there it takes the processes
+whose cgroup reads like its own.
 
 ## Looking at files in the browser
 

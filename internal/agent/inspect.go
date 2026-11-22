@@ -56,7 +56,7 @@ func (a *Agent) processes(ctx context.Context, q api.Query) ([]api.Process, []st
 			if !ok || s.State.Running == nil {
 				continue
 			}
-			pids, main, err := containerPIDs(a.Proc, id)
+			pids, main, err := containerPIDs(a.Proc, id, a.own(pod))
 			if err != nil {
 				continue // the container ended meanwhile
 			}
