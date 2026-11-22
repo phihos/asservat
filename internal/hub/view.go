@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -378,3 +380,115 @@ func (h *Hub) dissect(ctx context.Context, a storedArtifact) (func(string, json.
 }
 
 var errViewEnded = errStatus{http.StatusGone, "this view has ended; open the file again"}
+
+// packetText returns a packet capture as text, for readers that cannot open
+// the viewer. Without a filter it is the statistics of Wireshark's menu:
+// the protocols, the conversations and the expert information. With a
+// display filter, as Wireshark takes them, it is the packets that match, as
+// the rows of the packet list. Both list 60 entries: a page for a reader,
+// of whom most are language models with a limited context.
+func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (string, error) {
+	const entries = 60
+	ctx, done := context.WithCancel(ctx)
+	defer done() // ends sharkd
+	ask, err := h.dissect(ctx, a)
+	if err != nil {
+		return "", err
+	}
+	asked := func(method string, params any, into any) error {
+		question, err := json.Marshal(params)
+		if err != nil {
+			return err
+		}
+		answer, err := ask(method, question)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(answer, into)
+	}
+	var status struct {
+		Frames   int
+		Duration float64
+	}
+	if err := asked("status", struct{}{}, &status); err != nil {
+		return "", err
+	}
+	var text strings.Builder
+	fmt.Fprintf(&text, "%d packets over %s s.\n", status.Frames, strconv.FormatFloat(status.Duration, 'f', -1, 64))
+	if filter != "" {
+		if _, err := ask("check", json.RawMessage(`{"filter":`+strconv.Quote(filter)+`}`)); err != nil {
+			return "", errStatus{http.StatusBadRequest, "the display filter is not valid: " + err.Error()}
+		}
+		var frames []struct {
+			C []string
+		}
+		if err := asked("frames", map[string]any{"filter": filter, "limit": entries}, &frames); err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&text, "\nThe first %d packets that match %q (number, seconds, source, destination, protocol, length, info):\n", len(frames), filter)
+		for _, f := range frames {
+			text.WriteString(strings.Join(f.C, "  ") + "\n")
+		}
+		return text.String(), nil
+	}
+	var stats struct {
+		Taps []struct {
+			Tap    string
+			Protos []packetProtocol
+			Convs  []struct {
+				Saddr, Sport, Daddr, Dport string
+				Txf, Txb, Rxf, Rxb         int64
+				Start, Stop                float64
+			}
+			Details []struct{ S, G, M, P string }
+		}
+	}
+	if err := asked("tap", map[string]string{"tap0": "phs", "tap1": "conv:TCP", "tap2": "conv:UDP", "tap3": "expert"}, &stats); err != nil {
+		return "", err
+	}
+	// sharkd answers in its own order: each part is found by its name.
+	for _, tap := range stats.Taps {
+		switch {
+		case tap.Tap == "phs":
+			text.WriteString("\nProtocols, each within the one above it (packets, bytes):\n")
+			var walk func([]packetProtocol, int)
+			walk = func(list []packetProtocol, depth int) {
+				for _, p := range list {
+					fmt.Fprintf(&text, "%s%s  %d packets, %d bytes\n", strings.Repeat("  ", depth), p.Proto, p.Frames, p.Bytes)
+					walk(p.Protos, depth+1)
+				}
+			}
+			walk(tap.Protos, 1)
+		case strings.HasPrefix(tap.Tap, "conv:") && len(tap.Convs) > 0:
+			sort.Slice(tap.Convs, func(i, j int) bool { return tap.Convs[i].Txb+tap.Convs[i].Rxb > tap.Convs[j].Txb+tap.Convs[j].Rxb })
+			fmt.Fprintf(&text, "\n%d %s conversations, the largest first (A <-> B: packets and bytes from A, from B, seconds from start to end):\n", len(tap.Convs), strings.TrimPrefix(tap.Tap, "conv:"))
+			for _, c := range tap.Convs[:min(len(tap.Convs), entries)] {
+				fmt.Fprintf(&text, "  %s:%s <-> %s:%s: %d packets %d bytes, %d packets %d bytes, %.3f to %.3f\n", c.Saddr, c.Sport, c.Daddr, c.Dport, c.Txf, c.Txb, c.Rxf, c.Rxb, c.Start, c.Stop)
+			}
+		case tap.Tap == "expert" && len(tap.Details) > 0:
+			// The same remark on many packets is told once, with its number.
+			counts, order := map[string]int{}, []string{}
+			for _, d := range tap.Details {
+				remark := fmt.Sprintf("%s (%s, %s): %s", d.S, d.G, d.P, d.M)
+				if counts[remark] == 0 {
+					order = append(order, remark)
+				}
+				counts[remark]++
+			}
+			sort.SliceStable(order, func(i, j int) bool { return counts[order[i]] > counts[order[j]] })
+			text.WriteString("\nWireshark's expert information, the most frequent first:\n")
+			for _, remark := range order[:min(len(order), entries)] {
+				fmt.Fprintf(&text, "  %d × %s\n", counts[remark], remark)
+			}
+		}
+	}
+	text.WriteString("\nTo list packets, read the file again with \"filter\": a Wireshark display filter such as \"tcp.analysis.retransmission\", \"http.response.code >= 500\" or \"ip.addr == 10.0.0.1 and tcp.port == 8080\".\n")
+	return text.String(), nil
+}
+
+// packetProtocol is a protocol of the hierarchy that sharkd reports.
+type packetProtocol struct {
+	Proto         string
+	Frames, Bytes int64
+	Protos        []packetProtocol
+}

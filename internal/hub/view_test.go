@@ -25,14 +25,20 @@ import (
 )
 
 // sharkdStandIn answers like Wireshark's sharkd: one line per question. It
-// answers "status" with the content of the loaded file and fails "check".
+// answers with the content of the loaded file and what it was asked, and
+// fails "check". For a file that holds "summary" it answers the questions
+// of a packet summary as sharkd does.
 const sharkdStandIn = `#!/bin/sh
 while read -r line; do
 	id=$(printf %s "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
-	case "$line" in
+	result="{\"content\":\"$content\",\"asked\":$(printf %s "$line" | sed 's/.*"params":\(.*\)}$/\1/')}"
+	case "$content/$line" in
 	*'"method":"load"'*) content=$(cat "$(printf %s "$line" | sed 's/.*"file":"\([^"]*\)".*/\1/')"); echo "a notice that answers nothing"; result='{"status":"OK"}' ;;
+	summary/*'"method":"check"'*) result='{"status":"OK"}' ;;
+	summary/*'"method":"status"'*) result='{"frames":3,"duration":1.5}' ;;
+	summary/*'"method":"tap"'*) result='{"taps":[{"tap":"expert","type":"expert","details":[{"f":2,"s":"Warn","g":"Sequence","m":"Previous segment not captured","p":"TCP"},{"f":3,"s":"Warn","g":"Sequence","m":"Previous segment not captured","p":"TCP"}]},{"tap":"conv:TCP","type":"conv","convs":[{"saddr":"10.0.0.1","sport":"40000","daddr":"10.0.0.2","dport":"8080","txf":2,"txb":300,"rxf":1,"rxb":900,"start":0,"stop":1.5}]},{"tap":"phs","type":"phs","protos":[{"proto":"eth","frames":3,"bytes":1200,"protos":[{"proto":"tcp","frames":3,"bytes":1200,"protos":[{"proto":"http","frames":2,"bytes":1000}]}]}]},{"tap":"conv:UDP","type":"conv","convs":[]}]}' ;;
+	summary/*'"method":"frames"'*) result='[{"c":["2","0.500000","10.0.0.2","10.0.0.1","HTTP","900","HTTP/1.1 500 Internal Server Error"],"num":2}]' ;;
 	*'"method":"check"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-5001,\"message\":\"Filter invalid\"}}"; continue ;;
-	*) result="{\"content\":\"$content\",\"asked\":$(printf %s "$line" | sed 's/.*"params":\(.*\)}$/\1/')}" ;;
 	esac
 	echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":$result}"
 done
@@ -493,7 +499,7 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 	if err := p.Write(&packed); err != nil {
 		t.Fatal(err)
 	}
-	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/trace.nettrace": syntheticNettrace(), "api-1/heapdump.hprof": syntheticHeap(), "api-1/broken.pprof": []byte("\x00no profile")})
+	f, capture, workDir := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/trace.nettrace": syntheticNettrace(), "api-1/heapdump.hprof": syntheticHeap(), "api-1/broken.pprof": []byte("\x00no profile"), "api-1/capture.pcap": []byte("summary")})
 	read := func(arguments map[string]any) string {
 		t.Helper()
 		arguments["id"] = capture
@@ -556,5 +562,20 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 	}
 	if text := read(map[string]any{"name": "api-1/broken.pprof"}); !strings.HasPrefix(text, "ERROR") || !strings.Contains(text, "pprof cannot read") {
 		t.Fatal("a file that is no profile", text)
+	}
+	// A packet capture reads as its statistics: how many packets over which
+	// time, the protocols, who talked to whom, and what Wireshark remarks.
+	text := read(map[string]any{"name": "api-1/capture.pcap"})
+	for _, part := range []string{"3 packets over 1.5 s", "http", "10.0.0.1:40000", "10.0.0.2:8080", "1200 bytes", "2 × Warn", "Previous segment not captured", "filter"} {
+		if !strings.Contains(text, part) {
+			t.Fatalf("a packet capture lacks %q: %s", part, text)
+		}
+	}
+	// With a display filter, as in Wireshark, it reads as the packets that match.
+	if text := read(map[string]any{"name": "api-1/capture.pcap", "filter": "http.response.code >= 500"}); !strings.Contains(text, "500 Internal Server Error") || !strings.Contains(text, "10.0.0.2") {
+		t.Fatal("packets by a display filter", text)
+	}
+	if left, _ := os.ReadDir(workDir); len(left) != 0 {
+		t.Fatal("the decrypted capture is still in the work directory", left)
 	}
 }
