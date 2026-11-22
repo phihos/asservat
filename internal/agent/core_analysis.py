@@ -147,9 +147,12 @@ selected = gdb.selected_thread()
 for thread in sorted(inferior.threads(), key=lambda t: t.num):
     thread.switch()
     stack, cut = frames(thread)
-    if not stack and thread.num != (selected.num if selected else 0):
-        continue  # gcore lists the process once more under its ID in its own namespace, without a stack
     report["threads"].append({"id": thread.num, "systemId": thread.ptid[1], "name": thread.name or "", "current": selected is not None and thread.num == selected.num, "frames": stack, "cut": cut})
+# For a core that gcore wrote from outside the process's PID namespace, gdb
+# lists the process once more under its ID inside, without registers.
+readable = [t for t in report["threads"] if any(f["pc"] for f in t["frames"])]
+if readable:
+    report["threads"] = readable
 for line in run("info sharedlibrary").splitlines():
     m = re.match(r"(0x[0-9a-f]+)\s+(0x[0-9a-f]+)\s+(\S+)\s+(?:\(\*\)\s+)?(\S.*)$", line)
     if m:
