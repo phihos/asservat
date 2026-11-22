@@ -294,6 +294,9 @@ func ViewerOf(name string) string {
 		return "pcap"
 	case strings.HasSuffix(file, ".log"):
 		return "log"
+	// A core and gdb's description of it open in the same viewer.
+	case strings.HasPrefix(file, "core."):
+		return "core"
 	case strings.HasSuffix(file, ".pprof"):
 		return "pprof"
 	case strings.HasSuffix(file, ".strace"):

@@ -198,7 +198,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 	case api.KindCoredump:
 		if r.Watch != "" {
 			// The core of the crashed process, not one of its successor.
-			return a.crashCores(pod, r.Trigger, up)
+			return a.crashCores(ctx, pod, r.Trigger, up)
 		}
 		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {
@@ -244,7 +244,11 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 		return err
 	}
 	defer f.Close()
-	return up(name, f)
+	if err := up(name, f); err != nil {
+		return err
+	}
+	a.describe(ctx, file, "/proc/"+strconv.Itoa(pid)+"/root", name, up)
+	return nil
 }
 
 // logs uploads the containers' logs. After a crash they are those of both

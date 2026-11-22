@@ -38,9 +38,9 @@ export function openView(opened) {
 // The browser holds a text file and an index of its lines in memory, so a
 // text viewer reads at most this much and says so when a file is longer.
 const textLimit = 64 << 20;
-export async function loadText() {
-  const res = await fetch(address, {headers});
-  if (!res.ok) throw new Error('The file could not be read.');
+export async function loadText(from = address) {
+  const res = await fetch(from, {headers});
+  if (!res.ok) throw Object.assign(new Error('The file could not be read.'), {status: res.status});
   const reader = res.body.getReader(), parts = [];
   let size = 0, truncated = false;
   for (;;) {

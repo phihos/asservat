@@ -1,0 +1,38 @@
+/* The core viewer: a debugger's view of a stopped program, in the dark theme of Visual Studio Code. */
+#root { background: #1e1e1e; color: #cccccc; }
+#stopped { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 12px; background: #252526; border-bottom: 1px solid #3c3c3c; }
+#stopped .crash { color: #f48771; font-weight: 600; }
+#stopped .snap { color: #89d185; }
+#stopped .warn { flex-basis: 100%; color: #cca700; }
+#stopped code, .code, .value, .registers { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+#debugger { flex: 1; display: flex; min-height: 0; }
+#side { flex: 0 0 380px; display: flex; flex-direction: column; min-height: 0; background: #252526; border-right: 1px solid #3c3c3c; }
+#side h4 { display: flex; gap: 8px; align-items: center; margin: 0; padding: 5px 10px; background: #333334; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #bbbbbb; }
+#side h4 input { flex: 1; height: 20px; padding: 0 6px; border: 1px solid #3c3c3c; border-radius: 2px; background: #1e1e1e; color: #cccccc; font-size: 12px; text-transform: none; }
+#threads { flex: 2; overflow: auto; outline: none; }
+#stack { flex: 3; overflow: auto; outline: none; }
+.row { display: flex; gap: 10px; justify-content: space-between; padding: 2px 10px; white-space: nowrap; cursor: default; }
+.row span { overflow: hidden; text-overflow: ellipsis; }
+.row:hover { background: #2a2d2e; }
+.row.selected { background: #04395e; color: #fff; }
+.row b { color: #f48771; }
+.dim { color: #8b8b8b; }
+.pad { padding: 8px 10px; }
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.tabs { display: flex; background: #252526; border-bottom: 1px solid #3c3c3c; }
+.tabs button { padding: 7px 16px; border: 0; border-bottom: 1px solid transparent; background: none; color: #969696; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+.tabs button.on { color: #e7e7e7; border-bottom-color: #e7e7e7; }
+.tab { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 40px; }
+.tab h3 { margin: 0 0 2px; font: 600 14px ui-monospace, Menlo, Consolas, monospace; color: #dcdcaa; }
+.tab h5 { margin: 18px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #bbbbbb; }
+.tab table { border-collapse: collapse; }
+.tab th { padding: 3px 18px 3px 0; text-align: left; font-weight: normal; color: #8b8b8b; border-bottom: 1px solid #3c3c3c; }
+.tab td { padding: 2px 18px 2px 0; vertical-align: top; font: 12px ui-monospace, Menlo, Consolas, monospace; }
+.name { color: #9cdcfe; }
+.value { color: #ce9178; word-break: break-all; }
+.type { color: #4ec9b0; }
+.code { margin: 0; line-height: 18px; color: #d4d4d4; }
+.code .pc { background: #4b4b18; color: #fff; }
+.registers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px 24px; }
+.registers div { display: flex; gap: 10px; }
+.registers .name { flex: 0 0 52px; }
