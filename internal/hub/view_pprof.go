@@ -40,8 +40,9 @@ func (h *Hub) profilePages(ctx context.Context, a storedArtifact) (map[string]ht
 	var all map[string]http.Handler
 	err = driver.PProf(&driver.Options{
 		// -http makes pprof build its web interface; HTTPServer takes the
-		// pages instead of listening. The profile carries its symbols.
-		Flagset: &pprofFlags{FlagSet: flag.NewFlagSet("pprof", flag.ContinueOnError), args: []string{"-http=localhost:0", "-no_browser", "-symbolize=none", a.Name}},
+		// pages instead of listening. The profile carries its symbols. The
+		// source is a fixed word: Fetch hands over the parsed profile.
+		Flagset: &pprofFlags{FlagSet: flag.NewFlagSet("pprof", flag.ContinueOnError), args: []string{"-http=localhost:0", "-no_browser", "-symbolize=none", "--", "profile"}},
 		Fetch:   fetched{parsed},
 		UI:      pprofUI{},
 		HTTPServer: func(args *driver.HTTPServerArgs) error {

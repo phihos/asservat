@@ -25,8 +25,8 @@ export function parse(text) {
     if (!go && !java) continue;
     const stack = lines.slice(1);
     const state = go ? go[2] : (/java\.lang\.Thread\.State: (\S+)/.exec(block)?.[1] || /\b(runnable|waiting on condition|in Object\.wait\(\))/.exec(lines[0])?.[1] || 'unknown');
-    // What makes two stacks the same: their frames, without addresses, arguments and object identities.
-    const same = stack.map(l => l.replace(/0x[0-9a-f]+/g, '').replace(/^(\S.*)\(.*\)$/, '$1').replace(/ \+$/, '').replace(/<[^>]*>/g, '<>').trim())
+    // What makes two stacks the same: their frames with file and line, without addresses, Go's argument values and Java's object identities.
+    const same = stack.map(l => (go ? l.replace(/^(\S.*)\(.*\)$/, '$1') : l).replace(/0x[0-9a-f]+/g, '').replace(/ \+$/, '').replace(/<[^>]*>/g, '<>').trim())
       .filter(l => !l.startsWith('java.lang.Thread.State')).join('\n');
     const frames = stack.map(l => l.trim()).filter(l => go ? !l.startsWith('/') && !l.startsWith('created by') : l.startsWith('at '));
     all.push({name: go ? `goroutine ${go[1]}` : java[1], state, waited: go?.[3] || '', top: (frames[0] || '').replace(/^at /, '').replace(/\([^()]*\)$/, ''), text: block.trim(), same});
