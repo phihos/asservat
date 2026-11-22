@@ -37,6 +37,9 @@ type view struct {
 	// pages are the pages of a tool's own web interface, by path, for a
 	// viewer that shows it: pprof's.
 	pages map[string]http.Handler
+	// tool serves every page of a tool that runs beside the hub: Go's
+	// trace tool.
+	tool http.Handler
 }
 
 type views struct {
@@ -86,7 +89,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 		return err
 	}
 	viewer := api.ViewerOf(a.Name)
-	if viewer != "pcap" && viewer != "pprof" {
+	if viewer != "pcap" && viewer != "pprof" && viewer != "gotrace" {
 		return errStatus{http.StatusBadRequest, "this file is not opened in the hub; its viewer reads it in the browser, or it only downloads"}
 	}
 	if err := h.Store.Audit(r.Context(), u.Name, "artifact.view", c.ID, map[string]string{"name": a.Name}); err != nil {
@@ -96,9 +99,13 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	opened := &view{user: u.Name, capture: c.ID, end: cancel}
-	if viewer == "pcap" {
+	id := uuid.NewString()
+	switch viewer {
+	case "pcap":
 		opened.ask, err = h.dissect(ctx, a)
-	} else {
+	case "gotrace":
+		opened.tool, err = h.tracePages(ctx, a, "/api/views/"+id+"/pages")
+	default:
 		// "base" names another profile, as "<capture>/<file>": pprof then
 		// shows this profile minus that one.
 		var base *storedArtifact
@@ -122,7 +129,6 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	if err != nil {
 		return err
 	}
-	id := uuid.NewString()
 	h.views.add(id, opened)
 	defer h.views.remove(id)
 
@@ -209,6 +215,11 @@ func (h *Hub) viewPage(w http.ResponseWriter, r *http.Request, u User) error {
 		return ErrNotFound
 	}
 	page := v.pages["/"+r.PathValue("page")]
+	if page == nil && v.tool != nil {
+		// The tool sees the page's address as its own.
+		r.URL.Path = "/" + r.PathValue("page")
+		page = v.tool
+	}
 	if page == nil {
 		return ErrNotFound
 	}

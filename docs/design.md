@@ -209,12 +209,14 @@ shows what the tool would show.
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
 | Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek; against a base, another profile of the same kind from the user's captures, the difference (pprof's `-diff_base`) | pprof in the hub (`dot` draws the graph) |
+| Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
 
 | Core dump | Like a debugger's view of a stopped program (Visual Studio Code): threads, call stack, the frame's variables, instructions and registers, modules, memory map | gdb on the node, when the core is recorded |
 
-Execution traces and the heap dumps of Java and .NET download only, for
-now.
+The heap dumps of Java and the traces and dumps of .NET download only:
+their tools (Eclipse MAT, PerfView, the .NET SDK) would each add a runtime
+of several hundred megabytes to the image.
 
 A core is a memory image: without the program's executable and libraries a
 debugger shows addresses, not functions. Those files are on the node while
@@ -248,7 +250,12 @@ read the loaded capture and no others; of its statistics, those that count
 packets. A profile is parsed in the hub's
 memory by pprof's library, which hands the hub the pages of its web
 interface; the view serves them, except those that write pprof's settings
-or read the profiled program's binary.
+or read the profiled program's binary. Go's trace tool is no library: the
+hub builds it from the toolchain's source (`cmd/trace`) into the image,
+runs one for the view on a loopback port, and passes its pages on. The tool
+writes its links from the root of its own server, so the hub rewrites them
+to the view's pages. It reads the whole trace into memory; the decrypted
+file is removed once it serves.
 
 ## Permissions
 
