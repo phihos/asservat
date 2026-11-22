@@ -209,7 +209,7 @@
         </section>
 
         <section data-kinds="pprof" id="profileSection">
-          <h3>Profile</h3>
+          <h3>Profile endpoint</h3>
           <p class="muted" id="profileState"></p>
           <div id="profileChoices"></div>
           <details id="otherEndpoint"><summary>Another endpoint</summary>
@@ -406,7 +406,8 @@ async function loadProfiles() {
   $('profileState').textContent = found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
     : `No profile endpoint that Asservat knows answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod: it listens on no TCP port'}. `
       + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor.'
-      + (ports.length ? ' If the application serves another one, give it below.' : '');
+      + (ports.length ? ' If the application serves another one, give it below.' : '')
+      + ' Without an endpoint, "CPU profile" and "Memory growth" in the step before record from outside the application.';
   $('otherEndpoint').open = !found.profiles.length && ports.length > 0;
   showParams();
 }
@@ -417,7 +418,7 @@ function profileParams() {
   if (ticked.length && path) throw new Error('Either tick endpoints above or give another endpoint, not both.');
   if (ticked.length) return {endpoints: ticked.map(box => box.dataset.endpoint).join(',')};
   if (path && $('profilePort').value) return {port: $('profilePort').value, path};
-  throw new Error($('profileChoices').innerHTML ? 'Tick at least one profile, or untick Profile above.' : 'No profile endpoint is chosen. Give one under "Another endpoint", or untick Profile above.');
+  throw new Error($('profileChoices').innerHTML ? 'Tick at least one profile, or untick "Profile endpoint" in the step before.' : 'No profile endpoint is chosen. Give one under "Another endpoint", or untick "Profile endpoint" in the step before.');
 }
 
 const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].map(box => box.value);
