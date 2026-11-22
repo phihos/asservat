@@ -145,9 +145,12 @@ func (s *sampler) begin(p *sampledProfile) error {
 	var err error
 	switch {
 	case p.kind.memory:
+		// The probe is kept once it is loaded, so that a failure is tried again.
 		if s.faults == nil {
-			s.faults = &faultProbe{}
-			err = s.tracer.Enable(context.Background(), s.faults)
+			probe := &faultProbe{}
+			if err = s.tracer.Enable(context.Background(), probe); err == nil {
+				s.faults = probe
+			}
 		}
 		if err == nil {
 			err = s.faults.attach()
@@ -247,15 +250,18 @@ func (s *sampler) run() error {
 	}
 	trc.StartPIDEventProcessor(ctx)
 	traces := make(chan *libpf.EbpfTrace)
-	for what, step := range map[string]func() error{
-		"sample the CPUs":         func() error { return trc.AttachTracer(nil) },
-		"follow ending processes": trc.AttachSchedMonitor,
-		"hand over its samples":   func() error { return trc.StartMapMonitors(ctx, traces) },
+	for _, step := range []struct {
+		what string
+		do   func() error
+	}{
+		{"sample the CPUs", func() error { return trc.AttachTracer(nil) }},
+		{"follow ending processes", trc.AttachSchedMonitor},
+		{"hand over its samples", func() error { return trc.StartMapMonitors(ctx, traces) }},
 	} {
-		if err := step(); err != nil {
+		if err := step.do(); err != nil {
 			cancel()
 			trc.Close()
-			return fmt.Errorf("the node's kernel does not let the profiler %s: %w", what, err)
+			return fmt.Errorf("the node's kernel does not let the profiler %s: %w", step.what, err)
 		}
 	}
 	go func() {
