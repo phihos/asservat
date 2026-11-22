@@ -313,6 +313,20 @@ if [ -n "${SAMPLE_CPU:-}" ]; then
   top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
   grep -q 'accounting for' <<<"$top" && ! grep -q 'accounting for 0,' <<<"$top" || fail "the sampled profile in pprof: $top"
   kill "$viewer"
+  # An interpreter's stacks are those of the program it runs: a Python function is named as such.
+  edge -n shop create deployment py --image=docker.io/library/python:3.12-slim -- python3 -c $'def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()' >/dev/null
+  edge -n shop rollout status deployment/py --timeout 180s >/dev/null
+  id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","kind":"cpu","durationSeconds":10}'); completed "$ALICE" "$id"
+  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  : >"$WORK/view"
+  curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
+  viewer=$!
+  for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
+  view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
+  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
+  grep -q 'burn' <<<"$top" && grep -q '<genexpr>\|genexpr' <<<"$top" || fail "Python's functions in the sampled profile: $(grep -o '"Name":"[^"]*"' <<<"$top" | head -40)"
+  kill "$viewer"
+  edge -n shop delete deployment py --wait=false >/dev/null
 fi
 # The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
 found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')
