@@ -49,14 +49,17 @@ func (h *Hub) tracePages(ctx context.Context, a storedArtifact, prefix string) (
 	cmd := exec.CommandContext(ctx, h.GoTrace, "-http=127.0.0.1:0", file.Name())
 	// The tool keeps a cache and looks for a browser to open; it has a home for neither.
 	cmd.Env = append(os.Environ(), "HOME="+h.WorkDir, "BROWSER=true")
-	said, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
+	// The hub owns the pipe of what the tool logs, so that the tool's end
+	// does not close it before its last words are read.
+	said, says := io.Pipe()
+	cmd.Stderr = says
 	if err := cmd.Start(); err != nil {
 		return nil, errStatus{http.StatusNotImplemented, "this hub cannot show Go execution traces: " + err.Error()}
 	}
-	go cmd.Wait() // ends with ctx; reaps the process
+	go func() {
+		cmd.Wait() // ends with ctx; reaps the process
+		says.Close()
+	}()
 	// The tool logs its progress and, at last, where it listens. If it ends
 	// before that, its last words say why.
 	var target *url.URL

@@ -82,7 +82,7 @@ function open() {
     const named = spot.read();
     try { await applyFilter(named.f || ''); } catch { await applyFilter(''); }
     if (named.p) await goTo(Number(named.p));
-    else if (named.at) {
+    else if (named.at && Number.isFinite(Number(named.at))) {
       const [first] = await ask('frames', {filter: (applied ? `(${applied}) and ` : '') + `frame.time_epoch >= ${Number(named.at)}`, limit: 1});
       await (first ? goTo(first.num) : select(shown - 1));
     }
