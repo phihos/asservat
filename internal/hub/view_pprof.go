@@ -5,7 +5,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -87,6 +89,52 @@ func (h *Hub) profilePages(ctx context.Context, a storedArtifact, base *storedAr
 	}
 	return pages, nil
 }
+
+// profileText returns a profile as pprof's text report of the functions
+// with the most weight ("top"), for readers that cannot open the viewer:
+// of the profile's kind of value named by sampleType, or else of its last
+// one, as pprof chooses; sorted by a function's own weight, or with
+// cumulative by its weight with everything it calls.
+func (h *Hub) profileText(ctx context.Context, a storedArtifact, sampleType string, cumulative bool) (string, error) {
+	parsed, err := h.parsedProfile(ctx, a)
+	if err != nil {
+		return "", err
+	}
+	var kinds []string
+	for _, kind := range parsed.SampleType {
+		kinds = append(kinds, kind.Type)
+	}
+	// The report lists this many functions: a page for a reader, of whom most are language models with a limited context.
+	args := []string{"-top", "-nodecount=60", "-symbolize=none", "-output=report"}
+	if sampleType != "" {
+		if !slices.Contains(kinds, sampleType) {
+			return "", errStatus{http.StatusBadRequest, fmt.Sprintf("the profile has no values of kind %q; it has: %s", sampleType, strings.Join(kinds, ", "))}
+		}
+		args = append(args, "-sample_index="+sampleType)
+	}
+	if cumulative {
+		args = append(args, "-cum")
+	}
+	pprofStart.Lock()
+	defer pprofStart.Unlock()
+	var report pprofReport
+	err = driver.PProf(&driver.Options{
+		Flagset: &pprofFlags{FlagSet: flag.NewFlagSet("pprof", flag.ContinueOnError), args: append(args, "--", "profile")},
+		Fetch:   fetched{"profile": parsed},
+		UI:      pprofUI{},
+		Writer:  &report,
+	})
+	if err != nil {
+		return "", errStatus{http.StatusUnprocessableEntity, "pprof cannot show this profile: " + err.Error()}
+	}
+	return "Kinds of values in this profile: " + strings.Join(kinds, ", ") + "\n" + report.String(), nil
+}
+
+// pprofReport takes the report that pprof writes to a file.
+type pprofReport struct{ bytes.Buffer }
+
+func (r *pprofReport) Open(string) (io.WriteCloser, error) { return r, nil }
+func (r *pprofReport) Close() error                        { return nil }
 
 // fetched hands pprof the profiles that the hub already holds, by the
 // names its command line gives them.

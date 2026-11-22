@@ -473,3 +473,69 @@ func TestStreamsStayOpenThroughProxies(t *testing.T) {
 		res.Body.Close()
 	}
 }
+
+// An AI agent cannot open a viewer. Over MCP, a profile reads as pprof's
+// list of the functions with the most weight, a .NET trace likewise, and a
+// heap dump as its classes with the number and size of their objects.
+func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
+	function := func(id uint64, name string) *profile.Function { return &profile.Function{ID: id, Name: name} }
+	work, idle := function(1, "synthetic.Workload"), function(2, "synthetic.Idle")
+	at := func(id uint64, f *profile.Function) *profile.Location {
+		return &profile.Location{ID: id, Line: []profile.Line{{Function: f}}}
+	}
+	working, idling := at(1, work), at(2, idle)
+	var packed bytes.Buffer
+	p := &profile.Profile{
+		SampleType: []*profile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
+		Function:   []*profile.Function{work, idle}, Location: []*profile.Location{working, idling},
+		Sample: []*profile.Sample{{Location: []*profile.Location{working}, Value: []int64{9, 9000000}}, {Location: []*profile.Location{idling}, Value: []int64{1, 1000000}}},
+	}
+	if err := p.Write(&packed); err != nil {
+		t.Fatal(err)
+	}
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/trace.nettrace": syntheticNettrace(), "api-1/heapdump.hprof": syntheticHeap(), "api-1/broken.pprof": []byte("\x00no profile")})
+	read := func(arguments map[string]any) string {
+		t.Helper()
+		arguments["id"] = capture
+		code, b := f.call("alice-token", "POST", "/mcp", map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "read_artifact", "arguments": arguments}})
+		if code != 200 {
+			t.Fatal(code, string(b))
+		}
+		var reply struct {
+			Result struct {
+				IsError bool
+				Content []struct{ Text string }
+			}
+		}
+		if err := json.Unmarshal(b, &reply); err != nil || len(reply.Result.Content) != 1 {
+			t.Fatal(err, string(b))
+		}
+		if reply.Result.IsError {
+			return "ERROR: " + reply.Result.Content[0].Text
+		}
+		var file struct{ Text string }
+		if err := json.Unmarshal([]byte(reply.Result.Content[0].Text), &file); err != nil {
+			t.Fatal(err, reply.Result.Content[0].Text)
+		}
+		return file.Text
+	}
+	// The profile's last kind of value by default, as pprof shows it: 90 % of 10 ms in the workload.
+	if text := read(map[string]any{"name": "api-1/cpu.pprof"}); !strings.Contains(text, "synthetic.Workload") || !strings.Contains(text, "9ms") || !strings.Contains(text, "90.00%") || !strings.Contains(text, "samples, cpu") {
+		t.Fatal("a profile", text)
+	}
+	if text := read(map[string]any{"name": "api-1/cpu.pprof", "sampleType": "samples"}); !strings.Contains(text, "synthetic.Workload") || strings.Contains(text, "9ms") {
+		t.Fatal("another kind of value", text)
+	}
+	if text := read(map[string]any{"name": "api-1/cpu.pprof", "sampleType": "heap"}); !strings.HasPrefix(text, "ERROR") || !strings.Contains(text, "samples, cpu") {
+		t.Fatal("a kind of value the profile has not", text)
+	}
+	if text := read(map[string]any{"name": "api-1/trace.nettrace"}); !strings.Contains(text, "Shop.Burn") || !strings.Contains(text, "thread_time") {
+		t.Fatal("a .NET trace", text)
+	}
+	if text := read(map[string]any{"name": "api-1/heapdump.hprof"}); !strings.Contains(text, "shop.Order") || !strings.Contains(text, "5 objects") || !strings.Contains(text, "byte[]") {
+		t.Fatal("a heap dump", text)
+	}
+	if text := read(map[string]any{"name": "api-1/broken.pprof"}); !strings.HasPrefix(text, "ERROR") || !strings.Contains(text, "pprof cannot read") {
+		t.Fatal("a file that is no profile", text)
+	}
+}

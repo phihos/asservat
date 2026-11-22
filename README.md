@@ -171,7 +171,9 @@ administrator's approval of the watch.
 
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
 get tools to list workloads, look at their processes and traffic, request
-captures, watch for crashes and read text evidence.
+captures, watch for crashes and read evidence: text files as they are, a
+profile as its list of the heaviest functions, a heap dump as its classes
+by size. Other binary files download over the REST API with the same token.
 
 > [!WARNING]
 > A downloaded file is outside Asservat's control: it is not deleted when
