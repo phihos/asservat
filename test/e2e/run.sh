@@ -219,6 +219,7 @@ grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
 LC_ALL=C grep -q $'\x1f\x90' "$WORK/capture.pcap" || fail "pcap lacks the filtered traffic"
 # The capture opens in the browser's viewer: Wireshark's sharkd reads it in
 # the hub for as long as the opening stream lasts.
+: >"$WORK/view" # a kept work directory holds the last run's view
 curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$(first_artifact "$ALICE" "$id")" >"$WORK/view" &
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
@@ -299,6 +300,7 @@ pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
 fetch "$ALICE" "$id" "$pod/cpu.pprof" "$WORK/cpu.pprof"; fetch "$ALICE" "$id" "$pod/heap.pprof" "$WORK/heap.pprof"
 cmp -s "$WORK/cpu.pprof" test/e2e/synthetic-cpu.pprof && [ "$(cat "$WORK/heap.pprof")" = heap-profile ] || fail "profile contents"
 # A profile in pprof's format opens in pprof's own web interface, served by the hub for the view.
+: >"$WORK/view" # a kept work directory holds the last run's view
 curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/cpu.pprof" >"$WORK/view" &
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
