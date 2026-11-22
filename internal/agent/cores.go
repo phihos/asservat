@@ -1,12 +1,14 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -220,7 +222,7 @@ func (s CoreSpool) take(podUID, trigger string) {
 
 // crashCores uploads the cores that were set aside for a crash report and
 // removes them from the node, also if the upload fails.
-func (a *Agent) crashCores(pod *corev1.Pod, trigger string, up func(string, io.Reader) error) error {
+func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string, up func(string, io.Reader) error) error {
 	if a.Cores == "" {
 		return errors.New("this node's agent runs without the core handler (agent.coreHandler.enabled)")
 	}
@@ -248,11 +250,19 @@ func (a *Agent) crashCores(pod *corev1.Pod, trigger string, up func(string, io.R
 		if err != nil {
 			return err
 		}
-		err = up("core."+container+"."+parts[1], f)
+		name := "core." + container + "." + parts[1]
+		err = up(name, f)
 		f.Close()
 		if err != nil {
 			return err
 		}
+		// The crashed process is gone. The container's next instance runs
+		// the same image, so its files stand in for the crashed one's.
+		root := ""
+		if pids, _, err := a.targets(pod, container, ""); err == nil && len(pids) > 0 {
+			root = "/proc/" + strconv.Itoa(pids[0]) + "/root"
+		}
+		a.describe(ctx, file, root, name, up)
 	}
 	return nil
 }

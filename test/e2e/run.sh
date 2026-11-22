@@ -219,6 +219,7 @@ grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
 LC_ALL=C grep -q $'\x1f\x90' "$WORK/capture.pcap" || fail "pcap lacks the filtered traffic"
 # The capture opens in the browser's viewer: Wireshark's sharkd reads it in
 # the hub for as long as the opening stream lasts.
+: >"$WORK/view" # a kept work directory holds the last run's view
 curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$(first_artifact "$ALICE" "$id")" >"$WORK/view" &
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
@@ -229,7 +230,7 @@ ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}
 [ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
 kill $viewer
 # The other viewers read in the browser; the hub names them and serves them.
-[ "$(ok "$ALICE" GET /api/captures | jq -c '[.[].artifacts[] | select(.viewer) | .viewer] | unique')" = '["kube","log","pcap"]' ] || fail "viewers of the files so far"
+ok "$ALICE" GET /api/captures | jq -e '[.[].artifacts[].viewer] | contains(["kube", "log", "pcap"])' >/dev/null || fail "viewers of the files so far"
 for v in kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
 grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
 
@@ -255,9 +256,9 @@ id=$(capture "$ALICE" "$(target edge "" "$several")")
 ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
 completed "$ALICE" "$id"
 bundle=$(ok "$ALICE" GET "/api/captures/$id")
-# Each of the two pods delivers the files of all five recordings.
-[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
-[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+# Each of the two pods delivers the files of all five recordings, and the description of its core.
+[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","core.web.analysis.json","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
+[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[14,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
 log "progress, and stopping a capture with what it has (edge)"
 id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")
@@ -299,6 +300,7 @@ pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
 fetch "$ALICE" "$id" "$pod/cpu.pprof" "$WORK/cpu.pprof"; fetch "$ALICE" "$id" "$pod/heap.pprof" "$WORK/heap.pprof"
 cmp -s "$WORK/cpu.pprof" test/e2e/synthetic-cpu.pprof && [ "$(cat "$WORK/heap.pprof")" = heap-profile ] || fail "profile contents"
 # A profile in pprof's format opens in pprof's own web interface, served by the hub for the view.
+: >"$WORK/view" # a kept work directory holds the last run's view
 curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/cpu.pprof" >"$WORK/view" &
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
@@ -327,6 +329,12 @@ completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/core.web"
 [ "$(od -An -tx1 -N4 "$WORK/core.web" | tr -d ' ')" = 7f454c46 ] || fail "core is not an ELF file"
 [ "$(od -An -tu2 -j16 -N2 "$WORK/core.web" | tr -d ' ')" = 4 ] || fail "ELF file is not a core (ET_CORE)"
+# gdb described the core on the node, with the program's files at hand; the viewer shows that.
+pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+fetch "$ALICE" "$id" "$pod/core.web.analysis.json" "$WORK/core.web.analysis.json"
+jq -e '.executable == "/bin/sh" and .symbols and (.commandLine | startswith("/bin/sh -c mkdir")) and .stopped == "" and (.threads | length == 1) and (.threads[0].frames | length > 1) and (.threads[0].frames[0].registers | length > 10) and ([.threads[0].frames[].function] | index("wait4") != null) and (.modules | length > 0) and (.mappings | length > 5)' "$WORK/core.web.analysis.json" >/dev/null || fail "description of the core: $(cat "$WORK/core.web.analysis.json")"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.artifacts[].viewer] | unique')" = '["core"]' ] || fail "viewer of cores"
+curl -sS --fail -o /dev/null "$URL/view/core.js" "$URL/view/core.css" || fail "the core viewer is not served"
 edge -n shop get pods -o json | jq -e '[.items[].status.containerStatuses[].restartCount] | add == 0' >/dev/null || fail "a captured pod restarted"
 
 log "packet capture with payload (edge) waits for an administrator; a denied capture never runs"
@@ -390,6 +398,9 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   fetch "$ALICE" "$id" "$name" "$WORK/crash.core"
   [ "$(od -An -tx1 -N4 "$WORK/crash.core" | tr -d ' ')" = 7f454c46 ] || fail "the crash core is not an ELF file"
   [ "$(od -An -tu2 -j16 -N2 "$WORK/crash.core" | tr -d ' ')" = 4 ] || fail "the crash core is not a core (ET_CORE)"
+  # Its description names the signal that the process died of.
+  fetch "$ALICE" "$id" "$name.analysis.json" "$WORK/crash.core.analysis.json"
+  jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0)' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
   [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "an uploaded core stayed on the node"
 fi
 
