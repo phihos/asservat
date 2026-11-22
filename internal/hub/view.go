@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -446,7 +447,11 @@ func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (
 	if err := asked("tap", map[string]string{"tap0": "phs", "tap1": "conv:TCP", "tap2": "conv:UDP", "tap3": "expert"}, &stats); err != nil {
 		return "", err
 	}
-	// sharkd answers in its own order: each part is found by its name.
+	// sharkd answers in its own order: the parts are put into that of the request.
+	wanted := []string{"phs", "conv:TCP", "conv:UDP", "expert"}
+	sort.SliceStable(stats.Taps, func(i, j int) bool {
+		return slices.Index(wanted, stats.Taps[i].Tap) < slices.Index(wanted, stats.Taps[j].Tap)
+	})
 	for _, tap := range stats.Taps {
 		switch {
 		case tap.Tap == "phs":
