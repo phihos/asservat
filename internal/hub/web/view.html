@@ -20,12 +20,22 @@ input[type=checkbox] { accent-color: var(--ink); }
 header { display: flex; gap: 14px; align-items: center; padding: 6px 12px; background: var(--bar); color: var(--on-bar); }
 header a { color: var(--marker); text-decoration: none; }
 header a:hover { text-decoration: underline; }
+header select:hover, header button:hover { border-color: var(--on-bar-quiet); }
 header .brand img { width: 22px; height: 22px; } header .brand b { font-size: 19px; }
+/* The capture's number on its marker, as in the console's list. */
+header .number { padding: 3px 6px; background: var(--marker); color: var(--on-marker); font: 700 16px/1 var(--display); }
 header .name { font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 header .muted { color: var(--on-bar-quiet); }
 header .grow { flex: 1; }
-header select, header button { height: 24px; padding: 0 8px; border: 1px solid #4A5357; background: var(--bar); color: var(--on-bar); font-size: 12px; cursor: pointer; }
+/* The bar stays one line: the file's origin gives way first, and on a phone only mark, number and name remain beside the actions. */
+header > * { flex: none; white-space: nowrap; } header #origin { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; } header .name { flex: 0 1 auto; min-width: 3em; }
+@media (max-width: 700px) { header #origin, header .back, header .brand b { display: none; } }
+header select, header button { height: 24px; padding: 0 8px; border: 1px solid #4A5357; background-color: var(--bar); color: var(--on-bar); font-size: 12px; cursor: pointer; }
 #notice { margin: auto; padding: 24px; text-align: center; color: var(--quiet); max-width: 520px; }
+/* While a file is being opened, a stretch of marker yellow runs along a line. */
+#notice.opening::before { content: ""; display: block; width: 180px; height: 3px; margin: 0 auto 14px; background: linear-gradient(90deg, var(--line) 0 35%, var(--marker) 35% 65%, var(--line) 65%) 0 0 / 300% 100%; animation: opening 1.4s linear infinite; }
+@keyframes opening { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { #notice.opening::before { animation: none; } }
 #notice button { margin-top: 12px; padding: 6px 14px; border: 0; background: var(--marker); color: var(--on-marker); font-weight: 600; cursor: pointer; }
 [hidden] { display: none !important; }
 #root { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -36,7 +46,7 @@ header select, header button { height: 24px; padding: 0 8px; border: 1px solid #
 .tabs .grow { flex: 1; }
 .tab { flex: 1; min-height: 0; overflow: auto; background: var(--surface); }
 .narrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--soft); }
-.narrow input[type=search], .narrow input[type=number], .narrow select, .narrow button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface); }
+.narrow input[type=search], .narrow input[type=number], .narrow select, .narrow button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background-color: var(--surface); }
 .narrow input[type=search] { width: min(340px, 40vw); font-family: var(--mono); }
 .narrow input[type=number] { width: 80px; }
 .narrow button { cursor: pointer; }
@@ -49,7 +59,8 @@ header select, header button { height: 24px; padding: 0 8px; border: 1px solid #
 <body>
 <header>
   <a class="brand" href="/#captures" title="Back to the captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a>
-  <a href="/#captures" title="Back to the captures">&larr; Captures</a>
+  <a class="back" href="/#captures" title="Back to the captures">&larr; Captures</a>
+  <span class="number" id="number" hidden></span>
   <span class="name" id="name"></span>
   <span class="muted" id="origin"></span>
   <span class="grow"></span>
@@ -57,7 +68,7 @@ header select, header button { height: 24px; padding: 0 8px; border: 1px solid #
   <button id="copy" title="Copy a link to this spot in the file">Copy link</button>
   <a id="download" title="Download the file for the tools on your machine. A local copy is outside Asservat's control.">Download</a>
 </header>
-<div id="notice">Opening the file…</div>
+<div id="notice" class="opening">Opening the file…</div>
 <main id="root" hidden></main>
 <script type="module">
 import {$, esc, capture, file, address, headers, notice, onMoment} from '/view/common.js';
@@ -73,6 +84,8 @@ async function open() {
   if (res.status === 401) return notice('Sign in to the console first.');
   if (!res.ok) return notice('This capture does not exist any more.');
   const c = await res.json(), artifact = c.artifacts.find(a => a.name === file);
+  $('number').textContent = String(c.number).padStart(4, '0'); $('number').title = `Capture ${c.number}`; $('number').hidden = false;
+  document.title = `${$('number').textContent} ${$('name').textContent} – Asservat`;
   $('origin').textContent = `pod ${file.split('/')[0]} · ${c.workload} in ${c.namespace} on ${c.cluster}`;
   if (!artifact) return notice('This file does not exist any more.');
   if (!artifact.viewer) return notice('This file cannot be shown here. Download it instead.');
@@ -81,6 +94,7 @@ async function open() {
   style.rel = 'stylesheet'; style.href = `/view/${artifact.viewer}.css`;
   document.head.append(style);
   const viewer = await import(`/view/${artifact.viewer}.js`);
+  $('root').classList.toggle('dark', !!viewer.dark);
   await viewer.default($('root'), {capture: c, artifact});
 }
 // The capture's other files that know when things happened, this pod's

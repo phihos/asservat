@@ -1,6 +1,5 @@
 /* The log viewer: a dark terminal, as the log panels of Lens and the
    Kubernetes dashboard are, in Asservat's ink in either theme. */
-#root { --ground: #14181A; --surface: #1D2326; --ink: #EEF0EC; --quiet: #A9B2B5; --line: #3A4246; --soft: #262D30; --custody: #8AB6F2; --bad: #F28B82; background: var(--ground); color: var(--ink); }
 .logbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .logbar input[type=search] { width: min(420px, 40vw); height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--ground); font-family: var(--mono); }
 .logbar input.bad { border-color: var(--bad); }

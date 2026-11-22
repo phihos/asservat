@@ -23,6 +23,8 @@ const stamp = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)) /;
 const levels = [[/\b(error|fatal|panic|critical|exception)\b/i, 'error'], [/\bwarn(ing)?\b/i, 'warn'], [/\b(debug|trace)\b/i, 'debug']];
 const rowHeight = 18;
 
+// Dark in either theme, as a terminal is.
+export const dark = true;
 export default async function (root) {
   const {text, truncated} = await loadText();
   const lines = text.split('\n');

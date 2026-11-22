@@ -1,6 +1,5 @@
 /* The core viewer: a debugger's view of a stopped program. Dark in either
    theme, as debuggers are; ink, marker and type are Asservat's. */
-#root { --ground: #14181A; --surface: #1D2326; --ink: #EEF0EC; --quiet: #A9B2B5; --line: #3A4246; --soft: #262D30; --custody: #8AB6F2; --custody-ink: #A9CBF7; --ok: #7FD3A0; --bad: #F28B82; background: var(--ground); color: var(--ink); }
 #stopped { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
 #stopped .crash { color: var(--bad); font: 600 17px var(--display); text-transform: uppercase; letter-spacing: .04em; }
 #stopped .snap { color: var(--ok); font: 600 17px var(--display); text-transform: uppercase; letter-spacing: .04em; }
@@ -31,7 +30,7 @@
 .tab td { padding: 2px 18px 2px 0; vertical-align: top; font: 12px var(--mono); }
 /* Names, values and types apart, as a debugger's variables pane has them. */
 #root .name { color: var(--custody-ink); }
-#root .value { color: var(--ink); word-break: break-all; }
+#root .value { color: var(--ink); word-break: break-all; } #root .value.dim { color: var(--quiet); }
 #root .type { color: var(--ok); }
 .code { margin: 0; line-height: 18px; }
 .code .pc { background: var(--marker); color: var(--on-marker); }

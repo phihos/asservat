@@ -13,14 +13,15 @@
   h1 { margin: 0; } h2 { font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 24px 0 10px; }
   header { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; min-height: 52px; padding: 0 max(16px, calc((100vw - 1100px) / 2 + 16px)); background: var(--bar); color: var(--on-bar); }
   header #me { color: var(--on-bar-quiet); } .spacer { flex: 1; }
-  header button { color: var(--on-bar); border-color: #4A5357; }
+  header button { color: var(--on-bar); border-color: #4A5357; } header button:hover { border-color: var(--on-bar-quiet); }
   nav { display: flex; gap: 4px; align-self: stretch; } nav a { display: flex; align-items: center; padding: 0 10px; text-decoration: none; color: var(--on-bar-quiet); border-bottom: 3px solid transparent; border-top: 3px solid transparent; }
   nav a.on { color: var(--on-bar); font-weight: 600; border-bottom-color: var(--marker); }
   .count { font: 600 12px var(--mono); background: var(--marker); color: var(--on-marker); padding: 0 6px; margin-left: 6px; } .count:empty { display: none; }
   a.button { font: inherit; padding: 6px 14px; text-decoration: none; } a.button.primary { background: var(--marker); color: var(--on-marker); font-weight: 600; }
   .empty { border: 1px dashed var(--line); padding: 24px; text-align: center; color: var(--quiet); }
-  .head { justify-content: space-between; } .head h2 { margin: 20px 0 10px; }
-  .chips button { padding: 2px 10px; font-size: 12px; margin-left: 4px; } .chips button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  .head { justify-content: space-between; }
+  #error { margin-block: 0; } #error:not(:empty) { padding-top: 12px; }
+  .chips button { min-height: 0; padding: 2px 10px; font-size: 12px; margin-left: 4px; } .chips button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
   /* The steps of a new capture, one at a time, each with its numbered marker. */
   #steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 8px 0; flex-wrap: wrap; }
   #steps li { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 0; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 13px; color: var(--quiet); }
@@ -36,8 +37,8 @@
   .capture .number { font: 700 20px/1 var(--display); text-align: center; padding: 6px 2px; border: 2px dashed var(--line); color: var(--quiet); overflow: visible; }
   .capture .number.filed { border: 2px solid var(--marker); background: var(--marker); color: var(--on-marker); }
   .capture .what { font-weight: 600; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { padding: 2px 8px; }
-  .capture .chev { transition: transform .15s; color: var(--quiet); } .capture.open .chev { transform: rotate(90deg); }
+  .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { min-height: 28px; padding: 2px 10px; }
+  .capture .chev { overflow: visible; } .capture .chev::before { content: ""; display: block; width: 7px; height: 7px; border: solid var(--quiet); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; } .capture.open .chev::before { transform: rotate(45deg); }
   .capture > .more { display: none; padding: 4px 12px 12px; border-top: 1px solid var(--line); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
   .capture.open > .more { display: grid; }
   .capture h4 { margin: 8px 0 4px; font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; }
@@ -51,17 +52,21 @@
   }
   form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
-  input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: inherit; }
-  header button, .chips button, td button, .capture .acts button { background: transparent; }
+  input, select, button { font: inherit; min-height: 32px; box-sizing: border-box; padding: 4px 10px; border: 1px solid var(--line); border-radius: 0; background-color: var(--surface); color: inherit; }
+  input[type=checkbox], input[type=radio] { min-height: 0; }
+  input:hover, select:hover, button:hover:not(:disabled) { border-color: var(--quiet); } button.primary:hover:not(:disabled), a.button.primary:hover { background: color-mix(in srgb, var(--marker) 88%, var(--ink)); border-color: transparent; }
+  header button, .chips button, td button, .capture .acts button { background-color: transparent; }
   select { max-width: 100%; }
   button { cursor: pointer; } button.primary { background: var(--marker); color: var(--on-marker); border-color: var(--marker); font-weight: 600; }
   button:disabled { opacity: .6; cursor: progress; }
   :focus-visible { outline: 2px solid var(--custody); outline-offset: 1px; }
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; }
+  /* A list on a page of its own lies on a surface, as a capture does. */
+  section[data-view] > table { background: var(--surface); border: 1px solid var(--line); } section[data-view] > table :is(th, td) { padding: 8px 12px; } section[data-view] > table tr:last-child td { border-bottom: 0; }
   .state { font-weight: 600; } .PendingApproval { color: var(--custody-ink); } .Completed { color: var(--ok); } .Failed, .Denied { color: var(--bad); }
   .muted { color: var(--quiet); font-size: 12px; } .error { color: var(--bad); } code { font: 12px var(--mono); word-break: break-all; }
-  td button { padding: 2px 6px; margin: 0 4px 2px 0; white-space: nowrap; }
+  td button { min-height: 28px; padding: 2px 10px; margin: 0 4px 2px 0; white-space: nowrap; }
   [hidden] { display: none !important; }
   /* Signing in: the mark, large, over the two ways in. */
   #login { max-width: 420px; margin-top: 12vh; text-align: center; }
@@ -83,7 +88,10 @@
   .group { margin-top: 6px; } .group > div { font-size: 12px; color: var(--quiet); margin-bottom: 2px; }
   .group label { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 0; cursor: pointer; }
   .notice { border: 1px solid var(--custody); padding: 6px 10px; margin: 8px 0 0; background: var(--surface); }
-  .file { white-space: nowrap; } .file a { color: var(--custody-ink); }
+  /* A file: its name opens it, then its size and the way to a local copy. */
+  .file { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--soft); font-size: 12px; }
+  .file a:first-child { font: 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .file .size { font-family: var(--mono); color: var(--quiet); }
+  .when { font-family: var(--mono); }
   .rec { font-size: 12px; white-space: nowrap; } .rec.Completed { color: var(--ok); } .rec.Failed { color: var(--bad); white-space: normal; } .rec.Waiting { color: var(--quiet); }
   .rec .muted { color: inherit; }
   .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; background: var(--line); overflow: hidden; }
@@ -594,8 +602,8 @@ async function loadCaptures() {
     const files = Object.entries(byPod).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a => {
       // A file with a viewer opens in the browser; every file downloads in its own format.
       const address = `/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}`, name = esc(a.name.split('/')[1]);
-      return a.viewer ? `<a href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here">${name}</a> <span class="muted">${fileSize(a.size)}</span> <a class="muted" href="${address}" title="Download · sha256 ${a.sha256}">Download</a>`
-        : `<a href="${address}" title="Download · sha256 ${a.sha256}">${name}</a> <span class="muted">${fileSize(a.size)}</span>`;
+      const look = a.viewer ? `href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here"` : `href="${address}" title="Download: this kind of file has no viewer here"`;
+      return `<a ${look}>${name}</a><span class="size">${fileSize(a.size)}</span><a href="${address}" title="Download · sha256 ${a.sha256}">Download</a>`;
     }).map(line => `<div class="file">${line}</div>`).join('')).join('')
       || `<div class="muted">${c.state === 'Running' ? 'Files appear here as each recording ends.' : inProgress(c) ? 'Nothing yet.' : 'No files.'}</div>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
@@ -612,7 +620,7 @@ async function loadCaptures() {
         <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}</span>
         <span class="where" title="${esc(c.cluster)} / ${esc(c.namespace)} / ${esc(c.workload)}">${esc(c.workload)}<div class="muted">${esc(c.cluster)} / ${esc(c.namespace)}</div></span>
         <span class="when muted">${new Date(c.createdAt).toLocaleString()}<div>${esc(c.requester)}</div></span>
-        <span class="acts">${actions}</span><span class="chev">▸</span>
+        <span class="acts">${actions}</span><span class="chev"></span>
       </div>
       <div class="more">
         <div><h4>Recordings</h4>${pods}<div class="muted">${esc(c.message)}</div></div>

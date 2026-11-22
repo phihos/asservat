@@ -283,8 +283,11 @@ look covers the console and the viewers. A viewer keeps what makes its
 tool familiar: the layout, and colour where it carries meaning (Wireshark's
 colouring rules and filter validity, the levels of a log, the dark ground of
 a terminal and of a debugger). Type, palette, corners, tabs and tables are
-Asservat's, and what is selected is marker yellow in every viewer. pprof's
-and Go's trace tool's own pages are shown as they are.
+Asservat's, and what is selected is marker yellow in every viewer. A viewer
+shows its capture's number on a marker beside the file's name. The pages
+that pprof and Go's trace tool draw themselves keep their layout and
+colours; the hub adds a stylesheet to them that sets them in Asservat's
+type.
 
 ## Permissions
 

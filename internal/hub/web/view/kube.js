@@ -12,7 +12,8 @@ const markup = `
     <div id="tree"></div>
   </div>
 `;
-const when = t => t ? esc(String(t).replace('T', ' ').replace('Z', ' UTC')) : '';
+// Times to the second, in UTC as Kubernetes writes them.
+const when = t => t ? esc(String(t).replace('T', ' ').replace(/(\.\d+)?Z$/, ' UTC')) : '';
 const chips = o => Object.entries(o || {}).map(([k, v]) => `<span class="chip" title="${esc(k)}=${esc(v)}">${esc(k)}=${esc(v)}</span>`).join('') || '<span class="muted">none</span>';
 const rows = list => `<table class="props">${list.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>`;
 const badge = (text, kind) => `<span class="badge ${kind}">${esc(text)}</span>`;

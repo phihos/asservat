@@ -311,7 +311,9 @@ curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/cp
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
 view=$(sed -n 's/^data: //p' "$WORK/view")
-grep -q 'shop.priceOf' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")" || fail "pprof's top page"
+top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
+grep -q 'shop.priceOf' <<<"$top" || fail "pprof's top page"
+grep -q '/view/framed.css' <<<"$top" && curl -sS --fail -o /dev/null "$URL/view/framed.css" || fail "pprof's page in Asservat's type"
 grep -q '<svg' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/graph")" || fail "pprof's graph page, drawn by dot"
 kill $viewer
 [ "$(status "$ALICE" GET "/api/captures/$id/views/$pod/heap.pprof")" = 422 ] || fail "a file that is no profile opened in pprof"

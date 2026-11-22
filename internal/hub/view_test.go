@@ -262,7 +262,7 @@ func TestProfileView(t *testing.T) {
 
 	view := openedView(t, f, capture, "api-1/cpu.pprof")
 	for _, page := range []string{"flamegraph", "top"} {
-		if code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/"+page, nil); code != 200 || !strings.Contains(string(b), "synthetic.Workload") {
+		if code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/"+page, nil); code != 200 || !strings.Contains(string(b), "synthetic.Workload") || !strings.Contains(string(b), `/view/framed.css"><body`) {
 			t.Fatal(page, code, len(b))
 		}
 	}
@@ -316,14 +316,14 @@ func TestExecutionTraceView(t *testing.T) {
 	}
 	pages := "/api/views/" + view + "/pages/"
 	code, b := f.call("alice-token", "GET", pages, nil)
-	if code != 200 || !strings.Contains(string(b), `href="`+pages+`goroutines"`) || strings.Contains(string(b), `href="/goroutines"`) {
+	if code != 200 || !strings.Contains(string(b), `href="`+pages+`goroutines"`) || strings.Contains(string(b), `href="/goroutines"`) || !strings.Contains(string(b), `/view/framed.css"><body`) {
 		t.Fatal("the tool's first page", code, string(b))
 	}
 	if code, b := f.call("alice-token", "GET", pages+"goroutines", nil); code != 200 || !strings.Contains(string(b), "Goroutines") {
 		t.Fatal("goroutine analysis", code, string(b))
 	}
 	// The viewer's requests for the trace itself are led to the view as well.
-	if code, b := f.call("alice-token", "GET", pages+"trace", nil); code != 200 || !strings.Contains(string(b), pages+"jsontrace") {
+	if code, b := f.call("alice-token", "GET", pages+"trace", nil); code != 200 || !strings.Contains(string(b), pages+"jsontrace") || strings.Contains(string(b), "/view/framed.css") {
 		t.Fatal("trace page", code, len(b))
 	}
 	if code, _ := f.call("root-token", "GET", pages, nil); code != 404 {
