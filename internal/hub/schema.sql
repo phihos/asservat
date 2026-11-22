@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS captures (
   finished_at timestamptz,
   expires_at  timestamptz NOT NULL
 );
+-- A capture's number, counted up: what people call it by.
+ALTER TABLE captures ADD COLUMN IF NOT EXISTS number bigserial;
 CREATE INDEX IF NOT EXISTS captures_created ON captures (created_at DESC);
 CREATE INDEX IF NOT EXISTS captures_expires ON captures (expires_at);
 

@@ -236,6 +236,9 @@ func (r *CaptureRequest) Sensitive() bool {
 // Capture is a request with its progress and results.
 type Capture struct {
 	ID string `json:"id"`
+	// Number counts the installation's captures up; people call a capture
+	// by it, as an exhibit by its number.
+	Number int64 `json:"number"`
 	CaptureRequest
 	Requester  string     `json:"requester"`
 	Sensitive  bool       `json:"sensitive"`

@@ -122,6 +122,11 @@ func (h *Hub) Handler() http.Handler {
 	mux.HandleFunc("GET /view", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web, "web/view.html")
 	})
+	// The look: style, mark and fonts. They change only with the hub.
+	mux.HandleFunc("GET /assets/{file}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=86400")
+		http.ServeFileFS(w, r, web, "web/assets/"+r.PathValue("file"))
+	})
 	mux.HandleFunc("GET /view/{file}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web, "web/view/"+r.PathValue("file"))
 	})

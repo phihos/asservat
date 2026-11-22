@@ -269,6 +269,19 @@ writes its links from the root of its own server, so the hub rewrites them
 to the view's pages. It reads the whole trace into memory; the decrypted
 file is removed once it serves.
 
+## Look
+
+An Asservat is a piece of evidence in custody. The mark is the yellow
+numbered marker that is set next to evidence, and marker yellow is the one
+loud colour: it means "recorded here" and the next step to take. Every
+capture has a number, counted up per installation, shown on such a marker:
+outlined while the capture holds no files, filled once it does. Headings,
+numbers and states are set in Barlow Condensed capitals, text in IBM Plex
+Sans, hashes, sizes and filters in IBM Plex Mono; the hub serves the fonts
+itself (`/assets/`), so the console fetches nothing from elsewhere. The
+look covers the console and the bar above a viewer; below that bar each
+viewer keeps the look of its tool.
+
 ## Permissions
 
 - A user is identified by a name and groups, from a static token or an OIDC ID

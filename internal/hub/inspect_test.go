@@ -273,6 +273,10 @@ func TestOwnApprovalProgressAndStop(t *testing.T) {
 	if code != 201 || theirs.State != api.StatePendingApproval || theirs.Approver != "" {
 		t.Fatal("a user's sensitive request", code, theirs.State)
 	}
+	// Captures are numbered as they are requested; people call them by that.
+	if first, second := f.capture("root-token", mine.ID).Number, f.capture("alice-token", theirs.ID).Number; first < 1 || second <= first {
+		t.Fatal("numbers of two captures", first, second)
+	}
 	var watch api.Watch
 	code, b = f.call("root-token", "POST", "/api/watches", sensitive)
 	json.Unmarshal(b, &watch)
