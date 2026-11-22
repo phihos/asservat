@@ -227,7 +227,7 @@ view=$(sed -n 's/^data: //p' "$WORK/view")
 frames=$(ok "$ALICE" POST "/api/views/$view/frames" '{"filter":"tcp.port == 8080","limit":5}')
 jq -e 'length == 5 and (.[0].c | index("TCP") != null)' <<<"$frames" >/dev/null || fail "packet list of the view: $frames"
 ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}' | jq -e '(.tree | length > 2) and (.bytes | length > 0)' >/dev/null || fail "packet details of the view"
-ok "$ALICE" POST "/api/views/$view/tap" '{"tap0":"conv:TCP","tap1":"phs","tap2":"expert"}' | jq -e '(.taps[0].convs | length > 0) and (.taps[1].protos[0].frames > 0) and (.taps[2].type == "expert")' >/dev/null || fail "statistics of the view"
+ok "$ALICE" POST "/api/views/$view/tap" '{"tap0":"conv:TCP","tap1":"phs","tap2":"expert"}' | jq -e '(.taps | map({(.tap): .}) | add) as $t | ($t["conv:TCP"].convs | length > 0) and ($t.phs.protos[0].frames > 0) and ($t.expert.type == "expert")' >/dev/null || fail "statistics of the view"
 [ "$(status "$ALICE" POST "/api/views/$view/tap" '{"tap0":"eo:http"}')" = 400 ] || fail "a statistic that does more than count"
 [ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
 kill $viewer

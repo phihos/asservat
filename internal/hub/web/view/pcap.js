@@ -263,7 +263,9 @@ async function showStatistics(kind) {
     $('statBody').innerHTML = kind === 'phs' ? hierarchy(taps[0]) : expert(taps[0]);
     return;
   }
-  const {taps} = await ask('tap', {...Object.fromEntries(named.protocols.map((p, i) => [`tap${i}`, `${kind}:${p}`])), ...within});
+  // sharkd answers in an order of its own: each answer names its statistic.
+  const answer = await ask('tap', {...Object.fromEntries(named.protocols.map((p, i) => [`tap${i}`, `${kind}:${p}`])), ...within});
+  const taps = named.protocols.map(p => answer.taps.find(t => t.tap === `${kind}:${p}`) || {});
   const sizes = taps.map(t => (t.convs || t.hosts || []).length);
   const showTab = i => {
     $('statTabs').innerHTML = named.protocols.map((p, n) => `<button data-n="${n}"${n === i ? ' class="on"' : ''}>${p} · ${sizes[n]}</button>`).join('');
