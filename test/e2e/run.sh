@@ -302,7 +302,7 @@ for p in $(edge -n shop get pods -l app=web -o name); do
 done
 # Sampled profiles need no endpoint: the agent takes the stacks of the pods' processes in the node's kernel.
 if [ -n "${SAMPLE_CPU:-}" ]; then
-  # A Python program that computes and takes memory is sampled: an
+  # A Python program that computes and keeps taking memory (up to 400 MiB) is sampled: an
   # interpreter's stacks are those of the program it runs, so its functions
   # are named as such, in the profile of CPU time and in that of memory growth.
   edge apply -f - >/dev/null <<'EOF'
@@ -318,7 +318,7 @@ spec:
       containers:
         - name: py
           image: docker.io/library/python:3.12-slim
-          command: [python3, -c, "held = []\ndef grow():\n    held.append(b'x' * (1 << 20))\n    del held[:-64]\ndef burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()\n    grow()"]
+          command: [python3, -c, "held = []\ndef grow():\n    held.append(b'x' * (1 << 14))\n    if len(held) > 25000: held.clear()\ndef burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()\n    grow()"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 EOF
   edge -n shop rollout status deployment/py --timeout 180s >/dev/null
