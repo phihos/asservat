@@ -73,6 +73,10 @@ type Config struct {
 	// WorkDir holds the files that viewers have open, decrypted, while they
 	// are open. Empty means the system's directory for temporary files.
 	WorkDir string
+	// StreamBeat is how often the hub writes a line into an event stream
+	// that has nothing to say, so that proxies on the way do not take the
+	// connection for dead; 20 seconds if zero.
+	StreamBeat time.Duration
 	// Sharkd is the path of Wireshark's sharkd, which reads packet captures
 	// for their viewer.
 	Sharkd string
@@ -98,6 +102,11 @@ func New(c Config) (*Hub, error) {
 	}
 	if c.Retention <= 0 {
 		return nil, errors.New("retention must be positive")
+	}
+	if c.StreamBeat <= 0 {
+		// Well below the time after which common proxies end a silent
+		// connection: HAProxy 50 seconds, nginx and cloud load balancers 60.
+		c.StreamBeat = 20 * time.Second
 	}
 	for i, cluster := range c.Clusters {
 		// A join token is a secret that agents present from other networks.
@@ -775,18 +784,32 @@ func (h *Hub) events(w http.ResponseWriter, r *http.Request, _ User) error {
 		delete(h.watchers, ch)
 		h.mu.Unlock()
 	}()
+	h.stream(r.Context(), w, ": connected", ch)
+	return nil
+}
+
+// stream writes an event stream (Server-Sent Events) until ctx ends: first
+// what it begins with, then every event that arrives, each as one line.
+// While there is nothing to say it writes an empty comment at every beat,
+// which a browser ignores. No event tells that a proxy on the way is about
+// to give up a silent connection, so this goes by the clock.
+func (h *Hub) stream(ctx context.Context, w http.ResponseWriter, first string, events <-chan string) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	rc := http.NewResponseController(w)
-	fmt.Fprint(w, ": connected\n\n")
+	fmt.Fprintf(w, "%s\n\n", first)
 	rc.Flush()
+	beat := time.NewTicker(h.StreamBeat)
+	defer beat.Stop()
 	for {
 		select {
-		case <-r.Context().Done():
-			return nil
-		case id := <-ch:
-			fmt.Fprintf(w, "data: %s\n\n", id)
-			rc.Flush()
+		case <-ctx.Done():
+			return
+		case event := <-events:
+			fmt.Fprintf(w, "data: %s\n\n", event)
+		case <-beat.C:
+			fmt.Fprint(w, ":\n\n")
 		}
+		rc.Flush()
 	}
 }
 

@@ -367,7 +367,9 @@ type Pod struct {
 
 // Command is a message from the hub to a node agent on its stream.
 type Command struct {
-	// Type is "sync", "query", "task", "stop", "cancel" or "watches". A stop
+	// Type is "sync", "query", "task", "stop", "cancel", "watches" or
+	// "beat", which asks for nothing and keeps the stream from being
+	// silent; an agent passes over a type it does not know. A stop
 	// ends the recordings of a capture that run over time and keeps what
 	// they recorded; a cancel abandons them.
 	Type string `json:"type"`
