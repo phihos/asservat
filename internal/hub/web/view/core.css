@@ -18,7 +18,7 @@
 .row span { overflow: hidden; text-overflow: ellipsis; }
 .row:hover { background: var(--soft); }
 .row.selected { background: var(--marker); color: var(--on-marker); }
-.row.selected .dim { color: var(--on-marker); }
+.row.selected .dim, .row.selected b { color: var(--on-marker); }
 .row b { color: var(--bad); }
 .dim { color: var(--quiet); }
 .pad { padding: 8px 10px; }
