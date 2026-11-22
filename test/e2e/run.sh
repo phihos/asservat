@@ -296,9 +296,18 @@ grep -Eq '(wait4|nanosleep|clock_nanosleep|execve|read)\(' "$WORK/web.strace" ||
 log "HTTP profile endpoint, fetched inside the pod's network namespace (edge)"
 # The demo serves files as its profiles: a synthetic one in pprof's format
 # as the CPU profile, a word as the heap profile, a synthetic execution trace.
+# kubectl sometimes loses the end of what it copies into a pod: a file is
+# copied again until the pod holds all of it.
+put() {
+  for _ in 1 2 3; do
+    edge -n shop exec -i "$1" -- sh -c "cat >$3" <"$2" || true
+    [ "$(edge -n shop exec "$1" -- sh -c "wc -c <$3" | tr -d ' ')" = "$(wc -c <"$2" | tr -d ' ')" ] && return
+  done
+  fail "copying $2 into $1"
+}
 for p in $(edge -n shop get pods -l app=web -o name); do
-  edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/profile' <test/e2e/synthetic-cpu.pprof
-  edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/trace' <test/e2e/synthetic-trace.out
+  put "$p" test/e2e/synthetic-cpu.pprof /tmp/www/debug/pprof/profile
+  put "$p" test/e2e/synthetic-trace.out /tmp/www/debug/pprof/trace
 done
 # Sampled profiles need no endpoint: the agent takes the stacks of the pods' processes in the node's kernel.
 if [ -n "${SAMPLE_CPU:-}" ]; then
