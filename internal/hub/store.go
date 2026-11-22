@@ -86,14 +86,14 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 	return tx.Commit(ctx)
 }
 
-const captureColumns = `c.id::text, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at,
+const captureColumns = `c.id::text, c.number, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at,
  coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message, 'recordings', recordings) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
  coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
 
 func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	var c api.Capture
 	var request, tasks, artifacts []byte
-	if err := r.Scan(&c.ID, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &c.StoppedAt, &tasks, &artifacts); err != nil {
+	if err := r.Scan(&c.ID, &c.Number, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &c.StoppedAt, &tasks, &artifacts); err != nil {
 		return c, err
 	}
 	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {

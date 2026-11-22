@@ -4,87 +4,101 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asservat</title>
+<link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
+<link rel="stylesheet" href="/assets/identity.css">
 <style>
-  :root { color-scheme: light dark; --line: #8884; --accent: #2b6cb0; --soft: #8881; --warn: #b7791f; }
-  body { font: 14px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 16px; }
-  h1 { font-size: 20px; margin: 0; } h2 { font-size: 16px; margin: 24px 0 8px; }
-  header { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
-  header #me { opacity: .75; } .spacer { flex: 1; }
-  nav { display: flex; gap: 4px; } nav a { padding: 5px 10px; border-radius: 4px; text-decoration: none; color: inherit; }
-  nav a.on { background: var(--soft); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
-  .count { font-size: 11px; background: var(--accent); color: #fff; border-radius: 8px; padding: 0 6px; margin-left: 6px; } .count:empty { display: none; }
-  a.button { font: inherit; padding: 5px 10px; border-radius: 4px; text-decoration: none; } a.button.primary { background: var(--accent); color: #fff; }
-  .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 24px; text-align: center; opacity: .85; }
-  .head { justify-content: space-between; } .head h2 { margin: 16px 0 8px; }
-  .chips button { border-radius: 12px; padding: 2px 10px; font-size: 12px; margin-left: 4px; } .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  /* The steps of a new capture, one at a time. */
+  /* The tokens, fonts and the wordmark are in identity.css. Corners are square, as on a label. */
+  body { font: 14px/1.45 var(--text); margin: 0; background: var(--ground); color: var(--ink); }
+  body > :not(header) { max-width: 1100px; margin-inline: auto; padding-inline: 16px; box-sizing: border-box; }
+  h1 { margin: 0; } h2 { font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 24px 0 10px; }
+  header { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; min-height: 52px; padding: 0 max(16px, calc((100vw - 1100px) / 2 + 16px)); background: var(--bar); color: var(--on-bar); }
+  header #me { color: var(--on-bar-quiet); } .spacer { flex: 1; }
+  header button { color: var(--on-bar); border-color: #4A5357; }
+  nav { display: flex; gap: 4px; align-self: stretch; } nav a { display: flex; align-items: center; padding: 0 10px; text-decoration: none; color: var(--on-bar-quiet); border-bottom: 3px solid transparent; border-top: 3px solid transparent; }
+  nav a.on { color: var(--on-bar); font-weight: 600; border-bottom-color: var(--marker); }
+  .count { font: 600 12px var(--mono); background: var(--marker); color: var(--on-marker); padding: 0 6px; margin-left: 6px; } .count:empty { display: none; }
+  a.button { font: inherit; padding: 6px 14px; text-decoration: none; } a.button.primary { background: var(--marker); color: var(--on-marker); font-weight: 600; }
+  .empty { border: 1px dashed var(--line); padding: 24px; text-align: center; color: var(--quiet); }
+  .head { justify-content: space-between; } .head h2 { margin: 20px 0 10px; }
+  .chips button { padding: 2px 10px; font-size: 12px; margin-left: 4px; } .chips button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  /* The steps of a new capture, one at a time, each with its numbered marker. */
   #steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 8px 0; flex-wrap: wrap; }
-  #steps li { padding: 4px 12px 4px 6px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; font-size: 13px; opacity: .7; }
-  #steps li b { display: inline-block; width: 1.6em; height: 1.6em; line-height: 1.6em; text-align: center; border-radius: 50%; background: var(--line); margin-right: 4px; font-size: 12px; }
-  #steps li.on { opacity: 1; border-color: var(--accent); } #steps li.on b, #steps li.done b { background: var(--accent); color: #fff; } #steps li.done { opacity: 1; }
+  #steps li { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 0; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 13px; color: var(--quiet); }
+  #steps li b { display: inline-block; min-width: 1.5em; padding: 2px 4px; text-align: center; background: var(--soft); font: 700 18px var(--display); color: var(--quiet); }
+  #steps li.on { color: var(--ink); border-color: var(--ink); font-weight: 600; } #steps li.on b, #steps li.done b { background: var(--marker); color: var(--on-marker); } #steps li.done { color: var(--ink); }
   #steps li.skip { text-decoration: line-through; cursor: default; }
   #summary { min-height: 1.4em; margin: 0 0 8px; }
   .footer { margin-top: 4px; }
-  /* A capture: one line, opened for its recordings and files. */
-  .capture { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
-  .capture > .line { display: grid; grid-template-columns: 9.5em minmax(0, 1.2fr) minmax(0, 1fr) 11em 13.5em 1.2em; gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer; }
+  /* A capture: one line, opened for its recordings and files. Its number is on a marker: filled once it holds files. */
+  .capture { border: 1px solid var(--line); background: var(--surface); margin-bottom: 8px; }
+  .capture > .line { display: grid; grid-template-columns: 3.6em 10.5em minmax(0, 1.2fr) minmax(0, 1fr) 11em 13.5em 1.2em; gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer; }
   .capture > .line:hover { background: var(--soft); }
+  .capture .number { font: 700 20px/1 var(--display); text-align: center; padding: 6px 2px; border: 2px dashed var(--line); color: var(--quiet); overflow: visible; }
+  .capture .number.filed { border: 2px solid var(--marker); background: var(--marker); color: var(--on-marker); }
   .capture .what { font-weight: 600; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { padding: 2px 8px; }
-  .capture .chev { transition: transform .15s; opacity: .6; } .capture.open .chev { transform: rotate(90deg); }
+  .capture .chev { transition: transform .15s; color: var(--quiet); } .capture.open .chev { transform: rotate(90deg); }
   .capture > .more { display: none; padding: 4px 12px 12px; border-top: 1px solid var(--line); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
   .capture.open > .more { display: grid; }
-  .capture h4 { margin: 8px 0 4px; font-size: 12px; opacity: .7; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-  .pill { display: inline-block; font-size: 12px; font-weight: 600; }
+  .capture h4 { margin: 8px 0 4px; font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; }
+  .pill { display: inline-block; font: 600 15px/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em; }
   .capture.fresh { animation: fresh 4s ease-out; }
-  @media (max-width: 760px) { .capture > .line { grid-template-columns: 1fr auto 1.2em; } .capture .where, .capture .when { grid-column: 1 / -1; } }
+  @media (max-width: 760px) { .capture > .line { grid-template-columns: 3.6em 1fr auto 1.2em; } .capture .where, .capture .when { grid-column: 1 / -1; } }
   form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
-  input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+  input, select, button { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: inherit; }
+  header button, .chips button, td button, .capture .acts button { background: transparent; }
   select { max-width: 100%; }
-  button { cursor: pointer; } button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button { cursor: pointer; } button.primary { background: var(--marker); color: var(--on-marker); border-color: var(--marker); font-weight: 600; }
   button:disabled { opacity: .6; cursor: progress; }
+  :focus-visible { outline: 2px solid var(--custody); outline-offset: 1px; }
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .state { font-weight: 600; } .PendingApproval { color: var(--warn); } .Completed { color: #2f855a; } .Failed, .Denied { color: #c53030; }
-  .muted { opacity: .7; font-size: 12px; } .error { color: #c53030; } code { font-size: 12px; word-break: break-all; }
+  th { font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; }
+  .state { font-weight: 600; } .PendingApproval { color: var(--custody-ink); } .Completed { color: var(--ok); } .Failed, .Denied { color: var(--bad); }
+  .muted { color: var(--quiet); font-size: 12px; } .error { color: var(--bad); } code { font: 12px var(--mono); word-break: break-all; }
   td button { padding: 2px 6px; margin: 0 4px 2px 0; white-space: nowrap; }
   [hidden] { display: none !important; }
+  /* Signing in: the mark, large, over the two ways in. */
+  #login { max-width: 420px; margin-top: 12vh; text-align: center; }
+  #login img { width: 96px; height: 96px; }
+  #login h2 { font-size: 44px; letter-spacing: .05em; margin: 12px 0 4px; }
+  #login form { margin-top: 20px; text-align: left; grid-template-columns: 1fr auto; }
   /* The capture form: numbered steps, each a fieldset. */
-  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
-  legend { font-weight: 600; padding: 0 6px; }
+  fieldset { border: 1px solid var(--line); background: var(--surface); margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
+  legend { font: 600 18px var(--display); text-transform: uppercase; letter-spacing: .04em; padding: 0 6px; }
   .kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
-  .kinds label, .choice label { display: block; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 13px; }
-  .kinds label:has(input:checked), .choice label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--soft); }
-  .kinds input, .choice input { margin: 0 6px 0 0; }
-  .kinds small, .choice small { display: block; opacity: .75; margin: 2px 0 0 20px; }
+  .kinds label, .choice label { display: block; border: 1px solid var(--line); padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .kinds label:has(input:checked), .choice label:has(input:checked) { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--marker); background: var(--soft); }
+  .kinds input, .choice input { margin: 0 6px 0 0; accent-color: var(--ink); }
+  .kinds small, .choice small { display: block; color: var(--quiet); margin: 2px 0 0 20px; }
   .choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-bottom: 8px; }
   .wide { grid-column: span 2; }
-  .badge { font-size: 11px; color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 0 6px; margin-left: 6px; white-space: nowrap; }
-  .problem { color: #c53030; margin: 4px 0 0; } .problem:empty { display: none; }
-  .group { margin-top: 6px; } .group > div { font-size: 12px; opacity: .8; margin-bottom: 2px; }
+  .badge { font: 500 11px var(--mono); color: var(--custody-ink); border: 1px solid var(--custody); padding: 0 6px; margin-left: 6px; white-space: nowrap; }
+  .problem { color: var(--bad); margin: 4px 0 0; } .problem:empty { display: none; }
+  .group { margin-top: 6px; } .group > div { font-size: 12px; color: var(--quiet); margin-bottom: 2px; }
   .group label { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 0; cursor: pointer; }
-  .notice { border-left: 3px solid var(--warn); padding: 6px 10px; margin: 8px 0 0; background: var(--soft); }
-  .file { white-space: nowrap; }
-  .rec { font-size: 12px; white-space: nowrap; } .rec.Completed { color: #2f855a; } .rec.Failed { color: #c53030; white-space: normal; } .rec.Waiting { opacity: .6; }
+  .notice { border: 1px solid var(--custody); padding: 6px 10px; margin: 8px 0 0; background: var(--surface); }
+  .file { white-space: nowrap; } .file a { color: var(--custody-ink); }
+  .rec { font-size: 12px; white-space: nowrap; } .rec.Completed { color: var(--ok); } .rec.Failed { color: var(--bad); white-space: normal; } .rec.Waiting { color: var(--quiet); }
   .rec .muted { color: inherit; }
-  .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; background: var(--line); overflow: hidden; }
   .track .bar { width: 0; transition: width 1s linear; }
-  tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #2b6cb033; } to { background: transparent; } }
-  .pod { font-size: 12px; opacity: .7; margin-top: 4px; } .pod:first-child { margin-top: 0; }
+  tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #F2C20055; } to { background: transparent; } }
+  .pod { font: 12px var(--mono); color: var(--quiet); margin-top: 4px; } .pod:first-child { margin-top: 0; }
   .options > * + * { margin-top: 14px; }
   h3 { font-size: 13px; margin: 0 0 6px; } .lead { margin: 0 0 8px; }
   .options section > * + * { margin-top: 8px; }
   #flows td { vertical-align: middle; } #flows tr { cursor: pointer; } #flows tr:has(input:checked) { background: var(--soft); }
   #flows .arrow { font-size: 16px; text-align: center; }
   #flowTable th:nth-child(-n+2) { width: 1.5em; }
-  .bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+  .bar { height: 6px; background: var(--marker); min-width: 2px; }
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  details summary { cursor: pointer; font-size: 12px; opacity: .8; } details input { width: 100%; box-sizing: border-box; margin-top: 4px; }
+  details summary { cursor: pointer; font-size: 12px; color: var(--quiet); } details input { width: 100%; box-sizing: border-box; margin-top: 4px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Asservat</h1>
+  <h1><a class="brand" href="#captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a></h1>
   <nav id="nav" hidden>
     <a href="#captures" data-nav="captures">Captures<span class="count" id="captureCount"></span></a>
     <a href="#watches" data-nav="watches">Watches<span class="count" id="watchCount"></span></a>
@@ -97,7 +111,9 @@
 <p id="error" class="error"></p>
 
 <section id="login" hidden>
-  <h2>Sign in</h2>
+  <img src="/assets/mark.svg" alt="">
+  <h2>Asservat</h2>
+  <p class="muted">Evidence from running workloads. Sign in to record and to look at what was recorded.</p>
   <p id="sso" hidden><button class="primary" onclick="location.href='/auth/login'">Sign in with single sign-on</button></p>
   <form id="loginForm" class="row"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button>Sign in with a token</button></form>
 </section>
@@ -586,6 +602,7 @@ async function loadCaptures() {
     const count = c.artifacts.length ? ` · ${plural(c.artifacts.length, 'file')}` : '';
     return `<div class="capture${open ? ' open' : ''}${freshClass(c.id)}" data-capture="${c.id}">
       <div class="line">
+        <span class="number${c.artifacts.length ? ' filed' : ''}" title="Capture ${c.number}${c.artifacts.length ? '' : ': no files yet'}">${String(c.number).padStart(4, '0')}</span>
         <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted">${inProgress(c) ? '' : count.slice(3)}</div>`}</span>
         <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}</span>
         <span class="where" title="${esc(c.cluster)} / ${esc(c.namespace)} / ${esc(c.workload)}">${esc(c.workload)}<div class="muted">${esc(c.cluster)} / ${esc(c.namespace)}</div></span>

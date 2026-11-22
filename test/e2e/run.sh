@@ -235,6 +235,9 @@ kill $viewer
 ok "$ALICE" GET /api/captures | jq -e '[.[].artifacts[].viewer] | contains(["kube", "log", "pcap"])' >/dev/null || fail "viewers of the files so far"
 for v in gotrace kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
 grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
+# The look is served by the hub itself: style, mark and fonts.
+for a in identity.css mark.svg barlow-condensed-700.woff2 ibm-plex-sans-400.woff2 ibm-plex-mono-400.woff2; do curl -sS --fail -o /dev/null "$URL/assets/$a" || fail "asset $a is not served"; done
+[ "$(ok "$ALICE" GET /api/captures | jq '[.[].number] | (length > 0) and (unique | length) == length and all(. > 0)')" = true ] || fail "numbers of the captures"
 
 log "what runs and who talks: the choices for a process and a packet filter (edge)"
 processes=$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/processes?workload=Deployment/web')
