@@ -36,11 +36,11 @@ const captureProperties = `"cluster":{"type":"string"},"namespace":{"type":"stri
 "workload":{"type":"string","description":"Deployment/name, StatefulSet/name, DaemonSet/name or Pod/name"},
 "pods":{"type":"array","items":{"type":"string"},"description":"Restrict to these pods; default all pods of the workload"},
 "recordings":{"type":"array","description":"What to record, at most one of each kind. All recordings start together on the same pods, share durationSeconds and, if any needs approval, one approval.","items":{"type":"object","properties":{
- "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"]},
- "params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: endpoints, a comma-separated list of <port>/<endpoint> from find_profile_endpoints, fetched at once; or port and path for an endpoint the catalog does not know (needs approval)."}},"required":["kind"]}},
-"kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof"],"description":"Short form for a single recording, with params"},
+ "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof","cpu"]},
+ "params":{"type":"object","additionalProperties":{"type":"string"},"description":"logs: container, previous, tailLines. pcap: filter (tcpdump syntax), payload (true needs approval). coredump: container, process. strace: container, process, strings (true needs approval). process is an executable from list_processes. pprof: endpoints, a comma-separated list of <port>/<endpoint> from find_profile_endpoints, fetched at once; or port and path for an endpoint the catalog does not know (needs approval). cpu: no parameters; a CPU profile of all processes of the pod, sampled from the node, for applications without a profile endpoint (Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, Perl, .NET, Erlang); the file sampled-cpu.pprof is in pprof's format."}},"required":["kind"]}},
+"kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof","cpu"],"description":"Short form for a single recording, with params"},
 "params":{"type":"object","additionalProperties":{"type":"string"}},
-"durationSeconds":{"type":"integer","description":"The time frame of pcap, strace, pprof and followed logs; default 30"},
+"durationSeconds":{"type":"integer","description":"The time frame of pcap, strace, cpu, pprof and followed logs; default 30"},
 "reason":{"type":"string","description":"Shown to the approving administrator"}`
 
 // mcpReadLimit bounds one read_artifact result so that it fits a model's

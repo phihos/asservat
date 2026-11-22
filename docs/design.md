@@ -12,7 +12,7 @@ what is deliberately left out. Change it together with the code.
 | Component | Runs as | Does |
 | --- | --- | --- |
 | Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, opens files for their viewers, serves console, REST API and MCP |
-| Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
+| Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`, `SYS_RESOURCE`, `SYSLOG`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
 | PostgreSQL | Bundled or external | Captures, tasks, watches, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
 
@@ -174,8 +174,31 @@ Because Asservat knows what each returns, only those that return memory
 need approval. An endpoint outside this list can return anything, so
 requesting one by `port` and `path` needs approval. Applications without
 such an endpoint (most Python, Node.js, Ruby and PHP services, and Java or
-.NET ones without the tools above) cannot be profiled this way; see "Not
-built yet".
+.NET ones without the tools above) get a CPU profile by sampling (`cpu`,
+below); memory, blocking and traces need the runtime's own endpoint.
+
+### CPU profiles by sampling
+
+The kind `cpu` needs nothing from the application. For the time frame the
+agent runs the OpenTelemetry eBPF profiler, which it contains as a library:
+programs in the node's kernel take the stack of whatever runs on a CPU, 99
+times per second, and unwind native code (Go, C, C++, Rust) as well as the
+interpreters and virtual machines of Python, Java, Node.js, Ruby, PHP, Perl,
+.NET and Erlang, without attaching to a process or loading anything into
+it. The profiler samples the whole node; the agent keeps the samples of the
+recorded pods' containers and drops the rest. It runs only while a
+recording wants it.
+
+Each pod yields `sampled-cpu.pprof`, in pprof's format, with the process
+name and ID as labels of every sample, so pprof can narrow to one process.
+Interpreted and Go functions are named by the profiler. For other native
+code the agent reads the names from the binaries' symbol tables in the
+container; a function of a stripped binary appears as `file+0xaddress`,
+except for the functions it exports.
+
+!!! note
+    The node needs Linux 5.10 or later. On an older kernel the recording
+    fails and says so; the other recordings of the capture are not affected.
 
 ## Evidence kinds
 
@@ -188,6 +211,7 @@ own format and nothing is injected into the pod:
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
 | `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
+| `cpu` | Samples of the pod's processes by eBPF programs in the node's kernel, for `durationSeconds`; all containers of the pod | No |
 | `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |
 | `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
 
@@ -362,9 +386,7 @@ type.
 
 These are known gaps, in rough order of value:
 
-- Profiles of applications that serve no profile endpoint, by sampling
-  their processes from the node (as perf, py-spy, rbspy or async-profiler
-  do).
+- Memory profiles of applications that serve no profile endpoint.
 - Other triggers than a crash (alerts, failing probes, a log line).
 - Passing the cores of unwatched processes on to the node's previous core
   handler.

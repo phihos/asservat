@@ -7,10 +7,13 @@
 #   test/e2e/run.sh          build the image, create the clusters, test, delete
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
 #   CORE_HANDLER=1 test/e2e/run.sh   also record the core of a crashed process
+#   SAMPLE_CPU=1 test/e2e/run.sh     also sample a CPU profile
 #
 # CORE_HANDLER changes kernel.core_pattern of the machine that runs kind,
 # because kind nodes share its kernel. Use it only on a disposable machine
 # such as a CI runner; it needs sudo to create the spool directory.
+# SAMPLE_CPU=1 also samples a CPU profile. That loads eBPF programs into the
+# kernel of the machine that runs kind, which rootless containers cannot do.
 #
 # Needs docker (or podman as docker), kind, kubectl, helm, curl and jq.
 set -euo pipefail
@@ -297,6 +300,40 @@ for p in $(edge -n shop get pods -l app=web -o name); do
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/profile' <test/e2e/synthetic-cpu.pprof
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/trace' <test/e2e/synthetic-trace.out
 done
+# A CPU profile needs no endpoint: the agent samples the pods' processes from the node's kernel.
+if [ -n "${SAMPLE_CPU:-}" ]; then
+  # A busy Python program is sampled: an interpreter's stacks are those of the
+  # program it runs, so its functions are named as such.
+  edge apply -f - >/dev/null <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: py, namespace: shop}
+spec:
+  selector: {matchLabels: {app: py}}
+  template:
+    metadata: {labels: {app: py}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: py
+          image: docker.io/library/python:3.12-slim
+          command: [python3, -c, "def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+EOF
+  edge -n shop rollout status deployment/py --timeout 180s >/dev/null
+  id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","kind":"cpu","durationSeconds":10}'); completed "$ALICE" "$id"
+  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, .artifacts[0].name, .artifacts[0].viewer] | @csv')" = "false,\"$pod/sampled-cpu.pprof\",\"pprof\"" ] || fail "the sampled CPU profile: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
+  : >"$WORK/view"
+  curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
+  viewer=$!
+  for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
+  view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
+  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
+  grep -q 'burn' <<<"$top" && grep -q '<genexpr>\|genexpr' <<<"$top" || fail "Python's functions in the sampled profile: $(grep -o '"Name":"[^"]*"' <<<"$top" | head -40)"
+  kill "$viewer"
+  edge -n shop delete deployment py --wait=false >/dev/null
+fi
 # The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
 found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')
 [ "$(jq -c '[.ports, [.profiles[] | select(.endpoint == "go-cpu" or .endpoint == "go-heap") | [.port, .endpoint, .timed, .sensitive]]]' <<<"$found")" = '[[8080],[[8080,"go-cpu",true,false],[8080,"go-heap",false,false]]]' ] || fail "profile endpoints: $found"

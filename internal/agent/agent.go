@@ -47,6 +47,8 @@ type Agent struct {
 	// aside at a crash, by trigger ID, until the hub's task for it arrives.
 	rings     map[string]*ring
 	snapshots map[string][]byte
+	// sampler takes the CPU profiles of pods.
+	sampler sampler
 }
 
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
