@@ -416,6 +416,11 @@ type.
 - **No polling.** The hub pushes commands on the agents' open streams and
   change hints to browsers over Server-Sent Events. Agents learn of crashes
   from a Kubernetes watch. The retention loop sleeps until the next expiry.
+- **Streams through proxies.** A proxy in front of the hub ends a connection
+  that stays silent (HAProxy after 50 seconds by default, nginx and cloud
+  load balancers after 60). The hub therefore writes a line every 20
+  seconds into each open stream that has nothing to say: an empty comment
+  into an event stream, a command that asks for nothing to an agent.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves.

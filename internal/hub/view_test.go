@@ -432,3 +432,44 @@ func TestDotnetTraceView(t *testing.T) {
 		}
 	}
 }
+
+// An event stream that has nothing to say still writes a line now and then:
+// a proxy in front of the hub ends a connection that stays silent (HAProxy
+// after 50 seconds by default), and with its stream a view would end.
+func TestStreamsStayOpenThroughProxies(t *testing.T) {
+	profile := func() []byte {
+		function := &profile.Function{ID: 1, Name: "synthetic.Workload"}
+		location := &profile.Location{ID: 1, Line: []profile.Line{{Function: function}}}
+		var packed bytes.Buffer
+		p := &profile.Profile{SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, Function: []*profile.Function{function}, Location: []*profile.Location{location},
+			Sample: []*profile.Sample{{Location: []*profile.Location{location}, Value: []int64{1}}}}
+		if err := p.Write(&packed); err != nil {
+			t.Fatal(err)
+		}
+		return packed.Bytes()
+	}()
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": profile}, func(c *hub.Config) { c.StreamBeat = 20 * time.Millisecond })
+	const join = "join-token-of-the-cluster-with-viewed-files-0123456789"
+	for what, stream := range map[string][2]string{
+		"a view":                {"/api/captures/" + capture + "/views/api-1/cpu.pprof", "alice-token"},
+		"the captures' changes": {"/api/events", "alice-token"},
+		"an agent's commands":   {"/agent/stream?node=node-1", join},
+	} {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		req, _ := http.NewRequestWithContext(ctx, "GET", f.url+stream[0], nil)
+		req.Header.Set("Authorization", "Bearer "+stream[1])
+		res, err := http.DefaultClient.Do(req)
+		if err != nil || res.StatusCode != 200 {
+			t.Fatal(what, err)
+		}
+		// A stream begins with at most two lines. More lines come although nothing happens.
+		lines := bufio.NewReader(res.Body)
+		for read := 0; read < 6; read++ {
+			if _, err := lines.ReadString('\n'); err != nil {
+				t.Fatalf("the stream of %s stayed silent after %d lines: %v", what, read, err)
+			}
+		}
+		cancel()
+		res.Body.Close()
+	}
+}

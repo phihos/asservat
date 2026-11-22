@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -163,6 +164,10 @@ func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string
 		return nil
 	}
 	rc.Flush()
+	// Like an event stream, the commands' stream writes a line at every
+	// beat while it has nothing to say: a command that asks for nothing.
+	beat := time.NewTicker(h.StreamBeat)
+	defer beat.Stop()
 	for {
 		select {
 		case <-r.Context().Done():
@@ -171,8 +176,12 @@ func (h *Hub) agentStream(w http.ResponseWriter, r *http.Request, cluster string
 			if !ok || enc.Encode(c) != nil {
 				return nil
 			}
-			rc.Flush()
+		case <-beat.C:
+			if enc.Encode(api.Command{Type: "beat"}) != nil {
+				return nil
+			}
 		}
+		rc.Flush()
 	}
 }
 

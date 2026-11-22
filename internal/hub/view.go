@@ -135,10 +135,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	h.views.add(id, opened)
 	defer h.views.remove(id)
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	fmt.Fprintf(w, "data: %s\n\n", id)
-	http.NewResponseController(w).Flush()
-	<-ctx.Done()
+	h.stream(ctx, w, "data: "+id, nil)
 	return nil
 }
 
