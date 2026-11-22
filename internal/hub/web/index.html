@@ -265,7 +265,8 @@ async function call(method, path, body) {
 // A failure is shown where it happened: every action names the element for
 // its message, next to what the user just used.
 const guard = (f, at = 'error') => async e => {
-  e?.preventDefault();
+  // Only a form's own submit is replaced; a click on a link, such as a file to download, takes its course.
+  if (e?.type === 'submit') e.preventDefault();
   $(at).textContent = '';
   try { await f(e); } catch (err) { $(at).textContent = err.message; $(at).scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
 };
