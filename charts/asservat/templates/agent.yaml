@@ -77,6 +77,9 @@ spec:
             {{- if .Values.agent.caCert }}
             - --ca-file=/secrets/agent/ca.crt
             {{- end }}
+            {{- with .Values.agent.debuginfodURLs }}
+            - --debuginfod-urls={{ join " " . }}
+            {{- end }}
             {{- if .Values.agent.coreHandler.enabled }}
             - --core-spool={{ .Values.agent.coreHandler.hostPath }}
             {{- end }}

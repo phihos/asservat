@@ -1,0 +1,171 @@
+package agent
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+// A synthetic Go program whose goroutines block where the test finds them.
+const blockedProgram = `package main
+
+import (
+	"fmt"
+	"os"
+	"sync"
+	"syscall"
+	"time"
+)
+
+type order struct {
+	ID       int
+	Customer string
+}
+
+var started sync.WaitGroup
+
+func waitForOrder(orders chan order, shelf string) {
+	started.Done()
+	o := <-orders
+	fmt.Println(o, shelf)
+}
+
+func holdLedger(ledger *sync.Mutex, attempt int) {
+	started.Done()
+	ledger.Lock()
+	fmt.Println(attempt)
+}
+
+func main() {
+	// Yama lets only ancestors attach unless the process allows others; the
+	// test's gcore is a sibling.
+	syscall.RawSyscall(syscall.SYS_PRCTL, 0x59616d61 /* PR_SET_PTRACER */, ^uintptr(0), 0)
+	var ledger sync.Mutex
+	ledger.Lock()
+	orders := make(chan order)
+	started.Add(2)
+	go waitForOrder(orders, "synthetic-shelf")
+	go holdLedger(&ledger, 6)
+	started.Wait()
+	// Nothing tells when the goroutines have gone on to block.
+	time.Sleep(200 * time.Millisecond)
+	fmt.Println("ready")
+	// Reading keeps main in a system call: the runtime sees no deadlock.
+	os.Stdin.Read(make([]byte, 1))
+}
+`
+
+// TestGoroutinesOfGoCore describes the core of a Go program as the agent
+// does after recording it: gdb first, then Delve's goroutines.
+func TestGoroutinesOfGoCore(t *testing.T) {
+	for _, tool := range []string{"go", "gcore", "gdb"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("%s is not installed", tool)
+		}
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(blockedProgram), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	program := filepath.Join(dir, "blocked")
+	build := exec.Command("go", "build", "-o", program, "main.go")
+	build.Dir = dir
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v: %s", err, out)
+	}
+	cmd := exec.Command(program)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { stdin.Close(); cmd.Process.Kill(); cmd.Wait() })
+	if line, err := bufio.NewReader(stdout).ReadString('\n'); err != nil || line != "ready\n" {
+		t.Fatalf("program said %q: %v", line, err)
+	}
+	pid := strconv.Itoa(cmd.Process.Pid)
+	if out, err := exec.Command("gcore", "-o", filepath.Join(dir, "core"), pid).CombinedOutput(); err != nil {
+		t.Skipf("gcore cannot attach here: %v: %s", err, tail(out))
+	}
+
+	a := &Agent{Scratch: dir}
+	data, err := a.analyze(context.Background(), filepath.Join(dir, "core."+pid), "/proc/"+pid+"/root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		Runtime    string
+		Threads    []json.RawMessage
+		Goroutines []goroutine
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(report.Runtime, "go1") {
+		t.Errorf("runtime = %q", report.Runtime)
+	}
+	if len(report.Threads) == 0 {
+		t.Error("gdb's threads are gone")
+	}
+	described, _ := json.Marshal(report.Goroutines)
+	t.Logf("%d goroutines in %d bytes, runtime %s", len(report.Goroutines), len(described), report.Runtime)
+	value := func(vars []goVariable, name string) string {
+		for _, v := range vars {
+			if v.Name == name {
+				return v.Value
+			}
+		}
+		return "<absent>"
+	}
+	found := map[string]bool{}
+	for _, g := range report.Goroutines {
+		t.Logf("goroutine %d [%s] %s, %d frames, thread %d", g.ID, g.Status, g.Function, len(g.Frames), g.ThreadSystemID)
+		for _, f := range g.Frames {
+			if !strings.HasPrefix(f.Function, "main.") {
+				continue
+			}
+			found[f.Function] = true
+			t.Logf("  #%d %s %s:%d arguments %v locals %v", f.Level, f.Function, filepath.Base(f.File), f.Line, f.Arguments, f.Locals)
+			switch f.Function {
+			case "main.waitForOrder":
+				if g.Status != "chan receive" {
+					t.Errorf("waitForOrder is %q", g.Status)
+				}
+				if v := value(f.Arguments, "shelf"); v != `"synthetic-shelf"` {
+					t.Errorf("shelf = %s", v)
+				}
+			case "main.holdLedger":
+				if g.Status != "sync.Mutex.Lock" {
+					t.Errorf("holdLedger is %q", g.Status)
+				}
+				if v := value(f.Arguments, "attempt"); v != "6" {
+					t.Errorf("attempt = %s", v)
+				}
+			case "main.main":
+				if g.ThreadSystemID == 0 {
+					t.Error("main runs on no thread, though it is in a system call")
+				}
+				if v := value(f.Locals, "orders"); !strings.HasPrefix(v, "chan main.order") {
+					t.Errorf("orders = %s", v)
+				}
+			}
+		}
+	}
+	for _, name := range []string{"main.main", "main.waitForOrder", "main.holdLedger"} {
+		if !found[name] {
+			t.Errorf("no goroutine in %s", name)
+		}
+	}
+}
