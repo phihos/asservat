@@ -90,12 +90,13 @@ func TestPacketCaptureView(t *testing.T) {
 	for _, a := range f.capture("alice-token", c.ID).Artifacts {
 		viewers[a.Name] = a.Viewer
 	}
-	if viewers["api-1/capture.pcap"] != "pcap" || viewers["api-1/pod.json"] != "" {
+	if viewers["api-1/capture.pcap"] != "pcap" || viewers["api-1/pod.json"] != "kube" {
 		t.Fatal("viewers", viewers)
 	}
+	// Only the packet viewer has the hub open the file.
 	views := "/api/captures/" + c.ID + "/views/"
 	if code, b := f.call("alice-token", "GET", views+"api-1/pod.json", nil); code != 400 {
-		t.Fatal("a file without a viewer", code, string(b))
+		t.Fatal("a file that the browser reads", code, string(b))
 	}
 	if code, _ := f.call("mallory-token", "GET", views+"api-1/capture.pcap", nil); code != 404 {
 		t.Fatal("another user's file", code)
