@@ -571,6 +571,10 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 			t.Fatalf("a packet capture lacks %q: %s", part, text)
 		}
 	}
+	// Protocols, then conversations, then remarks, whatever order sharkd answers in.
+	if protocols, talks, remarks := strings.Index(text, "Protocols"), strings.Index(text, "TCP conversations"), strings.Index(text, "expert information"); !(protocols < talks && talks < remarks) {
+		t.Fatal("the order of a packet summary", text)
+	}
 	// With a display filter, as in Wireshark, it reads as the packets that match.
 	if text := read(map[string]any{"name": "api-1/capture.pcap", "filter": "http.response.code >= 500"}); !strings.Contains(text, "500 Internal Server Error") || !strings.Contains(text, "10.0.0.2") {
 		t.Fatal("packets by a display filter", text)
