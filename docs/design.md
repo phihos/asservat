@@ -208,11 +208,16 @@ shows what the tool would show.
 | Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
-Profiles and core dumps download only, for now. The viewers that read in
+| Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek | pprof in the hub (`dot` draws the graph) |
+| Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
+
+Core dumps, execution traces and the heap dumps of Java and .NET download
+only, for now. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
-A packet capture is not sent to the browser. It is opened as a **view**.
+A packet capture or a profile is not sent to the browser. It is opened as a
+**view**.
 The browser opens it with an event stream; the view lives as long as that stream, so nothing has to guess when somebody
 stopped looking, and it ends early when the capture is deleted or its
 retention ends. The viewer's questions about the file go to the view and
@@ -220,7 +225,10 @@ only its opener may ask them. For a packet capture, the hub decrypts the
 file into its work directory (`--work-dir`, an `emptyDir` in the chart),
 starts one `sharkd` for the view, and removes the file's name as soon as
 `sharkd` has it open. Of `sharkd`'s requests, the hub passes on those that
-read the loaded capture and no others.
+read the loaded capture and no others. A profile is parsed in the hub's
+memory by pprof's library, which hands the hub the pages of its web
+interface; the view serves them, except those that write pprof's settings
+or read the profiled program's binary.
 
 ## Permissions
 
@@ -265,7 +273,8 @@ read the loaded capture and no others.
 - A file that is open in a viewer rests decrypted in the hub's work
   directory until the program that reads it has opened it, and in that
   program's memory while the view lasts. The program (`sharkd` for packet
-  captures) parses recorded traffic inside the hub's container.
+  captures) parses recorded traffic inside the hub's container. A profile
+  is only ever decrypted into the hub's memory.
 - A core file rests unencrypted on the node until its upload ends, then it
   is deleted: in the agent's scratch volume, or for a crashed process in the
   core handler's directory.

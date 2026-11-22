@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/pprof/profile"
 
 	"asservat.local/asservat/internal/api"
 	"asservat.local/asservat/internal/hub"
@@ -32,10 +35,10 @@ while read -r line; do
 done
 `
 
-// A packet capture opens in the browser: the hub loads it into sharkd for as
-// long as the opening stream lasts and passes the viewer's questions on. The
-// decrypted file has no name once it is loaded.
-func TestPacketCaptureView(t *testing.T) {
+// viewed starts a hub with a capture of alice's that holds the given files,
+// and returns the capture's ID and the hub's work directory.
+func viewed(t *testing.T, files map[string][]byte) (fixture, string, string) {
+	t.Helper()
 	dsn := os.Getenv("ASSERVAT_TEST_DSN")
 	if dsn == "" {
 		t.Skip("ASSERVAT_TEST_DSN is not set")
@@ -44,7 +47,7 @@ func TestPacketCaptureView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	t.Cleanup(store.Close)
 	sharkd, work := filepath.Join(t.TempDir(), "sharkd"), t.TempDir()
 	if err := os.WriteFile(sharkd, []byte(sharkdStandIn), 0o700); err != nil {
 		t.Fatal(err)
@@ -75,8 +78,8 @@ func TestPacketCaptureView(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("no task")
 	}
-	for name, content := range map[string]string{"api-1/capture.pcap": "synthetic packets", "api-1/pod.json": "{}"} {
-		req, _ := http.NewRequest("PUT", server.URL+"/agent/captures/"+c.ID+"/artifacts/"+name, strings.NewReader(content))
+	for name, content := range files {
+		req, _ := http.NewRequest("PUT", server.URL+"/agent/captures/"+c.ID+"/artifacts/"+name, bytes.NewReader(content))
 		req.Header.Set("Authorization", "Bearer "+joined.Token)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil || res.StatusCode != 204 && res.StatusCode != 200 {
@@ -84,6 +87,16 @@ func TestPacketCaptureView(t *testing.T) {
 		}
 		res.Body.Close()
 	}
+	return f, c.ID, work
+}
+
+// A packet capture opens in the browser: the hub loads it into sharkd for as
+// long as the opening stream lasts and passes the viewer's questions on. The
+// decrypted file has no name once it is loaded.
+func TestPacketCaptureView(t *testing.T) {
+	f, capture, work := viewed(t, map[string][]byte{"api-1/capture.pcap": []byte("synthetic packets"), "api-1/pod.json": []byte("{}")})
+	c := api.Capture{ID: capture}
+	server := struct{ URL string }{f.url}
 
 	// The capture tells which files have a viewer.
 	viewers := map[string]string{}
@@ -122,7 +135,7 @@ func TestPacketCaptureView(t *testing.T) {
 	}
 
 	// sharkd got the decrypted file and gets the viewer's questions.
-	code, b = f.call("alice-token", "POST", "/api/views/"+view+"/status", map[string]int{"limit": 3})
+	code, b := f.call("alice-token", "POST", "/api/views/"+view+"/status", map[string]int{"limit": 3})
 	if code != 200 || !strings.Contains(string(b), `"content":"synthetic packets"`) || !strings.Contains(string(b), `"asked":{"limit":3}`) {
 		t.Fatal("status", code, string(b))
 	}
@@ -185,5 +198,56 @@ func TestPacketCaptureView(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatal("the view outlived its stream")
 		}
+	}
+}
+
+// openedView opens a file's view and returns its ID; the view lasts until
+// the test ends.
+func openedView(t *testing.T, f fixture, capture, name string) string {
+	t.Helper()
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", f.url+"/api/captures/"+capture+"/views/"+name, nil)
+	req.Header.Set("Authorization", "Bearer alice-token")
+	stream, err := http.DefaultClient.Do(req)
+	if err != nil || stream.StatusCode != 200 {
+		b, _ := io.ReadAll(stream.Body)
+		t.Fatal("open", name, err, stream.StatusCode, string(b))
+	}
+	t.Cleanup(func() { stream.Body.Close() })
+	line, _ := bufio.NewReader(stream.Body).ReadString('\n')
+	return strings.TrimSpace(strings.TrimPrefix(line, "data: "))
+}
+
+// A profile in pprof's format is shown by pprof's own web interface, which
+// the hub serves for the view.
+func TestProfileView(t *testing.T) {
+	// A synthetic profile: one sample in one function.
+	function := &profile.Function{ID: 1, Name: "synthetic.Workload", Filename: "workload.go"}
+	location := &profile.Location{ID: 1, Line: []profile.Line{{Function: function, Line: 7}}}
+	var packed bytes.Buffer
+	err := (&profile.Profile{
+		SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}},
+		Sample:     []*profile.Sample{{Location: []*profile.Location{location}, Value: []int64{1000}}},
+		Location:   []*profile.Location{location}, Function: []*profile.Function{function},
+	}).Write(&packed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/heap.pprof": []byte("not a profile")})
+
+	view := openedView(t, f, capture, "api-1/cpu.pprof")
+	for _, page := range []string{"flamegraph", "top"} {
+		if code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/"+page, nil); code != 200 || !strings.Contains(string(b), "synthetic.Workload") {
+			t.Fatal(page, code, len(b))
+		}
+	}
+	// pprof's settings are not written from the browser, and the view is its opener's.
+	if code, _ := f.call("alice-token", "POST", "/api/views/"+view+"/pages/saveconfig", nil); code != 404 && code != 405 {
+		t.Fatal("saveconfig", code)
+	}
+	if code, _ := f.call("root-token", "GET", "/api/views/"+view+"/pages/top", nil); code != 404 {
+		t.Fatal("another user's view", code)
+	}
+	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/heap.pprof", nil); code != 422 || !strings.Contains(string(b), "pprof cannot read this profile") {
+		t.Fatal("a file that is no profile", code, string(b))
 	}
 }

@@ -18,6 +18,23 @@ export function notice(text, retry) {
 }
 export function show() { $('notice').hidden = true; $('root').hidden = false; }
 
+// openView has the hub open the file with its tool and calls opened with
+// the view's ID. The hub keeps the file open as long as this stream lasts.
+export function openView(opened) {
+  const views = `/api/captures/${capture}/views/${filePath}`, stream = new EventSource(views);
+  let view = null;
+  stream.onmessage = e => { view = e.data; opened(view); };
+  stream.onerror = async () => {
+    stream.close();
+    if (view) return notice('This view has ended.', true);
+    // The stream gives no reason; asking again without it does, unless it works this time.
+    const again = new AbortController(), res = await fetch(views, {headers, signal: again.signal}).catch(() => null);
+    const reason = res && !res.ok ? (await res.json().catch(() => null))?.error : '';
+    again.abort();
+    notice('The hub could not open this file' + (reason ? ': ' + reason : '.'), true);
+  };
+}
+
 // The browser holds a text file and an index of its lines in memory, so a
 // text viewer reads at most this much and says so when a file is longer.
 const textLimit = 64 << 20;

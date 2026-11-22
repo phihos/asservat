@@ -174,6 +174,7 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
 	user("GET /api/captures/{id}/views/{name...}", h.openView)
 	user("POST /api/views/{view}/{method}", h.askView)
+	user("GET /api/views/{view}/pages/{page...}", h.viewPage)
 	user("POST /api/watches", h.createWatch)
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
