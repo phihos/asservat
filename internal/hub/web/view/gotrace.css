@@ -1,0 +1,2 @@
+/* The pages of Go's trace tool fill the viewer. */
+#gotrace { flex: 1; width: 100%; border: 0; background: #fff; }

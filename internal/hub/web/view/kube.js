@@ -2,7 +2,7 @@
 // Kubernetes dashboard: a pod's properties, conditions, containers and
 // volumes, or the table of its events; and the object itself as a tree that
 // folds, like a browser's JSON viewer.
-import {$, esc, file, loadText, show} from './common.js';
+import {$, esc, file, loadText, moment, show} from './common.js';
 
 const markup = `
   <div class="tabs"><button data-tab="overview" class="on">Overview</button><button data-tab="json">JSON</button></div>
@@ -89,7 +89,7 @@ function eventsOverview(events) {
   if (!events.length) return '<p class="muted">The pod had no events when it was recorded. Kubernetes keeps events for about an hour.</p>';
   const last = e => e.lastTimestamp || e.eventTime || e.firstTimestamp || '';
   return `<table class="grid events"><thead><tr><th>Type</th><th>Reason</th><th>Message</th><th>From</th><th>Count</th><th>First seen</th><th>Last seen</th></tr></thead><tbody>${
-    [...events].sort((a, b) => last(b).localeCompare(last(a))).map(e => `<tr class="${e.type === 'Warning' ? 'warning' : ''}"><td>${badge(e.type || 'Normal', e.type === 'Warning' ? 'warn' : 'done')}</td><td>${esc(e.reason || '')}</td><td>${esc(e.message || '')}</td><td>${esc(e.source?.component || e.reportingComponent || '')}</td><td>${e.count || 1}</td><td>${when(e.firstTimestamp || e.eventTime)}</td><td>${when(last(e))}</td></tr>`).join('')}</tbody></table>`;
+    [...events].sort((a, b) => last(b).localeCompare(last(a))).map(e => `<tr class="${e.type === 'Warning' ? 'warning' : ''}" data-at="${esc(last(e))}" title="Select the event to open the logs, packets or calls of its moment"><td>${badge(e.type || 'Normal', e.type === 'Warning' ? 'warn' : 'done')}</td><td>${esc(e.reason || '')}</td><td>${esc(e.message || '')}</td><td>${esc(e.source?.component || e.reportingComponent || '')}</td><td>${e.count || 1}</td><td>${when(e.firstTimestamp || e.eventTime)}</td><td>${when(last(e))}</td></tr>`).join('')}</tbody></table>`;
 }
 
 // The JSON tree. With a filter, only the values whose key or text matches
@@ -119,6 +119,14 @@ export default async function (root) {
     if (!name) return;
     for (const b of root.querySelectorAll('[data-tab]')) b.classList.toggle('on', b === e.target);
     $('overview').hidden = name !== 'overview'; $('json').hidden = name !== 'json';
+  };
+  // An event's moment leads to what the pod's other files recorded then.
+  $('overview').onclick = e => {
+    const row = e.target.closest('tr[data-at]');
+    if (!row) return;
+    for (const r of $('overview').querySelectorAll('tr.selected')) r.classList.remove('selected');
+    row.classList.add('selected');
+    moment(Date.parse(row.dataset.at) / 1000);
   };
   $('filter').oninput = () => draw(false);
   $('expand').onclick = () => draw(true);

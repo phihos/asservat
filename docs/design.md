@@ -203,18 +203,20 @@ shows what the tool would show.
 
 | File | Viewer | Read by |
 | --- | --- | --- |
-| Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details, packet bytes, follow stream | Wireshark's `sharkd` in the hub |
+| Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details and bytes side by side or stacked, follow stream; conversations, endpoints, protocol hierarchy and expert information, whose rows filter the list | Wireshark's `sharkd` in the hub |
 | Logs | Like the log panels of Lens and the Kubernetes dashboard: a dark terminal with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out) | The browser |
 | Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
-| Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek | pprof in the hub (`dot` draws the graph) |
+| Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek; against a base, another profile of the same kind from the user's captures, the difference (pprof's `-diff_base`) | pprof in the hub (`dot` draws the graph) |
+| Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
 
 | Core dump | Like a debugger's view of a stopped program (Visual Studio Code): threads, call stack, the frame's variables, instructions and registers, modules, memory map | gdb on the node, when the core is recorded |
 
-Execution traces and the heap dumps of Java and .NET download only, for
-now.
+The heap dumps of Java and the traces and dumps of .NET download only:
+their tools (Eclipse MAT, PerfView, the .NET SDK) would each add a runtime
+of several hundred megabytes to the image.
 
 A core is a memory image: without the program's executable and libraries a
 debugger shows addresses, not functions. Those files are on the node while
@@ -228,6 +230,13 @@ description is also readable for AI agents over MCP. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
+A viewer's address names the spot it shows (the packet and display filter,
+the log line, the trace entry, the stack, the base of a comparison), so a
+copied link leads there. Logs, packets and system calls of a capture share
+a clock: for a selected line, packet, call or event, the page offers the
+capture's other such files at that moment, and each opens at the first
+entry from then on. A trace's times of day are placed on the capture's day.
+
 A packet capture or a profile is not sent to the browser. It is opened as a
 **view**.
 The browser opens it with an event stream; the view lives as long as that stream, so nothing has to guess when somebody
@@ -237,10 +246,16 @@ only its opener may ask them. For a packet capture, the hub decrypts the
 file into its work directory (`--work-dir`, an `emptyDir` in the chart),
 starts one `sharkd` for the view, and removes the file's name as soon as
 `sharkd` has it open. Of `sharkd`'s requests, the hub passes on those that
-read the loaded capture and no others. A profile is parsed in the hub's
+read the loaded capture and no others; of its statistics, those that count
+packets. A profile is parsed in the hub's
 memory by pprof's library, which hands the hub the pages of its web
 interface; the view serves them, except those that write pprof's settings
-or read the profiled program's binary.
+or read the profiled program's binary. Go's trace tool is no library: the
+hub builds it from the toolchain's source (`cmd/trace`) into the image,
+runs one for the view on a loopback port, and passes its pages on. The tool
+writes its links from the root of its own server, so the hub rewrites them
+to the view's pages. It reads the whole trace into memory; the decrypted
+file is removed once it serves.
 
 ## Permissions
 

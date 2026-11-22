@@ -299,6 +299,9 @@ func ViewerOf(name string) string {
 		return "core"
 	case strings.HasSuffix(file, ".pprof"):
 		return "pprof"
+	// Go's execution trace, as the endpoint catalog names it.
+	case strings.HasSuffix(file, "trace.out"):
+		return "gotrace"
 	case strings.HasSuffix(file, ".strace"):
 		return "strace"
 	// Dumps of goroutines or threads; with a port in front of the name

@@ -227,11 +227,13 @@ view=$(sed -n 's/^data: //p' "$WORK/view")
 frames=$(ok "$ALICE" POST "/api/views/$view/frames" '{"filter":"tcp.port == 8080","limit":5}')
 jq -e 'length == 5 and (.[0].c | index("TCP") != null)' <<<"$frames" >/dev/null || fail "packet list of the view: $frames"
 ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}' | jq -e '(.tree | length > 2) and (.bytes | length > 0)' >/dev/null || fail "packet details of the view"
+ok "$ALICE" POST "/api/views/$view/tap" '{"tap0":"conv:TCP","tap1":"phs","tap2":"expert"}' | jq -e '(.taps | map({(.tap): .}) | add) as $t | ($t["conv:TCP"].convs | length > 0) and ($t.phs.protos[0].frames > 0) and ($t.expert.type == "expert")' >/dev/null || fail "statistics of the view"
+[ "$(status "$ALICE" POST "/api/views/$view/tap" '{"tap0":"eo:http"}')" = 400 ] || fail "a statistic that does more than count"
 [ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
 kill $viewer
 # The other viewers read in the browser; the hub names them and serves them.
 ok "$ALICE" GET /api/captures | jq -e '[.[].artifacts[].viewer] | contains(["kube", "log", "pcap"])' >/dev/null || fail "viewers of the files so far"
-for v in kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
+for v in gotrace kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
 grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
 
 log "what runs and who talks: the choices for a process and a packet filter (edge)"
@@ -287,16 +289,17 @@ grep -Eq '(wait4|nanosleep|clock_nanosleep|execve|read)\(' "$WORK/web.strace" ||
 
 log "HTTP profile endpoint, fetched inside the pod's network namespace (edge)"
 # The demo serves files as its profiles: a synthetic one in pprof's format
-# as the CPU profile, a word as the heap profile.
+# as the CPU profile, a word as the heap profile, a synthetic execution trace.
 for p in $(edge -n shop get pods -l app=web -o name); do
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/profile' <test/e2e/synthetic-cpu.pprof
+  edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/trace' <test/e2e/synthetic-trace.out
 done
 # The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
 found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')
 [ "$(jq -c '[.ports, [.profiles[] | select(.endpoint == "go-cpu" or .endpoint == "go-heap") | [.port, .endpoint, .timed, .sensitive]]]' <<<"$found")" = '[[8080],[[8080,"go-cpu",true,false],[8080,"go-heap",false,false]]]' ] || fail "profile endpoints: $found"
-id=$(capture "$ALICE" "$(target edge pprof '{"durationSeconds":1,"params":{"endpoints":"8080/go-cpu,8080/go-heap"}}')"); completed "$ALICE" "$id"
+id=$(capture "$ALICE" "$(target edge pprof '{"durationSeconds":1,"params":{"endpoints":"8080/go-cpu,8080/go-heap,8080/go-trace"}}')"); completed "$ALICE" "$id"
 pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
-[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, (.artifacts | length)] | @csv')" = 'false,4' ] || fail "profiles of two endpoints on two pods"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, (.artifacts | length)] | @csv')" = 'false,6' ] || fail "profiles of three endpoints on two pods"
 fetch "$ALICE" "$id" "$pod/cpu.pprof" "$WORK/cpu.pprof"; fetch "$ALICE" "$id" "$pod/heap.pprof" "$WORK/heap.pprof"
 cmp -s "$WORK/cpu.pprof" test/e2e/synthetic-cpu.pprof && [ "$(cat "$WORK/heap.pprof")" = heap-profile ] || fail "profile contents"
 # A profile in pprof's format opens in pprof's own web interface, served by the hub for the view.
@@ -309,6 +312,24 @@ grep -q 'shop.priceOf' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "
 grep -q '<svg' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/graph")" || fail "pprof's graph page, drawn by dot"
 kill $viewer
 [ "$(status "$ALICE" GET "/api/captures/$id/views/$pod/heap.pprof")" = 422 ] || fail "a file that is no profile opened in pprof"
+# Against a base, here the other pod's profile, pprof shows the difference: none.
+other=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[1].pod')
+: >"$WORK/view"
+curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/cpu.pprof?base=$id/$other/cpu.pprof" >"$WORK/view" &
+viewer=$!
+for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
+view=$(sed -n 's/^data: //p' "$WORK/view")
+grep -q 'accounting for 0' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")" || fail "pprof's difference to a base"
+kill $viewer
+# An execution trace opens in Go's own trace tool, which the hub runs for the view; its links lead to the view's pages.
+: >"$WORK/view"
+curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/trace.out" >"$WORK/view" &
+viewer=$!
+for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
+view=$(sed -n 's/^data: //p' "$WORK/view")
+grep -q "href=\"/api/views/$view/pages/goroutines\"" <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/")" || fail "the first page of Go's trace tool"
+grep -q 'Goroutines' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/goroutines")" || fail "goroutine analysis of Go's trace tool"
+kill $viewer
 # An endpoint that Asservat does not know can return anything: it needs approval.
 id=$(capture "$ALICE" "$(target edge pprof '{"params":{"port":"8080","path":"/index.html"}}')")
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .state)" = PendingApproval ] || fail "an unknown endpoint did not wait for approval"

@@ -1,7 +1,7 @@
 // The viewer for goroutine and thread dumps follows the tools that analyse
 // them (panicparse for Go, the thread dump analysers of Java IDEs): stacks
 // that are the same are shown once with their number, by state.
-import {$, esc, loadText, truncatedNote, show} from './common.js';
+import {$, esc, loadText, spot, truncatedNote, show} from './common.js';
 
 const markup = `
   <div class="narrow">
@@ -62,16 +62,20 @@ export default async function (root) {
     draw();
   };
   for (const id of ['text', 'state', 'group']) $(id).oninput = narrow;
-  $('groups').onclick = e => { const g = e.target.closest('.g'); if (g) { selected = Number(g.dataset.i); draw(); } };
+  const choose = i => { selected = i; spot.write({g: groups[i]?.[0].name}); draw(); };
+  $('groups').onclick = e => { const g = e.target.closest('.g'); if (g) choose(Number(g.dataset.i)); };
   $('groups').onkeydown = e => {
     const step = {ArrowDown: 1, ArrowUp: -1}[e.key];
     if (!step || selected + step < 0 || selected + step >= groups.length) return;
     e.preventDefault();
-    selected += step; draw();
+    choose(selected + step);
     $('groups').querySelector('.selected')?.scrollIntoView({block: 'nearest'});
   };
   if (truncated) { $('note').hidden = false; $('note').textContent = truncatedNote; }
   if (!all.length) { $('note').hidden = false; $('note').textContent = 'No goroutines or threads were recognized in this file. Its text follows.'; $('stack').textContent = text; }
   show();
   if (all.length) narrow();
+  // The address names a goroutine or thread: its stack is selected.
+  const named = spot.read().g, at = named ? groups.findIndex(g => g.some(s => s.name === named)) : -1;
+  if (at >= 0) { choose(at); $('groups').querySelector('.selected')?.scrollIntoView({block: 'nearest'}); }
 }

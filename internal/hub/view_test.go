@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime/trace"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +39,7 @@ done
 
 // viewed starts a hub with a capture of alice's that holds the given files,
 // and returns the capture's ID and the hub's work directory.
-func viewed(t *testing.T, files map[string][]byte) (fixture, string, string) {
+func viewed(t *testing.T, files map[string][]byte, tools ...func(*hub.Config)) (fixture, string, string) {
 	t.Helper()
 	dsn := os.Getenv("ASSERVAT_TEST_DSN")
 	if dsn == "" {
@@ -54,8 +56,12 @@ func viewed(t *testing.T, files map[string][]byte) (fixture, string, string) {
 	}
 	cluster := "view" + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:10]
 	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-cluster-with-viewed-files-0123456789"}
-	h, err := hub.New(hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, Clusters: []hub.Cluster{joined}, WorkDir: work, Sharkd: sharkd,
-		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "mallory", Token: "mallory-token"}, {Name: "root", Token: "root-token", Groups: []string{"admins"}}}})
+	config := hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, Clusters: []hub.Cluster{joined}, WorkDir: work, Sharkd: sharkd,
+		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "mallory", Token: "mallory-token"}, {Name: "root", Token: "root-token", Groups: []string{"admins"}}}}
+	for _, tool := range tools {
+		tool(&config)
+	}
+	h, err := hub.New(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +147,15 @@ func TestPacketCaptureView(t *testing.T) {
 	}
 	if code, b := f.call("alice-token", "POST", "/api/views/"+view+"/check", map[string]string{"filter": "tcp.port =="}); code != 400 || !strings.Contains(string(b), "Filter invalid") {
 		t.Fatal("sharkd's refusal", code, string(b))
+	}
+	// Of sharkd's statistics, those that count packets pass.
+	if code, b := f.call("alice-token", "POST", "/api/views/"+view+"/tap", map[string]string{"tap0": "conv:TCP", "tap1": "expert", "filter": "tcp"}); code != 200 || !strings.Contains(string(b), `"tap0":"conv:TCP"`) {
+		t.Fatal("statistics", code, string(b))
+	}
+	for _, asked := range []map[string]any{{"tap0": "eo:http"}, {"tap0": "follow:TCP"}, {"tap0": 7}, {"file": "/etc/passwd"}} {
+		if code, _ := f.call("alice-token", "POST", "/api/views/"+view+"/tap", asked); code != 400 {
+			t.Fatal("other statistics", asked, code)
+		}
 	}
 	// Only questions about the loaded capture pass; "load" would open files.
 	if code, _ := f.call("alice-token", "POST", "/api/views/"+view+"/load", map[string]string{"file": "/etc/passwd"}); code != 400 {
@@ -232,7 +247,18 @@ func TestProfileView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/heap.pprof": []byte("not a profile")})
+	// The same workload later: twice the samples.
+	location.Line[0].Function.Name = "synthetic.Workload"
+	var later bytes.Buffer
+	err = (&profile.Profile{
+		SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}},
+		Sample:     []*profile.Sample{{Location: []*profile.Location{location}, Value: []int64{3000}}},
+		Location:   []*profile.Location{location}, Function: []*profile.Function{function},
+	}).Write(&later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/cpu.pprof": packed.Bytes(), "api-1/later.pprof": later.Bytes(), "api-1/heap.pprof": []byte("not a profile")})
 
 	view := openedView(t, f, capture, "api-1/cpu.pprof")
 	for _, page := range []string{"flamegraph", "top"} {
@@ -247,7 +273,63 @@ func TestProfileView(t *testing.T) {
 	if code, _ := f.call("root-token", "GET", "/api/views/"+view+"/pages/top", nil); code != 404 {
 		t.Fatal("another user's view", code)
 	}
+	// Against a base, pprof shows the difference: 3000 - 1000 nanoseconds are 2 microseconds.
+	diff := openedView(t, f, capture, "api-1/later.pprof?base="+capture+"/api-1/cpu.pprof")
+	if code, b := f.call("alice-token", "GET", "/api/views/"+diff+"/pages/top", nil); code != 200 || !strings.Contains(string(b), "accounting for 2us") {
+		t.Fatal("difference to the base", code, string(b))
+	}
+	for base, want := range map[string]int{capture + "/api-1/missing.pprof": 404, "00000000-0000-0000-0000-000000000000/api-1/cpu.pprof": 404, capture + "/api-1/heap.pprof": 422} {
+		if code, _ := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/later.pprof?base="+base, nil); code != want {
+			t.Fatal("base", base, code)
+		}
+	}
 	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/heap.pprof", nil); code != 422 || !strings.Contains(string(b), "pprof cannot read this profile") {
 		t.Fatal("a file that is no profile", code, string(b))
+	}
+}
+
+// A Go execution trace is shown by Go's own trace tool, which the hub runs
+// for the view. Its links start at the root of its own server; the hub
+// leads them to the view's pages.
+func TestExecutionTraceView(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("building Go's trace tool needs the go command")
+	}
+	tool := filepath.Join(t.TempDir(), "gotrace")
+	if out, err := exec.Command("go", "build", "-o", tool, "cmd/trace").CombinedOutput(); err != nil {
+		t.Fatal("build cmd/trace:", err, string(out))
+	}
+	// A synthetic trace: this test's own goroutines for a moment.
+	var recorded bytes.Buffer
+	if err := trace.Start(&recorded); err != nil {
+		t.Skip("another trace is running:", err)
+	}
+	done := make(chan struct{})
+	go func() { time.Sleep(5 * time.Millisecond); close(done) }()
+	<-done
+	trace.Stop()
+	f, capture, work := viewed(t, map[string][]byte{"api-1/trace.out": recorded.Bytes(), "api-1/6060-trace.out": []byte("no trace")}, func(c *hub.Config) { c.GoTrace = tool })
+
+	view := openedView(t, f, capture, "api-1/trace.out")
+	if left, _ := os.ReadDir(work); len(left) != 0 {
+		t.Fatal("the decrypted trace kept its name", left)
+	}
+	pages := "/api/views/" + view + "/pages/"
+	code, b := f.call("alice-token", "GET", pages, nil)
+	if code != 200 || !strings.Contains(string(b), `href="`+pages+`goroutines"`) || strings.Contains(string(b), `href="/goroutines"`) {
+		t.Fatal("the tool's first page", code, string(b))
+	}
+	if code, b := f.call("alice-token", "GET", pages+"goroutines", nil); code != 200 || !strings.Contains(string(b), "Goroutines") {
+		t.Fatal("goroutine analysis", code, string(b))
+	}
+	// The viewer's requests for the trace itself are led to the view as well.
+	if code, b := f.call("alice-token", "GET", pages+"trace", nil); code != 200 || !strings.Contains(string(b), pages+"jsontrace") {
+		t.Fatal("trace page", code, len(b))
+	}
+	if code, _ := f.call("root-token", "GET", pages, nil); code != 404 {
+		t.Fatal("another user's view", code)
+	}
+	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/6060-trace.out", nil); code != 422 || !strings.Contains(string(b), "cannot read this trace") {
+		t.Fatal("a file that is no trace", code, string(b))
 	}
 }

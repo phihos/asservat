@@ -76,6 +76,9 @@ type Config struct {
 	// Sharkd is the path of Wireshark's sharkd, which reads packet captures
 	// for their viewer.
 	Sharkd string
+	// GoTrace is the path of Go's trace tool (cmd/trace), which shows
+	// execution traces for their viewer.
+	GoTrace string
 }
 
 type Hub struct {

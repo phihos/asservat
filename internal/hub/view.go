@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -35,6 +37,9 @@ type view struct {
 	// pages are the pages of a tool's own web interface, by path, for a
 	// viewer that shows it: pprof's.
 	pages map[string]http.Handler
+	// tool serves every page of a tool that runs beside the hub: Go's
+	// trace tool.
+	tool http.Handler
 }
 
 type views struct {
@@ -84,7 +89,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 		return err
 	}
 	viewer := api.ViewerOf(a.Name)
-	if viewer != "pcap" && viewer != "pprof" {
+	if viewer != "pcap" && viewer != "pprof" && viewer != "gotrace" {
 		return errStatus{http.StatusBadRequest, "this file is not opened in the hub; its viewer reads it in the browser, or it only downloads"}
 	}
 	if err := h.Store.Audit(r.Context(), u.Name, "artifact.view", c.ID, map[string]string{"name": a.Name}); err != nil {
@@ -94,15 +99,36 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	opened := &view{user: u.Name, capture: c.ID, end: cancel}
-	if viewer == "pcap" {
+	id := uuid.NewString()
+	switch viewer {
+	case "pcap":
 		opened.ask, err = h.dissect(ctx, a)
-	} else {
-		opened.pages, err = h.profilePages(ctx, a)
+	case "gotrace":
+		opened.tool, err = h.tracePages(ctx, a, "/api/views/"+id+"/pages")
+	default:
+		// "base" names another profile, as "<capture>/<file>": pprof then
+		// shows this profile minus that one.
+		var base *storedArtifact
+		if named := r.URL.Query().Get("base"); named != "" {
+			id, name, _ := strings.Cut(named, "/")
+			from, err := h.visible(ctx, u, id)
+			if err != nil {
+				return err
+			}
+			b, err := h.Store.Artifact(ctx, from.ID, name)
+			if err != nil {
+				return err
+			}
+			if api.ViewerOf(b.Name) != "pprof" {
+				return errStatus{http.StatusBadRequest, "the base is no profile"}
+			}
+			base = &b
+		}
+		opened.pages, err = h.profilePages(ctx, a, base)
 	}
 	if err != nil {
 		return err
 	}
-	id := uuid.NewString()
 	h.views.add(id, opened)
 	defer h.views.remove(id)
 
@@ -123,6 +149,31 @@ var sharkdMethods = map[string]bool{
 	"check":     true, // whether a display filter is valid
 	"complete":  true, // field names for the filter input
 	"follow":    true, // the payload of a stream
+	"tap":       true, // statistics; see allowedTaps
+}
+
+// tapName matches the statistics that a viewer may ask sharkd for:
+// conversations and endpoints of a protocol, expert information and the
+// protocol hierarchy. sharkd has other taps; these only count packets.
+var tapName = regexp.MustCompile(`^(?:(?:conv|endpt):[A-Za-z0-9]+|expert|phs)$`)
+
+// allowedTaps reports whether a "tap" question names only such statistics,
+// with or without a display filter.
+func allowedTaps(params json.RawMessage) bool {
+	var asked map[string]json.RawMessage
+	if json.Unmarshal(params, &asked) != nil {
+		return false
+	}
+	for key, value := range asked {
+		var text string
+		if json.Unmarshal(value, &text) != nil {
+			return false
+		}
+		if key != "filter" && !(strings.HasPrefix(key, "tap") && tapName.MatchString(text)) {
+			return false
+		}
+	}
+	return true
 }
 
 // askView passes a viewer's question to its view.
@@ -145,6 +196,9 @@ func (h *Hub) askView(w http.ResponseWriter, r *http.Request, u User) error {
 	if !json.Valid(params) {
 		return errStatus{http.StatusBadRequest, "the question is not JSON"}
 	}
+	if method == "tap" && !allowedTaps(params) {
+		return errStatus{http.StatusBadRequest, "unknown statistics"}
+	}
 	result, err := v.ask(method, params)
 	if err != nil {
 		return err
@@ -161,6 +215,11 @@ func (h *Hub) viewPage(w http.ResponseWriter, r *http.Request, u User) error {
 		return ErrNotFound
 	}
 	page := v.pages["/"+r.PathValue("page")]
+	if page == nil && v.tool != nil {
+		// The tool sees the page's address as its own.
+		r.URL.Path = "/" + r.PathValue("page")
+		page = v.tool
+	}
 	if page == nil {
 		return ErrNotFound
 	}

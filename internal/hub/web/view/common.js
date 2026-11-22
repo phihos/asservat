@@ -18,10 +18,28 @@ export function notice(text, retry) {
 }
 export function show() { $('notice').hidden = true; $('root').hidden = false; }
 
+// After "#", a viewer's address names the spot it shows, so that a copied
+// link leads to the same packet, line or call.
+export const spot = {
+  read: () => Object.fromEntries(new URLSearchParams(location.hash.slice(1))),
+  write(values) {
+    const named = new URLSearchParams();
+    for (const [key, value] of Object.entries(values)) if (value !== '' && value !== null && value !== undefined) named.set(key, value);
+    history.replaceState(null, '', location.pathname + location.search + (named.size ? '#' + named : ''));
+  },
+};
+
+// A viewer tells the moment of what is selected, in seconds since 1970, or
+// null. The page then offers the capture's other files at that moment; a
+// viewer that is opened with "at" in its address shows what happened then.
+let told = () => {};
+export const onMoment = listener => { told = listener; };
+export const moment = seconds => told(Number.isFinite(seconds) ? seconds : null);
+
 // openView has the hub open the file with its tool and calls opened with
 // the view's ID. The hub keeps the file open as long as this stream lasts.
-export function openView(opened) {
-  const views = `/api/captures/${capture}/views/${filePath}`, stream = new EventSource(views);
+export function openView(opened, query = '') {
+  const views = `/api/captures/${capture}/views/${filePath}${query}`, stream = new EventSource(views);
   let view = null;
   stream.onmessage = e => { view = e.data; opened(view); };
   stream.onerror = async () => {
