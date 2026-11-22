@@ -3,6 +3,8 @@ package hub
 import (
 	"bytes"
 	"crypto/rand"
+	"io"
+	"runtime"
 	"testing"
 )
 
@@ -55,5 +57,36 @@ func TestWrapKey(t *testing.T) {
 	master[0] ^= 1
 	if _, err := unwrapKey(master, wrapped); err == nil {
 		t.Fatal("unwrapped with another master key")
+	}
+}
+
+// Sealing and opening a file takes memory for a few chunks, however long
+// the file is: the buffers serve every chunk. (Found with a memory growth
+// profile of the hub, which took new memory for each chunk of a download.)
+func TestEncryptionReusesItsBuffers(t *testing.T) {
+	key := make([]byte, 32)
+	plain := make([]byte, 64*chunkSize)
+	var sealed bytes.Buffer
+	sealed.Grow(len(plain) + 64*32)
+	allocated := func(run func()) uint64 {
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		run()
+		runtime.ReadMemStats(&after)
+		return after.TotalAlloc - before.TotalAlloc
+	}
+	if got := allocated(func() {
+		if err := encrypt(&sealed, bytes.NewReader(plain), key); err != nil {
+			t.Fatal(err)
+		}
+	}); got > 4*chunkSize {
+		t.Errorf("sealing 64 chunks allocated %d bytes, more than 4 chunks", got)
+	}
+	if got := allocated(func() {
+		if err := decrypt(io.Discard, bytes.NewReader(sealed.Bytes()), key); err != nil {
+			t.Fatal(err)
+		}
+	}); got > 4*chunkSize {
+		t.Errorf("opening 64 chunks allocated %d bytes, more than 4 chunks", got)
 	}
 }
