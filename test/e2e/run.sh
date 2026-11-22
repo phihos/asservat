@@ -256,9 +256,9 @@ id=$(capture "$ALICE" "$(target edge "" "$several")")
 ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
 completed "$ALICE" "$id"
 bundle=$(ok "$ALICE" GET "/api/captures/$id")
-# Each of the two pods delivers the files of all five recordings.
-[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
-[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[12,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+# Each of the two pods delivers the files of all five recordings, and the description of its core.
+[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","core.web.analysis.json","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
+[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[14,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
 log "progress, and stopping a capture with what it has (edge)"
 id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")
