@@ -225,10 +225,15 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 	}
 	if _, err := tx.Exec(ctx, `UPDATE captures c SET
   state = CASE WHEN t.open > 0 THEN 'Running' WHEN t.completed > 0 THEN 'Completed' ELSE 'Failed' END,
-  message = CASE WHEN t.open = 0 AND t.failed > 0 THEN t.failed || ' of ' || t.total || ' pods failed' ELSE '' END,
+  message = CASE WHEN t.open > 0 THEN '' ELSE concat_ws('; ',
+    CASE WHEN t.failed > 0 THEN t.failed || ' of ' || t.total || ' pods failed' END,
+    CASE WHEN r.failed > 0 THEN r.failed || ' of ' || r.total || ' recordings failed' END) END,
   finished_at = CASE WHEN t.open = 0 THEN now() END
  FROM (SELECT count(*) FILTER (WHERE state IN ('Queued','Running')) AS open, count(*) FILTER (WHERE state = 'Completed') AS completed,
-   count(*) FILTER (WHERE state = 'Failed') AS failed, count(*) AS total FROM tasks WHERE capture_id = $1::uuid) t
+   count(*) FILTER (WHERE state = 'Failed') AS failed, count(*) AS total FROM tasks WHERE capture_id = $1::uuid) t,
+  -- The recordings of the pods that delivered: one of them can have failed while the others gave files.
+  (SELECT count(*) FILTER (WHERE rec->>'state' = 'Failed') AS failed, count(*) AS total
+   FROM tasks, jsonb_array_elements(recordings) rec WHERE capture_id = $1::uuid AND tasks.state = 'Completed') r
  WHERE c.id = $1::uuid AND c.state IN ('Queued','Running')`, id); err != nil {
 		return err
 	}
