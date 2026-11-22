@@ -263,11 +263,25 @@ shows what the tool would show.
 | Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
 
+| Heap dump of Java (`*.hprof`) or of .NET (`*.gcdump`) | Like the first views of a heap analyser (VisualVM, Eclipse MAT, PerfView): a summary, the histogram of classes with the number and size of their objects, narrowed by name and sorted, the biggest single objects, and for Java the kinds of GC roots and the threads' stacks | The hub |
 | Core dump | Like a debugger's view of a stopped program (Visual Studio Code): threads, for a Go program goroutines, call stack, the frame's variables, instructions and registers, modules, memory map | gdb, and Delve for a Go program, on the node, when the core is recorded |
 
-The heap dumps of Java and the traces and dumps of .NET download only:
-their tools (Eclipse MAT, PerfView, the .NET SDK) would each add a runtime
-of several hundred megabytes to the image.
+The hub reads a heap dump itself, once and as a stream, so its memory does
+not grow with the dump: it counts the objects of each class and keeps no
+object. The sizes are the objects' own ("shallow"), computed as heap
+analysers do; for a JVM with compressed references, which is taken to be so
+when the objects lie within 32 GiB, they are the figures of the JVM's own
+class histogram. What an object keeps alive ("retained size", dominators,
+paths to GC roots) needs the whole object graph in memory and stays with an
+analyser on the user's machine.
+
+A .NET heap dump (gcdump) holds the objects' types and sizes without
+their contents; the hub counts them per type, as `dotnet-gcdump report`
+does.
+
+The traces and memory dumps of .NET download only: their tools (PerfView,
+the .NET SDK) would add a runtime of several hundred megabytes to the
+image. For CPU time of a .NET program, the sampled profile opens in pprof.
 
 A core is a memory image: without the program's executable and libraries a
 debugger shows addresses, not functions. Those files are on the node while
@@ -384,7 +398,8 @@ type.
   directory until the program that reads it has opened it, and in that
   program's memory while the view lasts. The program (`sharkd` for packet
   captures) parses recorded traffic inside the hub's container. A profile
-  is only ever decrypted into the hub's memory.
+  is only ever decrypted into the hub's memory, and so is a heap dump, as
+  a stream of which the hub keeps the counts per class.
 - A core file rests unencrypted on the node until its upload ends, then it
   is deleted: in the agent's scratch volume, or for a crashed process in the
   core handler's directory.

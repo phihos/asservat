@@ -90,7 +90,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 		return err
 	}
 	viewer := api.ViewerOf(a.Name)
-	if viewer != "pcap" && viewer != "pprof" && viewer != "gotrace" {
+	if viewer != "pcap" && viewer != "pprof" && viewer != "gotrace" && viewer != "heap" {
 		return errStatus{http.StatusBadRequest, "this file is not opened in the hub; its viewer reads it in the browser, or it only downloads"}
 	}
 	if err := h.Store.Audit(r.Context(), u.Name, "artifact.view", c.ID, map[string]string{"name": a.Name}); err != nil {
@@ -106,6 +106,8 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 		opened.ask, err = h.dissect(ctx, a)
 	case "gotrace":
 		opened.tool, err = h.tracePages(ctx, a, "/api/views/"+id+"/pages")
+	case "heap":
+		opened.pages, err = h.heapPages(ctx, a)
 	default:
 		// "base" names another profile, as "<capture>/<file>": pprof then
 		// shows this profile minus that one.

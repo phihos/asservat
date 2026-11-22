@@ -236,7 +236,7 @@ ok "$ALICE" POST "/api/views/$view/tap" '{"tap0":"conv:TCP","tap1":"phs","tap2":
 kill $viewer
 # The other viewers read in the browser; the hub names them and serves them.
 ok "$ALICE" GET /api/captures | jq -e '[.[].artifacts[].viewer] | contains(["kube", "log", "pcap"])' >/dev/null || fail "viewers of the files so far"
-for v in gotrace kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
+for v in gotrace heap kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
 grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
 # The look is served by the hub itself: style, mark and fonts.
 for a in identity.css mark.svg barlow-condensed-700.woff2 ibm-plex-sans-400.woff2 ibm-plex-mono-400.woff2; do curl -sS --fail -o /dev/null "$URL/assets/$a" || fail "asset $a is not served"; done

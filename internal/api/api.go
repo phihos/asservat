@@ -311,6 +311,9 @@ func ViewerOf(name string) string {
 		return "gotrace"
 	case strings.HasSuffix(file, ".strace"):
 		return "strace"
+	// A heap dump of Java, or .NET's dump of the heap's objects without their contents.
+	case strings.HasSuffix(file, ".hprof"), strings.HasSuffix(file, ".gcdump"):
+		return "heap"
 	// Dumps of goroutines or threads; with a port in front of the name
 	// when a capture fetched the same endpoint from several ports.
 	case strings.HasSuffix(file, "goroutines.txt"), strings.HasSuffix(file, "threaddump.txt"):

@@ -132,7 +132,7 @@ func TestViewerOf(t *testing.T) {
 	for name, want := range map[string]string{
 		"api-1/capture.pcap": "pcap", "api-1/web.log": "log", "api-1/web.previous.log": "log", "api-1/web.strace": "strace",
 		"api-1/pod.json": "kube", "api-1/events.json": "kube", "api-1/core.web": "core", "api-1/core.web.1234.analysis.json": "core", "api-1/heap.pprof": "pprof", "api-1/other.json": "",
-		"api-1/goroutines.txt": "stacks", "api-1/8080-threaddump.txt": "stacks", "api-1/trace.out": "gotrace", "api-1/6060-trace.out": "gotrace", "api-1/profile.out": "", "api-1/heapdump.hprof": "",
+		"api-1/goroutines.txt": "stacks", "api-1/8080-threaddump.txt": "stacks", "api-1/trace.out": "gotrace", "api-1/6060-trace.out": "gotrace", "api-1/profile.out": "", "api-1/heapdump.hprof": "heap", "api-1/heap.gcdump": "heap", "api-1/memory.dmp": "", "api-1/trace.nettrace": "",
 	} {
 		if got := ViewerOf(name); got != want {
 			t.Errorf("ViewerOf(%q) = %q, want %q", name, got, want)
