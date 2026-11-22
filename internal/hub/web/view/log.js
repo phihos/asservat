@@ -35,7 +35,7 @@ export default async function (root) {
     if (!pattern) return esc(s);
     let out = '', last = 0;
     for (const m of s.matchAll(pattern)) {
-      if (!m[0]) break;
+      if (!m[0]) continue;
       out += esc(s.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>'; last = m.index + m[0].length;
     }
     return out + esc(s.slice(last));
