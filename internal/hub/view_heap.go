@@ -533,9 +533,8 @@ func javaName(name string) string {
 	return strings.ReplaceAll(name, "/", ".") + strings.Repeat("[]", depth)
 }
 
-// heapPages reads a heap dump, of Java or of .NET by the file's name, and
-// returns the page that holds its summary.
-func (h *Hub) heapPages(ctx context.Context, a storedArtifact) (map[string]http.Handler, error) {
+// heapSummaryOf reads a heap dump, of Java or of .NET by the file's name.
+func (h *Hub) heapSummaryOf(ctx context.Context, a storedArtifact) (*heapSummary, error) {
 	dump, write := io.Pipe()
 	go func() { write.CloseWithError(h.plain(ctx, a, write)) }()
 	summarize := summarizeHeap
@@ -546,6 +545,42 @@ func (h *Hub) heapPages(ctx context.Context, a storedArtifact) (map[string]http.
 	dump.CloseWithError(err) // ends the decryption if the dump was not read to its end
 	if err != nil {
 		return nil, errStatus{http.StatusUnprocessableEntity, "this heap dump cannot be read: " + err.Error()}
+	}
+	return sum, nil
+}
+
+// heapText returns a heap dump's summary as text, for readers that cannot
+// open the viewer: the totals and the largest classes, as a class
+// histogram prints them.
+func (h *Hub) heapText(ctx context.Context, a storedArtifact) (string, error) {
+	sum, err := h.heapSummaryOf(ctx, a)
+	if err != nil {
+		return "", err
+	}
+	var text strings.Builder
+	fmt.Fprintf(&text, "%s: %d objects, %d bytes, %d classes with objects. Sizes are the objects' own (shallow).\n", sum.Format, sum.Objects, sum.Bytes, len(sum.Classes))
+	// As many classes as the profile report lists functions.
+	fmt.Fprintf(&text, "\nThe largest classes:\n%12s %14s  %s\n", "objects", "bytes", "class")
+	for _, c := range sum.Classes[:min(len(sum.Classes), 60)] {
+		fmt.Fprintf(&text, "%12d %14d  %s\n", c.Instances, c.Bytes, c.Name)
+	}
+	text.WriteString("\nThe biggest single objects:\n")
+	for _, o := range sum.Biggest[:min(len(sum.Biggest), 20)] {
+		fmt.Fprintf(&text, "%14d  %s\n", o.Bytes, o.Class)
+	}
+	for _, t := range sum.Threads {
+		if len(t.Frames) > 0 {
+			fmt.Fprintf(&text, "\nThread %d:\n\tat %s\n", t.Serial, strings.Join(t.Frames, "\n\tat "))
+		}
+	}
+	return text.String(), nil
+}
+
+// heapPages reads a heap dump and returns the page that holds its summary.
+func (h *Hub) heapPages(ctx context.Context, a storedArtifact) (map[string]http.Handler, error) {
+	sum, err := h.heapSummaryOf(ctx, a)
+	if err != nil {
+		return nil, err
 	}
 	page, err := json.Marshal(sum)
 	if err != nil {

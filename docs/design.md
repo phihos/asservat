@@ -310,7 +310,11 @@ missing symbols from those debuginfod servers; this is off by default
 because the agent then sends them the build IDs of the programs it describes
 and of their libraries. The downloads rest in the agent's scratch directory,
 where the debuginfod client removes those unused for a week. As text, the
-description is also readable for AI agents over MCP. The viewers that read in
+description is also readable for AI agents over MCP. For the binary files
+that have a viewer in the hub, MCP's `read_artifact` returns what the
+viewer shows, as text: a profile and a .NET trace as pprof's list of the
+60 functions with the most weight, a heap dump as its 60 largest classes,
+its biggest objects and its threads' stacks. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
@@ -430,7 +434,8 @@ type.
   those ports out. A capture of a pod through which the agent's connection
   passes (the hub's pod, a pod on the host's network) would otherwise
   record its own upload.
-- **Limits.** `read_artifact` over MCP returns 64 KiB per call so that a
+- **Limits.** `read_artifact` over MCP returns 64 KiB of a text file per
+  call, and 60 functions of a profile or classes of a heap dump, so that a
   result fits a model's context. A watch's packet buffer is 16 MiB per pod
   because it lives in the agent's memory. A capture's duration is what the
   user requests. There are no other built-in limits; add one only with a
@@ -446,6 +451,6 @@ These are known gaps, in rough order of value:
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.
-- Server-side analysis of binary evidence for AI agents (packet summaries,
-  profile summaries).
+- A summary of packet captures for AI agents, as profiles and heap dumps
+  have.
 - Several hub replicas.
