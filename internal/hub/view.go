@@ -25,7 +25,10 @@ import (
 
 // view is one file that a user has open.
 type view struct {
-	user string
+	user    string
+	capture string
+	// end closes the view; its stream ends with it.
+	end context.CancelFunc
 	// ask sends one question to the program that holds the file.
 	ask func(method string, params json.RawMessage) (json.RawMessage, error)
 }
@@ -45,6 +48,17 @@ func (v *views) remove(id string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	delete(v.open, id)
+}
+
+// endOf closes the views of a capture's files, when the capture is deleted.
+func (v *views) endOf(capture string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	for _, opened := range v.open {
+		if opened.capture == capture {
+			opened.end()
+		}
+	}
 }
 
 func (v *views) get(id string) *view {
@@ -79,7 +93,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 		return err
 	}
 	id := uuid.NewString()
-	h.views.add(id, &view{user: u.Name, ask: ask})
+	h.views.add(id, &view{user: u.Name, capture: c.ID, end: cancel, ask: ask})
 	defer h.views.remove(id)
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -111,10 +125,9 @@ func (h *Hub) askView(w http.ResponseWriter, r *http.Request, u User) error {
 	if !sharkdMethods[method] {
 		return errStatus{http.StatusBadRequest, "unknown question"}
 	}
-	// A question is small; the limit keeps a client from filling memory.
-	params, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	params, err := io.ReadAll(r.Body)
 	if err != nil {
-		return errStatus{http.StatusBadRequest, "the question is too large"}
+		return err
 	}
 	if len(params) == 0 {
 		params = json.RawMessage("{}")

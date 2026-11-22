@@ -148,6 +148,32 @@ func TestPacketCaptureView(t *testing.T) {
 		t.Fatal("the view is not in the audit log")
 	}
 
+	// A deleted capture takes its open views with it: the stream ends and
+	// the view answers no more.
+	other, err := http.DefaultClient.Do(req.Clone(t.Context()))
+	if err != nil || other.StatusCode != 200 {
+		t.Fatal("open again", err, other)
+	}
+	defer other.Body.Close()
+	lines := bufio.NewReader(other.Body)
+	line, _ = lines.ReadString('\n')
+	second := strings.TrimSpace(strings.TrimPrefix(line, "data: "))
+	if code, _ := f.call("alice-token", "POST", "/api/views/"+second+"/status", nil); code != 200 {
+		t.Fatal("second view", code)
+	}
+	defer func() {
+		if code, _ := f.call("alice-token", "DELETE", "/api/captures/"+c.ID, nil); code != 204 && code != 200 {
+			t.Fatal("delete", code)
+		}
+		lines.ReadString('\n') // the blank line of the event
+		if _, err := lines.ReadString('\n'); err == nil {
+			t.Fatal("the stream of a deleted capture's view stayed open")
+		}
+		if code, _ := f.call("alice-token", "POST", "/api/views/"+second+"/status", nil); code != 404 {
+			t.Fatal("the view of a deleted capture", code)
+		}
+	}()
+
 	// The view ends with its stream. The hub learns of the closed stream
 	// from the connection, so the test can only wait for it.
 	closeStream()

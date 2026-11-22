@@ -209,7 +209,8 @@ Other files download only, for now.
 
 An open file is a **view**. The browser opens it with an event stream; the
 view lives as long as that stream, so nothing has to guess when somebody
-stopped looking. The viewer's questions about the file go to the view and
+stopped looking, and it ends early when the capture is deleted or its
+retention ends. The viewer's questions about the file go to the view and
 only its opener may ask them. For a packet capture, the hub decrypts the
 file into its work directory (`--work-dir`, an `emptyDir` in the chart),
 starts one `sharkd` for the view, and removes the file's name as soon as

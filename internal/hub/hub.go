@@ -680,6 +680,8 @@ func (h *Hub) remove(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	// Nobody keeps looking at files that are gone.
+	h.views.endOf(id)
 	for _, b := range blobs {
 		if err := h.Blobs.Delete(ctx, b); err != nil {
 			slog.Error("blob not deleted", "blob", b, "error", err)
