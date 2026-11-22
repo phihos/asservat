@@ -344,7 +344,7 @@ EOF
   fetch "$ALICE" "$id" "$pod/sampled-memory.pprof" "$WORK/sampled-memory.pprof"
   grep -q 'grow' <<<"$graph" || fail "Python's functions in the flame graph of memory growth: a page of ${#graph} bytes for view '$view'; the profile's stacks: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -40)"
   grown=$(go tool pprof -top "$WORK/sampled-memory.pprof" 2>&1)
-  grep -q 'Total samples = [0-9.]*[MG]B' <<<"$grown" || fail "the amount of memory growth: $(head -8 <<<"$grown")"
+  grep -q 'Total samples = [1-9][0-9.]*[kMG]B' <<<"$grown" || fail "the amount of memory growth: $(head -8 <<<"$grown")"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
 fi
