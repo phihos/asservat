@@ -330,17 +330,19 @@ EOF
   viewer=$!
   for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
   view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
-  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
-  grep -q 'burn' <<<"$top" && grep -q '<genexpr>\|genexpr' <<<"$top" || fail "Python's functions in the sampled profile: $(grep -o '"Name":"[^"]*"' <<<"$top" | head -40)"
+  # The flame graph holds every function; the top list only those with the most weight of their own.
+  graph=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/flamegraph")
+  fetch "$ALICE" "$id" "$pod/sampled-cpu.pprof" "$WORK/sampled-cpu.pprof"
+  grep -q 'burn' <<<"$graph" && grep -q 'genexpr' <<<"$graph" || fail "Python's functions in the profile of CPU time: $(go tool pprof -traces "$WORK/sampled-cpu.pprof" 2>&1 | head -150)"
   kill "$viewer"
   : >"$WORK/view"
   curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-memory.pprof" >"$WORK/view" &
   viewer=$!
   for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
   view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
-  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
+  graph=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/flamegraph")
   fetch "$ALICE" "$id" "$pod/sampled-memory.pprof" "$WORK/sampled-memory.pprof"
-  grep -q 'grow' <<<"$top" && grep -q 'MB\|GB' <<<"$top" || fail "Python's functions in the profile of memory growth: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -150)"
+  grep -q 'grow' <<<"$graph" && go tool pprof -top "$WORK/sampled-memory.pprof" 2>/dev/null | grep -q 'Total samples = [0-9.]*[MG]B' || fail "Python's functions in the profile of memory growth: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -150)"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
 fi
