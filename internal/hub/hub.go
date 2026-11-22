@@ -115,8 +115,12 @@ func (h *Hub) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web, "web/index.html")
 	})
+	// The viewer page and, under /view/, the script and style of each viewer.
 	mux.HandleFunc("GET /view", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web, "web/view.html")
+	})
+	mux.HandleFunc("GET /view/{file}", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, web, "web/view/"+r.PathValue("file"))
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {})
 	mux.HandleFunc("GET /api/login", h.loginInfo)
