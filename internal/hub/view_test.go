@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -331,5 +332,103 @@ func TestExecutionTraceView(t *testing.T) {
 	}
 	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/6060-trace.out", nil); code != 422 || !strings.Contains(string(b), "cannot read this trace") {
 		t.Fatal("a file that is no trace", code, string(b))
+	}
+}
+
+// syntheticNettrace writes a .NET trace as the runtime does, with compressed
+// event headers: four samples of one thread's stack, three of them in
+// Shop.Burn under Shop.Main and two frames outside of .NET methods, and the
+// methods' addresses after the samples, as the end of a trace reports them.
+func syntheticNettrace() []byte {
+	var trace bytes.Buffer
+	le := func(values ...any) []byte {
+		var b bytes.Buffer
+		for _, v := range values {
+			binary.Write(&b, binary.LittleEndian, v)
+		}
+		return b.Bytes()
+	}
+	wide := func(s string) []byte {
+		var b []byte
+		for _, r := range s {
+			b = append(b, byte(r), 0)
+		}
+		return append(b, 0, 0)
+	}
+	str := func(s string) []byte { return append(le(int32(len(s))), s...) }
+	object := func(name string, version int32, content []byte, block bool) {
+		trace.Write([]byte{5, 5, 1})
+		trace.Write(le(version, version))
+		trace.Write(str(name))
+		trace.WriteByte(6)
+		if block {
+			trace.Write(le(int32(len(content))))
+			for trace.Len()%4 != 0 {
+				trace.WriteByte(0)
+			}
+		}
+		trace.Write(content)
+		trace.WriteByte(6)
+	}
+	// An event with a compressed header: its description's ID, thread and stack as far as given, a time and its payload.
+	event := func(id, thread, stack byte, payload []byte) []byte {
+		flags, fields := byte(128), []byte{}
+		for bit, value := range map[byte]byte{1: id, 4: thread, 8: stack} {
+			if value != 0 {
+				flags |= bit
+			}
+		}
+		for _, value := range []byte{id, thread, stack} {
+			if value != 0 {
+				fields = append(fields, value)
+			}
+		}
+		fields = append(fields, 1, byte(len(payload))) // the time since the event before, the payload's size
+		return append(append([]byte{flags}, fields...), payload...)
+	}
+	events := func(blobs ...[]byte) []byte {
+		return append(le(int16(20), int16(1), int64(0), int64(0)), bytes.Join(blobs, nil)...)
+	}
+	describe := func(id int32, provider string, number int32) []byte {
+		payload := append(le(id), wide(provider)...)
+		payload = append(payload, le(number)...)
+		return event(0, 0, 0, append(append(payload, wide("")...), le(int64(0), int32(0), int32(0), int32(0))...))
+	}
+	method := func(start uint64, namespace, name string) []byte {
+		payload := le(uint64(1), uint64(2), start, uint32(0x100), uint32(0), uint32(0))
+		return event(2, 7, 0, append(append(payload, wide(namespace)...), wide(name)...))
+	}
+	trace.WriteString("Nettrace")
+	trace.Write(str("!FastSerialization.1"))
+	object("Trace", 4, le([8]int16{}, int64(0), int64(1000000000), int32(8), int32(42), int32(4), int32(1000000)), false)
+	object("MetadataBlock", 2, events(describe(1, "Microsoft-DotNETCore-SampleProfiler", 0), describe(2, "Microsoft-Windows-DotNETRuntimeRundown", 144)), true)
+	sample := le(int32(2))
+	object("EventBlock", 2, events(event(1, 7, 1, sample), event(0, 0, 0, sample), event(0, 0, 0, sample), event(0, 0, 2, sample)), true)
+	object("StackBlock", 2, append(le(int32(1), int32(2), int32(32), uint64(0x2010), uint64(0x1010), uint64(0x9999), uint64(0x9998)), le(int32(8), uint64(0x1020))...), true)
+	object("SPBlock", 2, le(int64(0), int32(0)), true)
+	object("EventBlock", 2, events(method(0x1000, "Shop", "Main"), method(0x2000, "Shop", "Burn")), true)
+	trace.WriteByte(1)
+	return trace.Bytes()
+}
+
+// A .NET trace opens in pprof's viewer as a profile of the runtime's stack
+// samples, with the methods' names that the trace reports at its end.
+func TestDotnetTraceView(t *testing.T) {
+	trace := syntheticNettrace()
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/trace.nettrace": trace, "api-1/cut.nettrace": trace[:len(trace)-40], "api-1/other.nettrace": []byte("no trace")})
+	view := openedView(t, f, capture, "api-1/trace.nettrace")
+	code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/top", nil)
+	// Four samples of a millisecond each: three in Burn, one in Main itself.
+	if code != 200 || !strings.Contains(string(b), "Shop.Burn") || !strings.Contains(string(b), "Shop.Main") || !strings.Contains(string(b), "of 4ms total") {
+		t.Fatal(code, string(b))
+	}
+	code, b = f.call("alice-token", "GET", "/api/views/"+view+"/pages/flamegraph", nil)
+	if code != 200 || !strings.Contains(string(b), "[native code]") {
+		t.Fatal("frames outside of .NET methods", code, len(b))
+	}
+	for _, name := range []string{"cut.nettrace", "other.nettrace"} {
+		if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/"+name, nil); code != 422 || !strings.Contains(string(b), ".NET trace") {
+			t.Fatal(name, code, string(b))
+		}
 	}
 }

@@ -260,6 +260,7 @@ shows what the tool would show.
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
 | Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek; against a base, another profile of the same kind from the user's captures, the difference (pprof's `-diff_base`) | pprof in the hub (`dot` draws the graph) |
+| .NET trace (`*.nettrace`) | pprof's web interface, as for a profile: the hub turns the runtime's samples of the threads' stacks into a profile, with the methods' names that the trace holds. This is the view of PerfView's thread time stacks and of `dotnet-trace report`; the trace's other events are not shown | The hub, then pprof |
 | Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
 
@@ -279,9 +280,15 @@ A .NET heap dump (gcdump) holds the objects' types and sizes without
 their contents; the hub counts them per type, as `dotnet-gcdump report`
 does.
 
-The traces and memory dumps of .NET download only: their tools (PerfView,
-the .NET SDK) would add a runtime of several hundred megabytes to the
-image. For CPU time of a .NET program, the sampled profile opens in pprof.
+A .NET trace is read in the format that .NET 5 to 10 write ("Nettrace"
+version 4). Its samples are taken of every managed thread at an interval,
+whether the thread ran or waited, so the profile shows thread time, not
+CPU time; for CPU time, the sampled profile (`cpu`) is the one to take.
+Frames outside of compiled .NET methods are shown as `[native code]`.
+
+The memory dumps of .NET download only: reading their managed objects
+needs the .NET SDK's tools, which would add several hundred megabytes to
+the image.
 
 A core is a memory image: without the program's executable and libraries a
 debugger shows addresses, not functions. Those files are on the node while

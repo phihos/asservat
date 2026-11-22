@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,11 +27,19 @@ var pprofPages = []string{"/", "/flamegraph", "/top", "/graph", "/peek", "/downl
 // package variables.
 var pprofStart sync.Mutex
 
-// parsedProfile decrypts a profile into memory and parses it.
+// parsedProfile decrypts a profile into memory and parses it. A .NET trace
+// becomes a profile of its stack samples.
 func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Profile, error) {
 	var plain bytes.Buffer
 	if err := h.plain(ctx, a, &plain); err != nil {
 		return nil, fmt.Errorf("open artifact: %w", err)
+	}
+	if strings.HasSuffix(a.Name, ".nettrace") {
+		converted, err := nettraceProfile(plain.Bytes())
+		if err != nil {
+			return nil, errStatus{http.StatusUnprocessableEntity, "this .NET trace cannot be shown: " + err.Error()}
+		}
+		return converted, nil
 	}
 	parsed, err := profile.Parse(&plain)
 	if err != nil {
