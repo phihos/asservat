@@ -217,6 +217,17 @@ case "$magic" in d4c3b2a1|a1b2c3d4|4d3cb2a1|a1b23c4d) ;; *) fail "not a pcap fil
 grep -q 'GET /' "$WORK/capture.pcap" && fail "header capture contains payload"
 # Port 8080 (0x1f90) appears in the TCP headers.
 LC_ALL=C grep -q $'\x1f\x90' "$WORK/capture.pcap" || fail "pcap lacks the filtered traffic"
+# The capture opens in the browser's viewer: Wireshark's sharkd reads it in
+# the hub for as long as the opening stream lasts.
+curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$(first_artifact "$ALICE" "$id")" >"$WORK/view" &
+viewer=$!
+for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
+view=$(sed -n 's/^data: //p' "$WORK/view")
+frames=$(ok "$ALICE" POST "/api/views/$view/frames" '{"filter":"tcp.port == 8080","limit":5}')
+jq -e 'length == 5 and (.[0].c | index("TCP") != null)' <<<"$frames" >/dev/null || fail "packet list of the view: $frames"
+ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}' | jq -e '(.tree | length > 2) and (.bytes | length > 0)' >/dev/null || fail "packet details of the view"
+[ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
+kill $viewer
 
 log "what runs and who talks: the choices for a process and a packet filter (edge)"
 processes=$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/processes?workload=Deployment/web')

@@ -43,6 +43,7 @@ spec:
             - --clusters-file=/secrets/hub/clusters.yaml
             - --admin-groups={{ join "," .Values.hub.adminGroups }}
             - --retention={{ .Values.hub.retention }}
+            - --work-dir=/work
             - --allow-self-approval={{ .Values.hub.allowSelfApproval }}
             {{- if $s3.endpoint }}
             - --s3-endpoint={{ $s3.endpoint }}
@@ -87,6 +88,8 @@ spec:
               drop: [ALL]
           resources: {{- toYaml .Values.hub.resources | nindent 12 }}
           volumeMounts:
+            - name: work
+              mountPath: /work
             - name: hub
               mountPath: /secrets/hub
               readOnly: true
@@ -107,6 +110,9 @@ spec:
               mountPath: /data
             {{- end }}
       volumes:
+        # Files that are open in a viewer, decrypted while they are open.
+        - name: work
+          emptyDir: {}
         - name: hub
           secret:
             secretName: {{ .Release.Name }}-hub

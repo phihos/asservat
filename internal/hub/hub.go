@@ -25,7 +25,7 @@ import (
 	"asservat.local/asservat/internal/api"
 )
 
-//go:embed web/index.html
+//go:embed web
 var web embed.FS
 
 // User is an authenticated caller. Name and Groups are the identity that the
@@ -70,6 +70,12 @@ type Config struct {
 	// AllowSelfApproval lets an administrator approve their own request, for
 	// installations with a single administrator.
 	AllowSelfApproval bool
+	// WorkDir holds the files that viewers have open, decrypted, while they
+	// are open. Empty means the system's directory for temporary files.
+	WorkDir string
+	// Sharkd is the path of Wireshark's sharkd, which reads packet captures
+	// for their viewer.
+	Sharkd string
 }
 
 type Hub struct {
@@ -80,6 +86,7 @@ type Hub struct {
 
 	mu       sync.Mutex
 	watchers map[chan string]struct{}
+	views    views
 }
 
 func New(c Config) (*Hub, error) {
@@ -100,13 +107,16 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), watchers: map[chan string]struct{}{}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 func (h *Hub) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, web, "web/index.html")
+	})
+	mux.HandleFunc("GET /view", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, web, "web/view.html")
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {})
 	mux.HandleFunc("GET /api/login", h.loginInfo)
@@ -158,6 +168,8 @@ func (h *Hub) Handler() http.Handler {
 	user("POST /api/captures/{id}/stop", h.stopCapture)
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
+	user("GET /api/captures/{id}/views/{name...}", h.openView)
+	user("POST /api/views/{view}/{method}", h.askView)
 	user("POST /api/watches", h.createWatch)
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
@@ -668,6 +680,8 @@ func (h *Hub) remove(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	// Nobody keeps looking at files that are gone.
+	h.views.endOf(id)
 	for _, b := range blobs {
 		if err := h.Blobs.Delete(ctx, b); err != nil {
 			slog.Error("blob not deleted", "blob", b, "error", err)
