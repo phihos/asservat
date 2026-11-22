@@ -1,6 +1,6 @@
 // The packet viewer follows Wireshark's main window. Wireshark's sharkd reads
 // the capture in the hub; this page asks it for what is in sight.
-import {$, esc, capture, filePath, headers, notice, show, virtual} from './common.js';
+import {$, esc, headers, notice, openView, show, virtual} from './common.js';
 
 const markup = `
   <div class="toolbar">
@@ -56,20 +56,15 @@ let total = 0, shown = 0, applied = '', pages = new Map(), selected = -1, frame 
 const expanded = new Set(); // subtree kinds that stay open from packet to packet, as in Wireshark
 
 function open() {
-  const stream = new EventSource(`/api/captures/${capture}/views/${filePath}`);
-  stream.onmessage = async e => {
-    view = e.data;
+  openView(async id => {
+    view = id;
     const status = await ask('status');
     total = status.frames;
     $('head').innerHTML = status.columns.map(c => `<span>${esc(c)}</span>`).join('');
     $('goto').max = total;
     show();
     await applyFilter($('filter').value.trim());
-  };
-  stream.onerror = () => {
-    stream.close();
-    notice(view ? 'This view has ended.' : 'The hub could not open this file.', true);
-  };
+  });
 }
 
 // Packet list: only the rows in sight exist; their pages are fetched as needed.

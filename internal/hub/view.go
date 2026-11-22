@@ -29,8 +29,12 @@ type view struct {
 	capture string
 	// end closes the view; its stream ends with it.
 	end context.CancelFunc
-	// ask sends one question to the program that holds the file.
+	// ask sends one question to the program that holds the file, for a
+	// viewer that asks: the packet viewer.
 	ask func(method string, params json.RawMessage) (json.RawMessage, error)
+	// pages are the pages of a tool's own web interface, by path, for a
+	// viewer that shows it: pprof's.
+	pages map[string]http.Handler
 }
 
 type views struct {
@@ -79,8 +83,9 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	if err != nil {
 		return err
 	}
-	if api.ViewerOf(a.Name) != "pcap" {
-		return errStatus{http.StatusBadRequest, "this file has no viewer; download it"}
+	viewer := api.ViewerOf(a.Name)
+	if viewer != "pcap" && viewer != "pprof" {
+		return errStatus{http.StatusBadRequest, "this file is not opened in the hub; its viewer reads it in the browser, or it only downloads"}
 	}
 	if err := h.Store.Audit(r.Context(), u.Name, "artifact.view", c.ID, map[string]string{"name": a.Name}); err != nil {
 		return err
@@ -88,12 +93,17 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	// The view ends with the stream, whichever way the stream ends.
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	ask, err := h.dissect(ctx, a)
+	opened := &view{user: u.Name, capture: c.ID, end: cancel}
+	if viewer == "pcap" {
+		opened.ask, err = h.dissect(ctx, a)
+	} else {
+		opened.pages, err = h.profilePages(ctx, a)
+	}
 	if err != nil {
 		return err
 	}
 	id := uuid.NewString()
-	h.views.add(id, &view{user: u.Name, capture: c.ID, end: cancel, ask: ask})
+	h.views.add(id, opened)
 	defer h.views.remove(id)
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -118,7 +128,7 @@ var sharkdMethods = map[string]bool{
 // askView passes a viewer's question to its view.
 func (h *Hub) askView(w http.ResponseWriter, r *http.Request, u User) error {
 	v := h.views.get(r.PathValue("view"))
-	if v == nil || v.user != u.Name {
+	if v == nil || v.user != u.Name || v.ask == nil {
 		return ErrNotFound
 	}
 	method := r.PathValue("method")
@@ -144,26 +154,45 @@ func (h *Hub) askView(w http.ResponseWriter, r *http.Request, u User) error {
 	return err
 }
 
+// viewPage serves a page of the tool's web interface that a view holds.
+func (h *Hub) viewPage(w http.ResponseWriter, r *http.Request, u User) error {
+	v := h.views.get(r.PathValue("view"))
+	if v == nil || v.user != u.Name {
+		return ErrNotFound
+	}
+	page := v.pages["/"+r.PathValue("page")]
+	if page == nil {
+		return ErrNotFound
+	}
+	page.ServeHTTP(w, r)
+	return nil
+}
+
+// plain writes an artifact, decrypted, to w.
+func (h *Hub) plain(ctx context.Context, a storedArtifact, w io.Writer) error {
+	key, err := unwrapKey(h.MasterKey, a.Key)
+	if err != nil {
+		return err
+	}
+	blob, err := h.Blobs.Get(ctx, a.Blob)
+	if err != nil {
+		return err
+	}
+	defer blob.Close()
+	return decrypt(w, blob, key)
+}
+
 // dissect loads a packet capture into Wireshark's sharkd, which runs until
 // ctx ends, and returns how to ask it. sharkd needs the capture as a file:
 // the hub decrypts it into its work directory and removes the name as soon
 // as sharkd holds the file open.
 func (h *Hub) dissect(ctx context.Context, a storedArtifact) (func(string, json.RawMessage) (json.RawMessage, error), error) {
-	key, err := unwrapKey(h.MasterKey, a.Key)
-	if err != nil {
-		return nil, err
-	}
-	blob, err := h.Blobs.Get(ctx, a.Blob)
-	if err != nil {
-		return nil, err
-	}
-	defer blob.Close()
 	file, err := os.CreateTemp(h.WorkDir, "view-*"+path.Ext(a.Name))
 	if err != nil {
 		return nil, err
 	}
 	defer os.Remove(file.Name())
-	err = decrypt(file, blob, key)
+	err = h.plain(ctx, a, file)
 	if e := file.Close(); err == nil {
 		err = e
 	}

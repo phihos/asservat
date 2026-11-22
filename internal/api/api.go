@@ -294,8 +294,14 @@ func ViewerOf(name string) string {
 		return "pcap"
 	case strings.HasSuffix(file, ".log"):
 		return "log"
+	case strings.HasSuffix(file, ".pprof"):
+		return "pprof"
 	case strings.HasSuffix(file, ".strace"):
 		return "strace"
+	// Dumps of goroutines or threads; with a port in front of the name
+	// when a capture fetched the same endpoint from several ports.
+	case strings.HasSuffix(file, "goroutines.txt"), strings.HasSuffix(file, "threaddump.txt"):
+		return "stacks"
 	case file == "pod.json", file == "events.json":
 		return "kube"
 	}
