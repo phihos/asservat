@@ -186,7 +186,7 @@ own format and nothing is injected into the pod:
 | --- | --- | --- |
 | `pod-state` | Kubernetes API: pod object and events | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
-| `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true` | With `payload=true` |
+| `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
 | `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |
 | `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
@@ -311,6 +311,12 @@ or read the profiled program's binary.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves.
+- **The agent's own traffic.** An agent dials the hub from the source ports
+  61000 to 61063, above Linux's default range for outgoing connections, and
+  every packet capture, packet buffer and traffic sample leaves TCP on
+  those ports out. A capture of a pod through which the agent's connection
+  passes (the hub's pod, a pod on the host's network) would otherwise
+  record its own upload.
 - **Limits.** `read_artifact` over MCP returns 64 KiB per call so that a
   result fits a model's context. A watch's packet buffer is 16 MiB per pod
   because it lives in the agent's memory. A capture's duration is what the

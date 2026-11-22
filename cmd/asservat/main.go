@@ -217,6 +217,8 @@ func runAgent(ctx context.Context, args []string) error {
 		return fmt.Errorf("token-file: %w", err)
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// From the agent's own source ports, which packet captures leave out.
+	transport.DialContext = agent.DialHub
 	if *caFile != "" {
 		pem, err := os.ReadFile(*caFile)
 		if err != nil {

@@ -132,10 +132,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err != nil {
 			return err
 		}
-		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
-		if f := rec.Params["filter"]; f != "" {
-			args = append(args, f)
-		}
+		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-", withoutOwnTraffic(rec.Params["filter"])}
 		// Headers only unless payload was requested (and approved).
 		if rec.Params["payload"] != "true" {
 			packets := up

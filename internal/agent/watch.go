@@ -200,10 +200,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 		return
 	}
 	ctx, stop := context.WithCancel(ctx)
-	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
-	if f := packets.Params["filter"]; f != "" {
-		args = append(args, f)
-	}
+	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-", withoutOwnTraffic(packets.Params["filter"])}
 	cmd := exec.CommandContext(ctx, "nsenter", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
