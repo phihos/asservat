@@ -37,6 +37,9 @@ type Agent struct {
 	DebuginfodURLs string
 	// Proc is the node's /proc.
 	Proc string
+	// Pod is the name of the agent's own pod, whose processes it finds
+	// differently than those of other pods; empty if unknown.
+	Pod string
 	// Cores is the spool of the node's core handler; empty without it.
 	Cores CoreSpool
 

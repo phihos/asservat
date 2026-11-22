@@ -240,6 +240,8 @@ func runAgent(ctx context.Context, args []string) error {
 		return err
 	}
 	a := &agent.Agent{HubURL: strings.TrimRight(*hubURL, "/"), Token: token, Node: *node, Kube: kube, HTTP: &http.Client{Transport: transport}, Scratch: *scratch, Proc: "/proc"}
+	// A pod's host name is its name, as the agent's pod has its own network.
+	a.Pod, _ = os.Hostname()
 	a.DebuginfodURLs = strings.Join(strings.FieldsFunc(*debuginfod, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), " ")
 	if *coreSpool != "" {
 		a.Cores = agent.CoreSpool(*coreSpool)
