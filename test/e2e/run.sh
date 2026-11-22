@@ -228,6 +228,10 @@ jq -e 'length == 5 and (.[0].c | index("TCP") != null)' <<<"$frames" >/dev/null 
 ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}' | jq -e '(.tree | length > 2) and (.bytes | length > 0)' >/dev/null || fail "packet details of the view"
 [ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
 kill $viewer
+# The other viewers read in the browser; the hub names them and serves them.
+[ "$(ok "$ALICE" GET /api/captures | jq -c '[.[].artifacts[] | select(.viewer) | .viewer] | unique')" = '["kube","log","pcap"]' ] || fail "viewers of the files so far"
+for v in kube log pcap strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
+curl -sS --fail "$URL/view" | grep -q '/view/common.js' || fail "viewer page"
 
 log "what runs and who talks: the choices for a process and a packet filter (edge)"
 processes=$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/processes?workload=Deployment/web')

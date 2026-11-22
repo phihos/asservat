@@ -81,7 +81,7 @@ export default async function (root) {
     const words = $('text').value.toLowerCase(), name = $('syscall').value, pid = $('pid').value, failed = $('failed').checked, slower = Number($('slower').value) / 1000;
     visible = calls.filter(c => (!name || c.name === name) && (!pid || c.pid === pid) && (!failed || c.failed) && (!slower || c.seconds >= slower)
       && (!words || c.args.toLowerCase().includes(words) || c.result.toLowerCase().includes(words) || c.name.includes(words)));
-    $('shown').textContent = `${calls.length} lines · ${visible.length} shown`;
+    $('shown').textContent = `${calls.length} entries · ${visible.length} shown`;
     $('table').scrollTop = 0;
     list.count(visible.length);
   };
@@ -120,7 +120,11 @@ export default async function (root) {
     select(at + step);
   };
   root.querySelector('.tabs').onclick = e => { if (e.target.dataset.tab) tab(e.target.dataset.tab); };
-  $('summary').onclick = e => { const r = e.target.closest('tr[data-name]'); if (r) { $('syscall').value = r.dataset.name; tab('calls'); narrow(); } };
+  $('summary').onclick = e => { const r = e.target.closest('tr[data-name]'); if (!r) return;
+    // The calls of that name, all of them: the other narrowing is dropped.
+    $('text').value = ''; $('pid').value = ''; $('failed').checked = false; $('slower').value = '';
+    $('syscall').value = r.dataset.name; tab('calls'); narrow();
+  };
   if (truncated) { $('note').hidden = false; $('note').textContent = truncatedNote; }
   if (!calls.length) { $('note').hidden = false; $('note').textContent = 'This trace holds no calls.'; }
   show();

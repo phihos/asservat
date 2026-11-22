@@ -204,11 +204,16 @@ shows what the tool would show.
 | File | Viewer | Read by |
 | --- | --- | --- |
 | Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details, packet bytes, follow stream | Wireshark's `sharkd` in the hub |
+| Logs | Like the log panels of Lens and the Kubernetes dashboard: a dark terminal with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out) | The browser |
+| Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
+| System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
-Other files download only, for now.
+Profiles and core dumps download only, for now. The viewers that read in
+the browser fetch the file like a download and read at most 64 MiB of it,
+because the text and an index of its lines stay in the browser's memory.
 
-An open file is a **view**. The browser opens it with an event stream; the
-view lives as long as that stream, so nothing has to guess when somebody
+A packet capture is not sent to the browser. It is opened as a **view**.
+The browser opens it with an event stream; the view lives as long as that stream, so nothing has to guess when somebody
 stopped looking, and it ends early when the capture is deleted or its
 retention ends. The viewer's questions about the file go to the view and
 only its opener may ask them. For a packet capture, the hub decrypts the
