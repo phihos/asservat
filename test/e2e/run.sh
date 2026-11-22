@@ -304,7 +304,22 @@ done
 if [ -n "${SAMPLE_CPU:-}" ]; then
   # A busy Python program is sampled: an interpreter's stacks are those of the
   # program it runs, so its functions are named as such.
-  edge -n shop create deployment py --image=docker.io/library/python:3.12-slim -- python3 -c $'def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()' >/dev/null
+  edge apply -f - >/dev/null <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: py, namespace: shop}
+spec:
+  selector: {matchLabels: {app: py}}
+  template:
+    metadata: {labels: {app: py}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: py
+          image: docker.io/library/python:3.12-slim
+          command: [python3, -c, "def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+EOF
   edge -n shop rollout status deployment/py --timeout 180s >/dev/null
   id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","kind":"cpu","durationSeconds":10}'); completed "$ALICE" "$id"
   pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
