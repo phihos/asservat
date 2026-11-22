@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,11 +55,12 @@ func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Pro
 // difference of the profile to it (pprof's -diff_base).
 func (h *Hub) profilePages(ctx context.Context, a storedArtifact, base *storedArtifact) (map[string]http.Handler, error) {
 	sources := fetched{}
-	args := []string{"-http=localhost:0", "-no_browser", "-symbolize=none"}
 	var err error
 	if sources["profile"], err = h.parsedProfile(ctx, a); err != nil {
 		return nil, err
 	}
+	// All functions, sorted by their own weight: what pprof begins with.
+	args := append([]string{"-http=localhost:0", "-no_browser"}, pprofOptions(sources["profile"], "", false, -1)...)
 	if base != nil {
 		if sources["base"], err = h.parsedProfile(ctx, *base); err != nil {
 			return nil, err
@@ -104,17 +106,11 @@ func (h *Hub) profileText(ctx context.Context, a storedArtifact, sampleType stri
 	for _, kind := range parsed.SampleType {
 		kinds = append(kinds, kind.Type)
 	}
-	// The report lists this many functions: a page for a reader, of whom most are language models with a limited context.
-	args := []string{"-top", "-nodecount=60", "-symbolize=none", "-output=report"}
-	if sampleType != "" {
-		if !slices.Contains(kinds, sampleType) {
-			return "", errStatus{http.StatusBadRequest, fmt.Sprintf("the profile has no values of kind %q; it has: %s", sampleType, strings.Join(kinds, ", "))}
-		}
-		args = append(args, "-sample_index="+sampleType)
+	if sampleType != "" && !slices.Contains(kinds, sampleType) {
+		return "", errStatus{http.StatusBadRequest, fmt.Sprintf("the profile has no values of kind %q; it has: %s", sampleType, strings.Join(kinds, ", "))}
 	}
-	if cumulative {
-		args = append(args, "-cum")
-	}
+	// The report lists 60 functions: a page for a reader, of whom most are language models with a limited context.
+	args := append([]string{"-top", "-output=report"}, pprofOptions(parsed, sampleType, cumulative, 60)...)
 	pprofStart.Lock()
 	defer pprofStart.Unlock()
 	var report pprofReport
@@ -128,6 +124,22 @@ func (h *Hub) profileText(ctx context.Context, a storedArtifact, sampleType stri
 		return "", errStatus{http.StatusUnprocessableEntity, "pprof cannot show this profile: " + err.Error()}
 	}
 	return "Kinds of values in this profile: " + strings.Join(kinds, ", ") + "\n" + report.String(), nil
+}
+
+// pprofOptions are the options of every start of pprof. pprof keeps its
+// options for the whole program, so each start names all of those that any
+// start sets; otherwise it would inherit them from the start before. The
+// kind of value is the profile's last one unless one is named, as pprof
+// chooses by itself.
+func pprofOptions(p *profile.Profile, sampleType string, cumulative bool, functions int) []string {
+	if sampleType == "" && len(p.SampleType) > 0 {
+		sampleType = p.SampleType[len(p.SampleType)-1].Type
+	}
+	sort := "-flat"
+	if cumulative {
+		sort = "-cum"
+	}
+	return []string{"-symbolize=none", "-sample_index=" + sampleType, sort, "-nodecount=" + strconv.Itoa(functions)}
 }
 
 // pprofReport takes the report that pprof writes to a file.
