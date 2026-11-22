@@ -5,10 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"asservat.local/asservat/internal/api"
@@ -111,5 +114,65 @@ func TestSyncStopsTasksThatAreNoLongerOpen(t *testing.T) {
 	a.handle(t.Context(), api.Command{Type: "stop", ID: "capture-1"})
 	if !ended["capture-1/pod-a"] || len(ended) != 1 || len(stopped) != 0 {
 		t.Fatal("stopped", ended, stopped)
+	}
+}
+
+// drips hands out a few bytes per read, as a tool's output arrives line by line.
+type drips struct {
+	left  []byte
+	reads int
+}
+
+func (d *drips) Read(p []byte) (int, error) {
+	if len(d.left) == 0 {
+		return 0, io.EOF
+	}
+	d.reads++
+	n := copy(p, d.left[:min(7, len(d.left))])
+	d.left = d.left[n:]
+	return n, nil
+}
+
+// An upload goes to the hub in full pieces, however small the pieces are in
+// which a tool writes: each piece is a write to the network of its own.
+func TestUploadInFullPieces(t *testing.T) {
+	content := bytes.Repeat([]byte("a line of a trace\n"), 10000)
+	var got bytes.Buffer
+	var pieces []int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The server reads what each network write brought.
+		buf := make([]byte, 1<<20)
+		for {
+			n, err := r.Body.Read(buf)
+			if n > 0 {
+				pieces = append(pieces, n)
+				got.Write(buf[:n])
+			}
+			if err != nil {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+	a := &Agent{HubURL: server.URL, HTTP: server.Client()}
+	source := &drips{left: bytes.Clone(content)}
+	if err := a.upload(t.Context(), "capture", "pod", "trace", source); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got.Bytes(), content) {
+		t.Fatal("the upload changed the content", got.Len(), len(content))
+	}
+	// 180 kB in pieces of 7 bytes would be some 25000 writes.
+	if len(pieces) > 100 {
+		t.Fatalf("the upload reached the hub in %d pieces", len(pieces))
+	}
+	// A reader that ends, or fails, in the middle of a piece hands on what it had.
+	short := full{r: io.MultiReader(strings.NewReader("abc"), iotest.ErrReader(io.ErrClosedPipe))}
+	p := make([]byte, 10)
+	if n, err := short.Read(p); n != 3 || err != nil {
+		t.Fatal("the bytes before a failure", n, err)
+	}
+	if n, err := short.Read(p); n != 0 || err != io.ErrClosedPipe {
+		t.Fatal("the failure", n, err)
 	}
 }

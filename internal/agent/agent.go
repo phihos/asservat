@@ -289,9 +289,35 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 
 // upload streams one file of a capture to the hub.
 func (a *Agent) upload(ctx context.Context, id, pod, name string, r io.Reader) error {
-	res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), r)
+	res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), &full{r: r})
 	if err != nil {
 		return err
 	}
 	return res.Body.Close()
+}
+
+// full reads from r until the caller's buffer is full or r ends. A tool
+// writes its output in small pieces, a line or a packet at a time, and the
+// HTTP client sends each piece it reads as a chunk with a write to the
+// network of its own: tens of thousands per second for a busy trace. The
+// hub has no use for a piece before the file is complete, so the pieces
+// are gathered.
+type full struct {
+	r   io.Reader
+	err error
+}
+
+func (f *full) Read(p []byte) (int, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	n, err := io.ReadFull(f.r, p)
+	if err == io.ErrUnexpectedEOF {
+		err = io.EOF
+	}
+	// What was read before the end or a failure is handed on first.
+	if n > 0 && err != nil {
+		f.err, err = err, nil
+	}
+	return n, err
 }
