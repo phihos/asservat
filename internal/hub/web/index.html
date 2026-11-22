@@ -158,6 +158,7 @@
         <label><input type="checkbox" name="kind" value="pcap">Network traffic<small>A packet capture for Wireshark, of all traffic or chosen connections</small></label>
         <label><input type="checkbox" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
         <label><input type="checkbox" name="kind" value="cpu">CPU profile<small>Where the pod's processes spend CPU time, sampled from the node. Needs nothing from the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, .NET</small></label>
+        <label><input type="checkbox" name="kind" value="memory">Memory growth<small>Which code makes the pod's memory grow while this records, from the stacks at its page faults. Needs nothing from the application; it slows page faults on the node meanwhile</small></label>
         <label><input type="checkbox" name="kind" value="pprof">Profile endpoint<small>What the application's own profile endpoint returns, such as Go's pprof: also memory, blocking and traces</small></label>
         <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
       </div>
@@ -420,7 +421,7 @@ function profileParams() {
 }
 
 const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].map(box => box.value);
-const kindNames = {'pod-state': 'pod state', logs: 'logs', pcap: 'network traffic', strace: 'system calls', pprof: 'profile endpoint', cpu: 'CPU profile', coredump: 'core dump'};
+const kindNames = {'pod-state': 'pod state', logs: 'logs', pcap: 'network traffic', strace: 'system calls', pprof: 'profile endpoint', cpu: 'CPU profile', memory: 'memory growth', coredump: 'core dump'};
 const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).join(', ') + ' and ' + words.at(-1);
 // A core dump on a crash is that of the crashed process: nothing to choose.
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') === 'now';
@@ -513,7 +514,7 @@ function showParams() {
   // One time frame for everything that runs over time.
   const otherProfile = has('pprof') && !profileBoxes().length && $('profilePath').value.trim();
   const profileRuns = has('pprof') && (otherProfile || profileBoxes().some(box => 'timed' in box.dataset));
-  const timed = ['pcap', 'strace', 'cpu', 'pprof'].filter(k => has(k) && (k !== 'pprof' || profileRuns)), follows = has('logs');
+  const timed = ['pcap', 'strace', 'cpu', 'memory', 'pprof'].filter(k => has(k) && (k !== 'pprof' || profileRuns)), follows = has('logs');
   $('frameBlock').hidden = !timed.length && !follows;
   $('duration').placeholder = timed.length ? '30' : '0';
   // The packet buffer of a crash watch reaches back; everything else runs forward.

@@ -16,6 +16,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unique"
+
+	cebpf "github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
 
 	"github.com/google/pprof/profile"
 	"github.com/ianlancetaylor/demangle"
@@ -46,12 +50,52 @@ const sampleRate = 99
 // profiler attaches to.
 const tracefs = "/sys/kernel/tracing"
 
+// sampledKind is what a sampled profile counts.
+type sampledKind struct {
+	file string
+	// memory tells a profile of page faults from one of CPU samples.
+	memory bool
+	// count and amount name the two values of every stack: how often it
+	// was seen, and what that stands for, each sample standing for unit.
+	count, amount profile.ValueType
+	unit          int64
+	// nothing is what a pod without a sample is told.
+	nothing string
+}
+
+var (
+	// sampledCPU counts the samples taken of what runs on the CPUs.
+	sampledCPU = sampledKind{
+		file:  "sampled-cpu.pprof",
+		count: profile.ValueType{Type: "samples", Unit: "count"}, amount: profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
+		unit:    int64(time.Second / sampleRate),
+		nothing: "the pod's processes used no CPU time while they were sampled",
+	}
+	// sampledMemory counts page faults. The kernel gives a process a page of
+	// memory when the process first touches it, which is a page fault: the
+	// stacks at the faults are the code that makes the memory in use grow.
+	// Every fault counts as one page of the usual size, also where the
+	// kernel hands out a huge page.
+	sampledMemory = sampledKind{
+		file: "sampled-memory.pprof", memory: true,
+		count: profile.ValueType{Type: "page_faults", Unit: "count"}, amount: profile.ValueType{Type: "memory", Unit: "bytes"},
+		unit:    int64(os.Getpagesize()),
+		nothing: "the pod's processes took no new memory while they were watched",
+	}
+)
+
 // sampler runs the profiler while at least one recording wants samples.
 type sampler struct {
 	// running guards the profiler's start and stop, which take seconds and
 	// during which the profiler goes on reporting.
 	running sync.Mutex
-	stop    func()
+	tracer  *tracer.Tracer
+	cancel  func()
+	// cpus tells that the CPUs are sampled, which the first profile of CPU
+	// time turns on until the profiler stops.
+	cpus bool
+	// faults reports page faults while a profile of memory wants them.
+	faults *faultProbe
 	// mu guards what the profiler's reports change.
 	mu       sync.Mutex
 	profiles map[*sampledProfile]struct{}
@@ -66,8 +110,9 @@ type mappedFile struct {
 	path string
 }
 
-// sampledProfile collects the samples of one pod.
+// sampledProfile collects the samples of one kind of one pod.
 type sampledProfile struct {
+	kind       sampledKind
 	containers map[string]bool // the pod's container IDs
 	pids       map[int]bool    // its processes when the sampling began
 	stacks     map[stackKey]*sampledStack
@@ -86,17 +131,39 @@ type sampledStack struct {
 	count  int64
 }
 
-// begin starts collecting the samples of a pod, and the profiler if it does
-// not run yet.
+// begin starts collecting the samples of a pod, and before that the
+// profiler and what the profile's kind needs of it, unless they run.
 func (s *sampler) begin(p *sampledProfile) error {
 	s.running.Lock()
 	defer s.running.Unlock()
-	if s.stop == nil {
-		stop, err := s.run()
-		if err != nil {
+	started := s.tracer == nil
+	if started {
+		if err := s.run(); err != nil {
 			return err
 		}
-		s.stop = stop
+	}
+	var err error
+	switch {
+	case p.kind.memory:
+		// The probe is kept once it is loaded, so that a failure is tried again.
+		if s.faults == nil {
+			probe := &faultProbe{}
+			if err = s.tracer.Enable(context.Background(), probe); err == nil {
+				s.faults = probe
+			}
+		}
+		if err == nil {
+			err = s.faults.attach()
+		}
+	case !s.cpus:
+		err = s.tracer.EnableProfiling()
+		s.cpus = err == nil
+	}
+	if err != nil {
+		if started {
+			s.halt()
+		}
+		return fmt.Errorf("the node's kernel does not let the profiler take these samples: %w", err)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -107,43 +174,57 @@ func (s *sampler) begin(p *sampledProfile) error {
 	return nil
 }
 
-// end stops collecting for a pod, and the profiler with its last pod. It
-// returns where the symbols of the binaries seen can be read.
+// end stops collecting for a pod. Page faults are reported until the last
+// profile of memory ends, and the profiler runs until its last profile
+// ends. It returns where the symbols of the binaries seen can be read.
 func (s *sampler) end(p *sampledProfile) map[libpf.FileID]mappedFile {
 	s.running.Lock()
 	defer s.running.Unlock()
 	s.mu.Lock()
 	delete(s.profiles, p)
+	memory := false
+	for other := range s.profiles {
+		memory = memory || other.kind.memory
+	}
 	last := len(s.profiles) == 0
 	binaries := make(map[libpf.FileID]mappedFile, len(s.binaries))
 	for id, b := range s.binaries {
 		binaries[id] = b
 	}
-	if last {
-		s.binaries = nil
-	}
 	s.mu.Unlock()
-	if last && s.stop != nil {
-		s.stop()
-		s.stop = nil
+	if !memory && s.faults != nil {
+		s.faults.Unload()
+	}
+	if last {
+		s.halt()
 	}
 	return binaries
 }
 
-// run loads the profiler's programs into the kernel and starts sampling.
-// The order of the steps is the profiler's own (its collector receiver).
-func (s *sampler) run() (stop func(), err error) {
+// halt stops the profiler.
+func (s *sampler) halt() {
+	if s.faults != nil {
+		s.faults.Unload()
+	}
+	s.cancel()
+	s.tracer.Close()
+	s.tracer, s.cancel, s.faults, s.cpus = nil, nil, nil, false
+	s.mu.Lock()
+	s.binaries = nil
+	s.mu.Unlock()
+}
+
+// run loads the profiler's programs into the kernel. The order of the steps
+// is the profiler's own (its collector receiver); sampling the CPUs and
+// reporting page faults are turned on by the profiles that want them.
+func (s *sampler) run() error {
 	// A container's /sys comes without the tracepoints.
 	if _, err := os.Stat(tracefs + "/events"); err != nil {
 		if err := syscall.Mount("tracefs", tracefs, "tracefs", 0, ""); err != nil {
-			return nil, fmt.Errorf("the kernel's tracepoints cannot be reached (mount of %s: %w)", tracefs, err)
+			return fmt.Errorf("the kernel's tracepoints cannot be reached (mount of %s: %w)", tracefs, err)
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	fail := func(what string, err error) (func(), error) {
-		cancel()
-		return nil, fmt.Errorf("the node's kernel does not let the profiler %s: %w", what, err)
-	}
 	times.StartRealtimeSync(ctx, 0)
 	// The intervals at which the profiler looks after its own state: its defaults.
 	intervals := times.New(5*time.Second, 5*time.Second, time.Minute)
@@ -164,26 +245,24 @@ func (s *sampler) run() (stop func(), err error) {
 		PIDNamespaceTranslationMode: tracer.PIDNamespaceTranslationModeAuto,
 	})
 	if err != nil {
-		return fail("load its programs", err)
+		cancel()
+		return fmt.Errorf("the node's kernel does not let the profiler load its programs: %w", err)
 	}
-	stop = func() { cancel(); trc.Close() }
 	trc.StartPIDEventProcessor(ctx)
-	if err := trc.AttachTracer(nil); err != nil {
-		stop()
-		return fail("sample the CPUs", err)
-	}
-	if err := trc.EnableProfiling(); err != nil {
-		stop()
-		return fail("sample the CPUs", err)
-	}
-	if err := trc.AttachSchedMonitor(); err != nil {
-		stop()
-		return fail("follow ending processes", err)
-	}
 	traces := make(chan *libpf.EbpfTrace)
-	if err := trc.StartMapMonitors(ctx, traces); err != nil {
-		stop()
-		return fail("hand over its samples", err)
+	for _, step := range []struct {
+		what string
+		do   func() error
+	}{
+		{"sample the CPUs", func() error { return trc.AttachTracer(nil) }},
+		{"follow ending processes", trc.AttachSchedMonitor},
+		{"hand over its samples", func() error { return trc.StartMapMonitors(ctx, traces) }},
+	} {
+		if err := step.do(); err != nil {
+			cancel()
+			trc.Close()
+			return fmt.Errorf("the node's kernel does not let the profiler %s: %w", step.what, err)
+		}
 	}
 	go func() {
 		for {
@@ -199,7 +278,66 @@ func (s *sampler) run() (stop func(), err error) {
 			}
 		}
 	}()
-	return stop, nil
+	s.tracer, s.cancel = trc, cancel
+	return nil
+}
+
+// pageFaults marks the profiler's reports of page faults.
+var pageFaults = &samples.TypeMetadata{
+	SampleTypes:  []samples.SampleType{{Type: "page_faults", Unit: "count"}},
+	AppendValues: samples.AppendFirstContextValue,
+}
+
+// faultProbe has the profiler take a stack at every page fault on the node:
+// at the kernel function that handles the fault for every architecture. It
+// is the profiler's own probe for a kernel function (probes/kprobe), which
+// only its collector can configure.
+type faultProbe struct {
+	program  *cebpf.Program
+	attached link.Link
+}
+
+// Load registers page faults as an origin of stacks and loads the program
+// that takes them.
+func (f *faultProbe) Load(_ context.Context, origins tracer.ProbeRegistrar, c *tracer.ProbeContext) error {
+	const program = "kprobe__generic"
+	origin, err := origins.Register(&tracer.OriginEntry{Meta: pageFaults})
+	if err != nil {
+		return err
+	}
+	spec, err := c.CollectionSpecWith(nil, []string{program}, []string{"origin_id_probe"})
+	if err != nil {
+		return err
+	}
+	if err := spec.Variables["origin_id_probe"].Set(origin); err != nil {
+		return err
+	}
+	if err := c.RewriteMaps(spec, nil); err != nil {
+		return err
+	}
+	loaded := map[string]*cebpf.Program{}
+	if err := c.LoadProbeUnwinders(spec, loaded, []tracer.ProgLoaderHelper{{Name: program, NoTailCallTarget: true, Enable: true}}, 0); err != nil {
+		return err
+	}
+	f.program = loaded[program]
+	return nil
+}
+
+func (f *faultProbe) attach() (err error) {
+	if f.attached == nil {
+		f.attached, err = link.Kprobe("handle_mm_fault", f.program, nil)
+	}
+	return err
+}
+
+// Unload ends the reports; attach brings them back.
+func (f *faultProbe) Unload() error {
+	if f.attached == nil {
+		return nil
+	}
+	attached := f.attached
+	f.attached = nil
+	return attached.Close()
 }
 
 // ReportTraceEvent takes a sample from the profiler.
@@ -214,10 +352,18 @@ func (s *sampler) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceEventM
 		if container := meta.ContainerID.String(); !p.containers[container] && (container != "" || !p.pids[pid]) {
 			continue
 		}
+		if p.kind.memory != (meta.ProfileType == pageFaults) {
+			continue
+		}
 		key := stackKey{trace.Hash(), pid}
 		stack := p.stacks[key]
 		if stack == nil {
-			stack = &sampledStack{frames: slices.Clone(trace.Frames), pid: pid, comm: meta.Comm.String()}
+			frames := slices.Clone(trace.Frames)
+			if p.kind.memory {
+				// The kernel's part is the same at every fault: the fault's handler.
+				frames = slices.DeleteFunc(frames, func(f unique.Handle[libpf.Frame]) bool { return f.Value().Type == libpf.KernelFrame })
+			}
+			stack = &sampledStack{frames: frames, pid: pid, comm: meta.Comm.String()}
 			p.stacks[key] = stack
 		}
 		stack.count++
@@ -238,11 +384,11 @@ func (s *sampler) ReportExecutable(args *reporter.ExecutableMetadata) {
 	s.binaries[args.MappingFile.Value().FileID] = mappedFile{pid: int(args.Process.PID()), path: strings.Clone(args.Mapping.Path)}
 }
 
-// sample records where the pod's processes spend CPU time, for duration
-// from when the profiler runs or until frame ends before, and uploads the
-// profile in pprof's format.
-func (a *Agent) sample(ctx, frame context.Context, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
-	p := &sampledProfile{containers: map[string]bool{}, pids: map[int]bool{}, stacks: map[stackKey]*sampledStack{}}
+// sample records the stacks of the pod's processes at what kind counts,
+// for duration from when the profiler runs or until frame ends before, and
+// uploads the profile in pprof's format.
+func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
+	p := &sampledProfile{kind: kind, containers: map[string]bool{}, pids: map[int]bool{}, stacks: map[stackKey]*sampledStack{}}
 	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
 		if _, id, ok := strings.Cut(status.ContainerID, "://"); ok {
 			p.containers[id] = true
@@ -268,7 +414,7 @@ func (a *Agent) sample(ctx, frame context.Context, duration time.Duration, pod *
 		return ctx.Err()
 	}
 	if len(p.stacks) == 0 {
-		return errors.New("the pod's processes used no CPU time while they were sampled")
+		return errors.New(kind.nothing)
 	}
 	// The symbols of native code are in the binaries, which the pod's own processes lead to first.
 	pids := make([]int, 0, len(p.pids))
@@ -289,20 +435,19 @@ func (a *Agent) sample(ctx, frame context.Context, duration time.Duration, pod *
 		return table.name(address)
 	}
 	var packed bytes.Buffer
-	if err := sampledAsProfile(p.stacks, began, time.Since(began), name).Write(&packed); err != nil {
+	if err := sampledAsProfile(kind, p.stacks, began, time.Since(began), name).Write(&packed); err != nil {
 		return err
 	}
-	return up("sampled-cpu.pprof", &packed)
+	return up(kind.file, &packed)
 }
 
 // sampledAsProfile turns sampled stacks into a profile in pprof's format.
 // name tells the function at an address of a binary, or "".
-func sampledAsProfile(stacks map[stackKey]*sampledStack, began time.Time, lasted time.Duration, name func(file libpf.FileID, address uint64) string) *profile.Profile {
-	period := int64(time.Second / sampleRate)
+func sampledAsProfile(kind sampledKind, stacks map[stackKey]*sampledStack, began time.Time, lasted time.Duration, name func(file libpf.FileID, address uint64) string) *profile.Profile {
 	prof := &profile.Profile{
-		SampleType:    []*profile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
-		PeriodType:    &profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
-		Period:        period,
+		SampleType:    []*profile.ValueType{&kind.count, &kind.amount},
+		PeriodType:    &kind.amount,
+		Period:        kind.unit,
 		TimeNanos:     began.UnixNano(),
 		DurationNanos: lasted.Nanoseconds(),
 		Comments:      []string{"Sampled from the node by Asservat with the OpenTelemetry eBPF profiler."},
@@ -365,7 +510,7 @@ func sampledAsProfile(stacks map[stackKey]*sampledStack, began time.Time, lasted
 	})
 	for _, stack := range ordered {
 		sample := &profile.Sample{
-			Value:    []int64{stack.count, stack.count * period},
+			Value:    []int64{stack.count, stack.count * kind.unit},
 			Label:    map[string][]string{"process": {stack.comm}},
 			NumLabel: map[string][]int64{"pid": {int64(stack.pid)}},
 		}

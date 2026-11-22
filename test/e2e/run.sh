@@ -7,12 +7,12 @@
 #   test/e2e/run.sh          build the image, create the clusters, test, delete
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
 #   CORE_HANDLER=1 test/e2e/run.sh   also record the core of a crashed process
-#   SAMPLE_CPU=1 test/e2e/run.sh     also sample a CPU profile
+#   SAMPLE_CPU=1 test/e2e/run.sh     also sample profiles of CPU time and memory growth
 #
 # CORE_HANDLER changes kernel.core_pattern of the machine that runs kind,
 # because kind nodes share its kernel. Use it only on a disposable machine
 # such as a CI runner; it needs sudo to create the spool directory.
-# SAMPLE_CPU=1 also samples a CPU profile. That loads eBPF programs into the
+# SAMPLE_CPU=1 also samples profiles. That loads eBPF programs into the
 # kernel of the machine that runs kind, which rootless containers cannot do.
 #
 # Needs docker (or podman as docker), kind, kubectl, helm, curl and jq.
@@ -300,10 +300,11 @@ for p in $(edge -n shop get pods -l app=web -o name); do
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/profile' <test/e2e/synthetic-cpu.pprof
   edge -n shop exec -i "$p" -- sh -c 'cat >/tmp/www/debug/pprof/trace' <test/e2e/synthetic-trace.out
 done
-# A CPU profile needs no endpoint: the agent samples the pods' processes from the node's kernel.
+# Sampled profiles need no endpoint: the agent takes the stacks of the pods' processes in the node's kernel.
 if [ -n "${SAMPLE_CPU:-}" ]; then
-  # A busy Python program is sampled: an interpreter's stacks are those of the
-  # program it runs, so its functions are named as such.
+  # A Python program that computes and keeps taking memory (up to 400 MiB) is sampled: an
+  # interpreter's stacks are those of the program it runs, so its functions
+  # are named as such, in the profile of CPU time and in that of memory growth.
   edge apply -f - >/dev/null <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
@@ -317,20 +318,31 @@ spec:
       containers:
         - name: py
           image: docker.io/library/python:3.12-slim
-          command: [python3, -c, "def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()"]
+          command: [python3, -c, "held = []\ndef grow():\n    held.append(b'x' * (1 << 14))\n    if len(held) > 25000: held.clear()\ndef burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()\n    grow()"]
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 EOF
   edge -n shop rollout status deployment/py --timeout 180s >/dev/null
-  id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","kind":"cpu","durationSeconds":10}'); completed "$ALICE" "$id"
+  id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","recordings":[{"kind":"cpu"},{"kind":"memory"}],"durationSeconds":10}'); completed "$ALICE" "$id"
   pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
-  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, .artifacts[0].name, .artifacts[0].viewer] | @csv')" = "false,\"$pod/sampled-cpu.pprof\",\"pprof\"" ] || fail "the sampled CPU profile: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
+  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, .artifacts[0].name, .artifacts[1].name, .artifacts[1].viewer] | @csv')" = "false,\"$pod/sampled-cpu.pprof\",\"$pod/sampled-memory.pprof\",\"pprof\"" ] || fail "the sampled CPU profile: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
   : >"$WORK/view"
   curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
   viewer=$!
   for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
   view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
-  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
-  grep -q 'burn' <<<"$top" && grep -q '<genexpr>\|genexpr' <<<"$top" || fail "Python's functions in the sampled profile: $(grep -o '"Name":"[^"]*"' <<<"$top" | head -40)"
+  # The flame graph holds every function; the top list only those with the most weight of their own.
+  graph=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/flamegraph")
+  fetch "$ALICE" "$id" "$pod/sampled-cpu.pprof" "$WORK/sampled-cpu.pprof"
+  grep -q 'burn' <<<"$graph" && grep -q 'genexpr' <<<"$graph" || fail "Python's functions in the profile of CPU time: $(go tool pprof -traces "$WORK/sampled-cpu.pprof" 2>&1 | head -150)"
+  kill "$viewer"
+  : >"$WORK/view"
+  curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-memory.pprof" >"$WORK/view" &
+  viewer=$!
+  for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
+  view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
+  graph=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/flamegraph")
+  fetch "$ALICE" "$id" "$pod/sampled-memory.pprof" "$WORK/sampled-memory.pprof"
+  grep -q 'grow' <<<"$graph" && grep -q 'Total samples = [0-9.]*[MG]B' <<<"$(go tool pprof -top "$WORK/sampled-memory.pprof" 2>/dev/null)" || fail "Python's functions in the profile of memory growth: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -150)"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
 fi

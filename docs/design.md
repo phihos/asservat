@@ -174,8 +174,9 @@ Because Asservat knows what each returns, only those that return memory
 need approval. An endpoint outside this list can return anything, so
 requesting one by `port` and `path` needs approval. Applications without
 such an endpoint (most Python, Node.js, Ruby and PHP services, and Java or
-.NET ones without the tools above) get a CPU profile by sampling (`cpu`,
-below); memory, blocking and traces need the runtime's own endpoint.
+.NET ones without the tools above) get a CPU profile and a profile of
+memory growth by sampling (`cpu` and `memory`, below); what a process holds
+by allocation site, blocking and traces need the runtime's own endpoint.
 
 ### CPU profiles by sampling
 
@@ -196,6 +197,31 @@ code the agent reads the names from the binaries' symbol tables in the
 container; a function of a stripped binary appears as `file+0xaddress`,
 except for the functions it exports.
 
+### Memory growth by sampling
+
+The kind `memory` uses the same profiler to show which code makes a pod's
+memory grow. The kernel gives a process a page of memory when the process
+first touches it, which is a page fault. For the time frame the profiler
+takes the stack at every page fault (a probe on the kernel's
+`handle_mm_fault`), and the agent keeps those of the recorded pods. Each
+pod yields `sampled-memory.pprof`, which counts page faults and the bytes
+they bring in, one page per fault, by the application's stack; the
+kernel's own frames are left out.
+
+This is the way to see memory from outside that costs the application
+nearly nothing and works for every runtime. Tracing every `malloc` and
+`free` instead (as bcc's memleak does) would also tell what is still held,
+but slows a program that allocates much several times over, and misses
+runtimes with their own heap such as Go and Java.
+
+!!! warning
+    The profile shows growth while it records. Memory that was taken
+    before, and memory that an allocator hands out again without asking the
+    kernel, cause no page fault and do not appear: a core dump shows what a
+    process holds. A fault that brings in a huge page counts as one page.
+    While it records, every page fault on the node takes a few microseconds
+    longer, also those of other pods.
+
 !!! note
     The node needs Linux 5.10 or later. On an older kernel the recording
     fails and says so; the other recordings of the capture are not affected.
@@ -212,6 +238,7 @@ own format and nothing is injected into the pod:
 | `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
 | `cpu` | Samples of the pod's processes by eBPF programs in the node's kernel, for `durationSeconds`; all containers of the pod | No |
+| `memory` | Stacks of the pod's processes at their page faults, taken by an eBPF program in the node's kernel, for `durationSeconds`; all containers of the pod | No |
 | `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |
 | `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
 
@@ -386,7 +413,8 @@ type.
 
 These are known gaps, in rough order of value:
 
-- Memory profiles of applications that serve no profile endpoint.
+- What a process holds in memory by allocation site, for applications that
+  serve no profile endpoint.
 - Other triggers than a crash (alerts, failing probes, a log line).
 - Passing the cores of unwatched processes on to the node's previous core
   handler.

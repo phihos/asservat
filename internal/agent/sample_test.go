@@ -34,7 +34,7 @@ func TestSampledAsProfile(t *testing.T) {
 	}
 	began := time.Unix(1700000000, 0)
 	var packed bytes.Buffer
-	if err := sampledAsProfile(stacks, began, 30*time.Second, name).Write(&packed); err != nil {
+	if err := sampledAsProfile(sampledCPU, stacks, began, 30*time.Second, name).Write(&packed); err != nil {
 		t.Fatal(err)
 	}
 	prof, err := profile.Parse(&packed)
@@ -61,6 +61,11 @@ func TestSampledAsProfile(t *testing.T) {
 	}
 	if got := prof.Sample[1].Location[0].Line[0].Function.Name; got != "libwork.so+0x5000" {
 		t.Fatal("a function without a symbol", got)
+	}
+	// The same stacks at page faults count pages of memory.
+	grown := sampledAsProfile(sampledMemory, stacks, began, 30*time.Second, name)
+	if got := grown.SampleType[1]; got.Type != "memory" || got.Unit != "bytes" || grown.Sample[0].Value[1] != 3*int64(os.Getpagesize()) || grown.CheckValid() != nil {
+		t.Fatal("memory growth", got, grown.Sample[0].Value, grown.CheckValid())
 	}
 }
 

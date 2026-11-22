@@ -31,7 +31,7 @@ func TestValidateAndSensitive(t *testing.T) {
 		{"profile endpoint without port", base(KindPprof, map[string]string{"endpoints": "go-cpu"}), false, false},
 		{"profile endpoint twice", base(KindPprof, map[string]string{"endpoints": "6060/go-cpu,6060/go-cpu"}), false, false},
 		{"profile endpoints and a path", base(KindPprof, map[string]string{"endpoints": "6060/go-cpu", "port": "1", "path": "/x"}), false, false},
-		{"unknown kind", base("memory", nil), false, false},
+		{"unknown kind", base("thoughts", nil), false, false},
 		{"foreign parameter", base(KindPodState, map[string]string{"filter": "x"}), false, false},
 		{"bad boolean", base(KindPcap, map[string]string{"payload": "yes"}), false, false},
 		{"bad path", base(KindPprof, map[string]string{"port": "1", "path": "x; rm"}), false, false},
@@ -140,15 +140,17 @@ func TestViewerOf(t *testing.T) {
 	}
 }
 
-// A sampled CPU profile runs for the time frame, takes no parameters and
-// holds no memory or payload.
-func TestSampledCPUProfile(t *testing.T) {
-	r := CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: KindCPU}
-	if err := r.Validate(); err != nil || r.DurationSeconds != 30 || !r.Recordings[0].Timed(false) || r.Recordings[0].Sensitive() {
-		t.Fatal(err, r)
-	}
-	r = CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: KindCPU, Params: map[string]string{"container": "web"}}
-	if err := r.Validate(); err == nil {
-		t.Fatal("a parameter was accepted")
+// A sampled profile, of CPU time or of memory growth, runs for the time
+// frame, takes no parameters and holds no memory contents or payload.
+func TestSampledProfiles(t *testing.T) {
+	for _, kind := range []string{KindCPU, KindMemory} {
+		r := CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: kind}
+		if err := r.Validate(); err != nil || r.DurationSeconds != 30 || !r.Recordings[0].Timed(false) || r.Recordings[0].Sensitive() {
+			t.Fatal(kind, err, r)
+		}
+		r = CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Kind: kind, Params: map[string]string{"container": "web"}}
+		if err := r.Validate(); err == nil {
+			t.Fatal(kind, "a parameter was accepted")
+		}
 	}
 }

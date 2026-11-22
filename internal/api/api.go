@@ -18,6 +18,7 @@ const (
 	KindStrace   = "strace"    // system call trace
 	KindPprof    = "pprof"     // HTTP profile endpoints of the application's runtime
 	KindCPU      = "cpu"       // CPU profile sampled from the node, without an endpoint
+	KindMemory   = "memory"    // where memory grows, sampled from the node at page faults
 )
 
 // Capture states.
@@ -56,7 +57,7 @@ type CaptureRequest struct {
 	Kind   string            `json:"kind,omitempty"`
 	Params map[string]string `json:"params,omitempty"`
 	// DurationSeconds is the time frame of the recordings that run over
-	// time: pcap, strace, cpu, pprof and followed logs.
+	// time: pcap, strace, cpu, memory, pprof and followed logs.
 	DurationSeconds int    `json:"durationSeconds,omitempty"`
 	Reason          string `json:"reason,omitempty"`
 	// Watch is the watch that created the capture and Trigger the agent's
@@ -76,7 +77,7 @@ func (r *CaptureRequest) Normalize() {
 // Timed reports whether the recording runs for the request's time frame.
 func (rec Recording) Timed(followLogs bool) bool {
 	switch rec.Kind {
-	case KindPcap, KindStrace, KindCPU:
+	case KindPcap, KindStrace, KindCPU, KindMemory:
 		return true
 	case KindLogs:
 		return followLogs
@@ -121,6 +122,7 @@ var params = map[string][]string{
 	KindStrace:   {"container", "strings", "process"},
 	KindPprof:    {"endpoints", "port", "path"},
 	KindCPU:      {},
+	KindMemory:   {},
 }
 
 // Validate normalizes the request and checks its shape. The time frame
@@ -149,7 +151,7 @@ func (r *CaptureRequest) Validate() error {
 				return fmt.Errorf("kind %s is requested twice", rec.Kind)
 			}
 		}
-		timed = timed || rec.Kind == KindPcap || rec.Kind == KindStrace || rec.Kind == KindPprof || rec.Kind == KindCPU
+		timed = timed || rec.Kind == KindPcap || rec.Kind == KindStrace || rec.Kind == KindPprof || rec.Kind == KindCPU || rec.Kind == KindMemory
 	}
 	if r.DurationSeconds < 0 {
 		return fmt.Errorf("durationSeconds must not be negative")
