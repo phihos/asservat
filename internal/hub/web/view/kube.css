@@ -6,9 +6,9 @@
 .page > h2:first-child { font: 600 20px/1.3 var(--mono); text-transform: none; letter-spacing: 0; }
 .page h3 { margin: 0 0 6px; font: 600 15px var(--text); }
 .page .muted { font-weight: normal; }
-/* A state, as on the console: ready is filled, the rest outlined. */
+/* A state, outlined in its colour as on the console. What asks for attention is a filled marker, as a warning is yellow in a log. */
 .badge { display: inline-block; padding: 0 8px; border: 2px solid currentColor; font: 600 14px/1.4 var(--display); text-transform: uppercase; letter-spacing: .05em; vertical-align: middle; }
-.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); } .badge.warn { color: var(--custody-ink); } .badge.done { color: var(--quiet); }
+.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); } .badge.warn { background: var(--marker); border-color: var(--marker); color: var(--on-marker); } .badge.done { color: var(--quiet); }
 .props { border-collapse: collapse; width: 100%; }
 .props th { width: 150px; padding: 5px 12px 5px 0; text-align: left; vertical-align: top; color: var(--quiet); font: 500 11px/1.9 var(--mono); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .props td { padding: 5px 0; border-bottom: 1px solid var(--soft); word-break: break-word; }
@@ -18,10 +18,10 @@ code { font: 12px var(--mono); }
 .grid th { padding: 5px 10px; text-align: left; border-bottom: 1px solid var(--ink); white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); }
 .grid td { padding: 5px 10px; border-bottom: 1px solid var(--soft); vertical-align: top; }
 .grid.events td:nth-child(n+5) { white-space: nowrap; font: 12px var(--mono); }
-.grid tr.warning { background: color-mix(in srgb, var(--custody) 8%, var(--surface)); }
+.grid tr.warning { background: color-mix(in srgb, var(--marker) 12%, var(--surface)); }
 .grid.events tbody tr { cursor: default; }
 .grid tr.selected { background: var(--marker); color: var(--on-marker); }
-.grid tr.selected .badge { color: var(--on-marker); }
+.grid tr.selected .badge { color: var(--on-marker); border-color: var(--on-marker); }
 .container { margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line); }
 #json .narrow { position: sticky; top: 0; }
 #tree { padding: 8px 12px 40px; font: 12px/19px var(--mono); }

@@ -2,6 +2,7 @@ package hub
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -223,8 +224,66 @@ func (h *Hub) viewPage(w http.ResponseWriter, r *http.Request, u User) error {
 	if page == nil {
 		return ErrNotFound
 	}
-	page.ServeHTTP(w, r)
+	// The trace viewer under /trace is an application of its own, with its own look.
+	if r.URL.Path == "/trace" {
+		page.ServeHTTP(w, r)
+		return nil
+	}
+	framed := &framedPage{ResponseWriter: w}
+	page.ServeHTTP(framed, r)
+	framed.end()
 	return nil
+}
+
+// framedLook is added to the pages that a tool draws itself, so that they
+// are set in Asservat's type inside the viewer's frame.
+const framedLook = `<link rel="stylesheet" href="/assets/identity.css"><link rel="stylesheet" href="/view/framed.css">`
+
+// framedPage passes a tool's response on and adds framedLook to an HTML
+// page, before its body and so after the page's own styles. It holds such
+// a page until the tool has written all of it; anything else is passed on
+// as it comes.
+type framedPage struct {
+	http.ResponseWriter
+	decided, html bool
+	page          bytes.Buffer
+}
+
+func (f *framedPage) Unwrap() http.ResponseWriter { return f.ResponseWriter }
+
+// decide tells from the response's type, or else from its first bytes,
+// whether it is an HTML page.
+func (f *framedPage) decide(first []byte) {
+	if f.decided {
+		return
+	}
+	f.decided = true
+	kind := f.Header().Get("Content-Type")
+	if kind == "" && first != nil {
+		kind = http.DetectContentType(first)
+	}
+	if f.html = strings.HasPrefix(kind, "text/html"); f.html {
+		f.Header().Del("Content-Length")
+	}
+}
+
+func (f *framedPage) WriteHeader(status int) {
+	f.decide(nil)
+	f.ResponseWriter.WriteHeader(status)
+}
+
+func (f *framedPage) Write(p []byte) (int, error) {
+	f.decide(p)
+	if f.html {
+		return f.page.Write(p)
+	}
+	return f.ResponseWriter.Write(p)
+}
+
+func (f *framedPage) end() {
+	if f.html {
+		f.ResponseWriter.Write(bytes.Replace(f.page.Bytes(), []byte("<body"), []byte(framedLook+"<body"), 1))
+	}
 }
 
 // plain writes an artifact, decrypted, to w.

@@ -1,0 +1,12 @@
+/* Asservat's type on the pages that a tool draws itself inside a viewer:
+   pprof and Go's trace tool. The hub adds this sheet to their pages. Their
+   layout and colours stay, and they are light in either theme, so the one
+   colour set here, a link's, is written out. */
+:root { color-scheme: light; scrollbar-color: auto; }
+body, input, button, select, .menu-item, .header input, .boxtext { font-family: var(--text) !important; }
+code, pre, tt, textarea.code, #toptable td, .ctrl { font-family: var(--mono) !important; }
+h1, h2 { font-family: var(--display); text-transform: uppercase; letter-spacing: .02em; }
+a { color: #174A96; }
+/* pprof's bar: its name as a heading of ours. */
+.header { background-color: #E4E7E2; }
+.header .title h1 { font: 700 22px/1 var(--display); letter-spacing: .04em; margin-bottom: 0; }

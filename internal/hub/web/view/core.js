@@ -28,6 +28,8 @@ const base = path => path.split('/').pop();
 const where = f => f.file ? `${base(f.file)}:${f.line}` : f.module ? base(f.module) : '';
 const named = f => f.function || f.pc || '??';
 
+// Dark in either theme, as a debugger is.
+export const dark = true;
 export default async function (root) {
   let report;
   try { report = JSON.parse((await loadText(file.endsWith(suffix) ? address : address + suffix)).text); }
@@ -50,7 +52,10 @@ export default async function (root) {
     ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
 
   const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
-  const variables = (title, list) => !list?.length ? '' : `<h5>${title}</h5>` + table(['Name', 'Value', 'Type'], list.map(v => `<tr><td class="name">${esc(v.name)}</td><td class="value">${esc(v.value)}</td><td class="type">${esc(v.type)}</td></tr>`));
+  const variables = (title, list) => !list?.length ? '' : `<h5>${title}</h5>` + table(['Name', 'Value', 'Type'], list.map(v => `<tr><td class="name">${esc(v.name)}</td>${value(v.value)}<td class="type">${esc(v.type)}</td></tr>`));
+  // What the debugger says in place of a value it cannot read: a variable
+  // that the compiler kept in no place at this instruction is "optimised out".
+  const value = v => /^<.*>$/.test(v || '') ? `<td class="value dim" title="${esc(v)}">${/loclist|optimized|OP stack/.test(v) ? 'optimised out' : esc(v.slice(1, -1))}</td>` : `<td class="value">${esc(v)}</td>`;
   const rows = {
     threads: t => `<span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${t.id}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${t.systemId}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`,
     goroutines: g => `<span>${g.current ? '<b title="The goroutine of the thread that the core selects: for a crash, the one that crashed">●</b> ' : ''}Goroutine ${g.id} <span class="dim">${esc(g.status)}${g.threadSystemId ? ` · LWP ${g.threadSystemId}` : ''}</span></span><span class="dim">${esc(g.function || (g.frames[0] ? named(g.frames[0]) : ''))}</span>`,

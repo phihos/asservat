@@ -12,7 +12,7 @@ export const headers = token ? {Authorization: 'Bearer ' + token} : {};
 
 // notice replaces the viewer with a message, show brings the viewer back.
 export function notice(text, retry) {
-  $('root').hidden = true; $('notice').hidden = false;
+  $('root').hidden = true; $('notice').hidden = false; $('notice').classList.remove('opening');
   $('notice').innerHTML = esc(text) + (retry ? '<br><button id="retry">Open again</button>' : '');
   if (retry) $('retry').onclick = () => location.reload();
 }
