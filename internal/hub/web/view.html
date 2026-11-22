@@ -25,6 +25,7 @@ header .brand img { width: 22px; height: 22px; } header .brand b { font-size: 19
 /* The capture's number on its marker, as in the console's list. */
 header .number { padding: 3px 6px; background: var(--marker); color: var(--on-marker); font: 700 16px/1 var(--display); }
 header .name { font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header select.name { font-size: 13px; max-width: 40vw; }
 header .muted { color: var(--on-bar-quiet); }
 header .grow { flex: 1; }
 /* The bar stays one line: the file's origin gives way first, and on a phone only mark, number and name remain beside the actions. */
@@ -62,6 +63,7 @@ header select, header button { height: 24px; padding: 0 8px; border: 1px solid #
   <a class="back" href="/#captures" title="Back to the captures">&larr; Captures</a>
   <span class="number" id="number" hidden></span>
   <span class="name" id="name"></span>
+  <select class="name" id="files" hidden title="Open another file of this capture"></select>
   <span class="muted" id="origin"></span>
   <span class="grow"></span>
   <select id="moment" hidden title="Open another file of this capture at the moment of what is selected here"></select>
@@ -89,6 +91,7 @@ async function open() {
   $('origin').textContent = `pod ${file.split('/')[0]} · ${c.workload} in ${c.namespace} on ${c.cluster}`;
   if (!artifact) return notice('This file does not exist any more.');
   if (!artifact.viewer) return notice('This file cannot be shown here. Download it instead.');
+  otherFiles(c);
   sameMoment(c);
   const style = document.createElement('link');
   style.rel = 'stylesheet'; style.href = `/view/${artifact.viewer}.css`;
@@ -96,6 +99,20 @@ async function open() {
   const viewer = await import(`/view/${artifact.viewer}.js`);
   $('root').classList.toggle('dark', !!viewer.dark);
   await viewer.default($('root'), {capture: c, artifact});
+}
+// The file's name becomes the choice among the capture's files that have a
+// viewer, so that the way to another one does not lead back over the list.
+// A core's description opens with its core and is not listed.
+function otherFiles(c) {
+  const shown = c.artifacts.filter(a => a.viewer && !a.name.endsWith('.analysis.json'));
+  if (shown.length < 2) return;
+  const pods = new Set(shown.map(a => a.name.split('/')[0]));
+  $('files').innerHTML = shown.map(a => {
+    const [pod, name] = a.name.split('/');
+    return `<option value="${esc(a.name)}"${a.name === file ? ' selected' : ''}>${esc(name)}${pods.size > 1 ? ' · ' + esc(pod) : ''}</option>`;
+  }).join('');
+  $('files').onchange = () => { location.href = `/view?capture=${capture}&file=${encodeURIComponent($('files').value)}`; };
+  $('name').hidden = true; $('files').hidden = false;
 }
 // The capture's other files that know when things happened, this pod's
 // first. They are offered once the viewer tells the moment of a selection.
