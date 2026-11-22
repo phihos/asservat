@@ -29,8 +29,12 @@ type Agent struct {
 	Node   string
 	Kube   kubernetes.Interface
 	HTTP   *http.Client
-	// Scratch holds a core file until it is uploaded.
+	// Scratch holds a core file until it is uploaded, and the symbols that
+	// gdb fetched from debuginfod servers.
 	Scratch string
+	// DebuginfodURLs are the debuginfod servers, separated by spaces, that
+	// gdb asks for the symbols of stripped programs; empty for none.
+	DebuginfodURLs string
 	// Proc is the node's /proc.
 	Proc string
 	// Cores is the spool of the node's core handler; empty without it.

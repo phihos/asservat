@@ -100,7 +100,9 @@ def frames(thread):
 
 gdb.execute("set pagination off")
 gdb.execute("set confirm off")
-gdb.execute("set debuginfod enabled off")
+# gdb asks debuginfod servers for the symbols of stripped files only where
+# the operator named servers: the request tells them which programs run here.
+gdb.execute("set debuginfod enabled " + ("on" if os.environ.get("DEBUGINFOD_URLS") else "off"))
 if ROOT:
     gdb.execute("set sysroot " + ROOT)
 loaded = run("core-file " + CORE)

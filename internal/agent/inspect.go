@@ -129,7 +129,7 @@ func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.D
 	}
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "nsenter", "-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-")
+	cmd := exec.CommandContext(ctx, "nsenter", "-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-", withoutOwnTraffic(""))
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGINT) }
 	cmd.WaitDelay = 5 * time.Second
 	var stderr bytes.Buffer

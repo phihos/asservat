@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/kubernetes"
@@ -205,6 +206,7 @@ func runAgent(ctx context.Context, args []string) error {
 	node := f.String("node", os.Getenv("NODE_NAME"), "name of this node")
 	caFile := f.String("ca-file", "", "PEM file with the CA of the hub's certificate, if it is not publicly trusted")
 	scratch := f.String("scratch", "/scratch", "directory for a core file until it is uploaded")
+	debuginfod := f.String("debuginfod-urls", "", "debuginfod servers, separated by spaces or commas, from which gdb fetches the symbols of stripped programs when it describes a core; the agent then sends them the build IDs of those programs and their libraries. Empty: none, and the stacks of stripped programs show addresses")
 	coreSpool := f.String("core-spool", "", "directory at the same path on the node and in this container; set to make this agent the node's core handler, which keeps the cores of crashed processes in watched pods")
 	corePattern := f.String("core-pattern-file", "/proc/1/root/proc/sys/kernel/core_pattern", "the node's kernel.core_pattern")
 	f.Parse(args)
@@ -216,6 +218,8 @@ func runAgent(ctx context.Context, args []string) error {
 		return fmt.Errorf("token-file: %w", err)
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// From the agent's own source ports, which packet captures leave out.
+	transport.DialContext = agent.DialHub
 	if *caFile != "" {
 		pem, err := os.ReadFile(*caFile)
 		if err != nil {
@@ -236,6 +240,7 @@ func runAgent(ctx context.Context, args []string) error {
 		return err
 	}
 	a := &agent.Agent{HubURL: strings.TrimRight(*hubURL, "/"), Token: token, Node: *node, Kube: kube, HTTP: &http.Client{Transport: transport}, Scratch: *scratch, Proc: "/proc"}
+	a.DebuginfodURLs = strings.Join(strings.FieldsFunc(*debuginfod, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), " ")
 	if *coreSpool != "" {
 		a.Cores = agent.CoreSpool(*coreSpool)
 		restore, err := a.Cores.Install(*corePattern)

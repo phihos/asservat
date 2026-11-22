@@ -186,10 +186,10 @@ own format and nothing is injected into the pod:
 | --- | --- | --- |
 | `pod-state` | Kubernetes API: pod object and events | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
-| `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true` | With `payload=true` |
+| `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
 | `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |
-| `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core is stored next to it | Yes |
+| `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
 
 The main process of a container is the oldest process in the container's
 cgroup whose parent is outside of it.
@@ -212,7 +212,7 @@ shows what the tool would show.
 | Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
 
-| Core dump | Like a debugger's view of a stopped program (Visual Studio Code): threads, call stack, the frame's variables, instructions and registers, modules, memory map | gdb on the node, when the core is recorded |
+| Core dump | Like a debugger's view of a stopped program (Visual Studio Code): threads, for a Go program goroutines, call stack, the frame's variables, instructions and registers, modules, memory map | gdb, and Delve for a Go program, on the node, when the core is recorded |
 
 The heap dumps of Java and the traces and dumps of .NET download only:
 their tools (Eclipse MAT, PerfView, the .NET SDK) would each add a runtime
@@ -225,7 +225,19 @@ every core right after recording it, reading the program's files through a
 process of the same container (for a crashed process, the container's next
 instance), and uploads the description as `<core>.analysis.json` next to
 the core. The viewer shows that file; it does not browse the core's memory.
-Variables appear where the program carries debug information. As text, the
+Variables appear where the program carries debug information. gdb unwinds
+the stacks of Go programs poorly and knows nothing of goroutines: for a Go
+program, Delve (as a library in the agent) adds the goroutines with their
+state, call stacks and variables, and the viewer lists them before the
+threads. It describes at most 10000 goroutines, those running on a thread
+first, because the viewer reads at most 64 MiB and a goroutine takes about
+4 KiB; where Delve cannot read the program, for instance a stripped one,
+gdb's description stands alone. The stacks of a stripped program show
+addresses. With `agent.debuginfodURLs` (`--debuginfod-urls`) gdb fetches the
+missing symbols from those debuginfod servers; this is off by default
+because the agent then sends them the build IDs of the programs it describes
+and of their libraries. The downloads rest in the agent's scratch directory,
+where the debuginfod client removes those unused for a week. As text, the
 description is also readable for AI agents over MCP. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
@@ -314,6 +326,12 @@ file is removed once it serves.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves.
+- **The agent's own traffic.** An agent dials the hub from the source ports
+  61000 to 61063, above Linux's default range for outgoing connections, and
+  every packet capture, packet buffer and traffic sample leaves TCP on
+  those ports out. A capture of a pod through which the agent's connection
+  passes (the hub's pod, a pod on the host's network) would otherwise
+  record its own upload.
 - **Limits.** `read_artifact` over MCP returns 64 KiB per call so that a
   result fits a model's context. A watch's packet buffer is 16 MiB per pod
   because it lives in the agent's memory. A capture's duration is what the

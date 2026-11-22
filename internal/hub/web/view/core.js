@@ -2,14 +2,15 @@
 // Visual Studio Code: threads and the call stack on the left; the selected
 // frame's variables, registers and instructions on the right; the modules
 // and the memory map beside them. gdb described the core on the node, where
-// the program's files were at hand; this page shows that description.
+// the program's files were at hand; this page shows that description. For a
+// Go program Delve added the goroutines, which the list then offers first.
 import {$, esc, address, file, loadText, notice, show} from './common.js';
 
 const markup = `
   <div id="stopped"></div>
   <div id="debugger">
     <div id="side">
-      <h4>Threads <input id="find" type="search" placeholder="Search" autocomplete="off" spellcheck="false"></h4>
+      <h4><span id="kinds">Threads</span> <input id="find" type="search" placeholder="Search" autocomplete="off" spellcheck="false"></h4>
       <div id="threads" tabindex="0"></div>
       <h4>Call stack</h4>
       <div id="stack" tabindex="0"></div>
@@ -35,36 +36,49 @@ export default async function (root) {
     throw err;
   }
   root.innerHTML = markup;
-  const threads = report.threads || [];
-  let thread = threads.find(t => t.current) || threads[0], frame = thread?.frames[0];
+  // A goroutine has a call stack like a thread: both are listed, selected
+  // and shown the same way. Registers and instructions exist for threads.
+  const lists = {goroutines: report.goroutines || [], threads: report.threads || []};
+  let kind = lists.goroutines.length ? 'goroutines' : 'threads', thread, frame;
+  const choose = to => { kind = to; thread = lists[kind].find(t => t.current) || lists[kind][0]; frame = thread?.frames[0]; };
+  choose(kind);
+  if (lists.goroutines.length) $('kinds').innerHTML = '<button data-kind="goroutines">Goroutines</button><button data-kind="threads">Threads</button>';
 
   $('stopped').innerHTML = `<span class="${report.stopped ? 'crash' : 'snap'}">${esc(report.stopped || 'Snapshot of a running process; it continued afterwards.')}</span>
     <code>${esc(report.commandLine || report.executable || '')}</code>
+    ${report.runtime ? `<span class="dim">${esc(report.runtime)}</span>` : ''}
     ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
 
   const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
   const variables = (title, list) => !list?.length ? '' : `<h5>${title}</h5>` + table(['Name', 'Value', 'Type'], list.map(v => `<tr><td class="name">${esc(v.name)}</td><td class="value">${esc(v.value)}</td><td class="type">${esc(v.type)}</td></tr>`));
+  const rows = {
+    threads: t => `<span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${t.id}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${t.systemId}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`,
+    goroutines: g => `<span>${g.current ? '<b title="The goroutine of the thread that the core selects: for a crash, the one that crashed">●</b> ' : ''}Goroutine ${g.id} <span class="dim">${esc(g.status)}${g.threadSystemId ? ` · LWP ${g.threadSystemId}` : ''}</span></span><span class="dim">${esc(g.function || (g.frames[0] ? named(g.frames[0]) : ''))}</span>`,
+  };
   const draw = () => {
     const words = $('find').value.toLowerCase();
-    $('threads').innerHTML = threads.filter(t => !words || `${t.name} ${t.frames.map(named).join(' ')}`.toLowerCase().includes(words)).map(t =>
-      `<div class="row${t === thread ? ' selected' : ''}" data-thread="${t.id}"><span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${t.id}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${t.systemId}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span></div>`).join('') || '<div class="dim pad">No thread matches.</div>';
+    for (const b of $('kinds').querySelectorAll('button')) b.classList.toggle('on', b.dataset.kind === kind);
+    $('threads').innerHTML = (lists[kind].filter(t => !words || `${t.name || ''} ${t.status || ''} ${t.frames.map(named).join(' ')}`.toLowerCase().includes(words)).map(t =>
+      `<div class="row${t === thread ? ' selected' : ''}" data-thread="${t.id}">${rows[kind](t)}</div>`).join('') || `<div class="dim pad">No ${kind === 'threads' ? 'thread' : 'goroutine'} matches.</div>`)
+      + (kind === 'goroutines' && report.goroutinesCut ? `<div class="dim pad">The program has more goroutines; ${lists.goroutines.length} are shown, with those that run on a thread.</div>` : '');
     $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${f.level}"><span>${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
       + (thread.cut ? '<div class="dim pad">The stack goes deeper; the innermost 256 frames are shown.</div>' : '');
-    $('frame').innerHTML = !frame ? '<p class="dim pad">This thread has no frames.</p>' : `
+    $('frame').innerHTML = !frame ? '<p class="dim pad">No frames.</p>' : `
       <h3>#${frame.level} ${esc(named(frame))}</h3>
-      <div class="dim">${frame.file ? `${esc(frame.file)}:${frame.line} · ` : ''}${esc(frame.module || '')} · ${esc(frame.pc)}</div>
+      <div class="dim">${[frame.file && `${frame.file}:${frame.line}`, frame.module, frame.pc].filter(Boolean).map(esc).join(' · ')}</div>
       ${variables('Arguments', frame.arguments)}${variables('Locals', frame.locals)}
       ${frame.arguments?.length || frame.locals?.length ? '' : '<p class="dim">No variables: the program carries no debug information for this frame.</p>'}
       ${frame.code?.length ? '<h5>Instructions</h5><pre class="code">' + frame.code.map((i, n) => `<span class="${n ? '' : 'pc'}">${n ? '  ' : '=&gt;'} ${esc(i.address)}  ${esc(i.instruction)}</span>`).join('\n') + '</pre>' : ''}
       ${frame.registers?.length ? '<h5>Registers</h5><div class="registers">' + frame.registers.map(r => `<div><span class="name">${esc(r.name)}</span><span class="value">${esc(r.value)}</span></div>`).join('') + '</div>'
-        : '<p class="dim">Registers are shown for the innermost frame.</p>'}`;
+        : `<p class="dim">${kind === 'threads' ? 'Registers are shown for the innermost frame.' : 'Registers and instructions are shown for threads.'}</p>`}`;
   };
   $('modules').innerHTML = table(['File', 'From', 'To', 'Symbols'], [`<tr><td class="name">${esc(report.executable || '')}</td><td></td><td></td><td>${report.symbols ? 'read' : 'not at hand'}</td></tr>`,
     ...(report.modules || []).map(m => `<tr><td class="name">${esc(m.file)}</td><td class="value">${esc(m.from)}</td><td class="value">${esc(m.to)}</td><td>${m.symbols ? 'read' : 'not at hand'}</td></tr>`)]);
   $('map').innerHTML = table(['Start', 'End', 'Size', 'Offset', 'File'], (report.mappings || []).map(m => `<tr><td class="value">${esc(m.start)}</td><td class="value">${esc(m.end)}</td><td class="value">${esc(m.size)}</td><td class="value">${esc(m.offset)}</td><td class="name">${esc(m.file)}</td></tr>`));
 
   $('find').oninput = draw;
-  $('threads').onclick = e => { const r = e.target.closest('[data-thread]'); if (r) { thread = threads.find(t => t.id === Number(r.dataset.thread)); frame = thread.frames[0]; draw(); } };
+  $('kinds').onclick = e => { if (e.target.dataset.kind) { choose(e.target.dataset.kind); draw(); } };
+  $('threads').onclick = e => { const r = e.target.closest('[data-thread]'); if (r) { thread = lists[kind].find(t => t.id === Number(r.dataset.thread)); frame = thread.frames[0]; draw(); } };
   $('stack').onclick = e => { const r = e.target.closest('[data-level]'); if (r) { frame = thread.frames[Number(r.dataset.level)]; draw(); } };
   $('stack').onkeydown = e => {
     const step = {ArrowDown: 1, ArrowUp: -1}[e.key], to = thread?.frames[(frame?.level ?? 0) + step];

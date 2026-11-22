@@ -90,6 +90,12 @@ agent:
   existingSecret: ""
   # PEM CA certificate of the hub, if its certificate is not publicly trusted.
   caCert: ""
+  # debuginfod servers from which gdb fetches the symbols of stripped
+  # programs when it describes a core dump, so that stacks show functions
+  # instead of addresses. The agent then sends these servers the build IDs
+  # of the programs it describes and of their libraries. Empty: none.
+  #   - https://debuginfod.debian.net
+  debuginfodURLs: []
   # Core dumps of crashed processes, for core dump watches. The agent then
   # replaces the node's kernel.core_pattern while it runs and restores it
   # when it stops: other crashes on the node leave no core meanwhile.
