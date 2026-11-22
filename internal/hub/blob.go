@@ -130,7 +130,8 @@ func encrypt(dst io.Writer, src io.Reader, key []byte) error {
 	if err != nil {
 		return err
 	}
-	buf, next := make([]byte, chunkSize), make([]byte, chunkSize)
+	// Three buffers serve every chunk: this one, the next one, and the sealed one.
+	buf, next, out := make([]byte, chunkSize), make([]byte, chunkSize), make([]byte, 0, chunkSize+aead.Overhead())
 	n, err := io.ReadFull(src, buf)
 	for i := uint64(0); ; i++ {
 		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
@@ -142,7 +143,7 @@ func encrypt(dst io.Writer, src io.Reader, key []byte) error {
 			m, nextErr = io.ReadFull(src, next)
 		}
 		last := nextErr == io.EOF
-		sealed := aead.Seal(nil, chunkNonce(i), buf[:n], []byte{b2i(last)})
+		sealed := aead.Seal(out[:0], chunkNonce(i), buf[:n], []byte{b2i(last)})
 		var size [4]byte
 		binary.BigEndian.PutUint32(size[:], uint32(len(sealed)))
 		if _, err := dst.Write(size[:]); err != nil {
@@ -168,12 +169,14 @@ func decrypt(dst io.Writer, src io.Reader, key []byte) error {
 	if _, err := io.ReadFull(src, size[:]); err != nil {
 		return err
 	}
+	// One buffer serves every chunk, which is opened in place.
+	buf := make([]byte, chunkSize+aead.Overhead())
 	for i := uint64(0); ; i++ {
 		n := binary.BigEndian.Uint32(size[:])
 		if n > chunkSize+uint32(aead.Overhead()) {
 			return errors.New("corrupt artifact")
 		}
-		sealed := make([]byte, n)
+		sealed := buf[:n]
 		if _, err := io.ReadFull(src, sealed); err != nil {
 			return err
 		}
@@ -182,7 +185,7 @@ func decrypt(dst io.Writer, src io.Reader, key []byte) error {
 		if err != nil && !last {
 			return err
 		}
-		plain, err := aead.Open(nil, chunkNonce(i), sealed, []byte{b2i(last)})
+		plain, err := aead.Open(sealed[:0], chunkNonce(i), sealed, []byte{b2i(last)})
 		if err != nil {
 			return errors.New("corrupt artifact")
 		}
