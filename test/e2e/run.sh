@@ -231,7 +231,7 @@ kill $viewer
 # The other viewers read in the browser; the hub names them and serves them.
 [ "$(ok "$ALICE" GET /api/captures | jq -c '[.[].artifacts[] | select(.viewer) | .viewer] | unique')" = '["kube","log","pcap"]' ] || fail "viewers of the files so far"
 for v in kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
-curl -sS --fail "$URL/view" | grep -q '/view/common.js' || fail "viewer page"
+grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
 
 log "what runs and who talks: the choices for a process and a packet filter (edge)"
 processes=$(ok "$ALICE" GET '/api/clusters/edge/namespaces/shop/processes?workload=Deployment/web')
@@ -303,8 +303,8 @@ curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/cp
 viewer=$!
 for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.1; done
 view=$(sed -n 's/^data: //p' "$WORK/view")
-curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top" | grep -q 'shop.priceOf' || fail "pprof's top page"
-curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/graph" | grep -q '<svg' || fail "pprof's graph page, drawn by dot"
+grep -q 'shop.priceOf' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")" || fail "pprof's top page"
+grep -q '<svg' <<<"$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/graph")" || fail "pprof's graph page, drawn by dot"
 kill $viewer
 [ "$(status "$ALICE" GET "/api/captures/$id/views/$pod/heap.pprof")" = 422 ] || fail "a file that is no profile opened in pprof"
 # An endpoint that Asservat does not know can return anything: it needs approval.
