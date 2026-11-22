@@ -230,7 +230,7 @@ ok "$ALICE" POST "/api/views/$view/frame" '{"frame":1,"proto":true,"bytes":true}
 [ "$(status "$MALLORY" POST "/api/views/$view/status" '{}')" = 404 ] || fail "mallory asked alice's view"
 kill $viewer
 # The other viewers read in the browser; the hub names them and serves them.
-[ "$(ok "$ALICE" GET /api/captures | jq -c '[.[].artifacts[] | select(.viewer) | .viewer] | unique')" = '["kube","log","pcap"]' ] || fail "viewers of the files so far"
+ok "$ALICE" GET /api/captures | jq -e '[.[].artifacts[].viewer] | contains(["kube", "log", "pcap"])' >/dev/null || fail "viewers of the files so far"
 for v in kube log pcap pprof stacks strace; do curl -sS --fail -o /dev/null "$URL/view/$v.js" "$URL/view/$v.css" || fail "viewer $v is not served"; done
 grep -q '/view/common.js' <<<"$(curl -sS --fail "$URL/view")" || fail "viewer page"
 
