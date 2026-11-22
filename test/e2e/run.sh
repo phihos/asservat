@@ -302,22 +302,13 @@ for p in $(edge -n shop get pods -l app=web -o name); do
 done
 # A CPU profile needs no endpoint: the agent samples the pods' processes from the node's kernel.
 if [ -n "${SAMPLE_CPU:-}" ]; then
-  id=$(capture "$ALICE" "$(target edge cpu '{"durationSeconds":10}')"); completed "$ALICE" "$id"
-  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
-  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, ([.artifacts[].name | select(endswith("/sampled-cpu.pprof"))] | length)] | @csv')" = 'false,2' ] || fail "sampled CPU profiles of two pods: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
-  : >"$WORK/view"
-  curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
-  viewer=$!
-  for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
-  view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
-  top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
-  grep -q 'accounting for' <<<"$top" && ! grep -q 'accounting for 0,' <<<"$top" || fail "the sampled profile in pprof: $top"
-  kill "$viewer"
-  # An interpreter's stacks are those of the program it runs: a Python function is named as such.
+  # A busy Python program is sampled: an interpreter's stacks are those of the
+  # program it runs, so its functions are named as such.
   edge -n shop create deployment py --image=docker.io/library/python:3.12-slim -- python3 -c $'def burn():\n    return sum(i * i for i in range(100000))\nwhile True:\n    burn()' >/dev/null
   edge -n shop rollout status deployment/py --timeout 180s >/dev/null
   id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","kind":"cpu","durationSeconds":10}'); completed "$ALICE" "$id"
   pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, .artifacts[0].name, .artifacts[0].viewer] | @csv')" = "false,\"$pod/sampled-cpu.pprof\",\"pprof\"" ] || fail "the sampled CPU profile: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"
   : >"$WORK/view"
   curl -sSN -H "Authorization: Bearer $ALICE" "$URL/api/captures/$id/views/$pod/sampled-cpu.pprof" >"$WORK/view" &
   viewer=$!

@@ -48,8 +48,12 @@ const tracefs = "/sys/kernel/tracing"
 
 // sampler runs the profiler while at least one recording wants samples.
 type sampler struct {
+	// running guards the profiler's start and stop, which take seconds and
+	// during which the profiler goes on reporting.
+	running sync.Mutex
+	stop    func()
+	// mu guards what the profiler's reports change.
 	mu       sync.Mutex
-	stop     func()
 	profiles map[*sampledProfile]struct{}
 	// binaries are the executables and libraries the profiler has seen
 	// mapped, by the ID it gives them: where to read their symbols from.
@@ -85,8 +89,8 @@ type sampledStack struct {
 // begin starts collecting the samples of a pod, and the profiler if it does
 // not run yet.
 func (s *sampler) begin(p *sampledProfile) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.running.Lock()
+	defer s.running.Unlock()
 	if s.stop == nil {
 		stop, err := s.run()
 		if err != nil {
@@ -94,6 +98,8 @@ func (s *sampler) begin(p *sampledProfile) error {
 		}
 		s.stop = stop
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.profiles == nil {
 		s.profiles = map[*sampledProfile]struct{}{}
 	}
@@ -104,18 +110,22 @@ func (s *sampler) begin(p *sampledProfile) error {
 // end stops collecting for a pod, and the profiler with its last pod. It
 // returns where the symbols of the binaries seen can be read.
 func (s *sampler) end(p *sampledProfile) map[libpf.FileID]mappedFile {
+	s.running.Lock()
+	defer s.running.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	delete(s.profiles, p)
-	binaries := s.binaries
-	if len(s.profiles) == 0 && s.stop != nil {
+	last := len(s.profiles) == 0
+	binaries := make(map[libpf.FileID]mappedFile, len(s.binaries))
+	for id, b := range s.binaries {
+		binaries[id] = b
+	}
+	if last {
+		s.binaries = nil
+	}
+	s.mu.Unlock()
+	if last && s.stop != nil {
 		s.stop()
-		s.stop, s.binaries = nil, nil
-	} else {
-		binaries = make(map[libpf.FileID]mappedFile, len(s.binaries))
-		for id, b := range s.binaries {
-			binaries[id] = b
-		}
+		s.stop = nil
 	}
 	return binaries
 }
@@ -198,7 +208,10 @@ func (s *sampler) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceEventM
 	defer s.mu.Unlock()
 	pid := int(meta.PID)
 	for p := range s.profiles {
-		if !p.containers[meta.ContainerID.String()] && !p.pids[pid] {
+		// The container tells whose sample it is. Only where the profiler
+		// knows none does the process ID decide, which another process can
+		// get once the pod's process has ended.
+		if container := meta.ContainerID.String(); !p.containers[container] && (container != "" || !p.pids[pid]) {
 			continue
 		}
 		key := stackKey{trace.Hash(), pid}
