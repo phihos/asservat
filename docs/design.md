@@ -316,7 +316,9 @@ description is also readable for AI agents over MCP. For the binary files
 that have a viewer in the hub, MCP's `read_artifact` returns what the
 viewer shows, as text: a profile and a .NET trace as pprof's list of the
 60 functions with the most weight, a heap dump as its 60 largest classes,
-its biggest objects and its threads' stacks. The viewers that read in
+its biggest objects and its threads' stacks, a packet capture as its
+protocols, conversations and Wireshark's expert information, or with a
+display filter as the packets that match. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
@@ -437,7 +439,8 @@ type.
   passes (the hub's pod, a pod on the host's network) would otherwise
   record its own upload.
 - **Limits.** `read_artifact` over MCP returns 64 KiB of a text file per
-  call, and 60 functions of a profile or classes of a heap dump, so that a
+  call, and 60 functions of a profile, classes of a heap dump or packets
+  and conversations of a packet capture, so that a
   result fits a model's context. A watch's packet buffer is 16 MiB per pod
   because it lives in the agent's memory. A capture's duration is what the
   user requests. There are no other built-in limits; add one only with a
@@ -453,6 +456,4 @@ These are known gaps, in rough order of value:
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.
-- A summary of packet captures for AI agents, as profiles and heap dumps
-  have.
 - Several hub replicas.

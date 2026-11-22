@@ -146,14 +146,15 @@ var mcpTools = []mcpTool{
 			}
 			return h.visible(ctx, u, in.ID)
 		}},
-	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace, a core dump's description core.*.analysis.json) is returned 64 KiB at a time from a byte offset. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) and a .NET trace (*.nettrace) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. Other binary files (pcap, core) are downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
-		InputSchema: object(`"id":{"type":"string"},"name":{"type":"string"},"offset":{"type":"integer","description":"Text files: the byte to start at"},"sampleType":{"type":"string","description":"Profiles: the kind of value, such as cpu, samples, inuse_space or alloc_space"},"cumulative":{"type":"boolean","description":"Profiles: sort by weight including callees"}`, "id", "name"),
+	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace, a core dump's description core.*.analysis.json) is returned 64 KiB at a time from a byte offset. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) and a .NET trace (*.nettrace) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. A packet capture (*.pcap) is returned as its statistics (protocols, conversations, Wireshark's expert information), or with filter, a Wireshark display filter, as the packets that match. A core is downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
+		InputSchema: object(`"id":{"type":"string"},"name":{"type":"string"},"offset":{"type":"integer","description":"Text files: the byte to start at"},"sampleType":{"type":"string","description":"Profiles: the kind of value, such as cpu, samples, inuse_space or alloc_space"},"cumulative":{"type":"boolean","description":"Profiles: sort by weight including callees"},"filter":{"type":"string","description":"Packet captures: a Wireshark display filter; the packets that match are listed"}`, "id", "name"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in struct {
 				ID, Name   string
 				Offset     int64
 				SampleType string
 				Cumulative bool
+				Filter     string
 			}
 			if err := json.Unmarshal(args, &in); err != nil {
 				return nil, err
@@ -167,15 +168,18 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			// What a viewer shows of a binary file, as text.
-			if viewer := api.ViewerOf(a.Name); viewer == "pprof" || viewer == "heap" {
+			if viewer := api.ViewerOf(a.Name); viewer == "pprof" || viewer == "heap" || viewer == "pcap" {
 				if err := h.Store.Audit(ctx, u.Name, "artifact.read", c.ID, map[string]any{"name": a.Name, "summary": true}); err != nil {
 					return nil, err
 				}
 				var text string
-				if viewer == "pprof" {
+				switch viewer {
+				case "pprof":
 					text, err = h.profileText(ctx, a, in.SampleType, in.Cumulative)
-				} else {
+				case "heap":
 					text, err = h.heapText(ctx, a)
+				default:
+					text, err = h.packetText(ctx, a, in.Filter)
 				}
 				if err != nil {
 					return nil, err
