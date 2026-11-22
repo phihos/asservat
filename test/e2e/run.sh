@@ -339,7 +339,8 @@ EOF
   for _ in $(seq 100); do grep -q '^data: ' "$WORK/view" && break; sleep 0.2; done
   view=$(sed -n 's/^data: //p' "$WORK/view" | head -1)
   top=$(curl -sS --fail -H "Authorization: Bearer $ALICE" "$URL/api/views/$view/pages/top")
-  grep -q 'grow' <<<"$top" && grep -q 'MB\|GB' <<<"$top" || fail "Python's functions in the profile of memory growth: $(grep -o '"Name":"[^"]*"' <<<"$top" | head -40) $(grep -o 'accounting for[^<]*' <<<"$top")"
+  fetch "$ALICE" "$id" "$pod/sampled-memory.pprof" "$WORK/sampled-memory.pprof"
+  grep -q 'grow' <<<"$top" && grep -q 'MB\|GB' <<<"$top" || fail "Python's functions in the profile of memory growth: $(go tool pprof -traces "$WORK/sampled-memory.pprof" 2>&1 | head -150)"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
 fi
