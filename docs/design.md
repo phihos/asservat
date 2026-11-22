@@ -331,6 +331,8 @@ copied link leads there. Logs, packets and system calls of a capture share
 a clock: for a selected line, packet, call or event, the page offers the
 capture's other such files at that moment, and each opens at the first
 entry from then on. A trace's times of day are placed on the capture's day.
+The file's name in the viewer's bar is the choice among the capture's files
+that have a viewer.
 
 A packet capture or a profile is not sent to the browser. It is opened as a
 **view**.
