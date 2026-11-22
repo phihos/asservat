@@ -1,5 +1,5 @@
 /* pprof's own pages fill the viewer, under the choice of a profile to compare with. */
-#compare { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 5px 10px; border-bottom: 1px solid #c8c8c8; background: #e8e8e8; }
-#compare select { max-width: min(560px, 60vw); height: 24px; border: 1px solid #a0a0a0; border-radius: 3px; background: #fff; }
-#comparing { color: #555; }
+#compare { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 5px 10px; border-bottom: 1px solid var(--line); background: var(--soft); }
+#compare select { max-width: min(560px, 60vw); height: 24px; border: 1px solid var(--line); background: var(--surface); }
+#comparing { color: var(--quiet); }
 #pprof { flex: 1; width: 100%; border: 0; background: #fff; }

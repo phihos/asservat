@@ -7,26 +7,43 @@
 <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
 <link rel="stylesheet" href="/assets/identity.css">
 <style>
-/* The page around every viewer. Each viewer brings its own script and style
-   from /view/ and follows the tool that people use for its kind of file. */
+/* The page around every viewer. A viewer keeps the layout and the meaning
+   of colour of the tool that people know for its kind of file; type,
+   palette, corners and what is selected are Asservat's (identity.css).
+   The selection is marker yellow in every viewer. */
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { display: flex; flex-direction: column; font: 13px var(--text); color: #1c1c1c; background: #efefef; }
-button, input { font: inherit; }
-/* The bar is Asservat's; below it, each viewer looks like its tool. */
+body { display: flex; flex-direction: column; font: 13px var(--text); color: var(--ink); background: var(--ground); }
+button, input, select { font: inherit; color: inherit; border-radius: 0; }
+input[type=checkbox] { accent-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--custody); outline-offset: -2px; }
 header { display: flex; gap: 14px; align-items: center; padding: 6px 12px; background: var(--bar); color: var(--on-bar); }
 header a { color: var(--marker); text-decoration: none; }
-header .brand img { width: 22px; height: 22px; } header .brand b { font-size: 19px; }
 header a:hover { text-decoration: underline; }
-header .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-header .name { font-family: var(--mono); }
+header .brand img { width: 22px; height: 22px; } header .brand b { font-size: 19px; }
+header .name { font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 header .muted { color: var(--on-bar-quiet); }
 header .grow { flex: 1; }
-#notice { margin: auto; padding: 24px; text-align: center; color: #444; max-width: 520px; }
-#notice button { margin-top: 12px; padding: 6px 14px; }
+header select, header button { height: 24px; padding: 0 8px; border: 1px solid #4A5357; background: var(--bar); color: var(--on-bar); font-size: 12px; cursor: pointer; }
+#notice { margin: auto; padding: 24px; text-align: center; color: var(--quiet); max-width: 520px; }
+#notice button { margin-top: 12px; padding: 6px 14px; border: 0; background: var(--marker); color: var(--on-marker); font-weight: 600; cursor: pointer; }
 [hidden] { display: none !important; }
-header select, header button { height: 24px; padding: 0 8px; border: 1px solid #4A5357; border-radius: 0; background: var(--bar); color: var(--on-bar); font-size: 12px; cursor: pointer; }
 #root { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* What the viewers share: tabs, the bar that narrows a list, a note under a file. */
+.tabs { display: flex; align-items: stretch; padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs button { padding: 8px 14px 5px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 15px var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--marker); }
+.tabs .grow { flex: 1; }
+.tab { flex: 1; min-height: 0; overflow: auto; background: var(--surface); }
+.narrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--soft); }
+.narrow input[type=search], .narrow input[type=number], .narrow select, .narrow button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface); }
+.narrow input[type=search] { width: min(340px, 40vw); font-family: var(--mono); }
+.narrow input[type=number] { width: 80px; }
+.narrow button { cursor: pointer; }
+.narrow label { display: flex; gap: 5px; align-items: center; }
+.narrow .grow { flex: 1; }
+.muted { color: var(--quiet); }
+#note { padding: 6px 12px; border-top: 2px solid var(--custody); background: var(--surface); color: var(--ink); }
 </style>
 </head>
 <body>

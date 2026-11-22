@@ -1,21 +1,24 @@
-/* The packet viewer follows Wireshark's main window: filter toolbar, packet
-   list, packet details, packet bytes, status bar. Its colours are those of
-   Wireshark's light theme, because the colouring rules assume them. */
-.toolbar { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid #c8c8c8; background: #e8e8e8; }
-.toolbar button { min-width: 28px; height: 26px; padding: 0 6px; border: 1px solid transparent; border-radius: 3px; background: none; cursor: pointer; }
-.toolbar button:hover:not(:disabled) { border-color: #b0b0b0; background: #f6f6f6; }
+/* The packet viewer follows Wireshark's main window: toolbar, display
+   filter, packet list, packet details, packet bytes, status bar. Wireshark's
+   colouring rules colour the packets, and the filter is green or red as it
+   is there; everything around that is Asservat's. */
+.toolbar { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--soft); }
+.toolbar button { min-width: 28px; height: 26px; padding: 0 6px; border: 1px solid transparent; background: none; cursor: pointer; }
+.toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--surface); }
 .toolbar button:disabled { opacity: .4; cursor: default; }
-.toolbar .sep { width: 1px; height: 20px; margin: 0 4px; background: #c0c0c0; }
-.toolbar input[type=number] { width: 90px; height: 24px; padding: 0 4px; border: 1px solid #b0b0b0; border-radius: 3px; }
-.filter { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid #c8c8c8; background: #e8e8e8; }
-.filter input { flex: 1; height: 26px; padding: 0 6px; border: 1px solid #a0a0a0; border-radius: 3px; font-family: ui-monospace, Menlo, Consolas, monospace; background: #fff; }
-.filter input.valid { background: #afffaf; }
-.filter input.invalid { background: #ffafaf; }
-.filter button { height: 26px; padding: 0 8px; border: 1px solid #b0b0b0; border-radius: 3px; background: #f6f6f6; cursor: pointer; }
+.toolbar .sep { width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
+.toolbar .grow { flex: 1; }
+.toolbar input[type=number] { width: 90px; height: 24px; padding: 0 4px; border: 1px solid var(--line); background: var(--surface); }
+.filter { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--soft); }
+.filter input { flex: 1; height: 26px; padding: 0 6px; border: 1px solid var(--line); font-family: var(--mono); background: var(--surface); }
+/* Wireshark's own greens and reds, with dark text in either theme. */
+.filter input.valid { background: #afffaf; color: #14181A; }
+.filter input.invalid { background: #ffafaf; color: #14181A; }
+.filter button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 .filter button:disabled { opacity: .5; cursor: default; }
 #panes { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.pane { min-height: 40px; overflow: auto; background: #fff; }
-.splitter { height: 5px; flex: none; background: #d8d8d8; cursor: row-resize; }
+.pane { min-height: 40px; overflow: auto; background: var(--surface); }
+.splitter { height: 5px; flex: none; background: var(--line); cursor: row-resize; }
 #list { flex: 5; position: relative; outline: none; }
 #lower { flex: 5; display: flex; flex-direction: column; min-height: 40px; }
 #details { flex: 3; padding: 2px 0; outline: none; }
@@ -23,49 +26,49 @@
 #panes.beside #lower { flex-direction: row; }
 #panes.beside #lower > .pane { flex: 1; min-width: 40px; }
 #panes.beside #lower > .splitter { width: 5px; height: auto; cursor: col-resize; }
-.toolbar .grow { flex: 1; }
-#stat { width: min(1200px, 94vw); }
-#statTabs { display: flex; gap: 2px; padding: 6px 10px 0; background: #e8e8e8; border-bottom: 1px solid #c8c8c8; }
-#statTabs button { padding: 4px 12px; border: 1px solid #c0c0c0; border-bottom: 0; border-radius: 3px 3px 0 0; background: #dcdcdc; cursor: pointer; }
-#statTabs button.on { background: #fff; font-weight: 600; }
-#statBody { flex: 1; overflow: auto; padding: 0 0 8px; }
-#statBody table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-#statBody th { position: sticky; top: 0; padding: 4px 10px; background: #f0f0f0; border-bottom: 1px solid #c0c0c0; text-align: right; white-space: nowrap; }
-#statBody td { padding: 2px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid #eee; }
-#statBody th:first-child, #statBody td.text { text-align: left; }
-#statBody td.none { text-align: left; color: #666; padding: 12px 10px; }
-#statBody tr[data-filter] { cursor: pointer; }
-#statBody tr[data-filter]:hover { background: #eaf3fb; }
-#statBody td.Error { background: #ff5c5c; } #statBody td.Warn { background: #f7f240; } #statBody td.Note { background: #b7f774; } #statBody td.Chat { background: #80b7f7; }
-#statNote { color: #555; }
 #head, .row { display: grid; grid-template-columns: 70px 100px minmax(110px, 1.2fr) minmax(110px, 1.2fr) 80px 70px minmax(200px, 5fr); }
-#head { position: sticky; top: 0; z-index: 1; height: 22px; line-height: 22px; background: #f0f0f0; border-bottom: 1px solid #c0c0c0; font-weight: 600; }
-#head span { padding: 0 6px; border-right: 1px solid #d0d0d0; overflow: hidden; white-space: nowrap; }
+#head { position: sticky; top: 0; z-index: 1; height: 22px; line-height: 22px; background: var(--soft); border-bottom: 1px solid var(--line); font-weight: 600; }
+#head span { padding: 0 6px; border-right: 1px solid var(--line); overflow: hidden; white-space: nowrap; }
 #rows { position: relative; }
 .row { position: absolute; left: 0; right: 0; height: 20px; line-height: 20px; cursor: default; white-space: nowrap; }
 .row span { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
 .row span:nth-child(1), .row span:nth-child(6) { text-align: right; }
-.row.selected { background: #308cc6 !important; color: #fff !important; }
-.row.loading { color: #999; }
+.row.selected { background: var(--marker) !important; color: var(--on-marker) !important; font-weight: 600; }
+.row.loading { color: var(--quiet); }
 .node { line-height: 19px; white-space: nowrap; cursor: default; padding-right: 8px; }
-.node .twist { display: inline-block; width: 14px; text-align: center; color: #555; font-size: 10px; }
-.node.selected { background: #308cc6; color: #fff; }
-.node.selected .twist { color: #fff; }
-.node.Chat { background: #80b7f7; } .node.Note { background: #b7f774; } .node.Warn { background: #f7f240; } .node.Error { background: #ff5c5c; }
-#sources { display: flex; gap: 2px; padding: 2px 4px 0; background: #e8e8e8; }
-#sources button { padding: 2px 8px; border: 1px solid #c0c0c0; border-bottom: 0; border-radius: 3px 3px 0 0; background: #dcdcdc; cursor: pointer; }
-#sources button.on { background: #fff; }
-#hex { flex: 1; overflow: auto; margin: 0; padding: 4px 8px; font: 12px/17px ui-monospace, Menlo, Consolas, monospace; white-space: pre; }
-#hex .off { color: #707070; }
+.node .twist { display: inline-block; width: 14px; text-align: center; color: var(--quiet); font-size: 10px; }
+.node.selected { background: var(--marker); color: var(--on-marker); }
+.node.selected .twist { color: var(--on-marker); }
+/* Wireshark's expert severities. */
+.node.Chat, #statBody td.Chat { background: #80b7f7; color: #14181A; } .node.Note, #statBody td.Note { background: #b7f774; color: #14181A; }
+.node.Warn, #statBody td.Warn { background: #f7f240; color: #14181A; } .node.Error, #statBody td.Error { background: #ff5c5c; color: #14181A; }
+#sources, #statTabs { display: flex; padding: 0 8px; background: var(--soft); border-bottom: 1px solid var(--line); }
+#sources button, #statTabs button { padding: 5px 12px 3px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); cursor: pointer; }
+#sources button.on, #statTabs button.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--marker); }
+#hex { flex: 1; overflow: auto; margin: 0; padding: 4px 8px; font: 12px/17px var(--mono); white-space: pre; }
+#hex .off { color: var(--quiet); }
 #hex b { font-weight: normal; }
-#hex b.hl { background: #308cc6; color: #fff; }
-footer { display: flex; gap: 16px; padding: 3px 10px; border-top: 1px solid #c0c0c0; background: #e8e8e8; white-space: nowrap; }
-footer #field { flex: 1; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, Menlo, Consolas, monospace; }
-dialog { width: min(900px, 92vw); height: min(640px, 86vh); padding: 0; border: 1px solid #888; border-radius: 6px; }
+#hex b.hl { background: var(--marker); color: var(--on-marker); }
+footer { display: flex; gap: 16px; padding: 3px 10px; border-top: 1px solid var(--line); background: var(--soft); white-space: nowrap; }
+footer #field { flex: 1; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); }
+dialog { width: min(900px, 92vw); height: min(640px, 86vh); padding: 0; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); }
 dialog[open] { display: flex; flex-direction: column; }
-dialog h2 { margin: 0; padding: 8px 12px; font-size: 14px; background: #e8e8e8; border-bottom: 1px solid #c8c8c8; }
-dialog pre { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; font: 12px/17px ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
-dialog .client { color: #7f0000; background: #fbeded; }
-dialog .server { color: #00007f; background: #ededfb; }
-dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid #c8c8c8; background: #e8e8e8; }
+dialog::backdrop { background: #14181A99; }
+dialog h2 { margin: 0; padding: 8px 12px; font: 700 20px var(--display); text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid var(--line); }
+dialog pre { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
+/* The two sides of a followed stream, red and blue as in Wireshark. */
+dialog .client { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+dialog .server { color: var(--custody-ink); background: color-mix(in srgb, var(--custody) 10%, var(--surface)); }
+dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--soft); }
 dialog .bar .grow { flex: 1; }
+dialog .bar button { height: 28px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+#stat { width: min(1200px, 94vw); }
+#statBody { flex: 1; overflow: auto; padding: 0 0 8px; }
+#statBody table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+#statBody th { position: sticky; top: 0; padding: 5px 10px; background: var(--soft); border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); }
+#statBody td { padding: 2px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--soft); font: 12px var(--mono); }
+#statBody th:first-child, #statBody td.text { text-align: left; }
+#statBody td.none { text-align: left; color: var(--quiet); padding: 12px 10px; font-family: var(--text); }
+#statBody tr[data-filter] { cursor: pointer; }
+#statBody tr[data-filter]:hover { background: color-mix(in srgb, var(--marker) 25%, var(--surface)); }
+#statNote { color: var(--quiet); }
