@@ -570,8 +570,12 @@ async function loadCaptures() {
     // The files of each pod under the pod's name.
     const byPod = {};
     for (const a of c.artifacts) (byPod[a.name.split('/')[0]] ||= []).push(a);
-    const files = Object.entries(byPod).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a =>
-      `<a href="/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}" title="sha256 ${a.sha256}">${esc(a.name.split('/')[1])}</a> <span class="muted">${fileSize(a.size)}</span>`).map(line => `<div class="file">${line}</div>`).join('')).join('')
+    const files = Object.entries(byPod).map(([pod, list]) => `<div class="pod">${esc(pod)}</div>` + list.map(a => {
+      // A file with a viewer opens in the browser; every file downloads in its own format.
+      const address = `/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}`, name = esc(a.name.split('/')[1]);
+      return a.viewer ? `<a href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here">${name}</a> <span class="muted">${fileSize(a.size)}</span> <a class="muted" href="${address}" title="Download · sha256 ${a.sha256}">Download</a>`
+        : `<a href="${address}" title="Download · sha256 ${a.sha256}">${name}</a> <span class="muted">${fileSize(a.size)}</span>`;
+    }).map(line => `<div class="file">${line}</div>`).join('')).join('')
       || `<div class="muted">${c.state === 'Running' ? 'Files appear here as each recording ends.' : inProgress(c) ? 'Nothing yet.' : 'No files.'}</div>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
     const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')

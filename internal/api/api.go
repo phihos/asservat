@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -280,6 +281,17 @@ type Artifact struct {
 	Name   string `json:"name"` // "<pod>/<file>"
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"`
+	// Viewer names the viewer that shows the file in the browser; a file
+	// without one only downloads.
+	Viewer string `json:"viewer,omitempty"`
+}
+
+// ViewerOf names the viewer for an artifact, or "" if it only downloads.
+func ViewerOf(name string) string {
+	if strings.HasSuffix(name, ".pcap") {
+		return "pcap"
+	}
+	return ""
 }
 
 // WatchRequest is what a user submits to record the next crashes of a

@@ -11,7 +11,7 @@ what is deliberately left out. Change it together with the code.
 
 | Component | Runs as | Does |
 | --- | --- | --- |
-| Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, serves console, REST API and MCP |
+| Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, opens files for their viewers, serves console, REST API and MCP |
 | Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
 | PostgreSQL | Bundled or external | Captures, tasks, watches, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
@@ -194,6 +194,28 @@ own format and nothing is injected into the pod:
 The main process of a container is the oldest process in the container's
 cgroup whose parent is outside of it.
 
+## Looking at files in the browser
+
+A file can be looked at in the console without downloading it. Each kind of
+file gets a viewer that follows the tool people use for it, and the hub does
+the reading with that tool's own engine where one exists, so the viewer
+shows what the tool would show.
+
+| File | Viewer | Read by |
+| --- | --- | --- |
+| Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details, packet bytes, follow stream | Wireshark's `sharkd` in the hub |
+
+Other files download only, for now.
+
+An open file is a **view**. The browser opens it with an event stream; the
+view lives as long as that stream, so nothing has to guess when somebody
+stopped looking. The viewer's questions about the file go to the view and
+only its opener may ask them. For a packet capture, the hub decrypts the
+file into its work directory (`--work-dir`, an `emptyDir` in the chart),
+starts one `sharkd` for the view, and removes the file's name as soon as
+`sharkd` has it open. Of `sharkd`'s requests, the hub passes on those that
+read the loaded capture and no others.
+
 ## Permissions
 
 - A user is identified by a name and groups, from a static token or an OIDC ID
@@ -232,7 +254,12 @@ cgroup whose parent is outside of it.
   Losing the master key loses the evidence.
 - **Audit.** Requests, watches and the captures they
   trigger, approvals, denials, stops, cancellations, deletions, expiries and
-  every download are recorded with the actor.
+  every download and every file opened in a viewer are recorded with the
+  actor.
+- A file that is open in a viewer rests decrypted in the hub's work
+  directory until the program that reads it has opened it, and in that
+  program's memory while the view lasts. The program (`sharkd` for packet
+  captures) parses recorded traffic inside the hub's container.
 - A core file rests unencrypted on the node until its upload ends, then it
   is deleted: in the agent's scratch volume, or for a crashed process in the
   core handler's directory.

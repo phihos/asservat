@@ -103,7 +103,13 @@ func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	if err := json.Unmarshal(tasks, &c.Tasks); err != nil {
 		return c, err
 	}
-	return c, json.Unmarshal(artifacts, &c.Artifacts)
+	if err := json.Unmarshal(artifacts, &c.Artifacts); err != nil {
+		return c, err
+	}
+	for i, a := range c.Artifacts {
+		c.Artifacts[i].Viewer = api.ViewerOf(a.Name)
+	}
+	return c, nil
 }
 
 func (s *Store) Capture(ctx context.Context, id string) (api.Capture, error) {

@@ -62,6 +62,8 @@ func runHub(ctx context.Context, args []string) error {
 	dsnFile := f.String("dsn-file", "", "file with the PostgreSQL connection string")
 	keyFile := f.String("master-key-file", "", "file with the 32-byte master key as 64 hex digits")
 	dataDir := f.String("data-dir", "", "directory for encrypted evidence (instead of S3)")
+	workDir := f.String("work-dir", "", "directory for files that are open in a viewer, decrypted while they are open (default: the system's temporary directory)")
+	sharkd := f.String("sharkd", "sharkd", "Wireshark's sharkd, which reads packet captures for their viewer")
 	s3Endpoint := f.String("s3-endpoint", "", "S3 endpoint host[:port] for encrypted evidence")
 	s3Bucket := f.String("s3-bucket", "", "S3 bucket")
 	s3AccessKeyFile := f.String("s3-access-key-file", "", "file with the S3 access key")
@@ -95,7 +97,7 @@ func runHub(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("master-key-file: %w", err)
 	}
-	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval}
+	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval, WorkDir: *workDir, Sharkd: *sharkd}
 	switch {
 	case *dataDir != "":
 		if err := os.MkdirAll(*dataDir, 0o700); err != nil {

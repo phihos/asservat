@@ -17,7 +17,8 @@ One **hub** serves a web console, a REST API and an MCP endpoint for AI agents.
 Every cluster runs a **node agent** on each node. The agents connect out to the
 hub, so workload clusters need no inbound access. You pick a workload, choose
 what to record and download the result in its standard format for your own
-tools.
+tools. A packet capture also opens in the console, in a viewer that works
+like Wireshark.
 
 | Evidence | What you get | Needs approval |
 | --- | --- | --- |
