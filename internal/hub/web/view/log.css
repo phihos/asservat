@@ -1,23 +1,25 @@
-/* The log viewer: a dark terminal, as in Lens and the Kubernetes dashboard. */
-.logbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: #2b2f36; color: #d7dae0; white-space: nowrap; }
-.logbar input[type=search] { width: min(420px, 40vw); height: 26px; padding: 0 8px; border: 1px solid #555b66; border-radius: 3px; background: #1b1d21; color: #e6e6e6; font-family: ui-monospace, Menlo, Consolas, monospace; }
-.logbar input.bad { border-color: #e06c75; }
-.logbar button { width: 26px; height: 26px; border: 1px solid #555b66; border-radius: 3px; background: #353a43; color: #d7dae0; cursor: pointer; }
+/* The log viewer: a dark terminal, as the log panels of Lens and the
+   Kubernetes dashboard are, in Asservat's ink in either theme. */
+#root { --ground: #14181A; --surface: #1D2326; --ink: #EEF0EC; --quiet: #A9B2B5; --line: #3A4246; --soft: #262D30; --custody: #8AB6F2; --bad: #F28B82; background: var(--ground); color: var(--ink); }
+.logbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.logbar input[type=search] { width: min(420px, 40vw); height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--ground); font-family: var(--mono); }
+.logbar input.bad { border-color: var(--bad); }
+.logbar button { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--soft); cursor: pointer; }
 .logbar label { display: flex; gap: 4px; align-items: center; }
+.logbar input[type=checkbox] { accent-color: var(--marker); }
 .logbar .grow { flex: 1; }
-.logbar #found { min-width: 110px; color: #9da5b4; }
-.logbar #span { color: #9da5b4; overflow: hidden; text-overflow: ellipsis; }
-#log { flex: 1; min-height: 0; overflow: auto; background: #1b1d21; color: #d7dae0; font: 12px/18px ui-monospace, Menlo, Consolas, monospace; outline: none; }
+.logbar #found { min-width: 110px; color: var(--quiet); font-family: var(--mono); font-size: 12px; }
+.logbar #span { color: var(--quiet); overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 12px; }
+#log { flex: 1; min-height: 0; overflow: auto; font: 12px/18px var(--mono); outline: none; }
 #lines { position: relative; min-width: 100%; }
 .l { position: absolute; left: 0; min-width: 100%; height: 18px; padding-right: 16px; white-space: pre; cursor: default; }
-.l:hover { background: #262a31; }
-.l.selected { background: #2f4a6d; }
-.l.current { outline: 1px solid #e5c07b; outline-offset: -1px; }
-.l .no { display: inline-block; width: 64px; padding-right: 12px; text-align: right; color: #5c6370; user-select: none; }
-.l .ts { color: #56b6c2; }
-.l.error { color: #f0838c; }
-.l.warn { color: #e5c07b; }
-.l.debug { color: #8b93a1; }
-.l mark { background: #e5c07b; color: #1b1d21; }
-#line { flex: none; max-height: 35%; margin: 0; padding: 8px 12px; overflow: auto; border-top: 2px solid #3a3f4b; background: #22252b; color: #e6e6e6; font: 12px/17px ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
-#note { padding: 6px 12px; background: #5a4a1f; color: #f3e2b3; }
+.l:hover { background: var(--soft); }
+.l.selected { background: var(--line); box-shadow: inset 4px 0 0 var(--marker); }
+.l.current { outline: 1px solid var(--marker); outline-offset: -1px; }
+.l .no { display: inline-block; width: 64px; padding-right: 12px; text-align: right; color: #7C868A; user-select: none; }
+.l .ts { color: var(--quiet); }
+.l.error { color: var(--bad); }
+.l.warn { color: var(--marker); }
+.l.debug { color: var(--quiet); }
+.l mark { background: var(--marker); color: var(--on-marker); }
+#line { flex: none; max-height: 35%; margin: 0; padding: 8px 12px; overflow: auto; border-top: 2px solid var(--marker); background: var(--surface); font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
