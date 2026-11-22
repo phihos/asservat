@@ -361,6 +361,10 @@ func TestOwnApprovalProgressAndStop(t *testing.T) {
 	if got.State != api.StateCompleted || got.RemainingSeconds != nil || got.Tasks[0].Recordings[1].Message != "stopped early" {
 		t.Fatalf("stopped capture %+v", got)
 	}
+	// It is complete although the core dump failed, and says so at first sight.
+	if got.Message != "1 of 3 recordings failed" {
+		t.Fatalf("a completed capture with a failed recording says %q", got.Message)
+	}
 	_, b = f.call("root-token", "GET", "/api/audit?limit=30", nil)
 	for _, action := range []string{"capture.approve", "capture.stop", "watch.approve"} {
 		if !strings.Contains(string(b), `"`+action+`"`) {

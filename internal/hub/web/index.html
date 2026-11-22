@@ -619,7 +619,7 @@ async function loadCaptures() {
     return `<div class="capture${open ? ' open' : ''}${freshClass(c.id)}" data-capture="${c.id}">
       <div class="line">
         <span class="number${c.artifacts.length ? ' filed' : ''}" title="Capture ${c.number}${c.artifacts.length ? '' : ': no files yet'}">${String(c.number).padStart(4, '0')}</span>
-        <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted">${inProgress(c) ? '' : count.slice(3)}</div>`}</span>
+        <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted${c.message && !inProgress(c) ? ' error' : ''}" title="${esc(c.message || '')}">${inProgress(c) ? '' : esc(c.message) || count.slice(3)}</div>`}</span>
         <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}</span>
         <span class="where" title="${esc(c.cluster)} / ${esc(c.namespace)} / ${esc(c.workload)}">${esc(c.workload)}<div class="muted">${esc(c.cluster)} / ${esc(c.namespace)}</div></span>
         <span class="when muted">${new Date(c.createdAt).toLocaleString()}<div>${esc(c.requester)}</div></span>

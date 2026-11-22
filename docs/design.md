@@ -35,7 +35,9 @@ Both components are the same binary and image (`asservat hub`, `asservat agent`)
 5. The agent makes all recordings of the pod at once, streams the files to
    the hub and reports the task as `Completed` or `Failed`. A task is
    `Completed` if at least one recording succeeded and names those that
-   failed. The capture is `Completed` if at least one pod succeeded.
+   failed. The capture is `Completed` if at least one pod succeeded; its
+   message then tells how many pods and how many recordings failed, and the
+   console shows it in the list.
 6. The requester or an administrator downloads the files. When the retention
    ends the hub deletes the capture and its files.
 
