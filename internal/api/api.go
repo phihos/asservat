@@ -288,8 +288,16 @@ type Artifact struct {
 
 // ViewerOf names the viewer for an artifact, or "" if it only downloads.
 func ViewerOf(name string) string {
-	if strings.HasSuffix(name, ".pcap") {
+	file := name[strings.LastIndex(name, "/")+1:]
+	switch {
+	case strings.HasSuffix(file, ".pcap"):
 		return "pcap"
+	case strings.HasSuffix(file, ".log"):
+		return "log"
+	case strings.HasSuffix(file, ".strace"):
+		return "strace"
+	case file == "pod.json", file == "events.json":
+		return "kube"
 	}
 	return ""
 }
