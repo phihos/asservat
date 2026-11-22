@@ -279,8 +279,12 @@ outlined while the capture holds no files, filled once it does. Headings,
 numbers and states are set in Barlow Condensed capitals, text in IBM Plex
 Sans, hashes, sizes and filters in IBM Plex Mono; the hub serves the fonts
 itself (`/assets/`), so the console fetches nothing from elsewhere. The
-look covers the console and the bar above a viewer; below that bar each
-viewer keeps the look of its tool.
+look covers the console and the viewers. A viewer keeps what makes its
+tool familiar: the layout, and colour where it carries meaning (Wireshark's
+colouring rules and filter validity, the levels of a log, the dark ground of
+a terminal and of a debugger). Type, palette, corners, tabs and tables are
+Asservat's, and what is selected is marker yellow in every viewer. pprof's
+and Go's trace tool's own pages are shown as they are.
 
 ## Permissions
 

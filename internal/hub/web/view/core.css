@@ -30,11 +30,11 @@
 .tab th { padding: 3px 18px 3px 0; text-align: left; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); border-bottom: 1px solid var(--line); }
 .tab td { padding: 2px 18px 2px 0; vertical-align: top; font: 12px var(--mono); }
 /* Names, values and types apart, as a debugger's variables pane has them. */
-.name { color: var(--custody-ink); }
-.value { color: var(--ink); word-break: break-all; }
-.type { color: var(--ok); }
+#root .name { color: var(--custody-ink); }
+#root .value { color: var(--ink); word-break: break-all; }
+#root .type { color: var(--ok); }
 .code { margin: 0; line-height: 18px; }
 .code .pc { background: var(--marker); color: var(--on-marker); }
 .registers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px 24px; }
 .registers div { display: flex; gap: 10px; }
-.registers .name { flex: 0 0 52px; }
+#root .registers .name { flex: 0 0 52px; }

@@ -55,9 +55,10 @@ export function parse(text) {
 function finish(c, tail) {
   const d = / <(\d+\.\d+)>$/.exec(tail);
   if (d) { c.seconds = Number(d[1]); tail = tail.slice(0, d.index); }
-  const eq = tail.lastIndexOf(') = ');
-  if (eq < 0) { c.args = tail; return; }
-  c.args = tail.slice(0, eq); c.result = tail.slice(eq + 4).trim();
+  // strace pads short calls with spaces before the "=".
+  const eq = [...tail.matchAll(/\)\s+= /g)].pop();
+  if (!eq) { c.args = tail; return; }
+  c.args = tail.slice(0, eq.index); c.result = tail.slice(eq.index + eq[0].length).trim();
   c.failed = /^-1\b/.test(c.result);
   c.error = c.failed ? c.result.split(' ')[1] : '';
 }
