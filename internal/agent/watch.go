@@ -382,7 +382,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 	if buffering {
 		return
 	}
-	pid, err := a.podPID(pod)
+	pid, err := a.podPID(pod, nil)
 	if err != nil {
 		return
 	}
@@ -562,7 +562,7 @@ func (a *Agent) trace(ctx context.Context, w api.Watch, rec api.Recording, pod *
 	if running != nil && !running.ended.Load() {
 		return
 	}
-	pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
+	pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"], nil)
 	if err != nil {
 		return // no such process yet
 	}

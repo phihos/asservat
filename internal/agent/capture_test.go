@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -129,7 +130,7 @@ func BenchmarkMainPID(b *testing.B) {
 	a, pod := &Agent{Proc: proc}, runningPod("app", "0123abcd")
 	b.Run("searched", func(b *testing.B) {
 		for b.Loop() {
-			if _, _, err := a.containerPID(pod, "app"); err != nil {
+			if _, _, err := a.containerPID(pod, "app", nil); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -142,6 +143,56 @@ func BenchmarkMainPID(b *testing.B) {
 			}
 		}
 	})
+}
+
+// What the recordings of one capture ask about the pod's processes: packets,
+// a trace, a core dump, a CPU profile and a memory profile.
+func BenchmarkCaptureLookups(b *testing.B) {
+	proc, _ := fakeProc(b, "0123abcd", 5000)
+	a, pod := &Agent{Proc: proc}, runningPod("app", "0123abcd")
+	for b.Loop() {
+		known := &processes{}
+		if _, err := a.podPID(pod, known); err != nil {
+			b.Fatal(err)
+		}
+		for range 2 {
+			if _, _, err := a.targets(pod, "", "", known); err != nil {
+				b.Fatal(err)
+			}
+		}
+		for _, kind := range []sampledKind{sampledCPU, sampledMemory} {
+			a.cover(newSampledProfile(kind, 0), pod, known)
+		}
+	}
+}
+
+// The recordings of one capture, which run at once, search the node's
+// processes once per container between them.
+func TestCaptureSearchesOncePerContainer(t *testing.T) {
+	proc, add := fakeProc(t, "0123abcd", 10)
+	a, pod, known := &Agent{Proc: proc}, runningPod("app", "0123abcd"), &processes{}
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Go(func() {
+			if pid, err := a.podPID(pod, known); err != nil || pid != 1200 {
+				t.Error("main process", pid, err)
+			}
+		})
+	}
+	wg.Wait()
+	// A search would now find this one as well, and as the main process.
+	add(1100, 900, 60, "/kubelet.slice/cri-containerd-0123abcd.scope")
+	if pids, _, err := a.targets(pod, "app", "", known); err != nil || len(pids) != 1 || pids[0] != 1200 {
+		t.Fatal("searched again for a trace", pids, err)
+	}
+	p := newSampledProfile(sampledCPU, 0)
+	if a.cover(p, pod, known); len(p.pids) != 2 || !p.pids[1200] || !p.pids[1201] {
+		t.Fatal("searched again for a profile", p.pids)
+	}
+	// What does not belong to a capture searches each time.
+	if pid, err := a.podPID(pod, nil); err != nil || pid != 1100 {
+		t.Fatal("without a capture", pid, err)
+	}
 }
 
 // A recording is interrupted after its duration and its output until then is

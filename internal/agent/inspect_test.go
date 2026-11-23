@@ -57,15 +57,15 @@ func TestProcessesAndTargets(t *testing.T) {
 
 	// Without a program the main process is the target, with one every
 	// process that runs it.
-	if pids, container, err := a.targets(pod, "", ""); err != nil || container != "app" || !slices.Equal(pids, []int{1001}) {
+	if pids, container, err := a.targets(pod, "", "", nil); err != nil || container != "app" || !slices.Equal(pids, []int{1001}) {
 		t.Fatal("default target", pids, container, err)
 	}
-	pids, _, err := a.targets(pod, "app", "/usr/local/bin/python3.12")
+	pids, _, err := a.targets(pod, "app", "/usr/local/bin/python3.12", nil)
 	slices.Sort(pids)
 	if err != nil || !slices.Equal(pids, []int{1001, 1007, 1008}) {
 		t.Fatal("targets of a program", pids, err)
 	}
-	if _, _, err := a.targets(pod, "app", "/usr/bin/ruby"); err == nil {
+	if _, _, err := a.targets(pod, "app", "/usr/bin/ruby", nil); err == nil {
 		t.Fatal("found a program that does not run")
 	}
 }

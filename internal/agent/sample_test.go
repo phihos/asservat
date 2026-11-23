@@ -171,7 +171,7 @@ func TestCoverSearchesOutsideTheSamplersLock(t *testing.T) {
 	a, p := &Agent{Proc: proc}, newSampledProfile(sampledCPU, 0)
 	covered := make(chan struct{})
 	go func() {
-		a.cover(p, runningPod("app", "0123abcd"))
+		a.cover(p, runningPod("app", "0123abcd"), nil)
 		close(covered)
 	}()
 	writer, err := os.OpenFile(pipe, os.O_WRONLY, 0) // returns once the search reads the pipe

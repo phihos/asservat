@@ -193,7 +193,7 @@ func (p *sampledProfile) since(from time.Time) map[stackKey]*sampledStack {
 
 // cover adds the pod's containers and processes to those whose samples the
 // profile takes: a restarted container is a new one.
-func (a *Agent) cover(p *sampledProfile, pod *corev1.Pod) {
+func (a *Agent) cover(p *sampledProfile, pod *corev1.Pod, known *processes) {
 	var added []string
 	a.sampler.mu.Lock()
 	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
@@ -208,7 +208,7 @@ func (a *Agent) cover(p *sampledProfile, pod *corev1.Pod) {
 	// the lock.
 	var pids []int
 	for _, id := range added {
-		all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
+		all, _, _ := known.of(a, pod, id)
 		pids = append(pids, all...)
 	}
 	a.sampler.mu.Lock()
@@ -512,9 +512,9 @@ func (s *sampler) ReportExecutable(args *reporter.ExecutableMetadata) {
 // sample records the stacks of the pod's processes at what kind counts,
 // for duration from when the profiler runs or until frame ends before, and
 // uploads the profile in pprof's format.
-func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
+func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration time.Duration, pod *corev1.Pod, known *processes, up func(string, io.Reader) error) error {
 	p := newSampledProfile(kind, 0)
-	a.cover(p, pod)
+	a.cover(p, pod, known)
 	if len(p.pids) == 0 {
 		return fmt.Errorf("pod %s has no running process", pod.Name)
 	}
@@ -536,12 +536,12 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 // sampled records a sampled profile for a capture: from the profile that the
 // capture's watch has kept running for the pod if there is one, and
 // otherwise from now on.
-func (a *Agent) sampled(ctx, frame context.Context, kind sampledKind, r api.CaptureRequest, podName string, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
+func (a *Agent) sampled(ctx, frame context.Context, kind sampledKind, r api.CaptureRequest, podName string, duration time.Duration, pod *corev1.Pod, known *processes, up func(string, io.Reader) error) error {
 	a.mu.Lock()
 	running := a.kept[r.Watch+"/"+podName+"/"+kind.recording]
 	a.mu.Unlock()
 	if r.Watch == "" || running == nil {
-		return a.sample(ctx, frame, kind, duration, pod, up)
+		return a.sample(ctx, frame, kind, duration, pod, known, up)
 	}
 	if r.AfterCrash() {
 		duration = 0
@@ -567,12 +567,12 @@ func (a *Agent) keep(ctx context.Context, w api.Watch, kind sampledKind, pod *co
 	running := a.kept[key]
 	a.mu.Unlock()
 	if running != nil {
-		a.cover(running.profile, pod)
+		a.cover(running.profile, pod, nil)
 		return
 	}
 	// A few seconds more than asked: the capture's task takes a moment to arrive.
 	p := newSampledProfile(kind, w.Before()+time.Duration(w.DurationSeconds)*time.Second+10*time.Second)
-	a.cover(p, pod)
+	a.cover(p, pod, nil)
 	if len(p.pids) == 0 {
 		return // no container runs yet: the pod's next change tries again
 	}
@@ -604,7 +604,7 @@ func (a *Agent) sampleKept(ctx, frame context.Context, k *kept, after time.Durat
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	a.cover(k.profile, pod) // the processes of now lead to the binaries
+	a.cover(k.profile, pod, nil) // the processes of now lead to the binaries
 	a.sampler.mu.Lock()
 	stacks := k.profile.since(from)
 	binaries := make(map[libpf.FileID]mappedFile, len(a.sampler.binaries))
