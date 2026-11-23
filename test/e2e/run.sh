@@ -333,6 +333,15 @@ spec:
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
 EOF
   edge -n shop rollout status deployment/py --timeout 180s >/dev/null
+  # A core of the Python program is described with its Python stacks: the
+  # interpreter's own threads tell nothing of what the program did.
+  id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","recordings":[{"kind":"coredump"}]}')
+  ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+  completed "$ALICE" "$id"
+  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  fetch "$ALICE" "$id" "$pod/core.py.analysis.json" "$WORK/core.py.analysis.json"
+  jq -e '.runtimeStacks[0] | .runtime == "python" and (.version | startswith("3.12")) and ([.threads[].frames[] | select(.function == "<module>" and .line > 0)] | length == 1)' "$WORK/core.py.analysis.json" >/dev/null \
+    || fail "the Python stacks of a core: $(jq -c '.runtimeStacks' "$WORK/core.py.analysis.json" | head -c 600)"
   id=$(capture "$ALICE" '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","recordings":[{"kind":"cpu"},{"kind":"memory"}],"durationSeconds":10}'); completed "$ALICE" "$id"
   pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
   [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.sensitive, .artifacts[0].name, .artifacts[1].name, .artifacts[1].viewer] | @csv')" = "false,\"$pod/sampled-cpu.pprof\",\"$pod/sampled-memory.pprof\",\"pprof\"" ] || fail "the sampled CPU profile: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.message, .tasks, .artifacts]')"

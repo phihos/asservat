@@ -35,13 +35,17 @@ const (
 	// can tell one that this Asservat would make better:
 	// 2: goroutines of Go programs without debug information.
 	// 3: stacks through libraries without unwind tables, such as musl.
-	Version = 3
+	// 4: the stacks of Python programs.
+	Version = 4
 )
 
 // Describer describes cores with gdb and Delve.
 type Describer struct {
 	// Scratch is a directory for the script and what gdb downloads.
 	Scratch string
+	// PystackPython is the Python interpreter that has pystack; the
+	// constant of that name if empty.
+	PystackPython string
 	// DebuginfodURLs are the debuginfod servers, separated by spaces, that
 	// gdb asks for the debug information of stripped files; empty for none.
 	DebuginfodURLs string
@@ -88,13 +92,18 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	if report, err = json.Marshal(fields); err != nil {
 		return nil, err
 	}
-	// gdb's description stands without Delve's part.
-	with, err := describeGo(ctx, report, core, root)
-	if err != nil {
+	// gdb's description stands without the parts of the language runtimes.
+	if with, err := describeGo(ctx, report, core, root); err != nil {
 		slog.Warn("goroutines not described", "core", core, "error", err)
-		return report, nil
+	} else {
+		report = with
 	}
-	return with, nil
+	if with, err := d.describePython(ctx, report, core, root); err != nil {
+		slog.Warn("Python stacks not described", "core", core, "error", err)
+	} else {
+		report = with
+	}
+	return report, nil
 }
 
 // DescribedBy tells which version of the describer made a description; 1
