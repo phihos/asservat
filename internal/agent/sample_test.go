@@ -3,6 +3,8 @@ package agent
 import (
 	"bytes"
 	"os"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -120,6 +122,18 @@ func TestKeptProfileHoldsItsWindow(t *testing.T) {
 	if len(p.seconds) != 11 {
 		t.Fatalf("a window of 10 seconds holds %d seconds", len(p.seconds))
 	}
+	if len(p.stacks) != 2 {
+		t.Fatal("stacks held:", len(p.stacks))
+	}
+	// A stack goes with the last second that saw it.
+	short := newSampledProfile(sampledCPU, 2*time.Second)
+	short.add(idle, at(0), stack("idle"))
+	for second := 0; second < 5; second++ {
+		short.add(busy, at(second), stack("busy"))
+	}
+	if len(short.stacks) != 1 || short.stacks[idle] != nil || short.since(time.Time{})[busy].count != 3 {
+		t.Fatal("stacks held after the idle one's second went:", len(short.stacks))
+	}
 	all := p.since(time.Time{})
 	if len(all) != 2 || all[busy].count != 22 || all[idle].count != 1 || all[busy].comm != "busy" {
 		t.Fatal("everything in the window", all[busy], all[idle])
@@ -138,5 +152,54 @@ func TestKeptProfileHoldsItsWindow(t *testing.T) {
 	}
 	if got := whole.since(time.Time{})[busy].count; got != 100 {
 		t.Fatal("a profile without a window", got)
+	}
+}
+
+// busyProfile fills a kept profile as a busy pod does: so many stacks of 40
+// frames, each seen in every second, for some seconds more than the window.
+func busyProfile(stacks int, window time.Duration) *sampledProfile {
+	var frames libpf.Frames
+	for line := range 40 {
+		frames.Append(&libpf.Frame{Type: libpf.PythonFrame, FunctionName: libpf.Intern("work"), SourceLine: libpf.SourceLineno(line)})
+	}
+	p := newSampledProfile(sampledCPU, window)
+	start := time.Unix(1700000000, 0)
+	for second := range int(window/time.Second) + 10 {
+		for i := range stacks {
+			p.add(stackKey{trace: libpf.NewTraceHash(0, uint64(i)), pid: 1}, start.Add(time.Duration(second)*time.Second), func() *sampledStack {
+				return &sampledStack{frames: slices.Clone(frames), pid: 1, comm: "busy"}
+			})
+		}
+	}
+	return p
+}
+
+// A kept profile holds the frames of a stack once, however many seconds
+// saw it.
+func TestKeptProfileHoldsEachStackOnce(t *testing.T) {
+	held := func() uint64 {
+		var m runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m)
+		return m.HeapAlloc
+	}
+	before := held()
+	p := busyProfile(1600, 70*time.Second)
+	holds := held() - before
+	t.Logf("1,600 stacks of 40 frames per second over a window of 70 seconds: %.1f MiB", float64(holds)/(1<<20))
+	if holds > 16<<20 {
+		t.Fatalf("the profile holds %d bytes", holds)
+	}
+	seventh := stackKey{trace: libpf.NewTraceHash(0, 7), pid: 1}
+	if all := p.since(time.Time{}); len(all) != 1600 || all[seventh].count != 71 || len(all[seventh].frames) != 40 {
+		t.Fatal("the stacks of the window", len(all))
+	}
+	runtime.KeepAlive(p)
+}
+
+func BenchmarkKeptProfile(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		busyProfile(1600, 70*time.Second)
 	}
 }

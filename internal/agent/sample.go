@@ -120,56 +120,72 @@ type sampledProfile struct {
 	kind       sampledKind
 	containers map[string]bool // the pod's container IDs
 	pids       map[int]bool    // its processes when the sampling began
-	// seconds holds the stacks by the second in which they were seen. A
-	// profile that is kept running for a watch drops the seconds that lie
-	// further back than its window; window 0 keeps all.
-	seconds map[int64]map[stackKey]*sampledStack
+	// stacks holds every stack once, and seconds how often each was seen
+	// by the second: a busy process shows the same stacks second after
+	// second. A profile that is kept running for a watch drops the seconds
+	// that lie further back than its window, and with them the stacks that
+	// no second counts any more; window 0 keeps all.
+	stacks  map[stackKey]*sampledStack
+	seconds map[int64]map[stackKey]int64
 	window  time.Duration
 }
 
 func newSampledProfile(kind sampledKind, window time.Duration) *sampledProfile {
-	return &sampledProfile{kind: kind, window: window, containers: map[string]bool{}, pids: map[int]bool{}, seconds: map[int64]map[stackKey]*sampledStack{}}
+	return &sampledProfile{kind: kind, window: window, containers: map[string]bool{}, pids: map[int]bool{}, stacks: map[stackKey]*sampledStack{}, seconds: map[int64]map[stackKey]int64{}}
 }
 
-// add counts a stack seen at a moment. The caller holds the sampler's lock.
+// add counts a stack seen at a moment; stack makes it if the profile does
+// not hold it yet. The caller holds the sampler's lock.
 func (p *sampledProfile) add(key stackKey, at time.Time, stack func() *sampledStack) {
 	second := at.Unix()
-	stacks := p.seconds[second]
-	if stacks == nil {
-		stacks = map[stackKey]*sampledStack{}
-		p.seconds[second] = stacks
+	counts := p.seconds[second]
+	if counts == nil {
+		counts = map[stackKey]int64{}
+		p.seconds[second] = counts
 		// A new second begins: those out of the window go.
 		if p.window > 0 {
-			for old := range p.seconds {
-				if old < second-int64(p.window/time.Second) {
-					delete(p.seconds, old)
+			for old, counted := range p.seconds {
+				if old >= second-int64(p.window/time.Second) {
+					continue
 				}
+				for key := range counted {
+					if held := p.stacks[key]; held.seconds > 1 {
+						held.seconds--
+					} else {
+						delete(p.stacks, key)
+					}
+				}
+				delete(p.seconds, old)
 			}
 		}
 	}
-	seen := stacks[key]
-	if seen == nil {
-		seen = stack()
-		stacks[key] = seen
+	if _, counted := counts[key]; !counted {
+		held := p.stacks[key]
+		if held == nil {
+			held = stack()
+			p.stacks[key] = held
+		}
+		held.seconds++
 	}
-	seen.count++
+	counts[key]++
 }
 
 // since returns the stacks seen from a moment on, each with how often. The
 // caller holds the sampler's lock, or the profile is no longer sampled.
 func (p *sampledProfile) since(from time.Time) map[stackKey]*sampledStack {
 	all := map[stackKey]*sampledStack{}
-	for second, stacks := range p.seconds {
+	for second, counts := range p.seconds {
 		if second < from.Unix() {
 			continue
 		}
-		for key, stack := range stacks {
-			if sum := all[key]; sum != nil {
-				sum.count += stack.count
-			} else {
-				whole := *stack
-				all[key] = &whole
+		for key, count := range counts {
+			sum := all[key]
+			if sum == nil {
+				whole := *p.stacks[key]
+				sum = &whole
+				all[key] = sum
 			}
+			sum.count += count
 		}
 	}
 	return all
@@ -196,12 +212,16 @@ type stackKey struct {
 	pid   int
 }
 
-// sampledStack is one stack of one process and how often it was seen.
+// sampledStack is one stack of one process.
 type sampledStack struct {
 	frames libpf.Frames // the innermost first
 	pid    int
 	comm   string
-	count  int64
+	// count is how often it was seen in the time that was asked for; a
+	// profile counts by the second instead.
+	count int64
+	// seconds is the number of a profile's seconds that count it.
+	seconds int
 }
 
 // begin starts collecting the samples of a pod, and before that the
