@@ -402,6 +402,10 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 	path := filepath.Join(f.cache, name)
 	dir := filepath.Join(path, "usr/lib/debug")
 	if _, err := os.Stat(dir); err == nil {
+		// Also what an Asservat before the names by build ID unpacked.
+		if _, err := os.Stat(filepath.Join(dir, ".build-id")); err != nil {
+			linkByBuildID(dir)
+		}
 		now := time.Now()
 		return dir, os.Chtimes(path, now, now)
 	}
