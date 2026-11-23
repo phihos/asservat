@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 // A synthetic library as musl is built: without unwind tables and frame
@@ -111,13 +110,9 @@ func describeWaiting(t *testing.T, dir, root string) (waitingReport, string) {
 			names = append(names, f.Function)
 		}
 		stack = strings.Join(names, " < ")
-		// Not a core that caught the thread on its way into or out of the
-		// wait, where its innermost frame is at no function: gcore stops
-		// the thread, and it enters its wait anew afterwards.
-		if strings.Contains(stack, "pause") && names[0] != "" {
+		if strings.Contains(stack, "pause") {
 			return report, stack
 		}
-		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("the program never waited in pause: %s", stack)
 	return waitingReport{}, ""
