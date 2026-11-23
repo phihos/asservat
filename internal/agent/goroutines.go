@@ -83,11 +83,45 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 	if err != nil {
 		return report, nil // not a Go program
 	}
-	goroutines, cut, err := goroutines(ctx, corePath, exe, info.GoVersion)
+	goroutines, threads, cut, err := goroutines(ctx, corePath, exe, info.GoVersion)
 	if err != nil {
 		return nil, err
 	}
 	add := map[string]any{"runtime": info.GoVersion, "goroutines": goroutines, "goroutinesCut": cut}
+	if threads != nil {
+		// Functions and lines are from the line table; there are no
+		// variables. gdb's stacks of the threads give way to those walked
+		// along the frame pointers; its registers and instructions stay
+		// with each thread's innermost frame.
+		add["withoutDebugInfo"] = true
+		var described []map[string]json.RawMessage
+		if json.Unmarshal(fields["threads"], &described) == nil {
+			for _, thread := range described {
+				var id int
+				var frames []map[string]any
+				json.Unmarshal(thread["systemId"], &id)
+				json.Unmarshal(thread["frames"], &frames)
+				walked := threads[id]
+				if len(walked) == 0 {
+					continue
+				}
+				with := make([]any, len(walked))
+				for i, frame := range walked {
+					with[i] = frame
+				}
+				if len(frames) > 0 && frames[0]["pc"] == walked[0].PC {
+					for _, name := range []string{"function", "file", "line"} {
+						delete(frames[0], name)
+					}
+					first, _ := json.Marshal(walked[0])
+					json.Unmarshal(first, &frames[0])
+					with[0] = frames[0]
+				}
+				thread["frames"], _ = json.Marshal(with)
+			}
+			add["threads"] = described
+		}
+	}
 	for name, value := range add {
 		if fields[name], err = json.Marshal(value); err != nil {
 			return nil, err
@@ -97,8 +131,10 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 }
 
 // goroutines reads a core's goroutines with Delve; cut reports that there
-// are more than maxGoroutines.
-func goroutines(ctx context.Context, corePath, exe, version string) (out []goroutine, cut bool, err error) {
+// are more than maxGoroutines. For a program without debug information
+// they are read without it, and so are the stacks of its threads, which
+// are otherwise nil.
+func goroutines(ctx context.Context, corePath, exe, version string) (out []goroutine, threads map[int][]goFrame, cut bool, err error) {
 	// Delve reads the memory of a program that may have crashed because that
 	// memory is damaged.
 	defer func() {
@@ -108,13 +144,19 @@ func goroutines(ctx context.Context, corePath, exe, version string) (out []gorou
 	}()
 	group, err := core.OpenCore(corePath, exe, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	defer group.Detach(false)
 	target := group.Selected
+	runtime, _ := goversion.Parse(version)
 	all, _, err := proc.GoroutinesInfo(target, 0, 0)
 	if err != nil {
-		return nil, false, err
+		// Delve finds no goroutines without debug information.
+		out, threads, cut, e := lineTableGoroutines(ctx, target, exe, runtime)
+		if e != nil {
+			return nil, nil, false, fmt.Errorf("%w; without debug information: %v", err, e)
+		}
+		return out, threads, cut, nil
 	}
 	gs := all[:0:0]
 	for _, g := range all {
@@ -127,12 +169,11 @@ func goroutines(ctx context.Context, corePath, exe, version string) (out []gorou
 		gs, cut = gs[:maxGoroutines], true
 	}
 	sort.Slice(gs, func(i, j int) bool { return gs[i].ID < gs[j].ID })
-	runtime, _ := goversion.Parse(version)
 	selected := target.SelectedGoroutine()
 	out = make([]goroutine, 0, len(gs))
 	for _, g := range gs {
 		if err := ctx.Err(); err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		}
 		d := goroutine{ID: g.ID, Status: goStatus(g, runtime), Current: selected != nil && g.ID == selected.ID, Frames: []goFrame{}}
 		if fn := g.UserCurrent().Fn; fn != nil {
@@ -159,7 +200,7 @@ func goroutines(ctx context.Context, corePath, exe, version string) (out []gorou
 		}
 		out = append(out, d)
 	}
-	return out, cut, nil
+	return out, nil, cut, nil
 }
 
 func goStatus(g *proc.G, runtime goversion.GoVersion) string {

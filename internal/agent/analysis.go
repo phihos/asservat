@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 )
 
 // A core is a memory image: without the program's executable and libraries
@@ -75,4 +76,9 @@ func (a *Agent) describe(ctx context.Context, core, root, name string, up func(s
 	if err != nil {
 		slog.Warn("core not described", "core", name, "error", err)
 	}
+	// Delve reads the tables of the whole program to describe a Go core,
+	// hundreds of megabytes for a large one. The agent describes cores
+	// rarely: what that took goes back to the node now, not when the
+	// runtime gets round to it.
+	debug.FreeOSMemory()
 }
