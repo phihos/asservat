@@ -549,9 +549,10 @@ func (a *Agent) trace(ctx context.Context, w api.Watch, rec api.Recording, pod *
 	}()
 }
 
-// follow reads what the pod's containers write from now on, through the
-// Kubernetes log stream, and reports to the hub when a line matches the
-// watch's pattern. It ends with ctx, which the pod's deletion or the
+// follow reads what the pod's containers write from now on and reports to
+// the hub when a line matches the watch's pattern. It reads the log files
+// on the node, which costs nobody else anything, and where it cannot, the
+// Kubernetes log stream. It ends with ctx, which the pod's deletion or the
 // watch's end cancels.
 func (a *Agent) follow(agent, ctx context.Context, w api.Watch, pod *corev1.Pod) {
 	pattern, err := regexp.Compile(w.When.Params["pattern"])
@@ -585,6 +586,21 @@ func (a *Agent) follow(agent, ctx context.Context, w api.Watch, pod *corev1.Pod)
 			continue
 		}
 		wg.Go(func() {
+			files, err := openPodLog(a.podLogDir(pod.Namespace, pod.Name, string(pod.UID), c.Name))
+			if err == nil {
+				err = files.follow(ctx, func(line []byte) {
+					if pattern.Match(line) {
+						matched(c.Name, string(line))
+					}
+				})
+			}
+			if err == nil {
+				return
+			}
+			// As where the runtime keeps the files elsewhere, or for a pod
+			// that the kubelet runs from a file, whose directory is named
+			// otherwise.
+			slog.Info("log watch reads through the API server", "watch", w.ID, "pod", pod.Name, "container", c.Name, "reason", err)
 			since := metav1.Now()
 			// A stream ends when its container ends, and also when the
 			// kubelet or the API server closes it. Nothing tells when it
