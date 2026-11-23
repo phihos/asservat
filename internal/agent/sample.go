@@ -221,8 +221,10 @@ func (s *sampler) halt() {
 	// time. So it is told to, once the profiler's goroutines have ended, and
 	// to return the profiler's part of the heap as well.
 	go func() {
-		time.Sleep(time.Second)
-		debug.FreeOSMemory()
+		for _, wait := range []time.Duration{time.Second, 6 * time.Second, 12 * time.Second} {
+			time.Sleep(wait)
+			debug.FreeOSMemory()
+		}
 	}()
 }
 
