@@ -413,8 +413,11 @@ func (s *Store) FireWatchOnce(ctx context.Context, id, key string) (int, error) 
 	return remaining, err
 }
 
-func (s *Store) RefundWatch(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1 WHERE id = $1::uuid`, id)
+// RefundWatch gives a watch's count back for something that was counted
+// and then not recorded, and forgets its key, if it had one, so that it
+// can be counted again.
+func (s *Store) RefundWatch(ctx context.Context, id, key string) error {
+	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1, fired = fired - $2::text WHERE id = $1::uuid`, id, key)
 	return err
 }
 

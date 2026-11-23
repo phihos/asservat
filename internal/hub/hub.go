@@ -80,6 +80,9 @@ type Config struct {
 	// that has nothing to say, so that proxies on the way do not take the
 	// connection for dead; 20 seconds if zero.
 	StreamBeat time.Duration
+	// ScheduleRetry is how long the hub waits before it tries again to
+	// record a watch's time that it could not record. One minute if unset.
+	ScheduleRetry time.Duration
 	// Sharkd is the path of Wireshark's sharkd, which reads packet captures
 	// for their viewer.
 	Sharkd string
@@ -93,6 +96,8 @@ type Hub struct {
 	agents *agents
 	// changed wakes the retention timer when a capture is created.
 	changed chan struct{}
+	// scheduled wakes the schedule of watches for a time when watches change.
+	scheduled chan struct{}
 
 	mu       sync.Mutex
 	watchers map[chan string]struct{}
@@ -105,6 +110,9 @@ func New(c Config) (*Hub, error) {
 	}
 	if c.Retention <= 0 {
 		return nil, errors.New("retention must be positive")
+	}
+	if c.ScheduleRetry <= 0 {
+		c.ScheduleRetry = time.Minute
 	}
 	if c.StreamBeat <= 0 {
 		// Well below the time after which common proxies end a silent
@@ -122,7 +130,7 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 func (h *Hub) Handler() http.Handler {
@@ -199,6 +207,7 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
 	admin("POST /api/watches/{id}/approve", h.approveWatch)
+	user("POST /api/watches/{id}/record", h.recordNow)
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
 	user("POST /mcp", h.mcp)

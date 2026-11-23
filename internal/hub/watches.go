@@ -3,8 +3,13 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -137,6 +142,10 @@ func (h *Hub) pushWatches(ctx context.Context, cluster string) {
 		h.agents.send(cluster, node, api.Command{Type: "watches", Watches: list})
 	}
 	h.notify("watches")
+	select { // the schedule looks at the watches again
+	case h.scheduled <- struct{}{}:
+	default:
+	}
 }
 
 func (h *Hub) createWatch(w http.ResponseWriter, r *http.Request, u User) error {
@@ -206,7 +215,7 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	}
 	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger", watch.Approver); err != nil {
 		// Nothing was recorded, so this time does not count.
-		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
+		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id, ""); e != nil {
 			slog.Error("watch's count not given back", "watch", id, "error", e)
 		}
 		return err
@@ -220,4 +229,148 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	}
 	h.pushWatches(r.Context(), cluster)
 	return nil
+}
+
+// fire creates the capture of a watch for something that the hub learns of
+// itself, named by key, unless that was recorded before: of the pod named,
+// or of all pods of the workload. The creator's permission is checked
+// again, as for an agent's report.
+func (h *Hub) fire(ctx context.Context, id, key, pod, on, message string) (api.Capture, error) {
+	watch, groups, err := h.Store.Watch(ctx, id)
+	if err == nil && watch.Sensitive && watch.Approver == "" {
+		err = ErrNotFound
+	}
+	if err != nil {
+		return api.Capture{}, err
+	}
+	u := h.withAdmin(User{Name: watch.Requester, Groups: groups})
+	if err := h.allowed(ctx, u, watch.Cluster, watch.Namespace); err != nil {
+		return api.Capture{}, err
+	}
+	res, err := h.agents.query(ctx, watch.Cluster, "", api.Query{Op: "resolve", Namespace: watch.Namespace, Workload: watch.Workload})
+	if err != nil {
+		return api.Capture{}, err
+	}
+	pods := slices.DeleteFunc(res.Pods, func(p api.Pod) bool { return pod != "" && p.Name != pod })
+	if len(pods) == 0 {
+		return api.Capture{}, errStatus{http.StatusUnprocessableEntity, "the watch's workload has no such running pod"}
+	}
+	remaining, err := h.Store.FireWatchOnce(ctx, id, key)
+	if err != nil {
+		return api.Capture{}, err
+	}
+	request := watch.CaptureRequest
+	request.Watch, request.On, request.Reason = id, on, message
+	for _, p := range pods {
+		request.Pods = append(request.Pods, p.Name)
+	}
+	if watch.Reason != "" {
+		request.Reason += " (" + watch.Reason + ")"
+	}
+	capture, err := h.record(ctx, u, request, pods, "capture.trigger", watch.Approver)
+	if err != nil {
+		if e := h.Store.RefundWatch(context.WithoutCancel(ctx), id, key); e != nil {
+			slog.Error("watch's count not given back", "watch", id, "error", e)
+		}
+		return api.Capture{}, err
+	}
+	if remaining == 0 {
+		if err := h.Store.DeleteWatch(ctx, id); err != nil {
+			slog.Error("ended watch not deleted", "watch", id, "error", err)
+		}
+		h.pushWatches(ctx, watch.Cluster)
+	}
+	return capture, nil
+}
+
+// RecordNow makes a watch record at once, whatever it waits for: the pod
+// named, or all pods of its workload. It uses up one of the watch's count.
+func (h *Hub) RecordNow(ctx context.Context, u User, id, pod string) (api.Capture, error) {
+	if uuid.Validate(id) != nil {
+		return api.Capture{}, ErrNotFound
+	}
+	w, _, err := h.Store.Watch(ctx, id)
+	if err != nil {
+		return api.Capture{}, err
+	}
+	if !u.Admin && w.Requester != u.Name {
+		return api.Capture{}, ErrNotFound
+	}
+	if w.Sensitive && w.Approver == "" {
+		return api.Capture{}, errStatus{http.StatusConflict, "the watch awaits an administrator's approval"}
+	}
+	return h.fire(ctx, id, "asked "+uuid.NewString(), pod, api.OnAsked, "asked for by "+u.Name)
+}
+
+func (h *Hub) recordNow(w http.ResponseWriter, r *http.Request, u User) error {
+	var in struct{ Pod string }
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil && err != io.EOF {
+		return errStatus{http.StatusBadRequest, "invalid JSON"}
+	}
+	c, err := h.RecordNow(r.Context(), u, r.PathValue("id"), in.Pod)
+	if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusCreated)
+	return reply(w, c)
+}
+
+// RunSchedule records for the watches that wait for a time, when it comes.
+// It sleeps until the next of their times and is woken when watches change.
+// A time that came while the hub was down is recorded when it starts,
+// unless another came since: of a time that repeats, only the last. A time
+// that cannot be recorded for now, as while no agent is connected, is tried
+// again after a pause until it can or the next one comes; one that is
+// refused, as when its creator may no longer record, is given up.
+func (h *Hub) RunSchedule(ctx context.Context) {
+	done := map[string]time.Time{} // the last time recorded for each watch
+	for {
+		list, err := h.Store.Watches(ctx, "")
+		var timer <-chan time.Time
+		if err != nil {
+			slog.Error("schedule", "error", err)
+			timer = time.After(time.Minute) // retry after a failure
+		}
+		var soonest time.Time
+		for _, w := range list {
+			if w.When.Kind != api.OnTime {
+				continue
+			}
+			last, next := w.When.Due(time.Now())
+			if !last.IsZero() && !done[w.ID].Equal(last) {
+				// An agent that does not answer must not hold up the times
+				// of the other watches: it gets as long as a retry waits.
+				once, cancel := context.WithTimeout(ctx, h.ScheduleRetry)
+				_, err := h.fire(once, w.ID, "time "+last.UTC().Format(time.RFC3339Nano), "", api.OnTime, "at the time set, "+last.UTC().Format(time.RFC3339))
+				cancel()
+				var refused errStatus
+				switch {
+				case err == nil || err == ErrNotFound: // not found: recorded before, or the watch awaits approval
+					done[w.ID] = last
+				case errors.As(err, &refused) && refused.code < 500: // not the cluster's failure to answer
+					slog.Warn("time not recorded", "watch", w.ID, "error", err)
+					done[w.ID] = last
+				case ctx.Err() == nil:
+					slog.Warn("time not recorded; trying again", "watch", w.ID, "in", h.ScheduleRetry, "error", err)
+					timer = time.After(h.ScheduleRetry)
+				}
+			}
+			if !next.IsZero() && (soonest.IsZero() || next.Before(soonest)) {
+				soonest = next
+			}
+		}
+		// The watches that are gone are forgotten.
+		maps.DeleteFunc(done, func(id string, _ time.Time) bool {
+			return err == nil && !slices.ContainsFunc(list, func(w api.Watch) bool { return w.ID == id })
+		})
+		if !soonest.IsZero() && (timer == nil || time.Until(soonest) < h.ScheduleRetry) {
+			timer = time.After(time.Until(soonest))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-h.scheduled:
+		case <-timer:
+		}
+	}
 }

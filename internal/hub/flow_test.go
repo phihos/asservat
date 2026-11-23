@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -112,7 +114,7 @@ func TestCaptureFlow(t *testing.T) {
 	h, err := hub.New(hub.Config{
 		Clusters: []hub.Cluster{joined, foreign},
 		Store:    store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
-		AlertToken: "the-token-that-alertmanager-presents-0123456789",
+		AlertToken: "the-token-that-alertmanager-presents-0123456789", ScheduleRetry: 200 * time.Millisecond,
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
@@ -146,9 +148,14 @@ func TestCaptureFlow(t *testing.T) {
 			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}, {Name: "proxy"}}}}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "payments"}}, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}})
 	// RBAC of the fake cluster: the payments group may exec in payments.
+	// The test can make the cluster fail to answer for a while.
+	var unavailable atomic.Bool
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
 		a := sar.Spec.ResourceAttributes
+		if unavailable.Load() {
+			return true, nil, errors.New("the API server does not answer")
+		}
 		sar.Status.Allowed = a.Namespace == "payments" && a.Subresource == "exec" && len(sar.Spec.Groups) == 1 && sar.Spec.Groups[0] == "payments"
 		return true, sar, nil
 	})
@@ -656,6 +663,66 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("the capture of a matching log line", got.On, got.Reason)
 	}
 
+	// A watch for the warnings that Kubernetes gives about a pod: the agent
+	// reports the event of the reason asked for, not another, and not one
+	// from before the watch.
+	warn := func(name, reason string, count int32) {
+		e := &corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "payments"}, Type: corev1.EventTypeWarning, Reason: reason, Message: "Readiness probe failed: HTTP probe failed with statuscode: 503", Count: count,
+			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Namespace: "payments", Name: "api-1"}}
+		if count > 1 {
+			_, err = kube.CoreV1().Events("payments").Update(t.Context(), e, metav1.UpdateOptions{})
+		} else {
+			_, err = kube.CoreV1().Events("payments").Create(t.Context(), e, metav1.CreateOptions{})
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Kubernetes warns most about pods that do not run yet.
+	starting := pod.DeepCopy()
+	starting.Status.Phase = corev1.PodPending
+	if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), starting, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	warn("api-1.before", "Unhealthy", 1)
+	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnEvent, Params: map[string]string{"reason": "not a reason"}}}); code != 400 {
+		t.Fatal("an event watch with a broken reason", code)
+	}
+	code, warned := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnEvent, Params: map[string]string{"reason": "Unhealthy"}}})
+	if code != 201 {
+		t.Fatal("watch for an event", code)
+	}
+	ofWarning := func() *api.Capture {
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		var list []api.Capture
+		json.Unmarshal(b, &list)
+		for _, c := range list {
+			if c.Watch == warned.ID {
+				return &c
+			}
+		}
+		return nil
+	}
+	time.Sleep(300 * time.Millisecond) // the agent begins to listen
+	warn("api-1.other", "FailedMount", 1)
+	time.Sleep(200 * time.Millisecond)
+	if got := ofWarning(); got != nil {
+		t.Fatal("a warning of another reason, or from before, was recorded:", got.Reason)
+	}
+	for i := int32(2); ofWarning() == nil; i++ {
+		if i == 100 {
+			t.Fatal("the warning created no capture")
+		}
+		warn("api-1.before", "Unhealthy", i) // the warning comes again
+		time.Sleep(50 * time.Millisecond)
+	}
+	if got := f.wait("alice-token", ofWarning().ID, api.StateCompleted, api.StateFailed); got.On != api.OnEvent || got.Reason != "Kubernetes warns: Unhealthy: Readiness probe failed: HTTP probe failed with statuscode: 503 (flaky)" {
+		t.Fatal("the capture of a warning", got.On, got.Reason)
+	}
+	if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), pod, metav1.UpdateOptions{}); err != nil { // it runs again
+		t.Fatal(err)
+	}
+
 	// A watch for a Prometheus alert: Alertmanager tells the hub, with the
 	// hub's alert token, and the hub records the pod that the alert names.
 	code, alerting := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2, When: api.Condition{Kind: api.OnAlert, Params: map[string]string{"name": "HighErrorRate"}}})
@@ -696,6 +763,110 @@ func TestCaptureFlow(t *testing.T) {
 	// It fires anew later: the watch's second and last capture.
 	if code, b := notice(alertmanager, "firing", "payments", "2026-01-01T12:00:00Z"); code != 200 || b != `{"captures":1}` || len(watches("alice-token")) != 0 {
 		t.Fatal("the alert firing anew", code, b, len(watches("alice-token")))
+	}
+
+	// A watch records when it is asked to, whatever it waits for: here one
+	// pod of a crash watch. Only the watch's requester and administrators ask.
+	code, asking := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2})
+	if code != 201 {
+		t.Fatal("watch to ask", code)
+	}
+	// A watch that awaits approval says so when asked.
+	code, unapproved := watch("alice-token", api.WatchRequest{CaptureRequest: core, When: api.Condition{Kind: api.OnNotReady}})
+	if code != 201 || unapproved.Approver != "" {
+		t.Fatal("a sensitive watch", code, unapproved.Approver)
+	}
+	if code, b := f.call("alice-token", "POST", "/api/watches/"+unapproved.ID+"/record", nil); code != 409 || !strings.Contains(string(b), "approv") {
+		t.Fatal("a watch that awaits approval was asked", code, string(b))
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+unapproved.ID, nil)
+	if code, _ := f.call("mallory-token", "POST", "/api/watches/"+asking.ID+"/record", nil); code != 404 {
+		t.Fatal("another user asked a watch to record", code)
+	}
+	if code, b := f.call("alice-token", "POST", "/api/watches/"+asking.ID+"/record", map[string]string{"pod": "api-9"}); code != 422 {
+		t.Fatal("a watch asked to record a pod that is not there", code, string(b))
+	}
+	code, b = f.call("alice-token", "POST", "/api/watches/"+asking.ID+"/record", map[string]string{"pod": "api-1"})
+	var asked api.Capture
+	json.Unmarshal(b, &asked)
+	if code != 201 || asked.Watch != asking.ID || asked.On != api.OnAsked || asked.Reason != "asked for by alice (flaky)" || len(asked.Tasks) != 1 || asked.Tasks[0].Pod != "api-1" {
+		t.Fatalf("a watch asked to record: %d %s", code, b)
+	}
+	if left := watches("alice-token"); len(left) != 1 || left[0].Remaining != 1 {
+		t.Fatal("the watch after it was asked", left)
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+asking.ID, nil)
+
+	// A watch for a time records the workload's pods then, and with "every"
+	// again and again until its count is used up.
+	for what, params := range map[string]map[string]string{
+		"without a time": {}, "at no time": {"at": "tomorrow"}, "every nothing": {"at": "2026-01-01T10:00:00Z", "every": "0"},
+	} {
+		if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: params}}); code != 400 {
+			t.Fatal("a time watch", what, code)
+		}
+	}
+	_, timedOnce := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": "2099-01-01T00:00:00Z"}}})
+	schedule, stop := context.WithCancel(t.Context())
+	defer stop()
+	go h.RunSchedule(schedule)
+	at := time.Now().Add(400 * time.Millisecond).UTC()
+	code, timed := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": at.Format(time.RFC3339Nano), "every": "1"}}})
+	if code != 201 {
+		t.Fatal("watch for a time", code)
+	}
+	var atTimes []api.Capture
+	for range 100 {
+		_, b = f.call("alice-token", "GET", "/api/captures", nil)
+		json.Unmarshal(b, &atTimes)
+		atTimes = slices.DeleteFunc(atTimes, func(c api.Capture) bool { return c.Watch != timed.ID })
+		if len(atTimes) == 2 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	slices.SortFunc(atTimes, func(a, b api.Capture) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	// What was counted and then not recorded can be counted again.
+	if n, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != nil || n != 0 {
+		t.Fatal("counting a watch's event", n, err)
+	}
+	if _, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != hub.ErrNotFound {
+		t.Fatal("counting it twice", err)
+	}
+	if err := store.RefundWatch(t.Context(), timedOnce.ID, "a key"); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != nil || n != 0 {
+		t.Fatal("counting it again after it was given back", n, err)
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+timedOnce.ID, nil)
+	// A time that cannot be recorded when it comes is tried again: here the
+	// cluster does not answer for a while.
+	code, later := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": time.Now().Add(200 * time.Millisecond).UTC().Format(time.RFC3339Nano)}}})
+	if code != 201 {
+		t.Fatal("watch for a time that fails at first", code)
+	}
+	unavailable.Store(true)
+	ofLater := func() int {
+		var list []api.Capture
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		json.Unmarshal(b, &list)
+		return len(slices.DeleteFunc(list, func(c api.Capture) bool { return c.Watch != later.ID }))
+	}
+	time.Sleep(600 * time.Millisecond)
+	if n := ofLater(); n != 0 {
+		t.Fatal("recorded while the cluster did not answer:", n)
+	}
+	unavailable.Store(false)
+	for i := 0; ofLater() != 1; i++ {
+		if i == 100 {
+			t.Fatal("the time that failed at first was not tried again")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(atTimes) != 2 || atTimes[0].On != api.OnTime || atTimes[0].CreatedAt.Before(at) || atTimes[1].CreatedAt.Before(at.Add(time.Second)) ||
+		atTimes[0].Reason != "at the time set, "+at.Format(time.RFC3339)+" (flaky)" || len(atTimes[0].Tasks) < 2 || len(watches("alice-token")) != 0 {
+		t.Fatalf("the captures of a watch for a time: %+v", atTimes)
 	}
 
 	// A corrupt stored file is an error for MCP, not partial text.

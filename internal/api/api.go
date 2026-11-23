@@ -364,6 +364,11 @@ const (
 	OnCPU      = "cpu"       // a container's CPU use is above a number of CPUs or a share of its limit
 	OnThrottle = "throttled" // a container is held back by its CPU limit in more than a share of the time
 	OnAlert    = "alert"     // a Prometheus alert fires, as Alertmanager tells the hub
+	OnEvent    = "event"     // Kubernetes warns about the pod with an event, such as a failed probe or mount
+	OnTime     = "time"      // a time comes, once or again and again, as the hub's clock tells
+	// OnAsked is not a condition to wait for: it marks the capture of a
+	// watch that was asked to record now.
+	OnAsked = "asked"
 	// More that the agent measures of a container:
 	OnPressure    = "pressure"        // it stalls for memory, CPU or I/O in more than a share of the time
 	OnGrowth      = "memory-growth"   // its memory use grows by more than a size within a time
@@ -382,6 +387,44 @@ type Condition struct {
 // Crash tells whether the condition is a container's crash.
 func (c Condition) Crash() bool { return c.Kind == "" || c.Kind == OnCrash }
 
+// eventReason is how Kubernetes writes the reason of an event: one word in
+// camel case.
+var eventReason = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
+
+// Times reads a time condition: when it is first met and, if it repeats,
+// after how long each time.
+func (c Condition) Times() (at time.Time, every time.Duration, err error) {
+	at, err = time.Parse(time.RFC3339, c.Params["at"])
+	if err != nil {
+		return at, 0, errors.New(`a time condition needs at: a time such as "2026-12-01T03:00:00Z"`)
+	}
+	if v, ok := c.Params["every"]; ok {
+		seconds, err := strconv.Atoi(v)
+		if err != nil || seconds <= 0 {
+			return at, 0, errors.New("every is the number of seconds after which the time comes again")
+		}
+		every = time.Duration(seconds) * time.Second
+	}
+	return at, every, nil
+}
+
+// Due tells for a time condition which of its times was the last to come,
+// if one has, and which comes next, if one will.
+func (c Condition) Due(now time.Time) (last, next time.Time) {
+	at, every, err := c.Times()
+	switch {
+	case err != nil:
+	case now.Before(at):
+		next = at
+	case every == 0:
+		last = at
+	default:
+		last = at.Add(now.Sub(at) / every * every)
+		next = last.Add(every)
+	}
+	return last, next
+}
+
 // conditionParams lists the parameters each kind of condition accepts.
 var conditionParams = map[string][]string{
 	OnCrash:       {},
@@ -392,6 +435,8 @@ var conditionParams = map[string][]string{
 	OnCPU:         {"above", "seconds", "container"},
 	OnThrottle:    {"above", "seconds", "container"},
 	OnAlert:       {"name"},
+	OnTime:        {"at", "every"},
+	OnEvent:       {"reason"},
 	OnPressure:    {"above", "seconds", "container", "of"},
 	OnGrowth:      {"above", "seconds", "container"},
 	OnThreads:     {"above", "seconds", "container"},
@@ -494,6 +539,14 @@ func (c *Condition) Validate() error {
 	}
 	if c.Kind == OnAlert && c.Params["name"] == "" {
 		return errors.New("an alert condition needs the alert's name")
+	}
+	if v, ok := c.Params["reason"]; ok && !eventReason.MatchString(v) {
+		return errors.New(`reason is that of the events to wait for, such as "Unhealthy" or "BackOff"`)
+	}
+	if c.Kind == OnTime {
+		if _, _, err := c.Times(); err != nil {
+			return err
+		}
 	}
 	if c.Usage() {
 		if c.Params["above"] == "" {

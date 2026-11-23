@@ -88,6 +88,8 @@ made for that pod.
 | `open-files` | A container's processes hold more than `above` files open | The container with its open files |
 | `tcp-retransmits` | The pod sends more than `above` TCP segments per second again | The pod while packets are lost |
 | `tcp-failures` | More than `above` of the pod's TCP connection attempts per second fail | The pod while it cannot connect |
+| `event` | Kubernetes warns about the pod with an event of type `Warning`: of `reason` (`Unhealthy`, `BackOff`, `FailedMount`), or of any | The pod while Kubernetes has trouble with it |
+| `time` | The time `at` comes, and with `every` again after each so many seconds | All pods of the workload at that time |
 | `alert` | The Prometheus alert `name` fires, as Alertmanager tells the hub | The pod that the alert names, or all pods of the workload, while the alert fires |
 
 1. A user creates a watch: a capture request, with one or more recordings,
@@ -143,6 +145,28 @@ alert fires: one start of one alert (its fingerprint) is recorded once per
 watch. The capture's reason is the alert's `summary` or `description`. Who
 holds the alert token can make these watches record, as their creators and
 only what they asked for.
+
+For events the agent watches the warnings about each watched pod on its
+node, which the API server sends as they come; a warning that repeats is
+one event whose count rises, and each rise meets the condition. Warnings
+from before the watch are passed over. A pod is watched from when it is
+bound to the node, so warnings about its start are told; those about its
+scheduling come before that and are not.
+
+The hub keeps the times: it sleeps until the next time of any watch and
+records all pods of the workload then, as the watch's creator. A time that
+came while the hub was down is recorded when it starts, however late; of a
+time that repeats, only the last one that came. A time that cannot be
+recorded, as while no agent of the cluster is connected, is tried again
+every minute until it can or the watch's next time comes; one that is
+refused, as when the watch's creator may no longer record there, is given
+up and logged.
+
+Any watch records at once when its creator or an administrator asks it to
+(`POST /api/watches/{id}/record`, optionally with a `pod`; **Record now**
+in the console): of all pods of its workload or the one named, as one of
+its count. With what the watch keeps running, the files reach back before
+that moment, which a capture that starts now cannot do.
 
 Except after a crash, the pod is alive when its capture starts: the
 recordings that run over time (CPU profile, memory growth, system calls)

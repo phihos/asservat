@@ -197,6 +197,7 @@ func runHub(ctx context.Context, args []string) error {
 		return err
 	}
 	go h.RunRetention(ctx)
+	go h.RunSchedule(ctx)
 	server := &http.Server{Addr: *listen, Handler: h.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
