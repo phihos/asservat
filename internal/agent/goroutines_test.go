@@ -62,19 +62,27 @@ func main() {
 `
 
 // TestGoroutinesOfGoCore describes the core of a Go program as the agent
-// does after recording it: gdb first, then Delve's goroutines.
+// does after recording it: gdb first, then Delve's goroutines. Most Go
+// programs in containers are built without debug information: their
+// goroutines are found all the same, with functions and lines from Go's
+// line table, and without variables.
 func TestGoroutinesOfGoCore(t *testing.T) {
 	for _, tool := range []string{"go", "gcore", "gdb"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s is not installed", tool)
 		}
 	}
+	t.Run("with debug information", func(t *testing.T) { goroutinesOfGoCore(t, true) })
+	t.Run("stripped", func(t *testing.T) { goroutinesOfGoCore(t, false, "-trimpath", "-ldflags=-s -w") })
+}
+
+func goroutinesOfGoCore(t *testing.T, variables bool, flags ...string) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(blockedProgram), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	program := filepath.Join(dir, "blocked")
-	build := exec.Command("go", "build", "-o", program, "main.go")
+	build := exec.Command("go", append(append([]string{"build"}, flags...), "-o", program, "main.go")...)
 	build.Dir = dir
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v: %s", err, out)
@@ -106,9 +114,16 @@ func TestGoroutinesOfGoCore(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report struct {
-		Runtime    string
-		Threads    []json.RawMessage
-		Goroutines []goroutine
+		Runtime string
+		Threads []struct {
+			SystemID int
+			Frames   []struct {
+				goFrame
+				Registers []json.RawMessage
+			}
+		}
+		Goroutines       []goroutine
+		WithoutDebugInfo bool
 	}
 	if err := json.Unmarshal(data, &report); err != nil {
 		t.Fatal(err)
@@ -118,6 +133,9 @@ func TestGoroutinesOfGoCore(t *testing.T) {
 	}
 	if len(report.Threads) == 0 {
 		t.Error("gdb's threads are gone")
+	}
+	if report.WithoutDebugInfo == variables {
+		t.Error("withoutDebugInfo =", report.WithoutDebugInfo)
 	}
 	described, _ := json.Marshal(report.Goroutines)
 	t.Logf("%d goroutines in %d bytes, runtime %s", len(report.Goroutines), len(described), report.Runtime)
@@ -133,37 +151,57 @@ func TestGoroutinesOfGoCore(t *testing.T) {
 	for _, g := range report.Goroutines {
 		t.Logf("goroutine %d [%s] %s, %d frames, thread %d", g.ID, g.Status, g.Function, len(g.Frames), g.ThreadSystemID)
 		for _, f := range g.Frames {
+			if f.Function == "sync.(*Mutex).Lock" && filepath.Base(f.File) == "mutex.go" {
+				found[f.Function] = true
+			}
 			if !strings.HasPrefix(f.Function, "main.") {
 				continue
 			}
 			found[f.Function] = true
+			if filepath.Base(f.File) != "main.go" || f.Line == 0 {
+				t.Errorf("%s is at %s:%d", f.Function, f.File, f.Line)
+			}
 			t.Logf("  #%d %s %s:%d arguments %v locals %v", f.Level, f.Function, filepath.Base(f.File), f.Line, f.Arguments, f.Locals)
 			switch f.Function {
 			case "main.waitForOrder":
 				if g.Status != "chan receive" {
 					t.Errorf("waitForOrder is %q", g.Status)
 				}
-				if v := value(f.Arguments, "shelf"); v != `"synthetic-shelf"` {
+				if v := value(f.Arguments, "shelf"); variables && v != `"synthetic-shelf"` {
 					t.Errorf("shelf = %s", v)
 				}
 			case "main.holdLedger":
 				if g.Status != "sync.Mutex.Lock" {
 					t.Errorf("holdLedger is %q", g.Status)
 				}
-				if v := value(f.Arguments, "attempt"); v != "6" {
+				if v := value(f.Arguments, "attempt"); variables && v != "6" {
 					t.Errorf("attempt = %s", v)
 				}
 			case "main.main":
 				if g.ThreadSystemID == 0 {
 					t.Error("main runs on no thread, though it is in a system call")
 				}
-				if v := value(f.Locals, "orders"); !strings.HasPrefix(v, "chan main.order") {
+				if v := value(f.Locals, "orders"); variables && !strings.HasPrefix(v, "chan main.order") {
 					t.Errorf("orders = %s", v)
 				}
 			}
 		}
 	}
-	for _, name := range []string{"main.main", "main.waitForOrder", "main.holdLedger"} {
+	// The thread in which main reads is described down to main, with the
+	// registers of its innermost frame.
+	reads := false
+	for _, thread := range report.Threads {
+		for _, f := range thread.Frames {
+			if f.Function == "main.main" && filepath.Base(f.File) == "main.go" && len(thread.Frames[0].Registers) > 0 {
+				reads = true
+			}
+		}
+	}
+	if !reads && !variables {
+		t.Error("no thread's stack reaches main.main")
+	}
+	// The compiler put Lock into holdLedger: it is a frame all the same.
+	for _, name := range []string{"main.main", "main.waitForOrder", "main.holdLedger", "sync.(*Mutex).Lock"} {
 		if !found[name] {
 			t.Errorf("no goroutine in %s", name)
 		}

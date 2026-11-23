@@ -420,8 +420,17 @@ program, Delve (as a library in the agent) adds the goroutines with their
 state, call stacks and variables, and the viewer lists them before the
 threads. It describes at most 10000 goroutines, those running on a thread
 first, because the viewer reads at most 64 MiB and a goroutine takes about
-4 KiB; where Delve cannot read the program, for instance a stripped one,
-gdb's description stands alone. The stacks of a stripped program show
+4 KiB. Most Go programs in containers are built without debug information
+(`-ldflags="-s -w"`), where Delve finds no goroutines. Every Go program
+carries its line table, though, which names the function, file and line of
+each address and the calls that the compiler inlined, and the runtime keeps
+frame pointers. For such a program the agent finds the runtime's list of
+goroutines by what it looks like in memory, walks their stacks and those of
+the threads along the frame pointers and names the frames from the line
+table (Go 1.20 and later on amd64 and arm64; inlined calls as their own
+frames). These stacks have functions, files and lines, but no variables,
+and the viewer says so. Where neither works, gdb's description stands
+alone. The stacks of a stripped program in another language show
 addresses. With `agent.debuginfodURLs` (`--debuginfod-urls`) gdb fetches the
 missing symbols from those debuginfod servers; this is off by default
 because the agent then sends them the build IDs of the programs it describes

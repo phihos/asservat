@@ -49,6 +49,7 @@ export default async function (root) {
   $('stopped').innerHTML = `<span class="${report.stopped ? 'crash' : 'snap'}">${esc(report.stopped || 'Snapshot of a running process; it continued afterwards.')}</span>
     <code>${esc(report.commandLine || report.executable || '')}</code>
     ${report.runtime ? `<span class="dim">${esc(report.runtime)}</span>` : ''}
+    ${report.withoutDebugInfo ? '<span class="dim" title="The program was built without debug information. Functions, files and lines are from the line table that every Go program carries; variables cannot be shown.">no debug information: functions and lines, no variables</span>' : ''}
     ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
 
   const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
