@@ -60,7 +60,7 @@ type Agent struct {
 	traces map[string]*lines
 	// calls holds the system calls set aside at a crash, by trigger ID,
 	// until the hub's task for it arrives.
-	calls map[string][]byte
+	calls map[string]setAside
 }
 
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
@@ -68,7 +68,7 @@ type Agent struct {
 func (a *Agent) Run(ctx context.Context) {
 	a.running, a.watching = map[string]task{}, map[string]context.CancelFunc{}
 	a.rings, a.snapshots, a.kept, a.traces = map[string]*ring{}, map[string][]byte{}, map[string]*kept{}, map[string]*lines{}
-	a.calls = map[string][]byte{}
+	a.calls = map[string]setAside{}
 	delay := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()

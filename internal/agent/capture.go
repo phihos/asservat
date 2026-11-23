@@ -175,8 +175,8 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		traced, calls := a.traces[r.Watch+"/"+t.Pod], a.calls[r.Trigger]
 		delete(a.calls, r.Trigger)
 		a.mu.Unlock()
-		if r.Watch != "" && traced != nil {
-			if calls == nil { // nothing was set aside: the process goes on
+		if r.Watch != "" && (traced != nil || calls.name != "") {
+			if calls.name == "" { // nothing was set aside: the process goes on
 				from := time.Now().Add(-traced.before)
 				if !r.AfterCrash() {
 					select {
@@ -184,12 +184,12 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 					case <-time.After(duration):
 					}
 				}
-				calls = traced.since(from)
+				calls = setAside{name: traced.name, content: traced.since(from)}
 			}
-			if len(calls) == 0 {
+			if len(calls.content) == 0 {
 				return errors.New("the node agent holds no system calls of this pod from before the watch's condition was met")
 			}
-			return up(traced.name, bytes.NewReader(calls))
+			return up(calls.name, bytes.NewReader(calls.content))
 		}
 		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {

@@ -293,7 +293,7 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 	// Likewise the system calls up to the crash: the trace starts anew with
 	// the restarted process.
 	if l := a.traces[w.ID+"/"+pod]; l != nil && w.When.Crash() {
-		a.calls[id] = l.since(time.Now().Add(-l.before))
+		a.calls[id] = setAside{name: l.name, content: l.since(time.Now().Add(-l.before))}
 	}
 	a.mu.Unlock()
 	slog.Info("watch met", "watch", w.ID, "pod", pod, "message", message)
@@ -428,6 +428,13 @@ func (r *ring) snapshot(from time.Time) []byte {
 	return bytes.Join(append([][]byte{r.header}, r.packets[first:]...), nil)
 }
 
+// setAside is a file's content that the agent kept at a crash, for the
+// capture of that crash.
+type setAside struct {
+	name    string
+	content []byte
+}
+
 // lines holds the most recent lines of a tool's output, each with the
 // moment it was read.
 type lines struct {
@@ -491,9 +498,6 @@ func (a *Agent) trace(ctx context.Context, w api.Watch, rec api.Recording, pod *
 	if running != nil && !running.ended.Load() {
 		return
 	}
-	if running != nil {
-		running.stop() // the buffer of the process that ended makes room
-	}
 	pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 	if err != nil {
 		return // no such process yet
@@ -517,6 +521,9 @@ func (a *Agent) trace(ctx context.Context, w api.Watch, rec api.Recording, pod *
 	a.mu.Lock()
 	a.traces[key] = l
 	a.mu.Unlock()
+	if running != nil {
+		running.stop() // the buffer of the process that ended makes room
+	}
 	go func() {
 		l.fill(out)
 		cmd.Wait()
