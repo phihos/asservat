@@ -184,8 +184,16 @@ var mcpTools = []mcpTool{
 			// Asservat is made anew first, as for the viewer.
 			if api.ViewerOf(a.Name) == "core" {
 				name := strings.TrimSuffix(a.Name, coredesc.Suffix)
-				if _, _, err := h.describeAgain(ctx, c.ID, name); err != nil {
-					slog.Warn("core not described again", "capture", c.ID, "name", name, "error", err)
+				// Why the description is an older one, if it stays one.
+				var stale string
+				select {
+				case result := <-h.renew(ctx, u, c.ID, name):
+					if stale = result.reason; result.err != nil {
+						slog.Warn("core not described again", "capture", c.ID, "name", name, "error", result.err)
+						stale = "the hub could not describe the core again now"
+					}
+				case <-ctx.Done(): // the work goes on for the next reader
+					return nil, ctx.Err()
 				}
 				described, err := h.Store.Artifact(ctx, c.ID, name+coredesc.Suffix)
 				if err == ErrNotFound {
@@ -202,6 +210,9 @@ var mcpTools = []mcpTool{
 					return nil, err
 				}
 				text := coreText(report.Bytes())
+				if stale != "" && coredesc.DescribedBy(report.Bytes()) < coredesc.Version {
+					text = "Described by an older Asservat, which may show less (" + stale + "). A new dump is described in full.\n\n" + text
+				}
 				from := min(max(in.Offset, 0), int64(len(text)))
 				return map[string]any{"size": len(text), "offset": from, "text": strings.ToValidUTF8(text[from:min(from+mcpReadLimit, int64(len(text)))], "")}, nil
 			}

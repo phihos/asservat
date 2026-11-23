@@ -42,37 +42,7 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 	// The work goes on when the viewer that asked is closed: the next one
 	// finds it done. It takes seconds, or minutes with debug information
 	// to download; a gdb that hangs gives the core's turn back after 15.
-	type outcome struct {
-		answer map[string]any
-		err    error
-	}
-	done := make(chan outcome, 1)
-	go func() {
-		work, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 15*time.Minute)
-		defer cancel()
-		described, reason, err := h.describeAgain(work, c.ID, in.Name)
-		var cannot undescribable
-		switch {
-		case errors.As(err, &cannot):
-			// The description as it is still shows. What the core or its
-			// files make fail fails again: it is not tried for this core
-			// until the hub starts anew. Other failures, as of the store,
-			// pass.
-			slog.Warn("core not described again", "capture", c.ID, "name", in.Name, "error", err)
-			h.mu.Lock()
-			h.undescribed[c.ID+"/"+in.Name] = true
-			h.mu.Unlock()
-			described, reason, err = false, "this Asservat could not describe the core again", nil
-		case err == nil && described:
-			// The description is stored: that is the answer, whatever
-			// becomes of its audit entry.
-			if err := h.Store.Audit(work, u.Name, "artifact.describe", c.ID, map[string]string{"name": in.Name}); err != nil {
-				slog.Error("audit", "action", "artifact.describe", "capture", c.ID, "error", err)
-			}
-			h.notify(c.ID)
-		}
-		done <- outcome{map[string]any{"described": described, "reason": reason}, err}
-	}()
+	done := h.renew(r.Context(), u, c.ID, in.Name)
 	// A description can take longer than a proxy waits for an answer: the
 	// answer begins with spaces, one for every beat of the hub's streams,
 	// which JSON allows before a value.
@@ -89,9 +59,9 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 			}
 			if result.err != nil {
 				slog.Error("core not described again", "capture", c.ID, "name", in.Name, "error", result.err)
-				result.answer = map[string]any{"described": false, "reason": "the hub could not describe the core again now"}
+				result.described, result.reason = false, "the hub could not describe the core again now"
 			}
-			return reply(w, result.answer)
+			return reply(w, map[string]any{"described": result.described, "reason": result.reason})
 		case <-beat.C:
 			if !begun {
 				w.Header().Set("Content-Type", "application/json")
@@ -101,6 +71,50 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 			http.NewResponseController(w).Flush()
 		}
 	}
+}
+
+// renewed is what became of describing a core again: whether it was, or
+// why not.
+type renewed struct {
+	described bool
+	reason    string
+	err       error
+}
+
+// renew describes a core again where its description is older than this
+// hub makes them, for the user who opens it, and tells on the channel what
+// became of it. The work goes on when the one who asked has gone: the next
+// finds it done. It takes seconds, or minutes with debug information to
+// download; a gdb that hangs gives the core's turn back after 15.
+func (h *Hub) renew(ctx context.Context, u User, capture, name string) <-chan renewed {
+	done := make(chan renewed, 1)
+	go func() {
+		work, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Minute)
+		defer cancel()
+		described, reason, err := h.describeAgain(work, capture, name)
+		var cannot undescribable
+		switch {
+		case errors.As(err, &cannot):
+			// The description as it is still shows. What the core or its
+			// files make fail fails again: it is not tried for this core
+			// until the hub starts anew. Other failures, as of the store,
+			// pass.
+			slog.Warn("core not described again", "capture", capture, "name", name, "error", err)
+			h.mu.Lock()
+			h.undescribed[capture+"/"+name] = true
+			h.mu.Unlock()
+			described, reason, err = false, "this Asservat could not describe the core again", nil
+		case err == nil && described:
+			// The description is stored: that is the answer, whatever
+			// becomes of its audit entry.
+			if err := h.Store.Audit(work, u.Name, "artifact.describe", capture, map[string]string{"name": name}); err != nil {
+				slog.Error("audit", "action", "artifact.describe", "capture", capture, "error", err)
+			}
+			h.notify(capture)
+		}
+		done <- renewed{described, reason, err}
+	}()
+	return done
 }
 
 // undescribable is the failure to describe a core that lies in the core or
