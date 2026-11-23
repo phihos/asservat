@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"asservat.local/asservat/internal/api"
 
@@ -37,15 +39,25 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 	if api.ViewerOf(in.Name) != "core" || strings.HasSuffix(in.Name, coredesc.Suffix) {
 		return errStatus{http.StatusBadRequest, "the file is no core"}
 	}
-	described, reason, err := h.describeAgain(r.Context(), c.ID, in.Name)
-	if err != nil {
-		// The description as it is still shows. What failed once fails
-		// again: it is not tried for this core until the hub starts anew.
+	// The work goes on when the viewer that asked is closed: the next one
+	// finds it done. It takes seconds, or minutes with debug information
+	// to download; a gdb that hangs gives the core's turn back after 15.
+	work, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 15*time.Minute)
+	defer cancel()
+	described, reason, err := h.describeAgain(work, c.ID, in.Name)
+	var cannot undescribable
+	if errors.As(err, &cannot) {
+		// The description as it is still shows. What the core or its files
+		// make fail fails again: it is not tried for this core until the
+		// hub starts anew. Other failures, as of the store, pass.
 		slog.Warn("core not described again", "capture", c.ID, "name", in.Name, "error", err)
 		h.mu.Lock()
 		h.undescribed[c.ID+"/"+in.Name] = true
 		h.mu.Unlock()
 		return reply(w, map[string]any{"described": false, "reason": "this Asservat could not describe the core again"})
+	}
+	if err != nil {
+		return err
 	}
 	if described {
 		if err := h.Store.Audit(r.Context(), u.Name, "artifact.describe", c.ID, map[string]string{"name": in.Name}); err != nil {
@@ -55,6 +67,10 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 	}
 	return reply(w, map[string]any{"described": described, "reason": reason})
 }
+
+// undescribable is the failure to describe a core that lies in the core or
+// its files, not in what the hub needs around them.
+type undescribable struct{ error }
 
 // describeAgain describes the core of the name anew if its description is
 // older than this hub makes them and the capture holds the program's
@@ -136,11 +152,11 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	err = coredesc.ExtractFiles(archive, root, files.Size)
 	archive.CloseWithError(err)
 	if err != nil {
-		return false, "", err
+		return false, "", undescribable{err}
 	}
 	report, err := coredesc.Describer{Scratch: h.WorkDir, DebuginfodURLs: h.DebuginfodURLs}.Describe(ctx, file.Name(), root) // what gdb downloads stays for the next core
 	if err != nil {
-		return false, "", err
+		return false, "", undescribable{err}
 	}
 	a, err := h.keep(ctx, name+coredesc.Suffix, bytes.NewReader(report))
 	if err != nil {
