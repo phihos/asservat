@@ -360,7 +360,7 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 	if server == "" {
 		server = microsoftSymbols
 	}
-	f := debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, "dotnet-helpers")}
+	f := d.fetcher(ctx, "dotnet-helpers")
 	if err := os.MkdirAll(f.cache, 0o700); err != nil {
 		return "", err
 	}

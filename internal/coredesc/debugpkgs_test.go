@@ -321,16 +321,20 @@ func TestDebugPackages(t *testing.T) {
 			http.NotFound(w, r)
 		}))
 		defer knows.Close()
-		wait := debugPackageWait
-		debugPackageWait = 300 * time.Millisecond
-		defer func() { debugPackageWait = wait }()
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL + " " + knows.URL + "/", sources: sources}
+		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL + " " + knows.URL + "/", sources: sources, wait: 300 * time.Millisecond}
 		began := time.Now()
 		if at, _ := describe(t, d, root(t, map[string]string{})); !strings.HasSuffix(at, "main.c:true") {
 			t.Fatalf("the function is at %q", at)
 		}
 		if took := time.Since(began); took > 10*time.Second {
 			t.Fatal("a silent server held the description up for", took)
+		}
+		// What a server did not answer for is not taken as unknown: asked
+		// again, with only the silent server, it is asked for again.
+		lone := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL, sources: sources, wait: 300 * time.Millisecond}
+		describe(t, lone, root(t, map[string]string{}))
+		if _, err := os.Stat(filepath.Join(lone.Scratch, "debuginfo/.build-id/00/112233445566778899aabbccddeeff00112233.debug")); err == nil {
+			t.Fatal("a file that the server did not answer for is remembered as unknown")
 		}
 		requests()
 	})

@@ -26,6 +26,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 //go:embed core_analysis.py
@@ -61,6 +62,8 @@ type Describer struct {
 	// sources are the places of the distributions' debug packages
 	// (debugpkgs.go); nil for the public ones.
 	sources *debugSources
+	// wait is how long a server may be silent, for tests; debugPackageWait if zero.
+	wait time.Duration
 	// symbols is the symbol server that has the helper libraries of .NET
 	// runtimes (dotnet.go); Microsoft's if empty.
 	symbols string

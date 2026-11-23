@@ -19,6 +19,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -74,7 +75,7 @@ var publicDebugSources = debugSources{
 // given up: a cluster may have no way out, and the description of a core
 // must not wait for one. Ubuntu's debuginfod server was seen to take 29
 // seconds to say that it does not know a file.
-var debugPackageWait = 10 * time.Second
+const debugPackageWait = 10 * time.Second
 
 const (
 	// A repository's index of build IDs is asked for anew after a day:
@@ -145,7 +146,7 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	// First the debuginfod servers, which know a file by its build ID
 	// alone; then the distribution's debug packages for what they lack.
 	var dirs []string
-	if dir, found := debuginfo(ctx, filepath.Join(d.Scratch, "debuginfo"), strings.Fields(d.DebuginfodURLs), stripped); dir != "" {
+	if dir, found := debuginfo(d.fetcher(ctx, "debuginfo"), strings.Fields(d.DebuginfodURLs), stripped); dir != "" {
 		dirs = append(dirs, dir)
 		maps.DeleteFunc(stripped, func(_, id string) bool { return found[id] })
 	}
@@ -170,7 +171,7 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	if len(stripped) == 0 || arch == "" || !plainName.MatchString(release["ID"]) || !plainName.MatchString(release["VERSION_ID"]) {
 		return dirs
 	}
-	f := debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, "debugpkgs")}
+	f := d.fetcher(ctx, "debugpkgs")
 	if err := os.MkdirAll(f.cache, 0o700); err != nil {
 		return dirs
 	}
@@ -373,14 +374,18 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 // that fails, other than by not having a file, is not asked again for
 // this core. What no server has is remembered for a day, as an empty
 // file, which a server's index may take to learn of a new build.
-func debuginfo(ctx context.Context, cache string, servers []string, files map[string]string) (string, map[string]bool) {
+func debuginfo(f debugFetcher, servers []string, files map[string]string) (string, map[string]bool) {
+	ctx, cache := f.ctx, f.cache
 	dir := filepath.Join(cache, ".build-id")
 	if len(servers) == 0 || os.MkdirAll(dir, 0o700) != nil {
 		return "", nil
 	}
 	// What was not used for a week goes, as with the packages.
 	filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
-		if info, e := entry.Info(); err == nil && e == nil && entry.Type().IsRegular() && time.Since(info.ModTime()) > debugPackageAge {
+		if err != nil || !entry.Type().IsRegular() {
+			return nil
+		}
+		if info, err := entry.Info(); err == nil && time.Since(info.ModTime()) > debugPackageAge {
 			os.Remove(path)
 		}
 		return nil
@@ -392,7 +397,6 @@ func debuginfo(ctx context.Context, cache string, servers []string, files map[st
 			ids[id] = false
 		}
 	}
-	f := debugFetcher{ctx: ctx, cache: cache}
 	var mu sync.Mutex
 	failed := map[string]bool{}
 	todo := make(chan string)
@@ -414,12 +418,14 @@ func debuginfo(ctx context.Context, cache string, servers []string, files map[st
 					continue
 				}
 				os.MkdirAll(filepath.Dir(path), 0o700)
-				got := false
+				// unknown: every server was asked and has it not.
+				got, unknown := false, true
 				for _, server := range servers {
 					mu.Lock()
 					skip := failed[server]
 					mu.Unlock()
 					if skip {
+						unknown = false
 						continue
 					}
 					body, err := f.get(strings.TrimSuffix(server, "/") + "/buildid/" + id + "/debuginfo")
@@ -441,23 +447,27 @@ func debuginfo(ctx context.Context, cache string, servers []string, files map[st
 					if got {
 						break
 					}
-					if err != errNotPublished && ctx.Err() == nil {
-						slog.Warn("debuginfod server not asked further for this core", "server", server, "error", err)
-						mu.Lock()
-						failed[server] = true
-						mu.Unlock()
+					if err != errNotPublished {
+						unknown = false
+						if ctx.Err() == nil {
+							slog.Warn("debuginfod server not asked further for this core", "server", server, "error", err)
+							mu.Lock()
+							failed[server] = true
+							mu.Unlock()
+						}
 					}
 				}
 				mu.Lock()
 				ids[id] = got
 				mu.Unlock()
-				if !got {
+				if unknown && !got {
 					os.WriteFile(path, nil, 0o600)
 				}
 			}
 		})
 	}
-	for id := range ids {
+	// The askers write what they found into ids: its keys are read first.
+	for _, id := range slices.Collect(maps.Keys(ids)) {
 		todo <- id
 	}
 	close(todo)
@@ -474,6 +484,18 @@ var plainName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
 type debugFetcher struct {
 	ctx   context.Context
 	cache string
+	// wait is how long a server may be silent: debugPackageWait, or what
+	// a test sets.
+	wait time.Duration
+}
+
+// fetcher returns what downloads into a directory of the scratch space.
+func (d Describer) fetcher(ctx context.Context, name string) debugFetcher {
+	wait := d.wait
+	if wait == 0 {
+		wait = debugPackageWait
+	}
+	return debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, name), wait: wait}
 }
 
 // sweep removes what was not used for a week.
@@ -489,8 +511,9 @@ func (f debugFetcher) sweep() {
 // waited ends a download whose server sends nothing for too long.
 type waited struct {
 	io.ReadCloser
-	wait *time.Timer
-	end  context.CancelFunc
+	wait   *time.Timer
+	end    context.CancelFunc
+	silent time.Duration // how long the server may send nothing
 }
 
 func (w waited) Close() error {
@@ -499,7 +522,7 @@ func (w waited) Close() error {
 }
 
 func (w waited) Read(b []byte) (int, error) {
-	w.wait.Reset(debugPackageWait)
+	w.wait.Reset(w.silent)
 	defer w.wait.Stop()
 	return w.ReadCloser.Read(b)
 }
@@ -507,7 +530,7 @@ func (w waited) Read(b []byte) (int, error) {
 // get asks for a file. One that the server does not have is errNotPublished.
 func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 	ctx, cancel := context.WithCancel(f.ctx)
-	wait := time.AfterFunc(debugPackageWait, cancel)
+	wait := time.AfterFunc(f.wait, cancel)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
 		cancel()
@@ -528,7 +551,7 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 		}
 		return nil, fmt.Errorf("%s: %s", address, response.Status)
 	}
-	return waited{response.Body, wait, cancel}, nil
+	return waited{response.Body, wait, cancel, f.wait}, nil
 }
 
 // unpack returns the directory of debug files of a package, which it
