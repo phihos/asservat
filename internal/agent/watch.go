@@ -390,7 +390,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 	ctx, stop := context.WithCancel(ctx)
 	// Payload is kept only for a watch that asked for it and was approved.
 	payload := packets.Params["payload"] == "true"
-	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, packets.Params["filter"], payload)...)
+	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, packets.Params["filter"], payload, true)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.StdoutPipe()

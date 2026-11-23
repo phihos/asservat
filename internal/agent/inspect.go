@@ -129,7 +129,7 @@ func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.D
 	}
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, "", false)...)
+	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, "", false, false)...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGINT) }
 	cmd.WaitDelay = 5 * time.Second
 	var stderr bytes.Buffer

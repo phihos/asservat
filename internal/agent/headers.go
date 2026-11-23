@@ -19,8 +19,17 @@ const headerSnap = 20 + 60 + 60
 // standard output. Without payload it hands over the first headerSnap bytes
 // of each packet only, so that the payload of the pod's traffic is not
 // copied out of the kernel and through a pipe just to be dropped here.
-func tcpdumpArgs(pid int, filter string, payload bool) []string {
-	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
+//
+// With asTheyCome it writes every packet when it has it (-U), for a reader
+// that needs the packets while tcpdump runs: a watch's buffer. Otherwise it
+// writes when its buffer of some kilobytes is full, with far fewer system
+// calls, and the rest when it is interrupted, which is how a recording and
+// a traffic sample end; neither has a use for a packet before that.
+func tcpdumpArgs(pid int, filter string, payload, asTheyCome bool) []string {
+	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-w", "-"}
+	if asTheyCome {
+		args = append(args, "-U")
+	}
 	if !payload {
 		args = append(args, "-s", strconv.Itoa(headerSnap))
 	}

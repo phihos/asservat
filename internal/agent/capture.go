@@ -167,7 +167,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			packets := up
 			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
-		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", tcpdumpArgs(pid, rec.Params["filter"], payload)...)
+		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", tcpdumpArgs(pid, rec.Params["filter"], payload, false)...)
 	case api.KindStrace:
 		// The system calls that the capture's watch kept tracing: those from
 		// before the capture and, unless a crash ended the process, those
