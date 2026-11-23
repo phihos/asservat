@@ -526,6 +526,15 @@ for _ in $(seq 60); do
 done
 [ "$(jq -r '.on + " " + (.reason | test("container web uses [0-9.]+ [KMG]iB of memory \\(above 1Ki\\)") | tostring)' <<<"$noticed")" = "memory true" ] || fail "the capture of a watch for memory use: $noticed"
 completed "$ALICE" "$(jq -r .id <<<"$noticed")"
+# Other things the agent measures: the demo holds more than one file open.
+files=$(ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"open-files","params":{"above":"1"}}}')" | jq -r .id)
+for _ in $(seq 60); do
+  noticed=$(ok "$ALICE" GET /api/captures | jq -c --arg w "$files" '[.[] | select(.watch == $w)][0]')
+  [ "$noticed" != null ] && break
+  sleep 1
+done
+[ "$(jq -r '.reason | test("container web holds [0-9]+ files open \\(above 1\\)") | tostring' <<<"$noticed")" = true ] || fail "the capture of a watch for open files: $noticed"
+completed "$ALICE" "$(jq -r .id <<<"$noticed")"
 # A watch for a Prometheus alert: Alertmanager's notification, with the hub's
 # alert token, records the pod that the alert names; told again, nothing more.
 ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"alert","params":{"name":"HighErrorRate"}}}')" >/dev/null

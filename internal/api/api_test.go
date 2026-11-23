@@ -200,6 +200,28 @@ func TestParseAbove(t *testing.T) {
 			t.Error(name, "was accepted")
 		}
 	}
+	for _, c := range []struct {
+		kind, in string
+		want     Above
+	}{
+		{OnPressure, "20%", Above{20, true}}, {OnGrowth, "100Mi", Above{100 << 20, false}}, {OnThreads, "500", Above{500, false}},
+		{OnFiles, "1000", Above{1000, false}}, {OnRetransmits, "10", Above{10, false}}, {OnTCPFailures, "0.5", Above{0.5, false}},
+	} {
+		if got, err := ParseAbove(c.kind, c.in); err != nil || got != c.want {
+			t.Errorf("ParseAbove(%s, %q) = %v, %v", c.kind, c.in, got, err)
+		}
+	}
+	for name, c := range map[string]Condition{
+		"pressure as a number":     {Kind: OnPressure, Params: map[string]string{"above": "3"}},
+		"pressure of the network":  {Kind: OnPressure, Params: map[string]string{"above": "20%", "of": "network"}},
+		"threads as a share":       {Kind: OnThreads, Params: map[string]string{"above": "80%"}},
+		"growth without a time":    {Kind: OnGrowth, Params: map[string]string{"above": "100Mi"}},
+		"of for another condition": {Kind: OnMemory, Params: map[string]string{"above": "80%", "of": "io"}},
+	} {
+		if err := c.Validate(); err == nil {
+			t.Error(name, "was accepted")
+		}
+	}
 	ok := Condition{Kind: OnThrottle, Params: map[string]string{"above": "25%", "seconds": "30", "container": "app"}}
 	if err := ok.Validate(); err != nil || !ok.Usage() {
 		t.Fatal(err)

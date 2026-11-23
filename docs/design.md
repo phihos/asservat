@@ -82,6 +82,12 @@ made for that pod.
 | `memory` | A container's memory use is above `above`: a share of its limit (`80%`) or a size (`500Mi`) | The container before the kernel ends it |
 | `cpu` | A container's CPU use is above `above`: a number of CPUs (`1.5`) or a share of its limit (`90%`) | The container while it is busy |
 | `throttled` | A container is held back by its CPU limit in more than `above` (`25%`) of the time | The container while it wants more CPU than it gets |
+| `memory-growth` | A container's memory grows by more than `above` (`100Mi`) within `seconds` | A leak while it grows |
+| `pressure` | A container stalls for `of` (`memory`, `cpu` or `io`) in more than `above` (`20%`) of the time | The container while it waits for the resource |
+| `threads` | A container has more than `above` threads and processes | The container with its threads |
+| `open-files` | A container's processes hold more than `above` files open | The container with its open files |
+| `tcp-retransmits` | The pod sends more than `above` TCP segments per second again | The pod while packets are lost |
+| `tcp-failures` | More than `above` of the pod's TCP connection attempts per second fail | The pod while it cannot connect |
 | `alert` | The Prometheus alert `name` fires, as Alertmanager tells the hub | The pod that the alert names, or all pods of the workload, while the alert fires |
 
 1. A user creates a watch: a capture request, with one or more recordings,
@@ -108,8 +114,9 @@ where it has none), because they belong to the incident that is being
 recorded. A stream that ends is opened again after a pause that grows up to
 a minute; nothing tells when it can be read again.
 
-The three conditions about what a container uses take `seconds`, for how
-long the use must stay above, and `container`. The agent measures every 5
+The conditions about what a container uses, from `memory` to
+`tcp-failures`, take `seconds`, for how long the use must stay above (for
+`memory-growth`: the time within which it grows), and `container`. The agent measures every 5
 seconds from the container's own accounting, the files of its cgroup,
 which it reaches through the container's main process; this needs cgroup
 v2. Use is a level and no event: the kernel only tells when a container
@@ -117,7 +124,11 @@ reaches its own limits, which is too late. Memory is counted as Kubernetes
 does (without file cache that can be dropped). A condition is met once the
 use has been above for as long as asked, and again only after it has been
 below; a pod that is already above when the watch starts is recorded. A
-share of a limit that the container does not have is never met.
+share of a limit that the container does not have is never met. Pressure is
+the kernel's own account of stalled tasks over the last 10 seconds, threads
+are the cgroup's count of tasks, open files are counted in `/proc` for the
+container's processes, and the TCP counters are those of the pod's network
+namespace, which all its containers share.
 
 A watch for an alert leaves the query to Prometheus, as an alerting rule,
 and lets Alertmanager tell the hub when it fires: a webhook receiver for
