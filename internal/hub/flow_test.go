@@ -600,6 +600,43 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("the capture of a pod that stopped being ready", got.On, got.Reason)
 	}
 
+	// A watch for a log line: the agent follows the pod's logs, which the
+	// stand-in cluster answers with "fake logs", and reports the line.
+	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnLog, Params: map[string]string{"pattern": "("}}}); code != 400 {
+		t.Fatal("a log watch with a broken pattern", code)
+	}
+	code, lines := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnLog, Params: map[string]string{"pattern": "fake l.gs"}}})
+	if code != 201 || lines.When.Params["pattern"] != "fake l.gs" {
+		t.Fatal("watch for a log line", code, lines)
+	}
+	matched := func() *api.Capture {
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		var list []api.Capture
+		json.Unmarshal(b, &list)
+		for _, c := range list {
+			if c.Watch == lines.ID {
+				return &c
+			}
+		}
+		return nil
+	}
+	for i := 0; matched() == nil; i++ {
+		if i == 200 {
+			t.Fatal("the matching log line created no capture")
+		}
+		// The agent reads the logs of a pod that runs.
+		running := pod.DeepCopy()
+		running.Status.Phase = corev1.PodRunning
+		running.Annotations = map[string]string{"seen": fmt.Sprint(i)}
+		if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), running, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if got := f.wait("alice-token", matched().ID, api.StateCompleted, api.StateFailed); got.On != api.OnLog || !strings.HasPrefix(got.Reason, `a log line of container app matches "fake l.gs": fake logs`) {
+		t.Fatal("the capture of a matching log line", got.On, got.Reason)
+	}
+
 	// A corrupt stored file is an error for MCP, not partial text.
 	if err := corrupt(blobDir); err != nil {
 		t.Fatal(err)

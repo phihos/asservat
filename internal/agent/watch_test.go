@@ -3,9 +3,11 @@ package agent
 import (
 	"bytes"
 	"encoding/binary"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,5 +190,24 @@ func TestRestartsAndReadiness(t *testing.T) {
 	ready(corev1.ConditionFalse, "")
 	if got := met(unready, pod, seen); got != "" {
 		t.Fatal("a deleted pod:", got)
+	}
+}
+
+// A log watch finds the lines that its pattern matches, also the last one
+// without a line end and one that is longer than the reader's buffer, and
+// shortens a line for the capture's reason.
+func TestMatchLines(t *testing.T) {
+	long := strings.Repeat("x", 100<<10) + " timeout at the end of a long line"
+	stream := strings.NewReader("served a request\nERROR: upstream timeout after 30s\n" + long + "\nall well\npanic: timeout")
+	var found []string
+	matchLines(stream, regexp.MustCompile(`(?i)timeout|panic`), func(line string) { found = append(found, line) })
+	if len(found) != 3 || found[0] != "ERROR: upstream timeout after 30s" || !strings.HasSuffix(found[1], "end of a long line") || found[2] != "panic: timeout" {
+		t.Fatal(len(found), found[0])
+	}
+	if got := clip(found[0]); got != found[0] {
+		t.Fatal("a short line was cut:", got)
+	}
+	if got := clip(strings.Repeat("é", 150)); len(got) > 204 || !strings.HasSuffix(got, "…") || !utf8.ValidString(got) {
+		t.Fatal("a long line:", len(got))
 	}
 }

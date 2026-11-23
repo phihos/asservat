@@ -481,6 +481,17 @@ grep -q crashing "$WORK/crash.log" || fail "the logs lack the crashed instance"
 # The packet watch ended with its one crash; the log watch waits for another.
 [ "$(ok "$ALICE" GET /api/watches | jq -c '[.[] | [.recordings[0].kind, .remaining]]')" = '[["logs",1]]' ] || fail "watches after the crash: $(ok "$ALICE" GET /api/watches)"
 [ "$(status "$ALICE" DELETE "/api/watches/$logs")" = 200 ] || fail "delete watch"
+# A watch for a log line: the demo writes "served a request" several times a
+# second, so the watch records at once, and its capture quotes the line.
+line=$(ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"log","params":{"pattern":"served a (request|page)"}}}')" | jq -r .id)
+for _ in $(seq 60); do
+  noticed=$(ok "$ALICE" GET /api/captures | jq -c --arg w "$line" '[.[] | select(.watch == $w)][0]')
+  [ "$noticed" != null ] && break
+  sleep 1
+done
+[ "$(jq -r '.on + " " + (.reason | test("a log line of container web matches .*: .*served a request") | tostring)' <<<"$noticed")" = "log true" ] || fail "the capture of a watch for a log line: $noticed"
+completed "$ALICE" "$(jq -r .id <<<"$noticed")"
+[ "$(ok "$ALICE" GET /api/watches | jq --arg w "$line" '[.[] | select(.id == $w)] | length')" = 0 ] || fail "the log watch outlived its one capture"
 
 if [ -n "${CORE_HANDLER:-}" ]; then
   log "an approved core dump watch records the core of the crashed process (edge)"
