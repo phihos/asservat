@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +117,97 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	}
 	if n, first := count(r); n != 10 || first != 190 {
 		t.Fatal("limit: packets", n, "from second", first)
+	}
+}
+
+// packetStream is a pcap stream of so many UDP packets with payload, a
+// thousand per second.
+func packetStream(packets int) []byte {
+	le := binary.LittleEndian
+	stream := []byte{0xd4, 0xc3, 0xb2, 0xa1, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0}
+	stream = le.AppendUint32(stream, 1) // Ethernet
+	packet := make([]byte, 14+20+8+98)  // Ethernet, IPv4, UDP and what tcpdump hands over of the payload
+	packet[12], packet[13], packet[14], packet[23] = 0x08, 0x00, 0x45, 17
+	for i := range packets {
+		stream = le.AppendUint32(le.AppendUint32(stream, uint32(100+i/1000)), 0)
+		stream = le.AppendUint32(le.AppendUint32(stream, uint32(len(packet))), 1400)
+		stream = append(stream, packet...)
+	}
+	return stream
+}
+
+// reads counts the reads of a stream.
+type reads struct {
+	src   *bytes.Reader
+	count int
+}
+
+func (r *reads) Read(p []byte) (int, error) {
+	r.count++
+	return r.src.Read(p)
+}
+
+// A pcap stream is read in pieces as large as they come, not with two reads
+// (system calls, of a pipe) per packet.
+func TestPacketsAreReadInBulk(t *testing.T) {
+	src := &reads{src: bytes.NewReader(packetStream(10000))}
+	r := &ring{window: time.Hour, limit: 1 << 20}
+	if err := r.fill(src); err != nil {
+		t.Fatal(err)
+	}
+	if src.count > 100 {
+		t.Fatal("reads of 10000 packets:", src.count)
+	}
+}
+
+func BenchmarkRingFill(b *testing.B) {
+	stream := packetStream(10000)
+	b.ReportAllocs()
+	for b.Loop() {
+		r := &ring{window: 5 * time.Second, limit: 1 << 20}
+		if err := r.fill(bytes.NewReader(stream)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkLinesFill(b *testing.B) {
+	stream := strings.Repeat("1234  12:00:00.000000 read(3, \"\"..., 4096) = 4096 <0.000012>\n", 10000)
+	b.ReportAllocs()
+	for b.Loop() {
+		l := &lines{window: time.Hour, limit: 64 << 10}
+		l.fill(strings.NewReader(stream))
+	}
+}
+
+func BenchmarkMatchLines(b *testing.B) {
+	stream := strings.Repeat("2026-11-23T12:00:00Z served GET /api/items in 12ms status=200\n", 10000)
+	pattern := regexp.MustCompile(`(?i)timeout|panic`)
+	b.ReportAllocs()
+	for b.Loop() {
+		matchLines(strings.NewReader(stream), pattern, func(string) {})
+	}
+}
+
+// A buffer holds what its limit says, also while it drops: the lines and
+// packets that went must not stay in memory behind those that are kept.
+func TestBuffersHoldNoMoreThanTheirLimit(t *testing.T) {
+	const limit = 1 << 20
+	held := func() uint64 {
+		var m runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m)
+		return m.HeapAlloc
+	}
+	l := &lines{window: time.Hour, limit: limit}
+	most, before := uint64(0), held()
+	for range 40 { // 100 lines of 1 KiB each time, 4 MiB in all
+		l.fill(strings.NewReader(strings.Repeat(strings.Repeat("x", 1023)+"\n", 100)))
+		most = max(most, held()-min(before, held()))
+	}
+	runtime.KeepAlive(l)
+	if most > limit*115/100 {
+		t.Fatalf("a buffer of %d bytes held %d", limit, most)
 	}
 }
 

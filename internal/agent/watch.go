@@ -400,7 +400,7 @@ func (r *ring) fill(src io.Reader) error {
 		}
 		second := packets.order.Uint32(record)
 		r.mu.Lock()
-		r.packets = append(r.packets, append(bytes.Clone(record), packet...))
+		r.packets = append(r.packets, append(append(make([]byte, 0, len(record)+len(packet)), record...), packet...))
 		r.seconds = append(r.seconds, second)
 		r.size += len(record) + len(packet)
 		drop := 0
@@ -408,6 +408,9 @@ func (r *ring) fill(src io.Reader) error {
 			r.size -= len(r.packets[drop])
 			drop++
 		}
+		// Cleared, or the dropped packets stay in memory until the list is
+		// next copied to grow.
+		clear(r.packets[:drop])
 		r.packets, r.seconds = r.packets[drop:], r.seconds[drop:]
 		r.mu.Unlock()
 	}
@@ -466,6 +469,7 @@ func (l *lines) fill(src io.Reader) {
 				l.size -= len(l.text[drop])
 				drop++
 			}
+			clear(l.text[:drop]) // as for packets: or they stay in memory
 			l.at, l.text = l.at[drop:], l.text[drop:]
 			l.mu.Unlock()
 		}

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -70,10 +71,11 @@ type packetReader struct {
 }
 
 // newPacketReader returns nil for a stream that ends before its file header:
-// the tool wrote nothing.
+// the tool wrote nothing. The stream is read through a buffer, as much at a
+// time as it has: a pipe would otherwise be read twice per packet.
 func newPacketReader(src io.Reader) (*packetReader, error) {
-	r := &packetReader{src: src, header: make([]byte, 24), record: make([]byte, 16)}
-	if _, err := io.ReadFull(src, r.header); err != nil {
+	r := &packetReader{src: bufio.NewReaderSize(src, 64<<10), header: make([]byte, 24), record: make([]byte, 16)}
+	if _, err := io.ReadFull(r.src, r.header); err != nil {
 		if err == io.EOF {
 			return nil, nil
 		}
