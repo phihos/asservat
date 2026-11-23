@@ -61,6 +61,12 @@ var jvmRequests = map[string][2]string{
 // it, as that client does, for a JVM that was not ready for the first.
 const attachWait = 10 * time.Second
 
+// jvmAnswerWait is how long a JVM is given for its whole answer. A heap
+// dump answers when it is written, at some hundred megabytes a second: half
+// an hour is a heap of more than a hundred gigabytes. A JVM that is silent
+// for longer is stuck.
+const jvmAnswerWait = 30 * time.Minute
+
 // errNoJVM tells that a process is no HotSpot JVM.
 var errNoJVM = errors.New("no HotSpot JVM")
 
@@ -282,7 +288,11 @@ func attachAs(ctx, frame context.Context, proc string, j jvm, held *os.File, tar
 	}
 	io.Copy(io.Discard, content)
 	if err := cmd.Wait(); err != nil {
-		return errors.New(tail(stderr.Bytes()))
+		// What the child said of it, or else how it ended.
+		if said := tail(stderr.Bytes()); said != "" {
+			return errors.New(said)
+		}
+		return fmt.Errorf("asking the JVM: %w", err)
 	}
 	return uploadErr
 }
@@ -507,6 +517,10 @@ func (c attacher) ask(request string, words *strings.Replacer) (io.ReadCloser, e
 	if err != nil {
 		return nil, fmt.Errorf("the JVM's attach socket: %w", err)
 	}
+	// A JVM that took the request and does not answer is not waited for
+	// without end: the child would hold the container's /tmp and what it
+	// wrote there.
+	conn.SetDeadline(time.Now().Add(jvmAnswerWait))
 	if _, err := conn.Write([]byte("1\x00" + command + "\x00" + argument + "\x00\x00\x00")); err != nil {
 		conn.Close()
 		return nil, err
