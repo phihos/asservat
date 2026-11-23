@@ -73,6 +73,9 @@ type Config struct {
 	// WorkDir holds the files that viewers have open, decrypted, while they
 	// are open. Empty means the system's directory for temporary files.
 	WorkDir string
+	// AlertToken is the secret that Alertmanager presents with its
+	// notifications; empty accepts none.
+	AlertToken string
 	// StreamBeat is how often the hub writes a line into an event stream
 	// that has nothing to say, so that proxies on the way do not take the
 	// connection for dead; 20 seconds if zero.
@@ -199,6 +202,8 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
 	user("POST /mcp", h.mcp)
+	// Alertmanager presents the hub's alert token, not a user's.
+	mux.HandleFunc("POST /api/alerts", h.alerts)
 
 	agent := func(pattern string, f func(http.ResponseWriter, *http.Request, string) error) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {

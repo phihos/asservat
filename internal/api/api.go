@@ -346,6 +346,7 @@ const (
 	OnMemory   = "memory"    // a container's memory use is above a size or a share of its limit
 	OnCPU      = "cpu"       // a container's CPU use is above a number of CPUs or a share of its limit
 	OnThrottle = "throttled" // a container is held back by its CPU limit in more than a share of the time
+	OnAlert    = "alert"     // a Prometheus alert fires, as Alertmanager tells the hub
 )
 
 // Condition is what a watch waits for. Without a kind it is a crash.
@@ -366,6 +367,7 @@ var conditionParams = map[string][]string{
 	OnMemory:   {"above", "seconds", "container"},
 	OnCPU:      {"above", "seconds", "container"},
 	OnThrottle: {"above", "seconds", "container"},
+	OnAlert:    {"name"},
 }
 
 // Usage tells whether the condition is about what a container uses, which
@@ -440,6 +442,9 @@ func (c *Condition) Validate() error {
 		if _, err := regexp.Compile(c.Params["pattern"]); err != nil {
 			return fmt.Errorf("the pattern is no regular expression: %v", err)
 		}
+	}
+	if c.Kind == OnAlert && c.Params["name"] == "" {
+		return errors.New("an alert condition needs the alert's name")
 	}
 	if c.Usage() {
 		if c.Params["above"] == "" {

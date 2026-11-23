@@ -122,6 +122,11 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			a.mu.Lock()
 			packets := a.snapshots[r.Trigger]
 			delete(a.snapshots, r.Trigger)
+			// A condition that the hub learns of otherwise, such as an alert,
+			// has set nothing aside: the packets up to now are taken.
+			if ring := a.rings[r.Watch+"/"+t.Pod]; packets == nil && ring != nil {
+				packets = ring.snapshot()
+			}
 			a.mu.Unlock()
 			if packets == nil {
 				return errors.New("the node agent holds no packets of this pod from before the watch's condition was met")

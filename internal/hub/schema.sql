@@ -61,6 +61,8 @@ ALTER TABLE watches ADD COLUMN IF NOT EXISTS sensitive boolean NOT NULL DEFAULT 
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
 -- What the watch waits for; a watch from before conditions waits for a crash.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS condition jsonb NOT NULL DEFAULT '{"kind":"crash"}';
+-- The firings of alerts that an alert watch has recorded: Alertmanager repeats them.
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS fired jsonb NOT NULL DEFAULT '[]';
 
 -- The audit log outlives the captures it describes.
 CREATE TABLE IF NOT EXISTS audit (

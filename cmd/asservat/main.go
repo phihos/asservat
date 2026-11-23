@@ -85,6 +85,7 @@ func runHub(ctx context.Context, args []string) error {
 	oidcRedirect := f.String("oidc-redirect-url", "", "https://<hub-host>/auth/callback, registered at the issuer; enables the browser sign-in")
 	oidcScopes := f.String("oidc-scopes", "openid,profile", "comma-separated scopes of the browser sign-in; the issuer must return the user name and groups claims for them")
 	oidcSecretFile := f.String("oidc-client-secret-file", "", "file with the client secret, for a confidential client")
+	alertTokenFile := f.String("alert-token-file", "", "file with the secret that Alertmanager presents at /api/alerts; without it the hub accepts no alerts")
 	f.Parse(args)
 
 	dsn, err := secret(*dsnFile)
@@ -137,6 +138,15 @@ func runHub(ctx context.Context, args []string) error {
 		}
 		if err := yaml.Unmarshal(b, &c.Clusters); err != nil {
 			return fmt.Errorf("clusters-file: %w", err)
+		}
+	}
+	if *alertTokenFile != "" {
+		if c.AlertToken, err = secret(*alertTokenFile); err != nil {
+			return fmt.Errorf("alert-token-file: %w", err)
+		}
+		// Anyone who presents it can make the watches for alerts record.
+		if len(c.AlertToken) < 32 {
+			return errors.New("alert-token-file: the alert token needs at least 32 characters")
 		}
 	}
 	if *localCluster != "" {

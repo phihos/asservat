@@ -401,6 +401,18 @@ func (s *Store) FireWatch(ctx context.Context, id string) (int, error) {
 	return remaining, err
 }
 
+// FireWatchOnce is FireWatch for an event that can be told several times:
+// it counts the event, named by key, only the first time.
+func (s *Store) FireWatchOnce(ctx context.Context, id, key string) (int, error) {
+	var remaining int
+	err := s.db.QueryRow(ctx, `UPDATE watches SET remaining = remaining - 1, fired = fired || to_jsonb($2::text)
+ WHERE id = $1::uuid AND remaining > 0 AND NOT fired ? $2 RETURNING remaining`, id, key).Scan(&remaining)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return remaining, err
+}
+
 func (s *Store) RefundWatch(ctx context.Context, id string) error {
 	_, err := s.db.Exec(ctx, `UPDATE watches SET remaining = remaining + 1 WHERE id = $1::uuid`, id)
 	return err

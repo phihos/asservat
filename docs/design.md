@@ -82,6 +82,7 @@ made for that pod.
 | `memory` | A container's memory use is above `above`: a share of its limit (`80%`) or a size (`500Mi`) | The container before the kernel ends it |
 | `cpu` | A container's CPU use is above `above`: a number of CPUs (`1.5`) or a share of its limit (`90%`) | The container while it is busy |
 | `throttled` | A container is held back by its CPU limit in more than `above` (`25%`) of the time | The container while it wants more CPU than it gets |
+| `alert` | The Prometheus alert `name` fires, as Alertmanager tells the hub | The pod that the alert names, or all pods of the workload, while the alert fires |
 
 1. A user creates a watch: a capture request, with one or more recordings,
    a condition, and the number of times to record (default 1). The
@@ -117,6 +118,20 @@ does (without file cache that can be dropped). A condition is met once the
 use has been above for as long as asked, and again only after it has been
 below; a pod that is already above when the watch starts is recorded. A
 share of a limit that the container does not have is never met.
+
+A watch for an alert leaves the query to Prometheus, as an alerting rule,
+and lets Alertmanager tell the hub when it fires: a webhook receiver for
+`POST /api/alerts` with the hub's alert token (`hub.alertToken`) as bearer
+token. So nothing is polled, and the hub knows neither the address nor the
+credentials of Prometheus. Without the token the hub accepts no alerts and
+no watches for them. An alert meets the watches that name its `alertname`;
+its labels `namespace` and `cluster`, where it has them, must be the
+watch's. Its label `pod` names the pod to record; without it all pods of
+the workload are recorded. Alertmanager repeats a notification while the
+alert fires: one start of one alert (its fingerprint) is recorded once per
+watch. The capture's reason is the alert's `summary` or `description`. Who
+holds the alert token can make these watches record, as their creators and
+only what they asked for.
 
 Except after a crash, the pod is alive when its capture starts: the
 recordings that run over time (CPU profile, memory growth, system calls)
@@ -493,7 +508,6 @@ These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint.
-- More conditions for watches: a Prometheus alert.
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.

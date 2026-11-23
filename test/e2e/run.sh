@@ -157,6 +157,7 @@ done
 log "install hub and local agents"
 TOKEN=edge-join-token-0123456789abcdef0123456789abcdef
 ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
+ALERTS=alert-token-0123456789abcdef0123456789abcd
 hub create namespace asservat --dry-run=client -o yaml | hub apply -f - >/dev/null
 helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
   --set image.repository=localhost/asservat,image.tag=e2e,image.pullPolicy=Never \
@@ -164,6 +165,7 @@ helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n as
   --set hub.users[0].name=alice,hub.users[0].token=$ALICE,hub.users[0].groups[0]=devs \
   --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
   --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
+  --set hub.alertToken=$ALERTS \
   --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
 hub -n asservat port-forward svc/asservat-hub "$PORT:80" >/dev/null 2>&1 &
 FORWARD=$!
@@ -503,6 +505,18 @@ for _ in $(seq 60); do
 done
 [ "$(jq -r '.on + " " + (.reason | test("container web uses [0-9.]+ [KMG]iB of memory \\(above 1Ki\\)") | tostring)' <<<"$noticed")" = "memory true" ] || fail "the capture of a watch for memory use: $noticed"
 completed "$ALICE" "$(jq -r .id <<<"$noticed")"
+# A watch for a Prometheus alert: Alertmanager's notification, with the hub's
+# alert token, records the pod that the alert names; told again, nothing more.
+ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"alert","params":{"name":"HighErrorRate"}}}')" >/dev/null
+pod=$(edge -n shop get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
+firing=$(jq -cn --arg pod "$pod" '{version: "4", status: "firing", alerts: [{status: "firing", startsAt: "2026-01-01T10:00:00Z", fingerprint: "f1a2b3",
+  labels: {alertname: "HighErrorRate", namespace: "shop", pod: $pod}, annotations: {summary: "5xx above 5 %"}}]}')
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $ALICE" -d "$firing" "$URL/api/alerts")" = 401 ] || fail "a user's token was taken for the alert token"
+[ "$(curl -sS --fail -H "Authorization: Bearer $ALERTS" -d "$firing" "$URL/api/alerts")" = '{"captures":1}' ] || fail "the alert created no capture"
+[ "$(curl -sS --fail -H "Authorization: Bearer $ALERTS" -d "$firing" "$URL/api/alerts")" = '{"captures":0}' ] || fail "the alert told again created another capture"
+alerted=$(ok "$ALICE" GET /api/captures | jq -c '[.[] | select(.on == "alert")][0]')
+[ "$(jq -r --arg pod "$pod" '.reason + " " + (.tasks | length | tostring) + " " + (.tasks[0].pod == $pod | tostring)' <<<"$alerted")" = "alert HighErrorRate fires: 5xx above 5 % 1 true" ] || fail "the capture of an alert: $alerted"
+completed "$ALICE" "$(jq -r .id <<<"$alerted")"
 
 if [ -n "${CORE_HANDLER:-}" ]; then
   log "an approved core dump watch records the core of the crashed process (edge)"

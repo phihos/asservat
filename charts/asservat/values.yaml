@@ -24,6 +24,11 @@ hub:
   #   - name: prod-eu
   #     token: <at least 32 random characters>
   clusters: []
+  # Let watches wait for Prometheus alerts: the secret that Alertmanager
+  # presents as bearer token when it notifies https://<hub-host>/api/alerts
+  # (a webhook receiver). Empty: the hub accepts no alerts. Make one with
+  # "openssl rand -hex 32".
+  alertToken: ""
   # Users with fixed bearer tokens. The names and groups are the subjects that
   # each cluster's RBAC is asked about (pods/exec in the namespace).
   #   - name: alice

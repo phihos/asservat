@@ -168,6 +168,24 @@ curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d
 }'
 ```
 
+With `"alert"` and a `name`, a watch waits for a Prometheus alert. Give the
+hub a secret (`hub.alertToken`) and Alertmanager a receiver that presents it:
+
+```yaml
+receivers:
+  - name: asservat
+    webhook_configs:
+      - url: https://<hub-host>/api/alerts
+        send_resolved: false
+        http_config:
+          authorization:
+            credentials: <hub.alertToken>
+```
+
+Route the alerts that watches are to wait for to this receiver, with
+`continue: true` if they also go elsewhere. The alert's `pod` label names
+the pod that is recorded.
+
 A crash watch for `coredump` records the core of the crashed process itself. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an

@@ -24,6 +24,9 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := in.When.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
+	if in.When.Kind == api.OnAlert && h.AlertToken == "" {
+		return api.Watch{}, errStatus{http.StatusBadRequest, "this hub accepts no alerts: it has no alert token (hub.alertToken in its Helm values) for Alertmanager to present"}
+	}
 	if dump := in.Recording(api.KindCoredump); dump != nil && dump.Params["process"] != "" && in.When.Crash() {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch for crashes records whichever process crashes; it takes no process"}
 	}
