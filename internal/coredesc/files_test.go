@@ -16,9 +16,15 @@ func TestProgramFiles(t *testing.T) {
 		os.MkdirAll(filepath.Join(root, filepath.Dir(name)), 0o755)
 		os.WriteFile(filepath.Join(root, name), []byte(content), 0o644)
 	}
-	report := []byte(`{"mappings":[{"file":"/app/server"},{"file":"/app/server"},{"file":"/lib/libc.so.6"},{"file":"/data/orders.db"},{"file":"/lib/gone.so (deleted)"},{"file":"[heap]"},{"file":""}]}`)
+	// The program asked for the library by a link, as most do: with a
+	// target as the program saw it, from the root of its container.
+	os.MkdirAll(filepath.Join(root, "usr/lib"), 0o755)
+	os.Symlink("/lib/libc.so.6", filepath.Join(root, "usr/lib/libc.so"))
+	os.Symlink("/etc/passwd", filepath.Join(root, "usr/lib/libout.so")) // leads to nothing in the container
+	report := []byte(`{"mappings":[{"file":"/app/server"},{"file":"/app/server"},{"file":"/lib/libc.so.6"},{"file":"/data/orders.db"},{"file":"/lib/gone.so (deleted)"},{"file":"[heap]"},{"file":""}],
+ "modules":[{"file":"/usr/lib/libc.so"},{"file":"/usr/lib/libout.so"}]}`)
 	files := Files(report, root)
-	if len(files) != 2 || files[0] != "/app/server" || files[1] != "/lib/libc.so.6" {
+	if len(files) != 3 || files[0] != "/app/server" || files[1] != "/lib/libc.so.6" || files[2] != "/usr/lib/libc.so" {
 		t.Fatal(files)
 	}
 	var archive bytes.Buffer
@@ -32,6 +38,12 @@ func TestProgramFiles(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dir, "lib/libc.so.6")); string(b) != "\x7fELF library" {
 		t.Fatalf("unpacked %q", b)
 	}
+	if to, _ := os.Readlink(filepath.Join(dir, "usr/lib/libc.so")); to != "../../lib/libc.so.6" {
+		t.Fatalf("the link leads to %q", to)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "usr/lib/libc.so")); string(b) != "\x7fELF library" {
+		t.Fatalf("through the link: %q", b)
+	}
 	if _, err := os.Stat(filepath.Join(dir, "data")); !os.IsNotExist(err) {
 		t.Fatal("a data file was archived")
 	}
@@ -39,7 +51,9 @@ func TestProgramFiles(t *testing.T) {
 	for name, header := range map[string]tar.Header{
 		"a path out of the directory": {Name: "../outside", Typeflag: tar.TypeReg, Size: 1},
 		"an absolute path":            {Name: "/etc/passwd", Typeflag: tar.TypeReg, Size: 1},
-		"a link":                      {Name: "link", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
+		"a link to an absolute path":  {Name: "link", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
+		"a link out of the directory": {Name: "lib/link", Typeflag: tar.TypeSymlink, Linkname: "../../outside"},
+		"a hard link":                 {Name: "link", Typeflag: tar.TypeLink, Linkname: "lib/libc.so.6"},
 	} {
 		var bad bytes.Buffer
 		w := tar.NewWriter(&bad)

@@ -5,8 +5,10 @@
 import json
 import os
 import re
+import struct
 
 import gdb
+import gdb.unwinder
 
 CORE, ROOT, OUT = os.environ["ASSERVAT_CORE"], os.environ.get("ASSERVAT_ROOT", ""), os.environ["ASSERVAT_OUT"]
 # A runaway recursion repeats the same frames until the stack ends; the
@@ -65,6 +67,122 @@ def variables(frame):
     return found
 
 
+# gdb walks a stack by the unwind tables of each function on it. Some
+# libraries carry none: musl, the C library of Alpine images, is built
+# without them and without frame pointers. A thread that waits in such a
+# library, as most threads of a core do, then ends there for gdb, and the
+# program's own functions above it stay unseen. But the way out is on the
+# stack: every caller left its return address there. For a frame in a
+# module without unwind tables, the unwinder below takes the first word
+# above the stack pointer that is the address after a call instruction for
+# the caller's, and gdb walks on from there by the caller's own tables.
+# A frame found so is marked: it is a reading of the stack, not a proof.
+WORD = struct.Struct("<Q")
+# How far above a frame's stack pointer its return address is looked for:
+# the size of a large frame. Beyond it lies other frames' data, where an old
+# return address may linger.
+SCAN = 64 << 10
+KEPT = {"x86-64": ["rbp", "rbx", "r12", "r13", "r14", "r15"], "aarch64": ["x%d" % n for n in range(19, 30)]}
+tables = {}   # by file name: whether the module carries unwind tables
+scanned = set()  # the frames that were found by scanning, each by its stack pointer and address
+
+
+def has_tables(objfile):
+    """Whether the module has unwind tables: .debug_frame, or an .eh_frame
+    that is not tiny beside the code, in the file or in its debug file.
+    Tables take some 5 % of the code's size; musl's .eh_frame holds 132
+    bytes for 600 KiB of code, for its few functions in assembly."""
+    name = objfile.filename or ""
+    if name not in tables:
+        found = False
+        try:
+            with open(name[len("target:"):] if name.startswith("target:") else name, "rb") as f:
+                header = f.read(64)
+                shoff, = struct.unpack_from("<Q", header, 0x28)
+                shentsize, shnum, shstrndx = struct.unpack_from("<HHH", header, 0x3A)
+                f.seek(shoff)
+                sections = [struct.unpack_from("<IIQQQQ", f.read(shentsize)) for _ in range(shnum)]
+                f.seek(sections[shstrndx][4])
+                names = f.read(sections[shstrndx][5])
+                sizes = {names[section[0]:names.index(b"\0", section[0])]: section[5] for section in sections}
+                # An .eh_frame of up to 64 bytes holds no more than one entry and its end.
+                found = sizes.get(b".debug_frame", 0) > 0 or sizes.get(b".eh_frame", 0) > 64 and sizes.get(b".eh_frame", 0) * 256 > sizes.get(b".text", 0)
+        except (OSError, struct.error, ValueError, IndexError):
+            found = True  # what cannot be read is left to gdb
+        tables[name] = found
+    return tables[name] or any(has_tables(o) for o in gdb.objfiles() if o.owner == objfile)
+
+
+def after_call(inferior, address, machine, callee, space):
+    """Whether the instruction before the address is a call that can have
+    led to callee, an address in the function that was called. A call to
+    a fixed address in the callee's own module leads to a function that
+    starts at or before callee; of any other call the target is not told."""
+    try:
+        before = bytes(inferior.read_memory(address - 8, 8))
+    except (gdb.MemoryError, gdb.error):
+        return False
+    if "aarch64" in machine:
+        word, = struct.unpack_from("<I", before, 4)
+        if word & 0xFC000000 == 0x94000000:  # bl, to an offset of 26 bits in words
+            offset = (word & 0x03FFFFFF) - (0x04000000 if word & 0x02000000 else 0)
+            return leads(address - 4 + 4 * offset, callee, space)
+        return word & 0xFFFFFC1F == 0xD63F0000  # blr
+    # x86-64: call rel32, or an indirect call (FF /2) of 2 to 7 bytes.
+    if before[3] == 0xE8:
+        offset, = struct.unpack_from("<i", before, 4)
+        return leads(address + offset, callee, space)
+    return any(before[8 - n] == 0xFF and (before[9 - n] >> 3) & 7 == 2 for n in (2, 3, 4, 6, 7))
+
+
+def leads(target, callee, space):
+    """Whether a call to target can have led to callee: not if it is a
+    call within callee's module to a function that starts behind it."""
+    return space.objfile_for_address(target) != space.objfile_for_address(callee) or target <= callee
+
+
+class ScanUnwinder(gdb.unwinder.Unwinder):
+    def __init__(self):
+        super().__init__("asservat-scan")
+
+    def __call__(self, pending):
+        machine = pending.architecture().name()
+        if "x86-64" not in machine and "aarch64" not in machine:
+            return None
+        try:
+            pc, sp = int(pending.read_register("pc")), int(pending.read_register("sp"))
+            space = gdb.current_progspace()
+            module = space.objfile_for_address(pc)
+            if module is None or has_tables(module):
+                return None
+            inferior = gdb.selected_inferior()
+            stack = bytes(inferior.read_memory(sp, SCAN))
+        except (gdb.MemoryError, gdb.error):
+            try:
+                stack = bytes(inferior.read_memory(sp, 4096 - sp % 4096))  # to the end of the stack's last page
+            except (gdb.MemoryError, gdb.error, UnboundLocalError):
+                return None
+        for at in range(0, len(stack) - 7, 8):
+            caller, = WORD.unpack_from(stack, at)
+            if caller > 0x1000 and space.objfile_for_address(caller) is not None and after_call(inferior, caller, machine, pc, space):
+                unwound = pending.create_unwind_info(gdb.unwinder.FrameId(sp + at + 8, pc))
+                kind = pending.read_register("pc").type
+                unwound.add_saved_register("pc", gdb.Value(caller).cast(kind))
+                unwound.add_saved_register("sp", gdb.Value(sp + at + 8).cast(pending.read_register("sp").type))
+                # The registers that a function must hand back as it got
+                # them are taken as unchanged: where this one saved them is
+                # not known. A caller that needs one it changed is walked
+                # wrongly from there on.
+                for kept in KEPT["aarch64" if "aarch64" in machine else "x86-64"]:
+                    try:
+                        unwound.add_saved_register(kept, pending.read_register(kept))
+                    except (gdb.error, ValueError):
+                        pass
+                scanned.add((sp + at + 8, caller))
+                return unwound
+        return None
+
+
 def frames(thread):
     out, frame, level = [], None, 0
     try:
@@ -76,6 +194,8 @@ def frames(thread):
         try:
             pc = frame.pc()
             entry["pc"] = "0x%016x" % pc
+            if level > 0 and (int(frame.read_register("sp")), pc) in scanned:
+                entry["scanned"] = True
             entry["function"] = frame.name() or ""
             entry["module"] = inside(gdb.solib_name(pc) or exe)
             sal = frame.find_sal()
@@ -98,6 +218,7 @@ def frames(thread):
     return out, frame is not None
 
 
+gdb.unwinder.register_unwinder(None, ScanUnwinder(), replace=True)
 gdb.execute("set pagination off")
 gdb.execute("set confirm off")
 # gdb asks debuginfod servers for the symbols of stripped files only where
