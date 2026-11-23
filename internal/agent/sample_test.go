@@ -3,9 +3,11 @@ package agent
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -152,6 +154,42 @@ func TestKeptProfileHoldsItsWindow(t *testing.T) {
 	}
 	if got := whole.since(time.Time{})[busy].count; got != 100 {
 		t.Fatal("a profile without a window", got)
+	}
+}
+
+// The processes of a pod are looked for without the lock that every sample
+// of the node waits for.
+func TestCoverSearchesOutsideTheSamplersLock(t *testing.T) {
+	proc, _ := fakeProc(t, "0123abcd", 0)
+	// The cgroup file of a process is a pipe here: the search waits at it
+	// until this test has written it.
+	pipe := filepath.Join(proc, "1201", "cgroup")
+	os.Remove(pipe)
+	if err := syscall.Mkfifo(pipe, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a, p := &Agent{Proc: proc}, newSampledProfile(sampledCPU, 0)
+	covered := make(chan struct{})
+	go func() {
+		a.cover(p, runningPod("app", "0123abcd"))
+		close(covered)
+	}()
+	writer, err := os.OpenFile(pipe, os.O_WRONLY, 0) // returns once the search reads the pipe
+	if err != nil {
+		t.Fatal(err)
+	}
+	free := a.sampler.mu.TryLock()
+	if free {
+		a.sampler.mu.Unlock()
+	}
+	writer.WriteString("0::/kubelet.slice/cri-containerd-0123abcd.scope\n")
+	writer.Close()
+	<-covered
+	if !free {
+		t.Fatal("the sampler's lock was held during the search")
+	}
+	if !p.containers["0123abcd"] || !p.pids[1200] || !p.pids[1201] {
+		t.Fatal("covered", p.containers, p.pids)
 	}
 }
 

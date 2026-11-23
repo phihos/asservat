@@ -194,16 +194,27 @@ func (p *sampledProfile) since(from time.Time) map[stackKey]*sampledStack {
 // cover adds the pod's containers and processes to those whose samples the
 // profile takes: a restarted container is a new one.
 func (a *Agent) cover(p *sampledProfile, pod *corev1.Pod) {
+	var added []string
 	a.sampler.mu.Lock()
-	defer a.sampler.mu.Unlock()
 	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
 		if _, id, ok := strings.Cut(status.ContainerID, "://"); ok && !p.containers[id] {
 			p.containers[id] = true
-			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
-			for _, pid := range all {
-				p.pids[pid] = true
-			}
+			added = append(added, id)
 		}
+	}
+	a.sampler.mu.Unlock()
+	// Their processes are looked for without the lock: that reads a file of
+	// every process on the node, and every sample of the node waits for
+	// the lock.
+	var pids []int
+	for _, id := range added {
+		all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
+		pids = append(pids, all...)
+	}
+	a.sampler.mu.Lock()
+	defer a.sampler.mu.Unlock()
+	for _, pid := range pids {
+		p.pids[pid] = true
 	}
 }
 
