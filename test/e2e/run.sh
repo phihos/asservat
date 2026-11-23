@@ -359,6 +359,7 @@ EOF
   # Once nothing is sampled, the agent gives the kernel back the profiler's
   # programs and maps, which count as the agent's memory: over 100 MiB while
   # the profiler runs, a few without it.
+  seen=
   for _ in $(seq 30); do
     held=$(edge -n asservat exec ds/asservat-agent -- sh -c 'grep "^kernel " /sys/fs/cgroup/memory.stat | cut -d" " -f2')
     seen="$seen $((held >> 20))"
