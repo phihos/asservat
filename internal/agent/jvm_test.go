@@ -303,6 +303,7 @@ func TestJVMLinksAreNotFollowed(t *testing.T) {
 // nothing is written outside of the root.
 func TestJVMTmpIsTheContainers(t *testing.T) {
 	root, node := t.TempDir(), t.TempDir()
+	// (Named its-tmp here: the test's own directories may lie under /tmp.)
 	// The container's /tmp is a link to a path that is the node's
 	// directory when the node follows it, and the container's own
 	// directory within the container.
@@ -310,10 +311,10 @@ func TestJVMTmpIsTheContainers(t *testing.T) {
 	if err := os.MkdirAll(inside, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(node, filepath.Join(root, "tmp")); err != nil {
+	if err := os.Symlink(node, filepath.Join(root, "its-tmp")); err != nil {
 		t.Fatal(err)
 	}
-	tmp, err := openInside(root, "/tmp")
+	tmp, err := openInside(root, "/its-tmp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,11 +330,11 @@ func TestJVMTmpIsTheContainers(t *testing.T) {
 		t.Errorf("written on the node: %v, signals: %d", entries, s.signals)
 	}
 	// Links that lead upwards stay within the root too.
-	os.Remove(filepath.Join(root, "tmp"))
-	if err := os.Symlink("../../../.."+node, filepath.Join(root, "tmp")); err != nil {
+	os.Remove(filepath.Join(root, "its-tmp"))
+	if err := os.Symlink("../../../.."+node, filepath.Join(root, "its-tmp")); err != nil {
 		t.Fatal(err)
 	}
-	up, err := openInside(root, "/tmp")
+	up, err := openInside(root, "/its-tmp")
 	if err != nil {
 		t.Fatal(err)
 	}
