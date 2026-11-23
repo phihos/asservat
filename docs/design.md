@@ -236,6 +236,11 @@ handler.
 - A later core of the same container replaces the earlier one. The handler
   stops writing when less than 10 % of the node's disk is free, which is the
   kubelet's default eviction threshold.
+- With each core the handler keeps the program's files that the core maps,
+  while the crashed process and its container's files are still there
+  (the kernel waits for the handler). The agent describes the core with
+  them: by then the container is gone, and its next instance may not run
+  yet.
 - The capture that the crash triggers uploads the pod's cores and deletes
   them from the node. Until then they rest there unencrypted.
 - A process that the kernel kills for exceeding a memory limit leaves no
@@ -417,8 +422,8 @@ A core is a memory image: without the program's executable and libraries a
 debugger shows addresses, not functions. Those files are on the node while
 the pod exists, and they are not evidence. So the agent has gdb describe
 every core right after recording it, reading the program's files through a
-process of the same container (for a crashed process, the container's next
-instance), and uploads the description as `<core>.analysis.json` next to
+process of the same container (for a crashed process, the files that the
+core handler kept), and uploads the description as `<core>.analysis.json` next to
 the core. The viewer shows that file; it does not browse the core's memory.
 Variables appear where the program carries debug information. gdb unwinds
 the stacks of Go programs poorly and knows nothing of goroutines: for a Go

@@ -15,6 +15,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"asservat.local/asservat/internal/coredesc"
 )
 
 // Cores of crashed processes. The kernel pipes the core of every process
@@ -156,6 +158,12 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string,
 	for _, name := range earlier {
 		os.Remove(name)
 	}
+	// And the program's files of earlier cores, also of one that was
+	// never finished.
+	kept, _ := filepath.Glob(filepath.Join(dir, container+".*"+programFiles))
+	for _, name := range kept {
+		os.Remove(name)
+	}
 	name := filepath.Join(dir, container+"."+pid+"."+at)
 	f, err := os.OpenFile(name+".part", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -180,7 +188,15 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string,
 	if err := f.Close(); err != nil {
 		return "", err
 	}
-	return "kept for pod " + podUID, os.Rename(name+".part", name+".core")
+	// The crashed process is still there while its core is handed over,
+	// and with it its container's files; when the agent comes to describe
+	// the core, both are gone, and the container's next instance may not
+	// run yet. The program's files that the core maps are kept now, for
+	// the description and with the core. Without them the core stands.
+	if err := keepProgramFiles(name+".part", filepath.Join(proc, pid, "root"), name+programFiles); err != nil {
+		outcome = ", without the program's files: " + err.Error()
+	}
+	return "kept for pod " + podUID + outcome, os.Rename(name+".part", name+".core")
 }
 
 // unmark stops keeping the pod's cores for a watch and removes those kept
@@ -247,6 +263,9 @@ func (s CoreSpool) take(podUID, trigger string) {
 	os.MkdirAll(s.taken(trigger), 0o700)
 	for _, file := range cores {
 		os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file)))
+		// And the program's files that the handler kept with it.
+		kept := strings.TrimSuffix(file, ".core") + programFiles
+		os.Rename(kept, filepath.Join(s.taken(trigger), filepath.Base(kept)))
 	}
 }
 
@@ -286,10 +305,14 @@ func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string,
 		if err != nil {
 			return err
 		}
-		// The crashed process is gone. The container's next instance runs
-		// the same image, so its files stand in for the crashed one's.
+		// The crashed process is gone. The handler kept the program's
+		// files that its core maps; without them the container's next
+		// instance, if it runs already, has the same image's files.
 		root := ""
-		if pids, _, err := a.targets(pod, container, "", known); err == nil && len(pids) > 0 {
+		if unpacked, err := a.keptProgramFiles(strings.TrimSuffix(file, ".core") + programFiles); err == nil {
+			root = unpacked
+			defer os.RemoveAll(unpacked)
+		} else if pids, _, err := a.targets(pod, container, "", known); err == nil && len(pids) > 0 {
 			root = "/proc/" + strconv.Itoa(pids[0]) + "/root"
 		}
 		a.describe(ctx, file, root, name, 0, up)
@@ -321,4 +344,55 @@ func copyFile(from, to string, mode os.FileMode) error {
 		return err
 	}
 	return dst.Close()
+}
+
+// programFiles ends the name of the archive of a crash core's program
+// files in the spool, next to the core.
+const programFiles = ".files"
+
+// keepProgramFiles writes the program files that a core maps, found under
+// root, as an archive.
+func keepProgramFiles(core, root, archive string) error {
+	files := coredesc.Files(coredesc.Mapped(core), root)
+	if len(files) == 0 {
+		return errors.New("the core names none")
+	}
+	// Named as a part until it is whole: the agent waits for parts.
+	f, err := os.OpenFile(archive+".part", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(archive + ".part")
+	err = coredesc.WriteFiles(f, root, files)
+	if e := f.Close(); err == nil {
+		err = e
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(archive+".part", archive)
+}
+
+// keptProgramFiles unpacks the archive that the handler kept with a crash
+// core into a directory of the scratch space, which then stands for the
+// crashed container's root.
+func (a *Agent) keptProgramFiles(archive string) (string, error) {
+	f, err := os.Open(archive)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	dir, err := os.MkdirTemp(a.Scratch, "crashed-*")
+	if err != nil {
+		return "", err
+	}
+	if err := coredesc.ExtractFiles(f, dir, info.Size()); err != nil {
+		os.RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
 }

@@ -2,6 +2,8 @@ package agent
 
 import (
 	"bytes"
+	"debug/elf"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -186,5 +188,71 @@ func TestInstallCopiesTheProgramWithoutHoldingIt(t *testing.T) {
 	}
 	if copied, err := os.Stat(spool.handler()); err != nil || copied.Size() != program.Size() || copied.Mode().Perm() != 0o700 {
 		t.Fatal("the copy:", copied, err)
+	}
+}
+
+// coreNaming is a core as the kernel writes it, as far as it names the
+// files that the process mapped (its NT_FILE note): here one file.
+func coreNaming(file string) []byte {
+	le := binary.LittleEndian
+	files := le.AppendUint64(le.AppendUint64(nil, 1), 0x1000)
+	for _, n := range []uint64{0x400000, 0x401000, 0} {
+		files = le.AppendUint64(files, n)
+	}
+	files = append(append(files, file...), 0)
+	note := le.AppendUint32(le.AppendUint32(le.AppendUint32(nil, 5), uint32(len(files))), 0x46494c45)
+	note = append(append(note, "CORE\x00\x00\x00\x00"...), files...)
+	var core bytes.Buffer
+	header := elf.Header64{Type: uint16(elf.ET_CORE), Machine: uint16(elf.EM_X86_64), Version: 1, Phoff: 64, Ehsize: 64, Phentsize: 56, Phnum: 1}
+	copy(header.Ident[:], "\x7fELF\x02\x01\x01")
+	binary.Write(&core, le, header)
+	binary.Write(&core, le, elf.Prog64{Type: uint32(elf.PT_NOTE), Off: 64 + 56, Filesz: uint64(len(note))})
+	core.Write(note)
+	return core.Bytes()
+}
+
+// The handler keeps the crashed program's files with its core, while the
+// process and its container's files are still there: the agent describes
+// the core with them when both are gone.
+func TestHandlerKeepsTheProgramsFiles(t *testing.T) {
+	spool, proc := CoreSpool(t.TempDir()), t.TempDir()
+	const uid, container = "0b7f2a56-6b6e-4bd4-9f3e-0c7d4c2a1e11", "5f3a9c1e7b2d4f6a8c0e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a"
+	os.MkdirAll(filepath.Join(proc, "100/root/app"), 0o755)
+	os.WriteFile(filepath.Join(proc, "100/cgroup"), []byte("0::/kubepods/besteffort/pod"+uid+"/"+container+"\n"), 0o644)
+	os.WriteFile(filepath.Join(proc, "100/root/app/server"), []byte("\x7fELF the program"), 0o755)
+	os.MkdirAll(filepath.Dir(spool.marker(uid, "watch-1")), 0o700)
+	os.WriteFile(spool.marker(uid, "watch-1"), nil, 0o600)
+	if outcome, err := spool.Handle(proc, "100", "1700000000", bytes.NewReader(coreNaming("/app/server"))); err != nil || outcome != "kept for pod "+uid {
+		t.Fatal(outcome, err)
+	}
+	spool.take(uid, "trigger-1")
+	taken, _ := filepath.Glob(filepath.Join(spool.taken("trigger-1"), "*"))
+	if len(taken) != 2 || !strings.HasSuffix(taken[0], ".core") || !strings.HasSuffix(taken[1], programFiles) {
+		t.Fatal("taken with the core:", taken)
+	}
+	// The process is gone; its files are unpacked for the description.
+	os.RemoveAll(filepath.Join(proc, "100"))
+	a := &Agent{Scratch: t.TempDir()}
+	root, err := a.keptProgramFiles(taken[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "app/server")); string(b) != "\x7fELF the program" {
+		t.Fatalf("the program as kept: %q", b)
+	}
+	// A core that names no file of the container is kept without, and the
+	// files of the earlier core do not stay for it.
+	os.MkdirAll(filepath.Join(proc, "101/root"), 0o755)
+	os.WriteFile(filepath.Join(proc, "101/cgroup"), []byte("0::/kubepods/besteffort/pod"+uid+"/"+container+"\n"), 0o644)
+	stale := filepath.Join(spool.cores(uid), container+".100.1700000000"+programFiles)
+	os.MkdirAll(spool.cores(uid), 0o700)
+	os.WriteFile(stale, []byte("of a core that was never finished"), 0o600)
+	outcome, err := spool.Handle(proc, "101", "1700000001", bytes.NewReader(coreNaming("/app/gone")))
+	if err != nil || !strings.HasPrefix(outcome, "kept for pod "+uid+", without the program's files") {
+		t.Fatal(outcome, err)
+	}
+	left, _ := filepath.Glob(filepath.Join(spool.cores(uid), "*"))
+	if len(left) != 1 || filepath.Base(left[0]) != container+".101.1700000001.core" {
+		t.Fatal("in the spool:", left)
 	}
 }
