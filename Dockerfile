@@ -12,9 +12,10 @@ RUN CGO_ENABLED=0 go build -trimpath -o /gotrace cmd/trace
 # One image serves the hub and the node agent. The agent runs the standard
 # tools: nsenter (util-linux), tcpdump, gcore (gdb), strace and curl. The hub
 # reads packet captures for their viewer with Wireshark's sharkd (tshark), and
-# pprof draws its graph view with dot (graphviz).
+# pprof draws its graph view with dot (graphviz). Both unpack the debug
+# packages of distributions with bsdtar and bsdcat (libarchive-tools).
 FROM docker.io/library/debian:stable-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb graphviz python3-venv strace tcpdump tshark && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb graphviz libarchive-tools python3-venv strace tcpdump tshark && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
 RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2
 COPY --from=build /asservat /gotrace /usr/local/bin/
