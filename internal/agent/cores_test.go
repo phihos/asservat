@@ -89,6 +89,17 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 	if len(cores()) != 0 {
 		t.Fatal("cores after the last watch ended:", cores())
 	}
+	// A core that was finished while the pod's last watch ended is taken,
+	// and nothing of the pod stays in the spool.
+	os.MkdirAll(spool.cores(uid), 0o700)
+	os.WriteFile(filepath.Join(spool.cores(uid), container+".100.1700000001.core"), []byte("the last core"), 0o600)
+	spool.take(uid, "trigger-2")
+	if taken, _ := filepath.Glob(filepath.Join(spool.taken("trigger-2"), "*.core")); len(taken) != 1 {
+		t.Fatal("the last core was not taken", taken)
+	}
+	if _, err := os.Stat(spool.cores(uid)); !os.IsNotExist(err) {
+		t.Fatal("the directory of a pod without watches stays:", err)
+	}
 	os.WriteFile(spool.marker(uid, "watch-3"), nil, 0o600)
 	handle("100", "a core of the previous agent")
 
