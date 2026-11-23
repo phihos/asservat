@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
@@ -107,6 +108,43 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 	restore()
 	if b, _ := os.ReadFile(pipeLimit); string(b) != "0" {
 		t.Fatalf("restored core pipe limit %q", b)
+	}
+}
+
+// A crash report takes the core when the handler has finished it, without
+// looking for it at an interval: the kernel tells of the finished file.
+func TestTakeWaitsForTheHandlersCore(t *testing.T) {
+	spool := CoreSpool(t.TempDir())
+	const uid = "0b7f2a56-6b6e-4bd4-9f3e-0c7d4c2a1e11"
+	os.MkdirAll(filepath.Join(string(spool), "watched"), 0o700)
+	os.WriteFile(spool.marker(uid, "watch-1"), nil, 0o600)
+	taken := make(chan time.Time)
+	go func() {
+		spool.take(uid, "trigger-1")
+		taken <- time.Now()
+	}()
+	// The handler begins its core after the report has begun to wait, as
+	// with a container that the kubelet reports before the core is written.
+	time.Sleep(20 * time.Millisecond)
+	part := filepath.Join(spool.cores(uid), "c1.100.1700000000.part")
+	if err := os.MkdirAll(spool.cores(uid), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(part, []byte("core"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(30 * time.Millisecond)
+	finished := time.Now()
+	if err := os.Rename(part, strings.TrimSuffix(part, ".part")+".core"); err != nil {
+		t.Fatal(err)
+	}
+	waited := (<-taken).Sub(finished)
+	t.Log("taken", waited, "after the core was finished")
+	if waited > 100*time.Millisecond {
+		t.Fatal("the report waited for a finished core for", waited)
+	}
+	if cores, _ := filepath.Glob(filepath.Join(spool.taken("trigger-1"), "*.core")); len(cores) != 1 {
+		t.Fatal("taken cores", cores)
 	}
 }
 
