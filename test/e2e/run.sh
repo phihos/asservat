@@ -356,6 +356,17 @@ EOF
   grep -q 'Total samples = [1-9][0-9.]*[kMG]B' <<<"$grown" || fail "the amount of memory growth: $(head -8 <<<"$grown")"
   kill "$viewer"
   edge -n shop delete deployment py --wait=false >/dev/null
+  # Once nothing is sampled, the agent gives the kernel back the profiler's
+  # programs and maps, which count as the agent's memory: over 100 MiB while
+  # the profiler runs, a few without it.
+  seen=
+  for _ in $(seq 30); do
+    held=$(edge -n asservat exec ds/asservat-agent -- sh -c 'grep "^kernel " /sys/fs/cgroup/memory.stat | cut -d" " -f2')
+    seen="$seen $((held >> 20))"
+    [ "$held" -lt $((40 << 20)) ] && break
+    sleep 1
+  done
+  [ "$held" -lt $((40 << 20)) ] || fail "the agent still holds $((held >> 20)) MiB of kernel memory after sampling (second by second:$seen)"
 fi
 # The pod's ports are asked for the known profile endpoints; the found ones are fetched at once.
 found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/web')

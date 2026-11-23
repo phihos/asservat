@@ -190,7 +190,9 @@ interpreters and virtual machines of Python, Java, Node.js, Ruby, PHP, Perl,
 .NET and Erlang, without attaching to a process or loading anything into
 it. The profiler samples the whole node; the agent keeps the samples of the
 recorded pods' containers and drops the rest. It runs only while a
-recording wants it.
+recording wants it. While it runs, its programs and maps in the kernel
+count as the agent's memory, over 100 MiB; when the last sampled recording
+ends, the agent has them and the profiler's heap released.
 
 Each pod yields `sampled-cpu.pprof`, in pprof's format, with the process
 name and ID as labels of every sample, so pprof can narrow to one process.
