@@ -218,8 +218,11 @@ func (s *sampler) halt() {
 	// hundred megabytes that count as the agent's memory: it is made for a
 	// process that ends. They go when the garbage collector finds their
 	// handles unused, which an idle agent's collector does not do for a long
-	// time. So it is told to, once the profiler's goroutines have ended, and
-	// to return the profiler's part of the heap as well.
+	// time. So it is told to, and to return the profiler's part of the heap
+	// as well. The profiler's goroutines still hold it until they notice
+	// that it stopped, some at once and some at their interval of 5 seconds,
+	// and no event tells when the last has: the collector runs after 1, 7
+	// and 19 seconds.
 	go func() {
 		for _, wait := range []time.Duration{time.Second, 6 * time.Second, 12 * time.Second} {
 			time.Sleep(wait)
