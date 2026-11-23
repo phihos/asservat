@@ -116,8 +116,38 @@ func TestProfileTargets(t *testing.T) {
 	if got := names("6060/go-cpu,6061/go-cpu"); got != "6060-cpu.pprof 6061-cpu.pprof " {
 		t.Error(got)
 	}
+	// A JVM's own diagnostics are named with their container, which may
+	// read like a port. Their files differ from those of Actuator's
+	// endpoints, and of two containers from each other.
+	if got := names("8080/java-threads,app/jvm-threads,app/jvm-heapdump"); got != "threaddump.txt jvm-threaddump.txt jvm-heapdump.hprof " {
+		t.Error(got)
+	}
+	if got := names("8080/jvm-recording,app/jvm-recording,8080/go-cpu"); got != "8080-jvm-recording.jfr app-jvm-recording.jfr cpu.pprof " {
+		t.Error(got)
+	}
+	for list, want := range map[string]string{
+		"app/go-cpu": "unknown", "8080/jvm-load": "unknown", "jvm-threads": "unknown", "App/jvm-threads": "unknown", "/jvm-threads": "unknown", "app/jvm-threads,app/jvm-threads": "twice",
+	} {
+		if _, err := (Recording{Kind: KindPprof, Params: map[string]string{"endpoints": list}}).ProfileTargets(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("endpoints %q: %v", list, err)
+		}
+	}
+	// Of a JVM's diagnostics only the heap dump holds memory, and only the
+	// flight recording runs for the time frame.
+	for id, want := range map[string][2]bool{"jvm-threads": {false, false}, "jvm-histogram": {false, false}, "jvm-heapdump": {true, false}, "jvm-recording": {false, true}} {
+		rec := Recording{Kind: KindPprof, Params: map[string]string{"endpoints": "app/" + id}}
+		if rec.Sensitive() != want[0] || rec.Timed(false) != want[1] {
+			t.Errorf("%s: sensitive %v, timed %v", id, rec.Sensitive(), rec.Timed(false))
+		}
+	}
 	// Every endpoint of the catalog has a distinct ID and file within its family.
 	seen := map[string]bool{}
+	for _, e := range JVMDiagnostics {
+		if seen[e.ID] || !e.Attach || e.Path != "" || e.File == "" {
+			t.Errorf("catalog entry %+v", e)
+		}
+		seen[e.ID] = true
+	}
 	for _, f := range ProfileFamilies {
 		files := map[string]bool{}
 		for _, e := range f.Endpoints {
@@ -147,7 +177,7 @@ func TestViewerOf(t *testing.T) {
 	for name, want := range map[string]string{
 		"api-1/capture.pcap": "pcap", "api-1/web.log": "log", "api-1/web.previous.log": "log", "api-1/web.strace": "strace",
 		"api-1/pod.json": "kube", "api-1/events.json": "kube", "api-1/core.web": "core", "api-1/core.web.1234.analysis.json": "core", "api-1/heap.pprof": "pprof", "api-1/other.json": "",
-		"api-1/goroutines.txt": "stacks", "api-1/8080-threaddump.txt": "stacks", "api-1/trace.out": "gotrace", "api-1/6060-trace.out": "gotrace", "api-1/profile.out": "", "api-1/heapdump.hprof": "heap", "api-1/heap.gcdump": "heap", "api-1/memory.dmp": "", "api-1/trace.nettrace": "pprof",
+		"api-1/goroutines.txt": "stacks", "api-1/8080-threaddump.txt": "stacks", "api-1/jvm-threaddump.txt": "stacks", "api-1/app-jvm-heapdump.hprof": "heap", "api-1/jvm-recording.jfr": "", "api-1/jvm-histogram.txt": "", "api-1/trace.out": "gotrace", "api-1/6060-trace.out": "gotrace", "api-1/profile.out": "", "api-1/heapdump.hprof": "heap", "api-1/heap.gcdump": "heap", "api-1/memory.dmp": "", "api-1/trace.nettrace": "pprof",
 	} {
 		if got := ViewerOf(name); got != want {
 			t.Errorf("ViewerOf(%q) = %q, want %q", name, got, want)

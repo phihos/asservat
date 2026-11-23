@@ -96,10 +96,12 @@ spec:
             # block setns and ptrace of other containers' processes. Sampling
             # CPU profiles loads eBPF programs (SYS_ADMIN), which raises the
             # limit of locked memory on kernels before 5.11 (SYS_RESOURCE)
-            # and reads the kernel's symbols (SYSLOG).
+            # and reads the kernel's symbols (SYSLOG). A JVM answers
+            # diagnostic commands only to a process with its own user and
+            # group, which a child of the agent becomes (SETUID, SETGID).
             capabilities:
               drop: [ALL]
-              add: [SYS_ADMIN, SYS_PTRACE, NET_ADMIN, NET_RAW, DAC_READ_SEARCH, DAC_OVERRIDE, SYS_RESOURCE, SYSLOG]
+              add: [SYS_ADMIN, SYS_PTRACE, NET_ADMIN, NET_RAW, DAC_READ_SEARCH, DAC_OVERRIDE, SYS_RESOURCE, SYSLOG, SETUID, SETGID]
             seccompProfile:
               type: Unconfined
             appArmorProfile:

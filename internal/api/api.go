@@ -19,7 +19,7 @@ const (
 	KindPcap     = "pcap"      // packet capture (tcpdump)
 	KindCoredump = "coredump"  // core of the container's main process (gcore)
 	KindStrace   = "strace"    // system call trace
-	KindPprof    = "pprof"     // HTTP profile endpoints of the application's runtime
+	KindPprof    = "pprof"     // profile endpoints of the application's runtime, and a JVM's own diagnostics
 	KindCPU      = "cpu"       // CPU profile sampled from the node, without an endpoint
 	KindMemory   = "memory"    // where memory grows, sampled from the node at page faults
 )
@@ -695,7 +695,7 @@ type Query struct {
 	// or of all namespaces with All). About Pods of the agent's node:
 	// "processes" (what runs in them), "traffic" (their connections, from
 	// the packet headers of Seconds) or "profiles" (the profile endpoints
-	// that the first of them serves).
+	// that the first of them serves, and the diagnostics of its JVMs).
 	Op        string   `json:"op"`
 	Namespace string   `json:"namespace"`
 	Workload  string   `json:"workload,omitempty"`
@@ -753,6 +753,8 @@ type Inspection struct {
 	// ports that it listens on.
 	Profiles []ProfileTarget `json:"profiles,omitempty"`
 	Ports    []int           `json:"ports,omitempty"`
+	// Notes say why a JVM of the pod cannot be asked for its diagnostics.
+	Notes []string `json:"notes,omitempty"`
 }
 
 // Flow directions, seen from the pod.
@@ -798,9 +800,10 @@ type Reply struct {
 	Processes  []Process `json:"processes,omitempty"`
 	// Flows of one pod each.
 	Flows []Flow `json:"flows,omitempty"`
-	// Profiles and Ports answer a "profiles" query.
+	// Profiles, Ports and Notes answer a "profiles" query.
 	Profiles []ProfileTarget `json:"profiles,omitempty"`
 	Ports    []int           `json:"ports,omitempty"`
+	Notes    []string        `json:"notes,omitempty"`
 	// Skipped names the pods of a "processes" or "traffic" query that the
 	// agent could not look at, for example because they are gone.
 	Skipped []string `json:"skipped,omitempty"`

@@ -70,7 +70,8 @@ func TestInspection(t *testing.T) {
 				{Direction: api.FlowLocal, Protocol: "tcp", Port: 9000, Packets: 2, Bytes: 120},
 			}}
 		case "profiles":
-			return api.Reply{Ports: []int{6060, 8080}, Profiles: []api.ProfileTarget{
+			return api.Reply{Ports: []int{6060, 8080}, Notes: []string{"Container side: it runs an OpenJ9 JVM."}, Profiles: []api.ProfileTarget{
+				{Container: "app", ProfileEndpoint: api.ProfileEndpoint{ID: "jvm-heapdump"}},
 				{Port: 6060, ProfileEndpoint: api.ProfileEndpoint{ID: "go-cpu"}}, {Port: 6060, ProfileEndpoint: api.ProfileEndpoint{ID: "go-heap"}},
 				{Port: 8080, ProfileEndpoint: api.ProfileEndpoint{ID: "java-heapdump"}}, {Port: 8080, ProfileEndpoint: api.ProfileEndpoint{ID: "made-up"}}}}
 		case "peers":
@@ -166,8 +167,12 @@ func TestInspection(t *testing.T) {
 		t.Fatal("profile endpoints looked for without the exec right", code)
 	}
 	code, in = get("alice-token", "POST", "/profiles?workload=Deployment/api")
-	if code != 200 || len(in.Profiles) != 3 || len(in.Ports) != 2 {
+	if code != 200 || len(in.Profiles) != 4 || len(in.Ports) != 2 || len(in.Notes) != 1 {
 		t.Fatalf("profiles %d %+v", code, in)
+	}
+	// A JVM's own diagnostics come with their container, after the ports.
+	if p := in.Profiles[3]; p.Port != 0 || p.Container != "app" || p.ID != "jvm-heapdump" || !p.Sensitive || p.File != "jvm-heapdump.hprof" {
+		t.Fatalf("a JVM's diagnostic %+v", p)
 	}
 	if p := in.Profiles[0]; p.Port != 6060 || p.ID != "go-cpu" || p.Name != "CPU profile" || !p.Timed || p.Sensitive || p.File != "cpu.pprof" || !strings.HasPrefix(p.Runtime, "Go") {
 		t.Fatalf("profile endpoint %+v", p)

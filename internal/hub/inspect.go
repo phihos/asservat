@@ -185,17 +185,24 @@ func (h *Hub) Traffic(ctx context.Context, u User, cluster, namespace, workload 
 }
 
 // Profiles looks for the profile endpoints that the workload's pods serve:
-// those of the catalog, on the ports that a pod listens on. One pod per node
-// is asked, since the replicas of a workload serve the same.
+// those of the catalog, on the ports that a pod listens on, and a JVM's own
+// diagnostics in the containers that run one. One pod per node is asked,
+// since the replicas of a workload serve the same.
 func (h *Hub) Profiles(ctx context.Context, u User, cluster, namespace, workload string) (api.Inspection, error) {
 	var found []api.ProfileTarget
 	var ports []int
+	var notes []string
 	in, err := h.inspect(ctx, u, cluster, namespace, workload, api.Query{Op: "profiles"}, func(r api.Reply) {
 		for _, p := range r.Profiles {
 			// The agent names the endpoint; what it is comes from the catalog.
 			endpoint, known := api.FindProfileEndpoint(p.ID)
-			if known && !slices.ContainsFunc(found, func(f api.ProfileTarget) bool { return f.Port == p.Port && f.ID == p.ID }) {
-				found = append(found, api.ProfileTarget{Port: p.Port, ProfileEndpoint: endpoint})
+			if known && !slices.ContainsFunc(found, func(f api.ProfileTarget) bool { return f.Port == p.Port && f.Container == p.Container && f.ID == p.ID }) {
+				found = append(found, api.ProfileTarget{Port: p.Port, Container: p.Container, ProfileEndpoint: endpoint})
+			}
+		}
+		for _, note := range r.Notes {
+			if !slices.Contains(notes, note) {
+				notes = append(notes, note)
 			}
 		}
 		for _, port := range r.Ports {
@@ -210,9 +217,16 @@ func (h *Hub) Profiles(ctx context.Context, u User, cluster, namespace, workload
 	if err := h.Store.Audit(ctx, u.Name, "profile.discover", "", map[string]any{"cluster": cluster, "namespace": namespace, "workload": workload}); err != nil {
 		return in, err
 	}
-	slices.SortStableFunc(found, func(a, b api.ProfileTarget) int { return cmp.Compare(a.Port, b.Port) })
+	// By port; a JVM's own diagnostics, which have none, come last.
+	place := func(t api.ProfileTarget) int {
+		if t.Container != "" {
+			return 1 << 16
+		}
+		return t.Port
+	}
+	slices.SortStableFunc(found, func(a, b api.ProfileTarget) int { return cmp.Compare(place(a), place(b)) })
 	slices.Sort(ports)
-	in.Profiles, in.Ports = found, ports
+	in.Profiles, in.Ports, in.Notes = found, ports, notes
 	if in.Profiles == nil {
 		in.Profiles = []api.ProfileTarget{}
 	}

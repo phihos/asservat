@@ -33,7 +33,7 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 	case "traffic":
 		r.Flows, r.Skipped = a.traffic(ctx, q)
 	case "profiles":
-		r.Profiles, r.Ports, r.Skipped = a.profiles(ctx, q)
+		r.Profiles, r.Ports, r.Notes, r.Skipped = a.profiles(ctx, q)
 	case "peers":
 		r.Names, err = a.peers(ctx, q)
 	default:

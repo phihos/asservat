@@ -68,6 +68,12 @@ development or cost runtime performance.
   tenant abstraction.
 - Permissions are configured in Kubernetes only.
 - Workloads keep Pod Security `restricted`; nothing is injected into them.
+  One exception (maintainer, 2026-11-23): to reach a HotSpot JVM's attach
+  socket the agent may write the marker file into the container and send
+  the JVM SIGQUIT, for an allow-list of diagnostic commands (thread dump,
+  class histogram, heap dump, flight recording). No code is loaded into
+  the JVM: `load` and anything else that changes the program must not be
+  reachable.
 - All evidence downloads in its native format for local tools (Wireshark, a
   debugger). State clearly that local copies are outside Asservat's control.
 - Managed evidence is stored encrypted and never served anonymously.

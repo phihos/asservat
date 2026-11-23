@@ -14,6 +14,7 @@ require (
 	github.com/minio/minio-go/v7 v7.4.1
 	go.opentelemetry.io/ebpf-profiler v0.0.202646-0.20261120173755-50edbb45c361
 	golang.org/x/oauth2 v0.36.0
+	golang.org/x/sys v0.50.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
@@ -86,7 +87,6 @@ require (
 	golang.org/x/exp v0.0.0-20261119141654-b15d094f3610 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
-	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/telemetry v0.0.0-20241106142447-58a1122356f5 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

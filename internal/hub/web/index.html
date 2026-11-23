@@ -163,7 +163,7 @@
         <label><input type="checkbox" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
         <label><input type="checkbox" name="kind" value="cpu">CPU profile<small>Where the pod's processes spend CPU time, sampled from the node. Needs nothing from the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, .NET</small></label>
         <label><input type="checkbox" name="kind" value="memory">Memory growth<small>Which code makes the pod's memory grow while this records, from the stacks at its page faults. Needs nothing from the application; it slows page faults on the node meanwhile</small></label>
-        <label><input type="checkbox" name="kind" value="pprof">Profile endpoint<small>What the application's own profile endpoint returns, such as Go's pprof: also memory, blocking and traces</small></label>
+        <label><input type="checkbox" name="kind" value="pprof">Profile endpoint<small>What the application's own profile endpoint returns, such as Go's pprof: also memory, blocking and traces. A Java program needs none: its JVM is asked</small></label>
         <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
       </div>
       <p class="problem" id="kindProblem"></p>
@@ -449,18 +449,21 @@ async function loadProfiles() {
   const ports = found.ports || [];
   found.profiles ||= []; // left out when nothing was found
   $('profilePort').innerHTML = options(ports);
-  // One group per runtime and port; the first profile over time is ticked.
-  const groups = {};
-  for (const p of found.profiles) (groups[`${p.runtime} on port ${p.port}`] ||= []).push(p);
-  const first = found.profiles.find(p => p.timed && !p.sensitive) || found.profiles.find(p => !p.sensitive);
+  // One group per runtime and port, or container for a JVM's own
+  // diagnostics. The first profile over time is ticked; a JVM's
+  // diagnostics are not, since they write into the container and signal.
+  const groups = {}, where = p => p.container || p.port, served = found.profiles.filter(p => !p.container);
+  for (const p of found.profiles) (groups[`${p.runtime} ${p.container ? 'in container' : 'on port'} ${where(p)}`] ||= []).push(p);
+  const first = served.find(p => p.timed && !p.sensitive) || served.find(p => !p.sensitive);
   $('profileChoices').innerHTML = Object.entries(groups).map(([title, list]) => `<div class="group"><div>${esc(title)}</div>${list.map(p =>
-    `<label><input type="checkbox" data-endpoint="${p.port}/${esc(p.endpoint)}" ${p.timed ? 'data-timed' : ''} ${p.sensitive ? 'data-sensitive' : ''} ${p === first ? 'checked' : ''}>${esc(p.name)}${
+    `<label><input type="checkbox" data-endpoint="${esc(where(p))}/${esc(p.endpoint)}" ${p.timed ? 'data-timed' : ''} ${p.sensitive ? 'data-sensitive' : ''} ${p === first ? 'checked' : ''}>${esc(p.name)}${
       p.sensitive ? `<span class="badge">${badgeText()}</span>` : ''}${p.timed ? '<span class="muted">for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
-  $('profileState').textContent = found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
+  $('profileState').textContent = (found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
     : `No profile endpoint that Asservat knows answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod: it listens on no TCP port'}. `
-      + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor.'
+      + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor, and asks a HotSpot JVM itself.'
       + (ports.length ? ' If the application serves another one, give it below.' : '')
-      + ' Without an endpoint, "CPU profile" and "Memory growth" in the step before record from outside the application.';
+      + ' Without an endpoint, "CPU profile" and "Memory growth" in the step before record from outside the application.')
+    + (found.notes || []).map(note => ' ' + note).join('');
   $('otherEndpoint').open = !found.profiles.length && ports.length > 0;
   showParams();
 }
@@ -676,7 +679,7 @@ const whatIs = name => name === 'capture.pcap' ? 'packets, for Wireshark' : name
   : name.endsWith('.previous.log') ? 'log of the container\'s previous instance' : name.endsWith('.log') ? 'the container\'s log' : name.endsWith('.strace') ? 'system calls, as strace writes them'
   : name === 'sampled-cpu.pprof' ? 'where CPU time went, for pprof' : name === 'sampled-memory.pprof' ? 'what made memory grow, for pprof'
   : name.endsWith('.analysis.json') ? 'the core described: stacks and variables' : name.endsWith('.files.tar') ? 'the program\'s files, which a debugger needs with the core'
-  : name.startsWith('core.') ? 'memory image, for gdb or Delve' : name.endsWith('.pprof') ? 'profile, for pprof' : name.endsWith('.hprof') ? 'Java heap dump' : name.endsWith('.nettrace') ? '.NET trace'
+  : name.startsWith('core.') ? 'memory image, for gdb or Delve' : name.endsWith('.pprof') ? 'profile, for pprof' : name.endsWith('.hprof') ? 'Java heap dump' : name.endsWith('.jfr') ? 'Java flight recording, for JDK Mission Control' : name.endsWith('threaddump.txt') ? 'the stacks of all threads' : name.endsWith('histogram.txt') ? 'objects and bytes by class' : name.endsWith('.nettrace') ? '.NET trace'
   : name.endsWith('.gcdump') ? '.NET heap summary' : name.endsWith('.dmp') ? '.NET memory dump' : name === 'trace.out' ? 'Go execution trace' : name === 'goroutines.txt' ? 'the stacks of all goroutines' : name === 'threads.txt' ? 'the stacks of all threads' : '';
 // How long a capture took.
 const took = c => { const s = Math.max(0, Math.round((new Date(c.finishedAt) - new Date(c.createdAt)) / 1000)); return s < 90 ? `${s} s` : `${Math.round(s / 60)} min`; };
