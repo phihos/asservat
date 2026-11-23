@@ -739,7 +739,9 @@ async function loadCaptures() {
     };
     const pods = c.tasks.map(t => {
       const mine = c.artifacts.filter(a => a.name.startsWith(t.pod + '/'));
-      const of = kind => mine.filter(a => (a.recording || (asked.includes('pprof') ? 'pprof' : '')) === kind);
+      // A file whose recording was not asked for, which should not be, is shown all the same.
+      const from = a => { const kind = a.recording || (asked.includes('pprof') ? 'pprof' : ''); return asked.includes(kind) ? kind : ''; };
+      const of = kind => mine.filter(a => from(a) === kind);
       const states = new Map((t.recordings || []).map(r => [r.kind, r]));
       const groups = asked.map(kind => {
         const r = states.get(kind) || {state: t.recordings?.length ? 'Waiting' : t.state === 'Failed' ? 'Failed' : 'Waiting'};
@@ -751,7 +753,7 @@ async function loadCaptures() {
         + (t.message && !t.recordings?.some(r => r.message) ? `<div class="muted">${esc(t.message)}</div>` : '');
     }).join('') || '<div class="muted">No pod was recorded.</div>';
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
-      c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt ? `took ${took(c)}` : '',
+      c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
     const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
