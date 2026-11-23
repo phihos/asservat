@@ -424,6 +424,17 @@ func (a *Agent) podPID(pod *corev1.Pod) (int, error) {
 // containerPID returns the node PID of a container's main process. An empty
 // name selects the pod's first container.
 func (a *Agent) containerPID(pod *corev1.Pod, name string) (int, string, error) {
+	id, name, err := runningID(pod, name)
+	if err != nil {
+		return 0, name, err
+	}
+	pid, err := mainPID(a.Proc, id, a.own(pod))
+	return pid, name, err
+}
+
+// runningID returns the ID of a container of the pod that runs. An empty
+// name selects the pod's first container.
+func runningID(pod *corev1.Pod, name string) (string, string, error) {
 	if name == "" {
 		name = pod.Spec.Containers[0].Name
 	}
@@ -433,12 +444,42 @@ func (a *Agent) containerPID(pod *corev1.Pod, name string) (int, string, error) 
 		}
 		_, id, ok := strings.Cut(s.ContainerID, "://")
 		if !ok || s.State.Running == nil {
-			return 0, name, fmt.Errorf("container %s is not running", name)
+			return "", name, fmt.Errorf("container %s is not running", name)
 		}
-		pid, err := mainPID(a.Proc, id, a.own(pod))
-		return pid, name, err
+		return id, name, nil
 	}
-	return 0, name, fmt.Errorf("pod %s has no container %s", pod.Name, name)
+	return "", name, fmt.Errorf("pod %s has no container %s", pod.Name, name)
+}
+
+// mainPIDs remembers the main processes of a pod's containers for something
+// that asks again and again. Finding one reads a file of every process on
+// the node, and it stays the same for as long as the container's ID does.
+type mainPIDs map[string]foundPID // by container name
+
+type foundPID struct {
+	id  string // of the container
+	pid int
+}
+
+// of returns the node PID of the named container's main process. What it
+// remembers costs one read to confirm: that the process is still in the
+// container, since the ID of a process that ended is given to another.
+func (m mainPIDs) of(a *Agent, pod *corev1.Pod, name string) (int, error) {
+	id, name, err := runningID(pod, name)
+	if err != nil {
+		delete(m, name)
+		return 0, err
+	}
+	own := a.own(pod)
+	if found := m[name]; found.id == id && inContainer(a.Proc, found.pid, id, ownCgroup(a.Proc, own)) {
+		return found.pid, nil
+	}
+	delete(m, name)
+	pid, err := mainPID(a.Proc, id, own)
+	if err == nil {
+		m[name] = foundPID{id, pid}
+	}
+	return pid, err
 }
 
 // mainPID finds a container's main process in the node's /proc.
@@ -459,14 +500,8 @@ func (a *Agent) own(pod *corev1.Pod) bool { return a.Pod != "" && pod.Name == a.
 // cgroup as the root of its cgroup namespace. There the processes are those
 // whose cgroup reads like the agent's own.
 func containerPIDs(proc, containerID string, own bool) (all []int, main int, err error) {
-	var mine []byte
-	if own {
-		mine, _ = os.ReadFile(filepath.Join(proc, "self", "cgroup"))
-	}
-	inside := func(pid int) bool {
-		b, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "cgroup"))
-		return err == nil && (bytes.Contains(b, []byte(containerID)) || len(mine) > 0 && bytes.Equal(b, mine))
-	}
+	mine := ownCgroup(proc, own)
+	inside := func(pid int) bool { return inContainer(proc, pid, containerID, mine) }
 	entries, err := os.ReadDir(proc)
 	if err != nil {
 		return nil, 0, err
@@ -498,6 +533,23 @@ func containerPIDs(proc, containerID string, own bool) (all []int, main int, err
 		return nil, 0, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
 	}
 	return all, main, nil
+}
+
+// ownCgroup returns how the agent's own cgroup reads, for a container that
+// is the agent's own, and nothing for any other.
+func ownCgroup(proc string, own bool) []byte {
+	if !own {
+		return nil
+	}
+	mine, _ := os.ReadFile(filepath.Join(proc, "self", "cgroup"))
+	return mine
+}
+
+// inContainer tells whether a process is in a container's cgroup: one with
+// the container's ID in its path, or one that reads like mine.
+func inContainer(proc string, pid int, containerID string, mine []byte) bool {
+	b, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "cgroup"))
+	return err == nil && (bytes.Contains(b, []byte(containerID)) || len(mine) > 0 && bytes.Equal(b, mine))
 }
 
 // executable returns the path of a process's program, as the process sees it.

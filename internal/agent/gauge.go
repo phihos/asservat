@@ -312,7 +312,7 @@ func bytesText(n int64) string {
 // holds the pod as the agent last saw it: a restarted container is another
 // process.
 func (a *Agent) measure(agent, ctx context.Context, w api.Watch, latest *atomic.Pointer[corev1.Pod]) {
-	gauges := map[string]*gauge{}
+	gauges, pids := map[string]*gauge{}, mainPIDs{}
 	every := time.NewTicker(gaugeEvery)
 	defer every.Stop()
 	for {
@@ -321,7 +321,7 @@ func (a *Agent) measure(agent, ctx context.Context, w api.Watch, latest *atomic.
 			if want := w.When.Params["container"]; want != "" && want != c.Name {
 				continue
 			}
-			pid, _, err := a.containerPID(pod, c.Name)
+			pid, err := pids.of(a, pod, c.Name)
 			if err != nil {
 				delete(gauges, c.Name) // not running: its successor starts anew
 				continue
