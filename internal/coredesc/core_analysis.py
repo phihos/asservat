@@ -222,9 +222,9 @@ def frames(thread):
 gdb.unwinder.register_unwinder(None, ScanUnwinder(), replace=True)
 gdb.execute("set pagination off")
 gdb.execute("set confirm off")
-# gdb asks debuginfod servers for the symbols of stripped files only where
-# the operator named servers: the request tells them which programs run here.
-gdb.execute("set debuginfod enabled " + ("on" if os.environ.get("DEBUGINFOD_URLS") else "off"))
+# The describer fetched the debug files that servers have (ASSERVAT_DEBUG_DIRS):
+# gdb asks none itself.
+gdb.execute("set debuginfod enabled off")
 # The debug files of the distribution's debug packages, before gdb's own
 # directory and the one under the root.
 if os.environ.get("ASSERVAT_DEBUG_DIRS"):

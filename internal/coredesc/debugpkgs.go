@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,7 +19,9 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -68,12 +71,13 @@ var publicDebugSources = debugSources{
 	Alpine: "https://dl-cdn.alpinelinux.org/alpine",
 }
 
+// A server that does not answer, or sends nothing more, for this long is
+// given up: a cluster may have no way out, and the description of a core
+// must not wait for one. Ubuntu's debuginfod server was seen to take 29
+// seconds to say that it does not know a file.
+const debugPackageWait = 10 * time.Second
+
 const (
-	// A server that does not answer, or sends nothing more, for this long
-	// is given up, as gdb gives up a debuginfod server (DEBUGINFOD_TIMEOUT
-	// in analysis.go): a cluster may have no way out, and the description
-	// of a core must not wait for one.
-	debugPackageWait = 10 * time.Second
 	// A repository's index of build IDs is asked for anew after a day:
 	// the distributions publish updates on working days, not by the hour,
 	// and the index of Amazon Linux is a download of 5 MiB.
@@ -115,20 +119,6 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	if d.DebuginfodURLs == "" || root == "" {
 		return nil
 	}
-	sources := d.sources
-	if sources == nil {
-		sources = &publicDebugSources
-	}
-	release := osRelease(root)
-	repositories := sources.RPM[release["ID"]]
-	if repositories == nil && release["ID"] != "alpine" {
-		return nil
-	}
-	// The packages are unpacked with bsdtar; where it is not installed,
-	// cores are described without.
-	if _, err := exec.LookPath("bsdtar"); err != nil {
-		return nil
-	}
 	// The stripped files with their build IDs, by the name the program
 	// mapped them under and by the path that leads to without links: a
 	// package's list of files may have either.
@@ -150,16 +140,40 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 		}
 		file.Close()
 	}
+	if len(stripped) == 0 {
+		return nil
+	}
+	// First the debuginfod servers, which know a file by its build ID
+	// alone; then the distribution's debug packages for what they lack.
+	var dirs []string
+	if dir, found := debuginfo(d.fetcher(ctx, "debuginfo"), strings.Fields(d.DebuginfodURLs), stripped); dir != "" {
+		dirs = append(dirs, dir)
+		maps.DeleteFunc(stripped, func(_, id string) bool { return found[id] })
+	}
+	sources := d.sources
+	if sources == nil {
+		sources = &publicDebugSources
+	}
+	release := osRelease(root)
+	repositories := sources.RPM[release["ID"]]
+	if repositories == nil && release["ID"] != "alpine" {
+		return dirs
+	}
+	// The packages are unpacked with bsdtar; where it is not installed,
+	// cores are described without.
+	if _, err := exec.LookPath("bsdtar"); err != nil {
+		return dirs
+	}
 	// What the container says of itself becomes part of addresses and of
 	// names in the cache: only what reads as a name or a version is taken.
 	// The repositories are laid out by machine: for another than the two
 	// known here there is nothing to ask for.
 	if len(stripped) == 0 || arch == "" || !plainName.MatchString(release["ID"]) || !plainName.MatchString(release["VERSION_ID"]) {
-		return nil
+		return dirs
 	}
-	f := debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, "debugpkgs")}
+	f := d.fetcher(ctx, "debugpkgs")
 	if err := os.MkdirAll(f.cache, 0o700); err != nil {
-		return nil
+		return dirs
 	}
 	f.sweep()
 	// The packages to unpack: for each a name in the cache and the places
@@ -184,7 +198,6 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	} else {
 		packages = apkDebugPackages(root, sources.Alpine, release["VERSION_ID"], stripped)
 	}
-	var dirs []string
 	for name, urls := range packages {
 		if err != nil {
 			break
@@ -351,6 +364,117 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 	return packages
 }
 
+// debuginfo fetches the debug files of build IDs from debuginfod servers
+// into a directory laid out by build ID, as gdb looks them up, and returns
+// it with the IDs it holds. The describer asks the servers itself and gdb
+// asks none: gdb's own client waited minutes for a server that neither
+// answered nor closed, and also asks for the program itself.
+//
+// A server is asked for one file at a time by each of a few askers. One
+// that fails, other than by not having a file, is not asked again for
+// this core. What no server has is remembered for a day, as an empty
+// file, which a server's index may take to learn of a new build.
+func debuginfo(f debugFetcher, servers []string, files map[string]string) (string, map[string]bool) {
+	ctx, cache := f.ctx, f.cache
+	dir := filepath.Join(cache, ".build-id")
+	if len(servers) == 0 || os.MkdirAll(dir, 0o700) != nil {
+		return "", nil
+	}
+	// What was not used for a week goes, as with the packages.
+	filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || !entry.Type().IsRegular() {
+			return nil
+		}
+		if info, err := entry.Info(); err == nil && time.Since(info.ModTime()) > debugPackageAge {
+			os.Remove(path)
+		}
+		return nil
+	})
+	ids := map[string]bool{}
+	for _, id := range files {
+		// A build ID is hexadecimal digits: it becomes part of an address.
+		if len(id) > 2 && strings.Trim(id, "0123456789abcdef") == "" {
+			ids[id] = false
+		}
+	}
+	var mu sync.Mutex
+	failed := map[string]bool{}
+	todo := make(chan string)
+	var askers sync.WaitGroup
+	// As many at a time as a browser asks one host for: enough to be done
+	// in seconds with dozens of libraries, and no flood for a public server.
+	for range 6 {
+		askers.Go(func() {
+			for id := range todo {
+				path := filepath.Join(dir, id[:2], id[2:]+".debug")
+				if info, err := os.Stat(path); err == nil && (info.Size() > 0 || time.Since(info.ModTime()) < debugIndexAge) {
+					if info.Size() > 0 {
+						now := time.Now()
+						os.Chtimes(path, now, now)
+						mu.Lock()
+						ids[id] = true
+						mu.Unlock()
+					}
+					continue
+				}
+				os.MkdirAll(filepath.Dir(path), 0o700)
+				// unknown: every server was asked and has it not.
+				got, unknown := false, true
+				for _, server := range servers {
+					mu.Lock()
+					skip := failed[server]
+					mu.Unlock()
+					if skip {
+						unknown = false
+						continue
+					}
+					body, err := f.get(strings.TrimSuffix(server, "/") + "/buildid/" + id + "/debuginfo")
+					if err == nil {
+						var part *os.File
+						if part, err = os.CreateTemp(filepath.Dir(path), "part-*"); err == nil {
+							_, err = io.Copy(part, body)
+							if e := part.Close(); err == nil {
+								err = e
+							}
+							if err == nil {
+								err = os.Rename(part.Name(), path)
+							}
+							os.Remove(part.Name())
+						}
+						body.Close()
+						got = err == nil
+					}
+					if got {
+						break
+					}
+					if err != errNotPublished {
+						unknown = false
+						if ctx.Err() == nil {
+							slog.Warn("debuginfod server not asked further for this core", "server", server, "error", err)
+							mu.Lock()
+							failed[server] = true
+							mu.Unlock()
+						}
+					}
+				}
+				mu.Lock()
+				ids[id] = got
+				mu.Unlock()
+				if unknown && !got {
+					os.WriteFile(path, nil, 0o600)
+				}
+			}
+		})
+	}
+	// The askers write what they found into ids: its keys are read first.
+	for _, id := range slices.Collect(maps.Keys(ids)) {
+		todo <- id
+	}
+	close(todo)
+	askers.Wait()
+	return cache, ids
+}
+
 // plainName is a name or a version as distributions write them: nothing
 // that leads elsewhere in an address or a directory.
 var plainName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
@@ -360,6 +484,18 @@ var plainName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
 type debugFetcher struct {
 	ctx   context.Context
 	cache string
+	// wait is how long a server may be silent: debugPackageWait, or what
+	// a test sets.
+	wait time.Duration
+}
+
+// fetcher returns what downloads into a directory of the scratch space.
+func (d Describer) fetcher(ctx context.Context, name string) debugFetcher {
+	wait := d.wait
+	if wait == 0 {
+		wait = debugPackageWait
+	}
+	return debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, name), wait: wait}
 }
 
 // sweep removes what was not used for a week.
@@ -375,8 +511,9 @@ func (f debugFetcher) sweep() {
 // waited ends a download whose server sends nothing for too long.
 type waited struct {
 	io.ReadCloser
-	wait *time.Timer
-	end  context.CancelFunc
+	wait   *time.Timer
+	end    context.CancelFunc
+	silent time.Duration // how long the server may send nothing
 }
 
 func (w waited) Close() error {
@@ -385,7 +522,7 @@ func (w waited) Close() error {
 }
 
 func (w waited) Read(b []byte) (int, error) {
-	w.wait.Reset(debugPackageWait)
+	w.wait.Reset(w.silent)
 	defer w.wait.Stop()
 	return w.ReadCloser.Read(b)
 }
@@ -393,7 +530,7 @@ func (w waited) Read(b []byte) (int, error) {
 // get asks for a file. One that the server does not have is errNotPublished.
 func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 	ctx, cancel := context.WithCancel(f.ctx)
-	wait := time.AfterFunc(debugPackageWait, cancel)
+	wait := time.AfterFunc(f.wait, cancel)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
 		cancel()
@@ -414,7 +551,7 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 		}
 		return nil, fmt.Errorf("%s: %s", address, response.Status)
 	}
-	return waited{response.Body, wait, cancel}, nil
+	return waited{response.Body, wait, cancel, f.wait}, nil
 }
 
 // unpack returns the directory of debug files of a package, which it
