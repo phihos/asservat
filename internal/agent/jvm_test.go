@@ -276,7 +276,9 @@ func TestJVMDoesNotAnswer(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "did not open its attach socket") {
 		t.Errorf("error: %v", err)
 	}
-	if left := s.left(); len(left) != 0 || s.signals != 2 {
+	// It is signalled once: a second signal would make a slow JVM print
+	// its threads to its output.
+	if left := s.left(); len(left) != 0 || s.signals != 1 {
 		t.Errorf("left in /tmp: %v, signals: %d", left, s.signals)
 	}
 }

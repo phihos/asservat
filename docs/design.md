@@ -333,8 +333,8 @@ container in place of a port (`<container>/<endpoint>`):
    writes the empty marker file `/tmp/.attach_pid<pid>` into the container
    and sends the JVM SIGQUIT, which makes it open the socket. It waits for
    the socket as long as the JDK's own client does, 10 seconds, told by the
-   kernel (inotify), signals a second time after half of that as that
-   client does, and removes the marker. A JVM that does not find the marker
+   kernel (inotify), and removes the marker. It signals once: a JVM
+   that is opening its socket prints its threads at a second signal. A JVM that does not find the marker
    prints its threads to its standard output instead, as at any SIGQUIT.
    The JVM keeps the socket open from then on.
 3. The agent sends one of the commands above. It has no way to send
