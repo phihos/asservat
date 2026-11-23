@@ -656,6 +656,57 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("the capture of a matching log line", got.On, got.Reason)
 	}
 
+	// A watch for the warnings that Kubernetes gives about a pod: the agent
+	// reports the event of the reason asked for, not another, and not one
+	// from before the watch.
+	warn := func(name, reason string, count int32) {
+		e := &corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "payments"}, Type: corev1.EventTypeWarning, Reason: reason, Message: "Readiness probe failed: HTTP probe failed with statuscode: 503", Count: count,
+			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Namespace: "payments", Name: "api-1"}}
+		if count > 1 {
+			_, err = kube.CoreV1().Events("payments").Update(t.Context(), e, metav1.UpdateOptions{})
+		} else {
+			_, err = kube.CoreV1().Events("payments").Create(t.Context(), e, metav1.CreateOptions{})
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	warn("api-1.before", "Unhealthy", 1)
+	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnEvent, Params: map[string]string{"reason": "not a reason"}}}); code != 400 {
+		t.Fatal("an event watch with a broken reason", code)
+	}
+	code, warned := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnEvent, Params: map[string]string{"reason": "Unhealthy"}}})
+	if code != 201 {
+		t.Fatal("watch for an event", code)
+	}
+	ofWarning := func() *api.Capture {
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		var list []api.Capture
+		json.Unmarshal(b, &list)
+		for _, c := range list {
+			if c.Watch == warned.ID {
+				return &c
+			}
+		}
+		return nil
+	}
+	time.Sleep(300 * time.Millisecond) // the agent begins to listen
+	warn("api-1.other", "FailedMount", 1)
+	time.Sleep(200 * time.Millisecond)
+	if got := ofWarning(); got != nil {
+		t.Fatal("a warning of another reason, or from before, was recorded:", got.Reason)
+	}
+	for i := int32(2); ofWarning() == nil; i++ {
+		if i == 100 {
+			t.Fatal("the warning created no capture")
+		}
+		warn("api-1.before", "Unhealthy", i) // the warning comes again
+		time.Sleep(50 * time.Millisecond)
+	}
+	if got := f.wait("alice-token", ofWarning().ID, api.StateCompleted, api.StateFailed); got.On != api.OnEvent || got.Reason != "Kubernetes warns: Unhealthy: Readiness probe failed: HTTP probe failed with statuscode: 503 (flaky)" {
+		t.Fatal("the capture of a warning", got.On, got.Reason)
+	}
+
 	// A watch for a Prometheus alert: Alertmanager tells the hub, with the
 	// hub's alert token, and the hub records the pod that the alert names.
 	code, alerting := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2, When: api.Condition{Kind: api.OnAlert, Params: map[string]string{"name": "HighErrorRate"}}})
@@ -696,6 +747,62 @@ func TestCaptureFlow(t *testing.T) {
 	// It fires anew later: the watch's second and last capture.
 	if code, b := notice(alertmanager, "firing", "payments", "2026-01-01T12:00:00Z"); code != 200 || b != `{"captures":1}` || len(watches("alice-token")) != 0 {
 		t.Fatal("the alert firing anew", code, b, len(watches("alice-token")))
+	}
+
+	// A watch records when it is asked to, whatever it waits for: here one
+	// pod of a crash watch. Only the watch's requester and administrators ask.
+	code, asking := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2})
+	if code != 201 {
+		t.Fatal("watch to ask", code)
+	}
+	if code, _ := f.call("mallory-token", "POST", "/api/watches/"+asking.ID+"/record", nil); code != 404 {
+		t.Fatal("another user asked a watch to record", code)
+	}
+	if code, b := f.call("alice-token", "POST", "/api/watches/"+asking.ID+"/record", map[string]string{"pod": "api-9"}); code != 422 {
+		t.Fatal("a watch asked to record a pod that is not there", code, string(b))
+	}
+	code, b = f.call("alice-token", "POST", "/api/watches/"+asking.ID+"/record", map[string]string{"pod": "api-1"})
+	var asked api.Capture
+	json.Unmarshal(b, &asked)
+	if code != 201 || asked.Watch != asking.ID || asked.On != api.OnAsked || asked.Reason != "asked for by alice (flaky)" || len(asked.Tasks) != 1 || asked.Tasks[0].Pod != "api-1" {
+		t.Fatalf("a watch asked to record: %d %s", code, b)
+	}
+	if left := watches("alice-token"); len(left) != 1 || left[0].Remaining != 1 {
+		t.Fatal("the watch after it was asked", left)
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+asking.ID, nil)
+
+	// A watch for a time records the workload's pods then, and with "every"
+	// again and again until its count is used up.
+	for what, params := range map[string]map[string]string{
+		"without a time": {}, "at no time": {"at": "tomorrow"}, "every nothing": {"at": "2026-01-01T10:00:00Z", "every": "0"},
+	} {
+		if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: params}}); code != 400 {
+			t.Fatal("a time watch", what, code)
+		}
+	}
+	schedule, stop := context.WithCancel(t.Context())
+	defer stop()
+	go h.RunSchedule(schedule)
+	at := time.Now().Add(400 * time.Millisecond).UTC()
+	code, timed := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": at.Format(time.RFC3339Nano), "every": "1"}}})
+	if code != 201 {
+		t.Fatal("watch for a time", code)
+	}
+	var atTimes []api.Capture
+	for range 100 {
+		_, b = f.call("alice-token", "GET", "/api/captures", nil)
+		json.Unmarshal(b, &atTimes)
+		atTimes = slices.DeleteFunc(atTimes, func(c api.Capture) bool { return c.Watch != timed.ID })
+		if len(atTimes) == 2 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	slices.SortFunc(atTimes, func(a, b api.Capture) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	if len(atTimes) != 2 || atTimes[0].On != api.OnTime || atTimes[0].CreatedAt.Before(at) || atTimes[1].CreatedAt.Before(at.Add(time.Second)) ||
+		atTimes[0].Reason != "at the time set, "+at.Format(time.RFC3339)+" (flaky)" || len(atTimes[0].Tasks) < 2 || len(watches("alice-token")) != 0 {
+		t.Fatalf("the captures of a watch for a time: %+v", atTimes)
 	}
 
 	// A corrupt stored file is an error for MCP, not partial text.

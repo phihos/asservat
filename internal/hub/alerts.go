@@ -1,12 +1,10 @@
 package hub
 
 import (
-	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"slices"
 
 	"asservat.local/asservat/internal/api"
 )
@@ -68,7 +66,7 @@ func (h *Hub) alerts(w http.ResponseWriter, r *http.Request) {
 			}
 			// One firing of an alert is one start time of one fingerprint:
 			// Alertmanager repeats its notifications while the alert fires.
-			err := h.alerted(r.Context(), watch.ID, alert.Fingerprint+"@"+alert.StartsAt, alert.Labels["pod"], "alert "+alert.Labels["alertname"]+" fires"+separated(": ", told))
+			_, err := h.fire(r.Context(), watch.ID, alert.Fingerprint+"@"+alert.StartsAt, alert.Labels["pod"], api.OnAlert, "alert "+alert.Labels["alertname"]+" fires"+separated(": ", told))
 			switch {
 			case err == nil:
 				created++
@@ -89,55 +87,4 @@ func separated(by, text string) string {
 		return ""
 	}
 	return by + text
-}
-
-// alerted creates the capture of a watch for an alert's firing, unless that
-// firing was recorded before: of the pod that the alert names, or of all
-// pods of the workload. The creator's permission is checked again, as for
-// an agent's report.
-func (h *Hub) alerted(ctx context.Context, id, firing, pod, message string) error {
-	watch, groups, err := h.Store.Watch(ctx, id)
-	if err == nil && watch.Sensitive && watch.Approver == "" {
-		err = ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-	u := h.withAdmin(User{Name: watch.Requester, Groups: groups})
-	if err := h.allowed(ctx, u, watch.Cluster, watch.Namespace); err != nil {
-		return err
-	}
-	res, err := h.agents.query(ctx, watch.Cluster, "", api.Query{Op: "resolve", Namespace: watch.Namespace, Workload: watch.Workload})
-	if err != nil {
-		return err
-	}
-	pods := slices.DeleteFunc(res.Pods, func(p api.Pod) bool { return pod != "" && p.Name != pod })
-	if len(pods) == 0 {
-		return errStatus{http.StatusUnprocessableEntity, "the alert names no running pod of the watch's workload"}
-	}
-	remaining, err := h.Store.FireWatchOnce(ctx, id, firing)
-	if err != nil {
-		return err
-	}
-	request := watch.CaptureRequest
-	request.Watch, request.On, request.Reason = id, watch.When.Kind, message
-	for _, p := range pods {
-		request.Pods = append(request.Pods, p.Name)
-	}
-	if watch.Reason != "" {
-		request.Reason += " (" + watch.Reason + ")"
-	}
-	if _, err := h.record(ctx, u, request, pods, "capture.trigger", watch.Approver); err != nil {
-		if e := h.Store.RefundWatch(context.WithoutCancel(ctx), id); e != nil {
-			slog.Error("watch's count not given back", "watch", id, "error", e)
-		}
-		return err
-	}
-	if remaining == 0 {
-		if err := h.Store.DeleteWatch(ctx, id); err != nil {
-			slog.Error("ended watch not deleted", "watch", id, "error", err)
-		}
-		h.pushWatches(ctx, watch.Cluster)
-	}
-	return nil
 }

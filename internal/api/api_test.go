@@ -211,6 +211,23 @@ func TestParseAbove(t *testing.T) {
 			t.Errorf("ParseAbove(%s, %q) = %v, %v", c.kind, c.in, got, err)
 		}
 	}
+	// A time comes once, or again after every so many seconds.
+	at := time.Date(2026, 12, 1, 3, 0, 0, 0, time.UTC)
+	once := Condition{Kind: OnTime, Params: map[string]string{"at": "2026-12-01T03:00:00Z"}}
+	hourly := Condition{Kind: OnTime, Params: map[string]string{"at": "2026-12-01T03:00:00Z", "every": "3600"}}
+	for _, c := range []struct {
+		when       Condition
+		now        time.Time
+		last, next time.Time
+	}{
+		{once, at.Add(-time.Minute), time.Time{}, at}, {once, at, at, time.Time{}}, {once, at.Add(time.Hour), at, time.Time{}},
+		{hourly, at.Add(-time.Minute), time.Time{}, at}, {hourly, at.Add(59 * time.Minute), at, at.Add(time.Hour)},
+		{hourly, at.Add(150 * time.Minute), at.Add(2 * time.Hour), at.Add(3 * time.Hour)},
+	} {
+		if last, next := c.when.Due(c.now); !last.Equal(c.last) || !next.Equal(c.next) {
+			t.Errorf("Due(%v) of %v = %v, %v", c.now, c.when.Params, last, next)
+		}
+	}
 	for name, c := range map[string]Condition{
 		"pressure as a number":     {Kind: OnPressure, Params: map[string]string{"above": "3"}},
 		"pressure of the network":  {Kind: OnPressure, Params: map[string]string{"above": "20%", "of": "network"}},

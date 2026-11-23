@@ -93,6 +93,8 @@ type Hub struct {
 	agents *agents
 	// changed wakes the retention timer when a capture is created.
 	changed chan struct{}
+	// scheduled wakes the schedule of watches for a time when watches change.
+	scheduled chan struct{}
 
 	mu       sync.Mutex
 	watchers map[chan string]struct{}
@@ -122,7 +124,7 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 func (h *Hub) Handler() http.Handler {
@@ -199,6 +201,7 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
 	admin("POST /api/watches/{id}/approve", h.approveWatch)
+	user("POST /api/watches/{id}/record", h.recordNow)
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
 	user("POST /mcp", h.mcp)

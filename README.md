@@ -160,7 +160,9 @@ stops being ready, with `"log"` and a `pattern` a container that writes a
 matching log line, with `"memory"`, `"cpu"` or `"throttled"` and a threshold
 `above` a container that uses that much; likewise `"memory-growth"`,
 `"pressure"`, `"threads"`, `"open-files"`, `"tcp-retransmits"` and
-`"tcp-failures"`. Packets and the sampled CPU profile are kept running
+`"tcp-failures"`, with `"event"` a pod that Kubernetes warns about, with
+`"time"` and `at` all pods at that time. Any watch also records when asked
+(`POST /api/watches/<id>/record`). Packets and the sampled CPU profile are kept running
 while the watch waits, so their files begin `beforeSeconds` before that
 moment and show what led to it:
 

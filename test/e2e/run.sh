@@ -535,6 +535,24 @@ for _ in $(seq 60); do
 done
 [ "$(jq -r '.reason | test("container web holds [0-9]+ files open \\(above 1\\)") | tostring' <<<"$noticed")" = true ] || fail "the capture of a watch for open files: $noticed"
 completed "$ALICE" "$(jq -r .id <<<"$noticed")"
+# A watch for a warning of Kubernetes about the pod, and one that is asked to record.
+pod=$(edge -n shop get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
+warned=$(ok "$ALICE" POST /api/watches "$(target edge pod-state '{"count":2,"when":{"kind":"event","params":{"reason":"FailedMount"}}}')" | jq -r .id)
+sleep 3 # the agent begins to listen
+edge -n shop create -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Event
+metadata: {name: $pod.e2e, namespace: shop}
+type: Warning
+reason: FailedMount
+message: MountVolume.SetUp failed for volume "data"
+involvedObject: {kind: Pod, namespace: shop, name: $pod, uid: $(edge -n shop get pod "$pod" -o jsonpath='{.metadata.uid}')}
+EOF
+id=$(triggered "$warned"); completed "$ALICE" "$id"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .reason)" = 'Kubernetes warns: FailedMount: MountVolume.SetUp failed for volume "data"' ] || fail "the capture of a warning: $(ok "$ALICE" GET "/api/captures/$id" | jq -r .reason)"
+id=$(ok "$ALICE" POST "/api/watches/$warned/record" "{\"pod\":\"$pod\"}" | jq -r .id); completed "$ALICE" "$id"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.on, .reason] | @csv')" = '"asked","asked for by alice"' ] || fail "a watch asked to record"
+[ "$(ok "$ALICE" GET /api/watches | jq --arg w "$warned" '[.[] | select(.id == $w)] | length')" = 0 ] || fail "the watch's count was not used up"
 # A watch for a Prometheus alert: Alertmanager's notification, with the hub's
 # alert token, records the pod that the alert names; told again, nothing more.
 ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"alert","params":{"name":"HighErrorRate"}}}')" >/dev/null

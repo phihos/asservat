@@ -117,7 +117,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			}
 			marked[string(pod.UID)] = true
 		}
-		if w.When.Kind == api.OnLog || w.When.Usage() {
+		if w.When.Kind == api.OnLog || w.When.Kind == api.OnEvent || w.When.Usage() {
 			// The pod is read from once a container of it runs.
 			if t, reads := tending[pod.Name]; reads {
 				t.pod.Store(pod)
@@ -128,6 +128,8 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				tending[pod.Name] = t
 				if w.When.Usage() {
 					go a.measure(agent, reading, w, t.pod)
+				} else if w.When.Kind == api.OnEvent {
+					go a.warned(agent, reading, w, pod.DeepCopy())
 				} else {
 					go a.follow(agent, reading, w, pod.DeepCopy())
 				}
@@ -621,6 +623,75 @@ func matchLines(stream io.Reader, pattern *regexp.Regexp, found func(line string
 			return
 		}
 	}
+}
+
+// warned reports the warnings that Kubernetes gives about a pod with
+// events while a watch waits for them: those of the watch's reason, or all.
+// The API server sends them as they come; those from before are passed
+// over, and so are those of the time frame after a report, which belong to
+// the incident whose capture is being made.
+func (a *Agent) warned(agent, ctx context.Context, w api.Watch, pod *corev1.Pod) {
+	options := func(o metav1.ListOptions) metav1.ListOptions {
+		o.FieldSelector = "involvedObject.kind=Pod,involvedObject.name=" + pod.Name + ",involvedObject.uid=" + string(pod.UID) + ",type=" + corev1.EventTypeWarning
+		if reason := w.When.Params["reason"]; reason != "" {
+			o.FieldSelector += ",reason=" + reason
+		}
+		return o
+	}
+	events := a.Kube.CoreV1().Events(pod.Namespace)
+	source := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+		ListWithContextFunc: func(ctx context.Context, o metav1.ListOptions) (runtime.Object, error) {
+			return events.List(ctx, options(o))
+		},
+		WatchFuncWithContext: func(ctx context.Context, o metav1.ListOptions) (watch.Interface, error) {
+			return events.Watch(ctx, options(o))
+		},
+	}, a.Kube)
+	quiet := time.Duration(w.DurationSeconds) * time.Second
+	if quiet == 0 {
+		quiet = 30 * time.Second
+	}
+	var reported time.Time // the handlers run one at a time
+	told := func(e *corev1.Event) {
+		if message := warning(w.When, pod, e); message != "" && time.Since(reported) >= quiet {
+			reported = time.Now()
+			go a.trigger(agent, w, pod, message)
+		}
+	}
+	_, informer := cache.NewInformerWithOptions(cache.InformerOptions{ListerWatcher: source, ObjectType: &corev1.Event{}, Handler: cache.ResourceEventHandlerDetailedFuncs{
+		AddFunc: func(obj any, before bool) {
+			if !before {
+				told(obj.(*corev1.Event))
+			}
+		},
+		// Kubernetes counts a warning that repeats in its one event.
+		UpdateFunc: func(old, obj any) {
+			if was, e := old.(*corev1.Event), obj.(*corev1.Event); occurrences(e) > occurrences(was) {
+				told(e)
+			}
+		},
+	}})
+	informer.RunWithContext(ctx)
+}
+
+// warning describes an event that a watch for events waits for: a warning
+// about the pod, of the watch's reason if it names one.
+func warning(when api.Condition, pod *corev1.Pod, e *corev1.Event) string {
+	if e.Type != corev1.EventTypeWarning || e.InvolvedObject.Kind != "Pod" || e.InvolvedObject.Name != pod.Name {
+		return ""
+	}
+	if reason := when.Params["reason"]; reason != "" && reason != e.Reason {
+		return ""
+	}
+	return "Kubernetes warns: " + e.Reason + ": " + clip(e.Message)
+}
+
+// occurrences tells how often the warning of an event has come.
+func occurrences(e *corev1.Event) int32 {
+	if e.Series != nil {
+		return e.Series.Count
+	}
+	return e.Count
 }
 
 // clip shortens a log line for a capture's reason, which a person reads in a list.

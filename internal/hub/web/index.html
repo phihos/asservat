@@ -248,6 +248,8 @@
         <label><input type="radio" name="when" value="open-files">When it holds more files open than<small>Files, sockets and pipes of the container's processes: a leak of them</small></label>
         <label><input type="radio" name="when" value="tcp-retransmits">When it sends TCP segments again<small>More than a number per second in the pod: packets are lost on the way</small></label>
         <label><input type="radio" name="when" value="tcp-failures">When TCP connections fail<small>More than a number of the pod's connection attempts per second are refused or time out</small></label>
+        <label><input type="radio" name="when" value="event">When Kubernetes warns about the pod<small>A warning event: a failed probe, a failed mount, a back-off, an eviction. All warnings, or those of one reason</small></label>
+        <label><input type="radio" name="when" value="time">At a time<small>All pods of the workload, once or again and again: a nightly job, a peak hour</small></label>
         <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
       </div>
       <div id="beforeFields" hidden>
@@ -260,6 +262,13 @@
           <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, much if it makes many calls; a core dump of it cannot be taken then</span></label>
         </div>
         <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
+      </div>
+      <div class="fields" id="eventFields" hidden>
+        <label class="wide">Reason of the events<input id="eventReason" placeholder="any warning; or one reason, such as Unhealthy, BackOff, FailedMount" spellcheck="false" autocomplete="off"></label>
+      </div>
+      <div class="fields" id="timeFields" hidden>
+        <label>At<input id="timeAt" type="datetime-local"></label>
+        <label>Again every, in minutes<input id="timeEvery" type="number" min="1" placeholder="not again"></label>
       </div>
       <div class="fields" id="alertFields" hidden>
         <label class="wide">Name of the alert (its alertname label)<input id="alertName" placeholder="HighErrorRate" spellcheck="false" autocomplete="off"></label>
@@ -466,7 +475,7 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
 const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches',
-  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:',
+  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:', event: 'when Kubernetes warns about the pod', time: 'at', asked: 'when asked',
   'memory-growth': 'when memory grows by more than', pressure: 'when it stalls in more than', threads: 'when it has more threads than', 'open-files': 'when it holds more files open than',
   'tcp-retransmits': 'when it sends more TCP segments per second again than', 'tcp-failures': 'when more TCP connections per second fail than'};
 // The thresholds a usage condition takes, as an example in its field.
@@ -476,7 +485,8 @@ const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90%
 function told(when) {
   const given = when?.params || {}, where = given.container ? ' in ' + given.container : '';
   return (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${given.pattern || ''}"${where}`
-    : when?.kind in thresholds ? ` ${given.above}${given.of ? ' for ' + given.of : ''}${given.seconds > 0 ? ` ${when.kind === 'memory-growth' ? 'within' : 'for'} ${given.seconds} s` : ''}${where}` : when?.kind === 'alert' ? ` ${given.name || ''}` : '');
+    : when?.kind in thresholds ? ` ${given.above}${given.of ? ' for ' + given.of : ''}${given.seconds > 0 ? ` ${when.kind === 'memory-growth' ? 'within' : 'for'} ${given.seconds} s` : ''}${where}` : when?.kind === 'alert' ? ` ${given.name || ''}` : when?.kind === 'event' ? (given.reason ? ': ' + given.reason : '')
+    : when?.kind === 'time' ? ` ${new Date(given.at).toLocaleString()}${given.every ? `, again every ${Math.round(given.every / 60)} min` : ''}` : '');
 }
 // The condition that the form's last step describes.
 function condition() {
@@ -491,6 +501,15 @@ function condition() {
     if (!above) throw new Error(`Give the threshold: ${thresholds[kind]}.`);
     if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw new Error('Give the seconds within which the memory grows that much.');
     return {kind, params: {above, ...(kind === 'pressure' ? {of: $('usageOf').value} : {}), ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
+  }
+  if (kind === 'event') {
+    const reason = $('eventReason').value.trim();
+    return {kind, params: reason ? {reason} : {}};
+  }
+  if (kind === 'time') {
+    const at = new Date($('timeAt').value);
+    if (isNaN(at)) throw new Error('Give the time at which to record.');
+    return {kind, params: {at: at.toISOString().replace(/\.\d+Z$/, 'Z'), ...($('timeEvery').value > 0 ? {every: String(Math.round($('timeEvery').value * 60))} : {})}};
   }
   if (kind === 'alert') {
     const name = $('alertName').value.trim();
@@ -607,6 +626,8 @@ function showParams() {
   $('logFields').hidden = picked('when') !== 'log';
   $('usageFields').hidden = !(picked('when') in thresholds);
   $('alertFields').hidden = picked('when') !== 'alert';
+  $('eventFields').hidden = picked('when') !== 'event';
+  $('timeFields').hidden = picked('when') !== 'time';
   // What a watch can keep running, of what is chosen.
   for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
   $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
@@ -640,7 +661,7 @@ async function loadWatches() {
   $('watchCount').textContent = list.length || '';
   $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
     <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(told(w.when))}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
-    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
+    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}${!w.sensitive || w.approver ? `<button data-id="${w.id}" data-act="record" title="Record all pods of the workload now, as one of the watch's times">Record now</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
 // How a recording gets on, as a mark before its name.
@@ -839,6 +860,7 @@ function summarize() {
 $('watches').onclick = guard(async e => {
   if (!e.target.dataset.id) return;
   if (e.target.dataset.act === 'approve') await call('POST', `/api/watches/${e.target.dataset.id}/approve`);
+  else if (e.target.dataset.act === 'record') await call('POST', `/api/watches/${e.target.dataset.id}/record`);
   else await call('DELETE', `/api/watches/${e.target.dataset.id}`);
   await loadWatches();
 }, 'watchesProblem');
