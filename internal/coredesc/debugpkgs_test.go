@@ -291,3 +291,16 @@ func TestOSRelease(t *testing.T) {
 		t.Fatal(release)
 	}
 }
+
+// What a container says of itself reaches addresses and the cache's
+// names only where it reads as a name or a version.
+func TestOnlyPlainNamesFromTheContainer(t *testing.T) {
+	for value, plain := range map[string]bool{
+		"9.4": true, "2023": true, "rocky": true, "1.2.5-r4": true, "3.24.4": true, "x86_64": true, "openssl": true, "2.34-100.el9_4.2": true, "1:2.0+git~rc1": false,
+		"": false, "../../etc": false, "9/../../x": false, ".hidden": false, "a b": false, "evil.example/x": false, "v?x=1": false,
+	} {
+		if plainName.MatchString(value) != plain {
+			t.Errorf("%q plain: %v", value, !plain)
+		}
+	}
+}

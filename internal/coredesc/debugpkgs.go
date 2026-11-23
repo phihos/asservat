@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	pathpkg "path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -146,7 +147,9 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 		}
 		file.Close()
 	}
-	if len(stripped) == 0 {
+	// What the container says of itself becomes part of addresses and of
+	// names in the cache: only what reads as a name or a version is taken.
+	if len(stripped) == 0 || !plainName.MatchString(release["ID"]) || !plainName.MatchString(release["VERSION_ID"]) {
 		return nil
 	}
 	f := debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, "debugpkgs")}
@@ -310,7 +313,7 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 			}
 			fields[line[0]] = line[2:]
 		}
-		if origin := fields['o']; owns && origin != "" {
+		if origin := fields['o']; owns && plainName.MatchString(origin) && plainName.MatchString(fields['V']) && plainName.MatchString(fields['A']) && plainName.MatchString(branch) {
 			name, arch := origin+"-dbg-"+fields['V'], fields['A']
 			packages["alpine-"+branch+"-"+arch+"-"+name] = []string{
 				mirror + "/" + branch + "/main/" + arch + "/" + name + ".apk",
@@ -320,6 +323,10 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 	}
 	return packages
 }
+
+// plainName is a name or a version as distributions write them: nothing
+// that leads elsewhere in an address or a directory.
+var plainName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
 
 // debugFetcher downloads debug packages into a directory that keeps them
 // for the next core.

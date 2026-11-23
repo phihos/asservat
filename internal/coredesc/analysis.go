@@ -37,7 +37,8 @@ const (
 	// 2: goroutines of Go programs without debug information.
 	// 3: stacks through libraries without unwind tables, such as musl.
 	// 4: the stacks of Python programs.
-	Version = 4
+	// 5: debug information from the debug packages of distributions.
+	Version = 5
 )
 
 // Describer describes cores with gdb and Delve.
