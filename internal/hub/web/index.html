@@ -251,6 +251,7 @@
           <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">costs little</span></label>
           <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of a CPU on the pod's node while the watch waits</span></label>
           <label data-before="memory"><input type="checkbox" id="beforeMemory"> Memory growth <span class="muted">slows every page fault on the pod's node while the watch waits</span></label>
+          <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, much if it makes many calls; a core dump of it cannot be taken then</span></label>
         </div>
         <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
       </div>
@@ -580,9 +581,9 @@ function showParams() {
   $('frameBlock').hidden = !timed.length && !follows;
   $('duration').placeholder = timed.length ? '30' : '0';
   // The packet buffer of a watch reaches back; everything else runs forward.
-  const running = timed.filter(k => !(k === 'pcap' && watching)).map(k => kindNames[k]);
+  const running = timed.filter(k => !(k === 'pcap' && crash)).map(k => kindNames[k]);
   $('frameHint').textContent = [
-    has('pcap') && watching ? `The packets from before ${crash ? 'the crash' : 'that moment'} are kept: as many seconds as this, or as the last step says.` : '',
+    watching ? 'What the last step keeps running reaches back before that moment as well: as many seconds as this, or as given there.' : '',
     running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : watching ? ' from that moment' : ''}.` : '',
     follows ? (timed.length ? 'The logs are followed for the same time.' : 'With 0 the logs are saved as they are; otherwise they are followed this long.') : '',
   ].filter(Boolean).join(' ');
@@ -597,7 +598,7 @@ function showParams() {
   $('alertFields').hidden = picked('when') !== 'alert';
   // What a watch can keep running, of what is chosen.
   for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
-  $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory'].some(has);
+  $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
   $('usageAbove').placeholder = thresholds[picked('when')] || '';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
@@ -752,7 +753,7 @@ $('captureForm').onsubmit = guard(async () => {
     if (kind === 'pcap' && picked('payload')) params.payload = 'true';
     if (kind === 'strace' && picked('strings')) params.strings = 'true';
     if (kind === 'pprof') Object.assign(params, profile);
-    if (watching && ['pcap', 'cpu', 'memory'].includes(kind)) params.before = String($({pcap: 'beforePcap', cpu: 'beforeCpu', memory: 'beforeMemory'}[kind]).checked);
+    if (watching && ['pcap', 'cpu', 'memory', 'strace'].includes(kind)) params.before = String($({pcap: 'beforePcap', cpu: 'beforeCpu', memory: 'beforeMemory', strace: 'beforeStrace'}[kind]).checked);
     if (['coredump', 'strace'].includes(kind) && wantsProcess() && !(kind === 'coredump' && crash) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
     return {kind, params};
   });

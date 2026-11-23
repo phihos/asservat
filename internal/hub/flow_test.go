@@ -568,6 +568,12 @@ func TestCaptureFlow(t *testing.T) {
 	if code, _ := f.call("alice-token", "POST", "/api/captures", back.CaptureRequest); code != 400 {
 		t.Fatal("a capture that starts now took before", code)
 	}
+	// A trace that is kept running holds the process, so the watch cannot dump it as well.
+	both := api.WatchRequest{CaptureRequest: back.CaptureRequest, When: api.Condition{Kind: api.OnNotReady}}
+	both.Recordings = []api.Recording{{Kind: api.KindStrace, Params: map[string]string{"before": "true"}}, {Kind: api.KindCoredump}}
+	if code, _ := watch("root-token", both); code != 400 {
+		t.Fatal("a watch that traces and dumps the same process", code)
+	}
 	// A watch can wait for something else than a crash: here for the pod to
 	// stop being ready. Its capture finds the pod alive and says what was met.
 	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: "thoughts"}}); code != 400 {

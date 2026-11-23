@@ -131,7 +131,7 @@ var params = map[string][]string{
 	KindLogs:     {"container", "previous", "tailLines"},
 	KindPcap:     {"filter", "payload", "before"},
 	KindCoredump: {"container", "process"},
-	KindStrace:   {"container", "strings", "process"},
+	KindStrace:   {"container", "strings", "process", "before"},
 	KindPprof:    {"endpoints", "port", "path"},
 	KindCPU:      {"before"},
 	KindMemory:   {"before"},
@@ -220,13 +220,14 @@ func (rec Recording) validate() error {
 // the watch waits, so that its file reaches back before the moment the
 // watch's condition is met. The parameter "before" says so; without it the
 // recordings do that cost little while they wait: packets and the sampled
-// CPU profile. Memory growth slows every page fault on the node meanwhile
-// and is kept running only on request.
+// CPU profile. Memory growth slows every page fault on the node meanwhile,
+// and a trace of system calls slows the traced process: they are kept
+// running only on request.
 func (rec Recording) Buffers() bool {
 	switch rec.Kind {
 	case KindPcap, KindCPU:
 		return rec.Params["before"] != "false"
-	case KindMemory:
+	case KindMemory, KindStrace:
 		return rec.Params["before"] == "true"
 	}
 	return false

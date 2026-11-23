@@ -92,6 +92,21 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 	return strings.Join(failed, "; "), nil
 }
 
+// straceArgs are the arguments of strace for a recording of the processes:
+// children are followed, calls are timed, and the contents of buffers are
+// left out unless strings was requested (and approved).
+func straceArgs(rec api.Recording, pids []int) []string {
+	size := "0"
+	if rec.Params["strings"] == "true" {
+		size = "256"
+	}
+	args := []string{"-f", "-tt", "-T", "-s", size, "-o", "/dev/stdout"}
+	for _, pid := range pids {
+		args = append(args, "-p", strconv.Itoa(pid))
+	}
+	return args
+}
+
 // partialError is the failure of a recording that still delivered files.
 type partialError struct{ error }
 
@@ -118,16 +133,24 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		return a.logs(ctx, frame, pod, rec, r.AfterCrash(), duration, up)
 	case api.KindPcap:
 		if r.Watch != "" && rec.Buffers() {
-			// The packets before the watch's condition was met, set aside when it was reported.
+			// After a crash: the packets before it, set aside when it was
+			// reported. Otherwise the pod goes on: the packets from before
+			// the capture and those of its time frame, in one file.
 			a.mu.Lock()
 			packets := a.snapshots[r.Trigger]
 			delete(a.snapshots, r.Trigger)
-			// A condition that the hub learns of otherwise, such as an alert,
-			// has set nothing aside: the packets up to now are taken.
-			if ring := a.rings[r.Watch+"/"+t.Pod]; packets == nil && ring != nil {
-				packets = ring.snapshot()
-			}
+			ring := a.rings[r.Watch+"/"+t.Pod]
 			a.mu.Unlock()
+			if packets == nil && ring != nil {
+				from := time.Now().Add(-ring.before)
+				if !r.AfterCrash() {
+					select {
+					case <-frame.Done():
+					case <-time.After(duration):
+					}
+				}
+				packets = ring.snapshot(from)
+			}
 			if packets == nil {
 				return errors.New("the node agent holds no packets of this pod from before the watch's condition was met")
 			}
@@ -145,20 +168,34 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		}
 		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", args...)
 	case api.KindStrace:
+		// The system calls that the capture's watch kept tracing: those from
+		// before the capture and, unless a crash ended the process, those
+		// of its time frame.
+		a.mu.Lock()
+		traced, calls := a.traces[r.Watch+"/"+t.Pod], a.calls[r.Trigger]
+		delete(a.calls, r.Trigger)
+		a.mu.Unlock()
+		if r.Watch != "" && traced != nil {
+			if calls == nil { // nothing was set aside: the process goes on
+				from := time.Now().Add(-traced.before)
+				if !r.AfterCrash() {
+					select {
+					case <-frame.Done():
+					case <-time.After(duration):
+					}
+				}
+				calls = traced.since(from)
+			}
+			if len(calls) == 0 {
+				return errors.New("the node agent holds no system calls of this pod from before the watch's condition was met")
+			}
+			return up(traced.name, bytes.NewReader(calls))
+		}
 		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
 		if err != nil {
 			return err
 		}
-		// Buffer contents are omitted unless strings was requested (and approved).
-		size := "0"
-		if rec.Params["strings"] == "true" {
-			size = "256"
-		}
-		args := []string{"-f", "-tt", "-T", "-s", size, "-o", "/dev/stdout"}
-		for _, pid := range pids {
-			args = append(args, "-p", strconv.Itoa(pid))
-		}
-		return a.record(ctx, frame, duration, container+".strace", up, "strace", args...)
+		return a.record(ctx, frame, duration, container+".strace", up, "strace", straceArgs(rec, pids)...)
 	case api.KindCPU:
 		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, up)
 	case api.KindMemory:

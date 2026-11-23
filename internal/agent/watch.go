@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,6 +100,9 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		}
 		if packets := w.Recording(api.KindPcap); packets != nil && packets.Buffers() {
 			a.buffer(ctx, w, *packets, pod)
+		}
+		if trace := w.Recording(api.KindStrace); trace != nil && trace.Buffers() {
+			a.trace(ctx, w, *trace, pod)
 		}
 		// The sampled profiles that the watch keeps running reach back as well.
 		for _, kind := range []sampledKind{sampledCPU, sampledMemory} {
@@ -280,9 +284,16 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 	if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" {
 		a.Cores.take(string(crashed.UID), id)
 	}
+	// After a crash the packets up to it are set aside. A pod that goes on
+	// is recorded on by its buffer, which the capture reads when it is done.
 	a.mu.Lock()
-	if r := a.rings[w.ID+"/"+pod]; r != nil {
-		a.snapshots[id] = r.snapshot()
+	if r := a.rings[w.ID+"/"+pod]; r != nil && w.When.Crash() {
+		a.snapshots[id] = r.snapshot(time.Now().Add(-r.before))
+	}
+	// Likewise the system calls up to the crash: the trace starts anew with
+	// the restarted process.
+	if l := a.traces[w.ID+"/"+pod]; l != nil && w.When.Crash() {
+		a.calls[id] = l.since(time.Now().Add(-l.before))
 	}
 	a.mu.Unlock()
 	slog.Info("watch met", "watch", w.ID, "pod", pod, "message", message)
@@ -291,6 +302,7 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 		slog.Info("watch not recorded", "watch", w.ID, "pod", pod, "error", err)
 		a.mu.Lock()
 		delete(a.snapshots, id)
+		delete(a.calls, id)
 		a.mu.Unlock()
 		if a.Cores != "" {
 			os.RemoveAll(a.Cores.taken(id))
@@ -329,7 +341,9 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 		return
 	}
 	// Payload is kept only for a watch that asked for it and was approved.
-	r := &ring{window: w.Before(), limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
+	// The buffer holds what a capture wants: the seconds before it, its
+	// time frame after it, and some more for the task to arrive.
+	r := &ring{before: w.Before(), window: w.Before() + time.Duration(w.DurationSeconds)*time.Second + 10*time.Second, limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
 	a.mu.Lock()
 	a.rings[key] = r
 	a.mu.Unlock()
@@ -357,7 +371,8 @@ const ringBytes = 16 << 20
 // transport headers unless payload is set.
 type ring struct {
 	payload bool
-	window  time.Duration      // how far back the packets reach
+	before  time.Duration      // how far before a capture its packets reach
+	window  time.Duration      // how far back the packets are held
 	limit   int                // bytes
 	stop    context.CancelFunc // ends the tool that fills the ring
 
@@ -398,15 +413,126 @@ func (r *ring) fill(src io.Reader) error {
 	}
 }
 
-// snapshot returns the buffered packets as a pcap file, or nil before the
-// stream began.
-func (r *ring) snapshot() []byte {
+// snapshot returns the buffered packets from a moment on as a pcap file, or
+// nil before the stream began.
+func (r *ring) snapshot(from time.Time) []byte {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.header == nil {
 		return nil
 	}
-	return bytes.Join(append([][]byte{r.header}, r.packets...), nil)
+	first := 0
+	for first < len(r.packets) && int64(r.seconds[first]) < from.Unix() {
+		first++
+	}
+	return bytes.Join(append([][]byte{r.header}, r.packets[first:]...), nil)
+}
+
+// lines holds the most recent lines of a tool's output, each with the
+// moment it was read.
+type lines struct {
+	name   string             // the file that a capture stores them as
+	ended  atomic.Bool        // the tool has ended, with its process
+	before time.Duration      // how far before a capture its lines reach
+	window time.Duration      // how far back the lines are held
+	limit  int                // bytes
+	stop   context.CancelFunc // ends the tool that writes them
+
+	mu   sync.Mutex
+	at   []time.Time
+	text [][]byte // with their line ends, oldest first
+	size int
+}
+
+// fill reads lines into the buffer until the stream ends, dropping those
+// out of the window and the oldest over the limit.
+func (l *lines) fill(src io.Reader) {
+	stream := bufio.NewReaderSize(src, 64<<10)
+	for {
+		line, err := stream.ReadBytes('\n')
+		if len(line) > 0 {
+			now := time.Now()
+			l.mu.Lock()
+			l.at, l.text, l.size = append(l.at, now), append(l.text, line), l.size+len(line)
+			drop := 0
+			for drop < len(l.text)-1 && (l.size > l.limit || now.Sub(l.at[drop]) > l.window) {
+				l.size -= len(l.text[drop])
+				drop++
+			}
+			l.at, l.text = l.at[drop:], l.text[drop:]
+			l.mu.Unlock()
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+// since returns the lines read from a moment on.
+func (l *lines) since(from time.Time) []byte {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	first := 0
+	for first < len(l.text) && l.at[first].Before(from) {
+		first++
+	}
+	return bytes.Join(l.text[first:], nil)
+}
+
+// trace keeps tracing the system calls of the pod's process for a watch,
+// unless it already does, and holds the last of them in memory: as many
+// bytes as of packets. The tracing ends with its process; the pod's next
+// change then starts it for the restarted one.
+func (a *Agent) trace(ctx context.Context, w api.Watch, rec api.Recording, pod *corev1.Pod) {
+	key := w.ID + "/" + pod.Name
+	a.mu.Lock()
+	running := a.traces[key]
+	a.mu.Unlock()
+	if running != nil && !running.ended.Load() {
+		return
+	}
+	if running != nil {
+		running.stop() // the buffer of the process that ended makes room
+	}
+	pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
+	if err != nil {
+		return // no such process yet
+	}
+	ctx, stop := context.WithCancel(ctx)
+	cmd := exec.CommandContext(ctx, "strace", straceArgs(rec, pids)...)
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGINT) } // lets it detach
+	cmd.WaitDelay = 10 * time.Second
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.StdoutPipe()
+	if err == nil {
+		err = cmd.Start()
+	}
+	if err != nil {
+		slog.Error("system call buffer", "pod", pod.Name, "error", err)
+		stop()
+		return
+	}
+	l := &lines{name: container + ".strace", before: w.Before(), window: w.Before() + time.Duration(w.DurationSeconds)*time.Second + 10*time.Second, limit: ringBytes, stop: stop}
+	a.mu.Lock()
+	a.traces[key] = l
+	a.mu.Unlock()
+	go func() {
+		l.fill(out)
+		cmd.Wait()
+		if ctx.Err() == nil {
+			slog.Info("system call buffer ended with its process", "pod", pod.Name, "strace", tail(stderr.Bytes()))
+		}
+		// A capture may still want the calls up to the process's end: the
+		// buffer stays until tracing starts anew or the watch ends.
+		l.ended.Store(true)
+		<-ctx.Done()
+		a.mu.Lock()
+		if a.traces[key] == l {
+			delete(a.traces, key)
+		}
+		a.mu.Unlock()
+	}()
 }
 
 // follow reads what the pod's containers write from now on, through the

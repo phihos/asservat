@@ -80,7 +80,7 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	record := 16 + 14 + 20 + 8
 	count := func(r *ring) (int, uint32) {
 		t.Helper()
-		got := r.snapshot()
+		got := r.snapshot(time.Time{})
 		if !bytes.Equal(got[:24], stream[:24]) || (len(got)-24)%record != 0 || strings.Contains(string(got), "secret") {
 			t.Fatal("snapshot is not a pcap file of bare headers")
 		}
@@ -88,7 +88,7 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	}
 
 	r := &ring{window: 30 * time.Second, limit: 1 << 20}
-	if r.snapshot() != nil {
+	if r.snapshot(time.Time{}) != nil {
 		t.Fatal("snapshot before the stream began")
 	}
 	if err := r.fill(bytes.NewReader(stream)); err != nil {
@@ -97,12 +97,16 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	if n, first := count(r); n != 31 || first != 169 {
 		t.Fatal("window: packets", n, "from second", first)
 	}
+	// A capture takes the packets from a moment on: here the last ten seconds.
+	if got := r.snapshot(time.Unix(190, 0)); len(got) != 24+10*record || le.Uint32(got[24:]) != 190 {
+		t.Fatal("packets from a moment on", (len(got)-24)/record)
+	}
 	// A watch that was approved for payload keeps whole packets.
 	r = &ring{window: 30 * time.Second, limit: 1 << 20, payload: true}
 	if err := r.fill(bytes.NewReader(stream)); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.snapshot(); len(got) != 24+31*(16+len(packet)) || !strings.Contains(string(got), "secret payload") {
+	if got := r.snapshot(time.Time{}); len(got) != 24+31*(16+len(packet)) || !strings.Contains(string(got), "secret payload") {
 		t.Fatal("payload ring", len(got))
 	}
 	// The byte limit drops the oldest packets first.
@@ -209,5 +213,31 @@ func TestMatchLines(t *testing.T) {
 	}
 	if got := clip(strings.Repeat("é", 150)); len(got) > 204 || !strings.HasSuffix(got, "…") || !utf8.ValidString(got) {
 		t.Fatal("a long line:", len(got))
+	}
+}
+
+// The lines that a watch keeps of a tool's output are those of its window,
+// within its limit of bytes; a capture takes them from a moment on.
+func TestLinesKeepTheLastOfAStream(t *testing.T) {
+	l := &lines{window: time.Hour, limit: 60}
+	l.fill(strings.NewReader("one\ntwo\nthree\nwithout an end"))
+	if got := string(l.since(time.Time{})); got != "one\ntwo\nthree\nwithout an end" {
+		t.Fatalf("%q", got)
+	}
+	if got := l.since(time.Now().Add(time.Minute)); len(got) != 0 {
+		t.Fatalf("lines of the future: %q", got)
+	}
+	// Over the limit the oldest go.
+	l.fill(strings.NewReader(strings.Repeat("a line of twenty-two\n", 10)))
+	if got := string(l.since(time.Time{})); got != strings.Repeat("a line of twenty-two\n", 2) {
+		t.Fatalf("over the limit: %q", got)
+	}
+	// Out of the window they go as well.
+	old := &lines{window: time.Millisecond, limit: 1 << 20}
+	old.fill(strings.NewReader("early\n"))
+	time.Sleep(5 * time.Millisecond)
+	old.fill(strings.NewReader("late\n"))
+	if got := string(old.since(time.Time{})); got != "late\n" {
+		t.Fatalf("out of the window: %q", got)
 	}
 }
