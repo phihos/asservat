@@ -70,6 +70,9 @@ type Config struct {
 	// AllowSelfApproval lets an administrator approve their own request, for
 	// installations with a single administrator.
 	AllowSelfApproval bool
+	// DebuginfodURLs are the debuginfod servers, separated by spaces, that
+	// gdb asks for debug information when the hub describes a core again.
+	DebuginfodURLs string
 	// WorkDir holds the files that viewers have open, decrypted, while they
 	// are open. Empty means the system's directory for temporary files.
 	WorkDir string
@@ -99,9 +102,14 @@ type Hub struct {
 	// scheduled wakes the schedule of watches for a time when watches change.
 	scheduled chan struct{}
 
-	mu       sync.Mutex
-	watchers map[chan string]struct{}
-	views    views
+	mu sync.Mutex
+	// describing holds the cores that are being described again, each with
+	// a channel that closes when it is done.
+	describing map[string]chan struct{}
+	// undescribed holds the cores that could not be described again.
+	undescribed map[string]bool
+	watchers    map[chan string]struct{}
+	views       views
 }
 
 func New(c Config) (*Hub, error) {
@@ -130,7 +138,7 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 func (h *Hub) Handler() http.Handler {
@@ -200,6 +208,7 @@ func (h *Hub) Handler() http.Handler {
 	user("POST /api/captures/{id}/stop", h.stopCapture)
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
+	user("POST /api/captures/{id}/describe", h.describe)
 	user("GET /api/captures/{id}/views/{name...}", h.openView)
 	user("POST /api/views/{view}/{method}", h.askView)
 	user("GET /api/views/{view}/pages/{page...}", h.viewPage)

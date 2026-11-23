@@ -7,6 +7,21 @@ image:
 
 # The hub: API, console, approvals and evidence storage. Install it in one
 # cluster; set hub.enabled=false in the other clusters.
+# debuginfod servers from which gdb fetches the debug information of
+# stripped programs when a core dump is described, so that stacks show
+# functions, files and lines instead of addresses. The default is the
+# elfutils project's server, which asks the servers of Debian (and so of
+# distroless images), Fedora, Arch and others, and Ubuntu's own, which it
+# does not ask. No public server knows Alpine, Wolfi, RHEL, Rocky, Alma or
+# Amazon Linux. The agents and the hub send these servers the build IDs of
+# the programs whose cores they describe and of their libraries: 40
+# hexadecimal digits each that name a compiled file, nothing of its
+# memory. Set to [] to ask no server, as in a cluster without a way out;
+# cores are then described without.
+debuginfodURLs:
+  - https://debuginfod.elfutils.org/
+  - https://debuginfod.ubuntu.com/
+
 hub:
   enabled: true
   # Members of these groups approve sensitive captures and manage clusters.
@@ -95,12 +110,6 @@ agent:
   existingSecret: ""
   # PEM CA certificate of the hub, if its certificate is not publicly trusted.
   caCert: ""
-  # debuginfod servers from which gdb fetches the symbols of stripped
-  # programs when it describes a core dump, so that stacks show functions
-  # instead of addresses. The agent then sends these servers the build IDs
-  # of the programs it describes and of their libraries. Empty: none.
-  #   - https://debuginfod.debian.net
-  debuginfodURLs: []
   # Core dumps of crashed processes, for core dump watches. The agent then
   # replaces the node's kernel.core_pattern while it runs and restores it
   # when it stops: other crashes on the node leave no core meanwhile.

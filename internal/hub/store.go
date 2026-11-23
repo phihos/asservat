@@ -277,6 +277,28 @@ func (s *Store) AddArtifact(ctx context.Context, capture string, a storedArtifac
 	return tag.RowsAffected() == 1, err
 }
 
+// ReplaceArtifact records a stored file of a capture in place of the one
+// of its name, if there is one, whose blob it returns to delete. It
+// reports false when the capture is gone.
+func (s *Store) ReplaceArtifact(ctx context.Context, capture string, a storedArtifact) (old string, replaced bool, err error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	defer tx.Rollback(ctx)
+	// The row lock keeps the capture from being deleted meanwhile.
+	if tag, err := tx.Exec(ctx, `SELECT 1 FROM captures WHERE id = $1::uuid FOR SHARE`, capture); err != nil || tag.RowsAffected() == 0 {
+		return "", false, err
+	}
+	if err := tx.QueryRow(ctx, `DELETE FROM artifacts WHERE capture_id = $1::uuid AND name = $2 RETURNING blob`, capture, a.Name).Scan(&old); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", false, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key) VALUES ($1::uuid, $2, $3, $4, $5, $6)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key); err != nil {
+		return "", false, err
+	}
+	return old, true, tx.Commit(ctx)
+}
+
 func (s *Store) Artifact(ctx context.Context, capture, name string) (storedArtifact, error) {
 	a := storedArtifact{}
 	err := s.db.QueryRow(ctx, `SELECT name, size, sha256, blob, wrapped_key FROM artifacts WHERE capture_id = $1::uuid AND name = $2`, capture, name).Scan(&a.Name, &a.Size, &a.SHA256, &a.Blob, &a.Key)

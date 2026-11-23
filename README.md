@@ -32,7 +32,7 @@ a stopped program in a debugger.
 | CPU profile | Where the pod's processes spend CPU time, sampled from the node with eBPF. Needs no support in the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, Perl, .NET, Erlang | No |
 | Memory growth | Which code makes the pod's memory grow while it records, from the stacks at its page faults. Same runtimes, needs no support in the application | No |
 | Profile endpoint | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
-| Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running | Yes |
+| Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running, with the program's files that a debugger needs next to it | Yes |
 
 A capture that can contain memory or payload contents waits until an
 administrator approves it. Everything else starts at once.

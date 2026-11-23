@@ -267,8 +267,8 @@ ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
 completed "$ALICE" "$id"
 bundle=$(ok "$ALICE" GET "/api/captures/$id")
 # Each of the two pods delivers the files of all five recordings, and the description of its core.
-[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","core.web.analysis.json","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
-[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[14,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+[ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","core.web.analysis.json","core.web.files.tar","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
+[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[16,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
 log "progress, and stopping a capture with what it has (edge)"
 id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")
@@ -449,7 +449,12 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/core.web"
 pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
 fetch "$ALICE" "$id" "$pod/core.web.analysis.json" "$WORK/core.web.analysis.json"
 jq -e '.executable == "/bin/sh" and .symbols and (.commandLine | startswith("/bin/sh -c mkdir")) and .stopped == "" and (.threads | length == 1) and (.threads[0].frames | length > 1) and (.threads[0].frames[0].registers | length > 10) and ([.threads[0].frames[].function] | any(. != "")) and (.modules | length > 0) and (.mappings | length > 5)' "$WORK/core.web.analysis.json" >/dev/null || fail "description of the core: $(cat "$WORK/core.web.analysis.json")"
-[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.artifacts[].viewer] | unique')" = '["core"]' ] || fail "viewer of cores"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.artifacts[] | select(.name | endswith(".files.tar") | not) | .viewer] | unique')" = '["core"]' ] || fail "viewer of cores"
+# The program's files are kept with the core, for a debugger and for the hub to describe it again;
+# the description is this version's, so the hub leaves it.
+fetch "$ALICE" "$id" "$pod/core.web.files.tar" "$WORK/core.web.files.tar"
+tar -tf "$WORK/core.web.files.tar" | grep -qx 'bin/busybox\|bin/sh' || fail "the core's program files: $(tar -tf "$WORK/core.web.files.tar" | head -5)"
+[ "$(ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.web\"}" | jq -c .)" = '{"described":false,"reason":""}' ] || fail "an up-to-date core was described again"
 curl -sS --fail -o /dev/null "$URL/view/core.js" "$URL/view/core.css" || fail "the core viewer is not served"
 edge -n shop get pods -o json | jq -e '[.items[].status.containerStatuses[].restartCount] | add == 0' >/dev/null || fail "a captured pod restarted"
 

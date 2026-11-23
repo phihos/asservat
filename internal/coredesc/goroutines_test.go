@@ -1,12 +1,14 @@
-package agent
+package coredesc
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -108,9 +110,31 @@ func goroutinesOfGoCore(t *testing.T, variables bool, flags ...string) {
 		t.Skipf("gcore cannot attach here: %v: %s", err, tail(out))
 	}
 
-	a := &Agent{Scratch: dir}
-	data, err := a.analyze(context.Background(), filepath.Join(dir, "core."+pid), "/proc/"+pid+"/root")
+	data, err := Describer{Scratch: dir}.Describe(context.Background(), filepath.Join(dir, "core."+pid), "/proc/"+pid+"/root")
 	if err != nil {
+		t.Fatal(err)
+	}
+	// The program's files that the core maps are kept with it: unpacked
+	// elsewhere, they describe the core as the files on the node did.
+	if DescribedBy(data) != Version {
+		t.Error("described by", DescribedBy(data))
+	}
+	files := Files(data, "/proc/"+pid+"/root")
+	if len(files) == 0 || !slices.Contains(files, program) {
+		t.Fatal("the program is not among the core's files:", files)
+	}
+	var archive bytes.Buffer
+	if err := WriteFiles(&archive, "/proc/"+pid+"/root", files); err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := t.TempDir()
+	if err := ExtractFiles(&archive, elsewhere, int64(archive.Len())); err != nil {
+		t.Fatal(err)
+	}
+	stdin.Close()
+	cmd.Process.Kill()
+	cmd.Wait() // the process and its root are gone
+	if data, err = (Describer{Scratch: dir}).Describe(context.Background(), filepath.Join(dir, "core."+pid), elsewhere); err != nil {
 		t.Fatal(err)
 	}
 	var report struct {
