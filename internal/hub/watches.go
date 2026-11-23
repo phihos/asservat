@@ -198,9 +198,9 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 		request.Reason += " (" + watch.Reason + ")"
 	}
 	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger", watch.Approver); err != nil {
-		// The crash was not recorded, so it does not count.
+		// Nothing was recorded, so this time does not count.
 		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
-			slog.Error("watch crash not given back", "watch", id, "error", e)
+			slog.Error("watch's count not given back", "watch", id, "error", e)
 		}
 		return err
 	}

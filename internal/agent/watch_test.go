@@ -130,7 +130,12 @@ func TestRestartsAndReadiness(t *testing.T) {
 	if got := met(restart, pod, seen); got != "" {
 		t.Fatal("no change:", got)
 	}
+	// The count rises before the new instance runs: the report waits for it.
 	container(4, &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"})
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("a restart whose new instance does not run yet:", got)
+	}
+	pod.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{}
 	if got := met(restart, pod, seen); got != "container app was restarted: it ended with exit code 0, Completed" {
 		t.Fatal(got)
 	}

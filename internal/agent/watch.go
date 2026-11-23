@@ -140,12 +140,16 @@ func met(when api.Condition, pod *corev1.Pod, seen map[string]string) string {
 
 // restarts describes the containers of the pod that were started again
 // since the last call, whatever ended them: a failure, a clean exit or a
-// failed liveness probe.
+// failed liveness probe. A restart is reported once the new instance runs,
+// so that the capture finds its process.
 func restarts(pod *corev1.Pod, seen map[string]string) string {
 	var out []string
 	for _, s := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
 		key, count := pod.Name+"/"+s.Name+"/restarts", strconv.Itoa(int(s.RestartCount))
 		before, known := seen[key]
+		if known && before != count && s.State.Running == nil {
+			continue // counted, but not running yet: the next change tells
+		}
 		seen[key] = count
 		if !known || before == count || pod.DeletionTimestamp != nil {
 			continue

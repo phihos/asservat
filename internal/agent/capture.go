@@ -124,7 +124,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			delete(a.snapshots, r.Trigger)
 			a.mu.Unlock()
 			if packets == nil {
-				return errors.New("the node agent holds no packets of this pod from before the crash")
+				return errors.New("the node agent holds no packets of this pod from before the watch's condition was met")
 			}
 			return up("capture.pcap", bytes.NewReader(packets))
 		}
