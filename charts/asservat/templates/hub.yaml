@@ -58,6 +58,9 @@ spec:
             - --local-cluster={{ .Values.hub.localCluster }}
             - --local-token-file=/secrets/agent/token
             {{- end }}
+            {{- if .Values.hub.alertToken }}
+            - --alert-token-file=/secrets/hub/alert-token
+            {{- end }}
             {{- with .Values.hub.oidc }}
             {{- if .issuer }}
             - --oidc-issuer={{ .issuer }}

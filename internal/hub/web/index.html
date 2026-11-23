@@ -242,6 +242,10 @@
         <label><input type="radio" name="when" value="memory">When memory use is above<small>A share of the container's limit, or a size. Records it before the kernel ends it for using too much</small></label>
         <label><input type="radio" name="when" value="cpu">When CPU use is above<small>A number of CPUs, or a share of the container's limit. Records it while it is busy</small></label>
         <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
+        <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
+      </div>
+      <div class="fields" id="alertFields" hidden>
+        <label class="wide">Name of the alert (its alertname label)<input id="alertName" placeholder="HighErrorRate" spellcheck="false" autocomplete="off"></label>
       </div>
       <div class="fields" id="usageFields" hidden>
         <label>Above<input id="usageAbove" spellcheck="false" autocomplete="off"></label>
@@ -444,14 +448,14 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
 const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches',
-  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than'};
+  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:'};
 // The thresholds a usage condition takes, as an example in its field.
 const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90% of the limit', throttled: '25% of the time'};
 // A watch's condition in full, with what it is given.
 function told(when) {
   const given = when?.params || {}, where = given.container ? ' in ' + given.container : '';
   return (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${given.pattern || ''}"${where}`
-    : when?.kind in thresholds ? ` ${given.above}${given.seconds > 0 ? ` for ${given.seconds} s` : ''}${where}` : '');
+    : when?.kind in thresholds ? ` ${given.above}${given.seconds > 0 ? ` for ${given.seconds} s` : ''}${where}` : when?.kind === 'alert' ? ` ${given.name || ''}` : '');
 }
 // The condition that the form's last step describes.
 function condition() {
@@ -465,6 +469,11 @@ function condition() {
     const above = $('usageAbove').value.trim().replace(/\s+/g, '');
     if (!above) throw new Error(`Give the threshold: ${thresholds[kind]}.`);
     return {kind, params: {above, ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
+  }
+  if (kind === 'alert') {
+    const name = $('alertName').value.trim();
+    if (!name) throw new Error('Give the name of the alert.');
+    return {kind, params: {name}};
   }
   return {kind};
 }
@@ -575,6 +584,7 @@ function showParams() {
   $('countLabel').hidden = !watching;
   $('logFields').hidden = picked('when') !== 'log';
   $('usageFields').hidden = !(picked('when') in thresholds);
+  $('alertFields').hidden = picked('when') !== 'alert';
   $('usageAbove').placeholder = thresholds[picked('when')] || '';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);

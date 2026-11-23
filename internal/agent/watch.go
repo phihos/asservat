@@ -164,8 +164,10 @@ func met(when api.Condition, pod *corev1.Pod, seen map[string]string) string {
 		return restarts(pod, seen)
 	case api.OnNotReady:
 		return unready(pod, seen)
-	default:
+	case api.OnCrash, "":
 		return crashes(pod, seen)
+	default: // told by something else than the agent, such as an alert
+		return ""
 	}
 }
 

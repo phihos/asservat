@@ -583,3 +583,16 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 		t.Fatal("the decrypted capture is still in the work directory", left)
 	}
 }
+
+// A hub without an alert token accepts neither alerts nor watches for them.
+func TestAlertsNeedTheHubsToken(t *testing.T) {
+	f, _, _ := viewed(t, map[string][]byte{"api-1/pod.json": []byte("{}")})
+	code, b := f.call("alice-token", "POST", "/api/watches", map[string]any{"cluster": "any", "namespace": "payments", "workload": "Deployment/api", "kind": "pod-state",
+		"when": map[string]any{"kind": "alert", "params": map[string]string{"name": "HighErrorRate"}}})
+	if code != 400 || !strings.Contains(string(b), "alert token") {
+		t.Fatal("a watch for an alert", code, string(b))
+	}
+	if code, _ := f.call("alice-token", "POST", "/api/alerts", map[string]any{"alerts": []any{}}); code != 404 {
+		t.Fatal("an alert", code)
+	}
+}

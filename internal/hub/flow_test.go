@@ -112,6 +112,7 @@ func TestCaptureFlow(t *testing.T) {
 	h, err := hub.New(hub.Config{
 		Clusters: []hub.Cluster{joined, foreign},
 		Store:    store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
+		AlertToken: "the-token-that-alertmanager-presents-0123456789",
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
@@ -635,6 +636,48 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	if got := f.wait("alice-token", matched().ID, api.StateCompleted, api.StateFailed); got.On != api.OnLog || !strings.HasPrefix(got.Reason, `a log line of container app matches "fake l.gs": fake logs`) {
 		t.Fatal("the capture of a matching log line", got.On, got.Reason)
+	}
+
+	// A watch for a Prometheus alert: Alertmanager tells the hub, with the
+	// hub's alert token, and the hub records the pod that the alert names.
+	code, alerting := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, Count: 2, When: api.Condition{Kind: api.OnAlert, Params: map[string]string{"name": "HighErrorRate"}}})
+	if code != 201 || alerting.Remaining != 2 {
+		t.Fatal("watch for an alert", code, alerting)
+	}
+	notice := func(token, status, namespace, started string) (int, string) {
+		code, b := f.call(token, "POST", "/api/alerts", map[string]any{"version": "4", "status": status, "alerts": []map[string]any{{
+			"status": status, "startsAt": started, "fingerprint": "f1a2b3",
+			"labels":      map[string]string{"alertname": "HighErrorRate", "namespace": namespace, "pod": "api-1", "severity": "page"},
+			"annotations": map[string]string{"summary": "5xx above 5 %"},
+		}}})
+		return code, strings.TrimSpace(string(b))
+	}
+	const alertmanager = "the-token-that-alertmanager-presents-0123456789"
+	if code, _ := notice("alice-token", "firing", "payments", "2026-01-01T10:00:00Z"); code != 401 {
+		t.Fatal("a user's token as the alert token", code)
+	}
+	for what, n := range map[string][2]string{"an alert that is resolved": {"resolved", "payments"}, "an alert of another namespace": {"firing", "billing"}} {
+		if code, b := notice(alertmanager, n[0], n[1], "2026-01-01T10:00:00Z"); code != 200 || b != `{"captures":0}` {
+			t.Fatal(what, code, b)
+		}
+	}
+	if code, b := notice(alertmanager, "firing", "payments", "2026-01-01T10:00:00Z"); code != 200 || b != `{"captures":1}` {
+		t.Fatal("a firing alert", code, b)
+	}
+	// Alertmanager repeats its notification while the alert fires: one capture.
+	if code, b := notice(alertmanager, "firing", "payments", "2026-01-01T10:00:00Z"); code != 200 || b != `{"captures":0}` {
+		t.Fatal("the same firing told again", code, b)
+	}
+	var alerted []api.Capture
+	_, b = f.call("alice-token", "GET", "/api/captures", nil)
+	json.Unmarshal(b, &alerted)
+	alerted = slices.DeleteFunc(alerted, func(c api.Capture) bool { return c.Watch != alerting.ID })
+	if len(alerted) != 1 || alerted[0].On != api.OnAlert || alerted[0].Requester != "alice" || alerted[0].Reason != "alert HighErrorRate fires: 5xx above 5 % (flaky)" || len(alerted[0].Tasks) != 1 || alerted[0].Tasks[0].Pod != "api-1" {
+		t.Fatalf("the capture of an alert: %+v", alerted)
+	}
+	// It fires anew later: the watch's second and last capture.
+	if code, b := notice(alertmanager, "firing", "payments", "2026-01-01T12:00:00Z"); code != 200 || b != `{"captures":1}` || len(watches("alice-token")) != 0 {
+		t.Fatal("the alert firing anew", code, b, len(watches("alice-token")))
 	}
 
 	// A corrupt stored file is an error for MCP, not partial text.
