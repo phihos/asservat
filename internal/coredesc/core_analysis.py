@@ -84,7 +84,7 @@ WORD = struct.Struct("<Q")
 SCAN = 64 << 10
 KEPT = {"x86-64": ["rbp", "rbx", "r12", "r13", "r14", "r15"], "aarch64": ["x%d" % n for n in range(19, 30)]}
 tables = {}   # by file name: whether the module carries unwind tables
-scanned = set()  # the stack pointers of the frames that were found by scanning
+scanned = set()  # the frames that were found by scanning, each by its stack pointer and address
 
 
 def has_tables(objfile):
@@ -113,17 +113,32 @@ def has_tables(objfile):
     return tables[name] or any(has_tables(o) for o in gdb.objfiles() if o.owner == objfile)
 
 
-def after_call(inferior, address, machine):
-    """Whether the instruction before the address is a call."""
+def after_call(inferior, address, machine, callee, space):
+    """Whether the instruction before the address is a call that can have
+    led to callee, an address in the function that was called. A call to
+    a fixed address in the callee's own module leads to a function that
+    starts at or before callee; of any other call the target is not told."""
     try:
         before = bytes(inferior.read_memory(address - 8, 8))
     except (gdb.MemoryError, gdb.error):
         return False
     if "aarch64" in machine:
         word, = struct.unpack_from("<I", before, 4)
-        return word & 0xFC000000 == 0x94000000 or word & 0xFFFFFC1F == 0xD63F0000  # bl, blr
+        if word & 0xFC000000 == 0x94000000:  # bl, to an offset of 26 bits in words
+            offset = (word & 0x03FFFFFF) - (0x04000000 if word & 0x02000000 else 0)
+            return leads(address - 4 + 4 * offset, callee, space)
+        return word & 0xFFFFFC1F == 0xD63F0000  # blr
     # x86-64: call rel32, or an indirect call (FF /2) of 2 to 7 bytes.
-    return before[3] == 0xE8 or any(before[8 - n] == 0xFF and (before[9 - n] >> 3) & 7 == 2 for n in (2, 3, 4, 6, 7))
+    if before[3] == 0xE8:
+        offset, = struct.unpack_from("<i", before, 4)
+        return leads(address + offset, callee, space)
+    return any(before[8 - n] == 0xFF and (before[9 - n] >> 3) & 7 == 2 for n in (2, 3, 4, 6, 7))
+
+
+def leads(target, callee, space):
+    """Whether a call to target can have led to callee: not if it is a
+    call within callee's module to a function that starts behind it."""
+    return space.objfile_for_address(target) != space.objfile_for_address(callee) or target <= callee
 
 
 class ScanUnwinder(gdb.unwinder.Unwinder):
@@ -149,7 +164,7 @@ class ScanUnwinder(gdb.unwinder.Unwinder):
                 return None
         for at in range(0, len(stack) - 7, 8):
             caller, = WORD.unpack_from(stack, at)
-            if caller > 0x1000 and space.objfile_for_address(caller) is not None and after_call(inferior, caller, machine):
+            if caller > 0x1000 and space.objfile_for_address(caller) is not None and after_call(inferior, caller, machine, pc, space):
                 unwound = pending.create_unwind_info(gdb.unwinder.FrameId(sp + at + 8, pc))
                 kind = pending.read_register("pc").type
                 unwound.add_saved_register("pc", gdb.Value(caller).cast(kind))
@@ -163,7 +178,7 @@ class ScanUnwinder(gdb.unwinder.Unwinder):
                         unwound.add_saved_register(kept, pending.read_register(kept))
                     except (gdb.error, ValueError):
                         pass
-                scanned.add(sp + at + 8)
+                scanned.add((sp + at + 8, caller))
                 return unwound
         return None
 
@@ -179,7 +194,7 @@ def frames(thread):
         try:
             pc = frame.pc()
             entry["pc"] = "0x%016x" % pc
-            if level > 0 and int(frame.read_register("sp")) in scanned:
+            if level > 0 and (int(frame.read_register("sp")), pc) in scanned:
                 entry["scanned"] = True
             entry["function"] = frame.name() or ""
             entry["module"] = inside(gdb.solib_name(pc) or exe)
