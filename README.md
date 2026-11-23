@@ -32,7 +32,7 @@ a stopped program in a debugger.
 | CPU profile | Where the pod's processes spend CPU time, sampled from the node with eBPF. Needs no support in the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, Perl, .NET, Erlang | No |
 | Memory growth | Which code makes the pod's memory grow while it records, from the stacks at its page faults. Same runtimes, needs no support in the application | No |
 | Profile endpoint | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
-| Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running, with the program's files that a debugger needs next to it | Yes |
+| Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running, with the program's files that a debugger needs next to it and a description of its threads and stacks, with goroutines, Python and .NET stacks | Yes |
 
 A capture that can contain memory or payload contents waits until an
 administrator approves it. Everything else starts at once.
@@ -195,6 +195,17 @@ A crash watch for `coredump` records the core of the crashed process itself. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an
 administrator's approval of the watch.
+
+Every core comes with its program's executable and libraries, so that it
+opens in a debugger wherever you download it to, and with a description for
+the console's viewer: threads, stacks and variables, the goroutines of a Go
+program even without debug information, the Python and .NET stacks, and
+stacks through musl. For stripped programs the debug information is fetched
+from debuginfod servers, the distributions' debug packages and, for .NET,
+Microsoft's symbol server. This is on by default and sends these servers the
+build IDs of the programs and libraries and the names of their packages,
+nothing of a process's memory. Set `debuginfodURLs: []` to turn all of it
+off.
 
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
 get tools to list workloads, look at their processes and traffic, request
