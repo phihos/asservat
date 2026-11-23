@@ -242,6 +242,12 @@
         <label><input type="radio" name="when" value="memory">When memory use is above<small>A share of the container's limit, or a size. Records it before the kernel ends it for using too much</small></label>
         <label><input type="radio" name="when" value="cpu">When CPU use is above<small>A number of CPUs, or a share of the container's limit. Records it while it is busy</small></label>
         <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
+        <label><input type="radio" name="when" value="memory-growth">When memory grows by<small>More than a size within a time: a leak in progress, whatever the limit</small></label>
+        <label><input type="radio" name="when" value="pressure">When it stalls for memory, CPU or I/O<small>The kernel's own measure of a container that waits for a resource, in more than a share of the time</small></label>
+        <label><input type="radio" name="when" value="threads">When it has more threads than<small>Threads and processes of the container: a leak of them, or a fork storm</small></label>
+        <label><input type="radio" name="when" value="open-files">When it holds more files open than<small>Files, sockets and pipes of the container's processes: a leak of them</small></label>
+        <label><input type="radio" name="when" value="tcp-retransmits">When it sends TCP segments again<small>More than a number per second in the pod: packets are lost on the way</small></label>
+        <label><input type="radio" name="when" value="tcp-failures">When TCP connections fail<small>More than a number of the pod's connection attempts per second are refused or time out</small></label>
         <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
       </div>
       <div id="beforeFields" hidden>
@@ -260,8 +266,9 @@
       </div>
       <div class="fields" id="usageFields" hidden>
         <label>Above<input id="usageAbove" spellcheck="false" autocomplete="off"></label>
-        <label>For at least, in seconds<input id="usageSeconds" type="number" min="0" placeholder="0: as soon as it is seen"></label>
+        <label><span id="usageSecondsLabel">For at least, in seconds</span><input id="usageSeconds" type="number" min="0" placeholder="0: as soon as it is seen"></label>
         <label>Container<select id="usageContainer"></select></label>
+        <label id="pressureOf" hidden>Stalls for<select id="usageOf"><option value="memory">memory</option><option value="cpu">CPU</option><option value="io">I/O</option></select></label>
       </div>
       <div class="fields" id="logFields" hidden>
         <label class="wide">The line matches, as a regular expression<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
@@ -459,14 +466,17 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
 const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches',
-  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:'};
+  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:',
+  'memory-growth': 'when memory grows by more than', pressure: 'when it stalls in more than', threads: 'when it has more threads than', 'open-files': 'when it holds more files open than',
+  'tcp-retransmits': 'when it sends more TCP segments per second again than', 'tcp-failures': 'when more TCP connections per second fail than'};
 // The thresholds a usage condition takes, as an example in its field.
-const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90% of the limit', throttled: '25% of the time'};
+const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90% of the limit', throttled: '25% of the time', 'memory-growth': '100Mi', pressure: '20% of the time',
+  threads: '500', 'open-files': '1000', 'tcp-retransmits': '10 per second', 'tcp-failures': '1 per second'};
 // A watch's condition in full, with what it is given.
 function told(when) {
   const given = when?.params || {}, where = given.container ? ' in ' + given.container : '';
   return (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${given.pattern || ''}"${where}`
-    : when?.kind in thresholds ? ` ${given.above}${given.seconds > 0 ? ` for ${given.seconds} s` : ''}${where}` : when?.kind === 'alert' ? ` ${given.name || ''}` : '');
+    : when?.kind in thresholds ? ` ${given.above}${given.of ? ' for ' + given.of : ''}${given.seconds > 0 ? ` ${when.kind === 'memory-growth' ? 'within' : 'for'} ${given.seconds} s` : ''}${where}` : when?.kind === 'alert' ? ` ${given.name || ''}` : '');
 }
 // The condition that the form's last step describes.
 function condition() {
@@ -479,7 +489,8 @@ function condition() {
   if (kind in thresholds) {
     const above = $('usageAbove').value.trim().replace(/\s+/g, '');
     if (!above) throw new Error(`Give the threshold: ${thresholds[kind]}.`);
-    return {kind, params: {above, ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
+    if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw new Error('Give the seconds within which the memory grows that much.');
+    return {kind, params: {above, ...(kind === 'pressure' ? {of: $('usageOf').value} : {}), ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
   }
   if (kind === 'alert') {
     const name = $('alertName').value.trim();
@@ -600,6 +611,9 @@ function showParams() {
   for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
   $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
   $('usageAbove').placeholder = thresholds[picked('when')] || '';
+  $('pressureOf').hidden = picked('when') !== 'pressure';
+  $('usageSecondsLabel').textContent = picked('when') === 'memory-growth' ? 'Within, in seconds' : 'For at least, in seconds';
+  $('usageSeconds').placeholder = picked('when') === 'memory-growth' ? '300' : '0: as soon as it is seen';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;

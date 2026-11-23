@@ -105,3 +105,95 @@ func TestGauge(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// Beyond memory and CPU, the cgroup tells how much a container stalls and
+// how many tasks it has; the node's /proc tells the files its processes
+// hold open and the TCP counters of its pod.
+func TestReadMoreUsage(t *testing.T) {
+	u, err := readUsage(cgroup(t, map[string]string{
+		"memory.current": "1000", "cpu.stat": "usage_usec 5", "pids.current": "42\n", "cgroup.procs": "100\n101\n",
+		"memory.pressure": "some avg10=12.50 avg60=3.00 avg300=1.00 total=99\nfull avg10=2.00 avg60=0.00 avg300=0.00 total=9\n",
+		"io.pressure":     "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+	}))
+	if err != nil || u.pressure["memory"] != 12.5 || u.pressure["io"] != 0 || u.tasks != 42 || len(u.pids) != 2 || u.pids[1] != 101 {
+		t.Fatal(u, err)
+	}
+	proc := t.TempDir()
+	for pid, files := range map[string]int{"100": 3, "101": 2} {
+		os.MkdirAll(filepath.Join(proc, pid, "fd"), 0o755)
+		for i := range files {
+			os.WriteFile(filepath.Join(proc, pid, "fd", string(rune('0'+i))), nil, 0o644)
+		}
+	}
+	if n := openFiles(proc, []int{100, 101, 999}); n != 5 {
+		t.Fatal("open files", n)
+	}
+	os.MkdirAll(filepath.Join(proc, "100", "net"), 0o755)
+	os.WriteFile(filepath.Join(proc, "100", "net", "snmp"), []byte("Ip: Forwarding DefaultTTL\nIp: 1 64\n"+
+		"Tcp: RtoAlgorithm ActiveOpens PassiveOpens AttemptFails EstabResets InSegs OutSegs RetransSegs\nTcp: 1 500 300 17 4 9000 8000 230\nUdp: InDatagrams\nUdp: 5\n"), 0o644)
+	if retransmits, failures := tcpCounters(proc, 100); retransmits != 230 || failures != 17 {
+		t.Fatal("TCP counters", retransmits, failures)
+	}
+}
+
+func TestMoreGauges(t *testing.T) {
+	start := time.Unix(1700000000, 0)
+	at := func(seconds int) time.Time { return start.Add(time.Duration(seconds) * time.Second) }
+	condition := func(kind string, params ...string) *gauge {
+		c := api.Condition{Kind: kind, Params: map[string]string{}}
+		for i := 0; i < len(params); i += 2 {
+			c.Params[params[i]] = params[i+1]
+		}
+		if err := c.Validate(); err != nil {
+			t.Fatal(kind, err)
+		}
+		return newGauge(c)
+	}
+	// Pressure is of memory unless it says otherwise.
+	stalled := usage{pressure: map[string]float64{"memory": 30, "io": 5}}
+	if got := condition(api.OnPressure, "above", "20%").reading(stalled, at(0)); got != "stalls for memory in 30 % of the time (above 20%)" {
+		t.Fatal(got)
+	}
+	if got := condition(api.OnPressure, "above", "20%", "of", "io").reading(stalled, at(0)); got != "" {
+		t.Fatal("I/O pressure below the threshold:", got)
+	}
+	if got := condition(api.OnThreads, "above", "500").reading(usage{tasks: 812}, at(0)); got != "has 812 threads and processes (above 500)" {
+		t.Fatal(got)
+	}
+	if got := condition(api.OnFiles, "above", "1000").reading(usage{files: 1024}, at(0)); got != "holds 1024 files open (above 1000)" {
+		t.Fatal(got)
+	}
+	// The TCP counters are rates between two readings.
+	again := condition(api.OnRetransmits, "above", "10")
+	again.reading(usage{retransmits: 1000}, at(0))
+	if got := again.reading(usage{retransmits: 1020}, at(5)); got != "" {
+		t.Fatal("four per second:", got)
+	}
+	if got := again.reading(usage{retransmits: 1120}, at(10)); got != "is in a pod that sends 20.0 TCP segments per second again (above 10)" {
+		t.Fatal(got)
+	}
+	failing := condition(api.OnTCPFailures, "above", "1")
+	failing.reading(usage{failures: 3}, at(0))
+	if got := failing.reading(usage{failures: 13}, at(5)); got != "is in a pod of which 2.0 TCP connection attempts per second fail (above 1)" {
+		t.Fatal(got)
+	}
+
+	// Growth is from the lowest reading within the time: here 60 seconds.
+	mib := int64(1 << 20)
+	growth := condition(api.OnGrowth, "above", "100Mi", "seconds", "60")
+	for _, step := range []struct {
+		second int
+		used   int64
+		want   string
+	}{
+		{0, 300, ""}, {20, 350, ""}, {40, 390, ""},
+		{60, 420, "has grown by 120 MiB of memory in 1m0s, to 420 MiB (above 100Mi)"},
+		{80, 460, ""},  // told once while it stays above (110 MiB since second 20)
+		{100, 470, ""}, // 80 MiB since second 40: below, so the next time counts anew
+		{120, 580, "has grown by 160 MiB of memory in 1m0s, to 580 MiB (above 100Mi)"},
+	} {
+		if got := growth.reading(usage{memory: step.used * mib}, at(step.second)); got != step.want {
+			t.Fatalf("growth at %d s: %q, want %q", step.second, got, step.want)
+		}
+	}
+}

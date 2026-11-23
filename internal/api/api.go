@@ -364,6 +364,13 @@ const (
 	OnCPU      = "cpu"       // a container's CPU use is above a number of CPUs or a share of its limit
 	OnThrottle = "throttled" // a container is held back by its CPU limit in more than a share of the time
 	OnAlert    = "alert"     // a Prometheus alert fires, as Alertmanager tells the hub
+	// More that the agent measures of a container:
+	OnPressure    = "pressure"        // it stalls for memory, CPU or I/O in more than a share of the time
+	OnGrowth      = "memory-growth"   // its memory use grows by more than a size within a time
+	OnThreads     = "threads"         // it has more than a number of threads and processes
+	OnFiles       = "open-files"      // its processes hold more than a number of open files
+	OnRetransmits = "tcp-retransmits" // its pod retransmits more than a number of TCP segments per second
+	OnTCPFailures = "tcp-failures"    // more than a number of its pod's TCP connection attempts fail per second
 )
 
 // Condition is what a watch waits for. Without a kind it is a crash.
@@ -377,32 +384,50 @@ func (c Condition) Crash() bool { return c.Kind == "" || c.Kind == OnCrash }
 
 // conditionParams lists the parameters each kind of condition accepts.
 var conditionParams = map[string][]string{
-	OnCrash:    {},
-	OnRestart:  {},
-	OnNotReady: {},
-	OnLog:      {"pattern", "container"},
-	OnMemory:   {"above", "seconds", "container"},
-	OnCPU:      {"above", "seconds", "container"},
-	OnThrottle: {"above", "seconds", "container"},
-	OnAlert:    {"name"},
+	OnCrash:       {},
+	OnRestart:     {},
+	OnNotReady:    {},
+	OnLog:         {"pattern", "container"},
+	OnMemory:      {"above", "seconds", "container"},
+	OnCPU:         {"above", "seconds", "container"},
+	OnThrottle:    {"above", "seconds", "container"},
+	OnAlert:       {"name"},
+	OnPressure:    {"above", "seconds", "container", "of"},
+	OnGrowth:      {"above", "seconds", "container"},
+	OnThreads:     {"above", "seconds", "container"},
+	OnFiles:       {"above", "seconds", "container"},
+	OnRetransmits: {"above", "seconds", "container"},
+	OnTCPFailures: {"above", "seconds", "container"},
+}
+
+// aboveUnits tells for each condition that the agent measures what its
+// threshold counts: a size in bytes, CPUs or a plain number, and whether it
+// can instead be a share ("80%") of the container's limit or of the time.
+var aboveUnits = map[string]struct {
+	unit  string // "size", "cpus", "number" or "" for a share only
+	share bool
+}{
+	OnMemory: {"size", true}, OnCPU: {"cpus", true}, OnThrottle: {"", true}, OnPressure: {"", true},
+	OnGrowth: {"size", false}, OnThreads: {"number", false}, OnFiles: {"number", false}, OnRetransmits: {"number", false}, OnTCPFailures: {"number", false},
 }
 
 // Usage tells whether the condition is about what a container uses, which
 // the agent measures at intervals.
 func (c Condition) Usage() bool {
-	return c.Kind == OnMemory || c.Kind == OnCPU || c.Kind == OnThrottle
+	_, measured := aboveUnits[c.Kind]
+	return measured
 }
 
 // Above is the threshold of a usage condition: a share of the container's
-// limit, or an amount in bytes (memory) or CPUs (cpu).
+// limit or of the time, or an amount in bytes, CPUs or a plain number.
 type Above struct {
 	Value   float64
 	Percent bool
 }
 
-// ParseAbove reads the threshold of a usage condition: "80%" is a share,
-// of the limit or, for throttling, of the time; memory also takes a size
-// such as "500Mi" or "2G", cpu a number of CPUs such as "1.5" or "1500m".
+// ParseAbove reads the threshold of a usage condition: "80%" is a share
+// where the condition takes one; a size is written such as "500Mi" or
+// "2G", CPUs such as "1.5" or "1500m", a number as it is.
 func ParseAbove(kind, s string) (Above, error) {
 	bad := fmt.Errorf("%q is no threshold for %s", s, kind)
 	number := func(s string) (float64, error) {
@@ -412,12 +437,16 @@ func ParseAbove(kind, s string) (Above, error) {
 		}
 		return n, nil
 	}
+	takes := aboveUnits[kind]
 	if share, ok := strings.CutSuffix(s, "%"); ok {
+		if !takes.share {
+			return Above{}, bad
+		}
 		n, err := number(share)
 		return Above{Value: n, Percent: true}, err
 	}
-	switch kind {
-	case OnMemory:
+	switch takes.unit {
+	case "size":
 		for _, unit := range []struct {
 			suffix string
 			bytes  float64
@@ -427,15 +456,18 @@ func ParseAbove(kind, s string) (Above, error) {
 				return Above{Value: n * unit.bytes}, err
 			}
 		}
-	case OnCPU:
+	case "cpus":
 		if milli, ok := strings.CutSuffix(s, "m"); ok {
 			n, err := number(milli)
 			return Above{Value: n / 1000}, err
 		}
 		n, err := number(s)
 		return Above{Value: n}, err
+	case "number":
+		n, err := number(s)
+		return Above{Value: n}, err
 	}
-	return Above{}, bad // throttling is a share of the time
+	return Above{}, bad // a share only
 }
 
 // Validate sets the default kind and checks the condition's shape.
@@ -474,6 +506,13 @@ func (c *Condition) Validate() error {
 			if n, err := strconv.Atoi(v); err != nil || n < 0 {
 				return errors.New("seconds must be a number that is not negative")
 			}
+		}
+		if of, ok := c.Params["of"]; ok && !slices.Contains([]string{"memory", "cpu", "io"}, of) {
+			return errors.New("pressure is of memory, cpu or io")
+		}
+		// Growth is measured over a time, which it needs.
+		if seconds, _ := strconv.Atoi(c.Params["seconds"]); c.Kind == OnGrowth && seconds == 0 {
+			return errors.New("memory-growth needs seconds: the time within which the memory grows that much")
 		}
 	}
 	if v, ok := c.Params["container"]; ok && !namePattern.MatchString(v) {

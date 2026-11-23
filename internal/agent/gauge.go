@@ -40,6 +40,18 @@ type usage struct {
 	// periods counts the periods of the CPU limit so far and throttled
 	// those in which the container was held back.
 	periods, throttled int64
+	// pressure is the share of the last 10 seconds, in percent, in which
+	// some task of the container stalled for memory, CPU or I/O.
+	pressure map[string]float64
+	// tasks is the number of its threads and processes.
+	tasks int64
+	// pids are its processes, as the node numbers them.
+	pids []int
+	// files is the number of files its processes hold open; retransmits
+	// and failures count the TCP segments that its pod sent again and the
+	// connection attempts of its pod that failed, so far. They are read
+	// only for the conditions that are about them.
+	files, retransmits, failures int64
 }
 
 // readUsage reads a container's accounting from its cgroup directory.
@@ -76,6 +88,21 @@ func readUsage(dir string) (usage, error) {
 		return u, err
 	}
 	u.cpu, u.periods, u.throttled = time.Duration(stat["usage_usec"])*time.Microsecond, stat["nr_periods"], stat["nr_throttled"]
+	// "some avg10=1.23 avg60=… total=…": the share of the last 10 seconds.
+	u.pressure = map[string]float64{}
+	for _, of := range []string{"memory", "cpu", "io"} {
+		for _, field := range strings.Fields(strings.SplitN(firstOf(read(of+".pressure")), "\n", 2)[0]) {
+			if share, ok := strings.CutPrefix(field, "avg10="); ok {
+				u.pressure[of], _ = strconv.ParseFloat(share, 64)
+			}
+		}
+	}
+	u.tasks, _ = strconv.ParseInt(firstOf(read("pids.current")), 10, 64)
+	for _, pid := range strings.Fields(firstOf(read("cgroup.procs"))) {
+		if n, err := strconv.Atoi(pid); err == nil {
+			u.pids = append(u.pids, n)
+		}
+	}
 	// "quota period" in microseconds, or "max period" without a limit.
 	if quota, period, ok := strings.Cut(firstOf(read("cpu.max")), " "); ok && quota != "max" {
 		q, _ := strconv.ParseFloat(quota, 64)
@@ -88,6 +115,45 @@ func readUsage(dir string) (usage, error) {
 
 func firstOf(s string, _ error) string { return s }
 
+// openFiles counts the files that processes hold open, in the node's /proc.
+func openFiles(proc string, pids []int) int64 {
+	var n int64
+	for _, pid := range pids {
+		held, _ := os.ReadDir(filepath.Join(proc, strconv.Itoa(pid), "fd"))
+		n += int64(len(held))
+	}
+	return n
+}
+
+// tcpCounters reads how many TCP segments a process's network namespace has
+// sent again and how many of its connection attempts failed, from the
+// kernel's counters: a line of names and a line of numbers.
+func tcpCounters(proc string, pid int) (retransmits, failures int64) {
+	b, _ := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "net", "snmp"))
+	var names []string
+	for _, line := range strings.Split(string(b), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || fields[0] != "Tcp:" {
+			continue
+		}
+		if names == nil {
+			names = fields
+			continue
+		}
+		for i, value := range fields {
+			if i < len(names) {
+				switch n, _ := strconv.ParseInt(value, 10, 64); names[i] {
+				case "RetransSegs":
+					retransmits = n
+				case "AttemptFails":
+					failures = n
+				}
+			}
+		}
+	}
+	return retransmits, failures
+}
+
 // gauge follows one container's use against a usage condition.
 type gauge struct {
 	when    api.Condition
@@ -98,6 +164,13 @@ type gauge struct {
 	since   time.Time // since when the use is above; zero while it is not
 	told    bool      // reported for this time above
 	limited bool      // said once that a share needs a limit
+	// grown holds the memory readings of the time over which growth is measured.
+	grown []grownAt
+}
+
+type grownAt struct {
+	at     time.Time
+	memory int64
 }
 
 func newGauge(when api.Condition) *gauge {
@@ -150,6 +223,52 @@ func (g *gauge) reading(u usage, now time.Time) string {
 		}
 		is = 100 * float64(u.throttled-last.throttled) / float64(periods)
 		told = fmt.Sprintf("is held back by its CPU limit of %.2f CPUs in %.0f %% of the time", u.cpus, is)
+	case api.OnPressure:
+		of := g.when.Params["of"]
+		if of == "" {
+			of = "memory"
+		}
+		is = u.pressure[of]
+		told = fmt.Sprintf("stalls for %s in %.0f %% of the time", map[string]string{"memory": "memory", "cpu": "CPU", "io": "I/O"}[of], is)
+	case api.OnThreads:
+		is = float64(u.tasks)
+		told = fmt.Sprintf("has %d threads and processes", u.tasks)
+	case api.OnFiles:
+		is = float64(u.files)
+		told = fmt.Sprintf("holds %d files open", u.files)
+	case api.OnRetransmits, api.OnTCPFailures:
+		if first || elapsed <= 0 {
+			return ""
+		}
+		if g.when.Kind == api.OnRetransmits {
+			is = float64(u.retransmits-last.retransmits) / elapsed.Seconds()
+			told = fmt.Sprintf("is in a pod that sends %.1f TCP segments per second again", is)
+		} else {
+			is = float64(u.failures-last.failures) / elapsed.Seconds()
+			told = fmt.Sprintf("is in a pod of which %.1f TCP connection attempts per second fail", is)
+		}
+	case api.OnGrowth:
+		// By how much the memory has grown from its lowest reading within the time.
+		g.grown = append(g.grown, grownAt{now, u.memory})
+		for len(g.grown) > 1 && now.Sub(g.grown[0].at) > g.held {
+			g.grown = g.grown[1:]
+		}
+		lowest := g.grown[0]
+		for _, reading := range g.grown {
+			if reading.memory < lowest.memory {
+				lowest = reading
+			}
+		}
+		is = float64(u.memory - lowest.memory)
+		if is <= g.above.Value {
+			g.told = false
+			return ""
+		}
+		if g.told {
+			return ""
+		}
+		g.told = true
+		return fmt.Sprintf("has grown by %s of memory in %s, to %s (above %s)", bytesText(u.memory-lowest.memory), now.Sub(lowest.at).Round(time.Second), bytesText(u.memory), g.when.Params["above"])
 	}
 	if is <= g.above.Value {
 		g.since, g.told = time.Time{}, false
@@ -208,6 +327,12 @@ func (a *Agent) measure(agent, ctx context.Context, w api.Watch, latest *atomic.
 				continue
 			}
 			u, err := readUsage(filepath.Join(a.Proc, strconv.Itoa(pid), "root", "sys", "fs", "cgroup"))
+			switch w.When.Kind {
+			case api.OnFiles:
+				u.files = openFiles(a.Proc, u.pids)
+			case api.OnRetransmits, api.OnTCPFailures:
+				u.retransmits, u.failures = tcpCounters(a.Proc, pid)
+			}
 			if err != nil {
 				if gauges[c.Name] == nil {
 					slog.Warn("usage watch", "watch", w.ID, "pod", pod.Name, "container", c.Name, "error", err)
