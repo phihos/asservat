@@ -61,6 +61,8 @@ ALTER TABLE watches ADD COLUMN IF NOT EXISTS sensitive boolean NOT NULL DEFAULT 
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
 -- What the watch waits for; a watch from before conditions waits for a crash.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS condition jsonb NOT NULL DEFAULT '{"kind":"crash"}';
+-- How far the watch's running recordings reach back; 0: its time frame.
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS before_seconds integer NOT NULL DEFAULT 0;
 -- The firings of alerts that an alert watch has recorded: Alertmanager repeats them.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS fired jsonb NOT NULL DEFAULT '[]';
 

@@ -117,7 +117,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 	case api.KindLogs:
 		return a.logs(ctx, frame, pod, rec, r.AfterCrash(), duration, up)
 	case api.KindPcap:
-		if r.Watch != "" {
+		if r.Watch != "" && rec.Buffers() {
 			// The packets before the watch's condition was met, set aside when it was reported.
 			a.mu.Lock()
 			packets := a.snapshots[r.Trigger]
@@ -160,9 +160,9 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		}
 		return a.record(ctx, frame, duration, container+".strace", up, "strace", args...)
 	case api.KindCPU:
-		return a.sample(ctx, frame, sampledCPU, duration, pod, up)
+		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, up)
 	case api.KindMemory:
-		return a.sample(ctx, frame, sampledMemory, duration, pod, up)
+		return a.sampled(ctx, frame, sampledMemory, r, t.Pod, duration, pod, up)
 	case api.KindPprof:
 		pid, err := a.podPID(pod)
 		if err != nil {

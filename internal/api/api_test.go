@@ -3,6 +3,7 @@ package api
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateAndSensitive(t *testing.T) {
@@ -202,5 +203,37 @@ func TestParseAbove(t *testing.T) {
 	ok := Condition{Kind: OnThrottle, Params: map[string]string{"above": "25%", "seconds": "30", "container": "app"}}
 	if err := ok.Validate(); err != nil || !ok.Usage() {
 		t.Fatal(err)
+	}
+}
+
+// In a watch, packets and the sampled CPU profile are kept running so that
+// they reach back; memory growth only on request, because it costs the
+// node while the watch waits. "before" overrides either.
+func TestRecordingsThatReachBack(t *testing.T) {
+	for _, c := range []struct {
+		rec  Recording
+		want bool
+	}{
+		{Recording{Kind: KindPcap}, true}, {Recording{Kind: KindCPU}, true}, {Recording{Kind: KindMemory}, false}, {Recording{Kind: KindLogs}, false},
+		{Recording{Kind: KindCPU, Params: map[string]string{"before": "false"}}, false}, {Recording{Kind: KindMemory, Params: map[string]string{"before": "true"}}, true},
+	} {
+		if got := c.rec.Buffers(); got != c.want {
+			t.Errorf("%v reaches back: %v", c.rec, got)
+		}
+	}
+	bad := CaptureRequest{Cluster: "edge", Namespace: "shop", Workload: "Deployment/web", Recordings: []Recording{{Kind: KindLogs, Params: map[string]string{"before": "true"}}}}
+	if err := bad.Validate(); err == nil {
+		t.Fatal("logs took before")
+	}
+	bad.Recordings = []Recording{{Kind: KindCPU, Params: map[string]string{"before": "yes"}}}
+	if err := bad.Validate(); err == nil {
+		t.Fatal("before took a value that is neither true nor false")
+	}
+	w := Watch{CaptureRequest: CaptureRequest{DurationSeconds: 30}}
+	if w.Before() != 30*time.Second {
+		t.Fatal("without beforeSeconds a watch reaches back its time frame", w.Before())
+	}
+	if w.BeforeSeconds = 120; w.Before() != 2*time.Minute {
+		t.Fatal(w.Before())
 	}
 }

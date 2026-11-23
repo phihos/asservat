@@ -330,19 +330,19 @@ func (s *Store) CreateWatch(ctx context.Context, w api.Watch, groups []string) e
 	request, _ := json.Marshal(w.CaptureRequest)
 	g, _ := json.Marshal(groups)
 	condition, _ := json.Marshal(w.When)
-	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive, approver, condition) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive, w.Approver, condition)
+	_, err := s.db.Exec(ctx, `INSERT INTO watches(id, requester, groups, cluster, request, selector, remaining, sensitive, approver, condition, before_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		w.ID, w.Requester, g, w.Cluster, request, w.Selector, w.Remaining, w.Sensitive, w.Approver, condition, w.BeforeSeconds)
 	return err
 }
 
-const watchColumns = `id::text, requester, groups, request, selector, remaining, created_at, sensitive, approver, condition`
+const watchColumns = `id::text, requester, groups, request, selector, remaining, created_at, sensitive, approver, condition, before_seconds`
 
 // scanWatch also returns the groups of the user who created the watch.
 func scanWatch(r pgx.Row) (api.Watch, []string, error) {
 	var w api.Watch
 	var groups []string
 	var request, g, condition []byte
-	if err := r.Scan(&w.ID, &w.Requester, &g, &request, &w.Selector, &w.Remaining, &w.CreatedAt, &w.Sensitive, &w.Approver, &condition); err != nil {
+	if err := r.Scan(&w.ID, &w.Requester, &g, &request, &w.Selector, &w.Remaining, &w.CreatedAt, &w.Sensitive, &w.Approver, &condition, &w.BeforeSeconds); err != nil {
 		return w, nil, err
 	}
 	if err := json.Unmarshal(condition, &w.When); err != nil {

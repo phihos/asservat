@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -32,6 +33,8 @@ import (
 	"go.opentelemetry.io/ebpf-profiler/times"
 	"go.opentelemetry.io/ebpf-profiler/tracer"
 	corev1 "k8s.io/api/core/v1"
+
+	"asservat.local/asservat/internal/api"
 )
 
 // A CPU profile of a pod is sampled from the node, so the application needs
@@ -53,7 +56,8 @@ const tracefs = "/sys/kernel/tracing"
 
 // sampledKind is what a sampled profile counts.
 type sampledKind struct {
-	file string
+	recording string // the kind of recording that asks for it
+	file      string
 	// memory tells a profile of page faults from one of CPU samples.
 	memory bool
 	// count and amount name the two values of every stack: how often it
@@ -67,7 +71,7 @@ type sampledKind struct {
 var (
 	// sampledCPU counts the samples taken of what runs on the CPUs.
 	sampledCPU = sampledKind{
-		file:  "sampled-cpu.pprof",
+		recording: api.KindCPU, file: "sampled-cpu.pprof",
 		count: profile.ValueType{Type: "samples", Unit: "count"}, amount: profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		unit:    int64(time.Second / sampleRate),
 		nothing: "the pod's processes used no CPU time while they were sampled",
@@ -78,7 +82,7 @@ var (
 	// Every fault counts as one page of the usual size, also where the
 	// kernel hands out a huge page.
 	sampledMemory = sampledKind{
-		file: "sampled-memory.pprof", memory: true,
+		recording: api.KindMemory, file: "sampled-memory.pprof", memory: true,
 		count: profile.ValueType{Type: "page_faults", Unit: "count"}, amount: profile.ValueType{Type: "memory", Unit: "bytes"},
 		unit:    int64(os.Getpagesize()),
 		nothing: "the pod's processes took no new memory while they were watched",
@@ -116,7 +120,75 @@ type sampledProfile struct {
 	kind       sampledKind
 	containers map[string]bool // the pod's container IDs
 	pids       map[int]bool    // its processes when the sampling began
-	stacks     map[stackKey]*sampledStack
+	// seconds holds the stacks by the second in which they were seen. A
+	// profile that is kept running for a watch drops the seconds that lie
+	// further back than its window; window 0 keeps all.
+	seconds map[int64]map[stackKey]*sampledStack
+	window  time.Duration
+}
+
+func newSampledProfile(kind sampledKind, window time.Duration) *sampledProfile {
+	return &sampledProfile{kind: kind, window: window, containers: map[string]bool{}, pids: map[int]bool{}, seconds: map[int64]map[stackKey]*sampledStack{}}
+}
+
+// add counts a stack seen at a moment. The caller holds the sampler's lock.
+func (p *sampledProfile) add(key stackKey, at time.Time, stack func() *sampledStack) {
+	second := at.Unix()
+	stacks := p.seconds[second]
+	if stacks == nil {
+		stacks = map[stackKey]*sampledStack{}
+		p.seconds[second] = stacks
+		// A new second begins: those out of the window go.
+		if p.window > 0 {
+			for old := range p.seconds {
+				if old < second-int64(p.window/time.Second) {
+					delete(p.seconds, old)
+				}
+			}
+		}
+	}
+	seen := stacks[key]
+	if seen == nil {
+		seen = stack()
+		stacks[key] = seen
+	}
+	seen.count++
+}
+
+// since returns the stacks seen from a moment on, each with how often. The
+// caller holds the sampler's lock, or the profile is no longer sampled.
+func (p *sampledProfile) since(from time.Time) map[stackKey]*sampledStack {
+	all := map[stackKey]*sampledStack{}
+	for second, stacks := range p.seconds {
+		if second < from.Unix() {
+			continue
+		}
+		for key, stack := range stacks {
+			if sum := all[key]; sum != nil {
+				sum.count += stack.count
+			} else {
+				whole := *stack
+				all[key] = &whole
+			}
+		}
+	}
+	return all
+}
+
+// cover adds the pod's containers and processes to those whose samples the
+// profile takes: a restarted container is a new one.
+func (a *Agent) cover(p *sampledProfile, pod *corev1.Pod) {
+	a.sampler.mu.Lock()
+	defer a.sampler.mu.Unlock()
+	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
+		if _, id, ok := strings.Cut(status.ContainerID, "://"); ok && !p.containers[id] {
+			p.containers[id] = true
+			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
+			for _, pid := range all {
+				p.pids[pid] = true
+			}
+		}
+	}
 }
 
 type stackKey struct {
@@ -370,7 +442,7 @@ func (f *faultProbe) Unload() error {
 func (s *sampler) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceEventMeta) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	pid := int(meta.PID)
+	pid, now := int(meta.PID), time.Now()
 	for p := range s.profiles {
 		// The container tells whose sample it is. Only where the profiler
 		// knows none does the process ID decide, which another process can
@@ -381,18 +453,14 @@ func (s *sampler) ReportTraceEvent(trace *libpf.Trace, meta *samples.TraceEventM
 		if p.kind.memory != (meta.ProfileType == pageFaults) {
 			continue
 		}
-		key := stackKey{trace.Hash(), pid}
-		stack := p.stacks[key]
-		if stack == nil {
+		p.add(stackKey{trace.Hash(), pid}, now, func() *sampledStack {
 			frames := slices.Clone(trace.Frames)
 			if p.kind.memory {
 				// The kernel's part is the same at every fault: the fault's handler.
 				frames = slices.DeleteFunc(frames, func(f unique.Handle[libpf.Frame]) bool { return f.Value().Type == libpf.KernelFrame })
 			}
-			stack = &sampledStack{frames: frames, pid: pid, comm: meta.Comm.String()}
-			p.stacks[key] = stack
-		}
-		stack.count++
+			return &sampledStack{frames: frames, pid: pid, comm: meta.Comm.String()}
+		})
 	}
 	return nil
 }
@@ -414,16 +482,8 @@ func (s *sampler) ReportExecutable(args *reporter.ExecutableMetadata) {
 // for duration from when the profiler runs or until frame ends before, and
 // uploads the profile in pprof's format.
 func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
-	p := &sampledProfile{kind: kind, containers: map[string]bool{}, pids: map[int]bool{}, stacks: map[stackKey]*sampledStack{}}
-	for _, status := range slices.Concat(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses) {
-		if _, id, ok := strings.Cut(status.ContainerID, "://"); ok {
-			p.containers[id] = true
-			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
-			for _, pid := range all {
-				p.pids[pid] = true
-			}
-		}
-	}
+	p := newSampledProfile(kind, 0)
+	a.cover(p, pod)
 	if len(p.pids) == 0 {
 		return fmt.Errorf("pod %s has no running process", pod.Name)
 	}
@@ -439,14 +499,104 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if len(p.stacks) == 0 {
-		return errors.New(kind.nothing)
+	return a.uploadSampled(p, p.since(time.Time{}), binaries, began, up)
+}
+
+// sampled records a sampled profile for a capture: from the profile that the
+// capture's watch has kept running for the pod if there is one, and
+// otherwise from now on.
+func (a *Agent) sampled(ctx, frame context.Context, kind sampledKind, r api.CaptureRequest, podName string, duration time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
+	a.mu.Lock()
+	running := a.kept[r.Watch+"/"+podName+"/"+kind.recording]
+	a.mu.Unlock()
+	if r.Watch == "" || running == nil {
+		return a.sample(ctx, frame, kind, duration, pod, up)
+	}
+	if r.AfterCrash() {
+		duration = 0
+	}
+	return a.sampleKept(ctx, frame, running, duration, pod, up)
+}
+
+// kept is a sampled profile that a watch keeps running for a pod, so that
+// the profile of its capture reaches back before the watch's condition was
+// met.
+type kept struct {
+	profile *sampledProfile
+	before  time.Duration
+}
+
+// keep has the profiler take the pod's samples of a kind for as long as the
+// watch waits (ctx), keeping the seconds that a capture of the watch will
+// want: those before the condition is met and those of its time frame
+// after. A pod that is kept already gets its new containers covered.
+func (a *Agent) keep(ctx context.Context, w api.Watch, kind sampledKind, pod *corev1.Pod) {
+	key := w.ID + "/" + pod.Name + "/" + kind.recording
+	a.mu.Lock()
+	running := a.kept[key]
+	a.mu.Unlock()
+	if running != nil {
+		a.cover(running.profile, pod)
+		return
+	}
+	// A few seconds more than asked: the capture's task takes a moment to arrive.
+	p := newSampledProfile(kind, w.Before()+time.Duration(w.DurationSeconds)*time.Second+10*time.Second)
+	a.cover(p, pod)
+	if len(p.pids) == 0 {
+		return // no container runs yet: the pod's next change tries again
+	}
+	if err := a.sampler.begin(p); err != nil {
+		slog.Warn("a watch's profile is not kept running: its captures will sample from the moment they start", "watch", w.ID, "pod", pod.Name, "error", err)
+		return
+	}
+	a.mu.Lock()
+	a.kept[key] = &kept{profile: p, before: w.Before()}
+	a.mu.Unlock()
+	go func() {
+		<-ctx.Done()
+		a.mu.Lock()
+		delete(a.kept, key)
+		a.mu.Unlock()
+		a.sampler.end(p)
+	}()
+}
+
+// sampleKept uploads the profile of a watch's capture from the profile that
+// was kept running: the time before the capture, and after it the time
+// frame, unless the capture follows a crash, which leaves nothing to sample.
+func (a *Agent) sampleKept(ctx, frame context.Context, k *kept, after time.Duration, pod *corev1.Pod, up func(string, io.Reader) error) error {
+	from := time.Now().Add(-k.before)
+	select {
+	case <-frame.Done():
+	case <-time.After(after):
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	a.cover(k.profile, pod) // the processes of now lead to the binaries
+	a.sampler.mu.Lock()
+	stacks := k.profile.since(from)
+	binaries := make(map[libpf.FileID]mappedFile, len(a.sampler.binaries))
+	for id, b := range a.sampler.binaries {
+		binaries[id] = b
+	}
+	a.sampler.mu.Unlock()
+	return a.uploadSampled(k.profile, stacks, binaries, from, up)
+}
+
+// uploadSampled names the functions of the stacks and uploads them as a
+// profile in pprof's format.
+func (a *Agent) uploadSampled(p *sampledProfile, stacks map[stackKey]*sampledStack, binaries map[libpf.FileID]mappedFile, began time.Time, up func(string, io.Reader) error) error {
+	if len(stacks) == 0 {
+		return errors.New(p.kind.nothing)
 	}
 	// The symbols of native code are in the binaries, which the pod's own processes lead to first.
+	a.sampler.mu.Lock()
 	pids := make([]int, 0, len(p.pids))
 	for pid := range p.pids {
 		pids = append(pids, pid)
 	}
+	a.sampler.mu.Unlock()
 	tables := map[libpf.FileID]symbolTable{}
 	name := func(file libpf.FileID, address uint64) string {
 		table, read := tables[file]
@@ -461,10 +611,10 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 		return table.name(address)
 	}
 	var packed bytes.Buffer
-	if err := sampledAsProfile(kind, p.stacks, began, time.Since(began), name).Write(&packed); err != nil {
+	if err := sampledAsProfile(p.kind, stacks, began, time.Since(began), name).Write(&packed); err != nil {
 		return err
 	}
-	return up(kind.file, &packed)
+	return up(p.kind.file, &packed)
 }
 
 // sampledAsProfile turns sampled stacks into a profile in pprof's format.

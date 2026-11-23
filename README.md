@@ -158,8 +158,9 @@ its condition: by default a container that crashes, with `"when": {"kind":
 "restart"}` a container that is started again, with `"not-ready"` a pod that
 stops being ready, with `"log"` and a `pattern` a container that writes a
 matching log line, with `"memory"`, `"cpu"` or `"throttled"` and a threshold
-`above` a container that uses that much. After a crash a `pcap` holds the packet headers of the
-seconds before it:
+`above` a container that uses that much. Packets and the sampled CPU profile are kept running
+while the watch waits, so their files begin `beforeSeconds` before that
+moment and show what led to it:
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d '{
