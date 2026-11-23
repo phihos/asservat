@@ -101,10 +101,11 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 				var frames []map[string]any
 				json.Unmarshal(thread["systemId"], &id)
 				json.Unmarshal(thread["frames"], &frames)
-				walked := threads[id]
+				walked := threads[id].frames
 				if len(walked) == 0 {
 					continue
 				}
+				thread["cut"], _ = json.Marshal(threads[id].cut)
 				with := make([]any, len(walked))
 				for i, frame := range walked {
 					with[i] = frame
@@ -134,7 +135,7 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 // are more than maxGoroutines. For a program without debug information
 // they are read without it, and so are the stacks of its threads, which
 // are otherwise nil.
-func goroutines(ctx context.Context, corePath, exe, version string) (out []goroutine, threads map[int][]goFrame, cut bool, err error) {
+func goroutines(ctx context.Context, corePath, exe, version string) (out []goroutine, threads map[int]goStack, cut bool, err error) {
 	// Delve reads the memory of a program that may have crashed because that
 	// memory is damaged.
 	defer func() {

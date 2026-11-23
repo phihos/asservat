@@ -41,7 +41,6 @@ const (
 	gRead     = 512             // bytes read of each g: goid lies within in every version
 	gStatuses = 0b1101011111    // the states a g can be in, as bits: 0 to 4, 6, 8, 9
 	gScan     = 0x1000          // set in a status while the collector scans the stack
-	gMost     = 1 << 24         // more goroutines than a core's memory holds: no slice of them is longer
 	gIDMost   = uint64(1) << 48 // goroutine IDs count up from 1
 	gDead     = 6
 )
@@ -50,7 +49,7 @@ const (
 // debug information.
 // It also returns the stacks of the threads, by their system IDs: gdb
 // cannot walk them without debug information either.
-func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, runtime goversion.GoVersion) (out []goroutine, threads map[int][]goFrame, cut bool, err error) {
+func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, runtime goversion.GoVersion) (out []goroutine, threads map[int]goStack, cut bool, err error) {
 	bi, mem := target.BinInfo(), target.Memory()
 	if bi.Arch.PtrSize() != 8 || len(bi.Images) == 0 {
 		return nil, nil, false, errors.New("no 64-bit program")
@@ -98,13 +97,21 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 		vars := read(section.Addr+bi.Images[0].StaticBase, int(section.Size)&^7)
 		for at := 0; at+24 <= len(vars); at += 8 {
 			array, length, capacity := word(vars, at), word(vars, at+8), word(vars, at+16)
-			if length <= uint64(len(addrs)) || length > capacity || capacity > gMost || isG(word(read(array, 8), 0)) == nil {
+			if length <= uint64(len(addrs)) || length > capacity || isG(word(read(array, 8), 0)) == nil {
 				continue
 			}
-			elements := read(array, int(length)*8)
-			found := make([]uint64, 0, length)
-			for i := 0; i < len(elements) && isG(word(elements, i)) != nil; i += 8 {
-				found = append(found, word(elements, i))
+			// The elements are read a page at a time and only for as long
+			// as they are gs: what merely looks like a long slice costs
+			// one page.
+			var found []uint64
+			for whole := true; whole && uint64(len(found)) < length; {
+				page := read(array+uint64(len(found))*8, int(min(length-uint64(len(found)), 512))*8)
+				whole = page != nil
+				for i := 0; i < len(page) && whole; i += 8 {
+					if whole = isG(word(page, i)) != nil; whole {
+						found = append(found, word(page, i))
+					}
+				}
 			}
 			if uint64(len(found)) == length {
 				addrs = found
@@ -114,9 +121,11 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 	if len(addrs) == 0 {
 		return nil, nil, false, errors.New("the runtime's list of goroutines was not found")
 	}
-	gs := make([][]byte, len(addrs))
-	for i, addr := range addrs {
-		gs[i] = isG(addr)
+	// Where the fields of a g are is told by some of them: a program can
+	// have a million goroutines, and each is read again when it is needed.
+	gs := make([][]byte, min(len(addrs), 4096))
+	for i := range gs {
+		gs[i] = isG(addrs[i])
 	}
 
 	// goid: the first word after sched that is a different ID in every g,
@@ -161,16 +170,31 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 	}
 	running := map[uint64]registers{}
 	var all []registers
+	var sps []uint64 // their stack pointers
 	for _, thread := range target.ThreadList() {
 		regs, err := thread.Registers()
 		if err != nil {
 			continue
 		}
 		all = append(all, registers{regs.PC(), regs.BP(), thread.ThreadID()})
-		for i, g := range gs {
-			if regs.SP() >= word(g, 0) && regs.SP() < word(g, 8) {
-				running[addrs[i]] = registers{regs.PC(), regs.BP(), thread.ThreadID()}
+		sps = append(sps, regs.SP())
+	}
+	type found struct {
+		addr, id uint64
+	}
+	var live []found
+	for _, addr := range addrs {
+		g := isG(addr)
+		if g == nil {
+			continue
+		}
+		for i, sp := range sps {
+			if sp >= word(g, 0) && sp < word(g, 8) {
+				running[addr] = all[i]
 			}
+		}
+		if status := binary.LittleEndian.Uint32(g[goid-8:]) &^ gScan; status != 0 && status != gDead {
+			live = append(live, found{addr, word(g, goid)})
 		}
 	}
 	// Without the table of inlined calls a frame is its function with the
@@ -237,21 +261,12 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 	}
 	// A thread's stack, whose bounds are not known, is followed for as long
 	// as it leads upwards to addresses of the program.
-	threads = map[int][]goFrame{}
+	threads = map[int]goStack{}
 	for _, thread := range all {
-		threads[thread.thread], _ = walk(thread.pc, thread.bp, func(addr uint64) bool { return addr != 0 })
+		frames, cut := walk(thread.pc, thread.bp, func(addr uint64) bool { return addr != 0 })
+		threads[thread.thread] = goStack{frames, cut}
 	}
 
-	type found struct {
-		addr uint64
-		g    []byte
-	}
-	var live []found
-	for i, g := range gs {
-		if status := binary.LittleEndian.Uint32(g[goid-8:]) &^ gScan; status != 0 && status != gDead {
-			live = append(live, found{addrs[i], g})
-		}
-	}
 	if len(live) > maxGoroutines {
 		sort.SliceStable(live, func(i, j int) bool {
 			_, a := running[live[i].addr]
@@ -260,14 +275,17 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 		})
 		live, cut = live[:maxGoroutines], true
 	}
-	sort.Slice(live, func(i, j int) bool { return word(live[i].g, goid) < word(live[j].g, goid) })
+	sort.Slice(live, func(i, j int) bool { return live[i].id < live[j].id })
 	selected, _ := target.CurrentThread().Registers()
 	for _, l := range live {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, false, err
 		}
-		g := l.g
-		d := goroutine{ID: int64(word(g, goid))}
+		g := isG(l.addr)
+		if g == nil {
+			continue
+		}
+		d := goroutine{ID: int64(l.id)}
 		// What the goroutine was doing when it last left its thread is in
 		// sched; one on a thread is where the thread's registers say.
 		pc, bp := word(g, gSchedPC), word(g, schedBP)
@@ -302,6 +320,13 @@ func lineTableGoroutines(ctx context.Context, target *proc.Target, exe string, r
 		out = append(out, d)
 	}
 	return out, threads, cut, nil
+}
+
+// goStack is a stack that was walked without debug information; cut tells
+// that it goes deeper than maxFrames.
+type goStack struct {
+	frames []goFrame
+	cut    bool
 }
 
 // standard tells whether a function is of the runtime or of the standard
