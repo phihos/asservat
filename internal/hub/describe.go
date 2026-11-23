@@ -64,7 +64,11 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 			h.mu.Unlock()
 			described, reason, err = false, "this Asservat could not describe the core again", nil
 		case err == nil && described:
-			err = h.Store.Audit(work, u.Name, "artifact.describe", c.ID, map[string]string{"name": in.Name})
+			// The description is stored: that is the answer, whatever
+			// becomes of its audit entry.
+			if err := h.Store.Audit(work, u.Name, "artifact.describe", c.ID, map[string]string{"name": in.Name}); err != nil {
+				slog.Error("audit", "action", "artifact.describe", "capture", c.ID, "error", err)
+			}
 			h.notify(c.ID)
 		}
 		done <- outcome{map[string]any{"described": described, "reason": reason}, err}

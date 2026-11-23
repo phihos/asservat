@@ -132,20 +132,65 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 	cmd.Wait() // the files on the node are gone
 
 	// The viewer asks over HTTP. The answer starts with the spaces that
-	// keep a proxy waiting, and still reads as JSON.
+	// keep a proxy waiting. Here the viewer is closed while the hub works:
+	// the work goes on, with its audit entry.
 	server := httptest.NewServer(h.Handler())
 	defer server.Close()
-	ask, _ := http.NewRequest("POST", server.URL+"/api/captures/"+c.ID+"/describe", strings.NewReader(`{"name":"`+name+`"}`))
-	ask.Header.Set("Authorization", "Bearer alice-token-of-the-describe-test")
-	res, err := http.DefaultClient.Do(ask)
-	if err != nil {
-		t.Fatal(err)
+	ask := func(ctx context.Context) *http.Response {
+		req, _ := http.NewRequestWithContext(ctx, "POST", server.URL+"/api/captures/"+c.ID+"/describe", strings.NewReader(`{"name":"`+name+`"}`))
+		req.Header.Set("Authorization", "Bearer alice-token-of-the-describe-test")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
 	}
+	open, closeViewer := context.WithCancel(ctx)
+	res := ask(open)
+	first := make([]byte, 2)
+	if _, err := io.ReadFull(res.Body, first); err != nil || res.StatusCode != 200 || string(first) != "  " {
+		t.Fatalf("the answer begins %q: %d %v", first, res.StatusCode, err)
+	}
+	closeViewer()
+	res.Body.Close()
+	described := func() bool {
+		a, err := store.Artifact(ctx, c.ID, name+coredesc.Suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var report bytes.Buffer
+		return h.plain(ctx, a, &report) == nil && coredesc.DescribedBy(report.Bytes()) == coredesc.Version
+	}
+	for i := 0; !described(); i++ {
+		if i == 600 {
+			t.Fatal("the core was not described after the viewer was closed")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	audited := func() bool {
+		log, err := store.AuditLog(ctx, time.Now().Add(time.Hour), 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range log {
+			if e.Action == "artifact.describe" && e.Capture != nil && *e.Capture == c.ID {
+				return true
+			}
+		}
+		return false
+	}
+	for i := 0; !audited(); i++ {
+		if i == 100 {
+			t.Fatal("no audit entry of the description")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	// The next viewer finds it done.
+	res = ask(ctx)
 	answer, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var said struct{ Described bool }
-	if err := json.Unmarshal(answer, &said); err != nil || res.StatusCode != 200 || !said.Described || !bytes.HasPrefix(answer, []byte("  ")) {
-		t.Fatalf("with files: %d %q %v", res.StatusCode, answer, err)
+	if strings.TrimSpace(string(answer)) != `{"described":false,"reason":""}` {
+		t.Fatalf("asked again: %q", answer)
 	}
 	stored, err := store.Artifact(ctx, c.ID, name+coredesc.Suffix)
 	if err != nil {
