@@ -79,6 +79,9 @@ made for that pod.
 | `restart` | A container is started again, whatever ended it: a failure, a clean exit, a failed liveness probe | The pod as it runs again |
 | `not-ready` | The pod was ready and no longer is: its readiness probe fails | The pod in that state |
 | `log` | A container writes a log line that the regular expression `pattern` matches; `container` limits it to one container | The pod from that moment |
+| `memory` | A container's memory use is above `above`: a share of its limit (`80%`) or a size (`500Mi`) | The container before the kernel ends it |
+| `cpu` | A container's CPU use is above `above`: a number of CPUs (`1.5`) or a share of its limit (`90%`) | The container while it is busy |
+| `throttled` | A container is held back by its CPU limit in more than `above` (`25%`) of the time | The container while it wants more CPU than it gets |
 
 1. A user creates a watch: a capture request, with one or more recordings,
    a condition, and the number of times to record (default 1). The
@@ -103,6 +106,17 @@ pod's further lines are passed over for the watch's time frame (30 seconds
 where it has none), because they belong to the incident that is being
 recorded. A stream that ends is opened again after a pause that grows up to
 a minute; nothing tells when it can be read again.
+
+The three conditions about what a container uses take `seconds`, for how
+long the use must stay above, and `container`. The agent measures every 5
+seconds from the container's own accounting, the files of its cgroup,
+which it reaches through the container's main process; this needs cgroup
+v2. Use is a level and no event: the kernel only tells when a container
+reaches its own limits, which is too late. Memory is counted as Kubernetes
+does (without file cache that can be dropped). A condition is met once the
+use has been above for as long as asked, and again only after it has been
+below; a pod that is already above when the watch starts is recorded. A
+share of a limit that the container does not have is never met.
 
 Except after a crash, the pod is alive when its capture starts: the
 recordings that run over time (CPU profile, memory growth, system calls)
@@ -479,7 +493,7 @@ These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint.
-- More conditions for watches: memory or CPU use, a Prometheus alert.
+- More conditions for watches: a Prometheus alert.
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.

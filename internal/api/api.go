@@ -4,6 +4,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -342,6 +343,9 @@ const (
 	OnRestart  = "restart"   // a container is started again, whatever ended it
 	OnNotReady = "not-ready" // the pod stops being ready
 	OnLog      = "log"       // a container writes a log line that matches a pattern
+	OnMemory   = "memory"    // a container's memory use is above a size or a share of its limit
+	OnCPU      = "cpu"       // a container's CPU use is above a number of CPUs or a share of its limit
+	OnThrottle = "throttled" // a container is held back by its CPU limit in more than a share of the time
 )
 
 // Condition is what a watch waits for. Without a kind it is a crash.
@@ -359,6 +363,60 @@ var conditionParams = map[string][]string{
 	OnRestart:  {},
 	OnNotReady: {},
 	OnLog:      {"pattern", "container"},
+	OnMemory:   {"above", "seconds", "container"},
+	OnCPU:      {"above", "seconds", "container"},
+	OnThrottle: {"above", "seconds", "container"},
+}
+
+// Usage tells whether the condition is about what a container uses, which
+// the agent measures at intervals.
+func (c Condition) Usage() bool {
+	return c.Kind == OnMemory || c.Kind == OnCPU || c.Kind == OnThrottle
+}
+
+// Above is the threshold of a usage condition: a share of the container's
+// limit, or an amount in bytes (memory) or CPUs (cpu).
+type Above struct {
+	Value   float64
+	Percent bool
+}
+
+// ParseAbove reads the threshold of a usage condition: "80%" is a share,
+// of the limit or, for throttling, of the time; memory also takes a size
+// such as "500Mi" or "2G", cpu a number of CPUs such as "1.5" or "1500m".
+func ParseAbove(kind, s string) (Above, error) {
+	bad := fmt.Errorf("%q is no threshold for %s", s, kind)
+	number := func(s string) (float64, error) {
+		n, err := strconv.ParseFloat(s, 64)
+		if err != nil || n < 0 || math.IsInf(n, 0) || math.IsNaN(n) {
+			return 0, bad
+		}
+		return n, nil
+	}
+	if share, ok := strings.CutSuffix(s, "%"); ok {
+		n, err := number(share)
+		return Above{Value: n, Percent: true}, err
+	}
+	switch kind {
+	case OnMemory:
+		for _, unit := range []struct {
+			suffix string
+			bytes  float64
+		}{{"Ki", 1 << 10}, {"Mi", 1 << 20}, {"Gi", 1 << 30}, {"k", 1e3}, {"M", 1e6}, {"G", 1e9}, {"", 1}} {
+			if size, ok := strings.CutSuffix(s, unit.suffix); ok {
+				n, err := number(size)
+				return Above{Value: n * unit.bytes}, err
+			}
+		}
+	case OnCPU:
+		if milli, ok := strings.CutSuffix(s, "m"); ok {
+			n, err := number(milli)
+			return Above{Value: n / 1000}, err
+		}
+		n, err := number(s)
+		return Above{Value: n}, err
+	}
+	return Above{}, bad // throttling is a share of the time
 }
 
 // Validate sets the default kind and checks the condition's shape.
@@ -382,9 +440,22 @@ func (c *Condition) Validate() error {
 		if _, err := regexp.Compile(c.Params["pattern"]); err != nil {
 			return fmt.Errorf("the pattern is no regular expression: %v", err)
 		}
-		if v, ok := c.Params["container"]; ok && !namePattern.MatchString(v) {
-			return errors.New("invalid container name")
+	}
+	if c.Usage() {
+		if c.Params["above"] == "" {
+			return fmt.Errorf("a %s condition needs a threshold: above", c.Kind)
 		}
+		if _, err := ParseAbove(c.Kind, c.Params["above"]); err != nil {
+			return err
+		}
+		if v, ok := c.Params["seconds"]; ok {
+			if n, err := strconv.Atoi(v); err != nil || n < 0 {
+				return errors.New("seconds must be a number that is not negative")
+			}
+		}
+	}
+	if v, ok := c.Params["container"]; ok && !namePattern.MatchString(v) {
+		return errors.New("invalid container name")
 	}
 	return nil
 }

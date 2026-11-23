@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,8 +73,14 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	// The handlers run one at a time. A pod's first sighting only records
 	// the state it is in: what happened before is not reported.
 	seen := map[string]string{}
-	marked := map[string]bool{}                  // pod UIDs whose cores the node's handler keeps
-	following := map[string]context.CancelFunc{} // pods whose logs a log watch reads
+	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
+	// The pods that a watch for a log line or for what a container uses
+	// keeps reading: how to stop that, and the pod as last seen.
+	type tended struct {
+		stop context.CancelFunc
+		pod  *atomic.Pointer[corev1.Pod]
+	}
+	tending := map[string]tended{}
 	defer func() {
 		for uid := range marked {
 			a.Cores.unmark(uid, w.ID)
@@ -94,12 +101,20 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			}
 			marked[string(pod.UID)] = true
 		}
-		if w.When.Kind == api.OnLog {
-			// The pod's logs are read once a container of it runs.
-			if _, reads := following[pod.Name]; !reads && pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil {
+		if w.When.Kind == api.OnLog || w.When.Usage() {
+			// The pod is read from once a container of it runs.
+			if t, reads := tending[pod.Name]; reads {
+				t.pod.Store(pod)
+			} else if pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil {
 				reading, stop := context.WithCancel(ctx)
-				following[pod.Name] = stop
-				go a.follow(agent, reading, w, pod.DeepCopy())
+				t := tended{stop: stop, pod: &atomic.Pointer[corev1.Pod]{}}
+				t.pod.Store(pod)
+				tending[pod.Name] = t
+				if w.When.Usage() {
+					go a.measure(agent, reading, w, t.pod)
+				} else {
+					go a.follow(agent, reading, w, pod.DeepCopy())
+				}
 			}
 			return
 		}
@@ -124,9 +139,9 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				a.Cores.unmark(string(pod.UID), w.ID)
 				delete(marked, string(pod.UID))
 			}
-			if stop := following[pod.Name]; stop != nil {
-				stop()
-				delete(following, pod.Name)
+			if t, reads := tending[pod.Name]; reads {
+				t.stop()
+				delete(tending, pod.Name)
 			}
 			a.mu.Lock()
 			// A new pod of the same name gets its own buffer at once.
