@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -81,7 +84,9 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	h, err := New(Config{Store: store, Blobs: DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, WorkDir: t.TempDir()})
+	// The hub's streams beat often here, as a description outlasts many beats in production.
+	h, err := New(Config{Store: store, Blobs: DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, WorkDir: t.TempDir(), StreamBeat: 20 * time.Millisecond,
+		Users: []StaticUser{{Name: "alice", Token: "alice-token-of-the-describe-test"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,8 +131,21 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 	cmd.Process.Kill()
 	cmd.Wait() // the files on the node are gone
 
-	if described, reason, err := h.describeAgain(ctx, c.ID, name); err != nil || !described {
-		t.Fatal("with files:", described, reason, err)
+	// The viewer asks over HTTP. The answer starts with the spaces that
+	// keep a proxy waiting, and still reads as JSON.
+	server := httptest.NewServer(h.Handler())
+	defer server.Close()
+	ask, _ := http.NewRequest("POST", server.URL+"/api/captures/"+c.ID+"/describe", strings.NewReader(`{"name":"`+name+`"}`))
+	ask.Header.Set("Authorization", "Bearer alice-token-of-the-describe-test")
+	res, err := http.DefaultClient.Do(ask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var said struct{ Described bool }
+	if err := json.Unmarshal(answer, &said); err != nil || res.StatusCode != 200 || !said.Described || !bytes.HasPrefix(answer, []byte("  ")) {
+		t.Fatalf("with files: %d %q %v", res.StatusCode, answer, err)
 	}
 	stored, err := store.Artifact(ctx, c.ID, name+coredesc.Suffix)
 	if err != nil {
