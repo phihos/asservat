@@ -18,5 +18,28 @@ FROM docker.io/library/debian:stable-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb graphviz libarchive-tools python3-venv strace tcpdump tshark && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
 RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2
+# dotnet-dump reads the managed stacks of a .NET core dump for its
+# description. It needs a .NET runtime to run; both are in a directory that
+# no image of a .NET program has its runtime in (internal/coredesc/dotnet.go).
+# The checksums are those of the runtime's release metadata
+# (builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json)
+# and of the package in NuGet's catalog. Of the package only the tool is
+# taken, with its native part for this processor.
+ARG TARGETARCH
+RUN set -e; runtime=10.0.15; dump=10.0.750501; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in \
+      amd64) arch=x64; sum=a90177d75bc891f71aa814dde3bcf76a356f5a506824669f1891754457954a3d13b72f3ca04c98fa0fe588514a5a781f8a87b17930ee802105c14f9edb28318a;; \
+      arm64) arch=arm64; sum=e2e8b907d9eb6c239cccf5c1fe67fd9a72c56fddccedca9ba41c8a53ff034293b335fdd9f7ab504f09bf7b3f165e0d14e34fc9ea1f06cc0e86d0dfb06d274b6a;; \
+      *) echo "no .NET runtime is named here for this processor"; exit 1;; \
+    esac; \
+    mkdir -p /opt/asservat-dotnet/dump; cd /tmp; \
+    curl -fsSL -o runtime.tar.gz "https://builds.dotnet.microsoft.com/dotnet/Runtime/$runtime/dotnet-runtime-$runtime-linux-$arch.tar.gz"; \
+    echo "$sum  runtime.tar.gz" | sha512sum -c -; \
+    tar -xzf runtime.tar.gz -C /opt/asservat-dotnet --no-same-owner; \
+    curl -fsSL -o dump.zip "https://api.nuget.org/v3-flatcontainer/dotnet-dump/$dump/dotnet-dump.$dump.nupkg"; \
+    echo "b5f977e8d1c9df381389e7e7e88cc5f5ecca9e9f3774187d437493f00bb3a07d02f5aa11df26abed44333b54771718ee56ddf6be3f828420e925f3e68090dd73  dump.zip" | sha512sum -c -; \
+    bsdtar -xf dump.zip -C /opt/asservat-dotnet/dump --strip-components 3 --include "tools/net8.0/any/*"; \
+    find /opt/asservat-dotnet/dump -mindepth 1 -maxdepth 1 -type d ! -name "linux-$arch" -exec rm -r {} +; \
+    rm runtime.tar.gz dump.zip
 COPY --from=build /asservat /gotrace /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/asservat"]
