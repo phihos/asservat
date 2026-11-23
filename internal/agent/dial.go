@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 // A packet capture of a pod through which the agent's own connection to
@@ -39,6 +40,19 @@ var nextHubPort atomic.Uint32
 // DialHub connects to the hub from one of the agent's source ports. It is
 // the DialContext of the agent's HTTP transport.
 func DialHub(ctx context.Context, network, address string) (net.Conn, error) {
+	return dialHub(ctx, network, address, hubDialWait)
+}
+
+// hubDialWait is how long a connection to the hub may take to come about.
+// The kernel tries for two minutes to reach an address that does not
+// answer, as the hub's does while its pod is replaced, and the node is not
+// reachable for captures all that time; the agent tries anew by itself
+// after a second or more.
+const hubDialWait = 10 * time.Second
+
+func dialHub(ctx context.Context, network, address string, wait time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
 	const ports = hubPortLast - hubPortFirst + 1
 	for range ports {
 		port := hubPortFirst + int(nextHubPort.Add(1)%ports)
