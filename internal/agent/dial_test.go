@@ -3,6 +3,7 @@ package agent
 import (
 	"net"
 	"testing"
+	"time"
 )
 
 // The agent reaches the hub from its own source ports, also with several
@@ -42,5 +43,20 @@ func TestHubConnectionsLeaveFromTheAgentsPorts(t *testing.T) {
 		if got := withoutOwnTraffic(filter); got != want {
 			t.Errorf("withoutOwnTraffic(%q) = %q, want %q", filter, got, want)
 		}
+	}
+}
+
+// An address that does not answer is given up after the wait, not after
+// the two minutes the kernel tries for: the agent tries anew by itself.
+func TestHubThatDoesNotAnswerIsGivenUp(t *testing.T) {
+	began := time.Now()
+	// An address for documentation (RFC 5737): nothing answers there.
+	conn, err := dialHub(t.Context(), "tcp", "192.0.2.1:80", 300*time.Millisecond)
+	if err == nil {
+		conn.Close()
+		t.Fatal("connected to an address where nothing is")
+	}
+	if took := time.Since(began); took > 5*time.Second {
+		t.Fatal("given up only after", took)
 	}
 }
