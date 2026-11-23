@@ -3,8 +3,10 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
 	"time"
@@ -213,7 +215,7 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	}
 	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger", watch.Approver); err != nil {
 		// Nothing was recorded, so this time does not count.
-		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
+		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id, ""); e != nil {
 			slog.Error("watch's count not given back", "watch", id, "error", e)
 		}
 		return err
@@ -267,7 +269,7 @@ func (h *Hub) fire(ctx context.Context, id, key, pod, on, message string) (api.C
 	}
 	capture, err := h.record(ctx, u, request, pods, "capture.trigger", watch.Approver)
 	if err != nil {
-		if e := h.Store.RefundWatch(context.WithoutCancel(ctx), id); e != nil {
+		if e := h.Store.RefundWatch(context.WithoutCancel(ctx), id, key); e != nil {
 			slog.Error("watch's count not given back", "watch", id, "error", e)
 		}
 		return api.Capture{}, err
@@ -317,8 +319,9 @@ func (h *Hub) recordNow(w http.ResponseWriter, r *http.Request, u User) error {
 // It sleeps until the next of their times and is woken when watches change.
 // A time that came while the hub was down is recorded when it starts,
 // unless another came since: of a time that repeats, only the last. A time
-// that cannot be recorded, as while no agent is connected, is tried again
-// after a pause until it can or the next one comes.
+// that cannot be recorded for now, as while no agent is connected, is tried
+// again after a pause until it can or the next one comes; one that is
+// refused, as when its creator may no longer record, is given up.
 func (h *Hub) RunSchedule(ctx context.Context) {
 	done := map[string]time.Time{} // the last time recorded for each watch
 	for {
@@ -340,8 +343,12 @@ func (h *Hub) RunSchedule(ctx context.Context) {
 				once, cancel := context.WithTimeout(ctx, h.ScheduleRetry)
 				_, err := h.fire(once, w.ID, "time "+last.UTC().Format(time.RFC3339Nano), "", api.OnTime, "at the time set, "+last.UTC().Format(time.RFC3339))
 				cancel()
+				var refused errStatus
 				switch {
 				case err == nil || err == ErrNotFound: // not found: recorded before, or the watch awaits approval
+					done[w.ID] = last
+				case errors.As(err, &refused) && refused.code < 500: // not the cluster's failure to answer
+					slog.Warn("time not recorded", "watch", w.ID, "error", err)
 					done[w.ID] = last
 				case ctx.Err() == nil:
 					slog.Warn("time not recorded; trying again", "watch", w.ID, "in", h.ScheduleRetry, "error", err)
@@ -352,6 +359,10 @@ func (h *Hub) RunSchedule(ctx context.Context) {
 				soonest = next
 			}
 		}
+		// The watches that are gone are forgotten.
+		maps.DeleteFunc(done, func(id string, _ time.Time) bool {
+			return err == nil && !slices.ContainsFunc(list, func(w api.Watch) bool { return w.ID == id })
+		})
 		if !soonest.IsZero() && (timer == nil || time.Until(soonest) < h.ScheduleRetry) {
 			timer = time.After(time.Until(soonest))
 		}

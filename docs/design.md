@@ -158,7 +158,9 @@ records all pods of the workload then, as the watch's creator. A time that
 came while the hub was down is recorded when it starts, however late; of a
 time that repeats, only the last one that came. A time that cannot be
 recorded, as while no agent of the cluster is connected, is tried again
-every minute until it can or the watch's next time comes.
+every minute until it can or the watch's next time comes; one that is
+refused, as when the watch's creator may no longer record there, is given
+up and logged.
 
 Any watch records at once when its creator or an administrator asks it to
 (`POST /api/watches/{id}/record`, optionally with a `pod`; **Record now**

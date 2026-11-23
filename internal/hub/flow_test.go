@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -146,13 +147,16 @@ func TestCaptureFlow(t *testing.T) {
 		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}, {Name: "proxy"}}}}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "payments"}}, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}})
-	// RBAC of the fake cluster: the payments group may exec in payments,
-	// unless the test takes that away for a while.
-	var refused atomic.Bool
+	// RBAC of the fake cluster: the payments group may exec in payments.
+	// The test can make the cluster fail to answer for a while.
+	var unavailable atomic.Bool
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
 		a := sar.Spec.ResourceAttributes
-		sar.Status.Allowed = !refused.Load() && a.Namespace == "payments" && a.Subresource == "exec" && len(sar.Spec.Groups) == 1 && sar.Spec.Groups[0] == "payments"
+		if unavailable.Load() {
+			return true, nil, errors.New("the API server does not answer")
+		}
+		sar.Status.Allowed = a.Namespace == "payments" && a.Subresource == "exec" && len(sar.Spec.Groups) == 1 && sar.Spec.Groups[0] == "payments"
 		return true, sar, nil
 	})
 	ctx, stop := context.WithCancel(t.Context())
@@ -802,6 +806,7 @@ func TestCaptureFlow(t *testing.T) {
 			t.Fatal("a time watch", what, code)
 		}
 	}
+	_, timedOnce := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": "2099-01-01T00:00:00Z"}}})
 	schedule, stop := context.WithCancel(t.Context())
 	defer stop()
 	go h.RunSchedule(schedule)
@@ -821,13 +826,27 @@ func TestCaptureFlow(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	slices.SortFunc(atTimes, func(a, b api.Capture) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	// What was counted and then not recorded can be counted again.
+	if n, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != nil || n != 0 {
+		t.Fatal("counting a watch's event", n, err)
+	}
+	if _, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != hub.ErrNotFound {
+		t.Fatal("counting it twice", err)
+	}
+	if err := store.RefundWatch(t.Context(), timedOnce.ID, "a key"); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.FireWatchOnce(t.Context(), timedOnce.ID, "a key"); err != nil || n != 0 {
+		t.Fatal("counting it again after it was given back", n, err)
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+timedOnce.ID, nil)
 	// A time that cannot be recorded when it comes is tried again: here the
-	// creator may not record for a while.
+	// cluster does not answer for a while.
 	code, later := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": time.Now().Add(200 * time.Millisecond).UTC().Format(time.RFC3339Nano)}}})
 	if code != 201 {
 		t.Fatal("watch for a time that fails at first", code)
 	}
-	refused.Store(true)
+	unavailable.Store(true)
 	ofLater := func() int {
 		var list []api.Capture
 		_, b := f.call("alice-token", "GET", "/api/captures", nil)
@@ -836,9 +855,9 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	time.Sleep(600 * time.Millisecond)
 	if n := ofLater(); n != 0 {
-		t.Fatal("recorded without permission:", n)
+		t.Fatal("recorded while the cluster did not answer:", n)
 	}
-	refused.Store(false)
+	unavailable.Store(false)
 	for i := 0; ofLater() != 1; i++ {
 		if i == 100 {
 			t.Fatal("the time that failed at first was not tried again")
