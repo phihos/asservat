@@ -79,3 +79,40 @@ func TestProgramFiles(t *testing.T) {
 		t.Error("the version of a description")
 	}
 }
+
+// A container can make any part of a path a link to an absolute path. On a
+// node, where the root is /proc/<pid>/root, the kernel follows such a link
+// on the agent's own filesystem. No file is taken from there: links are
+// followed within the root, as the program saw them.
+func TestFilesStayWithinTheRoot(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(outside, "agent.so"), []byte("\x7fELF of the node"), 0o644)
+	os.WriteFile(filepath.Join(outside, "os-release"), []byte("ID=node\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, "usr/lib"), 0o755)
+	os.WriteFile(filepath.Join(root, "usr/lib/libc.so"), []byte("\x7fELF library"), 0o644)
+	// /app and /etc lead out of the container on the node; /lib leads within it.
+	os.Symlink(outside, filepath.Join(root, "app"))
+	os.Symlink(outside, filepath.Join(root, "etc"))
+	os.Symlink("/usr/lib", filepath.Join(root, "lib"))
+	report := []byte(`{"mappings":[{"file":"/app/agent.so"},{"file":"/lib/libc.so"}]}`)
+	files := Files(report, root)
+	for _, name := range files {
+		if name == "/app/agent.so" || name == "/etc/os-release" {
+			t.Fatalf("a file from outside the root is taken: %v", files)
+		}
+	}
+	if file, _ := resolve(root, "/lib/libc.so"); file != "/usr/lib/libc.so" {
+		t.Fatalf("a link within the root leads to %q", file)
+	}
+	var archive bytes.Buffer
+	if err := WriteFiles(&archive, root, []string{"/lib/libc.so"}); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len())); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "lib/libc.so")); string(b) != "\x7fELF library" {
+		t.Fatalf("the library under its name with a link on the way: %q", b)
+	}
+}

@@ -57,29 +57,45 @@ func Files(report []byte, root string) []string {
 }
 
 // resolve follows the links of a path as the program saw it, within root,
-// and returns the path of the file it leads to and whether name is a link.
+// and returns the path of the file it leads to, on which no part is a
+// link, and whether there was a link on the way. It follows them itself,
+// part by part: the kernel follows a link to an absolute path from the
+// root of the process that asks, and on a node root is /proc/<pid>/root,
+// so that a container could lead the agent to the node's own files.
 func resolve(root, name string) (file string, link bool) {
-	file = filepath.Clean("/" + name)
-	// As many links in a row as the kernel follows.
-	for range 40 {
-		info, err := os.Lstat(filepath.Join(root, file))
+	file = "/"
+	rest := strings.Split(name, "/")
+	// As many links as the kernel follows on one path.
+	for links := 0; len(rest) > 0; {
+		part := rest[0]
+		rest = rest[1:]
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			file = filepath.Dir(file)
+			continue
+		}
+		next := filepath.Join(file, part)
+		info, err := os.Lstat(filepath.Join(root, next))
 		if err != nil {
 			return "", link
 		}
 		if info.Mode()&os.ModeSymlink == 0 {
-			return file, link
+			file = next
+			continue
 		}
-		target, err := os.Readlink(filepath.Join(root, file))
-		if err != nil {
+		target, err := os.Readlink(filepath.Join(root, next))
+		if links++; err != nil || links > 40 {
 			return "", link
 		}
 		link = true
-		if !filepath.IsAbs(target) {
-			target = filepath.Join(filepath.Dir(file), target)
+		if filepath.IsAbs(target) {
+			file = "/"
 		}
-		file = filepath.Clean("/" + target)
+		rest = append(strings.Split(target, "/"), rest...)
 	}
-	return "", link
+	return file, link
 }
 
 // isELF tells whether the path is a regular file that starts as an

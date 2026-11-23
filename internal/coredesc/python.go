@@ -59,15 +59,17 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 	for _, m := range fields.Mappings {
 		interpreted = interpreted || pythonFile.MatchString(filepath.Base(m.File))
 	}
-	if _, err := os.Stat(python); !interpreted || err != nil || fields.Executable == "" || root == "" {
+	executable, _ := resolve(root, fields.Executable)
+	if _, err := os.Stat(python); !interpreted || err != nil || executable == "" || root == "" {
 		return report, nil
 	}
 	// pystack looks for the libraries in directories: those of the files
 	// that the core maps.
 	var dirs []string
 	seen := map[string]bool{}
-	for _, file := range Files(report, root) {
-		if dir := filepath.Join(root, filepath.Dir(file)); !seen[dir] {
+	for _, name := range Files(report, root) {
+		file, _ := resolve(root, name)
+		if dir := filepath.Join(root, filepath.Dir(file)); file != "" && !seen[dir] {
 			seen[dir] = true
 			dirs = append(dirs, dir)
 		}
@@ -84,7 +86,7 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, python, script.Name(), core, filepath.Join(root, fields.Executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
+	cmd := exec.CommandContext(ctx, python, script.Name(), core, filepath.Join(root, executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
 	// Not in a directory of the program's: Python would import from it.
 	cmd.Dir = d.Scratch
 	var stderr bytes.Buffer
