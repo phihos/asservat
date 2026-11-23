@@ -439,7 +439,9 @@ and the viewer says so. Where neither works, gdb's description stands
 alone. The stacks of a stripped program in another language show
 addresses unless gdb finds its debug information: with `debuginfodURLs`
 (`--debuginfod-urls`) it fetches that from debuginfod servers, by default
-from the elfutils project's server, which asks those of the distributions.
+from the elfutils project's server, which asks those of Debian, Fedora,
+Arch and others, and from Ubuntu's. A server that does not answer within
+10 seconds is passed over.
 The servers are sent the build IDs of the programs and libraries of the
 cores that are described, which name compiled files and hold nothing of a
 process; an installation without a way out sets the list empty. The

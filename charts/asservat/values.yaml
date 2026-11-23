@@ -10,14 +10,17 @@ image:
 # debuginfod servers from which gdb fetches the debug information of
 # stripped programs when a core dump is described, so that stacks show
 # functions, files and lines instead of addresses. The default is the
-# elfutils project's server, which asks the servers of the distributions
-# (Debian, Ubuntu, Fedora, CentOS Stream, openSUSE, Arch and others).
-# The agents and the hub send it the build IDs of the programs whose cores
-# they describe and of their libraries: 40 hexadecimal digits each that
-# name a compiled file, nothing of its memory. Set to [] to ask no server,
-# as in a cluster without a way out; cores are then described without.
+# elfutils project's server, which asks the servers of Debian (and so of
+# distroless images), Fedora, Arch and others, and Ubuntu's own, which it
+# does not ask. No public server knows Alpine, Wolfi, RHEL, Rocky, Alma or
+# Amazon Linux. The agents and the hub send these servers the build IDs of
+# the programs whose cores they describe and of their libraries: 40
+# hexadecimal digits each that name a compiled file, nothing of its
+# memory. Set to [] to ask no server, as in a cluster without a way out;
+# cores are then described without.
 debuginfodURLs:
   - https://debuginfod.elfutils.org/
+  - https://debuginfod.ubuntu.com/
 
 hub:
   enabled: true

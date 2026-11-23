@@ -268,7 +268,7 @@ completed "$ALICE" "$id"
 bundle=$(ok "$ALICE" GET "/api/captures/$id")
 # Each of the two pods delivers the files of all five recordings, and the description of its core.
 [ "$(jq -c '[.artifacts[].name | split("/")[1]] | unique' <<<"$bundle")" = '["capture.pcap","core.web","core.web.analysis.json","core.web.files.tar","events.json","pod.json","web.log","web.strace"]' ] || fail "files of the recordings: $(jq -c '[.artifacts[].name]' <<<"$bundle")"
-[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[14,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
+[ "$(jq -c '[(.artifacts | length), ([.tasks[].message // ""] | unique)]' <<<"$bundle")" = '[16,[""]]' ] || fail "recordings per pod: $(jq -c .tasks <<<"$bundle")"
 
 log "progress, and stopping a capture with what it has (edge)"
 id=$(capture "$ALICE" "$(target edge "" '{"durationSeconds":300,"recordings":[{"kind":"pcap"},{"kind":"logs"},{"kind":"pod-state"}]}')")

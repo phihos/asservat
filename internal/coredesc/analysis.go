@@ -67,7 +67,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	cmd := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-x", script.Name())
 	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+root, "ASSERVAT_OUT="+out,
 		// The script turns debuginfod on where servers are named.
-		"DEBUGINFOD_URLS="+d.DebuginfodURLs, "DEBUGINFOD_CACHE_PATH="+filepath.Join(d.Scratch, "debuginfod"))
+		"DEBUGINFOD_URLS="+d.DebuginfodURLs, "DEBUGINFOD_CACHE_PATH="+filepath.Join(d.Scratch, "debuginfod"),
+		// A server that does not answer is given up after this many
+		// seconds, not after the client's 90: gdb asks for every file a
+		// core maps, and a cluster may have no way out.
+		"DEBUGINFOD_TIMEOUT=10")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("gdb: %w: %s", err, tail(output))
 	}
