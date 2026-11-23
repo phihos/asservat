@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -54,29 +55,67 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 	}
 }
 
-// observe follows the watched workload's pods on this node through a
-// Kubernetes watch until ctx ends. It reports a pod that meets the watch's
-// condition to the hub and, for a packet watch, keeps a buffer of each
-// pod's packets. A report continues under the agent's context: the hub ends
-// the watch while it answers the last report it waited for.
-func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
-	options := func(o metav1.ListOptions) metav1.ListOptions {
-		selected := podOptions(w.Workload, w.Selector)
-		o.LabelSelector = selected.LabelSelector
-		o.FieldSelector = strings.TrimPrefix(selected.FieldSelector+",spec.nodeName="+a.Node, ",")
-		return o
+// podWatch returns the Kubernetes watch of this node's pods, which all the
+// agent's watches share: the API server serves one watch per node, however
+// many watches wait. It starts with the first of them, and release stops
+// it after the last.
+func (a *Agent) podWatch(ctx context.Context) (informer cache.SharedInformer, release func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.pods.users == 0 {
+		options := func(o metav1.ListOptions) metav1.ListOptions {
+			o.FieldSelector = "spec.nodeName=" + a.Node
+			return o
+		}
+		pods := a.Kube.CoreV1().Pods(metav1.NamespaceAll)
+		// The wrapper tells the informer whether the client can stream the
+		// initial list.
+		source := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, o metav1.ListOptions) (runtime.Object, error) {
+				return pods.List(ctx, options(o))
+			},
+			WatchFuncWithContext: func(ctx context.Context, o metav1.ListOptions) (watch.Interface, error) {
+				return pods.Watch(ctx, options(o))
+			},
+		}, a.Kube)
+		running, stop := context.WithCancel(ctx)
+		a.pods.informer, a.pods.stop = cache.NewSharedInformer(source, &corev1.Pod{}, 0), stop
+		go a.pods.informer.RunWithContext(running)
 	}
-	pods := a.Kube.CoreV1().Pods(w.Namespace)
-	// The wrapper tells the informer whether the client can stream the
-	// initial list.
-	source := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-		ListWithContextFunc: func(ctx context.Context, o metav1.ListOptions) (runtime.Object, error) {
-			return pods.List(ctx, options(o))
-		},
-		WatchFuncWithContext: func(ctx context.Context, o metav1.ListOptions) (watch.Interface, error) {
-			return pods.Watch(ctx, options(o))
-		},
-	}, a.Kube)
+	a.pods.users++
+	return a.pods.informer, func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.pods.users--; a.pods.users == 0 {
+			a.pods.stop()
+		}
+	}
+}
+
+// observe follows the watched workload's pods on this node, as the
+// Kubernetes watch of the node's pods tells of them, until ctx ends. It
+// reports a pod that meets the watch's condition to the hub and, for a
+// packet watch, keeps a buffer of each pod's packets. A report continues
+// under the agent's context: the hub ends the watch while it answers the
+// last report it waited for.
+func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
+	selector, err := labels.Parse(podOptions(w.Workload, w.Selector).LabelSelector)
+	if err != nil {
+		slog.Error("watch", "watch", w.ID, "error", err) // the hub read it from the workload
+		return
+	}
+	// of returns the pod that a change is about if it is one of the watch's
+	// workload on this node, and nil otherwise.
+	of := func(obj any) *corev1.Pod {
+		pod, ok := obj.(*corev1.Pod) // or a tombstone of a pod whose deletion was missed
+		if !ok || pod.Spec.NodeName != a.Node || pod.Namespace != w.Namespace || !selector.Matches(labels.Set(pod.Labels)) {
+			return nil
+		}
+		if kind, name, _ := strings.Cut(w.Workload, "/"); kind == "Pod" && name != pod.Name {
+			return nil
+		}
+		return pod
+	}
 	// The handlers run one at a time. A pod's first sighting only records
 	// the state it is in: what happened before is not reported.
 	seen := map[string]string{}
@@ -93,11 +132,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			a.Cores.unmark(uid, w.ID)
 		}
 	}()
-	changed := func(obj any, known bool) {
-		pod := obj.(*corev1.Pod)
-		if pod.Spec.NodeName != a.Node {
-			return
-		}
+	changed := func(pod *corev1.Pod, known bool) {
 		if packets := w.Recording(api.KindPcap); packets != nil && packets.Buffers() {
 			a.buffer(ctx, w, *packets, pod)
 		}
@@ -141,37 +176,59 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			go a.trigger(agent, w, pod, message)
 		}
 	}
-	_, informer := cache.NewInformerWithOptions(cache.InformerOptions{ListerWatcher: source, ObjectType: &corev1.Pod{}, Handler: cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj any) { changed(obj, false) },
-		UpdateFunc: func(_, obj any) { changed(obj, true) },
-		DeleteFunc: func(obj any) {
-			pod, ok := obj.(*corev1.Pod)
-			if !ok {
-				return // a tombstone of a pod whose deletion was missed
+	gone := func(pod *corev1.Pod) {
+		for key := range seen {
+			if strings.HasPrefix(key, pod.Name+"/") {
+				delete(seen, key)
 			}
-			for key := range seen {
-				if strings.HasPrefix(key, pod.Name+"/") {
-					delete(seen, key)
-				}
+		}
+		if marked[string(pod.UID)] {
+			a.Cores.unmark(string(pod.UID), w.ID)
+			delete(marked, string(pod.UID))
+		}
+		if t, reads := tending[pod.Name]; reads {
+			t.stop()
+			delete(tending, pod.Name)
+		}
+		a.mu.Lock()
+		// A new pod of the same name gets its own buffer at once.
+		if r := a.rings[w.ID+"/"+pod.Name]; r != nil {
+			r.stop()
+			delete(a.rings, w.ID+"/"+pod.Name)
+		}
+		a.mu.Unlock()
+	}
+	pods, release := a.podWatch(agent)
+	defer release()
+	// A watch that comes later is told of the pods that are already known
+	// as added, like the first one.
+	told, err := pods.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			if pod := of(obj); pod != nil {
+				changed(pod, false)
 			}
-			if marked[string(pod.UID)] {
-				a.Cores.unmark(string(pod.UID), w.ID)
-				delete(marked, string(pod.UID))
-			}
-			if t, reads := tending[pod.Name]; reads {
-				t.stop()
-				delete(tending, pod.Name)
-			}
-			a.mu.Lock()
-			// A new pod of the same name gets its own buffer at once.
-			if r := a.rings[w.ID+"/"+pod.Name]; r != nil {
-				r.stop()
-				delete(a.rings, w.ID+"/"+pod.Name)
-			}
-			a.mu.Unlock()
 		},
-	}})
-	informer.RunWithContext(ctx)
+		// A pod can come to the workload's selector and leave it.
+		UpdateFunc: func(old, obj any) {
+			if was, pod := of(old), of(obj); pod != nil {
+				changed(pod, was != nil)
+			} else if was != nil {
+				gone(was)
+			}
+		},
+		DeleteFunc: func(obj any) {
+			if pod := of(obj); pod != nil {
+				gone(pod)
+			}
+		},
+	})
+	if err != nil {
+		slog.Error("watch", "watch", w.ID, "error", err)
+		return
+	}
+	<-ctx.Done()
+	// Waits for the handler that runs, before what the watch held is given up.
+	cache.ShutDownEventHandler(pods, told)
 }
 
 // met describes how the pod has come to meet a condition since the last

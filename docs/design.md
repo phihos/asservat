@@ -99,8 +99,9 @@ made for that pod.
    it, by the same rules as a capture. The approval precedes the event, so
    it covers the captures that the watch creates.
 2. The hub sends the cluster's watches to its agents, and again whenever they
-   change or an agent connects. Each agent follows the workload's pods on its
-   node through a Kubernetes watch.
+   change or an agent connects. Each agent follows the pods of its node
+   through one Kubernetes watch, however many watches wait, and tells each
+   watch of its workload's pods.
 3. The agent reports a pod that meets the condition, and the hub creates the
    capture for that pod, as the user who created the watch, after checking
    that user's permission again. Containers of a pod that is being deleted
