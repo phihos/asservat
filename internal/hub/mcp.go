@@ -115,8 +115,8 @@ var mcpTools = []mcpTool{
 			}
 			return h.Request(ctx, u, in)
 		}},
-	{Name: "watch_crashes", Description: "Record evidence automatically when a container of the workload crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to the crashed pod. Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packets of the durationSeconds before the crash. A watch for evidence that needs approval waits until an administrator approves the watch; its captures then start without another approval. A coredump watch records the core of the crashed process and needs the core handler on the cluster's nodes. The captures appear in list_captures.",
-		InputSchema: object(captureProperties+`,"count":{"type":"integer","description":"How many crashes to record before the watch ends; default 1"}`, "cluster", "namespace", "workload"),
+	{Name: "watch_crashes", Description: "Record evidence automatically when a pod of the workload meets a condition, by default when a container crashes (exits with a failure, including out of memory): the same arguments as request_capture, applied to that pod. With when.kind \"restart\" it records when a container is started again, whatever ended it; with \"not-ready\" when the pod stops being ready. Those captures find the pod running, so recordings over time (cpu, memory, strace) show it in that state. For a crash: Useful: pod-state, logs (they then include the crashed instance of each container) and pcap, which then holds the packets of the durationSeconds before the crash. A watch for evidence that needs approval waits until an administrator approves the watch; its captures then start without another approval. A coredump watch records the core of the crashed process and needs the core handler on the cluster's nodes. The captures appear in list_captures.",
+		InputSchema: object(captureProperties+`,"when":{"type":"object","description":"What to wait for; a crash if left out","properties":{"kind":{"enum":["crash","restart","not-ready"]}}},"count":{"type":"integer","description":"How many times to record before the watch ends; default 1"}`, "cluster", "namespace", "workload"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in api.WatchRequest
 			if err := json.Unmarshal(args, &in); err != nil {
@@ -124,7 +124,7 @@ var mcpTools = []mcpTool{
 			}
 			return h.Watch(ctx, u, in)
 		}},
-	{Name: "list_watches", Description: "List your watches that still wait for crashes.", InputSchema: object(""),
+	{Name: "list_watches", Description: "List your watches that still wait.", InputSchema: object(""),
 		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) { return h.watches(ctx, u) }},
 	{Name: "delete_watch", Description: "End a watch.", InputSchema: object(`"id":{"type":"string"}`, "id"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {

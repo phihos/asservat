@@ -236,9 +236,11 @@
       <div class="choice">
         <label><input type="radio" name="when" value="now" checked>Now<small>Starts at once on every pod of the workload</small></label>
         <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
+        <label><input type="radio" name="when" value="restart">When a container restarts<small>Whatever ended it: a failure, a clean exit or a failed liveness probe. Records the pod as it runs again</small></label>
+        <label><input type="radio" name="when" value="not-ready">When the pod stops being ready<small>Its readiness probe starts to fail. Records the pod while it is in that state</small></label>
       </div>
       <div class="fields">
-        <label id="countLabel" hidden>How many crashes to record<input id="count" type="number" min="1" placeholder="1"></label>
+        <label id="countLabel" hidden>How many times to record<input id="count" type="number" min="1" placeholder="1"></label>
         <label class="wide"><span id="reasonLabel">Reason</span><input id="reason" placeholder="what you are looking for"></label>
       </div>
       <p class="notice" id="approvalNotice" hidden></p>
@@ -266,10 +268,10 @@
 
  <section data-view="watches" hidden>
   <h2>Watches</h2>
-  <p class="muted lead">A watch waits for a container of its workload to crash and then records the crashed pod. Its captures appear under Captures.</p>
+  <p class="muted lead">A watch waits until a pod of its workload meets a condition, such as a container that crashes, and then records that pod. Its captures appear under Captures.</p>
   <p class="problem" id="watchesProblem"></p>
-  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Records</th><th>Crashes left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
-  <p class="empty" id="noWatches" hidden>No watch is waiting. To create one, start a <a href="#new">new capture</a> and choose "When a container crashes" in the last step.</p>
+  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Waits for</th><th>Records</th><th>Times left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
+  <p class="empty" id="noWatches" hidden>No watch is waiting. To create one, start a <a href="#new">new capture</a> and choose in the last step when it is to record.</p>
  </section>
 
  <section data-view="clusters" hidden>
@@ -425,7 +427,9 @@ const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].m
 const kindNames = {'pod-state': 'pod state', logs: 'logs', pcap: 'network traffic', strace: 'system calls', pprof: 'profile endpoint', cpu: 'CPU profile', memory: 'memory growth', coredump: 'core dump'};
 const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).join(', ') + ' and ' + words.at(-1);
 // A core dump on a crash is that of the crashed process: nothing to choose.
-const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') === 'now';
+const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
+// What a watch can wait for, as the end of a sentence.
+const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready'};
 
 // The process list is read from the pods when a core dump or trace is
 // chosen. If that fails, the containers' main processes remain as choices.
@@ -505,7 +509,7 @@ function filterChanged(typed) {
 }
 
 function showParams() {
-  const chosen = kinds(), crash = picked('when') === 'crash', has = kind => chosen.includes(kind);
+  const chosen = kinds(), crash = picked('when') === 'crash', watching = picked('when') !== 'now', has = kind => chosen.includes(kind);
   for (const el of document.querySelectorAll('[data-kinds]')) el.hidden = !el.dataset.kinds.split(' ').some(has);
   $('processBlock').hidden = !wantsProcess();
   $('processTitle').textContent = 'Process for the ' + list(['coredump', 'strace'].filter(k => has(k) && (k !== 'coredump' || !crash)).map(k => kindNames[k]));
@@ -518,11 +522,11 @@ function showParams() {
   const timed = ['pcap', 'strace', 'cpu', 'memory', 'pprof'].filter(k => has(k) && (k !== 'pprof' || profileRuns)), follows = has('logs');
   $('frameBlock').hidden = !timed.length && !follows;
   $('duration').placeholder = timed.length ? '30' : '0';
-  // The packet buffer of a crash watch reaches back; everything else runs forward.
-  const running = timed.filter(k => !(k === 'pcap' && crash)).map(k => kindNames[k]);
+  // The packet buffer of a watch reaches back; everything else runs forward.
+  const running = timed.filter(k => !(k === 'pcap' && watching)).map(k => kindNames[k]);
   $('frameHint').textContent = [
-    has('pcap') && crash ? 'The packets of this many seconds before the crash are kept.' : '',
-    running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : ''}.` : '',
+    has('pcap') && watching ? `The packets of this many seconds before ${crash ? 'the crash' : 'that moment'} are kept.` : '',
+    running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : watching ? ' from that moment' : ''}.` : '',
     follows ? (timed.length ? 'The logs are followed for the same time.' : 'With 0 the logs are saved as they are; otherwise they are followed this long.') : '',
   ].filter(Boolean).join(' ');
   $('nothing').hidden = !(chosen.length === 1 && has('pod-state'));
@@ -530,7 +534,7 @@ function showParams() {
     pcap: 'the packets from before the crash', logs: 'the logs of the crashed instance and its successor',
     coredump: 'the core of the process that crashed (the agents need the core handler)', 'pod-state': 'the pod with the reason of the crash',
     strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
-  $('countLabel').hidden = !crash;
+  $('countLabel').hidden = !watching;
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
@@ -538,11 +542,11 @@ function showParams() {
   const asks = sensitive.length && !me?.selfApproval;
   $('approvalNotice').textContent = !sensitive.length ? '' : !asks
     ? `Sensitive because of ${list(sensitive)}. It starts at once, because you may approve your own requests; the audit log records it as approved by you.`
-    : `Needs approval because of ${list(sensitive)}. ` + (crash
+    : `Needs approval because of ${list(sensitive)}. ` + (watching
       ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
       : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
   $('reasonLabel').textContent = asks ? 'Reason, shown to the approver' : 'Reason';
-  $('submit').textContent = crash ? (asks ? 'Request approval for this watch' : 'Watch for crashes') : asks ? 'Request approval' : 'Record now';
+  $('submit').textContent = watching ? (asks ? 'Request approval for this watch' : 'Start the watch') : asks ? 'Request approval' : 'Record now';
   $('done').textContent = $('formProblem').textContent = $('profileProblem').textContent = $('kindProblem').textContent = '';
   $('submit').disabled = false;
   if (!$('app').hidden) showStep(step);
@@ -556,7 +560,7 @@ async function loadWatches() {
   $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
   $('watchCount').textContent = list.length || '';
   $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
-    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
+    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(conditions[w.when?.kind] || w.when?.kind || '')}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
     <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
@@ -670,7 +674,7 @@ $('flows').onclick = e => {
 };
 $('filter').oninput = () => filterChanged(true);
 $('captureForm').onsubmit = guard(async () => {
-  const crash = picked('when') === 'crash';
+  const crash = picked('when') === 'crash', watching = picked('when') !== 'now';
   // What is missing is said at its own step, not after a round trip.
   for (const n of [1, 2, 3]) {
     const problem = stepProblem(n);
@@ -689,20 +693,20 @@ $('captureForm').onsubmit = guard(async () => {
   });
   const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, recordings,
     durationSeconds: $('frameBlock').hidden ? 0 : Number($('duration').value || 0), reason: $('reason').value};
-  const created = crash ? await call('POST', '/api/watches', {...request, count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
+  const created = watching ? await call('POST', '/api/watches', {...request, when: {kind: picked('when')}, count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
-  $('done').textContent = crash ? (waits ? 'The watch waits for an administrator\'s approval.' : 'Watching: the capture appears below when a container crashes.')
+  $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${conditions[picked('when')]}.`)
     : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
   // Show where it went: the new capture, opened, in its list.
-  if (!crash) toggled.set(created.id, true);
+  if (!watching) toggled.set(created.id, true);
   fresh = {id: created.id, until: Date.now() + 4000};
   captureFilter = 'all';
   for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
   await Promise.all([loadCaptures(), loadWatches()]);
-  location.hash = crash ? '#watches' : '#captures';
+  location.hash = watching ? '#watches' : '#captures';
   showStep(1);
-  document.querySelector(crash ? `tr[data-watch="${created.id}"]` : `.capture[data-capture="${created.id}"]`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  document.querySelector(watching ? `tr[data-watch="${created.id}"]` : `.capture[data-capture="${created.id}"]`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }, 'formProblem');
 function problemAt(id, message) {
   showStep(Number($(id).closest('[data-step]').dataset.step));
@@ -749,7 +753,7 @@ $('steps').onclick = e => { const li = e.target.closest('li'); if (li && stepNee
 function summarize() {
   const where = $('workload').value ? `${$('workload').value} in ${$('cluster').value} / ${$('namespace').value}` : '';
   const what = kinds().length ? list(kinds().map(k => kindNames[k])) : '';
-  const when = step === 4 ? (picked('when') === 'crash' ? 'when a container crashes' : 'now') : '';
+  const when = step === 4 ? conditions[picked('when')] || 'now' : '';
   $('summary').textContent = [where, what, when].filter(Boolean).join('  ·  ');
 }
 $('watches').onclick = guard(async e => {

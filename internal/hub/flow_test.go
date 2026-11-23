@@ -555,6 +555,51 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("delete watch", code)
 	}
 
+	// A watch can wait for something else than a crash: here for the pod to
+	// stop being ready. Its capture finds the pod alive and says what was met.
+	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: "thoughts"}}); code != 400 {
+		t.Fatal("a watch for an unknown condition", code)
+	}
+	code, unready := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnNotReady}})
+	if code != 201 || unready.When.Kind != api.OnNotReady || watches("alice-token")[0].When.Kind != api.OnNotReady {
+		t.Fatal("watch for readiness", code, unready)
+	}
+	if code, w := watch("alice-token", onCrash); code != 201 || w.When.Kind != api.OnCrash {
+		t.Fatal("a watch without a condition waits for a crash", code, w.When)
+	} else {
+		f.call("alice-token", "DELETE", "/api/watches/"+w.ID, nil)
+	}
+	recorded := func() *api.Capture {
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		var list []api.Capture
+		json.Unmarshal(b, &list)
+		for _, c := range list {
+			if c.Watch == unready.ID {
+				return &c
+			}
+		}
+		return nil
+	}
+	// The pod is ready, then not, until the agent has seen both.
+	for i := 0; recorded() == nil; i++ {
+		if i == 200 {
+			t.Fatal("the pod that stopped being ready created no capture")
+		}
+		status := corev1.ConditionTrue
+		if i%2 == 1 {
+			status = corev1.ConditionFalse
+		}
+		changed := pod.DeepCopy()
+		changed.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: status, Message: "containers with unready status: [app]"}}
+		if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), changed, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if got := f.wait("alice-token", recorded().ID, api.StateCompleted, api.StateFailed); got.On != api.OnNotReady || !strings.HasPrefix(got.Reason, "pod is not ready any more: containers with unready status: [app]") {
+		t.Fatal("the capture of a pod that stopped being ready", got.On, got.Reason)
+	}
+
 	// A corrupt stored file is an error for MCP, not partial text.
 	if err := corrupt(blobDir); err != nil {
 		t.Fatal(err)

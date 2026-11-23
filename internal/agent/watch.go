@@ -45,10 +45,10 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 }
 
 // observe follows the watched workload's pods on this node through a
-// Kubernetes watch until ctx ends. It reports a pod whose container crashed
-// to the hub and, for a packet watch, keeps a buffer of each pod's packets.
-// A report continues under the agent's context: the hub ends the watch
-// while it answers the report of its last crash.
+// Kubernetes watch until ctx ends. It reports a pod that meets the watch's
+// condition to the hub and, for a packet watch, keeps a buffer of each
+// pod's packets. A report continues under the agent's context: the hub ends
+// the watch while it answers the last report it waited for.
 func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	options := func(o metav1.ListOptions) metav1.ListOptions {
 		selected := podOptions(w.Workload, w.Selector)
@@ -68,7 +68,7 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		},
 	}, a.Kube)
 	// The handlers run one at a time. A pod's first sighting only records
-	// the crashes it already had.
+	// the state it is in: what happened before is not reported.
 	seen := map[string]string{}
 	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
 	defer func() {
@@ -84,14 +84,14 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		if packets := w.Recording(api.KindPcap); packets != nil {
 			a.buffer(ctx, w, *packets, pod)
 		}
-		if w.Recording(api.KindCoredump) != nil && a.Cores != "" && !marked[string(pod.UID)] {
+		if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" && !marked[string(pod.UID)] {
 			// From now on the node's core handler keeps this pod's cores.
 			if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
 				slog.Error("core handler marker", "pod", pod.Name, "error", err)
 			}
 			marked[string(pod.UID)] = true
 		}
-		if message := crashes(pod, seen); message != "" && known {
+		if message := met(w.When, pod, seen); message != "" && known {
 			go a.trigger(agent, w, pod, message)
 		}
 	}
@@ -122,6 +122,62 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		},
 	}})
 	informer.RunWithContext(ctx)
+}
+
+// met describes how the pod has come to meet a condition since the last
+// call, or returns "". seen remembers what was reported and the state the
+// pod was in.
+func met(when api.Condition, pod *corev1.Pod, seen map[string]string) string {
+	switch when.Kind {
+	case api.OnRestart:
+		return restarts(pod, seen)
+	case api.OnNotReady:
+		return unready(pod, seen)
+	default:
+		return crashes(pod, seen)
+	}
+}
+
+// restarts describes the containers of the pod that were started again
+// since the last call, whatever ended them: a failure, a clean exit or a
+// failed liveness probe.
+func restarts(pod *corev1.Pod, seen map[string]string) string {
+	var out []string
+	for _, s := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
+		key, count := pod.Name+"/"+s.Name+"/restarts", strconv.Itoa(int(s.RestartCount))
+		before, known := seen[key]
+		seen[key] = count
+		if !known || before == count || pod.DeletionTimestamp != nil {
+			continue
+		}
+		ended := "it ended"
+		if t := s.LastTerminationState.Terminated; t != nil {
+			ended = fmt.Sprintf("it ended with exit code %d, %s", t.ExitCode, t.Reason)
+		}
+		out = append(out, fmt.Sprintf("container %s was restarted: %s", s.Name, ended))
+	}
+	return strings.Join(out, "; ")
+}
+
+// unready reports a pod that was ready and no longer is, with the reason
+// that Kubernetes gives. A pod that is being deleted, and one that has not
+// been ready yet, do not count.
+func unready(pod *corev1.Pod, seen map[string]string) string {
+	key, ready, why := pod.Name+"//ready", "", ""
+	for _, c := range pod.Status.Conditions {
+		if c.Type == corev1.PodReady {
+			ready, why = string(c.Status), c.Message
+		}
+	}
+	before := seen[key]
+	seen[key] = ready
+	if before != string(corev1.ConditionTrue) || ready == before || ready == "" || pod.DeletionTimestamp != nil {
+		return ""
+	}
+	if why == "" {
+		why = "its readiness probe fails"
+	}
+	return "pod is not ready any more: " + why
 }
 
 // crashes describes the containers of the pod that failed since the last
@@ -157,12 +213,12 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 	return strings.Join(out, "; ")
 }
 
-// trigger reports a crash to the hub, which answers with a capture task for
-// the pod. The packets before the crash and the cores of the crashed
-// processes are set aside for that task.
+// trigger reports to the hub that a pod met the watch's condition; the hub
+// answers with a capture task for the pod. The packets from before and, after
+// a crash, the cores of the crashed processes are set aside for that task.
 func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, message string) {
 	id, pod := uuid.NewString(), crashed.Name
-	if w.Recording(api.KindCoredump) != nil && a.Cores != "" {
+	if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" {
 		a.Cores.take(string(crashed.UID), id)
 	}
 	a.mu.Lock()
@@ -170,10 +226,10 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 		a.snapshots[id] = r.snapshot()
 	}
 	a.mu.Unlock()
-	slog.Info("crash", "watch", w.ID, "pod", pod, "message", message)
+	slog.Info("watch met", "watch", w.ID, "pod", pod, "message", message)
 	if err := a.post(ctx, "/agent/watches/"+w.ID+"/trigger", api.Trigger{ID: id, Pod: pod, Node: a.Node, Message: message}); err != nil {
-		// Also when the watch ended with another pod's crash.
-		slog.Info("crash not recorded", "watch", w.ID, "pod", pod, "error", err)
+		// Also when the watch ended with another pod's report.
+		slog.Info("watch not recorded", "watch", w.ID, "pod", pod, "error", err)
 		a.mu.Lock()
 		delete(a.snapshots, id)
 		a.mu.Unlock()

@@ -152,10 +152,12 @@ the programs that run in the workload's pods for a core dump or trace, and
 **Look at current traffic** shows whom the pods talk to right now; ticking
 connections there builds the packet filter.
 
-To catch a problem you cannot be present for, choose **when a container
-crashes** in the console or create a watch. The capture is then made for the
-crashed pod; a `pcap` holds the packet headers of the seconds before the
-crash:
+To catch a problem you cannot be present for, choose in the console's last
+step when to record, or create a watch. A watch records the pod that meets
+its condition: by default a container that crashes, with `"when": {"kind":
+"restart"}` a container that is started again, with `"not-ready"` a pod that
+stops being ready. After a crash a `pcap` holds the packet headers of the
+seconds before it:
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d '{
@@ -164,7 +166,7 @@ curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d
 }'
 ```
 
-A watch for `coredump` records the core of the crashed process itself. It
+A crash watch for `coredump` records the core of the crashed process itself. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an
 administrator's approval of the watch.

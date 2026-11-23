@@ -4,6 +4,7 @@ package api
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -60,10 +61,19 @@ type CaptureRequest struct {
 	// time: pcap, strace, cpu, memory, pprof and followed logs.
 	DurationSeconds int    `json:"durationSeconds,omitempty"`
 	Reason          string `json:"reason,omitempty"`
-	// Watch is the watch that created the capture and Trigger the agent's
-	// report of the crash. Only the hub sets them.
+	// Watch is the watch that created the capture, Trigger the agent's
+	// report that the watch's condition was met and On the kind of that
+	// condition. Only the hub sets them.
 	Watch   string `json:"watch,omitempty"`
 	Trigger string `json:"trigger,omitempty"`
+	On      string `json:"on,omitempty"`
+}
+
+// AfterCrash tells whether the capture is that of a watch for crashes: the
+// pod's container has ended, and what is recorded is what it left behind.
+// The capture of any other watch finds the pod as it runs.
+func (r *CaptureRequest) AfterCrash() bool {
+	return r.Watch != "" && Condition{Kind: r.On}.Crash()
 }
 
 // Normalize turns the short form with one kind into a recording.
@@ -325,20 +335,64 @@ func ViewerOf(name string) string {
 	return ""
 }
 
-// WatchRequest is what a user submits to record the next crashes of a
-// workload: the capture to make whenever one of its containers crashes.
+// The conditions a watch can wait for.
+const (
+	OnCrash    = "crash"     // a container ends with a failure
+	OnRestart  = "restart"   // a container is started again, whatever ended it
+	OnNotReady = "not-ready" // the pod stops being ready
+)
+
+// Condition is what a watch waits for. Without a kind it is a crash.
+type Condition struct {
+	Kind   string            `json:"kind,omitempty"`
+	Params map[string]string `json:"params,omitempty"`
+}
+
+// Crash tells whether the condition is a container's crash.
+func (c Condition) Crash() bool { return c.Kind == "" || c.Kind == OnCrash }
+
+// conditionParams lists the parameters each kind of condition accepts.
+var conditionParams = map[string][]string{
+	OnCrash:    {},
+	OnRestart:  {},
+	OnNotReady: {},
+}
+
+// Validate sets the default kind and checks the condition's shape.
+func (c *Condition) Validate() error {
+	if c.Kind == "" {
+		c.Kind = OnCrash
+	}
+	allowed, ok := conditionParams[c.Kind]
+	if !ok {
+		return fmt.Errorf("unknown condition %q", c.Kind)
+	}
+	for k := range c.Params {
+		if !slices.Contains(allowed, k) {
+			return fmt.Errorf("condition %s has no parameter %q", c.Kind, k)
+		}
+	}
+	return nil
+}
+
+// WatchRequest is what a user submits to record a workload whenever a
+// condition is met: the capture to make of the pod that meets it.
 type WatchRequest struct {
 	CaptureRequest
-	// Count is how many crashes the watch records before it ends; default 1.
+	// When is the condition; a container's crash if empty.
+	When Condition `json:"when,omitzero"`
+	// Count is how many times the watch records before it ends; default 1.
 	Count int `json:"count,omitempty"`
 }
 
 // Watch is a standing request. The node agents observe the workload's pods
-// and report a crash to the hub, which creates a capture for the pod.
+// and report to the hub when one meets the condition; the hub then creates
+// a capture for that pod.
 type Watch struct {
 	ID string `json:"id"`
 	CaptureRequest
-	Requester string `json:"requester"`
+	When      Condition `json:"when"`
+	Requester string    `json:"requester"`
 	// A sensitive watch waits until an administrator approves it. Its
 	// captures then need no further approval.
 	Sensitive bool   `json:"sensitive"`
@@ -349,7 +403,7 @@ type Watch struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// Trigger is an agent's report that a container of a watched pod crashed.
+// Trigger is an agent's report that a watched pod met the watch's condition.
 type Trigger struct {
 	// ID is chosen by the agent. The capture's task carries it back, so the
 	// agent finds what it set aside at the crash.
