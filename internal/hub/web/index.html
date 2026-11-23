@@ -103,7 +103,7 @@
   tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #F2C20055; } to { background: transparent; } }
   .pod { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font: 600 13px var(--mono); margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); } .pod .muted { font-weight: 400; font-size: 12px; }
   .options > * + * { margin-top: 14px; }
-  h3 { font-size: 13px; margin: 0 0 6px; } .lead { margin: 0 0 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; } .choice + h3 { margin-top: 14px; } .lead { margin: 0 0 8px; }
   .options section > * + * { margin-top: 8px; }
   #flows td { vertical-align: middle; } #flows tr { cursor: pointer; } #flows tr:has(input:checked) { background: var(--soft); }
   #flows .arrow { font-size: 16px; text-align: center; }
@@ -239,22 +239,34 @@
       <legend>4 · When</legend>
       <div class="choice">
         <label><input type="radio" name="when" value="now" checked>Now<small>Starts at once on every pod of the workload</small></label>
+      </div>
+      <h3>When something happens to the pod</h3>
+      <div class="choice">
         <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
         <label><input type="radio" name="when" value="restart">When a container restarts<small>Whatever ended it: a failure, a clean exit or a failed liveness probe. Records the pod as it runs again</small></label>
         <label><input type="radio" name="when" value="not-ready">When the pod stops being ready<small>Its readiness probe starts to fail. Records the pod while it is in that state</small></label>
+        <label><input type="radio" name="when" value="event">When Kubernetes warns about the pod<small>A warning event: a failed probe, a failed mount, a back-off, an eviction. All warnings, or those of one reason</small></label>
         <label><input type="radio" name="when" value="log">When a log line matches<small>A container writes a line that a pattern matches. Records the pod from that moment</small></label>
+      </div>
+      <h3>When it uses too much</h3>
+      <div class="choice">
         <label><input type="radio" name="when" value="memory">When memory use is above<small>A share of the container's limit, or a size. Records it before the kernel ends it for using too much</small></label>
+        <label><input type="radio" name="when" value="memory-growth">When memory grows by<small>More than a size within a time: a leak in progress, whatever the limit</small></label>
         <label><input type="radio" name="when" value="cpu">When CPU use is above<small>A number of CPUs, or a share of the container's limit. Records it while it is busy</small></label>
         <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
-        <label><input type="radio" name="when" value="memory-growth">When memory grows by<small>More than a size within a time: a leak in progress, whatever the limit</small></label>
         <label><input type="radio" name="when" value="pressure">When it stalls for memory, CPU or I/O<small>The kernel's own measure of a container that waits for a resource, in more than a share of the time</small></label>
         <label><input type="radio" name="when" value="threads">When it has more threads than<small>Threads and processes of the container: a leak of them, or a fork storm</small></label>
         <label><input type="radio" name="when" value="open-files">When it holds more files open than<small>Files, sockets and pipes of the container's processes: a leak of them</small></label>
+      </div>
+      <h3>When its network has trouble</h3>
+      <div class="choice">
         <label><input type="radio" name="when" value="tcp-retransmits">When it sends TCP segments again<small>More than a number per second in the pod: packets are lost on the way</small></label>
         <label><input type="radio" name="when" value="tcp-failures">When TCP connections fail<small>More than a number of the pod's connection attempts per second are refused or time out</small></label>
-        <label><input type="radio" name="when" value="event">When Kubernetes warns about the pod<small>A warning event: a failed probe, a failed mount, a back-off, an eviction. All warnings, or those of one reason</small></label>
-        <label><input type="radio" name="when" value="time">At a time<small>All pods of the workload, once or again and again: a nightly job, a peak hour</small></label>
+      </div>
+      <h3>When something else says so</h3>
+      <div class="choice">
         <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
+        <label><input type="radio" name="when" value="time">At a time<small>All pods of the workload, once or again and again: a nightly job, a peak hour</small></label>
       </div>
       <div id="beforeFields" hidden>
         <h3>From before it happens</h3>
@@ -900,7 +912,7 @@ $('steps').onclick = e => { const li = e.target.closest('li'); if (li && stepNee
 function summarize() {
   const where = $('workload').value ? `${$('workload').value} in ${$('cluster').value} / ${$('namespace').value}` : '';
   const what = kinds().length ? list(kinds().map(k => kindNames[k])) : '';
-  const when = step === 4 ? conditions[picked('when')] || 'now' : '';
+  const when = step === 4 ? (picked('when') === 'time' ? 'at a time' : conditions[picked('when')] || 'now') : '';
   $('summary').textContent = [where, what, when].filter(Boolean).join('  ·  ');
 }
 $('watches').onclick = guard(async e => {
