@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strconv"
@@ -201,10 +202,11 @@ func (s *sampler) end(p *sampledProfile) map[libpf.FileID]mappedFile {
 	return binaries
 }
 
-// halt stops the profiler.
+// halt stops the profiler and gives back what it held.
 func (s *sampler) halt() {
 	if s.faults != nil {
 		s.faults.Unload()
+		s.faults.release()
 	}
 	s.cancel()
 	s.tracer.Close()
@@ -212,6 +214,16 @@ func (s *sampler) halt() {
 	s.mu.Lock()
 	s.binaries = nil
 	s.mu.Unlock()
+	// The profiler's Close leaves its programs and maps in the kernel, some
+	// hundred megabytes that count as the agent's memory: it is made for a
+	// process that ends. They go when the garbage collector finds their
+	// handles unused, which an idle agent's collector does not do for a long
+	// time. So it is told to, once the profiler's goroutines have ended, and
+	// to return the profiler's part of the heap as well.
+	go func() {
+		time.Sleep(time.Second)
+		debug.FreeOSMemory()
+	}()
 }
 
 // run loads the profiler's programs into the kernel. The order of the steps
@@ -294,6 +306,7 @@ var pageFaults = &samples.TypeMetadata{
 // only its collector can configure.
 type faultProbe struct {
 	program  *cebpf.Program
+	loaded   map[string]*cebpf.Program // the program and the unwinders it calls
 	attached link.Link
 }
 
@@ -319,8 +332,16 @@ func (f *faultProbe) Load(_ context.Context, origins tracer.ProbeRegistrar, c *t
 	if err := c.LoadProbeUnwinders(spec, loaded, []tracer.ProgLoaderHelper{{Name: program, NoTailCallTarget: true, Enable: true}}, 0); err != nil {
 		return err
 	}
-	f.program = loaded[program]
+	f.program, f.loaded = loaded[program], loaded
 	return nil
+}
+
+// release takes the probe's programs out of the kernel.
+func (f *faultProbe) release() {
+	for _, p := range f.loaded {
+		p.Close()
+	}
+	f.program, f.loaded = nil, nil
 }
 
 func (f *faultProbe) attach() (err error) {
