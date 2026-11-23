@@ -2,7 +2,6 @@ package coredesc
 
 import (
 	"archive/tar"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -23,7 +22,8 @@ const FilesSuffix = ".files.tar"
 // found under root: executables and libraries, not the data files a
 // program may map as well, which can be of any size and are not needed to
 // read stacks. With them come the few files that name the container's
-// distribution (debugpkgs.go).
+// distribution (debugpkgs.go) and, of a .NET program, its managed
+// assemblies (dotnet.go).
 func Files(report []byte, root string) []string {
 	var fields struct {
 		Mappings []struct{ File string }
@@ -45,15 +45,17 @@ func Files(report []byte, root string) []string {
 			files = append(files, name)
 		}
 	}
+	var mapped []string
 	for _, m := range fields.Mappings {
 		add(m.File)
+		mapped = append(mapped, m.File)
 	}
 	// The program asks for a library by a name that is often a link to
 	// the file that is mapped: a debugger looks for it by that name.
 	for _, m := range fields.Modules {
 		add(m.File)
 	}
-	return withDistributionFiles(files, root)
+	return append(withDistributionFiles(files, root), dotnetFiles(mapped, root)...)
 }
 
 // resolve follows the links of a path as the program saw it, within root,
@@ -100,7 +102,11 @@ func resolve(root, name string) (file string, link bool) {
 
 // isELF tells whether the path is a regular file that starts as an
 // executable or library does.
-func isELF(path string) bool {
+func isELF(path string) bool { return startsWith(path, "\x7fELF") }
+
+// startsWith tells whether the path is a regular file that starts with the
+// bytes.
+func startsWith(path, start string) bool {
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
 		return false
@@ -110,9 +116,9 @@ func isELF(path string) bool {
 		return false
 	}
 	defer f.Close()
-	magic := make([]byte, 4)
+	magic := make([]byte, len(start))
 	_, err = io.ReadFull(f, magic)
-	return err == nil && bytes.Equal(magic, []byte("\x7fELF"))
+	return err == nil && string(magic) == start
 }
 
 // WriteFiles writes the files, found under root, as a tar archive. A name

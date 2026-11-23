@@ -1,0 +1,15 @@
+> clrthreads
+ThreadCount:      6
+UnstartedThread:  0
+BackgroundThread: 4
+PendingThread:    0
+DeadThread:       1
+Hosted Runtime:   no
+                                                                                                            Lock
+ DBG   ID     OSID ThreadOBJ           State GC Mode     GC Alloc Context                  Domain           Count Apt Exception
+   0    1        1 000056B2620587D0  2020020 Preemptive  00007E1CEB8B5FE0:00007E1CEB8B7030 000056B261FD90B0 -00001 Ukn
+  21    2       16 000056B2620C5530    21220 Preemptive  0000000000000000:0000000000000000 000056B261FD90B0 -00001 Ukn (Finalizer)
+  22    4       18 000056B261FE74A0  2021220 Preemptive  0000000000000000:0000000000000000 000056B261FD90B0 -00001 Ukn
+  23    5       19 000056B261FE66F0  2021220 Preemptive  00007E1CF1801A20:00007E1CF1802FF0 000056B261FD90B0 -00001 Ukn System.InvalidOperationException 00007e1cf1800040
+XXXX    6        0 000056B262189680    39820 Preemptive  0000000000000000:0000000000000000 000056B261FD90B0 -00001 Ukn
+  29   10       1f 000056B26223CEF0  1021220 Cooperative 00007E1CE8807610:00007E1CE8809050 000056B261FD90B0 -00001 Ukn (Threadpool Worker) System.TimeoutException 00007e1cf1800ac8 (nested exceptions)
