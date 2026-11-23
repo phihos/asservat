@@ -129,6 +129,20 @@ func TestProfileTargets(t *testing.T) {
 	}
 }
 
+// A capture's files are shown under the recording that made them.
+func TestRecordingOf(t *testing.T) {
+	for name, want := range map[string]string{
+		"api-1/capture.pcap": KindPcap, "api-1/pod.json": KindPodState, "api-1/events.json": KindPodState, "api-1/app.log": KindLogs, "api-1/app.previous.log": KindLogs,
+		"api-1/app.strace": KindStrace, "api-1/sampled-cpu.pprof": KindCPU, "api-1/sampled-memory.pprof": KindMemory,
+		"api-1/core.app": KindCoredump, "api-1/core.app.analysis.json": KindCoredump, "api-1/core.app.files.tar": KindCoredump,
+		"api-1/cpu.pprof": "", "api-1/heap.pprof": "", "api-1/goroutines.txt": "", "api-1/heapdump.hprof": "",
+	} {
+		if got := RecordingOf(name); got != want {
+			t.Errorf("RecordingOf(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
 func TestViewerOf(t *testing.T) {
 	for name, want := range map[string]string{
 		"api-1/capture.pcap": "pcap", "api-1/web.log": "log", "api-1/web.previous.log": "log", "api-1/web.strace": "strace",

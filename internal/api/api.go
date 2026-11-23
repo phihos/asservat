@@ -320,6 +320,34 @@ type Artifact struct {
 	// Viewer names the viewer that shows the file in the browser; a file
 	// without one only downloads.
 	Viewer string `json:"viewer,omitempty"`
+	// Recording is the kind of recording that made the file, where its
+	// name tells: the files of a profile endpoint are named by the
+	// application's endpoints and tell nothing.
+	Recording string `json:"recording,omitempty"`
+}
+
+// RecordingOf names the kind of recording that an artifact is from, by the
+// names the agent gives its files, or "" for a name it gives to none:
+// then it is a file of a profile endpoint.
+func RecordingOf(name string) string {
+	file := name[strings.LastIndex(name, "/")+1:]
+	switch {
+	case file == "capture.pcap":
+		return KindPcap
+	case file == "pod.json", file == "events.json":
+		return KindPodState
+	case strings.HasSuffix(file, ".log"):
+		return KindLogs
+	case strings.HasSuffix(file, ".strace"):
+		return KindStrace
+	case file == "sampled-cpu.pprof":
+		return KindCPU
+	case file == "sampled-memory.pprof":
+		return KindMemory
+	case strings.HasPrefix(file, "core."):
+		return KindCoredump
+	}
+	return ""
 }
 
 // ViewerOf names the viewer for an artifact, or "" if it only downloads.

@@ -107,7 +107,7 @@ func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 		return c, err
 	}
 	for i, a := range c.Artifacts {
-		c.Artifacts[i].Viewer = api.ViewerOf(a.Name)
+		c.Artifacts[i].Viewer, c.Artifacts[i].Recording = api.ViewerOf(a.Name), api.RecordingOf(a.Name)
 	}
 	return c, nil
 }
