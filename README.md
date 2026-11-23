@@ -31,7 +31,7 @@ a stopped program in a debugger.
 | System call trace | `strace` output with timing, following child processes | Only with buffer contents |
 | CPU profile | Where the pod's processes spend CPU time, sampled from the node with eBPF. Needs no support in the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, Perl, .NET, Erlang | No |
 | Memory growth | Which code makes the pod's memory grow while it records, from the stacks at its page faults. Same runtimes, needs no support in the application | No |
-| Profile endpoint | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor | Only memory dumps and endpoints Asservat does not know |
+| Profile endpoint | The profile endpoints that the application serves, found for you: Go pprof, gperftools, Spring Boot Actuator, dotnet-monitor. A HotSpot JVM is asked itself, without an endpoint: thread dump, class histogram, heap dump, flight recording | Only memory dumps and endpoints Asservat does not know |
 | Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running, with the program's files that a debugger needs next to it and a description of its threads and stacks, with goroutines, Python and .NET stacks | Yes |
 
 A capture that can contain memory or payload contents waits until an
@@ -59,7 +59,9 @@ flowchart LR
   may capture everywhere.
 - **Workloads keep Pod Security `restricted`.** The agent works from the node:
   it enters the pod's network namespace or attaches to its process. Nothing is
-  added to your pods.
+  added to your pods, with one exception: to ask a JVM for its own
+  diagnostics, the agent writes an empty marker file into the container's
+  `/tmp` and signals the JVM. No code is loaded into it.
 - **Evidence is encrypted** by the hub before it is stored, each file with its
   own key. Only the requester and administrators can download it, every
   download is recorded in the audit log, and evidence is deleted when its

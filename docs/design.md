@@ -12,7 +12,7 @@ what is deliberately left out. Change it together with the code.
 | Component | Runs as | Does |
 | --- | --- | --- |
 | Hub | One Deployment in one cluster | Authenticates users, records requests and approvals, pushes work to agents, encrypts and stores evidence, opens files for their viewers, serves console, REST API and MCP |
-| Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`, `SYS_RESOURCE`, `SYSLOG`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
+| Node agent | DaemonSet in every cluster (host PID namespace, `SYS_ADMIN`, `SYS_PTRACE`, `NET_ADMIN`, `NET_RAW`, `SYS_RESOURCE`, `SYSLOG`, `SETUID`, `SETGID`) | Holds one outbound stream to the hub, records evidence from the pods of its node, answers the hub's questions about its cluster |
 | PostgreSQL | Bundled or external | Captures, tasks, watches, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
 
@@ -47,7 +47,8 @@ time frame is left. Files appear as their recordings end.
 
 A running capture can be **stopped**: the recordings that run over time end
 at once and keep what they have, and the capture completes. A profile that
-runs over time cannot be cut short and is abandoned. A capture can also be
+runs over time cannot be cut short and is abandoned, except a JVM's flight
+recording, which keeps what it has. A capture can also be
 cancelled while it waits or runs, which abandons the recordings in progress,
 and deleted at any time.
 
@@ -275,8 +276,10 @@ same permission as a capture and store nothing.
 
 - **Profile endpoints.** An agent asks every TCP port that a pod listens on
   for the index or information page of each family of endpoints it knows,
-  with a two-second limit. That starts no profiling. It is written to the
-  audit log.
+  with a two-second limit. That starts no profiling. It also reads from the
+  node's `/proc` whether a container runs a HotSpot JVM, which can be asked
+  for its own diagnostics, and says why a JVM cannot be asked; nothing is
+  written or signalled for that. It is written to the audit log.
 
 The same inspections are MCP tools (`list_processes`, `sample_traffic`,
 `find_profile_endpoints`).
@@ -292,6 +295,7 @@ all languages. Asservat knows these:
 | C and C++ with gperftools or brpc | `/pprof/symbol` | CPU profile, heap, heap growth |
 | Java with Spring Boot Actuator | `/actuator` | Thread dump; heap dump (memory, needs approval) |
 | .NET with dotnet-monitor | `/info` | Trace; heap objects without contents; memory dump (needs approval) |
+| A HotSpot JVM itself, without an endpoint | The process has HotSpot's `libjvm.so` loaded | Thread dump; class histogram; heap dump (memory, needs approval); flight recording for the time frame |
 
 Because Asservat knows what each returns, only those that return memory
 need approval. An endpoint outside this list can return anything, so
@@ -300,6 +304,66 @@ such an endpoint (most Python, Node.js, Ruby and PHP services, and Java or
 .NET ones without the tools above) get a CPU profile and a profile of
 memory growth by sampling (`cpu` and `memory`, below); what a process holds
 by allocation site, blocking and traces need the runtime's own endpoint.
+
+### A JVM's own diagnostics
+
+A HotSpot JVM answers diagnostic commands over a socket in its `/tmp`, the
+attach mechanism that `jcmd` and `jstack` use, so a Java program needs no
+Actuator. This is the one case in which Asservat writes into a workload's
+container and signals its process, by the maintainer's decision
+(2026-11-23). The diagnostics are requested like endpoints, with the
+container in place of a port (`<container>/<endpoint>`):
+
+| Endpoint | Command | File | Cost |
+| --- | --- | --- | --- |
+| `jvm-threads` | `Thread.print -l` | `jvm-threaddump.txt` | A stop of milliseconds |
+| `jvm-histogram` | `GC.class_histogram` | `jvm-histogram.txt` | The JVM stops for a full collection and a walk of its heap: seconds for a heap of gigabytes |
+| `jvm-heapdump` (needs approval) | `GC.heap_dump` | `jvm-heapdump.hprof` | The JVM stops as for the histogram and while it writes the dump, which takes about the size of the live heap of the container's ephemeral storage until the agent has read it |
+| `jvm-recording` | `JFR.start`, then `JFR.stop` when the time frame ends or the capture is stopped | `jvm-recording.jfr`, for JDK Mission Control | The flight recorder's own while it runs, which its makers give as about 1 % of CPU time; its file is written at the end |
+
+1. The agent tells a JVM from the node's `/proc`: a process of the
+   container, its main process first, that has HotSpot's `libjvm.so`
+   mapped as code, none of OpenJ9's libraries, and that handles SIGQUIT.
+   Only such a process is ever signalled, because SIGQUIT ends a process
+   that does not handle it. An OpenJ9 JVM (IBM Semeru), which attaches
+   differently, a JVM started with `-XX:+DisableAttachMechanism` (on its
+   command line or in `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`,
+   `_JAVA_OPTIONS`) or with `-Xrs` are told as such and left alone.
+2. If the JVM's socket (`/tmp/.java_pid<pid>`) is not there, the agent
+   writes the empty marker file `/tmp/.attach_pid<pid>` into the container
+   and sends the JVM SIGQUIT, which makes it open the socket. It waits for
+   the socket as long as the JDK's own client does, 10 seconds, told by the
+   kernel (inotify), signals a second time after half of that as that
+   client does, and removes the marker. A JVM that does not find the marker
+   prints its threads to its standard output instead, as at any SIGQUIT.
+   The JVM keeps the socket open from then on.
+3. The agent sends one of the commands above. It has no way to send
+   another: not the socket's `load`, which loads an agent library into the
+   JVM, nor a command that changes its flags.
+4. A heap dump and a flight recording are written by the JVM itself, to a
+   file in the container's `/tmp` with a name that cannot be guessed. The
+   agent reads it from there and deletes it in every outcome, also when
+   the capture is cancelled meanwhile. The JVM ends a recording by itself
+   a minute after the time frame, should the agent be gone; that file
+   then stays. The flight recorder leaves an empty directory in `/tmp`
+   until the JVM ends.
+
+The JVM takes requests only from its own user and group (JDK 8; later
+versions also from root). The agent therefore starts itself again as that
+user, for which it has the capabilities `SETUID` and `SETGID`; that child
+has no capabilities (unless the JVM runs as root, as the agent does), is
+handed the container's `/tmp` and the JVM's
+process as open files, and signals the JVM itself, since the agent may not
+signal other users' processes. The container's `/tmp` is opened within
+the container's root (`openat2` with `RESOLVE_IN_ROOT`, Linux 5.6), so a
+link there cannot lead the agent to the node's files, and neither the
+socket nor the JVM's file is followed if it is a link.
+
+This needs a `/tmp` in the container that the JVM can write: with a
+read-only root file system and no volume there, the JVM cannot open its
+socket. It works with HotSpot from JDK 8 on (tested with 8, 11, 17, 21
+and 25); a flight recording needs a JVM that has the flight recorder
+(OpenJDK 8 from update 262).
 
 ### CPU profiles by sampling
 
@@ -354,7 +418,10 @@ runtimes with their own heap such as Go and Java.
 ## Evidence kinds
 
 The agent runs standard tools from the node, so the files are in each tool's
-own format and nothing is injected into the pod:
+own format and nothing is injected into the pod. The one exception is a
+JVM's own diagnostics, for which a marker file is written into the
+container and the JVM is signalled (see above); no code is loaded there
+either:
 
 | Kind | How | Sensitive |
 | --- | --- | --- |
@@ -364,7 +431,7 @@ own format and nothing is injected into the pod:
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true`. The trace rests in the agent's scratch directory and is uploaded when it is complete, so that the traced process does not wait for the way to the hub | With `strings=true` |
 | `cpu` | Samples of the pod's processes by eBPF programs in the node's kernel, for `durationSeconds`; all containers of the pod | No |
 | `memory` | Stacks of the pod's processes at their page faults, taken by an eBPF program in the node's kernel, for `durationSeconds`; all containers of the pod | No |
-| `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |
+| `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one. A JVM's own diagnostics, `<container>/<endpoint>` in the same list, are asked over its attach socket | For an endpoint that returns memory, and for one that Asservat does not know |
 | `coredump` | `gcore` on the container's main process, or on every process of `process`; the process pauses while the core is written. gdb's description of the core, for a Go program with Delve's goroutines, is stored next to it | Yes |
 
 The main process of a container is the oldest process in the container's
