@@ -137,6 +137,10 @@ func TestDebugPackages(t *testing.T) {
 			w.Write(content)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/broken/") {
+			http.Error(w, "the mirror is out of order", http.StatusBadGateway)
+			return
+		}
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
@@ -222,6 +226,15 @@ func TestDebugPackages(t *testing.T) {
 		if asked := requests(); len(asked) != 0 {
 			t.Fatal("asked again", asked)
 		}
+	})
+	// A repository that fails does not take away what the one before it found.
+	t.Run("RPM, with a later repository that fails", func(t *testing.T) {
+		failing := &debugSources{RPM: map[string][]string{"rocky": {server.URL + "/rpm/{version}/{arch}/", server.URL + "/broken/{version}/{arch}/"}}, Alpine: sources.Alpine}
+		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: failing}
+		if at, _ := describe(t, d, root(t, rocky)); !strings.HasSuffix(at, "main.c:true") {
+			t.Fatalf("the function is at %q, asked %v", at, requests())
+		}
+		requests()
 	})
 	t.Run("Alpine", func(t *testing.T) {
 		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}

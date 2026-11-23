@@ -149,7 +149,9 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	}
 	// What the container says of itself becomes part of addresses and of
 	// names in the cache: only what reads as a name or a version is taken.
-	if len(stripped) == 0 || !plainName.MatchString(release["ID"]) || !plainName.MatchString(release["VERSION_ID"]) {
+	// The repositories are laid out by machine: for another than the two
+	// known here there is nothing to ask for.
+	if len(stripped) == 0 || arch == "" || !plainName.MatchString(release["ID"]) || !plainName.MatchString(release["VERSION_ID"]) {
 		return nil
 	}
 	f := debugFetcher{ctx: ctx, cache: filepath.Join(d.Scratch, "debugpkgs")}
@@ -160,14 +162,16 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	// The packages to unpack: for each a name in the cache and the places
 	// it may be at.
 	var packages map[string][]string
-	var err error
+	var err, looked error
 	if repositories != nil {
 		major, _, _ := strings.Cut(release["VERSION_ID"], ".")
 		fill := strings.NewReplacer("{version}", release["VERSION_ID"], "{major}", major, "{arch}", arch)
 		packages = map[string][]string{}
 		for _, repository := range repositories {
 			var found []string
-			if found, err = f.lookup(fill.Replace(repository), stripped); err != nil {
+			// A repository that fails ends the looking, not the fetching
+			// of what the ones before it found.
+			if found, looked = f.lookup(fill.Replace(repository), stripped); looked != nil {
 				break
 			}
 			for _, rpm := range found {
@@ -187,7 +191,7 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 			dirs = append(dirs, dir)
 		}
 	}
-	if err != nil {
+	if err = errors.Join(looked, err); err != nil {
 		// One server that fails is not asked for the rest.
 		slog.Warn("debug packages not fetched", "core", core, "distribution", release["ID"], "error", err)
 	}
