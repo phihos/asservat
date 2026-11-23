@@ -474,9 +474,8 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 // linkByBuildID gives every debug file under dir a name by its build ID,
 // as the debug packages of RPMs have them and Alpine's have not. gdb finds
 // a debug file by that name whatever the path of the program's file is: by
-// the file's own path it looks in the wrong place where the root is
-// /proc/<pid>/root, whose links it follows on the node and not in the
-// container.
+// the file's own path it looks in the wrong place where it reads the file
+// through a link, as it does in its view of the root (analysis.go).
 func linkByBuildID(dir string) {
 	filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || !entry.Type().IsRegular() || !strings.HasSuffix(path, ".debug") {

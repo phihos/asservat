@@ -543,7 +543,11 @@ program). The agent follows the links of a container's
 paths itself, within the container's root: the kernel would follow a link
 to an absolute path on the node, and a container could so lead the agent
 to the node's files (the kind of fault behind CVE-2019-14271 in `docker cp`
-and CVE-2019-1002101 in `kubectl cp`). Unpacked, they are what a debugger needs to open the core where
+and CVE-2019-1002101 in `kubectl cp`). gdb follows links as the kernel
+does, so it reads the program's files through a directory of links that
+the agent makes for each core: one by each name of a mapped file or a
+library asked for, to the file that the name leads to in the container.
+Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core

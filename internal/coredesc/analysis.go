@@ -18,10 +18,12 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 )
@@ -82,8 +84,16 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	}
 	out := script.Name() + ".json"
 	defer os.Remove(out)
+	// gdb reads the program's files through a view of the root.
+	view := ""
+	if root != "" {
+		if view, err = d.view(ctx, core, root); err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(view)
+	}
 	cmd := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-x", script.Name())
-	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+root, "ASSERVAT_OUT="+out,
+	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+out,
 		"ASSERVAT_DEBUG_DIRS="+strings.Join(d.debugDirs(ctx, core, root), ":"),
 		// The script turns debuginfod on where servers are named.
 		"DEBUGINFOD_URLS="+d.DebuginfodURLs, "DEBUGINFOD_CACHE_PATH="+filepath.Join(d.Scratch, "debuginfod"),
@@ -123,6 +133,57 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 		report = with
 	}
 	return report, nil
+}
+
+// view makes a directory that holds, for every file that gdb looks for
+// under the root, a link at the name the program saw it by to the file in
+// the root that the name leads to (resolve). gdb takes the view for the
+// root: it follows links as the kernel does, from its own root, so that
+// under /proc/<pid>/root a container's link to an absolute path would have
+// it read the node's file as the program's. The names are those of the
+// files that the core maps, those by which the program asked for its
+// libraries, often links to the mapped files, and the directory of debug
+// files. Only gdb knows the names asked by, from the program's memory: it
+// lists them first, with an empty view in which it finds no file.
+func (d Describer) view(ctx context.Context, core, root string) (string, error) {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	view, err := os.MkdirTemp(d.Scratch, "view-*")
+	if err != nil {
+		return "", err
+	}
+	names := append(coreFiles(core), "/usr/lib/debug")
+	// Without the libraries gdb still describes, as it does without a
+	// root, but then without their functions: that is said.
+	listed, err := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary").Output()
+	if err != nil {
+		slog.Warn("the libraries that a core's program asked for are not known", "core", core, "error", err)
+	}
+	for _, line := range strings.Split(string(listed), "\n") {
+		// A library that was not found is listed without addresses.
+		if _, name, found := strings.Cut(line, " No "); found {
+			names = append(names, strings.TrimSpace(name))
+		}
+	}
+	for _, name := range names {
+		name = pathpkg.Clean("/" + strings.TrimSuffix(name, " (deleted)"))
+		file, _ := resolve(root, name)
+		if file == "" || name == "/" {
+			continue
+		}
+		at := filepath.Join(view, name)
+		err := os.MkdirAll(filepath.Dir(at), 0o700)
+		if err == nil {
+			err = os.Symlink(filepath.Join(root, file), at)
+		}
+		// As a name under one that is a file's: gdb then does not find it.
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			slog.Debug("a file of a core's program is not shown to gdb", "core", core, "file", name, "error", err)
+		}
+	}
+	return view, nil
 }
 
 // DescribedBy tells which version of the describer made a description; 1
