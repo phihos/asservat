@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -193,21 +194,51 @@ func (s CoreSpool) unmark(podUID, watch string) {
 
 // take sets the pod's cores aside for the capture of one crash report.
 // The handler may not have finished, or even begun, the core when the
-// kubelet reports the container as terminated, and no event tells when it
-// has. So this looks again while the handler writes, and for a few seconds
-// for a core to appear at all.
+// kubelet reports the container as terminated. So this waits while the
+// handler writes, and for a few seconds for a core to appear at all: a
+// process that the kernel killed for its memory limit leaves none. The
+// kernel tells when the handler begins a file, finishes it by renaming it,
+// or gives it up. The wait ends after a minute at most, because the crash's
+// report waits for it and the capture's other recordings for the report;
+// a core that is finished later goes with the pod's next crash or watch.
 func (s CoreSpool) take(podUID, trigger string) {
 	dir := s.cores(podUID)
-	for started := time.Now(); ; time.Sleep(200 * time.Millisecond) {
+	// The handler makes the directory for the pod's first core. It is made
+	// here to be watched from before that.
+	os.MkdirAll(dir, 0o700)
+	var changed <-chan struct{}
+	if changes, err := watchDir(dir, syscall.IN_CREATE|syscall.IN_MOVED_TO|syscall.IN_DELETE); err == nil {
+		defer changes.Close()
+		changed = changes.happened
+	} else {
+		// The two times alone then say when to look again.
+		slog.Warn("the core handler's directory is not watched", "error", err)
+	}
+	appear, most := time.After(5*time.Second), time.After(time.Minute)
+	for waiting, late := true, false; waiting; {
 		parts, _ := filepath.Glob(filepath.Join(dir, "*.part"))
 		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
-		waited := time.Since(started)
-		if len(parts) == 0 && (len(cores) > 0 || waited > 5*time.Second) || waited > time.Minute {
+		if len(parts) == 0 && (len(cores) > 0 || late) {
 			break
+		}
+		select {
+		case _, reports := <-changed:
+			if !reports {
+				changed = nil
+			}
+		case <-appear:
+			late = true // no core will come if none is being written by now
+		case <-most:
+			waiting = false
 		}
 	}
 	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	if len(cores) == 0 {
+		// Without a watch for the pod's cores the handler writes none: the
+		// pod went meanwhile, and its directory with it.
+		if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
+			os.Remove(dir)
+		}
 		return
 	}
 	os.MkdirAll(s.taken(trigger), 0o700)
@@ -218,7 +249,7 @@ func (s CoreSpool) take(podUID, trigger string) {
 
 // crashCores uploads the cores that were set aside for a crash report and
 // removes them from the node, also if the upload fails.
-func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string, up func(string, io.Reader) error) error {
+func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string, known *processes, up func(string, io.Reader) error) error {
 	if a.Cores == "" {
 		return errors.New("this node's agent runs without the core handler (agent.coreHandler.enabled)")
 	}
@@ -255,7 +286,7 @@ func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string,
 		// The crashed process is gone. The container's next instance runs
 		// the same image, so its files stand in for the crashed one's.
 		root := ""
-		if pids, _, err := a.targets(pod, container, ""); err == nil && len(pids) > 0 {
+		if pids, _, err := a.targets(pod, container, "", known); err == nil && len(pids) > 0 {
 			root = "/proc/" + strconv.Itoa(pids[0]) + "/root"
 		}
 		a.describe(ctx, file, root, name, up)

@@ -12,10 +12,11 @@ import (
 // start holds the longest headers, so the capture is the same as of whole
 // packets.
 func TestSnappedPacketsKeepTheirHeaders(t *testing.T) {
-	if args := strings.Join(tcpdumpArgs(7, "port 80", false), " "); !strings.Contains(args, "-t 7 -n tcpdump") || !strings.Contains(args, " -s 140 ") || !strings.Contains(args, "port 80") {
+	if args := strings.Join(tcpdumpArgs(7, "port 80", false, false), " "); !strings.Contains(args, "-t 7 -n tcpdump") || !strings.Contains(args, " -s 140 ") || !strings.Contains(args, "port 80") || strings.Contains(args, " -U ") {
 		t.Fatal("without payload:", args)
 	}
-	if args := strings.Join(tcpdumpArgs(7, "", true), " "); strings.Contains(args, " -s ") {
+	// What is read while tcpdump runs gets every packet as it comes.
+	if args := strings.Join(tcpdumpArgs(7, "", true, true), " "); strings.Contains(args, " -s ") || !strings.Contains(args, " -U ") {
 		t.Fatal("with payload:", args)
 	}
 	le := binary.LittleEndian

@@ -99,8 +99,9 @@ made for that pod.
    it, by the same rules as a capture. The approval precedes the event, so
    it covers the captures that the watch creates.
 2. The hub sends the cluster's watches to its agents, and again whenever they
-   change or an agent connects. Each agent follows the workload's pods on its
-   node through a Kubernetes watch.
+   change or an agent connects. Each agent follows the pods of its node
+   through one Kubernetes watch, however many watches wait, and tells each
+   watch of its workload's pods.
 3. The agent reports a pod that meets the condition, and the hub creates the
    capture for that pod, as the user who created the watch, after checking
    that user's permission again. Containers of a pod that is being deleted
@@ -109,12 +110,17 @@ made for that pod.
    creator or an administrator deletes it.
 
 For a log condition the agent follows the logs of the watched pods on its
-node through the Kubernetes log stream, from the moment it sees the pod. The
-capture's reason quotes the line, cut at 200 characters. After a report the
-pod's further lines are passed over for the watch's time frame (30 seconds
-where it has none), because they belong to the incident that is being
-recorded. A stream that ends is opened again after a pause that grows up to
-a minute; nothing tells when it can be read again.
+node from the moment it sees the pod. It reads the files that the container
+runtime writes on the node (`/var/log/pods`), told of every change by the
+kernel (inotify), so the lines do not travel through the kubelet and the API
+server while the watch waits. The capture's reason quotes the line, cut at
+200 characters. After a report the pod's further lines are passed over for
+the watch's time frame (30 seconds where it has none), because they belong
+to the incident that is being recorded. Where the agent cannot read the
+files (a runtime that keeps them elsewhere, a static pod, a line of more
+than 64 KiB) it follows the Kubernetes log stream instead; a stream that
+ends is opened again after a pause that grows up to a minute, as nothing
+tells when it can be read again.
 
 The conditions about what a container uses, from `memory` to
 `tcp-failures`, take `seconds`, for how long the use must stay above (for

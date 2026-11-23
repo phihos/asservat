@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 
 	"asservat.local/asservat/internal/api"
 )
@@ -46,6 +47,13 @@ type Agent struct {
 	mu       sync.Mutex
 	running  map[string]task               // capture ID + pod -> the running task
 	watching map[string]context.CancelFunc // watch ID -> cancel
+	// pods is the Kubernetes watch of this node's pods, which all watches
+	// share, and how many of them use it.
+	pods struct {
+		informer cache.SharedInformer
+		stop     context.CancelFunc
+		users    int
+	}
 	// Packet buffers of watched pods by watch ID + pod, and the packets set
 	// aside at a crash, by trigger ID, until the hub's task for it arrives.
 	rings     map[string]*ring

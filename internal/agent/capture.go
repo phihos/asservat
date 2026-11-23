@@ -45,6 +45,7 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 		close(dumped)
 	}
 	errs := make([]error, len(r.Recordings))
+	known := &processes{}
 	var wg sync.WaitGroup
 	for i, rec := range r.Recordings {
 		wg.Go(func() {
@@ -58,7 +59,7 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 				}
 			}
 			report.set(rec.Kind, api.StateRunning, "")
-			errs[i] = a.recording(ctx, frame, id, t, pod, rec)
+			errs[i] = a.recording(ctx, frame, id, t, pod, rec, known)
 			if rec.Kind == api.KindCoredump && !r.AfterCrash() {
 				close(dumped)
 			}
@@ -111,7 +112,7 @@ func straceArgs(rec api.Recording, pids []int) []string {
 type partialError struct{ error }
 
 // recording makes one recording of a pod.
-func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording) error {
+func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssignment, pod *corev1.Pod, rec api.Recording, known *processes) error {
 	r := t.Request
 	duration := time.Duration(r.DurationSeconds) * time.Second
 	up := func(name string, body io.Reader) error { return a.upload(ctx, id, t.Pod, name, body) }
@@ -156,7 +157,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			}
 			return up("capture.pcap", bytes.NewReader(packets))
 		}
-		pid, err := a.podPID(pod)
+		pid, err := a.podPID(pod, known)
 		if err != nil {
 			return err
 		}
@@ -166,7 +167,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			packets := up
 			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
-		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", tcpdumpArgs(pid, rec.Params["filter"], payload)...)
+		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", tcpdumpArgs(pid, rec.Params["filter"], payload, false)...)
 	case api.KindStrace:
 		// The system calls that the capture's watch kept tracing: those from
 		// before the capture and, unless a crash ended the process, those
@@ -191,17 +192,17 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			}
 			return up(calls.name, bytes.NewReader(calls.content))
 		}
-		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
+		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"], known)
 		if err != nil {
 			return err
 		}
 		return a.record(ctx, frame, duration, container+".strace", a.aside(up), "strace", straceArgs(rec, pids)...)
 	case api.KindCPU:
-		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, up)
+		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, known, up)
 	case api.KindMemory:
-		return a.sampled(ctx, frame, sampledMemory, r, t.Pod, duration, pod, up)
+		return a.sampled(ctx, frame, sampledMemory, r, t.Pod, duration, pod, known, up)
 	case api.KindPprof:
-		pid, err := a.podPID(pod)
+		pid, err := a.podPID(pod, known)
 		if err != nil {
 			return err
 		}
@@ -241,9 +242,9 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 	case api.KindCoredump:
 		if r.AfterCrash() {
 			// The core of the crashed process, not one of its successor.
-			return a.crashCores(ctx, pod, r.Trigger, up)
+			return a.crashCores(ctx, pod, r.Trigger, known, up)
 		}
-		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"])
+		pids, container, err := a.targets(pod, rec.Params["container"], rec.Params["process"], known)
 		if err != nil {
 			return err
 		}
@@ -431,12 +432,13 @@ func tail(b []byte) string {
 }
 
 // podPID returns the node PID of a process in the pod's network namespace:
-// the main process of its first running container.
-func (a *Agent) podPID(pod *corev1.Pod) (int, error) {
+// the main process of its first running container. known is what a capture
+// has found of the pod's processes, or nil.
+func (a *Agent) podPID(pod *corev1.Pod, known *processes) (int, error) {
 	err := fmt.Errorf("pod %s has no running container", pod.Name)
 	for _, c := range pod.Spec.Containers {
 		var pid int
-		if pid, _, err = a.containerPID(pod, c.Name); err == nil {
+		if pid, _, err = a.containerPID(pod, c.Name, known); err == nil {
 			return pid, nil
 		}
 	}
@@ -445,13 +447,51 @@ func (a *Agent) podPID(pod *corev1.Pod) (int, error) {
 
 // containerPID returns the node PID of a container's main process. An empty
 // name selects the pod's first container.
-func (a *Agent) containerPID(pod *corev1.Pod, name string) (int, string, error) {
+func (a *Agent) containerPID(pod *corev1.Pod, name string, known *processes) (int, string, error) {
 	id, name, err := runningID(pod, name)
 	if err != nil {
 		return 0, name, err
 	}
-	pid, err := mainPID(a.Proc, id, a.own(pod))
+	_, pid, err := known.of(a, pod, id)
 	return pid, name, err
+}
+
+// processes remembers the processes of a pod's containers for one capture.
+// The capture's recordings run at once and each ask for them, and finding
+// them reads a file of every process on the node: that is done once per
+// container. A nil one remembers nothing.
+type processes struct {
+	mu    sync.Mutex
+	found map[string]func() containerProcesses // by container ID
+}
+
+type containerProcesses struct {
+	all  []int
+	main int
+	err  error
+}
+
+// of returns the processes of a container of the pod, and its main process.
+func (p *processes) of(a *Agent, pod *corev1.Pod, containerID string) ([]int, int, error) {
+	if p == nil {
+		return containerPIDs(a.Proc, containerID, a.own(pod))
+	}
+	p.mu.Lock()
+	find := p.found[containerID]
+	if find == nil {
+		// Who asks meanwhile waits for the one search.
+		find = sync.OnceValue(func() (c containerProcesses) {
+			c.all, c.main, c.err = containerPIDs(a.Proc, containerID, a.own(pod))
+			return c
+		})
+		if p.found == nil {
+			p.found = map[string]func() containerProcesses{}
+		}
+		p.found[containerID] = find
+	}
+	p.mu.Unlock()
+	c := find()
+	return c.all, c.main, c.err
 }
 
 // runningID returns the ID of a container of the pod that runs. An empty
@@ -582,15 +622,15 @@ func executable(proc string, pid int) string {
 
 // targets returns the node PIDs to dump or trace in a container: its main
 // process, or with an executable every process that runs that program.
-func (a *Agent) targets(pod *corev1.Pod, container, program string) ([]int, string, error) {
-	main, container, err := a.containerPID(pod, container)
+func (a *Agent) targets(pod *corev1.Pod, container, program string, known *processes) ([]int, string, error) {
+	main, container, err := a.containerPID(pod, container, known)
 	if err != nil || program == "" {
 		return []int{main}, container, err
 	}
 	var pids []int
 	for _, s := range pod.Status.ContainerStatuses {
 		if _, id, ok := strings.Cut(s.ContainerID, "://"); ok && s.Name == container {
-			all, _, _ := containerPIDs(a.Proc, id, a.own(pod))
+			all, _, _ := known.of(a, pod, id)
 			for _, pid := range all {
 				if executable(a.Proc, pid) == program {
 					pids = append(pids, pid)

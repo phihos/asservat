@@ -117,7 +117,7 @@ func (a *Agent) traffic(ctx context.Context, q api.Query) ([]api.Flow, []string)
 }
 
 func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.Duration) ([]api.Flow, error) {
-	pid, err := a.podPID(pod)
+	pid, err := a.podPID(pod, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.D
 	}
 	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, "", false)...)
+	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, "", false, false)...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGINT) }
 	cmd.WaitDelay = 5 * time.Second
 	var stderr bytes.Buffer
@@ -164,7 +164,7 @@ func (a *Agent) profiles(ctx context.Context, q api.Query) (found []api.ProfileT
 	if len(pods) == 0 {
 		return nil, nil, skipped
 	}
-	pid, err := a.podPID(pods[0])
+	pid, err := a.podPID(pods[0], nil)
 	if err != nil {
 		return nil, nil, append(skipped, pods[0].Name)
 	}
