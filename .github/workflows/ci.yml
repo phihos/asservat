@@ -28,7 +28,9 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       # The tests that describe cores take them with gcore and skip without it.
-      - run: sudo apt-get install -y --no-install-recommends gdb
+      - run: sudo apt-get install -y --no-install-recommends gdb python3-venv
+      # As in the image: the test of a Python core's stacks skips without it.
+      - run: sudo python3 -m venv /opt/pystack && sudo /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2
       - run: go test -race ./...
         env:
           ASSERVAT_TEST_DSN: postgres://postgres:pw@127.0.0.1:5432/postgres

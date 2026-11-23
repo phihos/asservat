@@ -438,6 +438,15 @@ frames). These stacks have functions, files and lines, but no variables,
 and the viewer says so. Where neither works, gdb's description stands
 alone.
 
+A core of a Python program shows gdb the interpreter, whose threads all
+stand in its evaluation loop. What the program did is in the interpreter's
+memory. pystack (in the image, with a Python of its own) reads it from the
+core and the interpreter's files, stripped or not: the describer adds the
+interpreter's threads with their Python frames (function, file, line,
+arguments and local variables) as `runtimeStacks`, and the viewer lists
+them before the machine's threads, as it does goroutines. Other language
+runtimes are added in the same form.
+
 gdb walks a stack by the unwind tables of the functions on it. musl, the C
 library of Alpine images, carries none, and no frame pointers: a thread
 that waits in it, as most threads of a core do, ends there for gdb, and
