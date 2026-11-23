@@ -136,7 +136,7 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 		}
 	}
 	filled := filepath.Join(work, "core")
-	if err := fillCore(core, root, filled); err != nil {
+	if err := fillCore(core, root, filled, d.ThreadIDs); err != nil {
 		return nil, err
 	}
 	ctx, end := context.WithCancel(ctx)
@@ -217,6 +217,8 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 		if thread.Frames == nil {
 			thread.Frames = []goFrame{}
 		}
+		// As gdb names the thread: by its number on the node.
+		thread.ThreadSystemID = d.onNode(thread.ThreadSystemID)
 		if thread.held == "" {
 			continue
 		}
@@ -408,9 +410,16 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 		if err != nil {
 			return "", fmt.Errorf("%s: %w", address, err)
 		}
+		needs, _ := library.ImportedLibraries()
 		library.Close()
 		if library.Type != elf.ET_DYN || library.Machine != here {
 			return "", fmt.Errorf("%s: not a library for this processor", address)
+		}
+		// A runtime built for musl, as in Alpine images, has a helper
+		// library for musl, which this image, built on glibc, cannot load.
+		if slices.ContainsFunc(needs, func(name string) bool { return strings.HasPrefix(name, "libc.musl") }) {
+			slog.Info("no .NET stacks: the runtime is built for musl (an Alpine image), and its helper library does not load here", "libcoreclr", runtimeFile)
+			os.Remove(path)
 		}
 	}
 	// Another description may have fetched the same meanwhile.
@@ -436,7 +445,7 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 // while the core is described, less where the filesystem shares the blocks
 // of a copy (as Btrfs does), plus what is appended: about 100 MiB for an
 // ASP.NET program. For a core of 64-bit little-endian machines.
-func fillCore(core, root, filled string) error {
+func fillCore(core, root, filled string, ids map[int]int) error {
 	in, err := os.Open(core)
 	if err != nil {
 		return err
@@ -459,6 +468,12 @@ func fillCore(core, root, filled string) error {
 	end, err := io.Copy(out, in)
 	if err != nil {
 		return err
+	}
+	// The runtime knows its threads by their numbers in the container.
+	if len(ids) > 0 {
+		if err := renumberThreads(out, file, ids); err != nil {
+			return err
+		}
 	}
 	// The segments that hold memory, and the other ones as they are. A
 	// segment that says it is larger in memory than in the file would hide

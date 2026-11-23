@@ -116,3 +116,32 @@ func TestFilesStayWithinTheRoot(t *testing.T) {
 		t.Fatalf("the library under its name with a link on the way: %q", b)
 	}
 }
+
+// A core taken by the agent numbers its threads as the node does. What
+// they are numbered inside the container is read from the node's /proc and
+// kept in the description.
+func TestThreadNumbersInsideTheContainer(t *testing.T) {
+	proc := t.TempDir()
+	for task, status := range map[string]string{
+		"5000": "Name:\tdotnet\nNSpid:\t5000\t1\n", "5007": "Name:\tdotnet\nNSpid:\t5007\t8\n",
+	} {
+		os.MkdirAll(filepath.Join(proc, "5000/task", task), 0o755)
+		os.WriteFile(filepath.Join(proc, "5000/task", task, "status"), []byte(status), 0o644)
+	}
+	ids := NamespaceThreadIDs(proc, 5000)
+	if len(ids) != 2 || ids[5000] != 1 || ids[5007] != 8 {
+		t.Fatal(ids)
+	}
+	// A process of the node's own namespace needs none.
+	os.MkdirAll(filepath.Join(proc, "6000/task/6000"), 0o755)
+	os.WriteFile(filepath.Join(proc, "6000/task/6000/status"), []byte("NSpid:\t6000\n"), 0o644)
+	if ids := NamespaceThreadIDs(proc, 6000); ids != nil {
+		t.Fatal("of a process in the node's namespace:", ids)
+	}
+	if got := ThreadIDs([]byte(`{"threadIds":{"5000":1,"5007":8}}`)); len(got) != 2 || got[5007] != 8 {
+		t.Fatal("read back from a description:", got)
+	}
+	if d := (Describer{ThreadIDs: ids}); d.onNode(8) != 5007 || d.onNode(99) != 99 {
+		t.Fatal("a runtime's thread on the node")
+	}
+}

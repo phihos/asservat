@@ -42,13 +42,18 @@ const (
 	// 4: the stacks of Python programs.
 	// 5: debug information from the debug packages of distributions.
 	// 6: the managed stacks of .NET programs.
-	Version = 6
+	// 7: the threads of language runtimes told to be the core's threads.
+	Version = 7
 )
 
 // Describer describes cores with gdb, Delve, pystack and dotnet-dump.
 type Describer struct {
 	// Scratch is a directory for the script and what gdb downloads.
 	Scratch string
+	// ThreadIDs are the numbers of the process's threads inside its
+	// container, by their numbers on the node, for a core that numbers
+	// them as the node does (threads.go); nil for one that does not.
+	ThreadIDs map[int]int
 	// PystackPython is the Python interpreter that has pystack; the
 	// constant of that name if empty.
 	PystackPython string
@@ -112,6 +117,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 		return nil, err
 	}
 	fields["describer"] = json.RawMessage(fmt.Sprint(Version))
+	if len(d.ThreadIDs) > 0 {
+		if fields["threadIds"], err = json.Marshal(d.ThreadIDs); err != nil {
+			return nil, err
+		}
+	}
 	if report, err = json.Marshal(fields); err != nil {
 		return nil, err
 	}

@@ -146,6 +146,9 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 			return false, "", ctx.Err()
 		}
 	}
+	// The numbers of the threads inside their container, which only the
+	// agent could tell, are kept from the description that is replaced.
+	var threads map[int]int
 	if old, err := h.Store.Artifact(ctx, capture, name+coredesc.Suffix); err == nil {
 		var report bytes.Buffer
 		if err := h.plain(ctx, old, &report); err != nil {
@@ -154,6 +157,7 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 		if coredesc.DescribedBy(report.Bytes()) >= coredesc.Version {
 			return false, "", nil
 		}
+		threads = coredesc.ThreadIDs(report.Bytes())
 	} else if err != ErrNotFound {
 		return false, "", err
 	}
@@ -198,7 +202,7 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	if err != nil {
 		return false, "", undescribable{err}
 	}
-	report, err := coredesc.Describer{Scratch: h.WorkDir, DebuginfodURLs: h.DebuginfodURLs}.Describe(ctx, file.Name(), root) // what gdb downloads stays for the next core
+	report, err := coredesc.Describer{Scratch: h.WorkDir, DebuginfodURLs: h.DebuginfodURLs, ThreadIDs: threads}.Describe(ctx, file.Name(), root) // what gdb downloads stays for the next core
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return false, "", ctx.Err() // the hub is stopping: no fault of the core
 	}

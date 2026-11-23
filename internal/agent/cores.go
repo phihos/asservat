@@ -292,7 +292,7 @@ func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string,
 		if pids, _, err := a.targets(pod, container, "", known); err == nil && len(pids) > 0 {
 			root = "/proc/" + strconv.Itoa(pids[0]) + "/root"
 		}
-		a.describe(ctx, file, root, name, up)
+		a.describe(ctx, file, root, name, 0, up)
 	}
 	return nil
 }
