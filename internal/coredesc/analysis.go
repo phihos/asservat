@@ -18,6 +18,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -154,8 +155,12 @@ func (d Describer) view(ctx context.Context, core, root string) (string, error) 
 		return "", err
 	}
 	names := append(coreFiles(core), "/usr/lib/debug")
-	// Without the libraries gdb still describes, as it does without a root.
-	listed, _ := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary").Output()
+	// Without the libraries gdb still describes, as it does without a
+	// root, but then without their functions: that is said.
+	listed, err := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary").Output()
+	if err != nil {
+		slog.Warn("the libraries that a core's program asked for are not known", "core", core, "error", err)
+	}
 	for _, line := range strings.Split(string(listed), "\n") {
 		// A library that was not found is listed without addresses.
 		if _, name, found := strings.Cut(line, " No "); found {
@@ -168,8 +173,14 @@ func (d Describer) view(ctx context.Context, core, root string) (string, error) 
 		if file == "" || name == "/" {
 			continue
 		}
-		if at := filepath.Join(view, name); os.MkdirAll(filepath.Dir(at), 0o700) == nil {
-			os.Symlink(filepath.Join(root, file), at)
+		at := filepath.Join(view, name)
+		err := os.MkdirAll(filepath.Dir(at), 0o700)
+		if err == nil {
+			err = os.Symlink(filepath.Join(root, file), at)
+		}
+		// As a name under one that is a file's: gdb then does not find it.
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			slog.Debug("a file of a core's program is not shown to gdb", "core", core, "file", name, "error", err)
 		}
 	}
 	return view, nil
