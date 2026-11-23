@@ -206,6 +206,14 @@ func (s CoreSpool) take(podUID, trigger string) {
 	// The handler makes the directory for the pod's first core. It is made
 	// here to be watched from before that.
 	os.MkdirAll(dir, 0o700)
+	// Without a watch for the pod's cores the handler writes none: the
+	// watch ended meanwhile, and the directory goes with it once it is
+	// empty.
+	defer func() {
+		if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
+			os.Remove(dir)
+		}
+	}()
 	var changed <-chan struct{}
 	if changes, err := watchDir(dir, syscall.IN_CREATE|syscall.IN_MOVED_TO|syscall.IN_DELETE); err == nil {
 		defer changes.Close()
@@ -234,11 +242,6 @@ func (s CoreSpool) take(podUID, trigger string) {
 	}
 	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	if len(cores) == 0 {
-		// Without a watch for the pod's cores the handler writes none: the
-		// pod went meanwhile, and its directory with it.
-		if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
-			os.Remove(dir)
-		}
 		return
 	}
 	os.MkdirAll(s.taken(trigger), 0o700)
