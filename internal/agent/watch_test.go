@@ -203,7 +203,9 @@ func TestBuffersHoldNoMoreThanTheirLimit(t *testing.T) {
 	most, before := uint64(0), held()
 	for range 40 { // 100 lines of 1 KiB each time, 4 MiB in all
 		l.fill(strings.NewReader(strings.Repeat(strings.Repeat("x", 1023)+"\n", 100)))
-		most = max(most, held()-min(before, held()))
+		if now := held(); now > before { // the heap may also have shrunk since
+			most = max(most, now-before)
+		}
 	}
 	runtime.KeepAlive(l)
 	if most > limit*115/100 {
