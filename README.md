@@ -156,7 +156,8 @@ To catch a problem you cannot be present for, choose in the console's last
 step when to record, or create a watch. A watch records the pod that meets
 its condition: by default a container that crashes, with `"when": {"kind":
 "restart"}` a container that is started again, with `"not-ready"` a pod that
-stops being ready. After a crash a `pcap` holds the packet headers of the
+stops being ready, with `"log"` and a `pattern` a container that writes a
+matching log line. After a crash a `pcap` holds the packet headers of the
 seconds before it:
 
 ```sh

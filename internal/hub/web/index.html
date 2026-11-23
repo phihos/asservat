@@ -238,6 +238,11 @@
         <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
         <label><input type="radio" name="when" value="restart">When a container restarts<small>Whatever ended it: a failure, a clean exit or a failed liveness probe. Records the pod as it runs again</small></label>
         <label><input type="radio" name="when" value="not-ready">When the pod stops being ready<small>Its readiness probe starts to fail. Records the pod while it is in that state</small></label>
+        <label><input type="radio" name="when" value="log">When a log line matches<small>A container writes a line that a pattern matches. Records the pod from that moment</small></label>
+      </div>
+      <div class="fields" id="logFields" hidden>
+        <label class="wide">The line matches, as a regular expression<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
+        <label>Written by<select id="logContainer"></select></label>
       </div>
       <div class="fields">
         <label id="countLabel" hidden>How many times to record<input id="count" type="number" min="1" placeholder="1"></label>
@@ -375,6 +380,7 @@ async function workloadChanged() {
   if (!$('workload').value) return;
   containers = await call('GET', namespacePath() + '/containers?' + workloadQuery());
   $('container').innerHTML = '<option value="">all containers</option>' + options(containers);
+  $('logContainer').innerHTML = '<option value="">any container</option>' + options(containers);
   await Promise.all([loadProcesses(), loadProfiles()]);
 }
 
@@ -429,7 +435,17 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 // A core dump on a crash is that of the crashed process: nothing to choose.
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
-const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready'};
+const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches'};
+// A watch's condition in full, with what it is given.
+const told = when => (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${when.params?.pattern || ''}"${when.params?.container ? ' in ' + when.params.container : ''}` : '');
+// The condition that the form's last step describes.
+function condition() {
+  const kind = picked('when');
+  if (kind !== 'log') return {kind};
+  const pattern = $('logPattern').value.trim();
+  if (!pattern) throw new Error('Give the pattern that a log line is to match.');
+  return {kind, params: {pattern, ...($('logContainer').value ? {container: $('logContainer').value} : {})}};
+}
 
 // The process list is read from the pods when a core dump or trace is
 // chosen. If that fails, the containers' main processes remain as choices.
@@ -535,6 +551,7 @@ function showParams() {
     coredump: 'the core of the process that crashed (the agents need the core handler)', 'pod-state': 'the pod with the reason of the crash',
     strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
   $('countLabel').hidden = !watching;
+  $('logFields').hidden = picked('when') !== 'log';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
@@ -560,7 +577,7 @@ async function loadWatches() {
   $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
   $('watchCount').textContent = list.length || '';
   $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
-    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(conditions[w.when?.kind] || w.when?.kind || '')}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
+    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(told(w.when))}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
     <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
@@ -693,7 +710,7 @@ $('captureForm').onsubmit = guard(async () => {
   });
   const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, recordings,
     durationSeconds: $('frameBlock').hidden ? 0 : Number($('duration').value || 0), reason: $('reason').value};
-  const created = watching ? await call('POST', '/api/watches', {...request, when: {kind: picked('when')}, count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
+  const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${conditions[picked('when')]}.`)

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -70,7 +72,8 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	// The handlers run one at a time. A pod's first sighting only records
 	// the state it is in: what happened before is not reported.
 	seen := map[string]string{}
-	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
+	marked := map[string]bool{}                  // pod UIDs whose cores the node's handler keeps
+	following := map[string]context.CancelFunc{} // pods whose logs a log watch reads
 	defer func() {
 		for uid := range marked {
 			a.Cores.unmark(uid, w.ID)
@@ -90,6 +93,15 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				slog.Error("core handler marker", "pod", pod.Name, "error", err)
 			}
 			marked[string(pod.UID)] = true
+		}
+		if w.When.Kind == api.OnLog {
+			// The pod's logs are read once a container of it runs.
+			if _, reads := following[pod.Name]; !reads && pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil {
+				reading, stop := context.WithCancel(ctx)
+				following[pod.Name] = stop
+				go a.follow(agent, reading, w, pod.DeepCopy())
+			}
+			return
 		}
 		if message := met(w.When, pod, seen); message != "" && known {
 			go a.trigger(agent, w, pod, message)
@@ -111,6 +123,10 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			if marked[string(pod.UID)] {
 				a.Cores.unmark(string(pod.UID), w.ID)
 				delete(marked, string(pod.UID))
+			}
+			if stop := following[pod.Name]; stop != nil {
+				stop()
+				delete(following, pod.Name)
 			}
 			a.mu.Lock()
 			// A new pod of the same name gets its own buffer at once.
@@ -362,4 +378,90 @@ func (r *ring) snapshot() []byte {
 		return nil
 	}
 	return bytes.Join(append([][]byte{r.header}, r.packets...), nil)
+}
+
+// follow reads what the pod's containers write from now on, through the
+// Kubernetes log stream, and reports to the hub when a line matches the
+// watch's pattern. It ends with ctx, which the pod's deletion or the
+// watch's end cancels.
+func (a *Agent) follow(agent, ctx context.Context, w api.Watch, pod *corev1.Pod) {
+	pattern, err := regexp.Compile(w.When.Params["pattern"])
+	if err != nil {
+		slog.Error("log watch", "watch", w.ID, "error", err) // the hub validated it
+		return
+	}
+	// After a report the pod's lines are passed over for the watch's time
+	// frame, or the default time frame where it has none: they belong to
+	// the incident whose capture is being made.
+	quiet := time.Duration(w.DurationSeconds) * time.Second
+	if quiet == 0 {
+		quiet = 30 * time.Second
+	}
+	var mu sync.Mutex
+	var reported time.Time
+	matched := func(container, line string) {
+		mu.Lock()
+		again := time.Since(reported) < quiet
+		if !again {
+			reported = time.Now()
+		}
+		mu.Unlock()
+		if !again {
+			a.trigger(agent, w, pod, fmt.Sprintf("a log line of container %s matches %q: %s", container, pattern, clip(line)))
+		}
+	}
+	var wg sync.WaitGroup
+	for _, c := range pod.Spec.Containers {
+		if want := w.When.Params["container"]; want != "" && want != c.Name {
+			continue
+		}
+		wg.Go(func() {
+			since := metav1.Now()
+			// A stream ends when its container ends, and also when the
+			// kubelet or the API server closes it. Nothing tells when it
+			// can be read again, so it is opened again after a pause that
+			// grows up to a minute while the stream keeps failing.
+			for pause := time.Second; ctx.Err() == nil; pause = min(2*pause, time.Minute) {
+				opened := time.Now()
+				stream, err := a.Kube.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: c.Name, Follow: true, SinceTime: &since}).Stream(ctx)
+				if err == nil {
+					matchLines(stream, pattern, func(line string) { matched(c.Name, line) })
+					stream.Close()
+					since = metav1.Now()
+				}
+				if time.Since(opened) > 10*time.Second {
+					pause = time.Second // it worked for a while
+				}
+				select {
+				case <-ctx.Done():
+				case <-time.After(pause):
+				}
+			}
+		})
+	}
+	wg.Wait()
+}
+
+// matchLines calls found for every line of the stream that the pattern
+// matches. A line longer than the reader's buffer is matched in pieces.
+func matchLines(stream io.Reader, pattern *regexp.Regexp, found func(line string)) {
+	lines := bufio.NewReaderSize(stream, 64<<10)
+	for {
+		line, _, err := lines.ReadLine()
+		if len(line) > 0 && pattern.Match(line) {
+			found(string(line))
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+// clip shortens a log line for a capture's reason, which a person reads in a list.
+func clip(line string) string {
+	const most = 200
+	if len(line) <= most {
+		return line
+	}
+	return strings.ToValidUTF8(line[:most], "") + "…"
 }

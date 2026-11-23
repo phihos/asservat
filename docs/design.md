@@ -78,6 +78,7 @@ made for that pod.
 | `crash` (the default) | A container terminates with an exit code other than zero, which includes being killed for exceeding its memory limit | What the crashed container left behind, see below |
 | `restart` | A container is started again, whatever ended it: a failure, a clean exit, a failed liveness probe | The pod as it runs again |
 | `not-ready` | The pod was ready and no longer is: its readiness probe fails | The pod in that state |
+| `log` | A container writes a log line that the regular expression `pattern` matches; `container` limits it to one container | The pod from that moment |
 
 1. A user creates a watch: a capture request, with one or more recordings,
    a condition, and the number of times to record (default 1). The
@@ -94,6 +95,14 @@ made for that pod.
    do not count.
 4. The watch ends after it has recorded as often as asked, or when its
    creator or an administrator deletes it.
+
+For a log condition the agent follows the logs of the watched pods on its
+node through the Kubernetes log stream, from the moment it sees the pod. The
+capture's reason quotes the line, cut at 200 characters. After a report the
+pod's further lines are passed over for the watch's time frame (30 seconds
+where it has none), because they belong to the incident that is being
+recorded. A stream that ends is opened again after a pause that grows up to
+a minute; nothing tells when it can be read again.
 
 Except after a crash, the pod is alive when its capture starts: the
 recordings that run over time (CPU profile, memory growth, system calls)
@@ -470,8 +479,7 @@ These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint.
-- More conditions for watches: a log line, memory or CPU use, a Prometheus
-  alert.
+- More conditions for watches: memory or CPU use, a Prometheus alert.
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.

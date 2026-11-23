@@ -2,6 +2,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -340,6 +341,7 @@ const (
 	OnCrash    = "crash"     // a container ends with a failure
 	OnRestart  = "restart"   // a container is started again, whatever ended it
 	OnNotReady = "not-ready" // the pod stops being ready
+	OnLog      = "log"       // a container writes a log line that matches a pattern
 )
 
 // Condition is what a watch waits for. Without a kind it is a crash.
@@ -356,6 +358,7 @@ var conditionParams = map[string][]string{
 	OnCrash:    {},
 	OnRestart:  {},
 	OnNotReady: {},
+	OnLog:      {"pattern", "container"},
 }
 
 // Validate sets the default kind and checks the condition's shape.
@@ -370,6 +373,17 @@ func (c *Condition) Validate() error {
 	for k := range c.Params {
 		if !slices.Contains(allowed, k) {
 			return fmt.Errorf("condition %s has no parameter %q", c.Kind, k)
+		}
+	}
+	if c.Kind == OnLog {
+		if c.Params["pattern"] == "" {
+			return errors.New("a log condition needs a pattern: a regular expression that a line is to match")
+		}
+		if _, err := regexp.Compile(c.Params["pattern"]); err != nil {
+			return fmt.Errorf("the pattern is no regular expression: %v", err)
+		}
+		if v, ok := c.Params["container"]; ok && !namePattern.MatchString(v) {
+			return errors.New("invalid container name")
 		}
 	}
 	return nil

@@ -154,3 +154,21 @@ func TestSampledProfiles(t *testing.T) {
 		}
 	}
 }
+
+// A log condition needs a pattern that is a regular expression.
+func TestLogCondition(t *testing.T) {
+	for name, c := range map[string]Condition{
+		"no pattern":                       {Kind: OnLog},
+		"a broken pattern":                 {Kind: OnLog, Params: map[string]string{"pattern": "timeout("}},
+		"a bad container":                  {Kind: OnLog, Params: map[string]string{"pattern": "timeout", "container": "Not A Name"}},
+		"a parameter of another condition": {Kind: OnNotReady, Params: map[string]string{"pattern": "timeout"}},
+	} {
+		if err := c.Validate(); err == nil {
+			t.Error(name, "was accepted")
+		}
+	}
+	c := Condition{Kind: OnLog, Params: map[string]string{"pattern": `(?i)timeout|panic`, "container": "app"}}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
