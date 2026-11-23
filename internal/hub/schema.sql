@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS watches (
 );
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS sensitive boolean NOT NULL DEFAULT false;
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
+-- What the watch waits for; a watch from before conditions waits for a crash.
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS condition jsonb NOT NULL DEFAULT '{"kind":"crash"}';
 
 -- The audit log outlives the captures it describes.
 CREATE TABLE IF NOT EXISTS audit (

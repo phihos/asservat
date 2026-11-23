@@ -9,6 +9,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"asservat.local/asservat/internal/api"
 )
 
 func TestCrashes(t *testing.T) {
@@ -108,5 +110,83 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 	}
 	if n, first := count(r); n != 10 || first != 190 {
 		t.Fatal("limit: packets", n, "from second", first)
+	}
+}
+
+// A watch for restarts reports a container that was started again, also
+// after a clean exit; one for readiness a pod that was ready and no longer
+// is. Neither reports the state in which a pod is first seen.
+func TestRestartsAndReadiness(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1"}}
+	container := func(restarts int32, last *corev1.ContainerStateTerminated) {
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "app", RestartCount: restarts, LastTerminationState: corev1.ContainerState{Terminated: last}}}
+	}
+	restart := api.Condition{Kind: api.OnRestart}
+	seen := map[string]string{}
+	container(3, nil)
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("the restarts before the watch:", got)
+	}
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("no change:", got)
+	}
+	// The count rises before the new instance runs: the report waits for it.
+	container(4, &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"})
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("a restart whose new instance does not run yet:", got)
+	}
+	pod.Status.ContainerStatuses[0].State.Running = &corev1.ContainerStateRunning{}
+	if got := met(restart, pod, seen); got != "container app was restarted: it ended with exit code 0, Completed" {
+		t.Fatal(got)
+	}
+	// A crash watch does not report that clean exit.
+	if got := met(api.Condition{}, pod, map[string]string{}); got != "" {
+		t.Fatal("a clean exit as a crash:", got)
+	}
+	// A container in a crash loop may never be seen running: its restart is
+	// reported when the next one shows that it went on.
+	container(5, &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"})
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("a restart whose new instance does not run yet:", got)
+	}
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("the same state again:", got)
+	}
+	container(6, &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"})
+	if got := met(restart, pod, seen); got != "container app was restarted: it ended with exit code 1, Error" {
+		t.Fatal("a crash loop:", got)
+	}
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("reported twice:", got)
+	}
+
+	ready := func(status corev1.ConditionStatus, message string) {
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: status, Message: message}}
+	}
+	unready := api.Condition{Kind: api.OnNotReady}
+	seen = map[string]string{}
+	ready(corev1.ConditionFalse, "containers with unready status: [app]")
+	if got := met(unready, pod, seen); got != "" {
+		t.Fatal("a pod that was not ready when first seen:", got)
+	}
+	ready(corev1.ConditionTrue, "")
+	if got := met(unready, pod, seen); got != "" {
+		t.Fatal("a pod that became ready:", got)
+	}
+	ready(corev1.ConditionFalse, "containers with unready status: [app]")
+	if got := met(unready, pod, seen); got != "pod is not ready any more: containers with unready status: [app]" {
+		t.Fatal(got)
+	}
+	if got := met(unready, pod, seen); got != "" {
+		t.Fatal("reported twice:", got)
+	}
+	// Ready again and then stopped on purpose: no report.
+	ready(corev1.ConditionTrue, "")
+	met(unready, pod, seen)
+	now := metav1.Now()
+	pod.DeletionTimestamp = &now
+	ready(corev1.ConditionFalse, "")
+	if got := met(unready, pod, seen); got != "" {
+		t.Fatal("a deleted pod:", got)
 	}
 }

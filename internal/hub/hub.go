@@ -411,7 +411,7 @@ func (h *Hub) createCapture(w http.ResponseWriter, r *http.Request, u User) erro
 // Request validates and records a capture. A sensitive capture waits for an
 // administrator; any other starts at once.
 func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.Capture, error) {
-	in.Watch, in.Trigger = "", ""
+	in.Watch, in.Trigger, in.On = "", "", ""
 	if err := in.Validate(); err != nil {
 		return api.Capture{}, errStatus{http.StatusBadRequest, err.Error()}
 	}

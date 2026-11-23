@@ -59,7 +59,7 @@ The recordings of a capture share everything but their kind and parameters:
   of the first three is requested;
 - one approval, needed if any recording is sensitive, before which none of
   them starts;
-- one trigger, when they belong to a crash watch.
+- one trigger, when they belong to a watch.
 
 A capture holds at most one recording of each kind, because two would write
 the same files. A core dump and a system call trace both attach to the
@@ -67,41 +67,52 @@ process, which only one can do at a time: the trace starts when the core is
 written. A request with a single `kind` and `params` is the short form of
 one recording.
 
-## Crash watches
+## Watches
 
 A watch is a standing capture request for problems nobody is present for:
-whenever a container of the workload crashes, the capture is made for the
-crashed pod.
+whenever a pod of the workload meets the watch's condition, the capture is
+made for that pod.
+
+| Condition (`when.kind`) | Met when | The capture finds |
+| --- | --- | --- |
+| `crash` (the default) | A container terminates with an exit code other than zero, which includes being killed for exceeding its memory limit | What the crashed container left behind, see below |
+| `restart` | A container is started again, whatever ended it: a failure, a clean exit, a failed liveness probe | The pod as it runs again |
+| `not-ready` | The pod was ready and no longer is: its readiness probe fails | The pod in that state |
 
 1. A user creates a watch: a capture request, with one or more recordings,
-   plus the number of crashes to record (default 1). The permission is the
-   same as for a capture. A watch
+   a condition, and the number of times to record (default 1). The
+   permission is the same as for a capture. A watch
    for evidence that needs approval waits until an administrator approves
-   it, by the same rules as a capture. The approval precedes the crash, so
+   it, by the same rules as a capture. The approval precedes the event, so
    it covers the captures that the watch creates.
 2. The hub sends the cluster's watches to its agents, and again whenever they
    change or an agent connects. Each agent follows the workload's pods on its
    node through a Kubernetes watch.
-3. A crash is a container that terminated with an exit code other than zero,
-   which includes being killed for exceeding its memory limit. Containers of
-   a pod that is being deleted do not count. The agent reports the crash and
-   the hub creates the capture for that pod, as the user who created the
-   watch, after checking that user's permission again.
-4. The watch ends after its last crash, or when its creator or an
-   administrator deletes it.
+3. The agent reports a pod that meets the condition, and the hub creates the
+   capture for that pod, as the user who created the watch, after checking
+   that user's permission again. Containers of a pod that is being deleted
+   do not count.
+4. The watch ends after it has recorded as often as asked, or when its
+   creator or an administrator deletes it.
 
-Two kinds behave differently in a triggered capture:
+Except after a crash, the pod is alive when its capture starts: the
+recordings that run over time (CPU profile, memory growth, system calls)
+then show it in the state that met the condition, and a core dump is taken
+of the running process.
+
+Some kinds behave differently in a watch's capture:
 
 | Kind | Triggered capture holds |
 | --- | --- |
-| `pcap` | The packets of the `durationSeconds` before the crash, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
-| `logs` | The current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
+| `pcap` | The packets of the `durationSeconds` before the condition was met, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
+| `logs` | After a crash: the current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
 
-| `coredump` | The core that the kernel wrote of the crashed process, see below |
+| `coredump` | After a crash: the core that the kernel wrote of the crashed process, see below |
 
 An agent that starts or reconnects takes the pods' state at that moment as
-its baseline: crashes while it was away are not recorded, and its packet
-buffers start empty.
+its baseline: what happened while it was away is not recorded, and its
+packet buffers start empty. Agents older than the hub take every watch for
+a crash watch.
 
 ### Cores of crashed processes
 
@@ -459,7 +470,8 @@ These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint.
-- Other triggers than a crash (alerts, failing probes, a log line).
+- More conditions for watches: a log line, memory or CPU use, a Prometheus
+  alert.
 - Passing the cores of unwatched processes on to the node's previous core
   handler.
 - Sharing a capture with other users or teams.

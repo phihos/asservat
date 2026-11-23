@@ -41,7 +41,7 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 	// can do at a time: the trace starts when the dump is written. After a
 	// crash the core is the kernel's and nothing attaches for it.
 	dumped := make(chan struct{})
-	if r.Recording(api.KindCoredump) == nil || r.Watch != "" {
+	if r.Recording(api.KindCoredump) == nil || r.AfterCrash() {
 		close(dumped)
 	}
 	errs := make([]error, len(r.Recordings))
@@ -59,7 +59,7 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 			}
 			report.set(rec.Kind, api.StateRunning, "")
 			errs[i] = a.recording(ctx, frame, id, t, pod, rec)
-			if rec.Kind == api.KindCoredump && r.Watch == "" {
+			if rec.Kind == api.KindCoredump && !r.AfterCrash() {
 				close(dumped)
 			}
 			switch {
@@ -115,16 +115,16 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		}
 		return nil
 	case api.KindLogs:
-		return a.logs(ctx, frame, pod, rec, r.Watch != "", duration, up)
+		return a.logs(ctx, frame, pod, rec, r.AfterCrash(), duration, up)
 	case api.KindPcap:
 		if r.Watch != "" {
-			// The packets before the crash, set aside when it was reported.
+			// The packets before the watch's condition was met, set aside when it was reported.
 			a.mu.Lock()
 			packets := a.snapshots[r.Trigger]
 			delete(a.snapshots, r.Trigger)
 			a.mu.Unlock()
 			if packets == nil {
-				return errors.New("the node agent holds no packets of this pod from before the crash")
+				return errors.New("the node agent holds no packets of this pod from before the watch's condition was met")
 			}
 			return up("capture.pcap", bytes.NewReader(packets))
 		}
@@ -197,7 +197,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			return err
 		}
 	case api.KindCoredump:
-		if r.Watch != "" {
+		if r.AfterCrash() {
 			// The core of the crashed process, not one of its successor.
 			return a.crashCores(ctx, pod, r.Trigger, up)
 		}

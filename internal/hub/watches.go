@@ -17,12 +17,15 @@ import (
 
 // Watch validates and records a watch and hands it to the cluster's agents.
 func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch, error) {
-	in.Watch, in.Trigger, in.Pods = "", "", nil
+	in.Watch, in.Trigger, in.On, in.Pods = "", "", "", nil
 	if err := in.Validate(); err != nil {
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
-	if dump := in.Recording(api.KindCoredump); dump != nil && dump.Params["process"] != "" {
-		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch records whichever process crashes; it takes no process"}
+	if err := in.When.Validate(); err != nil {
+		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
+	}
+	if dump := in.Recording(api.KindCoredump); dump != nil && dump.Params["process"] != "" && in.When.Crash() {
+		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch for crashes records whichever process crashes; it takes no process"}
 	}
 	if in.Count < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count must not be negative"}
@@ -34,7 +37,7 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err != nil {
 		return api.Watch{}, err
 	}
-	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
+	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, When: in.When, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
 	if w.Sensitive && h.approvesOwn(u) {
 		w.Approver = u.Name
 	}
@@ -190,14 +193,14 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 		return err
 	}
 	request := watch.CaptureRequest
-	request.Watch, request.Trigger, request.Pods, request.Reason = id, in.ID, []string{in.Pod}, in.Message
+	request.Watch, request.Trigger, request.On, request.Pods, request.Reason = id, in.ID, watch.When.Kind, []string{in.Pod}, in.Message
 	if watch.Reason != "" {
 		request.Reason += " (" + watch.Reason + ")"
 	}
 	if _, err := h.record(r.Context(), u, request, []api.Pod{{Name: in.Pod, Node: in.Node}}, "capture.trigger", watch.Approver); err != nil {
-		// The crash was not recorded, so it does not count.
+		// Nothing was recorded, so this time does not count.
 		if e := h.Store.RefundWatch(context.WithoutCancel(r.Context()), id); e != nil {
-			slog.Error("watch crash not given back", "watch", id, "error", e)
+			slog.Error("watch's count not given back", "watch", id, "error", e)
 		}
 		return err
 	}
