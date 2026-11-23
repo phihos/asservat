@@ -157,12 +157,16 @@ class ScanUnwinder(gdb.unwinder.Unwinder):
             if module is None or has_tables(module):
                 return None
             inferior = gdb.selected_inferior()
-            stack = bytes(inferior.read_memory(sp, SCAN))
         except (gdb.MemoryError, gdb.error):
+            return None
+        # The stack from here up, a page at a time: it ends before SCAN
+        # where the frame is near the stack's beginning, as main's callees are.
+        stack, page = b"", 4096
+        while len(stack) < SCAN:
             try:
-                stack = bytes(inferior.read_memory(sp, 4096 - sp % 4096))  # to the end of the stack's last page
-            except (gdb.MemoryError, gdb.error, UnboundLocalError):
-                return None
+                stack += bytes(inferior.read_memory(sp + len(stack), page - (sp + len(stack)) % page))
+            except (gdb.MemoryError, gdb.error):
+                break
         for at in range(0, len(stack) - 7, 8):
             caller, = WORD.unpack_from(stack, at)
             if caller > 0x1000 and space.objfile_for_address(caller) is not None and after_call(inferior, caller, machine, pc, space):
