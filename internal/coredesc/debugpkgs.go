@@ -129,11 +129,14 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 	if _, err := exec.LookPath("bsdtar"); err != nil {
 		return nil
 	}
-	// The stripped files, as named under root, with their build IDs.
+	// The stripped files with their build IDs, by the name the program
+	// mapped them under and by the path that leads to without links: a
+	// package's list of files may have either.
 	stripped := map[string]string{}
 	arch := ""
 	for _, name := range coreFiles(core) {
-		path, _ := resolve(root, strings.TrimSuffix(name, " (deleted)"))
+		name = pathpkg.Clean("/" + strings.TrimSuffix(name, " (deleted)"))
+		path, _ := resolve(root, name)
 		if path == "" {
 			continue
 		}
@@ -142,7 +145,7 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 			continue
 		}
 		if file.Section(".debug_info") == nil {
-			stripped[path] = buildID(file)
+			stripped[path], stripped[name] = buildID(file), buildID(file)
 			arch = map[elf.Machine]string{elf.EM_X86_64: "x86_64", elf.EM_AARCH64: "aarch64"}[file.Machine]
 		}
 		file.Close()

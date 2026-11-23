@@ -78,6 +78,9 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 	if exe == "" || root == "" {
 		return report, nil
 	}
+	if exe, _ = resolve(root, exe); exe == "" {
+		return report, nil
+	}
 	exe = filepath.Join(root, exe)
 	info, err := buildinfo.ReadFile(exe)
 	if err != nil {

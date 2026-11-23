@@ -260,7 +260,8 @@ func TestDebugPackages(t *testing.T) {
 		if err := os.Rename(dir, filepath.Join(elsewhere, "moved")); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Symlink(filepath.Join(elsewhere, "moved"), dir); err != nil {
+		to, _ := filepath.Rel(filepath.Dir(dir), filepath.Join(elsewhere, "moved"))
+		if err := os.Symlink(to, dir); err != nil {
 			t.Fatal(err)
 		}
 		if at, _ := describe(t, Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}, elsewhere); !strings.HasSuffix(at, "main.c:true") {
