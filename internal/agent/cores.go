@@ -157,7 +157,12 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string,
 	earlier, _ := filepath.Glob(filepath.Join(dir, container+".*.core"))
 	for _, name := range earlier {
 		os.Remove(name)
-		os.Remove(strings.TrimSuffix(name, ".core") + programFiles)
+	}
+	// And the program's files of earlier cores, also of one that was
+	// never finished.
+	kept, _ := filepath.Glob(filepath.Join(dir, container+".*"+programFiles))
+	for _, name := range kept {
+		os.Remove(name)
 	}
 	name := filepath.Join(dir, container+"."+pid+"."+at)
 	f, err := os.OpenFile(name+".part", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)

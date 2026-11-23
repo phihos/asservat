@@ -240,8 +240,19 @@ func TestHandlerKeepsTheProgramsFiles(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(root, "app/server")); string(b) != "\x7fELF the program" {
 		t.Fatalf("the program as kept: %q", b)
 	}
-	// A core that names no file of the container is kept without.
-	if outcome, err := spool.Handle(proc, "100", "1700000001", strings.NewReader("no core")); err == nil {
-		t.Fatal("a process that is gone:", outcome)
+	// A core that names no file of the container is kept without, and the
+	// files of the earlier core do not stay for it.
+	os.MkdirAll(filepath.Join(proc, "101/root"), 0o755)
+	os.WriteFile(filepath.Join(proc, "101/cgroup"), []byte("0::/kubepods/besteffort/pod"+uid+"/"+container+"\n"), 0o644)
+	stale := filepath.Join(spool.cores(uid), container+".100.1700000000"+programFiles)
+	os.MkdirAll(spool.cores(uid), 0o700)
+	os.WriteFile(stale, []byte("of a core that was never finished"), 0o600)
+	outcome, err := spool.Handle(proc, "101", "1700000001", bytes.NewReader(coreNaming("/app/gone")))
+	if err != nil || !strings.HasPrefix(outcome, "kept for pod "+uid+", without the program's files") {
+		t.Fatal(outcome, err)
+	}
+	left, _ := filepath.Glob(filepath.Join(spool.cores(uid), "*"))
+	if len(left) != 1 || filepath.Base(left[0]) != container+".101.1700000001.core" {
+		t.Fatal("in the spool:", left)
 	}
 }
