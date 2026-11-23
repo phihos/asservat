@@ -81,8 +81,13 @@ func (d Describer) onNode(inner int) int {
 func renumberThreads(core *os.File, file *elf.File, ids map[int]int) error {
 	const prstatus, prpsinfo = 1, 3
 	at := map[uint32]int{prstatus: 32, prpsinfo: 24}
+	info, err := core.Stat()
+	if err != nil {
+		return err
+	}
 	for _, segment := range file.Progs {
-		if segment.Type != elf.PT_NOTE {
+		// Notes that say they are larger than the file are not notes.
+		if segment.Type != elf.PT_NOTE || segment.Filesz > uint64(info.Size()) {
 			continue
 		}
 		notes := make([]byte, segment.Filesz)
