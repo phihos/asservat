@@ -128,7 +128,7 @@ func goroutinesOfGoCore(t *testing.T, variables bool, flags ...string) {
 		t.Fatal(err)
 	}
 	elsewhere := t.TempDir()
-	if err := ExtractFiles(&archive, elsewhere); err != nil {
+	if err := ExtractFiles(&archive, elsewhere, int64(archive.Len())); err != nil {
 		t.Fatal(err)
 	}
 	stdin.Close()

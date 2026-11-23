@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"asservat.local/asservat/internal/api"
 
 	"asservat.local/asservat/internal/coredesc"
 )
@@ -30,9 +34,18 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 	if err != nil {
 		return err
 	}
+	if api.ViewerOf(in.Name) != "core" || strings.HasSuffix(in.Name, coredesc.Suffix) {
+		return errStatus{http.StatusBadRequest, "the file is no core"}
+	}
 	described, reason, err := h.describeAgain(r.Context(), c.ID, in.Name)
 	if err != nil {
-		return err
+		// The description as it is still shows. What failed once fails
+		// again: it is not tried for this core until the hub starts anew.
+		slog.Warn("core not described again", "capture", c.ID, "name", in.Name, "error", err)
+		h.mu.Lock()
+		h.undescribed[c.ID+"/"+in.Name] = true
+		h.mu.Unlock()
+		return reply(w, map[string]any{"described": false, "reason": "this Asservat could not describe the core again"})
 	}
 	if described {
 		if err := h.Store.Audit(r.Context(), u.Name, "artifact.describe", c.ID, map[string]string{"name": in.Name}); err != nil {
@@ -55,6 +68,10 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	key := capture + "/" + name
 	for {
 		h.mu.Lock()
+		if h.undescribed[key] {
+			h.mu.Unlock()
+			return false, "this Asservat could not describe the core again", nil
+		}
 		running := h.describing[key]
 		if running == nil {
 			if h.describing == nil {
@@ -116,7 +133,7 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	root := filepath.Join(dir, "root")
 	archive, unpacked := io.Pipe()
 	go func() { unpacked.CloseWithError(h.plain(ctx, files, unpacked)) }()
-	err = coredesc.ExtractFiles(archive, root)
+	err = coredesc.ExtractFiles(archive, root, files.Size)
 	archive.CloseWithError(err)
 	if err != nil {
 		return false, "", err

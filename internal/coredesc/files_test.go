@@ -26,7 +26,7 @@ func TestProgramFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir); err != nil {
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len())); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "lib/libc.so.6")); string(b) != "\x7fELF library" {
@@ -49,12 +49,17 @@ func TestProgramFiles(t *testing.T) {
 		}
 		w.Close()
 		parent := t.TempDir()
-		if err := ExtractFiles(&bad, filepath.Join(parent, "in")); err == nil {
+		if err := ExtractFiles(&bad, filepath.Join(parent, "in"), 1<<20); err == nil {
 			t.Error(name, "was unpacked")
 		}
 		if _, err := os.Stat(filepath.Join(parent, "outside")); err == nil {
 			t.Error(name, "wrote outside")
 		}
+	}
+	// An archive unpacks to no more than its own size; one that would, as
+	// with files made of holes, is refused.
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), t.TempDir(), 20); err == nil {
+		t.Error("an archive was unpacked to more than it was said to hold")
 	}
 	if DescribedBy([]byte(`{"threads":[]}`)) != 1 || DescribedBy([]byte(`{"describer":2}`)) != 2 {
 		t.Error("the version of a description")

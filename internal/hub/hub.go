@@ -106,8 +106,10 @@ type Hub struct {
 	// describing holds the cores that are being described again, each with
 	// a channel that closes when it is done.
 	describing map[string]chan struct{}
-	watchers   map[chan string]struct{}
-	views      views
+	// undescribed holds the cores that could not be described again.
+	undescribed map[string]bool
+	watchers    map[chan string]struct{}
+	views       views
 }
 
 func New(c Config) (*Hub, error) {
@@ -136,7 +138,7 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 func (h *Hub) Handler() http.Handler {

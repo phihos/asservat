@@ -88,9 +88,13 @@ func WriteFiles(w io.Writer, root string, files []string) error {
 
 // ExtractFiles unpacks an archive of program files into the directory dir,
 // which then stands for the root that the program saw. It takes regular
-// files only, and none that would land outside of dir.
-func ExtractFiles(r io.Reader, dir string) error {
+// files only, and none that would land outside of dir. size is the
+// archive's own: it unpacks to no more, since nothing in it is compressed,
+// unless it is made to with files that are mostly holes, which program
+// files are not.
+func ExtractFiles(r io.Reader, dir string, size int64) error {
 	archive := tar.NewReader(r)
+	left := size
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
@@ -110,7 +114,10 @@ func ExtractFiles(r io.Reader, dir string) error {
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(f, archive)
+		n, err := io.Copy(f, io.LimitReader(archive, left+1))
+		if left -= n; err == nil && left < 0 {
+			err = errors.New("the archive unpacks to more than it holds")
+		}
 		if e := f.Close(); err == nil {
 			err = e
 		}
