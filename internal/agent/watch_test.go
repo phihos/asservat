@@ -111,7 +111,7 @@ func TestRingKeepsTheLastSecondsWithoutPayload(t *testing.T) {
 		t.Fatal("payload ring", len(got))
 	}
 	// The byte limit drops the oldest packets first.
-	r = &ring{window: time.Hour, limit: 10 * record}
+	r = &ring{window: time.Hour, limit: 10 * (record + recordHead)}
 	if err := r.fill(bytes.NewReader(stream)); err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +211,79 @@ func TestBuffersHoldNoMoreThanTheirLimit(t *testing.T) {
 	if most > limit*115/100 {
 		t.Fatalf("a buffer of %d bytes held %d", limit, most)
 	}
+}
+
+// The circular buffer holds the records that a list of them would hold,
+// whatever their lengths and wherever they lie around its end.
+func TestRecentHoldsTheLastRecords(t *testing.T) {
+	const limit = 5000
+	var r recent
+	var listed [][]byte
+	start, size := time.Unix(1700000000, 0), 0
+	for i := range 3000 {
+		record := bytes.Repeat([]byte{byte(i)}, 1+(i*37)%300)
+		at := start.Add(time.Duration(i) * time.Second)
+		r.add(at, 20*time.Second, limit, record[:len(record)/2], record[len(record)/2:])
+		listed, size = append(listed, record), size+recordHead+len(record)
+		for size > limit || len(listed) > 21 {
+			size -= recordHead + len(listed[0])
+			listed = listed[1:]
+		}
+		if got := r.since(time.Time{}, nil); !bytes.Equal(got, bytes.Join(listed, nil)) {
+			t.Fatalf("after %d records the buffer holds %d bytes, a list %d", i+1, len(got), len(bytes.Join(listed, nil)))
+		}
+		if got, want := r.since(at.Add(-2*time.Second), []byte("since")), bytes.Join(listed[max(0, len(listed)-3):], nil); string(got) != "since"+string(want) {
+			t.Fatalf("after %d records: the last three seconds are %d bytes, in a list %d", i+1, len(got)-5, len(want))
+		}
+	}
+	// A record that the limit cannot hold is not kept, and costs nothing held.
+	r.add(start.Add(3000*time.Second), time.Hour, limit, make([]byte, limit))
+	if got := r.since(time.Time{}, nil); !bytes.Equal(got, bytes.Join(listed, nil)) || len(r.buf) > limit {
+		t.Fatal("after a record over the limit:", len(got), len(r.buf))
+	}
+}
+
+// A buffer full of small records, the headers of packets or the lines of a
+// trace, holds its limit and not half as much again for keeping each
+// record by itself.
+func TestBuffersOfSmallRecordsHoldTheirLimit(t *testing.T) {
+	held := func() uint64 {
+		var m runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m)
+		return m.HeapAlloc
+	}
+	le := binary.LittleEndian
+	stream := []byte{0xd4, 0xc3, 0xb2, 0xa1, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0}
+	stream = le.AppendUint32(stream, 1) // Ethernet
+	packet := make([]byte, 60)          // with its record header 76 bytes
+	for range 300000 {                  // 21 MiB
+		stream = le.AppendUint32(le.AppendUint32(stream, 100), 0)
+		stream = le.AppendUint32(le.AppendUint32(stream, uint32(len(packet))), uint32(len(packet)))
+		stream = append(stream, packet...)
+	}
+	traced := strings.Repeat(strings.Repeat("x", 99)+"\n", 250000) // 24 MiB
+	before := held()
+	r := &ring{window: time.Hour, limit: ringBytes, payload: true}
+	if err := r.fill(bytes.NewReader(stream)); err != nil {
+		t.Fatal(err)
+	}
+	packets := held() - before
+	l := &lines{window: time.Hour, limit: ringBytes}
+	l.fill(strings.NewReader(traced))
+	calls := held() - before - packets
+	t.Logf("a buffer of %d MiB holds %.1f MiB as packets of 76 bytes and %.1f MiB as lines of 100 bytes", ringBytes>>20, float64(packets)/(1<<20), float64(calls)/(1<<20))
+	if most := uint64(ringBytes * 105 / 100); packets > most || calls > most {
+		t.Fatal("more than the limit")
+	}
+	if got := r.snapshot(time.Time{}); len(got) < ringBytes*3/4 || (len(got)-24)%76 != 0 {
+		t.Fatal("packets in a full buffer:", len(got))
+	}
+	if got := l.since(time.Time{}); len(got) < ringBytes*3/4 || len(got)%100 != 0 {
+		t.Fatal("lines in a full buffer:", len(got))
+	}
+	runtime.KeepAlive(stream) // or the measure is short of what was read
+	runtime.KeepAlive(traced)
 }
 
 // A watch for restarts reports a container that was started again, also
@@ -313,7 +386,7 @@ func TestMatchLines(t *testing.T) {
 // The lines that a watch keeps of a tool's output are those of its window,
 // within its limit of bytes; a capture takes them from a moment on.
 func TestLinesKeepTheLastOfAStream(t *testing.T) {
-	l := &lines{window: time.Hour, limit: 60}
+	l := &lines{window: time.Hour, limit: 80} // four lines and their heads fit, or two of the longer ones
 	l.fill(strings.NewReader("one\ntwo\nthree\nwithout an end"))
 	if got := string(l.since(time.Time{})); got != "one\ntwo\nthree\nwithout an end" {
 		t.Fatalf("%q", got)

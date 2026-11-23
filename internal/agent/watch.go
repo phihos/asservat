@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -437,10 +438,8 @@ type ring struct {
 	stop    context.CancelFunc // ends the tool that fills the ring
 
 	mu      sync.Mutex
-	header  []byte   // the pcap file header
-	packets [][]byte // record header and bytes of each packet, oldest first
-	seconds []uint32 // each packet's timestamp
-	size    int
+	header  []byte // the pcap file header
+	packets recent // record header and bytes of each packet, at the second of its timestamp
 }
 
 // fill reads a pcap stream into the ring until the stream ends.
@@ -460,18 +459,7 @@ func (r *ring) fill(src io.Reader) error {
 		}
 		second := packets.order.Uint32(record)
 		r.mu.Lock()
-		r.packets = append(r.packets, append(append(make([]byte, 0, len(record)+len(packet)), record...), packet...))
-		r.seconds = append(r.seconds, second)
-		r.size += len(record) + len(packet)
-		drop := 0
-		for drop < len(r.packets)-1 && (r.size > r.limit || int64(second)-int64(r.seconds[drop]) > int64(r.window/time.Second)) {
-			r.size -= len(r.packets[drop])
-			drop++
-		}
-		// Cleared, or the dropped packets stay in memory until the list is
-		// next copied to grow.
-		clear(r.packets[:drop])
-		r.packets, r.seconds = r.packets[drop:], r.seconds[drop:]
+		r.packets.add(time.Unix(int64(second), 0), r.window, r.limit, record, packet)
 		r.mu.Unlock()
 	}
 }
@@ -484,11 +472,8 @@ func (r *ring) snapshot(from time.Time) []byte {
 	if r.header == nil {
 		return nil
 	}
-	first := 0
-	for first < len(r.packets) && int64(r.seconds[first]) < from.Unix() {
-		first++
-	}
-	return bytes.Join(append([][]byte{r.header}, r.packets[first:]...), nil)
+	// From the beginning of the moment's second: packets are held by the second.
+	return r.packets.since(time.Unix(from.Unix(), 0), slices.Clone(r.header))
 }
 
 // setAside is a file's content that the agent kept at a crash, for the
@@ -509,9 +494,7 @@ type lines struct {
 	stop   context.CancelFunc // ends the tool that writes them
 
 	mu   sync.Mutex
-	at   []time.Time
-	text [][]byte // with their line ends, oldest first
-	size int
+	text recent // with their line ends
 }
 
 // fill reads lines into the buffer until the stream ends, dropping those
@@ -519,21 +502,14 @@ type lines struct {
 func (l *lines) fill(src io.Reader) {
 	stream := bufio.NewReaderSize(src, 64<<10)
 	for {
-		line, err := stream.ReadBytes('\n')
+		// A line longer than the reader's buffer comes in pieces.
+		line, err := stream.ReadSlice('\n')
 		if len(line) > 0 {
-			now := time.Now()
 			l.mu.Lock()
-			l.at, l.text, l.size = append(l.at, now), append(l.text, line), l.size+len(line)
-			drop := 0
-			for drop < len(l.text)-1 && (l.size > l.limit || now.Sub(l.at[drop]) > l.window) {
-				l.size -= len(l.text[drop])
-				drop++
-			}
-			clear(l.text[:drop]) // as for packets: or they stay in memory
-			l.at, l.text = l.at[drop:], l.text[drop:]
+			l.text.add(time.Now(), l.window, l.limit, line)
 			l.mu.Unlock()
 		}
-		if err != nil {
+		if err != nil && err != bufio.ErrBufferFull {
 			return
 		}
 	}
@@ -543,11 +519,7 @@ func (l *lines) fill(src io.Reader) {
 func (l *lines) since(from time.Time) []byte {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	first := 0
-	for first < len(l.text) && l.at[first].Before(from) {
-		first++
-	}
-	return bytes.Join(l.text[first:], nil)
+	return l.text.since(from, nil)
 }
 
 // trace keeps tracing the system calls of the pod's process for a watch,
