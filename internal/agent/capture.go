@@ -195,7 +195,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err != nil {
 			return err
 		}
-		return a.record(ctx, frame, duration, container+".strace", up, "strace", straceArgs(rec, pids)...)
+		return a.record(ctx, frame, duration, container+".strace", a.aside(up), "strace", straceArgs(rec, pids)...)
 	case api.KindCPU:
 		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, up)
 	case api.KindMemory:
@@ -271,6 +271,28 @@ func profileRequest(pid int, target api.ProfileTarget, seconds int) []string {
 	}
 	path := strings.ReplaceAll(target.Path, "{seconds}", strconv.Itoa(seconds))
 	return append(args, "http://127.0.0.1:"+strconv.Itoa(target.Port)+path)
+}
+
+// aside makes an upload take its content to the scratch directory first and
+// send it when it is complete. A tool that holds a process, as strace does
+// at every system call, then waits for the node's disk only and not for
+// the way to the hub.
+func (a *Agent) aside(up func(string, io.Reader) error) func(string, io.Reader) error {
+	return func(name string, src io.Reader) error {
+		f, err := os.CreateTemp(a.Scratch, "aside-*")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(f.Name())
+		defer f.Close()
+		if _, err := io.Copy(f, src); err != nil {
+			return err
+		}
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		return up(name, f)
+	}
 }
 
 // gcore dumps a running process. gcore cannot write to a pipe: the core

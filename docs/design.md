@@ -326,7 +326,7 @@ own format and nothing is injected into the pod:
 | `pod-state` | Kubernetes API: pod object and events | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
 | `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
-| `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true` | With `strings=true` |
+| `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true`. The trace rests in the agent's scratch directory and is uploaded when it is complete, so that the traced process does not wait for the way to the hub | With `strings=true` |
 | `cpu` | Samples of the pod's processes by eBPF programs in the node's kernel, for `durationSeconds`; all containers of the pod | No |
 | `memory` | Stacks of the pod's processes at their page faults, taken by an eBPF program in the node's kernel, for `durationSeconds`; all containers of the pod | No |
 | `pprof` | HTTP GET of profile endpoints inside the pod's network namespace, all at once: `endpoints` lists known ones as `<port>/<endpoint>`; or `port` and `path` name another one | For an endpoint that returns memory, and for one that Asservat does not know |

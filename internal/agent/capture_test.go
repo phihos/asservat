@@ -259,3 +259,25 @@ func TestUploadInFullPieces(t *testing.T) {
 		t.Fatal("the failure", n, err)
 	}
 }
+
+// A tool whose output is set aside is not held up by the upload: it has
+// written everything, more than a pipe holds, before the upload reads.
+func TestAsideDoesNotHoldTheTool(t *testing.T) {
+	a := &Agent{Scratch: t.TempDir()}
+	done := filepath.Join(t.TempDir(), "done")
+	var got int64
+	up := func(_ string, r io.Reader) error {
+		if _, err := os.Stat(done); err != nil {
+			t.Error("the upload began while the tool still wrote")
+		}
+		n, err := io.Copy(io.Discard, r)
+		got = n
+		return err
+	}
+	if err := a.record(t.Context(), t.Context(), 0, "out", a.aside(up), "sh", "-c", "head -c 1000000 /dev/zero; touch "+done); err != nil || got != 1000000 {
+		t.Fatal(got, err)
+	}
+	if left, _ := os.ReadDir(a.Scratch); len(left) != 0 {
+		t.Fatal("left in the scratch directory:", left)
+	}
+}
