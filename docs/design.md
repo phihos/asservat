@@ -470,7 +470,10 @@ They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core
 whose description is from an older one, the hub describes it anew from the
 stored core and files, in its work directory, and stores the new
-description in place of the old. A capture from before the files were
+description in place of the old. That can take a minute or more with
+debug information to download: the answer to the viewer begins with a
+space for every beat of the hub's streams, so that a proxy keeps waiting,
+and the work goes on if the viewer is closed. A capture from before the files were
 kept stays as it was described, and the viewer says so. As text, the
 description is also readable for AI agents over MCP. For the binary files
 that have a viewer in the hub, MCP's `read_artifact` returns what the
