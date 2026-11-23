@@ -855,7 +855,7 @@ $('captureForm').onsubmit = guard(async () => {
   const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1), ...($('beforeSeconds').value > 0 && !$('beforeFields').hidden ? {beforeSeconds: Math.round($('beforeSeconds').value)} : {})}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
-  $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${conditions[picked('when')]}.`)
+  $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${told(condition())}.`)
     : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
   // Show where it went: the new capture, opened, in its list.
   if (!watching) toggled.set(created.id, true);
