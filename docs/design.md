@@ -138,11 +138,33 @@ recordings that run over time (CPU profile, memory growth, system calls)
 then show it in the state that met the condition, and a core dump is taken
 of the running process.
 
+### What reaches back before the moment
+
+A recording that starts when the condition is met shows what follows, and
+after a crash only the restarted process. Some recordings can therefore be
+kept running while the watch waits, so that their files begin
+`beforeSeconds` before the moment (the time frame if not given):
+
+| Kind | Kept running | Cost while the watch waits |
+| --- | --- | --- |
+| `pcap` | Unless `before=false` | A `tcpdump` per watched pod and its packet headers in the agent's memory |
+| `cpu` | Unless `before=false` | The profiler runs on the node: about 1 % of a CPU and some 100 MiB of the agent's memory |
+| `memory` | Only with `before=true` | The same, and every page fault on the node takes a few microseconds longer |
+
+The agent keeps the samples of a profile by the second and drops those
+older than the window. A capture of the watch takes the seconds before it
+and then the time frame after it, in one profile; after a crash only the
+seconds before, since nothing is left to sample. A recording that is not
+kept running starts with the capture, as in a capture made by hand. A watch
+ends with the report of its last time; the agent goes on observing it for
+its time frame and half a minute more, so that the capture which that
+report starts still finds what was kept running.
+
 Some kinds behave differently in a watch's capture:
 
 | Kind | Triggered capture holds |
 | --- | --- |
-| `pcap` | The packets of the `durationSeconds` before the condition was met, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
+| `pcap` | The packets of the seconds before the condition was met, cut after their headers unless the watch was approved for `payload=true`. The agent runs `tcpdump` in every watched pod and keeps them in memory, at most 16 MiB per pod (about 150,000 packet headers), oldest dropped first |
 | `logs` | After a crash: the current and the previous instance of each container, so that the crashed one is included whether or not it has restarted |
 
 | `coredump` | After a crash: the core that the kernel wrote of the crashed process, see below |

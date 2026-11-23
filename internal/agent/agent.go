@@ -52,13 +52,16 @@ type Agent struct {
 	snapshots map[string][]byte
 	// sampler takes the CPU profiles of pods.
 	sampler sampler
+	// kept holds the profiles that watches keep running, by watch ID, pod
+	// and kind of recording.
+	kept map[string]*kept
 }
 
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
 // growing delay after a failure.
 func (a *Agent) Run(ctx context.Context) {
 	a.running, a.watching = map[string]task{}, map[string]context.CancelFunc{}
-	a.rings, a.snapshots = map[string]*ring{}, map[string][]byte{}
+	a.rings, a.snapshots, a.kept = map[string]*ring{}, map[string][]byte{}, map[string]*kept{}
 	delay := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()

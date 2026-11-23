@@ -244,6 +244,16 @@
         <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
         <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
       </div>
+      <div id="beforeFields" hidden>
+        <h3>From before it happens</h3>
+        <p class="muted lead">These recordings can be kept running while the watch waits, so that their files begin before the moment and not at it.</p>
+        <div class="group">
+          <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">costs little</span></label>
+          <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of a CPU on the pod's node while the watch waits</span></label>
+          <label data-before="memory"><input type="checkbox" id="beforeMemory"> Memory growth <span class="muted">slows every page fault on the pod's node while the watch waits</span></label>
+        </div>
+        <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
+      </div>
       <div class="fields" id="alertFields" hidden>
         <label class="wide">Name of the alert (its alertname label)<input id="alertName" placeholder="HighErrorRate" spellcheck="false" autocomplete="off"></label>
       </div>
@@ -572,7 +582,7 @@ function showParams() {
   // The packet buffer of a watch reaches back; everything else runs forward.
   const running = timed.filter(k => !(k === 'pcap' && watching)).map(k => kindNames[k]);
   $('frameHint').textContent = [
-    has('pcap') && watching ? `The packets of this many seconds before ${crash ? 'the crash' : 'that moment'} are kept.` : '',
+    has('pcap') && watching ? `The packets from before ${crash ? 'the crash' : 'that moment'} are kept: as many seconds as this, or as the last step says.` : '',
     running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : watching ? ' from that moment' : ''}.` : '',
     follows ? (timed.length ? 'The logs are followed for the same time.' : 'With 0 the logs are saved as they are; otherwise they are followed this long.') : '',
   ].filter(Boolean).join(' ');
@@ -585,6 +595,9 @@ function showParams() {
   $('logFields').hidden = picked('when') !== 'log';
   $('usageFields').hidden = !(picked('when') in thresholds);
   $('alertFields').hidden = picked('when') !== 'alert';
+  // What a watch can keep running, of what is chosen.
+  for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
+  $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory'].some(has);
   $('usageAbove').placeholder = thresholds[picked('when')] || '';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
@@ -739,12 +752,13 @@ $('captureForm').onsubmit = guard(async () => {
     if (kind === 'pcap' && picked('payload')) params.payload = 'true';
     if (kind === 'strace' && picked('strings')) params.strings = 'true';
     if (kind === 'pprof') Object.assign(params, profile);
+    if (watching && ['pcap', 'cpu', 'memory'].includes(kind)) params.before = String($({pcap: 'beforePcap', cpu: 'beforeCpu', memory: 'beforeMemory'}[kind]).checked);
     if (['coredump', 'strace'].includes(kind) && wantsProcess() && !(kind === 'coredump' && crash) && $('process').value.startsWith('{')) Object.assign(params, JSON.parse($('process').value));
     return {kind, params};
   });
   const request = {cluster: $('cluster').value, namespace: $('namespace').value, workload: $('workload').value, recordings,
     durationSeconds: $('frameBlock').hidden ? 0 : Number($('duration').value || 0), reason: $('reason').value};
-  const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1)}) : await call('POST', '/api/captures', request);
+  const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1), ...($('beforeSeconds').value > 0 && !$('beforeFields').hidden ? {beforeSeconds: Math.round($('beforeSeconds').value)} : {})}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
   $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${conditions[picked('when')]}.`)

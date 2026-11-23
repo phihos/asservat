@@ -98,3 +98,45 @@ func TestSymbolTableBounds(t *testing.T) {
 		t.Fatal("an address outside every function got a name")
 	}
 }
+
+// A profile that is kept running for a watch holds the seconds of its
+// window and drops what is older; a capture takes the stacks from a moment
+// on, each with how often it was seen.
+func TestKeptProfileHoldsItsWindow(t *testing.T) {
+	p := newSampledProfile(sampledCPU, 10*time.Second)
+	start := time.Unix(1700000000, 0)
+	at := func(second int) time.Time { return start.Add(time.Duration(second) * time.Second) }
+	busy, idle := stackKey{pid: 1}, stackKey{pid: 2}
+	stack := func(comm string) func() *sampledStack {
+		return func() *sampledStack { return &sampledStack{comm: comm} }
+	}
+	for second := 0; second < 30; second++ {
+		p.add(busy, at(second), stack("busy"))
+		p.add(busy, at(second), stack("busy"))
+		if second == 25 {
+			p.add(idle, at(second), stack("idle"))
+		}
+	}
+	if len(p.seconds) != 11 {
+		t.Fatalf("a window of 10 seconds holds %d seconds", len(p.seconds))
+	}
+	all := p.since(time.Time{})
+	if len(all) != 2 || all[busy].count != 22 || all[idle].count != 1 || all[busy].comm != "busy" {
+		t.Fatal("everything in the window", all[busy], all[idle])
+	}
+	if recent := p.since(at(27)); len(recent) != 1 || recent[busy].count != 6 {
+		t.Fatal("the last three seconds", recent)
+	}
+	// Taking the stacks leaves the profile as it is.
+	if again := p.since(at(27)); again[busy].count != 6 {
+		t.Fatal("taken twice", again[busy])
+	}
+	// Without a window everything is kept.
+	whole := newSampledProfile(sampledCPU, 0)
+	for second := 0; second < 100; second++ {
+		whole.add(busy, at(second), stack("busy"))
+	}
+	if got := whole.since(time.Time{})[busy].count; got != 100 {
+		t.Fatal("a profile without a window", got)
+	}
+}

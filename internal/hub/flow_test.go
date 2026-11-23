@@ -556,6 +556,18 @@ func TestCaptureFlow(t *testing.T) {
 		t.Fatal("delete watch", code)
 	}
 
+	// How far its running recordings reach back is the watch's; a capture
+	// that starts now has nothing running before.
+	back := onCrash
+	back.CaptureRequest.Kind, back.Recordings, back.BeforeSeconds = "", []api.Recording{{Kind: api.KindCPU, Params: map[string]string{"before": "true"}}}, 120
+	if code, w := watch("alice-token", back); code != 201 || w.BeforeSeconds != 120 || watches("alice-token")[0].BeforeSeconds != 120 {
+		t.Fatal("a watch that reaches back", code, w)
+	} else {
+		f.call("alice-token", "DELETE", "/api/watches/"+w.ID, nil)
+	}
+	if code, _ := f.call("alice-token", "POST", "/api/captures", back.CaptureRequest); code != 400 {
+		t.Fatal("a capture that starts now took before", code)
+	}
 	// A watch can wait for something else than a crash: here for the pod to
 	// stop being ready. Its capture finds the pod alive and says what was met.
 	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: "thoughts"}}); code != 400 {

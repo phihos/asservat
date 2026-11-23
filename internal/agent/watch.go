@@ -35,7 +35,13 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 		wanted[w.ID] = true
 		if _, ok := a.watching[w.ID]; !ok {
 			watching, cancel := context.WithCancel(ctx)
-			a.watching[w.ID] = cancel
+			// A watch ends with the report of its last time, before the
+			// capture that this report starts has arrived and used what the
+			// watch kept running. So an ended watch is observed a while
+			// longer: for the capture's time frame and the half minute in
+			// which its task arrives. Its reports meanwhile find no watch.
+			linger := time.Duration(w.DurationSeconds)*time.Second + 30*time.Second
+			a.watching[w.ID] = func() { time.AfterFunc(linger, cancel) }
 			go a.observe(ctx, watching, w)
 		}
 	}
@@ -91,8 +97,14 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 		if pod.Spec.NodeName != a.Node {
 			return
 		}
-		if packets := w.Recording(api.KindPcap); packets != nil {
+		if packets := w.Recording(api.KindPcap); packets != nil && packets.Buffers() {
 			a.buffer(ctx, w, *packets, pod)
+		}
+		// The sampled profiles that the watch keeps running reach back as well.
+		for _, kind := range []sampledKind{sampledCPU, sampledMemory} {
+			if rec := w.Recording(kind.recording); rec != nil && rec.Buffers() {
+				a.keep(ctx, w, kind, pod)
+			}
 		}
 		if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" && !marked[string(pod.UID)] {
 			// From now on the node's core handler keeps this pod's cores.
@@ -317,7 +329,7 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 		return
 	}
 	// Payload is kept only for a watch that asked for it and was approved.
-	r := &ring{window: time.Duration(w.DurationSeconds) * time.Second, limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
+	r := &ring{window: w.Before(), limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
 	a.mu.Lock()
 	a.rings[key] = r
 	a.mu.Unlock()

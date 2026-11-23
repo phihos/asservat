@@ -129,12 +129,12 @@ func ValidName(s string) bool { return namePattern.MatchString(s) }
 var params = map[string][]string{
 	KindPodState: {},
 	KindLogs:     {"container", "previous", "tailLines"},
-	KindPcap:     {"filter", "payload"},
+	KindPcap:     {"filter", "payload", "before"},
 	KindCoredump: {"container", "process"},
 	KindStrace:   {"container", "strings", "process"},
 	KindPprof:    {"endpoints", "port", "path"},
-	KindCPU:      {},
-	KindMemory:   {},
+	KindCPU:      {"before"},
+	KindMemory:   {"before"},
 }
 
 // Validate normalizes the request and checks its shape. The time frame
@@ -188,7 +188,7 @@ func (rec Recording) validate() error {
 			return fmt.Errorf("kind %s has no parameter %q", rec.Kind, k)
 		}
 	}
-	for _, k := range []string{"previous", "payload", "strings"} {
+	for _, k := range []string{"previous", "payload", "strings", "before"} {
 		if v, ok := rec.Params[k]; ok && v != "true" && v != "false" {
 			return fmt.Errorf("parameter %s must be true or false", k)
 		}
@@ -214,6 +214,22 @@ func (rec Recording) validate() error {
 		return err
 	}
 	return nil
+}
+
+// Buffers tells whether the recording, in a watch, is kept running while
+// the watch waits, so that its file reaches back before the moment the
+// watch's condition is met. The parameter "before" says so; without it the
+// recordings do that cost little while they wait: packets and the sampled
+// CPU profile. Memory growth slows every page fault on the node meanwhile
+// and is kept running only on request.
+func (rec Recording) Buffers() bool {
+	switch rec.Kind {
+	case KindPcap, KindCPU:
+		return rec.Params["before"] != "false"
+	case KindMemory:
+		return rec.Params["before"] == "true"
+	}
+	return false
 }
 
 // Sensitive reports whether the recording can contain memory or payload
@@ -471,6 +487,10 @@ type WatchRequest struct {
 	CaptureRequest
 	// When is the condition; a container's crash if empty.
 	When Condition `json:"when,omitzero"`
+	// BeforeSeconds is how far the recordings that are kept running while
+	// the watch waits reach back before the condition is met; the time
+	// frame (DurationSeconds) if zero.
+	BeforeSeconds int `json:"beforeSeconds,omitempty"`
 	// Count is how many times the watch records before it ends; default 1.
 	Count int `json:"count,omitempty"`
 }
@@ -481,8 +501,9 @@ type WatchRequest struct {
 type Watch struct {
 	ID string `json:"id"`
 	CaptureRequest
-	When      Condition `json:"when"`
-	Requester string    `json:"requester"`
+	When          Condition `json:"when"`
+	BeforeSeconds int       `json:"beforeSeconds,omitempty"`
+	Requester     string    `json:"requester"`
 	// A sensitive watch waits until an administrator approves it. Its
 	// captures then need no further approval.
 	Sensitive bool   `json:"sensitive"`
@@ -491,6 +512,14 @@ type Watch struct {
 	Selector  string    `json:"selector,omitempty"`
 	Remaining int       `json:"remaining"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Before is how far the watch's running recordings reach back.
+func (w Watch) Before() time.Duration {
+	if w.BeforeSeconds > 0 {
+		return time.Duration(w.BeforeSeconds) * time.Second
+	}
+	return time.Duration(w.DurationSeconds) * time.Second
 }
 
 // Trigger is an agent's report that a watched pod met the watch's condition.

@@ -30,8 +30,8 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if dump := in.Recording(api.KindCoredump); dump != nil && dump.Params["process"] != "" && in.When.Crash() {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch for crashes records whichever process crashes; it takes no process"}
 	}
-	if in.Count < 0 {
-		return api.Watch{}, errStatus{http.StatusBadRequest, "count must not be negative"}
+	if in.Count < 0 || in.BeforeSeconds < 0 {
+		return api.Watch{}, errStatus{http.StatusBadRequest, "count and beforeSeconds must not be negative"}
 	}
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Watch{}, err
@@ -40,7 +40,7 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err != nil {
 		return api.Watch{}, err
 	}
-	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, When: in.When, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
+	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, When: in.When, BeforeSeconds: in.BeforeSeconds, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
 	if w.Sensitive && h.approvesOwn(u) {
 		w.Approver = u.Name
 	}

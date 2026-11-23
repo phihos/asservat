@@ -420,6 +420,11 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 	if err := in.Validate(); err != nil {
 		return api.Capture{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
+	for _, rec := range in.Recordings {
+		if _, ok := rec.Params["before"]; ok {
+			return api.Capture{}, errStatus{http.StatusBadRequest, "before is for a watch: a capture that starts now has nothing running before"}
+		}
+	}
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Capture{}, err
 	}

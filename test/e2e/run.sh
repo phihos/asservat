@@ -357,12 +357,28 @@ EOF
   grown=$(go tool pprof -top "$WORK/sampled-memory.pprof" 2>&1)
   grep -q 'Total samples = [1-9][0-9.]*[kMG]B' <<<"$grown" || fail "the amount of memory growth: $(head -8 <<<"$grown")"
   kill "$viewer"
+  # A watch keeps the CPU profile running: the capture of the busy program,
+  # made as soon as its CPU use is measured, holds the seconds before that
+  # moment as well as the two after it.
+  busy=$(ok "$ALICE" POST /api/watches '{"cluster":"edge","namespace":"shop","workload":"Deployment/py","recordings":[{"kind":"cpu"}],"durationSeconds":2,"beforeSeconds":30,"when":{"kind":"cpu","params":{"above":"0.2","seconds":"5"}}}' | jq -r .id)
+  for _ in $(seq 60); do
+    noticed=$(ok "$ALICE" GET /api/captures | jq -c --arg w "$busy" '[.[] | select(.watch == $w)][0]')
+    [ "$noticed" != null ] && break
+    sleep 1
+  done
+  [ "$noticed" != null ] || fail "the watch for CPU use did not record"
+  id=$(jq -r .id <<<"$noticed"); completed "$ALICE" "$id"
+  pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
+  fetch "$ALICE" "$id" "$pod/sampled-cpu.pprof" "$WORK/before.pprof"
+  sampled=$(go tool pprof -top "$WORK/before.pprof" 2>/dev/null | sed -n 's/.*Total samples = \([0-9.]*\)s.*/\1/p')
+  awk -v s="${sampled:-0}" 'BEGIN { exit !(s > 3.5) }' || fail "the profile of a watch that reaches back holds ${sampled:-no} seconds of samples, not more than its two seconds after the moment"
   edge -n shop delete deployment py --wait=false >/dev/null
   # Once nothing is sampled, the agent gives the kernel back the profiler's
   # programs and maps, which count as the agent's memory: over 100 MiB while
   # the profiler runs, a few without it.
   seen=
-  for _ in $(seq 30); do
+  # The watch above ended half a minute ago at most: its profile runs that much longer.
+  for _ in $(seq 90); do
     held=$(edge -n asservat exec ds/asservat-agent -- sh -c 'grep "^kernel " /sys/fs/cgroup/memory.stat | cut -d" " -f2')
     seen="$seen $((held >> 20))"
     [ "$held" -lt $((40 << 20)) ] && break
