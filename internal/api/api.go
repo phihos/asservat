@@ -330,6 +330,9 @@ func ViewerOf(name string) string {
 		return "pcap"
 	case strings.HasSuffix(file, ".log"):
 		return "log"
+	// The archive of a core's program files is for a debugger.
+	case strings.HasSuffix(file, ".files.tar"):
+		return ""
 	// A core and gdb's description of it open in the same viewer.
 	case strings.HasPrefix(file, "core."):
 		return "core"

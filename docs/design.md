@@ -437,11 +437,26 @@ table (Go 1.20 and later on amd64 and arm64; inlined calls as their own
 frames). These stacks have functions, files and lines, but no variables,
 and the viewer says so. Where neither works, gdb's description stands
 alone. The stacks of a stripped program in another language show
-addresses. With `agent.debuginfodURLs` (`--debuginfod-urls`) gdb fetches the
-missing symbols from those debuginfod servers; this is off by default
-because the agent then sends them the build IDs of the programs it describes
-and of their libraries. The downloads rest in the agent's scratch directory,
-where the debuginfod client removes those unused for a week. As text, the
+addresses unless gdb finds its debug information: with `debuginfodURLs`
+(`--debuginfod-urls`) it fetches that from debuginfod servers, by default
+from the elfutils project's server, which asks those of the distributions.
+The servers are sent the build IDs of the programs and libraries of the
+cores that are described, which name compiled files and hold nothing of a
+process; an installation without a way out sets the list empty. The
+downloads rest in the scratch directory, where the debuginfod client
+removes those unused for a week.
+
+The agent also uploads the program's files next to the core, as
+`<core>.files.tar`: the executable and the libraries that the core maps
+(not the data files a program may map as well), at the paths the program
+saw them. Unpacked, they are what a debugger needs to open the core where
+it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
+They also let the hub describe a core again: a description names the
+version of the describer that made it, and when the viewer opens a core
+whose description is from an older one, the hub describes it anew from the
+stored core and files, in its work directory, and stores the new
+description in place of the old. A capture from before the files were
+kept stays as it was described, and the viewer says so. As text, the
 description is also readable for AI agents over MCP. For the binary files
 that have a viewer in the hub, MCP's `read_artifact` returns what the
 viewer shows, as text: a profile and a .NET trace as pprof's list of the

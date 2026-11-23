@@ -77,7 +77,7 @@ spec:
             {{- if .Values.agent.caCert }}
             - --ca-file=/secrets/agent/ca.crt
             {{- end }}
-            {{- with .Values.agent.debuginfodURLs }}
+            {{- with .Values.debuginfodURLs }}
             - --debuginfod-urls={{ join " " . }}
             {{- end }}
             {{- if .Values.agent.coreHandler.enabled }}

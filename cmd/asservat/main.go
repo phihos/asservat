@@ -63,6 +63,7 @@ func runHub(ctx context.Context, args []string) error {
 	dsnFile := f.String("dsn-file", "", "file with the PostgreSQL connection string")
 	keyFile := f.String("master-key-file", "", "file with the 32-byte master key as 64 hex digits")
 	dataDir := f.String("data-dir", "", "directory for encrypted evidence (instead of S3)")
+	debuginfod := f.String("debuginfod-urls", "", debuginfodHelp)
 	workDir := f.String("work-dir", "", "directory for files that are open in a viewer, decrypted while they are open (default: the system's temporary directory)")
 	sharkd := f.String("sharkd", "sharkd", "Wireshark's sharkd, which reads packet captures for their viewer")
 	goTrace := f.String("go-trace", "gotrace", "Go's trace tool (cmd/trace), which shows Go execution traces for their viewer")
@@ -100,7 +101,7 @@ func runHub(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("master-key-file: %w", err)
 	}
-	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval, WorkDir: *workDir, Sharkd: *sharkd, GoTrace: *goTrace}
+	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval, WorkDir: *workDir, Sharkd: *sharkd, GoTrace: *goTrace, DebuginfodURLs: debuginfodServers(*debuginfod)}
 	switch {
 	case *dataDir != "":
 		if err := os.MkdirAll(*dataDir, 0o700); err != nil {
@@ -217,7 +218,7 @@ func runAgent(ctx context.Context, args []string) error {
 	node := f.String("node", os.Getenv("NODE_NAME"), "name of this node")
 	caFile := f.String("ca-file", "", "PEM file with the CA of the hub's certificate, if it is not publicly trusted")
 	scratch := f.String("scratch", "/scratch", "directory for a core file until it is uploaded")
-	debuginfod := f.String("debuginfod-urls", "", "debuginfod servers, separated by spaces or commas, from which gdb fetches the symbols of stripped programs when it describes a core; the agent then sends them the build IDs of those programs and their libraries. Empty: none, and the stacks of stripped programs show addresses")
+	debuginfod := f.String("debuginfod-urls", "", debuginfodHelp)
 	coreSpool := f.String("core-spool", "", "directory at the same path on the node and in this container; set to make this agent the node's core handler, which keeps the cores of crashed processes in watched pods")
 	corePattern := f.String("core-pattern-file", "/proc/1/root/proc/sys/kernel/core_pattern", "the node's kernel.core_pattern")
 	f.Parse(args)
@@ -253,7 +254,7 @@ func runAgent(ctx context.Context, args []string) error {
 	a := &agent.Agent{HubURL: strings.TrimRight(*hubURL, "/"), Token: token, Node: *node, Kube: kube, HTTP: &http.Client{Transport: transport}, Scratch: *scratch, Proc: "/proc"}
 	// A pod's host name is its name, as the agent's pod has its own network.
 	a.Pod, _ = os.Hostname()
-	a.DebuginfodURLs = strings.Join(strings.FieldsFunc(*debuginfod, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), " ")
+	a.DebuginfodURLs = debuginfodServers(*debuginfod)
 	if *coreSpool != "" {
 		a.Cores = agent.CoreSpool(*coreSpool)
 		restore, err := a.Cores.Install(*corePattern)
@@ -283,4 +284,11 @@ func handleCore(args []string) error {
 	}
 	os.WriteFile(filepath.Join(spool, "last-core"), []byte(time.Now().Format(time.RFC3339)+" pid "+args[0]+": "+outcome+"\n"), 0o600)
 	return err
+}
+
+const debuginfodHelp = "debuginfod servers, separated by spaces or commas, from which gdb fetches the debug information of stripped programs when a core is described; they are sent the build IDs of those programs and their libraries. Empty: none, and the stacks of stripped programs show addresses"
+
+// debuginfodServers reads the list of servers as the debuginfod client takes it.
+func debuginfodServers(list string) string {
+	return strings.Join(strings.FieldsFunc(list, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), " ")
 }

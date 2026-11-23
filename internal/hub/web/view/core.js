@@ -4,7 +4,7 @@
 // and the memory map beside them. gdb described the core on the node, where
 // the program's files were at hand; this page shows that description. For a
 // Go program Delve added the goroutines, which the list then offers first.
-import {$, esc, address, file, loadText, notice, show} from './common.js';
+import {$, esc, address, capture, file, headers, loadText, notice, show} from './common.js';
 
 const markup = `
   <div id="stopped"></div>
@@ -31,6 +31,15 @@ const named = f => f.function || f.pc || '??';
 // Dark in either theme, as a debugger is.
 export const dark = true;
 export default async function (root) {
+  // A description from an older Asservat is made anew by the hub, from the
+  // core and the program's files that the capture holds, before it shows.
+  let kept = '';
+  try {
+    notice('Opening the core…');
+    const res = await fetch(`/api/captures/${capture}/describe`, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify({name: file.endsWith(suffix) ? file.slice(0, -suffix.length) : file})});
+    if (res.ok) kept = (await res.json()).reason || '';
+  } catch { /* the description as it is */ }
+  show();
   let report;
   try { report = JSON.parse((await loadText(file.endsWith(suffix) ? address : address + suffix)).text); }
   catch (err) {
@@ -49,6 +58,7 @@ export default async function (root) {
   $('stopped').innerHTML = `<span class="${report.stopped ? 'crash' : 'snap'}">${esc(report.stopped || 'Snapshot of a running process; it continued afterwards.')}</span>
     <code>${esc(report.commandLine || report.executable || '')}</code>
     ${report.runtime ? `<span class="dim">${esc(report.runtime)}</span>` : ''}
+    ${kept && !(report.describer > 1) ? `<span class="warn" title="${esc(kept)}">described by an older Asservat, which may show less; a new dump is described in full</span>` : ''}
     ${report.withoutDebugInfo ? '<span class="dim" title="The program was built without debug information. Functions, files and lines are from the line table that every Go program carries; variables cannot be shown.">no debug information: functions and lines, no variables</span>' : ''}
     ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
 

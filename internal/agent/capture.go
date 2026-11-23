@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/coredesc"
 )
 
 // capture makes the request's recordings of one pod, all at once, and
@@ -421,6 +424,30 @@ func (a *Agent) record(ctx, frame context.Context, duration time.Duration, name 
 		return fmt.Errorf("%s: %w: %s", tool, err, tail(stderr.Bytes()))
 	}
 	return nil
+}
+
+// describe uploads the description of a core that was uploaded as name,
+// and the program's files that the core maps, found under root. The core
+// is the evidence; a description that fails is only logged.
+func (a *Agent) describe(ctx context.Context, core, root, name string, up func(string, io.Reader) error) {
+	report, err := coredesc.Describer{Scratch: a.Scratch, DebuginfodURLs: a.DebuginfodURLs}.Describe(ctx, core, root)
+	if err == nil {
+		err = up(name+coredesc.Suffix, bytes.NewReader(report))
+	}
+	if files := coredesc.Files(report, root); err == nil && root != "" && len(files) > 0 {
+		archive, w := io.Pipe()
+		go func() { w.CloseWithError(coredesc.WriteFiles(w, root, files)) }()
+		err = up(name+coredesc.FilesSuffix, archive)
+		archive.Close()
+	}
+	if err != nil {
+		slog.Warn("core not described", "core", name, "error", err)
+	}
+	// Delve reads the tables of the whole program to describe a Go core,
+	// hundreds of megabytes for a large one. The agent describes cores
+	// rarely: what that took goes back to the node now, not when the
+	// runtime gets round to it.
+	debug.FreeOSMemory()
 }
 
 func tail(b []byte) string {

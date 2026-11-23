@@ -44,6 +44,9 @@ spec:
             - --admin-groups={{ join "," .Values.hub.adminGroups }}
             - --retention={{ .Values.hub.retention }}
             - --work-dir=/work
+            {{- with .Values.debuginfodURLs }}
+            - --debuginfod-urls={{ join " " . }}
+            {{- end }}
             - --allow-self-approval={{ .Values.hub.allowSelfApproval }}
             {{- if $s3.endpoint }}
             - --s3-endpoint={{ $s3.endpoint }}

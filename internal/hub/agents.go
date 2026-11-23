@@ -237,35 +237,14 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 	if file == "" || strings.Contains(file, "/") || !slices.ContainsFunc(c.Tasks, func(t api.Task) bool { return t.Pod == pod }) {
 		return errStatus{http.StatusBadRequest, "the file name must be <pod>/<file> of a pod of the capture"}
 	}
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return err
-	}
-	wrapped, err := wrapKey(h.MasterKey, key)
+	a, err := h.keep(r.Context(), r.PathValue("name"), r.Body)
 	if err != nil {
 		return err
 	}
-	blob := uuid.NewString()
-	sum := sha256.New()
-	pr, pw := io.Pipe()
-	body := &countingReader{r: io.TeeReader(r.Body, sum)}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		pw.CloseWithError(encrypt(pw, body, key))
-	}()
-	err = h.Blobs.Put(r.Context(), blob, pr)
-	pr.CloseWithError(err)
-	<-done
-	if err != nil {
-		h.Blobs.Delete(context.WithoutCancel(r.Context()), blob)
-		return fmt.Errorf("store artifact: %w", err)
-	}
-	a := storedArtifact{Artifact: api.Artifact{Name: r.PathValue("name"), Size: body.n, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped}
 	added, err := h.Store.AddArtifact(r.Context(), c.ID, a)
 	if err != nil || !added {
 		// The capture ended or was deleted while the file streamed.
-		h.Blobs.Delete(context.WithoutCancel(r.Context()), blob)
+		h.Blobs.Delete(context.WithoutCancel(r.Context()), a.Blob)
 		if err == nil {
 			err = errStatus{http.StatusConflict, "the capture has ended"}
 		}
@@ -273,6 +252,36 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 	}
 	h.notify(c.ID)
 	return nil
+}
+
+// keep stores a file's content encrypted with a key of its own and returns
+// what to record of it.
+func (h *Hub) keep(ctx context.Context, name string, content io.Reader) (storedArtifact, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return storedArtifact{}, err
+	}
+	wrapped, err := wrapKey(h.MasterKey, key)
+	if err != nil {
+		return storedArtifact{}, err
+	}
+	blob := uuid.NewString()
+	sum := sha256.New()
+	pr, pw := io.Pipe()
+	body := &countingReader{r: io.TeeReader(content, sum)}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pw.CloseWithError(encrypt(pw, body, key))
+	}()
+	err = h.Blobs.Put(ctx, blob, pr)
+	pr.CloseWithError(err)
+	<-done
+	if err != nil {
+		h.Blobs.Delete(context.WithoutCancel(ctx), blob)
+		return storedArtifact{}, fmt.Errorf("store artifact: %w", err)
+	}
+	return storedArtifact{Artifact: api.Artifact{Name: name, Size: body.n, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped}, nil
 }
 
 type countingReader struct {
