@@ -217,15 +217,17 @@ func osRelease(root string) map[string]string {
 	return fields
 }
 
-// coreFiles lists the files that a core maps, from the note that the
-// kernel and gcore write into it (NT_FILE), on a 64-bit machine.
-func coreFiles(core string) []string {
-	file, err := elf.Open(core)
-	if err != nil {
-		return nil
-	}
-	defer file.Close()
-	var files []string
+// coreMapping is a part of a file that a core says was mapped: the
+// addresses it was at and where in the file they begin.
+type coreMapping struct {
+	start, end, offset uint64
+	name               string
+}
+
+// coreMappings lists the mappings of files in a core, from the note that
+// the kernel and gcore write into it (NT_FILE), on a 64-bit machine.
+func coreMappings(file *elf.File) []coreMapping {
+	var mappings []coreMapping
 	for _, segment := range file.Progs {
 		if segment.Type != elf.PT_NOTE {
 			continue
@@ -248,19 +250,37 @@ func coreFiles(core string) []string {
 			if kind != ntFile || len(content) < 16 {
 				continue
 			}
-			// The count of mappings and the page size, three words for
-			// each mapping, then the names, each ended by a zero byte.
-			count := file.ByteOrder.Uint64(content)
+			// The count of mappings and the page size; for each mapping
+			// its first address, the one after its last and the page of
+			// the file it begins at; then the names, each ended by a zero
+			// byte.
+			count, page := file.ByteOrder.Uint64(content), file.ByteOrder.Uint64(content[8:])
 			if count > uint64(len(content)-16)/24 {
 				continue
 			}
-			seen := map[string]bool{}
-			for _, name := range strings.Split(string(content[16+24*count:]), "\x00") {
-				if name != "" && !seen[name] {
-					seen[name] = true
-					files = append(files, name)
-				}
+			names := strings.Split(string(content[16+24*count:]), "\x00")
+			for i := range min(count, uint64(len(names))) {
+				at := content[16+24*i:]
+				mappings = append(mappings, coreMapping{file.ByteOrder.Uint64(at), file.ByteOrder.Uint64(at[8:]), file.ByteOrder.Uint64(at[16:]) * page, names[i]})
 			}
+		}
+	}
+	return mappings
+}
+
+// coreFiles lists the files that a core maps.
+func coreFiles(core string) []string {
+	file, err := elf.Open(core)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+	var files []string
+	seen := map[string]bool{}
+	for _, m := range coreMappings(file) {
+		if m.name != "" && !seen[m.name] {
+			seen[m.name] = true
+			files = append(files, m.name)
 		}
 	}
 	return files
