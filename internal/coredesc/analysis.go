@@ -43,7 +43,8 @@ const (
 	// 5: debug information from the debug packages of distributions.
 	// 6: the managed stacks of .NET programs.
 	// 7: the threads of language runtimes told to be the core's threads.
-	Version = 7
+	// 8: a stack read from memory is read to the stack's end, not to the page's.
+	Version = 8
 )
 
 // Describer describes cores with gdb, Delve, pystack and dotnet-dump.
