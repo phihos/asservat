@@ -518,6 +518,17 @@ that pprof and Go's trace tool draw themselves keep their layout and
 colours; the hub adds a stylesheet to them that sets them in Asservat's
 type.
 
+The list of captures shows one line per capture: its number, state, what
+was recorded and why, where, when and by whom. It lists the newest 50 and
+more on request, and a find box narrows it by any of those words. An open
+capture shows each pod with its recordings in the order they were asked
+for, and under each recording the files it made, with their full names,
+what each file is, its size, and the ways to it: **Open** where a viewer
+exists, and **Download**. The hub tells which recording a file is from by
+the name the agent gave it; the files of a profile endpoint are named by
+the application and are those that remain. Deleting a capture that holds
+files asks first.
+
 ## Permissions
 
 - A user is identified by a name and groups, from a static token or an OIDC ID
