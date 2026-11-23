@@ -34,7 +34,8 @@ const (
 	// Version counts up with what a description holds, so that the hub
 	// can tell one that this Asservat would make better:
 	// 2: goroutines of Go programs without debug information.
-	Version = 2
+	// 3: stacks through libraries without unwind tables, such as musl.
+	Version = 3
 )
 
 // Describer describes cores with gdb and Delve.

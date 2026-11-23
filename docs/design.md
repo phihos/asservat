@@ -436,7 +436,20 @@ the threads along the frame pointers and names the frames from the line
 table (Go 1.20 and later on amd64 and arm64; inlined calls as their own
 frames). These stacks have functions, files and lines, but no variables,
 and the viewer says so. Where neither works, gdb's description stands
-alone. The stacks of a stripped program in another language show
+alone.
+
+gdb walks a stack by the unwind tables of the functions on it. musl, the C
+library of Alpine images, carries none, and no frame pointers: a thread
+that waits in it, as most threads of a core do, ends there for gdb, and
+the program's own functions stay unseen, though the program has its
+symbols. For a frame in a module without unwind tables (told by the size
+of its `.eh_frame` beside its code) an unwinder in the description script
+takes the first word above the stack pointer that is the address after a
+call instruction as the caller's return address, and gdb walks on by the
+caller's own tables (amd64 and arm64). The frames found so are marked `≈`
+in the viewer: a reading of the stack, most likely right, not certain.
+
+The stacks of a stripped program in another language show
 addresses unless gdb finds its debug information: with `debuginfodURLs`
 (`--debuginfod-urls`) it fetches that from debuginfod servers, by default
 from the elfutils project's server, which asks those of Debian, Fedora,
@@ -451,7 +464,7 @@ removes those unused for a week.
 The agent also uploads the program's files next to the core, as
 `<core>.files.tar`: the executable and the libraries that the core maps
 (not the data files a program may map as well), at the paths the program
-saw them. Unpacked, they are what a debugger needs to open the core where
+saw them, with the links by which the program asks for its libraries. Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core
