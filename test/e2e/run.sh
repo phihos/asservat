@@ -442,6 +442,65 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/profile.out"
 [ "$(cat "$WORK/profile.out")" = hello ] || fail "content of the unknown endpoint"
 [ "$(status "$ALICE" POST /api/captures "$(target edge pprof)")" = 400 ] || fail "a profile without an endpoint was accepted"
 
+log "a JVM's own diagnostics, asked over its attach socket (edge)"
+# A Java program that serves nothing: threads with names to recognize wait
+# in a method to recognize. It runs as any workload does, as a user that is
+# not root, so the agent has to ask as that user.
+edge -n shop create configmap blocked --from-file=internal/agent/testdata/Blocked.java --dry-run=client -o yaml | edge apply -f - >/dev/null
+edge apply -f - >/dev/null <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: jvm, namespace: shop}
+spec:
+  selector: {matchLabels: {app: jvm}}
+  template:
+    metadata: {labels: {app: jvm}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: app
+          image: docker.io/library/eclipse-temurin:21-jdk
+          command: [java, /src/Blocked.java]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: src, mountPath: /src}]
+      volumes: [{name: src, configMap: {name: blocked}}]
+EOF
+edge -n shop rollout status deployment/jvm --timeout 300s >/dev/null
+jvm=$(edge -n shop get pods -l app=jvm -o jsonpath='{.items[0].metadata.name}')
+for _ in $(seq 60); do edge -n shop logs "$jvm" | grep -q waiting && break; sleep 1; done
+jvm_target() { jq -cn --argjson extra "$1" '{cluster: "edge", namespace: "shop", workload: "Deployment/jvm", kind: "pprof"} + $extra'; }
+found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=Deployment/jvm')
+[ "$(jq -c '[.profiles[] | [.container, .endpoint, .timed, .sensitive]]' <<<"$found")" = '[["app","jvm-threads",false,false],["app","jvm-histogram",false,false],["app","jvm-heapdump",false,true],["app","jvm-recording",true,false]]' ] || fail "the JVM's diagnostics were not found: $found"
+# Looking for them wrote nothing into the container.
+[ -z "$(edge -n shop exec "$jvm" -- ls -A /tmp | grep -v hsperfdata)" ] || fail "the search left something in the container's /tmp"
+id=$(capture "$ALICE" "$(jvm_target '{"durationSeconds":2,"params":{"endpoints":"app/jvm-threads,app/jvm-histogram,app/jvm-recording"}}')"); completed "$ALICE" "$id"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.sensitive, ([.artifacts[] | [.name, .viewer // ""]] | sort)]')" = "[false,[[\"$jvm/jvm-histogram.txt\",\"\"],[\"$jvm/jvm-recording.jfr\",\"\"],[\"$jvm/jvm-threaddump.txt\",\"stacks\"]]]" ] \
+  || fail "the files of a JVM's diagnostics: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.sensitive, .message, .artifacts]')"
+fetch "$ALICE" "$id" "$jvm/jvm-threaddump.txt" "$WORK/jvm-threaddump.txt"
+grep -q '"asservat-courier-2"' "$WORK/jvm-threaddump.txt" && grep -q 'Blocked.waitForParcel' "$WORK/jvm-threaddump.txt" || fail "the thread dump does not name the program's threads: $(head -5 "$WORK/jvm-threaddump.txt")"
+fetch "$ALICE" "$id" "$jvm/jvm-histogram.txt" "$WORK/jvm-histogram.txt"
+grep -q 'Blocked\$Parcel' "$WORK/jvm-histogram.txt" || fail "the class histogram does not name the program's class: $(head -5 "$WORK/jvm-histogram.txt")"
+fetch "$ALICE" "$id" "$jvm/jvm-recording.jfr" "$WORK/jvm-recording.jfr"
+[ "$(head -c 3 "$WORK/jvm-recording.jfr")" = FLR ] || fail "the flight recording is none"
+# A heap dump is the program's memory: it waits for an administrator.
+id=$(capture "$ALICE" "$(jvm_target '{"params":{"endpoints":"app/jvm-heapdump"}}')")
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .state)" = PendingApproval ] || fail "a heap dump did not wait for approval"
+ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+completed "$ALICE" "$id"
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.artifacts[0] | [.name, .viewer] | @csv')" = "\"$jvm/jvm-heapdump.hprof\",\"heap\"" ] || fail "the heap dump's file"
+fetch "$ALICE" "$id" "$jvm/jvm-heapdump.hprof" "$WORK/jvm-heapdump.hprof"
+[ "$(head -c 12 "$WORK/jvm-heapdump.hprof")" = 'JAVA PROFILE' ] || fail "the heap dump is none"
+# Nothing stays in the container but the JVM's own socket and the empty
+# directory of its flight recorder, and the JVM ran on: it was not
+# restarted and wrote no thread dump to its output, as it does at a SIGQUIT
+# that asks for nothing.
+left=$(edge -n shop exec "$jvm" -- sh -c 'ls -A /tmp; find /tmp -type f')
+[ -z "$(grep -E 'asservat-|attach_pid|\.hprof|\.jfr' <<<"$left")" ] || fail "left in the JVM's container: $left"
+[ "$(edge -n shop get pod "$jvm" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = 0 ] || fail "the JVM was restarted"
+[ "$(edge -n shop logs "$jvm")" = waiting ] || fail "the JVM wrote to its output: $(edge -n shop logs "$jvm" | head -5)"
+edge -n shop delete deployment/jvm configmap/blocked >/dev/null
+edge -n shop wait --for=delete pod -l app=jvm --timeout=120s >/dev/null
+
 log "core dump (edge) waits for an administrator"
 id=$(capture "$ALICE" "$(target edge coredump '{"reason":"e2e","pods":[]}')")
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r .state)" = PendingApproval ] || fail "core dump did not wait for approval"
