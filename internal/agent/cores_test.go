@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -106,5 +107,35 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 	restore()
 	if b, _ := os.ReadFile(pipeLimit); string(b) != "0" {
 		t.Fatalf("restored core pipe limit %q", b)
+	}
+}
+
+// Installing the handler copies the agent's own program, some 90 MiB, to
+// the node. It must not pass through the agent's memory, where it would
+// stay as heap for as long as the agent runs.
+func TestInstallCopiesTheProgramWithoutHoldingIt(t *testing.T) {
+	spool, pattern := CoreSpool(t.TempDir()), filepath.Join(t.TempDir(), "core_pattern")
+	if err := os.WriteFile(pattern, []byte("core\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(filepath.Dir(pattern), "core_pipe_limit"), []byte("0\n"), 0o600)
+	self, _ := os.Executable()
+	program, err := os.Stat(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	restore, err := spool.Install(pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore()
+	runtime.ReadMemStats(&after)
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > 1<<20 {
+		t.Fatalf("installing a program of %d bytes allocated %d", program.Size(), allocated)
+	}
+	if copied, err := os.Stat(spool.handler()); err != nil || copied.Size() != program.Size() || copied.Mode().Perm() != 0o700 {
+		t.Fatal("the copy:", copied, err)
 	}
 }

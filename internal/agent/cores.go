@@ -58,12 +58,8 @@ func (s CoreSpool) Install(patternFile string) (restore func(), err error) {
 	if err != nil {
 		return nil, err
 	}
-	binary, err := os.ReadFile(self)
-	if err != nil {
-		return nil, err
-	}
 	// Rename over the old copy: the kernel may be running it.
-	if err := os.WriteFile(s.handler()+".new", binary, 0o700); err != nil {
+	if err := copyFile(self, s.handler()+".new", 0o700); err != nil {
 		return nil, err
 	}
 	if err := os.Rename(s.handler()+".new", s.handler()); err != nil {
@@ -272,4 +268,23 @@ func terminatedID(s corev1.ContainerState) string {
 		return ""
 	}
 	return s.Terminated.ContainerID
+}
+
+// copyFile copies a file from one path to another without reading it into
+// memory: the agent's program is some 90 MiB, which would stay as heap.
+func copyFile(from, to string, mode os.FileMode) error {
+	src, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(to, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return err
+	}
+	return dst.Close()
 }
