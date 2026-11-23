@@ -149,12 +149,16 @@ only what they asked for.
 For events the agent watches the warnings about each watched pod on its
 node, which the API server sends as they come; a warning that repeats is
 one event whose count rises, and each rise meets the condition. Warnings
-from before the watch are passed over.
+from before the watch are passed over. A pod is watched from when it is
+bound to the node, so warnings about its start are told; those about its
+scheduling come before that and are not.
 
 The hub keeps the times: it sleeps until the next time of any watch and
 records all pods of the workload then, as the watch's creator. A time that
 came while the hub was down is recorded when it starts, however late; of a
-time that repeats, only the last one that came.
+time that repeats, only the last one that came. A time that cannot be
+recorded, as while no agent of the cluster is connected, is tried again
+every minute until it can or the watch's next time comes.
 
 Any watch records at once when its creator or an administrator asks it to
 (`POST /api/watches/{id}/record`, optionally with a `pod`; **Record now**

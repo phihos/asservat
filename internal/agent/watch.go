@@ -118,10 +118,11 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 			marked[string(pod.UID)] = true
 		}
 		if w.When.Kind == api.OnLog || w.When.Kind == api.OnEvent || w.When.Usage() {
-			// The pod is read from once a container of it runs.
+			// The pod is read from once a container of it runs; Kubernetes
+			// warns most about a pod before that.
 			if t, reads := tending[pod.Name]; reads {
 				t.pod.Store(pod)
-			} else if pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil {
+			} else if (pod.Status.Phase == corev1.PodRunning || w.When.Kind == api.OnEvent) && pod.DeletionTimestamp == nil {
 				reading, stop := context.WithCancel(ctx)
 				t := tended{stop: stop, pod: &atomic.Pointer[corev1.Pod]{}}
 				t.pod.Store(pod)

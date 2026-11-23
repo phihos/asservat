@@ -294,6 +294,9 @@ func (h *Hub) RecordNow(ctx context.Context, u User, id, pod string) (api.Captur
 	if !u.Admin && w.Requester != u.Name {
 		return api.Capture{}, ErrNotFound
 	}
+	if w.Sensitive && w.Approver == "" {
+		return api.Capture{}, errStatus{http.StatusConflict, "the watch awaits an administrator's approval"}
+	}
 	return h.fire(ctx, id, "asked "+uuid.NewString(), pod, api.OnAsked, "asked for by "+u.Name)
 }
 
@@ -313,9 +316,11 @@ func (h *Hub) recordNow(w http.ResponseWriter, r *http.Request, u User) error {
 // RunSchedule records for the watches that wait for a time, when it comes.
 // It sleeps until the next of their times and is woken when watches change.
 // A time that came while the hub was down is recorded when it starts,
-// unless another came since: of a time that repeats, only the last.
+// unless another came since: of a time that repeats, only the last. A time
+// that cannot be recorded, as while no agent is connected, is tried again
+// after a pause until it can or the next one comes.
 func (h *Hub) RunSchedule(ctx context.Context) {
-	tried := map[string]time.Time{} // the last time recorded for each watch, or tried
+	done := map[string]time.Time{} // the last time recorded for each watch
 	for {
 		list, err := h.Store.Watches(ctx, "")
 		var timer <-chan time.Time
@@ -329,18 +334,25 @@ func (h *Hub) RunSchedule(ctx context.Context) {
 				continue
 			}
 			last, next := w.When.Due(time.Now())
-			if !last.IsZero() && !tried[w.ID].Equal(last) {
-				tried[w.ID] = last
-				// Not found: recorded before, or the watch awaits approval.
-				if _, err := h.fire(ctx, w.ID, "time "+last.UTC().Format(time.RFC3339Nano), "", api.OnTime, "at the time set, "+last.UTC().Format(time.RFC3339)); err != nil && err != ErrNotFound {
-					slog.Warn("time not recorded", "watch", w.ID, "error", err)
+			if !last.IsZero() && !done[w.ID].Equal(last) {
+				// An agent that does not answer must not hold up the times
+				// of the other watches: it gets as long as a retry waits.
+				once, cancel := context.WithTimeout(ctx, h.ScheduleRetry)
+				_, err := h.fire(once, w.ID, "time "+last.UTC().Format(time.RFC3339Nano), "", api.OnTime, "at the time set, "+last.UTC().Format(time.RFC3339))
+				cancel()
+				switch {
+				case err == nil || err == ErrNotFound: // not found: recorded before, or the watch awaits approval
+					done[w.ID] = last
+				case ctx.Err() == nil:
+					slog.Warn("time not recorded; trying again", "watch", w.ID, "in", h.ScheduleRetry, "error", err)
+					timer = time.After(h.ScheduleRetry)
 				}
 			}
 			if !next.IsZero() && (soonest.IsZero() || next.Before(soonest)) {
 				soonest = next
 			}
 		}
-		if !soonest.IsZero() {
+		if !soonest.IsZero() && (timer == nil || time.Until(soonest) < h.ScheduleRetry) {
 			timer = time.After(time.Until(soonest))
 		}
 		select {

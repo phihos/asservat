@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -112,7 +113,7 @@ func TestCaptureFlow(t *testing.T) {
 	h, err := hub.New(hub.Config{
 		Clusters: []hub.Cluster{joined, foreign},
 		Store:    store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
-		AlertToken: "the-token-that-alertmanager-presents-0123456789",
+		AlertToken: "the-token-that-alertmanager-presents-0123456789", ScheduleRetry: 200 * time.Millisecond,
 		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
@@ -145,11 +146,13 @@ func TestCaptureFlow(t *testing.T) {
 		Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}, {Name: "proxy"}}}}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "payments"}}, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}})
-	// RBAC of the fake cluster: the payments group may exec in payments.
+	// RBAC of the fake cluster: the payments group may exec in payments,
+	// unless the test takes that away for a while.
+	var refused atomic.Bool
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
 		a := sar.Spec.ResourceAttributes
-		sar.Status.Allowed = a.Namespace == "payments" && a.Subresource == "exec" && len(sar.Spec.Groups) == 1 && sar.Spec.Groups[0] == "payments"
+		sar.Status.Allowed = !refused.Load() && a.Namespace == "payments" && a.Subresource == "exec" && len(sar.Spec.Groups) == 1 && sar.Spec.Groups[0] == "payments"
 		return true, sar, nil
 	})
 	ctx, stop := context.WithCancel(t.Context())
@@ -671,6 +674,12 @@ func TestCaptureFlow(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Kubernetes warns most about pods that do not run yet.
+	starting := pod.DeepCopy()
+	starting.Status.Phase = corev1.PodPending
+	if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), starting, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
 	warn("api-1.before", "Unhealthy", 1)
 	if code, _ := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnEvent, Params: map[string]string{"reason": "not a reason"}}}); code != 400 {
 		t.Fatal("an event watch with a broken reason", code)
@@ -705,6 +714,9 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	if got := f.wait("alice-token", ofWarning().ID, api.StateCompleted, api.StateFailed); got.On != api.OnEvent || got.Reason != "Kubernetes warns: Unhealthy: Readiness probe failed: HTTP probe failed with statuscode: 503 (flaky)" {
 		t.Fatal("the capture of a warning", got.On, got.Reason)
+	}
+	if _, err := kube.CoreV1().Pods("payments").UpdateStatus(t.Context(), pod, metav1.UpdateOptions{}); err != nil { // it runs again
+		t.Fatal(err)
 	}
 
 	// A watch for a Prometheus alert: Alertmanager tells the hub, with the
@@ -755,6 +767,15 @@ func TestCaptureFlow(t *testing.T) {
 	if code != 201 {
 		t.Fatal("watch to ask", code)
 	}
+	// A watch that awaits approval says so when asked.
+	code, unapproved := watch("alice-token", api.WatchRequest{CaptureRequest: core, When: api.Condition{Kind: api.OnNotReady}})
+	if code != 201 || unapproved.Approver != "" {
+		t.Fatal("a sensitive watch", code, unapproved.Approver)
+	}
+	if code, b := f.call("alice-token", "POST", "/api/watches/"+unapproved.ID+"/record", nil); code != 409 || !strings.Contains(string(b), "approv") {
+		t.Fatal("a watch that awaits approval was asked", code, string(b))
+	}
+	f.call("alice-token", "DELETE", "/api/watches/"+unapproved.ID, nil)
 	if code, _ := f.call("mallory-token", "POST", "/api/watches/"+asking.ID+"/record", nil); code != 404 {
 		t.Fatal("another user asked a watch to record", code)
 	}
@@ -800,6 +821,30 @@ func TestCaptureFlow(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	slices.SortFunc(atTimes, func(a, b api.Capture) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	// A time that cannot be recorded when it comes is tried again: here the
+	// creator may not record for a while.
+	code, later := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": time.Now().Add(200 * time.Millisecond).UTC().Format(time.RFC3339Nano)}}})
+	if code != 201 {
+		t.Fatal("watch for a time that fails at first", code)
+	}
+	refused.Store(true)
+	ofLater := func() int {
+		var list []api.Capture
+		_, b := f.call("alice-token", "GET", "/api/captures", nil)
+		json.Unmarshal(b, &list)
+		return len(slices.DeleteFunc(list, func(c api.Capture) bool { return c.Watch != later.ID }))
+	}
+	time.Sleep(600 * time.Millisecond)
+	if n := ofLater(); n != 0 {
+		t.Fatal("recorded without permission:", n)
+	}
+	refused.Store(false)
+	for i := 0; ofLater() != 1; i++ {
+		if i == 100 {
+			t.Fatal("the time that failed at first was not tried again")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	if len(atTimes) != 2 || atTimes[0].On != api.OnTime || atTimes[0].CreatedAt.Before(at) || atTimes[1].CreatedAt.Before(at.Add(time.Second)) ||
 		atTimes[0].Reason != "at the time set, "+at.Format(time.RFC3339)+" (flaky)" || len(atTimes[0].Tasks) < 2 || len(watches("alice-token")) != 0 {
 		t.Fatalf("the captures of a watch for a time: %+v", atTimes)
