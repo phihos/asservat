@@ -147,13 +147,23 @@ func restarts(pod *corev1.Pod, seen map[string]string) string {
 	for _, s := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
 		key, count := pod.Name+"/"+s.Name+"/restarts", strconv.Itoa(int(s.RestartCount))
 		before, known := seen[key]
-		if known && before != count && s.State.Running == nil {
-			continue // counted, but not running yet: the next change tells
-		}
-		seen[key] = count
 		if !known || before == count || pod.DeletionTimestamp != nil {
+			seen[key] = count
 			continue
 		}
+		// Counted, but the new instance does not run yet: the report waits
+		// for the change that shows it running. A container that fails so
+		// fast that it is never seen running is reported at its next restart.
+		if waiting := key + "/waiting"; s.State.Running == nil && seen[waiting] != count {
+			if seen[waiting] == "" {
+				seen[waiting] = count
+				continue
+			}
+		} else if s.State.Running == nil {
+			continue
+		}
+		delete(seen, key+"/waiting")
+		seen[key] = count
 		ended := "it ended"
 		if t := s.LastTerminationState.Terminated; t != nil {
 			ended = fmt.Sprintf("it ended with exit code %d, %s", t.ExitCode, t.Reason)

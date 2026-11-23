@@ -143,6 +143,22 @@ func TestRestartsAndReadiness(t *testing.T) {
 	if got := met(api.Condition{}, pod, map[string]string{}); got != "" {
 		t.Fatal("a clean exit as a crash:", got)
 	}
+	// A container in a crash loop may never be seen running: its restart is
+	// reported when the next one shows that it went on.
+	container(5, &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"})
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("a restart whose new instance does not run yet:", got)
+	}
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("the same state again:", got)
+	}
+	container(6, &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"})
+	if got := met(restart, pod, seen); got != "container app was restarted: it ended with exit code 1, Error" {
+		t.Fatal("a crash loop:", got)
+	}
+	if got := met(restart, pod, seen); got != "" {
+		t.Fatal("reported twice:", got)
+	}
 
 	ready := func(status corev1.ConditionStatus, message string) {
 		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: status, Message: message}}
