@@ -215,6 +215,7 @@ func TestRecordingsThatReachBack(t *testing.T) {
 		want bool
 	}{
 		{Recording{Kind: KindPcap}, true}, {Recording{Kind: KindCPU}, true}, {Recording{Kind: KindMemory}, false}, {Recording{Kind: KindLogs}, false},
+		{Recording{Kind: KindStrace}, false}, {Recording{Kind: KindStrace, Params: map[string]string{"before": "true"}}, true},
 		{Recording{Kind: KindCPU, Params: map[string]string{"before": "false"}}, false}, {Recording{Kind: KindMemory, Params: map[string]string{"before": "true"}}, true},
 	} {
 		if got := c.rec.Buffers(); got != c.want {

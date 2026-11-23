@@ -468,7 +468,9 @@ log "a crash watch records the crashed pod (edge): packets from before the crash
 # The packet watch also records the pod's state: one crash, one capture with both.
 packets=$(ok "$ALICE" POST /api/watches "$(target edge "" '{"durationSeconds":20,"recordings":[{"kind":"pcap","params":{"filter":"tcp port 8080"}},{"kind":"pod-state"}]}')" | jq -r .id)
 logs=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2}')" | jq -r .id)
-sleep 5 # the agents begin to buffer packets
+# A watch that keeps tracing system calls shows the last of them before the crash.
+calls=$(ok "$ALICE" POST /api/watches "$(target edge "" '{"durationSeconds":5,"recordings":[{"kind":"strace","params":{"before":"true"}}]}')" | jq -r .id)
+sleep 5 # the agents begin to buffer packets and to trace
 victim=$(edge -n shop get pods -l app=web -o jsonpath='{.items[0].metadata.name}')
 edge -n shop exec "$victim" -- touch /tmp/crash
 # triggered WATCH: waits for the capture that the watch created and prints its ID.
@@ -488,6 +490,9 @@ fetch "$ALICE" "$id" "$victim/capture.pcap" "$WORK/crash.pcap"
 [ "$(stat -c %s "$WORK/crash.pcap")" -gt 1000 ] || fail "the packet buffer holds no packets"
 grep -q 'GET /' "$WORK/crash.pcap" && fail "the packet buffer contains payload"
 LC_ALL=C grep -q $'\x1f\x90' "$WORK/crash.pcap" || fail "the packet buffer lacks the filtered traffic"
+id=$(triggered "$calls"); completed "$ALICE" "$id"
+fetch "$ALICE" "$id" "$victim/web.strace" "$WORK/crash.strace"
+grep -q 'exited with 3' "$WORK/crash.strace" && grep -q 'execve("/bin/wget"\|wait4(' "$WORK/crash.strace" || fail "the system calls before the crash: $(tail -5 "$WORK/crash.strace")"
 id=$(triggered "$logs"); completed "$ALICE" "$id"
 # The crashed instance is the current or the previous one, depending on
 # whether the container had restarted when the logs were read.

@@ -55,13 +55,20 @@ type Agent struct {
 	// kept holds the profiles that watches keep running, by watch ID, pod
 	// and kind of recording.
 	kept map[string]*kept
+	// traces holds the system calls that watches keep tracing, by watch ID
+	// and pod.
+	traces map[string]*lines
+	// calls holds the system calls set aside at a crash, by trigger ID,
+	// until the hub's task for it arrives.
+	calls map[string]setAside
 }
 
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
 // growing delay after a failure.
 func (a *Agent) Run(ctx context.Context) {
 	a.running, a.watching = map[string]task{}, map[string]context.CancelFunc{}
-	a.rings, a.snapshots, a.kept = map[string]*ring{}, map[string][]byte{}, map[string]*kept{}
+	a.rings, a.snapshots, a.kept, a.traces = map[string]*ring{}, map[string][]byte{}, map[string]*kept{}, map[string]*lines{}
+	a.calls = map[string]setAside{}
 	delay := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()
