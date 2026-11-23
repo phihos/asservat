@@ -148,13 +148,25 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	}
 	root := filepath.Join(dir, "root")
 	archive, unpacked := io.Pipe()
-	go func() { unpacked.CloseWithError(h.plain(ctx, files, unpacked)) }()
+	read := make(chan error, 1)
+	go func() {
+		err := h.plain(ctx, files, unpacked)
+		unpacked.CloseWithError(err)
+		read <- err
+	}()
 	err = coredesc.ExtractFiles(archive, root, files.Size)
 	archive.CloseWithError(err)
+	// An archive that the store could not hand over is not a bad archive.
+	if stored := <-read; stored != nil && !errors.Is(stored, io.ErrClosedPipe) {
+		return false, "", stored
+	}
 	if err != nil {
 		return false, "", undescribable{err}
 	}
 	report, err := coredesc.Describer{Scratch: h.WorkDir, DebuginfodURLs: h.DebuginfodURLs}.Describe(ctx, file.Name(), root) // what gdb downloads stays for the next core
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return false, "", ctx.Err() // the hub is stopping: no fault of the core
+	}
 	if err != nil {
 		return false, "", undescribable{err}
 	}
