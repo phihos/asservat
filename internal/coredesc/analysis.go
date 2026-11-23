@@ -38,10 +38,11 @@ const (
 	// 3: stacks through libraries without unwind tables, such as musl.
 	// 4: the stacks of Python programs.
 	// 5: debug information from the debug packages of distributions.
-	Version = 5
+	// 6: the managed stacks of .NET programs.
+	Version = 6
 )
 
-// Describer describes cores with gdb and Delve.
+// Describer describes cores with gdb, Delve, pystack and dotnet-dump.
 type Describer struct {
 	// Scratch is a directory for the script and what gdb downloads.
 	Scratch string
@@ -52,9 +53,15 @@ type Describer struct {
 	// gdb asks for the debug information of stripped files; empty for none,
 	// and then no debug packages are downloaded either.
 	DebuginfodURLs string
+	// DotnetDir is the directory with the .NET runtime and dotnet-dump;
+	// the constant of that name if empty.
+	DotnetDir string
 	// sources are the places of the distributions' debug packages
 	// (debugpkgs.go); nil for the public ones.
 	sources *debugSources
+	// symbols is the symbol server that has the helper libraries of .NET
+	// runtimes (dotnet.go); Microsoft's if empty.
+	symbols string
 }
 
 // Describe returns the description of a core. root is the directory in
@@ -107,6 +114,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	}
 	if with, err := d.describePython(ctx, report, core, root); err != nil {
 		slog.Warn("Python stacks not described", "core", core, "error", err)
+	} else {
+		report = with
+	}
+	if with, err := d.describeDotnet(ctx, report, core, root); err != nil {
+		slog.Warn(".NET stacks not described", "core", core, "error", err)
 	} else {
 		report = with
 	}

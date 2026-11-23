@@ -447,6 +447,42 @@ arguments and local variables) as `runtimeStacks`, and the viewer lists
 them before the machine's threads, as it does goroutines. Other language
 runtimes are added in the same form.
 
+A core of a .NET program shows gdb the runtime: threads in `libcoreclr.so`
+and in code that the runtime compiled, which has no symbols. dotnet-dump
+(in the image, with a .NET runtime of its own under `/opt/asservat-dotnet`)
+reads the runtime's memory, and the describer adds the managed threads in
+the same form: the methods of each stack, the source lines where the image
+has the program's PDBs, and the exception that a thread holds with its
+message. It gives no arguments or local variables, and of a thread's name
+only what the runtime uses the thread for. The frames that the runtime
+itself marks on a stack are left out. dotnet-dump reads the memory with a
+helper library that belongs to each build of the runtime
+(`libmscordaccore.so`) and that it loads into itself: the library's code
+runs in the agent and in the hub. So it is never taken from the workload's
+image, though every image has it. Microsoft's symbol server has the helper
+of each runtime that Microsoft built, under the build ID of that runtime's
+`libcoreclr.so`: the describer sends `msdl.microsoft.com` this build ID,
+follows its redirect to Azure's blob storage (`*.blob.core.windows.net`)
+and keeps the download in the scratch directory until unused for a week.
+Nothing verifies the download beyond HTTPS: Microsoft publishes no
+checksum or signature for it. It is fetched only where debuginfod servers
+are named, the same switch as for the other downloads, and dotnet-dump's
+own asking of that server is turned off. The assemblies and PDBs of the
+image are data and are read from it. A core from gcore or the kernel does
+not hold the pages of mapped files that the process did not change, which
+dotnet-dump needs of the assemblies and of the runtime's libraries: the
+describer gives it a copy of the core in the scratch directory with those
+pages appended from the files, and removes the copy afterwards. While a
+.NET core is described, the scratch directory so needs room for the core
+once more and about 100 MiB; on a filesystem that shares the blocks of a
+copy, as Btrfs, for the 100 MiB only. Described without
+managed stacks are: a runtime that Microsoft's server does not have, as
+those that distributions build from source; a program that maps no
+`libcoreclr.so` because it carries the runtime in its executable
+(NativeAOT, single-file programs); a core of another processor than the
+describing agent's or hub's, whose helper is another file; and every .NET
+core where no server may be asked.
+
 gdb walks a stack by the unwind tables of the functions on it. musl, the C
 library of Alpine images, carries none, and no frame pointers: a thread
 that waits in it, as most threads of a core do, ends there for gdb, and
@@ -501,7 +537,9 @@ The agent also uploads the program's files next to the core, as
 (not the data files a program may map as well), at the paths the program
 saw them, with the links by which the program asks for its libraries, and
 with `/etc/os-release` and Alpine's list of installed packages, by which
-the debug packages are found. The agent follows the links of a container's
+the debug packages are found, and for a .NET program with the managed
+assemblies that the core maps and their PDBs (some 28 MiB for an ASP.NET
+program). The agent follows the links of a container's
 paths itself, within the container's root: the kernel would follow a link
 to an absolute path on the node, and a container could so lead the agent
 to the node's files (the kind of fault behind CVE-2019-14271 in `docker cp`

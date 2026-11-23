@@ -20,9 +20,14 @@ image:
 # (not of Wolfi) are downloaded instead, from the distributions' own
 # package servers (cdn-ubi.redhat.com, dl.rockylinux.org,
 # repo.almalinux.org, cdn.amazonlinux.com, dl-cdn.alpinelinux.org), which
-# learn the names of the packages asked for. Set to [] to ask no server
-# and download no package, as in a cluster without a way out; cores are
-# then described without.
+# learn the names of the packages asked for. While servers are named
+# here, the core of a .NET program is described with its managed stacks:
+# the runtime's helper library for that is downloaded from Microsoft's
+# symbol server (msdl.microsoft.com, which redirects to
+# *.blob.core.windows.net) and never taken from the workload's image;
+# Microsoft learns the build ID of the runtime. Set to [] to ask no server
+# and download nothing, as in a cluster without a way out; cores are then
+# described without.
 debuginfodURLs:
   - https://debuginfod.elfutils.org/
   - https://debuginfod.ubuntu.com/

@@ -1,0 +1,35 @@
+> clrstack -all
+OS Thread Id: 0x1
+        Child SP               IP Call Site
+00007FFF80FCE830 00007e5d5daa4f16 [HelperMethodFrame_1OBJ: 00007fff80fce830] System.Threading.Monitor.ObjWait(Int32, System.Object)
+00007FFF80FCE960 00007E5CDE50753E System.Threading.Monitor.Wait(System.Object, Int32)
+00007FFF80FCEAD0 00007E5CDF221B45 Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(Microsoft.Extensions.Hosting.IHost)
+00007FFF80FCEAF0 00007E5CDF0C1C5A Shop.Program.Main(System.String[]) [/src/Program.cs @ 43]
+OS Thread Id: 0x16
+        Child SP               IP Call Site
+00007E5D58D81D10 00007e5d5daa4f16 [DebuggerU2MCatchHandlerFrame: 00007e5d58d81d10]
+OS Thread Id: 0x18
+        Child SP               IP Call Site
+00007E5D567BF9F0 00007e5d5daa4f16 [HelperMethodFrame_1OBJ: 00007e5d567bf9f0] System.Threading.Monitor.ObjWait(Int32, System.Object)
+00007E5D567BFB20 00007E5CDE50753E System.Threading.Monitor.Wait(System.Object, Int32)
+00007E5D567BFB30 00007E5CDF0C1E70 Shop.OrderQueue.WaitForOrder(Int32, System.String) [/src/Program.cs @ 12]
+00007E5D567BFB70 00007E5CDF0C1DBD Shop.Program+<>c__DisplayClass0_0.<Main>b__1() [/src/Program.cs @ 39]
+00007E5D567BFCD0 00007e5d5d728e57 [DebuggerU2MCatchHandlerFrame: 00007e5d567bfcd0]
+OS Thread Id: 0x19
+        Child SP               IP Call Site
+00007E5D55FBBE08 00007e5d5daa4f16 [HelperMethodFrame: 00007e5d55fbbe08] System.Threading.Thread.SleepInternal(Int32)
+00007E5D55FBBF30 00007E5CDE5084B1 System.Threading.Thread.Sleep(Int32)
+00007E5D55FBBF40 00007E5CDF0C2909 Shop.Billing.HoldFailure(System.Exception) [/src/Program.cs @ 31]
+00007E5D55FBBF60 00007E5CDF0C2011 Shop.Billing.Charge(System.Decimal) [/src/Program.cs @ 24]
+00007E5D55FBE9C0 00007e5d5d65c525 [HelperMethodFrame: 00007e5d55fbe9c0]
+00007E5D55FBEAE0 00007E5CDF0C20C3 Shop.Billing.Fail(System.Decimal) [/src/Program.cs @ 28]
+00007E5D55FBEB20 00007E5CDF0C1FD2 Shop.Billing.Charge(System.Decimal) [/src/Program.cs @ 23]
+00007E5D55FBEB60 00007E5CDF0C1F3B Shop.Program+<>c.<Main>b__0_2() [/src/Program.cs @ 40]
+00007E5D55FBECD0 00007e5d5d728e57 [DebuggerU2MCatchHandlerFrame: 00007e5d55fbecd0]
+OS Thread Id: 0x1f
+        Child SP               IP Call Site
+00007E1BD3FFE988 00007e5d5daa4f16 [InlinedCallFrame: 00007e1bd3ffe988]
+00007E1BD3FFE988 00007e5cde50b66d [InlinedCallFrame: 00007e1bd3ffe988]
+00007E1BD3FFE970 00007E5CDE50B66D System.Threading.LowLevelLifoSemaphore.WaitNative(Microsoft.Win32.SafeHandles.SafeWaitHandle, Int32)
+00007E1BD3FFEAC0 00007E5CDE5228BA System.Threading.PortableThreadPool+WorkerThread.WorkerThreadStart()
+00007E1BD3FFECD0 00007e5d5d728e57 [DebuggerU2MCatchHandlerFrame: 00007e1bd3ffecd0]

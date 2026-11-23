@@ -286,7 +286,7 @@ func handleCore(args []string) error {
 	return err
 }
 
-const debuginfodHelp = "debuginfod servers, separated by spaces or commas, from which gdb fetches the debug information of stripped programs when a core is described; they are sent the build IDs of those programs and their libraries. While any is named, the debug packages of RHEL's universal base images, Rocky, Alma, Amazon Linux and Alpine are downloaded from these distributions' package servers too. Empty: none, and the stacks of stripped programs show addresses"
+const debuginfodHelp = "debuginfod servers, separated by spaces or commas, from which gdb fetches the debug information of stripped programs when a core is described; they are sent the build IDs of those programs and their libraries. While any is named, the debug packages of RHEL's universal base images, Rocky, Alma, Amazon Linux and Alpine are downloaded from these distributions' package servers too, and the helper library that reads the managed stacks of a .NET core from Microsoft's symbol server. Empty: none, and the stacks of stripped programs show addresses"
 
 // debuginfodServers reads the list of servers as the debuginfod client takes it.
 func debuginfodServers(list string) string {

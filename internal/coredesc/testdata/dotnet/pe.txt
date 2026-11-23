@@ -1,0 +1,12 @@
+> pe -nested 00007e1cf1800040
+Exception object: 00007e1cf1800040
+Exception type:   System.InvalidOperationException
+Message:          card declined for 12.5
+InnerException:   <none>
+StackTrace (generated):
+    SP               IP               Function
+    00007E5D55FBEAE0 00007E5CDF0C20C2 shop.dll!Shop.Billing.Fail(System.Decimal)+0x82
+    00007E5D55FBEB20 00007E5CDF0C1FD1 shop.dll!Shop.Billing.Charge(System.Decimal)+0x31
+
+StackTraceString: <none>
+HResult: 80131509
