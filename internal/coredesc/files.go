@@ -100,6 +100,24 @@ func resolve(root, name string) (file string, link bool) {
 	return file, link
 }
 
+// Mapped stands in for the description of a core that could not be
+// described, as far as Files reads one: the files that the core maps. With
+// the program's files kept all the same, the hub can describe the core
+// later.
+func Mapped(core string) []byte {
+	type mapping struct {
+		File string `json:"file"`
+	}
+	var report struct {
+		Mappings []mapping `json:"mappings"`
+	}
+	for _, name := range coreFiles(core) {
+		report.Mappings = append(report.Mappings, mapping{name})
+	}
+	listed, _ := json.Marshal(report)
+	return listed
+}
+
 // isELF tells whether the path is a regular file that starts as an
 // executable or library does.
 func isELF(path string) bool { return startsWith(path, "\x7fELF") }

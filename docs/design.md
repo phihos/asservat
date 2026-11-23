@@ -498,13 +498,16 @@ The stacks of a stripped program in another language show
 addresses unless gdb finds its debug information: with `debuginfodURLs`
 (`--debuginfod-urls`) it fetches that from debuginfod servers, by default
 from the elfutils project's server, which asks those of Debian, Fedora,
-Arch and others, and from Ubuntu's. A server that does not answer within
-10 seconds is passed over.
+Arch and others, and from Ubuntu's. The describer asks the servers itself,
+for the debug files of the stripped files a core maps, and gdb asks none:
+gdb's own client waited minutes on a server that neither answered nor
+closed. A server that does not answer within 10 seconds is not asked
+again for that core; what no server has is asked for again after a day.
 The servers are sent the build IDs of the programs and libraries of the
 cores that are described, which name compiled files and hold nothing of a
 process; an installation without a way out sets the list empty. The
-downloads rest in the scratch directory, where the debuginfod client
-removes those unused for a week.
+downloads rest in the scratch directory and are removed when unused for
+a week.
 
 No debuginfod server knows the programs of RHEL's universal base images,
 Rocky, Alma, Amazon Linux 2023 or Alpine, but these publish their debug

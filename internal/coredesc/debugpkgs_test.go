@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // A synthetic program that is busy in a function of its own, so that its
@@ -294,6 +295,44 @@ func TestDebugPackages(t *testing.T) {
 		if asked := requests(); len(asked) != 2 {
 			t.Fatal("asked", asked)
 		}
+	})
+	// A debuginfod server has the debug file by the build ID alone, whatever
+	// the distribution. One that neither answers nor closes, as Ubuntu's
+	// was seen to for minutes, is given up and holds nothing up for long.
+	t.Run("debuginfod", func(t *testing.T) {
+		debug, err := os.ReadFile(filepath.Join(dir, "server.debug"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		release := make(chan struct{})
+		silent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case <-release:
+			case <-r.Context().Done():
+			}
+		}))
+		defer silent.Close()
+		defer close(release)
+		knows := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/buildid/00112233445566778899aabbccddeeff00112233/debuginfo" {
+				w.Write(debug)
+				return
+			}
+			http.NotFound(w, r)
+		}))
+		defer knows.Close()
+		wait := debugPackageWait
+		debugPackageWait = 300 * time.Millisecond
+		defer func() { debugPackageWait = wait }()
+		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL + " " + knows.URL + "/", sources: sources}
+		began := time.Now()
+		if at, _ := describe(t, d, root(t, map[string]string{})); !strings.HasSuffix(at, "main.c:true") {
+			t.Fatalf("the function is at %q", at)
+		}
+		if took := time.Since(began); took > 10*time.Second {
+			t.Fatal("a silent server held the description up for", took)
+		}
+		requests()
 	})
 	t.Run("nothing is fetched without debuginfod servers", func(t *testing.T) {
 		for _, files := range []map[string]string{rocky, alpine} {

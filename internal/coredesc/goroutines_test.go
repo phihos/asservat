@@ -119,6 +119,10 @@ func goroutinesOfGoCore(t *testing.T, variables bool, flags ...string) {
 	if DescribedBy(data) != Version {
 		t.Error("described by", DescribedBy(data))
 	}
+	// Also of a core that could not be described, by the files it maps.
+	if kept := Files(Mapped(filepath.Join(dir, "core."+pid)), "/proc/"+pid+"/root"); !slices.Contains(kept, program) {
+		t.Fatal("the program is not among the files of a core without description:", kept)
+	}
 	files := Files(data, "/proc/"+pid+"/root")
 	if len(files) == 0 || !slices.Contains(files, program) {
 		t.Fatal("the program is not among the core's files:", files)

@@ -434,14 +434,20 @@ func (a *Agent) describe(ctx context.Context, core, root, name string, up func(s
 	if err == nil {
 		err = up(name+coredesc.Suffix, bytes.NewReader(report))
 	}
-	if files := coredesc.Files(report, root); err == nil && root != "" && len(files) > 0 {
-		archive, w := io.Pipe()
-		go func() { w.CloseWithError(coredesc.WriteFiles(w, root, files)) }()
-		err = up(name+coredesc.FilesSuffix, archive)
-		archive.Close()
-	}
 	if err != nil {
 		slog.Warn("core not described", "core", name, "error", err)
+		// The program's files are kept all the same: with them the hub
+		// can describe the core when it is opened.
+		report = coredesc.Mapped(core)
+	}
+	if files := coredesc.Files(report, root); root != "" && len(files) > 0 {
+		archive, w := io.Pipe()
+		go func() { w.CloseWithError(coredesc.WriteFiles(w, root, files)) }()
+		err := up(name+coredesc.FilesSuffix, archive)
+		archive.Close()
+		if err != nil {
+			slog.Warn("program files not kept", "core", name, "error", err)
+		}
 	}
 	// Delve reads the tables of the whole program to describe a Go core,
 	// hundreds of megabytes for a large one. The agent describes cores
