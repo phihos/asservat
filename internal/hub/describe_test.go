@@ -218,6 +218,20 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 	if got.Describer != coredesc.Version || !found {
 		t.Fatalf("described anew by %d with %d goroutines, main.waitForInput among them: %v", got.Describer, len(got.Goroutines), found)
 	}
+	// Over MCP the core reads as its stacks, by its own name or its description's.
+	for _, file := range []string{name, name + coredesc.Suffix} {
+		call, _ := http.NewRequest("POST", server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_artifact","arguments":{"id":"`+c.ID+`","name":"`+file+`"}}}`))
+		call.Header.Set("Authorization", "Bearer alice-token-of-the-describe-test")
+		res, err := http.DefaultClient.Do(call)
+		if err != nil {
+			t.Fatal(err)
+		}
+		said, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if !strings.Contains(string(said), "main.waitForInput") || !strings.Contains(string(said), "Goroutines (") || strings.Contains(string(said), "mappings") {
+			t.Fatalf("read_artifact of %s: %.600s", file, said)
+		}
+	}
 	// It is up to date now; and the work directory holds nothing of it.
 	if described, _, err := h.describeAgain(ctx, c.ID, name); err != nil || described {
 		t.Fatal("described twice:", described, err)

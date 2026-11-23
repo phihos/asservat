@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/coredesc"
 )
 
 // The MCP endpoint (Model Context Protocol, streamable HTTP without
@@ -155,7 +158,7 @@ var mcpTools = []mcpTool{
 			}
 			return h.visible(ctx, u, in.ID)
 		}},
-	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace, a core dump's description core.*.analysis.json) is returned 64 KiB at a time from a byte offset. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) and a .NET trace (*.nettrace) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. A packet capture (*.pcap) is returned as its statistics (protocols, conversations, Wireshark's expert information), or with filter, a Wireshark display filter, as the packets that match. A core is downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
+	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace) is returned 64 KiB at a time from a byte offset. A core dump (core.*, or its description core.*.analysis.json) is returned as text, 64 KiB at a time from offset: why the process stopped, then the stacks of its program as its runtime sees them (goroutines, Python threads, .NET threads; those with the same state and stack once, with their number), then the machine's threads, with variables where there are any. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) and a .NET trace (*.nettrace) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. A packet capture (*.pcap) is returned as its statistics (protocols, conversations, Wireshark's expert information), or with filter, a Wireshark display filter, as the packets that match. A core is downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
 		InputSchema: object(`"id":{"type":"string"},"name":{"type":"string"},"offset":{"type":"integer","description":"Text files: the byte to start at"},"sampleType":{"type":"string","description":"Profiles: the kind of value, such as cpu, samples, inuse_space or alloc_space"},"cumulative":{"type":"boolean","description":"Profiles: sort by weight including callees"},"filter":{"type":"string","description":"Packet captures: a Wireshark display filter; the packets that match are listed"}`, "id", "name"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in struct {
@@ -175,6 +178,43 @@ var mcpTools = []mcpTool{
 			a, err := h.Store.Artifact(ctx, c.ID, in.Name)
 			if err != nil {
 				return nil, err
+			}
+			// A core, or its description: what the core viewer shows, as
+			// text, a window of it at a time. A description from an older
+			// Asservat is made anew first, as for the viewer.
+			if api.ViewerOf(a.Name) == "core" {
+				name := strings.TrimSuffix(a.Name, coredesc.Suffix)
+				// Why the description is an older one, if it stays one.
+				var stale string
+				select {
+				case result := <-h.renew(ctx, u, c.ID, name):
+					if stale = result.reason; result.err != nil {
+						slog.Warn("core not described again", "capture", c.ID, "name", name, "error", result.err)
+						stale = "the hub could not describe the core again now"
+					}
+				case <-ctx.Done(): // the work goes on for the next reader
+					return nil, ctx.Err()
+				}
+				described, err := h.Store.Artifact(ctx, c.ID, name+coredesc.Suffix)
+				if err == ErrNotFound {
+					return nil, fmt.Errorf("%s has no description; download /api/captures/%s/artifacts/%s and open it with a debugger", name, c.ID, name)
+				}
+				if err != nil {
+					return nil, err
+				}
+				if err := h.Store.Audit(ctx, u.Name, "artifact.read", c.ID, map[string]any{"name": described.Name, "summary": true, "offset": in.Offset}); err != nil {
+					return nil, err
+				}
+				var report bytes.Buffer
+				if err := h.plain(ctx, described, &report); err != nil {
+					return nil, err
+				}
+				text := coreText(report.Bytes())
+				if stale != "" && coredesc.DescribedBy(report.Bytes()) < coredesc.Version {
+					text = "Described by an older Asservat, which may show less (" + stale + "). A new dump is described in full.\n\n" + text
+				}
+				from := min(max(in.Offset, 0), int64(len(text)))
+				return map[string]any{"size": len(text), "offset": from, "text": strings.ToValidUTF8(text[from:min(from+mcpReadLimit, int64(len(text)))], "")}, nil
 			}
 			// What a viewer shows of a binary file, as text.
 			if viewer := api.ViewerOf(a.Name); viewer == "pprof" || viewer == "heap" || viewer == "pcap" {
