@@ -155,7 +155,10 @@ The agent keeps the samples of a profile by the second and drops those
 older than the window. A capture of the watch takes the seconds before it
 and then the time frame after it, in one profile; after a crash only the
 seconds before, since nothing is left to sample. A recording that is not
-kept running starts with the capture, as in a capture made by hand.
+kept running starts with the capture, as in a capture made by hand. A watch
+ends with the report of its last time; the agent goes on observing it for
+its time frame and half a minute more, so that the capture which that
+report starts still finds what was kept running.
 
 Some kinds behave differently in a watch's capture:
 

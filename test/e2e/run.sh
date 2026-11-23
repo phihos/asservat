@@ -377,7 +377,8 @@ EOF
   # programs and maps, which count as the agent's memory: over 100 MiB while
   # the profiler runs, a few without it.
   seen=
-  for _ in $(seq 30); do
+  # The watch above ended half a minute ago at most: its profile runs that much longer.
+  for _ in $(seq 90); do
     held=$(edge -n asservat exec ds/asservat-agent -- sh -c 'grep "^kernel " /sys/fs/cgroup/memory.stat | cut -d" " -f2')
     seen="$seen $((held >> 20))"
     [ "$held" -lt $((40 << 20)) ] && break

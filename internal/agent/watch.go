@@ -35,7 +35,13 @@ func (a *Agent) setWatches(ctx context.Context, list []api.Watch) {
 		wanted[w.ID] = true
 		if _, ok := a.watching[w.ID]; !ok {
 			watching, cancel := context.WithCancel(ctx)
-			a.watching[w.ID] = cancel
+			// A watch ends with the report of its last time, before the
+			// capture that this report starts has arrived and used what the
+			// watch kept running. So an ended watch is observed a while
+			// longer: for the capture's time frame and the half minute in
+			// which its task arrives. Its reports meanwhile find no watch.
+			linger := time.Duration(w.DurationSeconds)*time.Second + 30*time.Second
+			a.watching[w.ID] = func() { time.AfterFunc(linger, cancel) }
 			go a.observe(ctx, watching, w)
 		}
 	}
