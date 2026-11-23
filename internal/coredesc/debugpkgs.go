@@ -402,6 +402,10 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 	path := filepath.Join(f.cache, name)
 	dir := filepath.Join(path, "usr/lib/debug")
 	if _, err := os.Stat(dir); err == nil {
+		// Also what an Asservat before the names by build ID unpacked.
+		if _, err := os.Stat(filepath.Join(dir, ".build-id")); err != nil {
+			linkByBuildID(dir)
+		}
 		now := time.Now()
 		return dir, os.Chtimes(path, now, now)
 	}
@@ -433,6 +437,7 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 		}
 		break
 	}
+	linkByBuildID(filepath.Join(unpacked, "usr/lib/debug"))
 	// Another description may have unpacked the same meanwhile.
 	if err := os.Rename(unpacked, path); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
@@ -441,6 +446,34 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 		return "", nil
 	}
 	return dir, nil
+}
+
+// linkByBuildID gives every debug file under dir a name by its build ID,
+// as the debug packages of RPMs have them and Alpine's have not. gdb finds
+// a debug file by that name whatever the path of the program's file is: by
+// the file's own path it looks in the wrong place where the root is
+// /proc/<pid>/root, whose links it follows on the node and not in the
+// container.
+func linkByBuildID(dir string) {
+	filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || !entry.Type().IsRegular() || !strings.HasSuffix(path, ".debug") {
+			return nil
+		}
+		file, err := elf.Open(path)
+		if err != nil {
+			return nil
+		}
+		id := buildID(file)
+		file.Close()
+		if len(id) < 3 {
+			return nil
+		}
+		name := filepath.Join(dir, ".build-id", id[:2], id[2:]+".debug")
+		if to, err := filepath.Rel(filepath.Dir(name), path); err == nil && os.MkdirAll(filepath.Dir(name), 0o700) == nil {
+			os.Symlink(to, name) // the package's own name of the kind stays
+		}
+		return nil
+	})
 }
 
 // lookup returns the addresses of the debug packages that a repository of

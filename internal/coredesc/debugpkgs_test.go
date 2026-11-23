@@ -238,6 +238,7 @@ func TestDebugPackages(t *testing.T) {
 	})
 	t.Run("Alpine", func(t *testing.T) {
 		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}
+		elsewhere := root(t, alpine)
 		root := root(t, alpine)
 		at, report := describe(t, d, root)
 		if !strings.HasSuffix(at, "main.c:true") {
@@ -250,6 +251,22 @@ func TestDebugPackages(t *testing.T) {
 		if files := Files(report, root); !slices.Contains(files, "/lib/apk/db/installed") {
 			t.Fatal("kept", files)
 		}
+		// gdb looks for a debug file by the path of the program's file
+		// after following its links. On a node that leads elsewhere than
+		// in the container: the root is /proc/<pid>/root, and gdb follows
+		// links such as /lib on the node. The debug file is found all
+		// the same, by its build ID.
+		dir := filepath.Join(elsewhere, filepath.Dir(program))
+		if err := os.Rename(dir, filepath.Join(elsewhere, "moved")); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(elsewhere, "moved"), dir); err != nil {
+			t.Fatal(err)
+		}
+		if at, _ := describe(t, Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}, elsewhere); !strings.HasSuffix(at, "main.c:true") {
+			t.Fatalf("with the program's directory a link, the function is at %q", at)
+		}
+		requests()
 	})
 	t.Run("a package that is not published", func(t *testing.T) {
 		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}
