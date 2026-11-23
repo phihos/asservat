@@ -57,8 +57,9 @@ var jvmRequests = map[string][2]string{
 
 // attachWait is how long a JVM is given to open its socket after the
 // signal: as long as the JDK's own client waits (10 seconds,
-// sun.tools.attach.attachTimeout). It signals a second time after half of
-// it, as that client does, for a JVM that was not ready for the first.
+// sun.tools.attach.attachTimeout). Unlike that client it signals once:
+// on a slow node a JVM was seen to take more than half of that, and to
+// print its threads at the second signal.
 const attachWait = 10 * time.Second
 
 // jvmAnswerWait is how long a JVM is given for its whole answer. A heap
@@ -476,20 +477,20 @@ func (c attacher) open() error {
 	}
 	f.Close()
 	defer os.Remove(marker)
-	for range 2 {
-		if err := c.quit(); err != nil {
-			return fmt.Errorf("the JVM could not be signalled: %w", err)
+	// One signal: a JVM that is opening its socket takes a second one for
+	// a request to print its threads, and writes them to its output.
+	if err := c.quit(); err != nil {
+		return fmt.Errorf("the JVM could not be signalled: %w", err)
+	}
+	timeout := time.After(c.wait)
+	for waiting := true; waiting; {
+		if s, err := c.socket(); err == nil {
+			return s.Close()
 		}
-		timeout := time.After(c.wait / 2)
-		for waiting := true; waiting; {
-			if s, err := c.socket(); err == nil {
-				return s.Close()
-			}
-			select {
-			case <-changes.happened:
-			case <-timeout:
-				waiting = false
-			}
+		select {
+		case <-changes.happened:
+		case <-timeout:
+			waiting = false
 		}
 	}
 	return fmt.Errorf("the JVM did not open its attach socket within %s: it cannot write its /tmp, or was started with -XX:+DisableAttachMechanism", c.wait)
