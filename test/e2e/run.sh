@@ -594,9 +594,14 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   fetch "$ALICE" "$id" "$name" "$WORK/crash.core"
   [ "$(od -An -tx1 -N4 "$WORK/crash.core" | tr -d ' ')" = 7f454c46 ] || fail "the crash core is not an ELF file"
   [ "$(od -An -tu2 -j16 -N2 "$WORK/crash.core" | tr -d ' ')" = 4 ] || fail "the crash core is not a core (ET_CORE)"
+  # The handler kept the program's files while the crashed process was
+  # still there: the core is described with them, though the container's
+  # next instance may not run yet.
+  fetch "$ALICE" "$id" "$name.files.tar" "$WORK/crash.core.files.tar"
+  tar -tf "$WORK/crash.core.files.tar" | grep -qx 'bin/busybox\|bin/sh' || fail "the program files of a crash core: $(tar -tf "$WORK/crash.core.files.tar" | head -5)"
   # Its description names the signal that the process died of.
   fetch "$ALICE" "$id" "$name.analysis.json" "$WORK/crash.core.analysis.json"
-  jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0)' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
+  jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0) and .symbols and .executable == "/bin/sh"' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
   [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "an uploaded core stayed on the node"
 fi
 
