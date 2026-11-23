@@ -367,12 +367,13 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 	f.sweep()
 	dir := filepath.Join(f.cache, id)
 	if _, err := os.Stat(dir); err == nil {
-		now := time.Now()
-		os.Chtimes(dir, now, now)
-		// An empty directory is of a helper that was not there.
+		// An empty directory is of a helper that was not there. It keeps
+		// its age, so that the server is asked again after a week.
 		if _, err := os.Stat(filepath.Join(dir, dac)); err != nil {
 			return "", nil
 		}
+		now := time.Now()
+		os.Chtimes(dir, now, now)
 		return dir, nil
 	}
 	fetched, err := os.MkdirTemp(f.cache, "fetch-*")
