@@ -14,6 +14,8 @@ import (
 	"testing/iotest"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"asservat.local/asservat/internal/api"
 )
 
@@ -59,6 +61,87 @@ func TestMainPID(t *testing.T) {
 	if pid, err := mainPID(proc, id, true); err != nil || pid != 1200 {
 		t.Fatal("a container with its ID, asked as the agent's own", pid, err)
 	}
+}
+
+// fakeProc writes a node's /proc with a container's main process (1200) and
+// its worker among the given number of other processes, and returns it with
+// a function that adds a process.
+func fakeProc(t testing.TB, id string, others int) (string, func(pid, ppid, started int, cgroup string)) {
+	t.Helper()
+	proc := t.TempDir()
+	add := func(pid, ppid, started int, cgroup string) {
+		dir := filepath.Join(proc, fmt.Sprint(pid))
+		os.MkdirAll(dir, 0o755)
+		os.WriteFile(filepath.Join(dir, "cgroup"), []byte("0::"+cgroup+"\n"), 0o644)
+		stat := fmt.Sprintf("%d (app) S %d %s %d 0", pid, ppid, strings.Repeat("0 ", 17), started)
+		os.WriteFile(filepath.Join(dir, "stat"), []byte(stat), 0o644)
+	}
+	add(900, 1, 50, "/system.slice/containerd.service")
+	add(1200, 900, 100, "/kubelet.slice/cri-containerd-"+id+".scope")
+	add(1201, 1200, 110, "/kubelet.slice/cri-containerd-"+id+".scope")
+	for i := range others {
+		add(10000+i, 1, 200+i, fmt.Sprintf("/kubelet.slice/cri-containerd-other%d.scope", i/4))
+	}
+	return proc, add
+}
+
+func runningPod(container, id string) *corev1.Pod {
+	return &corev1.Pod{
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: container}}},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			Name: container, ContainerID: "containerd://" + id, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+		}}},
+	}
+}
+
+// What asks for a container's main process again and again searches the
+// node's processes once per instance of the container.
+func TestMainPIDsSearchOncePerContainer(t *testing.T) {
+	proc, add := fakeProc(t, "0123abcd", 10)
+	a, pod, pids := &Agent{Proc: proc}, runningPod("app", "0123abcd"), mainPIDs{}
+	if pid, err := pids.of(a, pod, "app"); err != nil || pid != 1200 {
+		t.Fatal("main process", pid, err)
+	}
+	// A search would now find this one: the remembered process is not searched for again.
+	add(1100, 900, 60, "/kubelet.slice/cri-containerd-0123abcd.scope")
+	if pid, err := pids.of(a, pod, "app"); err != nil || pid != 1200 {
+		t.Fatal("searched again", pid, err)
+	}
+	// A restarted container is another process.
+	add(3000, 900, 500, "/kubelet.slice/cri-containerd-4567ef.scope")
+	if pid, err := pids.of(a, runningPod("app", "4567ef"), "app"); err != nil || pid != 3000 {
+		t.Fatal("restarted container", pid, err)
+	}
+	// The ID of a process that ended may be another container's by now.
+	add(3000, 900, 600, "/kubelet.slice/cri-containerd-other.scope")
+	if pid, err := pids.of(a, runningPod("app", "4567ef"), "app"); err == nil {
+		t.Fatal("took another container's process for the remembered one", pid)
+	}
+	pod.Status.ContainerStatuses[0].State = corev1.ContainerState{}
+	if _, err := pids.of(a, pod, "app"); err == nil {
+		t.Fatal("found a container that does not run")
+	}
+}
+
+// On a node with 5000 processes: the search, and asking what is remembered.
+func BenchmarkMainPID(b *testing.B) {
+	proc, _ := fakeProc(b, "0123abcd", 5000)
+	a, pod := &Agent{Proc: proc}, runningPod("app", "0123abcd")
+	b.Run("searched", func(b *testing.B) {
+		for b.Loop() {
+			if _, _, err := a.containerPID(pod, "app"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("remembered", func(b *testing.B) {
+		pids := mainPIDs{}
+		for b.Loop() {
+			if _, err := pids.of(a, pod, "app"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 // A recording is interrupted after its duration and its output until then is
@@ -174,5 +257,27 @@ func TestUploadInFullPieces(t *testing.T) {
 	}
 	if n, err := short.Read(p); n != 0 || err != io.ErrClosedPipe {
 		t.Fatal("the failure", n, err)
+	}
+}
+
+// A tool whose output is set aside is not held up by the upload: it has
+// written everything, more than a pipe holds, before the upload reads.
+func TestAsideDoesNotHoldTheTool(t *testing.T) {
+	a := &Agent{Scratch: t.TempDir()}
+	done := filepath.Join(t.TempDir(), "done")
+	var got int64
+	up := func(_ string, r io.Reader) error {
+		if _, err := os.Stat(done); err != nil {
+			t.Error("the upload began while the tool still wrote")
+		}
+		n, err := io.Copy(io.Discard, r)
+		got = n
+		return err
+	}
+	if err := a.record(t.Context(), t.Context(), 0, "out", a.aside(up), "sh", "-c", "head -c 1000000 /dev/zero; touch "+done); err != nil || got != 1000000 {
+		t.Fatal(got, err)
+	}
+	if left, _ := os.ReadDir(a.Scratch); len(left) != 0 {
+		t.Fatal("left in the scratch directory:", left)
 	}
 }
