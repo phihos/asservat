@@ -43,6 +43,8 @@ func main() {
 		err = runAgent(ctx, os.Args[2:])
 	case "core-handler":
 		err = handleCore(os.Args[2:])
+	case "jvm-attach": // the agent, started again as a JVM's user
+		err = agent.AttachJVM(os.Args[2:], os.Stdin, os.Stdout)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}

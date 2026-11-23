@@ -205,13 +205,17 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 	case api.KindMemory:
 		return a.sampled(ctx, frame, sampledMemory, r, t.Pod, duration, pod, known, up)
 	case api.KindPprof:
-		pid, err := a.podPID(pod, known)
-		if err != nil {
-			return err
-		}
 		targets, err := rec.ProfileTargets()
 		if err != nil {
 			return err
+		}
+		// The pod's network namespace, for the endpoints that are served
+		// over HTTP.
+		pid := 0
+		if slices.ContainsFunc(targets, func(t api.ProfileTarget) bool { return !t.Attach }) {
+			if pid, err = a.podPID(pod, known); err != nil {
+				return err
+			}
 		}
 		// The endpoints are fetched at once, so that their profiles cover
 		// the same time.
@@ -219,6 +223,12 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		var wg sync.WaitGroup
 		for i, target := range targets {
 			wg.Go(func() {
+				if target.Attach {
+					if errs[i] = a.askJVM(ctx, frame, pod, target, r.DurationSeconds, known, up); errs[i] != nil {
+						errs[i] = fmt.Errorf("%s of container %s: %w", target.ID, target.Container, errs[i])
+					}
+					return
+				}
 				// A profile over time cannot be cut short: stopping the
 				// capture abandons it.
 				ctx := ctx

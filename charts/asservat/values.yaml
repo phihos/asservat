@@ -108,7 +108,7 @@ postgres:
 
 # The node agent: one pod per node that records evidence from the node's pods
 # and uploads it to the hub. It uses the node's PID namespace and the
-# capabilities SYS_ADMIN, SYS_PTRACE, NET_ADMIN and NET_RAW.
+# capabilities SYS_ADMIN, SYS_PTRACE, NET_ADMIN, NET_RAW, SETUID and SETGID.
 agent:
   enabled: true
   # URL of the hub. Empty: the hub of this release.

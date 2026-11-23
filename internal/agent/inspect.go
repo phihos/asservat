@@ -158,26 +158,29 @@ func (a *Agent) podTraffic(ctx context.Context, pod *corev1.Pod, duration time.D
 
 // profiles looks for the profile endpoints that the first of the pods
 // serves: it asks every TCP port that the pod listens on for the index or
-// information page of each known family. That starts no profiling.
-func (a *Agent) profiles(ctx context.Context, q api.Query) (found []api.ProfileTarget, ports []int, skipped []string) {
+// information page of each known family. That starts no profiling. It also
+// looks whether the pod's containers run a JVM that can be asked for its
+// diagnostics, and notes those that cannot.
+func (a *Agent) profiles(ctx context.Context, q api.Query) (found []api.ProfileTarget, ports []int, notes, skipped []string) {
 	pods, skipped := a.nodePods(ctx, q.Namespace, q.Pods)
 	if len(pods) == 0 {
-		return nil, nil, skipped
+		return nil, nil, nil, skipped
 	}
 	pid, err := a.podPID(pods[0], nil)
 	if err != nil {
-		return nil, nil, append(skipped, pods[0].Name)
+		return nil, nil, nil, append(skipped, pods[0].Name)
 	}
+	diagnostics, notes := a.jvmDiagnostics(pods[0])
 	for port := range listeningPorts(a.Proc, pid) {
 		ports = append(ports, int(port))
 	}
 	slices.Sort(ports)
-	return probeProfiles(ports, func(port int, path string) string {
+	return append(probeProfiles(ports, func(port int, path string) string {
 		// Two seconds: a port that speaks no HTTP may never answer.
 		out, _ := exec.CommandContext(ctx, "nsenter", "-t", strconv.Itoa(pid), "-n", "curl", "-sS", "--fail", "-m", "2", "--max-filesize", "1048576",
 			"http://127.0.0.1:"+strconv.Itoa(port)+path).Output()
 		return string(out)
-	}), ports, skipped
+	}), diagnostics...), ports, notes, skipped
 }
 
 // probeProfiles asks every port for the probe page of every family, all at
