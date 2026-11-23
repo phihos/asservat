@@ -445,7 +445,11 @@ core and the interpreter's files, stripped or not: the describer adds the
 interpreter's threads with their Python frames (function, file, line,
 arguments and local variables) as `runtimeStacks`, and the viewer lists
 them before the machine's threads, as it does goroutines. Other language
-runtimes are added in the same form.
+runtimes are added in the same form. A runtime knows its threads by
+their numbers inside the container, and a core that the agent takes
+numbers them as the node does: the description holds both numbers of each
+thread, so that a runtime's thread is told to be the core's, and the hub
+keeps them when it describes a core again.
 
 A core of a .NET program shows gdb the runtime: threads in `libcoreclr.so`
 and in code that the runtime compiled, which has no symbols. dotnet-dump
@@ -479,7 +483,8 @@ copy, as Btrfs, for the 100 MiB only. Described without
 managed stacks are: a runtime that Microsoft's server does not have, as
 those that distributions build from source; a program that maps no
 `libcoreclr.so` because it carries the runtime in its executable
-(NativeAOT, single-file programs); a core of another processor than the
+(NativeAOT, single-file programs); a runtime built for musl, as in
+Alpine images, whose helper library does not load in Asservat's image; a core of another processor than the
 describing agent's or hub's, whose helper is another file; and every .NET
 core where no server may be asked.
 

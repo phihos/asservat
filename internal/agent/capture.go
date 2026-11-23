@@ -316,7 +316,7 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 	if err := up(name, f); err != nil {
 		return err
 	}
-	a.describe(ctx, file, "/proc/"+strconv.Itoa(pid)+"/root", name, up)
+	a.describe(ctx, file, "/proc/"+strconv.Itoa(pid)+"/root", name, pid, up)
 	return nil
 }
 
@@ -429,8 +429,14 @@ func (a *Agent) record(ctx, frame context.Context, duration time.Duration, name 
 // describe uploads the description of a core that was uploaded as name,
 // and the program's files that the core maps, found under root. The core
 // is the evidence; a description that fails is only logged.
-func (a *Agent) describe(ctx context.Context, core, root, name string, up func(string, io.Reader) error) {
-	report, err := coredesc.Describer{Scratch: a.Scratch, DebuginfodURLs: a.DebuginfodURLs}.Describe(ctx, core, root)
+// pid is the process on the node that the agent took the core of, or 0 for
+// a core that the kernel wrote.
+func (a *Agent) describe(ctx context.Context, core, root, name string, pid int, up func(string, io.Reader) error) {
+	describer := coredesc.Describer{Scratch: a.Scratch, DebuginfodURLs: a.DebuginfodURLs}
+	if pid != 0 {
+		describer.ThreadIDs = coredesc.NamespaceThreadIDs(a.Proc, pid)
+	}
+	report, err := describer.Describe(ctx, core, root)
 	if err == nil {
 		err = up(name+coredesc.Suffix, bytes.NewReader(report))
 	}

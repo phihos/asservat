@@ -99,6 +99,19 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 	if err := json.Unmarshal(out, &stack); err != nil {
 		return nil, fmt.Errorf("pystack: %w", err)
 	}
+	// The interpreter knows its threads by their numbers in the
+	// container: gdb names them by their numbers on the node.
+	var threads []map[string]any
+	if len(d.ThreadIDs) > 0 && json.Unmarshal(stack.Threads, &threads) == nil {
+		for _, thread := range threads {
+			if inner, is := thread["threadSystemId"].(float64); is {
+				thread["threadSystemId"] = d.onNode(int(inner))
+			}
+		}
+		if stack.Threads, err = json.Marshal(threads); err != nil {
+			return nil, err
+		}
+	}
 	return addRuntimeStack(report, stack)
 }
 

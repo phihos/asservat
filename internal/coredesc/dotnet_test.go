@@ -249,6 +249,18 @@ func TestCoreIsFilledFromItsFiles(t *testing.T) {
 	note = binary.LittleEndian.AppendUint32(note, uint32(len(files)))
 	note = binary.LittleEndian.AppendUint32(note, 0x46494c45)
 	note = append(append(note, "CORE\x00\x00\x00\x00"...), files...)
+	for len(note)%4 != 0 {
+		note = append(note, 0)
+	}
+	// And the status of its one thread, which holds the thread's number.
+	const statusSize = 336
+	note = binary.LittleEndian.AppendUint32(note, 5)
+	note = binary.LittleEndian.AppendUint32(note, statusSize)
+	note = binary.LittleEndian.AppendUint32(note, 1)
+	note = append(note, "CORE\x00\x00\x00\x00"...)
+	inNote := len(note) + 32
+	note = append(note, make([]byte, statusSize)...)
+	binary.LittleEndian.PutUint32(note[inNote:], 5000)
 	// Of the assembly the core holds the page that the process changed; the
 	// first it names without holding it, as the kernel does, and the third
 	// not at all. Of the library it holds the first page, as both do.
@@ -262,6 +274,7 @@ func TestCoreIsFilledFromItsFiles(t *testing.T) {
 		{Type: uint32(elf.PT_LOAD), Off: at + uint64(len(note)) + page, Vaddr: 0x30000, Filesz: page, Memsz: 2 * page},
 		{Type: uint32(elf.PT_LOAD), Off: at + uint64(len(note)) + 2*page, Vaddr: 0x60000, Filesz: page, Memsz: page},
 	}
+	status := int(at) + inNote // where the thread's number is in the file
 	var core bytes.Buffer
 	header := elf.Header64{Type: uint16(elf.ET_CORE), Machine: uint16(elf.EM_X86_64), Version: 1, Phoff: 64, Ehsize: 64, Phentsize: 56, Phnum: segments}
 	copy(header.Ident[:], "\x7fELF\x02\x01\x01")
@@ -275,8 +288,15 @@ func TestCoreIsFilledFromItsFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "core"), core.Bytes(), 0o600)
 
 	filled := filepath.Join(dir, "filled")
-	if err := fillCore(filepath.Join(dir, "core"), root, filled); err != nil {
+	// The core numbers its thread as the node does; the copy as the container.
+	if err := fillCore(filepath.Join(dir, "core"), root, filled, map[int]int{5000: 7}); err != nil {
 		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filled); binary.LittleEndian.Uint32(b[status:]) != 7 {
+		t.Fatal("the thread's number in the copy:", binary.LittleEndian.Uint32(b[status:]))
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "core")); binary.LittleEndian.Uint32(b[status:]) != 5000 {
+		t.Fatal("the core itself was changed")
 	}
 	file, err := elf.Open(filled)
 	if err != nil {
