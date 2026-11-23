@@ -470,10 +470,38 @@ process; an installation without a way out sets the list empty. The
 downloads rest in the scratch directory, where the debuginfod client
 removes those unused for a week.
 
+No debuginfod server knows the programs of RHEL's universal base images,
+Rocky, Alma, Amazon Linux 2023 or Alpine, but these publish their debug
+information as packages. Where debuginfod servers are named, the describer
+fetches those too, for the stripped programs and libraries of a core,
+telling the distribution by the container's `/etc/os-release`. For the RPM
+distributions it downloads the list of packages of the release's debug
+repositories (from `cdn-ubi.redhat.com`, `dl.rockylinux.org`,
+`repo.almalinux.org`, `cdn.amazonlinux.com`), which names the build IDs
+that each debug package covers, looks the build IDs up in it and downloads
+the packages that have them: the vendor learns the names of those
+packages, no build ID. The list is asked for anew after a day. For Alpine
+it reads from the container's list of installed packages which packages
+own the files and asks `dl-cdn.alpinelinux.org` for the debug package
+(`<origin>-dbg`) of each in its version. The debug files are unpacked with
+`bsdtar` into the scratch directory, kept there until unused for a week,
+and given to gdb as further debug directories. A server that does not
+answer, or sends nothing more, within 10 seconds is given up, and the core
+is described without. Much is not there to be found: the universal base
+images' repositories and Rocky's list only the latest build of each
+package, so that an image built before a library's last update finds
+nothing for that library; Alpine builds debug packages for some ninety
+sources only (musl, OpenSSL, Python, curl among them, not BusyBox) and
+keeps the latest revision of each only. Alma and Amazon Linux keep every
+build. What an image's own package manager installed is found; a program
+built outside of the distribution is not.
+
 The agent also uploads the program's files next to the core, as
 `<core>.files.tar`: the executable and the libraries that the core maps
 (not the data files a program may map as well), at the paths the program
-saw them, with the links by which the program asks for its libraries. Unpacked, they are what a debugger needs to open the core where
+saw them, with the links by which the program asks for its libraries, and
+with `/etc/os-release` and Alpine's list of installed packages, by which
+the debug packages are found. Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core

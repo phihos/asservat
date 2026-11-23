@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed core_analysis.py
@@ -36,7 +37,8 @@ const (
 	// 2: goroutines of Go programs without debug information.
 	// 3: stacks through libraries without unwind tables, such as musl.
 	// 4: the stacks of Python programs.
-	Version = 4
+	// 5: debug information from the debug packages of distributions.
+	Version = 5
 )
 
 // Describer describes cores with gdb and Delve.
@@ -47,8 +49,12 @@ type Describer struct {
 	// constant of that name if empty.
 	PystackPython string
 	// DebuginfodURLs are the debuginfod servers, separated by spaces, that
-	// gdb asks for the debug information of stripped files; empty for none.
+	// gdb asks for the debug information of stripped files; empty for none,
+	// and then no debug packages are downloaded either.
 	DebuginfodURLs string
+	// sources are the places of the distributions' debug packages
+	// (debugpkgs.go); nil for the public ones.
+	sources *debugSources
 }
 
 // Describe returns the description of a core. root is the directory in
@@ -71,6 +77,7 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	defer os.Remove(out)
 	cmd := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-x", script.Name())
 	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+root, "ASSERVAT_OUT="+out,
+		"ASSERVAT_DEBUG_DIRS="+strings.Join(d.debugDirs(ctx, core, root), ":"),
 		// The script turns debuginfod on where servers are named.
 		"DEBUGINFOD_URLS="+d.DebuginfodURLs, "DEBUGINFOD_CACHE_PATH="+filepath.Join(d.Scratch, "debuginfod"),
 		// A server that does not answer is given up after this many

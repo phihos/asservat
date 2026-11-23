@@ -1,7 +1,8 @@
 # Run by gdb for a core file: writes what a debugger shows first, as JSON.
 # ASSERVAT_CORE names the core, ASSERVAT_ROOT the root directory in which the
 # program's executable and libraries are found (may be empty), ASSERVAT_OUT
-# the file to write.
+# the file to write, ASSERVAT_DEBUG_DIRS further directories of debug files,
+# separated by colons.
 import json
 import os
 import re
@@ -224,6 +225,10 @@ gdb.execute("set confirm off")
 # gdb asks debuginfod servers for the symbols of stripped files only where
 # the operator named servers: the request tells them which programs run here.
 gdb.execute("set debuginfod enabled " + ("on" if os.environ.get("DEBUGINFOD_URLS") else "off"))
+# The debug files of the distribution's debug packages, before gdb's own
+# directory and the one under the root.
+if os.environ.get("ASSERVAT_DEBUG_DIRS"):
+    gdb.execute("set debug-file-directory " + os.environ["ASSERVAT_DEBUG_DIRS"] + ":" + gdb.parameter("debug-file-directory"))
 if ROOT:
     gdb.execute("set sysroot " + ROOT)
 loaded = run("core-file " + CORE)
