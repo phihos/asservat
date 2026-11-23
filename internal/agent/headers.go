@@ -5,10 +5,29 @@ import (
 	"errors"
 	"io"
 	"net/netip"
+	"strconv"
 )
 
+// headerSnap is the most that the headers of a packet take as dissect reads
+// them: the link header of tcpdump's "any" interface (20 bytes), an IPv4
+// header with all its options (60) and a TCP header with all of its (60).
+const headerSnap = 20 + 60 + 60
+
+// tcpdumpArgs are the arguments of nsenter for a tcpdump in the network
+// namespace of a process that writes the packets of a filter to its
+// standard output. Without payload it hands over the first headerSnap bytes
+// of each packet only, so that the payload of the pod's traffic is not
+// copied out of the kernel and through a pipe just to be dropped here.
+func tcpdumpArgs(pid int, filter string, payload bool) []string {
+	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-"}
+	if !payload {
+		args = append(args, "-s", strconv.Itoa(headerSnap))
+	}
+	return append(args, withoutOwnTraffic(filter))
+}
+
 // headersOnly rewrites a pcap stream so that every packet ends after its
-// transport header. A fixed snap length cannot do that: header sizes vary, so
+// transport header. A snap length alone cannot do that: header sizes vary, so
 // it either cuts headers or keeps the first payload bytes.
 func headersOnly(src io.Reader) io.Reader {
 	pr, pw := io.Pipe()

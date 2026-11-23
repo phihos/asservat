@@ -4,8 +4,44 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"strings"
 	"testing"
 )
+
+// Without payload tcpdump hands over the start of each packet only. That
+// start holds the longest headers, so the capture is the same as of whole
+// packets.
+func TestSnappedPacketsKeepTheirHeaders(t *testing.T) {
+	if args := strings.Join(tcpdumpArgs(7, "port 80", false), " "); !strings.Contains(args, "-t 7 -n tcpdump") || !strings.Contains(args, " -s 140 ") || !strings.Contains(args, "port 80") {
+		t.Fatal("without payload:", args)
+	}
+	if args := strings.Join(tcpdumpArgs(7, "", true), " "); strings.Contains(args, " -s ") {
+		t.Fatal("with payload:", args)
+	}
+	le := binary.LittleEndian
+	packet := binary.BigEndian.AppendUint16(nil, 0x0800) // Linux cooked v2
+	packet = append(packet, make([]byte, 18)...)
+	ip := make([]byte, 60) // IPv4 with all options
+	ip[0], ip[9] = 0x4f, 6
+	tcp := make([]byte, 60) // TCP with all options
+	tcp[12], tcp[13] = 15<<4, 0x02
+	packet = append(append(append(packet, ip...), tcp...), bytes.Repeat([]byte("payload "), 150)...)
+	stream := func(captured int) []byte {
+		file := []byte{0xd4, 0xc3, 0xb2, 0xa1, 2, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0}
+		file = le.AppendUint32(file, 276)
+		file = le.AppendUint32(le.AppendUint32(file, 1), 2)
+		file = le.AppendUint32(le.AppendUint32(file, uint32(captured)), uint32(len(packet)))
+		return append(file, packet[:captured]...)
+	}
+	whole, err := io.ReadAll(headersOnly(bytes.NewReader(stream(len(packet)))))
+	if err != nil || len(whole) != 24+16+headerSnap {
+		t.Fatal("whole packets", len(whole), err)
+	}
+	snapped, err := io.ReadAll(headersOnly(bytes.NewReader(stream(headerSnap))))
+	if err != nil || !bytes.Equal(snapped, whole) {
+		t.Fatal("snapped packets differ", len(snapped), err)
+	}
+}
 
 func TestHeadersOnlyDropsPayload(t *testing.T) {
 	le := binary.LittleEndian

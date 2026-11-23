@@ -327,8 +327,9 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 		return
 	}
 	ctx, stop := context.WithCancel(ctx)
-	args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-", withoutOwnTraffic(packets.Params["filter"])}
-	cmd := exec.CommandContext(ctx, "nsenter", args...)
+	// Payload is kept only for a watch that asked for it and was approved.
+	payload := packets.Params["payload"] == "true"
+	cmd := exec.CommandContext(ctx, "nsenter", tcpdumpArgs(pid, packets.Params["filter"], payload)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.StdoutPipe()
@@ -340,10 +341,9 @@ func (a *Agent) buffer(ctx context.Context, w api.Watch, packets api.Recording, 
 		stop()
 		return
 	}
-	// Payload is kept only for a watch that asked for it and was approved.
 	// The buffer holds what a capture wants: the seconds before it, its
 	// time frame after it, and some more for the task to arrive.
-	r := &ring{before: w.Before(), window: w.Before() + time.Duration(w.DurationSeconds)*time.Second + 10*time.Second, limit: ringBytes, payload: packets.Params["payload"] == "true", stop: stop}
+	r := &ring{before: w.Before(), window: w.Before() + time.Duration(w.DurationSeconds)*time.Second + 10*time.Second, limit: ringBytes, payload: payload, stop: stop}
 	a.mu.Lock()
 	a.rings[key] = r
 	a.mu.Unlock()

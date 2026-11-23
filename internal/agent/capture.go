@@ -160,13 +160,13 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err != nil {
 			return err
 		}
-		args := []string{"-t", strconv.Itoa(pid), "-n", "tcpdump", "-Z", "root", "-i", "any", "-U", "-w", "-", withoutOwnTraffic(rec.Params["filter"])}
 		// Headers only unless payload was requested (and approved).
-		if rec.Params["payload"] != "true" {
+		payload := rec.Params["payload"] == "true"
+		if !payload {
 			packets := up
 			up = func(name string, body io.Reader) error { return packets(name, headersOnly(body)) }
 		}
-		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", args...)
+		return a.record(ctx, frame, duration, "capture.pcap", up, "nsenter", tcpdumpArgs(pid, rec.Params["filter"], payload)...)
 	case api.KindStrace:
 		// The system calls that the capture's watch kept tracing: those from
 		// before the capture and, unless a crash ended the process, those
