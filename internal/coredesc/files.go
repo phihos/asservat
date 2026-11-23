@@ -22,7 +22,8 @@ const FilesSuffix = ".files.tar"
 // Files lists the program files that a described core maps and that are
 // found under root: executables and libraries, not the data files a
 // program may map as well, which can be of any size and are not needed to
-// read stacks.
+// read stacks. With them come the few files that name the container's
+// distribution (debugpkgs.go).
 func Files(report []byte, root string) []string {
 	var fields struct {
 		Mappings []struct{ File string }
@@ -52,7 +53,7 @@ func Files(report []byte, root string) []string {
 	for _, m := range fields.Modules {
 		add(m.File)
 	}
-	return files
+	return withDistributionFiles(files, root)
 }
 
 // resolve follows the links of a path as the program saw it, within root,
