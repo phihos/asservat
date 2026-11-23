@@ -157,7 +157,8 @@ step when to record, or create a watch. A watch records the pod that meets
 its condition: by default a container that crashes, with `"when": {"kind":
 "restart"}` a container that is started again, with `"not-ready"` a pod that
 stops being ready, with `"log"` and a `pattern` a container that writes a
-matching log line. After a crash a `pcap` holds the packet headers of the
+matching log line, with `"memory"`, `"cpu"` or `"throttled"` and a threshold
+`above` a container that uses that much. After a crash a `pcap` holds the packet headers of the
 seconds before it:
 
 ```sh

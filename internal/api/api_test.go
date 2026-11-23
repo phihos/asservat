@@ -172,3 +172,35 @@ func TestLogCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The threshold of a usage condition is a share, a size or a number of CPUs.
+func TestParseAbove(t *testing.T) {
+	for _, c := range []struct {
+		kind, in string
+		want     Above
+	}{
+		{OnMemory, "80%", Above{80, true}}, {OnMemory, "500Mi", Above{500 << 20, false}}, {OnMemory, "2G", Above{2e9, false}}, {OnMemory, "1048576", Above{1 << 20, false}},
+		{OnCPU, "1.5", Above{1.5, false}}, {OnCPU, "1500m", Above{1.5, false}}, {OnCPU, "90%", Above{90, true}}, {OnThrottle, "25%", Above{25, true}},
+	} {
+		if got, err := ParseAbove(c.kind, c.in); err != nil || got != c.want {
+			t.Errorf("ParseAbove(%s, %q) = %v, %v", c.kind, c.in, got, err)
+		}
+	}
+	for _, c := range [][2]string{{OnMemory, "much"}, {OnMemory, "-5Mi"}, {OnCPU, "2 cores"}, {OnThrottle, "3"}, {OnCPU, "NaN"}, {OnMemory, ""}} {
+		if _, err := ParseAbove(c[0], c[1]); err == nil {
+			t.Errorf("ParseAbove(%s, %q) was accepted", c[0], c[1])
+		}
+	}
+	for name, c := range map[string]Condition{
+		"no threshold": {Kind: OnMemory}, "negative seconds": {Kind: OnCPU, Params: map[string]string{"above": "1", "seconds": "-1"}},
+		"a pattern": {Kind: OnMemory, Params: map[string]string{"above": "80%", "pattern": "x"}},
+	} {
+		if err := c.Validate(); err == nil {
+			t.Error(name, "was accepted")
+		}
+	}
+	ok := Condition{Kind: OnThrottle, Params: map[string]string{"above": "25%", "seconds": "30", "container": "app"}}
+	if err := ok.Validate(); err != nil || !ok.Usage() {
+		t.Fatal(err)
+	}
+}

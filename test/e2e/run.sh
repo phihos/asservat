@@ -492,6 +492,17 @@ done
 [ "$(jq -r '.on + " " + (.reason | test("a log line of container web matches .*: .*served a request") | tostring)' <<<"$noticed")" = "log true" ] || fail "the capture of a watch for a log line: $noticed"
 completed "$ALICE" "$(jq -r .id <<<"$noticed")"
 [ "$(ok "$ALICE" GET /api/watches | jq --arg w "$line" '[.[] | select(.id == $w)] | length')" = 0 ] || fail "the log watch outlived its one capture"
+# A watch for memory use: any running container uses more than 1 KiB, so the
+# agent's first measurement meets it.
+[ "$(status "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"memory","params":{"above":"much"}}}')")" = 400 ] || fail "a memory watch without a threshold was accepted"
+used=$(ok "$ALICE" POST /api/watches "$(target edge pod-state '{"when":{"kind":"memory","params":{"above":"1Ki"}}}')" | jq -r .id)
+for _ in $(seq 60); do
+  noticed=$(ok "$ALICE" GET /api/captures | jq -c --arg w "$used" '[.[] | select(.watch == $w)][0]')
+  [ "$noticed" != null ] && break
+  sleep 1
+done
+[ "$(jq -r '.on + " " + (.reason | test("container web uses [0-9.]+ [KMG]iB of memory \\(above 1Ki\\)") | tostring)' <<<"$noticed")" = "memory true" ] || fail "the capture of a watch for memory use: $noticed"
+completed "$ALICE" "$(jq -r .id <<<"$noticed")"
 
 if [ -n "${CORE_HANDLER:-}" ]; then
   log "an approved core dump watch records the core of the crashed process (edge)"

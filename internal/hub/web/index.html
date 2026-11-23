@@ -239,6 +239,14 @@
         <label><input type="radio" name="when" value="restart">When a container restarts<small>Whatever ended it: a failure, a clean exit or a failed liveness probe. Records the pod as it runs again</small></label>
         <label><input type="radio" name="when" value="not-ready">When the pod stops being ready<small>Its readiness probe starts to fail. Records the pod while it is in that state</small></label>
         <label><input type="radio" name="when" value="log">When a log line matches<small>A container writes a line that a pattern matches. Records the pod from that moment</small></label>
+        <label><input type="radio" name="when" value="memory">When memory use is above<small>A share of the container's limit, or a size. Records it before the kernel ends it for using too much</small></label>
+        <label><input type="radio" name="when" value="cpu">When CPU use is above<small>A number of CPUs, or a share of the container's limit. Records it while it is busy</small></label>
+        <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
+      </div>
+      <div class="fields" id="usageFields" hidden>
+        <label>Above<input id="usageAbove" spellcheck="false" autocomplete="off"></label>
+        <label>For at least, in seconds<input id="usageSeconds" type="number" min="0" placeholder="0: as soon as it is seen"></label>
+        <label>Container<select id="usageContainer"></select></label>
       </div>
       <div class="fields" id="logFields" hidden>
         <label class="wide">The line matches, as a regular expression<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
@@ -380,7 +388,7 @@ async function workloadChanged() {
   if (!$('workload').value) return;
   containers = await call('GET', namespacePath() + '/containers?' + workloadQuery());
   $('container').innerHTML = '<option value="">all containers</option>' + options(containers);
-  $('logContainer').innerHTML = '<option value="">any container</option>' + options(containers);
+  $('logContainer').innerHTML = $('usageContainer').innerHTML = '<option value="">any container</option>' + options(containers);
   await Promise.all([loadProcesses(), loadProfiles()]);
 }
 
@@ -435,16 +443,30 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 // A core dump on a crash is that of the crashed process: nothing to choose.
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
-const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches'};
+const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches',
+  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than'};
+// The thresholds a usage condition takes, as an example in its field.
+const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90% of the limit', throttled: '25% of the time'};
 // A watch's condition in full, with what it is given.
-const told = when => (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${when.params?.pattern || ''}"${when.params?.container ? ' in ' + when.params.container : ''}` : '');
+function told(when) {
+  const given = when?.params || {}, where = given.container ? ' in ' + given.container : '';
+  return (conditions[when?.kind] || when?.kind || '') + (when?.kind === 'log' ? ` "${given.pattern || ''}"${where}`
+    : when?.kind in thresholds ? ` ${given.above}${given.seconds > 0 ? ` for ${given.seconds} s` : ''}${where}` : '');
+}
 // The condition that the form's last step describes.
 function condition() {
   const kind = picked('when');
-  if (kind !== 'log') return {kind};
-  const pattern = $('logPattern').value.trim();
-  if (!pattern) throw new Error('Give the pattern that a log line is to match.');
-  return {kind, params: {pattern, ...($('logContainer').value ? {container: $('logContainer').value} : {})}};
+  if (kind === 'log') {
+    const pattern = $('logPattern').value.trim();
+    if (!pattern) throw new Error('Give the pattern that a log line is to match.');
+    return {kind, params: {pattern, ...($('logContainer').value ? {container: $('logContainer').value} : {})}};
+  }
+  if (kind in thresholds) {
+    const above = $('usageAbove').value.trim().replace(/\s+/g, '');
+    if (!above) throw new Error(`Give the threshold: ${thresholds[kind]}.`);
+    return {kind, params: {above, ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
+  }
+  return {kind};
 }
 
 // The process list is read from the pods when a core dump or trace is
@@ -552,6 +574,8 @@ function showParams() {
     strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
   $('countLabel').hidden = !watching;
   $('logFields').hidden = picked('when') !== 'log';
+  $('usageFields').hidden = !(picked('when') in thresholds);
+  $('usageAbove').placeholder = thresholds[picked('when')] || '';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
     has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
