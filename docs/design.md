@@ -861,5 +861,15 @@ files asks first.
 These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
-  serve no profile endpoint.
+  serve no profile endpoint. Looked into on 2026-11-24 and not built, for
+  want of a way that pays: a Go program records its allocations by itself
+  only where it links the runtime's memory profile, which the linker turns
+  off in programs that never ask for it, the ones without an endpoint among
+  them (`runtime.disableMemoryProfiling`); the profiler's own heap probe
+  needs probe points in the allocator that applications do not carry; and
+  following every `malloc` and `free` of a process from the kernel slows
+  programs that allocate much and needs kernel programs of Asservat's own.
+  What there is instead: memory growth by sampling for every language, the
+  heap dump and class histogram of a JVM, and the heap profile of a Go
+  program that does serve an endpoint.
 - Several hub replicas.
