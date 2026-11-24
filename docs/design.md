@@ -246,8 +246,14 @@ handler.
 
 - The handler keeps a core only if the process belongs to a pod of an
   approved `coredump` watch; the agent marks those pods in the directory.
-  Every other core on the node is dropped while the agent's handler is
-  installed, including those the node's own handler would have stored.
+  Every other core it passes on to the handler that the node had before,
+  such as apport or systemd-coredump, run as the kernel would have run it:
+  the agent's pattern asks the kernel for the values that the node's
+  handler takes as well, and the agent's handler gives them on with the
+  core. A node that wrote cores to files (a pattern without `|`) writes
+  none of unwatched processes while the agent's handler is installed, and
+  neither does one whose handler's values do not fit behind the agent's in
+  the 127 characters of a core pattern, which the agent logs.
 - A later core of the same container replaces the earlier one. The handler
   stops writing when less than 10 % of the node's disk is free, which is the
   kubelet's default eviction threshold.
@@ -827,7 +833,5 @@ These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint.
-- Passing the cores of unwatched processes on to the node's previous core
-  handler.
 - Sharing a capture with other users or teams.
 - Several hub replicas.
