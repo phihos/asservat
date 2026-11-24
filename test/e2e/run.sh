@@ -535,7 +535,9 @@ jq -e '.executable == "/bin/sh" and .symbols and (.commandLine | startswith("/bi
 # The program's files are kept with the core, for a debugger and for the hub to describe it again;
 # the description is this version's, so the hub leaves it.
 fetch "$ALICE" "$id" "$pod/core.web.files.tar" "$WORK/core.web.files.tar"
-tar -tf "$WORK/core.web.files.tar" | grep -qx 'bin/busybox\|bin/sh' || fail "the core's program files: $(tar -tf "$WORK/core.web.files.tar" | head -5)"
+# Listed first: grep leaves at its first match, and a tar that is still writing then fails the pipe.
+listed=$(tar -tf "$WORK/core.web.files.tar")
+grep -qx 'bin/busybox\|bin/sh' <<<"$listed" || fail "the core's program files: $(head -5 <<<"$listed")"
 [ "$(ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.web\"}" | jq -c .)" = '{"described":false,"reason":""}' ] || fail "an up-to-date core was described again"
 curl -sS --fail -o /dev/null "$URL/view/core.js" "$URL/view/core.css" || fail "the core viewer is not served"
 edge -n shop get pods -o json | jq -e '[.items[].status.containerStatuses[].restartCount] | add == 0' >/dev/null || fail "a captured pod restarted"
@@ -671,7 +673,9 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   # still there: the core is described with them, though the container's
   # next instance may not run yet.
   fetch "$ALICE" "$id" "$name.files.tar" "$WORK/crash.core.files.tar"
-  tar -tf "$WORK/crash.core.files.tar" | grep -qx 'bin/busybox\|bin/sh' || fail "the program files of a crash core: $(tar -tf "$WORK/crash.core.files.tar" | head -5)"
+  # Listed first: grep leaves at its first match, and a tar that is still writing then fails the pipe.
+  listed=$(tar -tf "$WORK/crash.core.files.tar")
+  grep -qx 'bin/busybox\|bin/sh' <<<"$listed" || fail "the program files of a crash core: $(head -5 <<<"$listed")"
   # Its description names the signal that the process died of.
   fetch "$ALICE" "$id" "$name.analysis.json" "$WORK/crash.core.analysis.json"
   jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0) and .symbols and .executable == "/bin/sh"' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
