@@ -73,3 +73,5 @@ dialog .bar button:hover { border-color: var(--quiet); }
 /* On a phone the packet list keeps its columns and scrolls sideways. */
 @media (max-width: 700px) { #head, #rows { min-width: 820px; } }
 @media (max-width: 700px) { .narrow.filter input { flex: 1 1 0; width: auto; } .narrow .sep { display: none; } }
+/* On a phone the tools are one row that scrolls sideways, so that the packets begin higher up. */
+@media (max-width: 700px) { .narrow:not(.filter) { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .narrow:not(.filter) > * { flex: none; } }

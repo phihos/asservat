@@ -763,7 +763,7 @@ func summarizeDotnetHeap(dump io.Reader) (*heapSummary, error) {
 		}
 		index := typeAndSize >> 1
 		if index < 0 || int(index) >= len(kinds) {
-			return nil, errors.New("an object of a type that the dump does not name")
+			return nil, errors.New("an object whose type the dump does not define")
 		}
 		size := kinds[index].size
 		if typeAndSize&1 != 0 {

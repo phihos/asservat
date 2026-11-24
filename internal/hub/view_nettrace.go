@@ -84,7 +84,7 @@ func (r *nettraceReader) varint() (uint64, error) {
 			return n, nil
 		}
 	}
-	return 0, errors.New("a number in the trace is longer than a number can be")
+	return 0, errors.New("a number in the trace is too long to be valid")
 }
 
 // wide reads a string of UTF-16 units that a zero ends.
@@ -314,7 +314,7 @@ func nettraceProfile(trace []byte) (*profile.Profile, error) {
 		// An object: its type (a nested object of versions and a name), its content, and a closing tag.
 		head, err := r.take(2)
 		if err != nil || tag != 5 || head[0] != 5 || head[1] != 1 {
-			return nil, errors.New("the trace holds something that is no object")
+			return nil, errors.New("the trace contains data that is not an object")
 		}
 		version, _ := r.i32()
 		r.i32() // the oldest reader that understands it

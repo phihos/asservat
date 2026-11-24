@@ -445,7 +445,7 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 	}
 	for _, rec := range in.Recordings {
 		if _, ok := rec.Params["before"]; ok {
-			return api.Capture{}, errStatus{http.StatusBadRequest, "before is for a watch: a capture that starts now has nothing running before"}
+			return api.Capture{}, errStatus{http.StatusBadRequest, "before only applies to a watch: a capture that starts now has nothing running beforehand"}
 		}
 	}
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {

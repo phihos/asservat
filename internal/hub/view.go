@@ -94,7 +94,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	}
 	viewer := api.ViewerOf(a.Name)
 	if viewer != "pcap" && viewer != "pprof" && viewer != "gotrace" && viewer != "heap" {
-		return errStatus{http.StatusBadRequest, "this file is not opened in the hub; its viewer reads it in the browser, or it only downloads"}
+		return errStatus{http.StatusBadRequest, "the hub does not open this file: its viewer reads it in the browser, or it can only be downloaded"}
 	}
 	if err := h.Store.Audit(r.Context(), u.Name, "artifact.view", c.ID, map[string]string{"name": a.Name}); err != nil {
 		return err
