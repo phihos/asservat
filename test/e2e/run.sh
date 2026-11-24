@@ -167,7 +167,7 @@ done
 
 log "install hub and local agents"
 TOKEN=edge-join-token-0123456789abcdef0123456789abcdef
-ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
+BOB=bob-token-0123456789abcdef0123456789abc ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
 ALERTS=alert-token-0123456789abcdef0123456789abcd
 hub create namespace asservat --dry-run=client -o yaml | hub apply -f - >/dev/null
 helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
@@ -176,6 +176,7 @@ helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n as
   --set hub.users[0].name=alice,hub.users[0].token=$ALICE,hub.users[0].groups[0]=devs \
   --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
   --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
+  --set hub.users[3].name=bob,hub.users[3].token=$BOB,hub.users[3].groups[0]=devs \
   --set hub.alertToken=$ALERTS \
   --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
 hub -n asservat port-forward svc/asservat-hub "$PORT:80" >/dev/null 2>&1 &
@@ -752,13 +753,27 @@ for action in capture.request capture.approve capture.deny capture.stop artifact
   case " $audit " in *" $action "*) ;; *) fail "audit lacks $action" ;; esac
 done
 
+log "a shared capture is there for a colleague who may capture in its namespace, and for nobody else"
+# Bob is in the group that may exec into the namespace's pods, as Alice is; Mallory is not.
+id=$(ok "$ALICE" GET /api/captures | jq -r '[.[] | select(.state == "Completed" and (.artifacts | length > 0) and .requester == "alice")][0].id')
+file=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.artifacts[0].name')
+[ "$(status "$BOB" GET "/api/captures/$id")" = 404 ] || fail "a colleague read a capture that is not shared"
+[ "$(ok "$ALICE" POST "/api/captures/$id/share" '{"shared":true}' | jq -r .shared)" = true ] || fail "sharing a capture"
+[ "$(ok "$BOB" GET "/api/captures/$id" | jq -r .requester)" = alice ] || fail "a colleague does not see the shared capture"
+ok "$BOB" GET /api/captures | jq -e --arg id "$id" 'any(.[]; .id == $id)' >/dev/null || fail "the shared capture is not in the colleague's list"
+[ "$(status "$BOB" GET "/api/captures/$id/artifacts/$file")" = 200 ] || fail "a colleague does not download a shared file"
+[ "$(status "$MALLORY" GET "/api/captures/$id")" = 404 ] || fail "someone without the namespace's exec right read a shared capture"
+[ "$(status "$BOB" DELETE "/api/captures/$id")" = 403 ] || fail "a colleague deleted a shared capture"
+ok "$ALICE" POST "/api/captures/$id/share" '{"shared":false}' >/dev/null
+[ "$(status "$BOB" GET "/api/captures/$id")" = 404 ] || fail "the capture is still shared"
+
 # What all of the above recorded is looked at as a person would: the console's
 # pages and one file per viewer in a headless browser, at a desk's and at a
 # phone's width. Scripts that fail, files that do not open and pages that run
 # out of the screen fail the run. Without a browser on the machine it is left out.
 log "the console and every viewer in a browser, wide and narrow"
 # The demo's heap profile is a word, not a profile: the viewer has to say so.
-browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
+browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" "$ROOT" || browsed=$?
 case $browsed in
   0) ;;
   78) [ -z "${REQUIRE_BROWSER:-}" ] || fail "no Chromium or Chrome is installed, and REQUIRE_BROWSER asks for the pages to be looked at"
