@@ -7,6 +7,7 @@ const markup = `
   <div id="compare" class="narrow">
     <label>Compare with <select id="base"><option value="">nothing: this profile alone</option></select></label>
     <span id="comparing"></span>
+    <span class="tally" title="pprof draws a box as wide as its share, so a small one cannot hold its name">Point at a box for its full name and share · click it to see what calls it and what it calls, at full width</span>
   </div>
   <iframe id="pprof" title="pprof"></iframe>
 `;
