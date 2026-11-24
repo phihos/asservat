@@ -98,6 +98,9 @@ type sampler struct {
 	// stopSending ends the profiler's goroutines that hand something over,
 	// stopTaking those that take it.
 	stopSending, stopTaking func()
+	// closed ends when the profiler that ran before is closed: the next
+	// one starts after that, so that two never sample at once.
+	closed chan struct{}
 	// cpus tells that the CPUs are sampled, which the first profile of CPU
 	// time turns on until the profiler stops.
 	cpus bool
@@ -313,9 +316,11 @@ func (s *sampler) halt() {
 		s.faults.Unload()
 		s.faults.release()
 	}
-	trc := s.tracer
+	trc, closed := s.tracer, make(chan struct{})
+	s.closed = closed
 	windDown(s.stopSending, s.stopTaking, func() {
 		trc.Close()
+		close(closed)
 		freeProfiler()
 	}, handedOver)
 	s.tracer, s.stopSending, s.stopTaking, s.faults, s.cpus = nil, nil, nil, nil, false
@@ -389,6 +394,9 @@ func (s *sampler) run() error {
 		if err := syscall.Mount("tracefs", tracefs, "tracefs", 0, ""); err != nil {
 			return fmt.Errorf("the kernel's tracepoints cannot be reached (mount of %s: %w)", tracefs, err)
 		}
+	}
+	if s.closed != nil {
+		<-s.closed
 	}
 	// The order in which the profiler's goroutines stop: see windDown.
 	taking, stopTaking := context.WithCancel(context.Background())
