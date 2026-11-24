@@ -44,6 +44,9 @@ spec:
             - --admin-groups={{ join "," .Values.hub.adminGroups }}
             - --retention={{ .Values.hub.retention }}
             - --work-dir=/work
+            {{- if .Values.hub.metrics.enabled }}
+            - --metrics-listen=:{{ .Values.hub.metrics.port }}
+            {{- end }}
             {{- with .Values.debuginfodURLs }}
             - --debuginfod-urls={{ join " " . }}
             {{- end }}
@@ -83,6 +86,10 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            {{- if .Values.hub.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.hub.metrics.port }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /healthz
@@ -165,6 +172,46 @@ spec:
       {{- with .Values.hub.service.nodePort }}
       nodePort: {{ . }}
       {{- end }}
+{{- if .Values.hub.metrics.enabled }}
+---
+# A Service of its own for the metrics: the hub's Service may be reachable
+# from outside the cluster, and the metrics ask for no sign-in.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-hub-metrics
+  labels:
+    {{- include "asservat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hub-metrics
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "asservat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hub
+  ports:
+    - name: metrics
+      port: {{ .Values.hub.metrics.port }}
+      targetPort: metrics
+{{- if .Values.hub.metrics.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-hub
+  labels:
+    {{- include "asservat.labels" . | nindent 4 }}
+    {{- with .Values.hub.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "asservat.labels" . | nindent 6 }}
+      app.kubernetes.io/component: hub-metrics
+  endpoints:
+    - port: metrics
+{{- end }}
+{{- end }}
 {{- if not $s3.endpoint }}
 ---
 apiVersion: v1
