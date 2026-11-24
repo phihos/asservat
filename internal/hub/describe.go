@@ -222,7 +222,8 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	err = coredesc.ExtractFiles(archive, root, files.Size)
 	archive.CloseWithError(err)
 	// An archive that the store could not hand over is not a bad archive.
-	if stored := <-read; stored != nil && !errors.Is(stored, io.ErrClosedPipe) {
+	// The store's reader is told why unpacking ended: that is not its failure.
+	if stored := <-read; stored != nil && !errors.Is(stored, io.ErrClosedPipe) && (err == nil || !errors.Is(stored, err)) {
 		return false, "", stored
 	}
 	if err != nil {

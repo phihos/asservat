@@ -343,7 +343,7 @@ EOF
   ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
   completed "$ALICE" "$id"
   pod=$(ok "$ALICE" GET "/api/captures/$id" | jq -r '.tasks[0].pod')
-  [ "$(status "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.py\"}")" = 200 ] || fail "the hub did not complete the description of a Python core: $(hub -n asservat logs deploy/asservat-hub --tail=20 2>&1)"
+  ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.py\"}" >/dev/null
   fetch "$ALICE" "$id" "$pod/core.py.analysis.json" "$WORK/core.py.analysis.json"
   # The program is in one of its functions; in about one core of a hundred the
   # interpreter is just entering the generator, whose frame then stands alone.

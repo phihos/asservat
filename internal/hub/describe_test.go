@@ -291,10 +291,13 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	if err := coredesc.WriteFiles(&files, root, coredesc.Files(begun, root)); err != nil {
 		t.Fatal(err)
 	}
+	// Of a second core the program's files are no archive.
+	const bad = "api-1/core.bad"
 	for _, file := range []struct {
 		name    string
 		content []byte
-	}{{name, []byte("synthetic core")}, {name + coredesc.Suffix, begun}, {name + coredesc.FilesSuffix, files.Bytes()}} {
+	}{{name, []byte("synthetic core")}, {name + coredesc.Suffix, begun}, {name + coredesc.FilesSuffix, files.Bytes()},
+		{bad, []byte("synthetic core")}, {bad + coredesc.Suffix, begun}, {bad + coredesc.FilesSuffix, bytes.Repeat([]byte("no archive "), 100)}} {
 		req, _ := http.NewRequest("PUT", server.URL+"/agent/captures/"+c.ID+"/artifacts/"+file.name, bytes.NewReader(file.content))
 		req.Header.Set("Authorization", "Bearer "+joined.Token)
 		res, err := http.DefaultClient.Do(req)
@@ -330,5 +333,10 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	}
 	if left, _ := os.ReadDir(h.WorkDir); len(left) != 0 {
 		t.Fatal("left in the work directory:", left)
+	}
+	// Files that are no archive are the core's fault, not the hub's: who
+	// opens it is shown the description as it is.
+	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, bad); result.err != nil || result.described || result.reason == "" {
+		t.Fatalf("a core with files that are no archive: %+v", result)
 	}
 }
