@@ -1,30 +1,27 @@
 // The log viewer follows the log panels of Lens and the Kubernetes
-// dashboard: a dark terminal with timestamps, search and a wrapped view of
-// the selected line.
+// dashboard: lines with their timestamps, search and a wrapped view of the
+// selected line.
 import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
-  <div class="logbar">
+  <div class="narrow">
     <input id="search" type="search" placeholder="Search … text, or /regular expression/" autocomplete="off" spellcheck="false">
     <button id="up" title="Previous match (Shift+Enter)">▲</button>
     <button id="down" title="Next match (Enter)">▼</button>
     <span id="found"></span>
     <label><input type="checkbox" id="only"> Only matching lines</label>
     <label><input type="checkbox" id="stamps" checked> Timestamps</label>
-    <span class="grow"></span>
-    <span id="span"></span>
+    <span id="span" class="tally"></span>
   </div>
   <div id="log" tabindex="0"><div id="lines"></div></div>
-  <pre id="line" hidden></pre>
+  <pre id="line" class="drawer" hidden></pre>
   <div id="note" hidden></div>
 `;
 // The kubelet puts an RFC 3339 timestamp in front of every line.
 const stamp = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)) /;
 const levels = [[/\b(error|fatal|panic|critical|exception)\b/i, 'error'], [/\bwarn(ing)?\b/i, 'warn'], [/\b(debug|trace)\b/i, 'debug']];
-const rowHeight = 18;
+const rowHeight = 20;
 
-// Dark in either theme, as a terminal is.
-export const dark = true;
 export default async function (root) {
   const {text, truncated} = await loadText();
   const lines = text.split('\n');
@@ -39,6 +36,8 @@ export default async function (root) {
   const marked = s => {
     if (!pattern) return esc(s);
     let out = '', last = 0;
+    // From the line's start: the search left the pattern where its last test ended.
+    pattern.lastIndex = 0;
     for (const m of s.matchAll(pattern)) {
       if (!m[0]) continue;
       out += esc(s.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>'; last = m.index + m[0].length;

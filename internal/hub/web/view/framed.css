@@ -1,12 +1,18 @@
-/* Asservat's type on the pages that a tool draws itself inside a viewer:
-   pprof and Go's trace tool. The hub adds this sheet to their pages. Their
-   layout and colours stay, and they are light in either theme, so the one
-   colour set here, a link's, is written out. */
+/* Asservat's type and frame on the pages that a tool draws itself inside a
+   viewer: pprof and Go's trace tool. The hub adds this sheet to their pages.
+   The tools colour their own graphs and are light in either theme, so the
+   colours here are written out, not taken from the theme. */
 :root { color-scheme: light; scrollbar-color: auto; }
+body { background: #FFFFFF; color: #14181A; }
 body, input, button, select, .menu-item, .header input, .boxtext { font-family: var(--text) !important; }
 code, pre, tt, textarea.code, #toptable td, .ctrl { font-family: var(--mono) !important; }
 h1, h2 { font-family: var(--display); text-transform: uppercase; letter-spacing: .02em; }
 a { color: #174A96; }
-/* pprof's bar: its name as a heading of ours. */
-.header { background-color: #E4E7E2; }
-.header .title h1 { font: 700 22px/1 var(--display); letter-spacing: .04em; margin-bottom: 0; }
+/* pprof's bar as a row of a viewer: its name and menus in the capitals of the views. */
+.header { min-height: 40px; padding: 0 16px !important; background-color: #E4E7E2 !important; border-bottom: 1px solid #C9CEC8; }
+.header .title h1 { margin: 0 12px 0 0; font: 700 20px/1 var(--display); letter-spacing: .04em; }
+.header .menu-name, .header .menu-item { font-size: 13px; }
+.header .menu-name { font: 600 15px/1 var(--display) !important; text-transform: uppercase; letter-spacing: .05em; color: #4A5357; }
+.header input { height: 28px; border: 1px solid #C9CEC8 !important; border-radius: 0 !important; font: 12px var(--mono) !important; }
+.submenu { border-radius: 0 !important; border: 1px solid #C9CEC8 !important; box-shadow: none !important; }
+#toptable th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #4A5357; }

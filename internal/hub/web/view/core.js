@@ -10,9 +10,9 @@ const markup = `
   <div id="stopped"></div>
   <div id="debugger">
     <div id="side">
-      <h4><span id="kinds">Threads</span> <input id="find" type="search" placeholder="Search" autocomplete="off" spellcheck="false"></h4>
+      <h4 class="cols"><span id="kinds">Threads</span> <input id="find" type="search" placeholder="Search" autocomplete="off" spellcheck="false"></h4>
       <div id="threads" tabindex="0"></div>
-      <h4>Call stack</h4>
+      <h4 class="cols">Call stack</h4>
       <div id="stack" tabindex="0"></div>
     </div>
     <div id="main">
@@ -28,8 +28,6 @@ const base = path => path.split('/').pop();
 const where = f => f.file ? `${base(f.file)}:${f.line}` : f.module ? base(f.module) : '';
 const named = f => f.function || f.pc || '??';
 
-// Dark in either theme, as a debugger is.
-export const dark = true;
 export default async function (root) {
   // A description from an older Asservat is made anew by the hub, from the
   // core and the program's files that the capture holds, before it shows.

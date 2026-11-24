@@ -1,15 +1,14 @@
 /* The viewer for goroutine and thread dumps: stacks on the left, the selected one on the right. */
-.narrow #shown { color: var(--quiet); font: 12px var(--mono); }
 #split { flex: 1; display: flex; min-height: 0; background: var(--surface); }
-#groups { flex: 0 0 46%; overflow: auto; border-right: 1px solid var(--line); outline: none; }
-.g { display: grid; grid-template-columns: 56px 150px 1fr auto; gap: 8px; padding: 3px 10px; border-bottom: 1px solid var(--soft); cursor: default; white-space: nowrap; }
+#groups { flex: 0 0 min(640px, 46%); overflow: auto; border-right: 1px solid var(--line); outline: none; }
+.g { display: grid; grid-template-columns: 44px 150px 1fr auto; gap: 12px; align-items: baseline; padding: 0 16px; line-height: 22px; border-bottom: 1px solid var(--soft); cursor: default; white-space: nowrap; }
 .g span { overflow: hidden; text-overflow: ellipsis; }
-.g .n { text-align: right; font: 700 16px/1.2 var(--display); }
-.g .state { color: var(--custody-ink); }
-.g .top { font: 12px/1.6 var(--mono); }
-.g .who { color: var(--quiet); font: 12px/1.6 var(--mono); }
+.g .n { text-align: right; font: 700 15px/22px var(--display); }
+.g .state { color: var(--quiet); font: 600 14px/22px var(--display); text-transform: uppercase; letter-spacing: .05em; }
+.g .top { font: 12px/22px var(--mono); }
+.g .who { color: var(--quiet); font: 12px/22px var(--mono); }
 .g:hover { background: var(--soft); }
 .g.selected { background: var(--marker); color: var(--on-marker); }
 .g.selected span { color: var(--on-marker); }
-#stack { flex: 1; margin: 0; padding: 10px 14px; overflow: auto; font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-word; tab-size: 4; }
-p.muted { padding: 10px; }
+#stack { flex: 1; margin: 0; padding: 14px 16px; overflow: auto; font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-word; tab-size: 4; }
+p.muted { padding: 10px 16px; }

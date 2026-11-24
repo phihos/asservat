@@ -8,7 +8,7 @@ const markup = `
     <input id="text" type="search" placeholder="Search in names and stacks" autocomplete="off" spellcheck="false">
     <label>State <select id="state"></select></label>
     <label><input type="checkbox" id="group" checked> Same stacks together</label>
-    <span class="grow"></span><span id="shown"></span>
+    <span id="shown" class="tally"></span>
   </div>
   <div id="split"><div id="groups" tabindex="0"></div><pre id="stack"></pre></div>
   <div id="note" hidden></div>

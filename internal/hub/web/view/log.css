@@ -1,24 +1,17 @@
-/* The log viewer: a dark terminal, as the log panels of Lens and the
-   Kubernetes dashboard are, in Asservat's ink in either theme. */
-.logbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; }
-.logbar input[type=search] { width: min(420px, 40vw); height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--ground); font-family: var(--mono); }
-.logbar input.bad { border-color: var(--bad); }
-.logbar button { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--soft); cursor: pointer; }
-.logbar label { display: flex; gap: 4px; align-items: center; }
-.logbar input[type=checkbox] { accent-color: var(--marker); }
-.logbar .grow { flex: 1; }
-.logbar #found { min-width: 110px; color: var(--quiet); font-family: var(--mono); font-size: 12px; }
-.logbar #span { color: var(--quiet); overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 12px; }
-#log { flex: 1; min-height: 0; overflow: auto; font: 12px/18px var(--mono); outline: none; }
+/* The log viewer: numbered lines with their timestamps, as the log panels
+   of Lens and the Kubernetes dashboard have them. */
+.narrow #up, .narrow #down { width: 28px; padding: 0; }
+.narrow #found { min-width: 110px; color: var(--quiet); font: 12px var(--mono); }
+#log { flex: 1; min-height: 0; overflow: auto; font: 12px/20px var(--mono); outline: none; }
 #lines { position: relative; min-width: 100%; }
-.l { position: absolute; left: 0; min-width: 100%; height: 18px; padding-right: 16px; white-space: pre; cursor: default; }
+.l { position: absolute; left: 0; min-width: 100%; height: 20px; padding-right: 16px; white-space: pre; cursor: default; }
 .l:hover { background: var(--soft); }
-.l.selected { background: var(--line); box-shadow: inset 4px 0 0 var(--marker); }
-.l.current { outline: 1px solid var(--marker); outline-offset: -1px; }
-.l .no { display: inline-block; width: 64px; padding-right: 12px; text-align: right; color: #7C868A; user-select: none; }
+.l .no { display: inline-block; width: 68px; padding-right: 12px; text-align: right; color: var(--quiet); user-select: none; }
 .l .ts { color: var(--quiet); }
 .l.error { color: var(--bad); }
-.l.warn { color: var(--marker); }
+.l.warn { color: var(--warn); }
 .l.debug { color: var(--quiet); }
 .l mark { background: var(--marker); color: var(--on-marker); }
-#line { flex: none; max-height: 35%; margin: 0; padding: 8px 12px; overflow: auto; border-top: 2px solid var(--marker); background: var(--surface); font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
+.l.current { outline: 1px solid var(--ink); outline-offset: -1px; }
+.l.selected, .l.selected .no, .l.selected .ts { background: var(--marker); color: var(--on-marker); }
+.l.selected mark { background: var(--on-marker); color: var(--marker); }
