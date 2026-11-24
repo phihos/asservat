@@ -141,13 +141,16 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 // are read with a tool of their own. Where the tool is not installed, as
 // in the agent's image, or fails, the description says that it awaits them.
 func (d Describer) runtimes(ctx context.Context, report []byte, core, root string) []byte {
-	for runtime, describe := range map[string]func(context.Context, []byte, string, string) ([]byte, error){runtimePython: d.describePython, runtimeDotnet: d.describeDotnet} {
-		with, err := describe(ctx, report, core, root)
+	for _, runtime := range []struct {
+		name     string
+		describe func(context.Context, []byte, string, string) ([]byte, error)
+	}{{runtimePython, d.describePython}, {runtimeDotnet, d.describeDotnet}} {
+		with, err := runtime.describe(ctx, report, core, root)
 		if err != nil {
 			// What the tool failed at this time it may read another time:
 			// the stacks stay awaited.
-			slog.Warn("a runtime's stacks not described", "runtime", runtime, "core", core, "error", err)
-			if with, err = await(report, runtime); err != nil {
+			slog.Warn("a runtime's stacks not described", "runtime", runtime.name, "core", core, "error", err)
+			if with, err = await(report, runtime.name); err != nil {
 				continue
 			}
 		}
@@ -182,6 +185,9 @@ func await(report []byte, runtime string) ([]byte, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(report, &fields); err != nil {
 		return nil, err
+	}
+	if slices.Contains(Awaits(report), runtime) {
+		return report, nil
 	}
 	awaited, err := json.Marshal(append(Awaits(report), runtime))
 	if err != nil {
