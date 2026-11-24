@@ -679,10 +679,10 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   # The core of a process outside of watched pods, here one of the node
   # itself, goes to the handler that the machine had before, with the
   # values that its pattern asks the kernel for: the signal and the program.
-  docker exec "$EDGE-control-plane" sh -c 'sleep 60 & kill -SEGV $!'
+  docker exec "$EDGE-control-plane" sh -c 'kill -SEGV $$' || true
   for _ in $(seq 20); do sudo test -s "$SPOOL/passed-on" && break; sleep 0.5; done
   read -r signal program size < <(sudo cat "$SPOOL/passed-on") || true
-  [ "${signal:-}" = 11 ] && [ "$program" = sleep ] && [ "$size" -gt 1000 ] || fail "the core of an unwatched process was not passed on to the machine's handler: ${signal:-} ${program:-} ${size:-}; $(sudo cat "$SPOOL/last-core" 2>&1)"
+  [ "${signal:-}" = 11 ] && [ "$program" = sh ] && [ "$size" -gt 1000 ] || fail "the core of an unwatched process was not passed on to the machine's handler: ${signal:-} ${program:-} ${size:-}; $(sudo cat "$SPOOL/last-core" 2>&1)"
 fi
 
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')

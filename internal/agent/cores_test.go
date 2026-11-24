@@ -313,6 +313,14 @@ func TestHandlerPassesOtherCoresOnToTheNodesHandler(t *testing.T) {
 			t.Fatalf("process %s: %q, %v; the node's handler got %s and %q", pid, outcome, err, arguments, core)
 		}
 	}
+	// A process that is gone before the handler reads its pod is of no
+	// watched pod as far as anyone can tell.
+	if outcome, err := spool.Handle(proc, "300", "1700000000", strings.NewReader("core of a process that is gone"), "7", "", "!bin!gone"); err != nil || !strings.Contains(outcome, "passed on") {
+		t.Fatal(outcome, err)
+	}
+	if _, core := passed(); core != "core of a process that is gone" {
+		t.Fatalf("the node's handler got %q of a process that is gone", core)
+	}
 	os.WriteFile(spool.marker(uid, "watch-1"), nil, 0o600)
 	if outcome, err := spool.Handle(proc, "100", "1700000000", strings.NewReader("core of a watched pod"), "7", "", "!usr!bin!shop"); err != nil || !strings.Contains(outcome, "kept") {
 		t.Fatal(outcome, err)

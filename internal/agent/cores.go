@@ -181,7 +181,7 @@ const minFreePercent = 10
 func (s CoreSpool) Handle(proc, pid, at string, core io.Reader, values ...string) (outcome string, err error) {
 	cgroup, err := os.ReadFile(filepath.Join(proc, pid, "cgroup"))
 	if err != nil {
-		return "", err
+		return s.passOn("the process was gone before its pod was read ("+err.Error()+")", core, values), nil
 	}
 	podUID, container := cgroupPod(string(cgroup))
 	if podUID == "" {
