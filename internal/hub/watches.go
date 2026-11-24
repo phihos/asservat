@@ -30,14 +30,14 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 		return api.Watch{}, errStatus{http.StatusBadRequest, err.Error()}
 	}
 	if in.When.Kind == api.OnAlert && h.AlertToken == "" {
-		return api.Watch{}, errStatus{http.StatusBadRequest, "this hub accepts no alerts: it has no alert token (hub.alertToken in its Helm values) for Alertmanager to present"}
+		return api.Watch{}, errStatus{http.StatusBadRequest, "this hub does not accept alerts: no alert token is configured (hub.alertToken in its Helm values)"}
 	}
 	if dump := in.Recording(api.KindCoredump); dump != nil && dump.Params["process"] != "" && in.When.Crash() {
-		return api.Watch{}, errStatus{http.StatusBadRequest, "a core dump watch for crashes records whichever process crashes; it takes no process"}
+		return api.Watch{}, errStatus{http.StatusBadRequest, "a crash watch records whichever process crashes, so it does not take a process"}
 	}
 	// Both attach to the process, which only one can do at a time.
 	if trace := in.Recording(api.KindStrace); trace != nil && trace.Buffers() && in.Recording(api.KindCoredump) != nil && !in.When.Crash() {
-		return api.Watch{}, errStatus{http.StatusBadRequest, "a trace of system calls that is kept running holds the process: the watch cannot take a core dump of it as well"}
+		return api.Watch{}, errStatus{http.StatusBadRequest, "a system call trace that runs while the watch waits holds the process, so the watch cannot also take a core dump of it"}
 	}
 	if in.Count < 0 || in.BeforeSeconds < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count and beforeSeconds must not be negative"}

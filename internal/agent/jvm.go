@@ -111,7 +111,7 @@ func findJVM(proc string, pid int) (jvm, error) {
 	}
 	switch {
 	case openj9:
-		return jvm{}, notAskable{errors.New("it runs an OpenJ9 JVM, which Asservat cannot ask: only HotSpot")}
+		return jvm{}, notAskable{errors.New("it runs an OpenJ9 JVM, and Asservat can only query HotSpot JVMs")}
 	case !hotspot:
 		return jvm{}, errNoJVM
 	}
@@ -451,7 +451,7 @@ func (c attacher) socket() (*os.File, error) {
 	f := os.NewFile(uintptr(fd), "socket")
 	if info, err := f.Stat(); err != nil || info.Mode()&os.ModeSocket == 0 {
 		f.Close()
-		return nil, errors.New("the JVM's attach socket is no socket")
+		return nil, errors.New("the JVM's attach socket path is not a socket")
 	}
 	return f, nil
 }
