@@ -65,4 +65,13 @@ func TestRuntimeStacksAwaitADescriberWithTheirTool(t *testing.T) {
 	if len(Awaits(report)) != 0 || completed.Describer != 8 || len(completed.RuntimeStacks) != 1 || completed.RuntimeStacks[0].Runtime != "python" || completed.RuntimeStacks[0].Threads[0].Frames[0].Function != "handle_order" {
 		t.Fatalf("completed: %s", report)
 	}
+	// A tool that fails leaves the stacks awaited, for another try.
+	broken := with
+	broken.PystackPython = filepath.Join(tools, "broken")
+	if err := os.WriteFile(broken.PystackPython, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if left := broken.Complete(ctx, without.runtimes(ctx, described(python), "core", root), "core", root); !slices.Equal(Awaits(left), []string{"python"}) {
+		t.Errorf("after the tool failed: %s", left)
+	}
 }

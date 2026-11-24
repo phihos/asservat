@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -240,6 +241,17 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	}
 	if err != nil {
 		return false, "", undescribable{err}
+	}
+	// A tool that failed leaves its runtime's stacks awaited. It is not run
+	// for this core again until the hub starts anew: what it failed at, as
+	// a server that does not answer, may have passed by then.
+	if describer.Completes(report) {
+		h.mu.Lock()
+		h.undescribed[key] = true
+		h.mu.Unlock()
+		if begun != nil && slices.Equal(coredesc.Awaits(report), coredesc.Awaits(begun)) {
+			return false, "this Asservat could not read the program's own stacks from the core", nil
+		}
 	}
 	a, err := h.keep(ctx, name+coredesc.Suffix, bytes.NewReader(report))
 	if err != nil {

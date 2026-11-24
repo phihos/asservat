@@ -242,14 +242,19 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 }
 
 // Stands in for the Python that has pystack, which the hub's image has.
+// It notes each run, and fails while a file says that it is broken.
 const pystackStandIn = `#!/bin/sh
+echo run >>$0.runs
+[ -e $0.broken ] && exit 1
 echo '{"runtime":"python","title":"Python threads","version":"3.12.1","threads":[{"id":1,"threadSystemId":1,"frames":[{"function":"handle_order","line":7}]}]}'
 `
 
 // An agent describes the core of a Python program without the Python
 // stacks, which its image has no tool for, and says so. When the program's
 // files have arrived, the last of a core's files, the hub adds the stacks
-// to the description, with nobody opening the core.
+// to the description, with nobody opening the core. Where its tool fails,
+// the description goes on awaiting them, and the hub tries once more after
+// it has started anew.
 func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	dsn := os.Getenv("ASSERVAT_TEST_DSN")
 	if dsn == "" {
@@ -338,5 +343,51 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	}
 	if left, _ := os.ReadDir(h.WorkDir); len(left) != 0 {
 		t.Fatal("left in the work directory:", left)
+	}
+
+	// The tool fails on a third core: its description awaits the stacks as
+	// before, who opens it is told so, and the tool is not run for it again.
+	const later = "api-1/core.later"
+	runs := func() int {
+		b, _ := os.ReadFile(h.pystack + ".runs")
+		return strings.Count(string(b), "run")
+	}
+	before := runs()
+	os.WriteFile(h.pystack+".broken", nil, 0o600)
+	add := func(name string, content []byte) {
+		a, err := h.keep(ctx, name, bytes.NewReader(content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if added, err := store.AddArtifact(ctx, c.ID, a); err != nil || !added {
+			t.Fatal(added, err)
+		}
+	}
+	add(later, []byte("synthetic core"))
+	add(later+coredesc.Suffix, begun)
+	add(later+coredesc.FilesSuffix, files.Bytes())
+	for range 2 {
+		if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, later); result.err != nil || result.described || result.reason == "" {
+			t.Fatalf("a core that the tool fails on: %+v", result)
+		}
+	}
+	described, err := store.Artifact(ctx, c.ID, later+coredesc.Suffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report.Reset()
+	if err := h.plain(ctx, described, &report); err != nil {
+		t.Fatal(err)
+	}
+	if left := coredesc.Awaits(report.Bytes()); len(left) != 1 || runs() != before+1 {
+		t.Fatalf("after the tool failed the description awaits %v, and the tool ran %d times", left, runs()-before)
+	}
+	// A hub that starts anew, here with the tool mended, tries once more.
+	os.Remove(h.pystack + ".broken")
+	h.mu.Lock()
+	h.undescribed = map[string]bool{}
+	h.mu.Unlock()
+	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, later); result.err != nil || !result.described {
+		t.Fatalf("after the hub started anew: %+v", result)
 	}
 }

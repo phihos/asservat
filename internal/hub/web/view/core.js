@@ -67,6 +67,7 @@ export default async function (root) {
     ${Object.values(runtimes).map(r => r.version ? `<span class="dim">${esc({python: 'Python', dotnet: '.NET'}[r.runtime] || r.runtime)} ${esc(r.version)}</span>` : '').join('')}
     ${kept && !(report.describer > 1) ? `<span class="warn" title="${esc(kept)}">described by an older Asservat, which may show less; a new dump is described in full</span>` : ''}
     ${report.withoutDebugInfo ? '<span class="dim" title="The program was built without debug information. Functions, files and lines are from the line table that every Go program carries; variables cannot be shown.">no debug information: functions and lines, no variables</span>' : ''}
+    ${(report.awaits || []).length ? `<span class="warn">The ${esc(report.awaits.map(r => ({python: 'Python', dotnet: '.NET'})[r] || r).join(' and '))} stacks of the program could not be read from this core: the machine's threads show the runtime, not the program.</span>` : ''}
     ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
 
   const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
