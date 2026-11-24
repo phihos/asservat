@@ -598,10 +598,13 @@ copy, as Btrfs, for the 100 MiB only. Described without
 managed stacks are: a runtime that Microsoft's server does not have, as
 those that distributions build from source; a program that maps no
 `libcoreclr.so` because it carries the runtime in its executable
-(NativeAOT, single-file programs); a runtime built for musl, as in
-Alpine images, whose helper library does not load in Asservat's image; a core of another processor than the
+(NativeAOT, single-file programs); a core of another processor than the
 hub's, whose helper is another file; and every .NET
-core where no server may be asked.
+core where no server may be asked. The helper of a runtime that was built for musl, as in Alpine
+images, loads only into a tool that itself runs on musl: the hub's image
+has the tool's runtime a second time for that, built for musl (under
+`/opt/asservat-dotnet-musl`, about 85 MB), and the describer runs that one
+when the helper asks for musl's C library.
 
 gdb walks a stack by the unwind tables of the functions on it. musl, the C
 library of Alpine images, carries none, and no frame pointers: a thread

@@ -583,3 +583,27 @@ func TestDotnetStacksOfACore(t *testing.T) {
 		}
 	}
 }
+
+// A helper library that was built for musl is told by the C library that
+// it asks for: it loads only into the tool that runs on musl.
+func TestHelperForMuslIsTold(t *testing.T) {
+	if _, err := exec.LookPath("gcc"); err != nil {
+		t.Skip("gcc is not installed")
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "empty.c"), []byte("int helper;\n"), 0o644)
+	build := func(args ...string) {
+		cmd := exec.Command("gcc", append([]string{"-shared", "-nostdlib", "-fPIC"}, args...)...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Skipf("gcc cannot build the test libraries here: %v: %s", err, out)
+		}
+	}
+	// A library that stands for musl's C library, by its name.
+	build("-Wl,-soname,libc.musl-x86_64.so.1", "-o", "libc.musl-x86_64.so.1", "empty.c")
+	build("-o", "for-musl.so", "empty.c", "-L.", "-l:libc.musl-x86_64.so.1")
+	build("-o", "for-glibc.so", "empty.c")
+	if !forMusl(filepath.Join(dir, "for-musl.so")) || forMusl(filepath.Join(dir, "for-glibc.so")) || forMusl(filepath.Join(dir, "none.so")) {
+		t.Fatal("for musl:", forMusl(filepath.Join(dir, "for-musl.so")), forMusl(filepath.Join(dir, "for-glibc.so")), forMusl(filepath.Join(dir, "none.so")))
+	}
+}
