@@ -108,6 +108,9 @@ type Hub struct {
 	describing map[string]chan struct{}
 	// undescribed holds the cores that could not be described again.
 	undescribed map[string]bool
+	// completing is held while the hub completes a description that an
+	// agent sent (agents.go).
+	completing sync.Mutex
 	// pystack is the Python that has pystack, for tests; coredesc's if empty.
 	pystack  string
 	watchers map[chan string]struct{}

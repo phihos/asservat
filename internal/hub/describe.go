@@ -234,8 +234,8 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	} else {
 		report, err = describer.Describe(ctx, file.Name(), root)
 	}
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return false, "", ctx.Err() // the hub is stopping: no fault of the core
+	if ctx.Err() != nil {
+		return false, "", ctx.Err() // the hub is stopping or the time is up: no fault of the core, and nothing to store
 	}
 	if err != nil {
 		return false, "", undescribable{err}

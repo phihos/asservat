@@ -32,6 +32,7 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
   if [ $? != 0 ] && [ -n "${FORWARD:-}" ]; then
+    log "hub log"; kubectl --context "kind-$HUB" -n asservat logs deploy/asservat-hub --tail=30 2>&1 || true
     for c in "$HUB" "$EDGE"; do
       log "agent log of $c"; kubectl --context "kind-$c" -n asservat logs ds/asservat-agent --tail=30 2>&1 || true
     done
