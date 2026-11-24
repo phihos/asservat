@@ -37,6 +37,12 @@ func Files(report []byte, root string) []string {
 	add := func(name string) {
 		// A mapping of a file that was deleted is named with that word.
 		name = strings.TrimSuffix(name, " (deleted)")
+		// A name through another directory, as /usr/local/bin/../lib/x, is
+		// no path of an archive: the file is kept at the path that the
+		// name leads to, where the name finds it once unpacked.
+		if strings.HasPrefix(name, "/") && name != pathpkg.Clean(name) {
+			name, _ = resolve(root, name)
+		}
 		if !strings.HasPrefix(name, "/") || seen[name] {
 			return
 		}

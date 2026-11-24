@@ -240,3 +240,103 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 		t.Fatal("left in the work directory:", left)
 	}
 }
+
+// Stands in for the Python that has pystack, which the hub's image has.
+const pystackStandIn = `#!/bin/sh
+echo '{"runtime":"python","title":"Python threads","version":"3.12.1","threads":[{"id":1,"threadSystemId":1,"frames":[{"function":"handle_order","line":7}]}]}'
+`
+
+// An agent describes the core of a Python program without the Python
+// stacks, which its image has no tool for, and says so. When the program's
+// files have arrived, the last of a core's files, the hub adds the stacks
+// to the description, with nobody opening the core.
+func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
+	dsn := os.Getenv("ASSERVAT_TEST_DSN")
+	if dsn == "" {
+		t.Skip("ASSERVAT_TEST_DSN is not set")
+	}
+	ctx := context.Background()
+	store, err := OpenStore(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	c := api.Capture{ID: uuid.NewString(), Requester: "alice", State: api.StateRunning, ExpiresAt: time.Now().Add(time.Hour), Tasks: []api.Task{{Pod: "api-1", Node: "node-a", State: api.StateRunning}}}
+	c.Cluster, c.Namespace, c.Workload = "c"+c.ID[:8], "payments", "Deployment/api"
+	joined := Cluster{Name: c.Cluster, Token: "join-token-of-the-cluster-with-a-python-core-0123456789"}
+	h, err := New(Config{Store: store, Blobs: DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, WorkDir: t.TempDir(), Clusters: []Cluster{joined}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.pystack = filepath.Join(t.TempDir(), "python")
+	if err := os.WriteFile(h.pystack, []byte(pystackStandIn), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateCapture(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	defer h.remove(ctx, c.ID)
+	server := httptest.NewServer(h.Handler())
+	defer server.Close()
+
+	// The program's files as the agent found them, and what it said of the core.
+	const python, name = "/usr/bin/python3.12", "api-1/core.python3"
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, filepath.Dir(python)), 0o755)
+	if err := os.WriteFile(filepath.Join(root, python), []byte("\x7fELF synthetic"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	begun := []byte(`{"describer":` + strconv.Itoa(coredesc.Version) + `,"executable":"` + python + `","threads":[],"mappings":[{"file":"` + python + `"}],"awaits":["python"]}`)
+	var files bytes.Buffer
+	if err := coredesc.WriteFiles(&files, root, coredesc.Files(begun, root)); err != nil {
+		t.Fatal(err)
+	}
+	// Of a second core the program's files are no archive.
+	const bad = "api-1/core.bad"
+	for _, file := range []struct {
+		name    string
+		content []byte
+	}{{name, []byte("synthetic core")}, {name + coredesc.Suffix, begun}, {name + coredesc.FilesSuffix, files.Bytes()},
+		{bad, []byte("synthetic core")}, {bad + coredesc.Suffix, begun}, {bad + coredesc.FilesSuffix, bytes.Repeat([]byte("no archive "), 100)}} {
+		req, _ := http.NewRequest("PUT", server.URL+"/agent/captures/"+c.ID+"/artifacts/"+file.name, bytes.NewReader(file.content))
+		req.Header.Set("Authorization", "Bearer "+joined.Token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil || res.StatusCode >= 300 {
+			t.Fatal("upload", file.name, err, res)
+		}
+		res.Body.Close()
+	}
+	var report bytes.Buffer
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		described, err := store.Artifact(ctx, c.ID, name+coredesc.Suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		report.Reset()
+		if err := h.plain(ctx, described, &report); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(report.String(), "handle_order") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the hub did not add the Python stacks: %s", report.String())
+		}
+	}
+	if left := coredesc.Awaits(report.Bytes()); len(left) != 0 {
+		t.Fatal("still awaited:", left)
+	}
+	// It is complete: opening the core describes nothing again.
+	if described, _, err := h.describeAgain(ctx, c.ID, name); err != nil || described {
+		t.Fatal("described twice:", described, err)
+	}
+	// Files that are no archive are the core's fault, not the hub's: who
+	// opens it is shown the description as it is. The work directory holds
+	// nothing of either core then.
+	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, bad); result.err != nil || result.described || result.reason == "" {
+		t.Fatalf("a core with files that are no archive: %+v", result)
+	}
+	if left, _ := os.ReadDir(h.WorkDir); len(left) != 0 {
+		t.Fatal("left in the work directory:", left)
+	}
+}

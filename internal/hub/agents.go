@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/google/uuid"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/coredesc"
 )
 
 var errNoAgent = errors.New("no agent of this cluster is connected")
@@ -251,7 +253,24 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 		return err
 	}
 	h.notify(c.ID)
+	// The program's files come last of a core: with them here, the hub adds
+	// what the agent left of the description to it.
+	if core, is := strings.CutSuffix(a.Name, coredesc.FilesSuffix); is {
+		go h.complete(context.WithoutCancel(r.Context()), c.ID, core)
+	}
 	return nil
+}
+
+// complete adds to a core's description what its agent left to the hub.
+// The cores that agents send are completed one after the other: each is
+// decrypted into the work directory, which a capture of many pods would
+// otherwise fill with all of its cores at once.
+func (h *Hub) complete(ctx context.Context, capture, core string) {
+	h.completing.Lock()
+	defer h.completing.Unlock()
+	if result := <-h.renew(ctx, User{}, capture, core); result.err != nil {
+		slog.Error("core's description not completed", "capture", capture, "name", core, "error", result.err)
+	}
 }
 
 // keep stores a file's content encrypted with a key of its own and returns

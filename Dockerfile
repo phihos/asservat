@@ -16,7 +16,20 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /gotrace cmd/trace
 # (libarchive-tools) for the debug packages of distributions. The agent
 # records with tcpdump and strace.
 FROM docker.io/library/debian:stable-slim AS tools
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools python3-venv strace tcpdump && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools strace tcpdump && rm -rf /var/lib/apt/lists/*
+# The node agent's image, which every node pulls: without the hub's viewers
+# and without the tools that read the stacks of Python and .NET programs
+# from a core dump, which the hub adds to the agent's description.
+FROM tools AS agent
+COPY --from=build /asservat /usr/local/bin/
+ENTRYPOINT ["/usr/local/bin/asservat"]
+
+# The hub's image, the default: it reads packet captures for their viewer
+# with Wireshark's sharkd (tshark), whose library alone is 130 MB, pprof
+# draws its graph view with dot (graphviz), and it reads the stacks of Python
+# and .NET programs from core dumps with pystack and dotnet-dump.
+FROM tools
+RUN apt-get update && apt-get install -y --no-install-recommends graphviz python3-venv tshark && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
 # pip is only needed to install it.
 RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2 && /opt/pystack/bin/pip uninstall -y pip
@@ -43,15 +56,5 @@ RUN set -e; runtime=10.0.15; dump=10.0.750501; \
     bsdtar -xf dump.zip -C /opt/asservat-dotnet/dump --strip-components 3 --include "tools/net8.0/any/*"; \
     find /opt/asservat-dotnet/dump -mindepth 1 -maxdepth 1 -type d ! -name "linux-$arch" -exec rm -r {} +; \
     rm runtime.tar.gz dump.zip
-# The node agent's image, which every node pulls: without the hub's viewers.
-FROM tools AS agent
-COPY --from=build /asservat /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/asservat"]
-
-# The hub's image, the default: it reads packet captures for their viewer
-# with Wireshark's sharkd (tshark), whose library alone is 130 MB, and pprof
-# draws its graph view with dot (graphviz).
-FROM tools
-RUN apt-get update && apt-get install -y --no-install-recommends graphviz tshark && rm -rf /var/lib/apt/lists/*
 COPY --from=build /asservat /gotrace /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/asservat"]

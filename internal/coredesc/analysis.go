@@ -15,6 +15,7 @@ package coredesc
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 	"os/exec"
 	pathpkg "path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -132,6 +134,13 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	} else {
 		report = with
 	}
+	return d.runtimes(ctx, report, core, root), nil
+}
+
+// runtimes adds to a description the stacks of the language runtimes that
+// are read with a tool of their own. Where the tool is not installed, as
+// in the agent's image, the description says that it awaits them.
+func (d Describer) runtimes(ctx context.Context, report []byte, core, root string) []byte {
 	if with, err := d.describePython(ctx, report, core, root); err != nil {
 		slog.Warn("Python stacks not described", "core", core, "error", err)
 	} else {
@@ -142,7 +151,76 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	} else {
 		report = with
 	}
-	return report, nil
+	return report
+}
+
+// The tools that read a runtime's stacks, pystack and dotnet-dump with a
+// Python and a .NET runtime of their own, are a third of the image that
+// has them. The agent's image, which every node pulls, has not: the agent
+// describes a core with gdb and Delve, and the hub, which gets the core
+// and the program's files anyway, adds the stacks of the runtimes.
+const (
+	runtimePython = "python"
+	runtimeDotnet = "dotnet"
+)
+
+// has tells whether the tool that reads the runtime's stacks is installed.
+func (d Describer) has(runtime string) bool {
+	tool := cmp.Or(d.PystackPython, PystackPython)
+	if runtime == runtimeDotnet {
+		tool = filepath.Join(cmp.Or(d.DotnetDir, DotnetDir), "dotnet")
+	}
+	_, err := os.Stat(tool)
+	return err == nil
+}
+
+// await notes in a description that it lacks the runtime's stacks because
+// its describer had not the tool.
+func await(report []byte, runtime string) ([]byte, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(report, &fields); err != nil {
+		return nil, err
+	}
+	awaited, err := json.Marshal(append(Awaits(report), runtime))
+	if err != nil {
+		return nil, err
+	}
+	fields["awaits"] = awaited
+	return json.Marshal(fields)
+}
+
+// Awaits lists the runtimes whose stacks a description lacks because its
+// describer had not their tool.
+func Awaits(report []byte) []string {
+	var fields struct{ Awaits []string }
+	json.Unmarshal(report, &fields)
+	return fields.Awaits
+}
+
+// Completes tells whether this describer has the tool of a runtime that
+// the description awaits.
+func (d Describer) Completes(report []byte) bool {
+	return slices.ContainsFunc(Awaits(report), d.has)
+}
+
+// Complete adds the stacks of the runtimes that a description awaits, as
+// far as this describer has their tools, from the core and the program's
+// files under root. What a tool fails at is logged and not awaited again,
+// as when the first describer has the tool.
+func (d Describer) Complete(ctx context.Context, report []byte, core, root string) []byte {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(report, &fields) != nil {
+		return report
+	}
+	delete(fields, "awaits")
+	if d.ThreadIDs == nil {
+		d.ThreadIDs = ThreadIDs(report)
+	}
+	without, err := json.Marshal(fields)
+	if err != nil {
+		return report
+	}
+	return d.runtimes(ctx, without, core, root)
 }
 
 // view makes a directory that holds, for every file that gdb looks for

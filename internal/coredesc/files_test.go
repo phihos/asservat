@@ -145,3 +145,31 @@ func TestThreadNumbersInsideTheContainer(t *testing.T) {
 		t.Fatal("a runtime's thread on the node")
 	}
 }
+
+// A program may ask for a library by a path through another directory, as
+// the Python of its official image does (/usr/local/bin/../lib/...). The
+// archive holds the file at the path it leads to, and unpacked the name
+// that was asked for leads to it.
+func TestProgramFileAskedForThroughAnotherDirectory(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{"usr/local/bin/python3.12": "\x7fELF program", "usr/local/lib/libpython3.12.so.1.0": "\x7fELF library"} {
+		os.MkdirAll(filepath.Join(root, filepath.Dir(name)), 0o755)
+		os.WriteFile(filepath.Join(root, name), []byte(content), 0o644)
+	}
+	const asked = "/usr/local/bin/../lib/libpython3.12.so.1.0"
+	files := Files([]byte(`{"mappings":[{"file":"/usr/local/bin/python3.12"},{"file":"/usr/local/lib/libpython3.12.so.1.0"}],"modules":[{"file":"`+asked+`"}]}`), root)
+	if len(files) != 2 || files[0] != "/usr/local/bin/python3.12" || files[1] != "/usr/local/lib/libpython3.12.so.1.0" {
+		t.Fatal(files)
+	}
+	var archive bytes.Buffer
+	if err := WriteFiles(&archive, root, files); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len())); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, asked)); string(b) != "\x7fELF library" {
+		t.Fatalf("unpacked, the name asked for leads to %q", b)
+	}
+}
