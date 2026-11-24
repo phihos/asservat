@@ -95,7 +95,9 @@ type sampler struct {
 	// during which the profiler goes on reporting.
 	running sync.Mutex
 	tracer  *tracer.Tracer
-	cancel  func()
+	// stopSending ends the profiler's goroutines that hand something over,
+	// stopTaking those that take it.
+	stopSending, stopTaking func()
 	// cpus tells that the CPUs are sampled, which the first profile of CPU
 	// time turns on until the profiler stops.
 	cpus bool
@@ -311,12 +313,35 @@ func (s *sampler) halt() {
 		s.faults.Unload()
 		s.faults.release()
 	}
-	s.cancel()
-	s.tracer.Close()
-	s.tracer, s.cancel, s.faults, s.cpus = nil, nil, nil, false
+	trc := s.tracer
+	windDown(s.stopSending, s.stopTaking, func() {
+		trc.Close()
+		freeProfiler()
+	}, handedOver)
+	s.tracer, s.stopSending, s.stopTaking, s.faults, s.cpus = nil, nil, nil, nil, false
 	s.mu.Lock()
 	s.binaries = nil
 	s.mu.Unlock()
+}
+
+// windDown stops the profiler without waiting for it. Its goroutines hand
+// traces and processes to one another and wait for each to be taken,
+// without looking whether the profiler has stopped: one whose taker went
+// first waits forever and keeps the profiler's programs and maps in the
+// kernel. So those that hand over are stopped first, and those that take
+// after quiet, in which the former finish what they were handing over;
+// nothing tells when they have. Then the profiler is closed.
+func windDown(stopSending, stopTaking, closed func(), quiet time.Duration) {
+	stopSending()
+	go func() {
+		time.Sleep(quiet)
+		stopTaking()
+		closed()
+	}()
+}
+
+// freeProfiler gives back what a closed profiler held.
+func freeProfiler() {
 	// The profiler's Close leaves its programs and maps in the kernel, some
 	// hundred megabytes that count as the agent's memory: it is made for a
 	// process that ends. They go when the garbage collector finds their
@@ -326,39 +351,31 @@ func (s *sampler) halt() {
 	// that it stopped, some at once and some at their interval of 5 seconds,
 	// and no event tells when the last has: the collector runs after 1, 7
 	// and 19 seconds.
-	go func() {
-		for _, wait := range []time.Duration{time.Second, 6 * time.Second, 12 * time.Second} {
-			time.Sleep(wait)
-			debug.FreeOSMemory()
-		}
-	}()
+	for _, wait := range []time.Duration{time.Second, 6 * time.Second, 12 * time.Second} {
+		time.Sleep(wait)
+		debug.FreeOSMemory()
+	}
 }
 
-// readerQuiet is how long the profiler's reader hands over nothing before
-// it is taken to have ended. Within a batch it does not wait at all, so a
-// second is far beyond what a busy node delays it.
-const readerQuiet = time.Second
+// handedOver is how long the profiler's goroutines that hand something
+// over are given to finish it, once they are told to stop. They do not wait
+// while they do, and what they hand over is then only dropped, so a second
+// is far beyond what a busy node delays them.
+const handedOver = time.Second
 
-// handOver passes on the traces that the profiler's reader hands over
-// until ctx ends. The reader hands over a batch without looking whether ctx
-// has ended and waits for each trace to be taken: left waiting it would
-// never end, and keep the profiler's programs and maps in the kernel, some
-// hundred megabytes with every sampling. So the rest of its batch is taken
-// and dropped. Nothing tells when the reader has ended, only that it hands
-// over nothing more: after quiet without a trace handOver returns.
-func handOver[T any](ctx context.Context, traces <-chan T, handle func(T), quiet time.Duration) {
+// handOver passes on the traces that the profiler's reader hands over. The
+// reader hands over a batch without looking whether it was told to stop:
+// from then on (sending) the rest is taken and dropped, until those that
+// take stop too (taking).
+func handOver[T any](sending, taking context.Context, traces <-chan T, handle func(T)) {
 	for {
 		select {
 		case trace := <-traces:
-			handle(trace)
-		case <-ctx.Done():
-			for {
-				select {
-				case <-traces:
-				case <-time.After(quiet):
-					return
-				}
+			if sending.Err() == nil {
+				handle(trace)
 			}
+		case <-taking.Done():
+			return
 		}
 	}
 }
@@ -373,11 +390,14 @@ func (s *sampler) run() error {
 			return fmt.Errorf("the kernel's tracepoints cannot be reached (mount of %s: %w)", tracefs, err)
 		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	times.StartRealtimeSync(ctx, 0)
+	// The order in which the profiler's goroutines stop: see windDown.
+	taking, stopTaking := context.WithCancel(context.Background())
+	sending, stopSending := context.WithCancel(taking)
+	cancel := func() { stopSending(); stopTaking() }
+	times.StartRealtimeSync(taking, 0)
 	// The intervals at which the profiler looks after its own state: its defaults.
 	intervals := times.New(5*time.Second, 5*time.Second, time.Minute)
-	trc, err := tracer.NewTracer(ctx, &tracer.Config{
+	trc, err := tracer.NewTracer(taking, &tracer.Config{
 		TraceReporter:          s,
 		ExecutableReporter:     s,
 		Intervals:              intervals,
@@ -397,7 +417,7 @@ func (s *sampler) run() error {
 		cancel()
 		return fmt.Errorf("the node's kernel does not let the profiler load its programs: %w", err)
 	}
-	trc.StartPIDEventProcessor(ctx)
+	trc.StartPIDEventProcessor(taking)
 	traces := make(chan *libpf.EbpfTrace)
 	for _, step := range []struct {
 		what string
@@ -405,7 +425,7 @@ func (s *sampler) run() error {
 	}{
 		{"sample the CPUs", func() error { return trc.AttachTracer(nil) }},
 		{"follow ending processes", trc.AttachSchedMonitor},
-		{"hand over its samples", func() error { return trc.StartMapMonitors(ctx, traces) }},
+		{"hand over its samples", func() error { return trc.StartMapMonitors(sending, traces) }},
 	} {
 		if err := step.do(); err != nil {
 			cancel()
@@ -413,12 +433,12 @@ func (s *sampler) run() error {
 			return fmt.Errorf("the node's kernel does not let the profiler %s: %w", step.what, err)
 		}
 	}
-	go handOver(ctx, traces, func(trace *libpf.EbpfTrace) {
+	go handOver(sending, taking, traces, func(trace *libpf.EbpfTrace) {
 		if trace != nil {
 			trc.HandleTrace(trace)
 		}
-	}, readerQuiet)
-	s.tracer, s.cancel = trc, cancel
+	})
+	s.tracer, s.stopSending, s.stopTaking = trc, stopSending, stopTaking
 	return nil
 }
 
