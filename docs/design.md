@@ -473,7 +473,7 @@ shows what the tool would show.
 | File | Viewer | Read by |
 | --- | --- | --- |
 | Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details and bytes side by side or stacked, follow stream; conversations, endpoints, protocol hierarchy and expert information, whose rows filter the list | Wireshark's `sharkd` in the hub |
-| Logs | Like the log panels of Lens and the Kubernetes dashboard: a dark terminal with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out). The JVM's class histogram, text as well, opens in it | The browser |
+| Logs | Like the log panels of Lens and the Kubernetes dashboard: numbered lines with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out). The JVM's class histogram, text as well, opens in it | The browser |
 | Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
@@ -739,15 +739,25 @@ outlined while the capture holds no files, filled once it does. Headings,
 numbers and states are set in Barlow Condensed capitals, text in IBM Plex
 Sans, hashes, sizes and filters in IBM Plex Mono; the hub serves the fonts
 itself (`/assets/`), so the console fetches nothing from elsewhere. The
-look covers the console and the viewers. A viewer keeps what makes its
-tool familiar: the layout, and colour where it carries meaning (Wireshark's
-colouring rules and filter validity, the levels of a log, the dark ground of
-a terminal and of a debugger). Type, palette, corners, tabs and tables are
-Asservat's, and what is selected is marker yellow in every viewer. A viewer
-shows its capture's number on a marker beside the file's name. The pages
-that pprof and Go's trace tool draw themselves keep their layout and
-colours; the hub adds a stylesheet to them that sets them in Asservat's
-type.
+look covers the console and the viewers, and a viewer is the console's
+page with a file on it. Every page has the same bar, in the theme of the
+system, none dark by itself. Under the bar every viewer has the same rows:
+the views of the file with the count of what is shown at their right end,
+then what narrows the list, the search first, then the file. A list is
+rows of one height under small capital headings, as in the console's
+tables, and what is selected is marker yellow. A view that is read like a
+page, as a pod's state or a heap dump's summary, is a sheet on the ground
+as a capture is in the console's list. A viewer keeps the panes of the tool
+that people know for its kind of file (Wireshark's three, a debugger's
+threads and stack beside a frame) and every colour that tells something:
+Wireshark's colouring rules colour the packets, its display filter is
+green or red, its expert severities have their colours, a log's levels
+colour the line's text, a warning event is tinted. Colour that only
+decorated is gone. A viewer shows its capture's number on a marker beside the file's
+name. The pages that pprof and Go's trace tool draw themselves keep their
+layout and the colours of their graphs, and are light in either theme; the
+hub adds a stylesheet to them that sets them in Asservat's type and gives
+pprof's bar the look of a viewer's row.
 
 The list of captures shows one line per capture: its number, state, what
 was recorded and why, where, when and by whom. It lists the newest 50 and

@@ -10,15 +10,14 @@ const markup = `
   <div class="tabs">
     <button data-tab="overview" class="on">Overview</button><button data-tab="classes">Classes</button>
     <button data-tab="biggest">Biggest objects</button><button data-tab="threads">Threads</button>
-    <span class="grow"></span>
   </div>
   <div class="tab" id="overview"></div>
   <div class="tab" id="classes" hidden>
     <div class="narrow">
       <input id="find" type="search" placeholder="Name, or /regular expression/" autocomplete="off" spellcheck="false">
-      <span class="grow"></span><span id="shown" class="muted"></span>
+      <span id="shown" class="tally"></span>
     </div>
-    <div class="histogram head"><button data-sort="name">Class</button><button data-sort="instances">Objects</button><button data-sort="bytes" class="sorted">Size</button><span>Share of the heap</span></div>
+    <div class="histogram head cols"><button data-sort="name">Class</button><button data-sort="instances">Objects</button><button data-sort="bytes" class="sorted">Size</button><span>Share of the heap</span></div>
     <div id="scroll" tabindex="0"><div id="rows"></div></div>
   </div>
   <div class="tab" id="biggest" hidden></div>
@@ -51,11 +50,11 @@ function draw(root, heap) {
       <div><b>${size(heap.bytes)}</b><span>in objects</span></div><div><b>${number(heap.objects)}</b><span>objects</span></div>
       <div><b>${number(heap.classes.length)}</b><span>${classes} with objects${java ? `, of ${number(heap.loaded)} loaded` : ''}</span></div>${java ? `<div><b>${number(heap.threads.length)}</b><span>threads</span></div>` : ''}
     </div>
-    <h3>Largest ${classes}</h3>
+    <h2>Largest ${classes}</h2>
     ${top.map(c => `<div class="bar" title="${esc(c.name)}"><span class="name">${esc(c.name)}</span><span class="track"><i style="width:${share(c.bytes).toFixed(1)}%"></i></span><span class="value">${size(c.bytes)} · ${share(c.bytes).toFixed(1)} %</span></div>`).join('')}
-    ${java ? `<h3>GC roots</h3>
+    ${java ? `<h2>GC roots</h2>
     <table class="plain">${Object.entries(heap.roots).sort((a, b) => b[1] - a[1]).map(([kind, n]) => `<tr><td>${esc(kind)}</td><td class="n">${number(n)}</td></tr>`).join('') || '<tr><td class="muted">None recorded.</td></tr>'}</table>` : ''}
-    <h3>The dump</h3>
+    <h2>The dump</h2>
     <table class="plain">
       ${java ? `<tr><td>Written</td><td>${heap.time ? esc(new Date(heap.time).toISOString().replace('T', ' ').replace(/\.\d+Z/, ' UTC')) : 'unknown'}</td></tr>` : ''}
       <tr><td>Format</td><td>${esc(heap.format)}${java ? `, references of ${heap.idSize} bytes` : ': the objects of the heap with their types and sizes, without their contents'}</td></tr>
@@ -63,11 +62,11 @@ function draw(root, heap) {
     </table></div>`;
 
   // The histogram: every class with objects, narrowed by name and sorted by a column.
-  const rowHeight = 22;
+  const rowHeight = 22; // as the rows of every list
   let rows = heap.classes, sort = 'bytes';
   const list = virtual($('scroll'), $('rows'), rowHeight, i => {
     const c = rows[i];
-    return `<div class="histogram" style="top:${i * rowHeight}px"><span class="name" title="${esc(c.name)}">${esc(c.name)}</span><span class="n">${number(c.instances)}</span><span class="n">${size(c.bytes)}</span><span class="track"><i style="width:${share(c.bytes).toFixed(2)}%"></i><em>${share(c.bytes).toFixed(1)} %</em></span></div>`;
+    return `<div class="histogram" style="top:${i * rowHeight}px"><span class="name" title="${esc(c.name)}">${esc(c.name)}</span><span class="n">${number(c.instances)}</span><span class="n">${size(c.bytes)}</span><span class="track labelled"><i style="width:calc((100% - 58px) * ${(share(c.bytes) / 100).toFixed(4)})"></i><em>${share(c.bytes).toFixed(1)} %</em></span></div>`;
   });
   const narrow = () => {
     const typed = $('find').value.trim(), re = /^\/(.*)\/$/.exec(typed);

@@ -7,68 +7,103 @@
 <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
 <link rel="stylesheet" href="/assets/identity.css">
 <style>
-/* The page around every viewer. A viewer keeps the layout and the meaning
-   of colour of the tool that people know for its kind of file; type,
-   palette, corners and what is selected are Asservat's (identity.css).
-   The selection is marker yellow in every viewer. */
+/* The page around every viewer. It is the console's page with a file on
+   it: the same bar, type, fields, tables and marker (identity.css), in the
+   theme of the system. Under the bar every viewer has the same rows: its
+   views with the count of what is shown, then what narrows the list, then
+   the file. A list is rows of one height under small capital headings, and
+   what is selected is marker yellow. */
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { display: flex; flex-direction: column; font: 13px var(--text); color: var(--ink); background: var(--ground); }
+body { display: flex; flex-direction: column; font: 13px/1.45 var(--text); color: var(--ink); background: var(--ground); }
 button, input, select { font: inherit; color: inherit; border-radius: 0; }
-input[type=checkbox] { accent-color: var(--ink); }
+input[type=checkbox], input[type=radio] { accent-color: var(--ink); }
 :focus-visible { outline: 2px solid var(--custody); outline-offset: -2px; }
-header { display: flex; gap: 14px; align-items: center; padding: 6px 12px; background: var(--bar); color: var(--on-bar); }
-header a { color: var(--marker); text-decoration: none; }
-header a:hover { text-decoration: underline; }
-header select:hover, header button:hover { border-color: var(--on-bar-quiet); }
-header .brand img { width: 22px; height: 22px; } header .brand b { font-size: 19px; }
+[hidden] { display: none !important; }
+.muted { color: var(--quiet); }
+.grow { flex: 1; }
+/* The bar, as the console's: the mark, where one is, and the file with its ways out. */
+header { flex: none; display: flex; gap: 16px; align-items: center; min-height: 52px; padding: 0 16px; background: var(--bar); color: var(--on-bar); font-size: 14px; }
+header > * { flex: none; white-space: nowrap; }
+header nav { display: flex; align-self: stretch; }
+header nav a { display: flex; align-items: center; padding: 0 10px; border-block: 3px solid transparent; border-bottom-color: var(--marker); color: var(--on-bar); font-weight: 600; text-decoration: none; }
 /* The capture's number on its marker, as in the console's list. */
-header .number { padding: 3px 6px; background: var(--marker); color: var(--on-marker); font: 700 16px/1 var(--display); }
-header .name { font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-header select.name { font-size: 13px; max-width: 40vw; }
-header .muted { color: var(--on-bar-quiet); }
-header .grow { flex: 1; }
-/* The bar stays one line: the file's origin gives way first, and on a phone only mark, number and name remain beside the actions. */
-header > * { flex: none; white-space: nowrap; } header #origin { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; } header .name { flex: 0 1 auto; min-width: 3em; }
-@media (max-width: 700px) { header #origin, header .back, header .brand b { display: none; } }
-header select, header button { height: 24px; padding: 0 8px; border: 1px solid #4A5357; background-color: var(--bar); color: var(--on-bar); font-size: 12px; cursor: pointer; }
-#notice { margin: auto; padding: 24px; text-align: center; color: var(--quiet); max-width: 520px; }
+header .number { padding: 5px 7px; background: var(--marker); color: var(--on-marker); font: 700 20px/1 var(--display); }
+header .name { flex: 0 1 auto; min-width: 3em; font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; }
+header select.name { max-width: 34vw; }
+header #origin { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--on-bar-quiet); font-size: 13px; }
+header select, header button, header a.button { height: 32px; padding: 0 12px; border: 1px solid #4A5357; background-color: transparent; color: var(--on-bar); font-size: 13px; cursor: pointer; }
+header select option { background: var(--bar); color: var(--on-bar); }
+header select:hover, header button:hover { border-color: var(--on-bar-quiet); }
+header a.button { display: flex; align-items: center; border-color: var(--marker); background: var(--marker); color: var(--on-marker); font-weight: 600; text-decoration: none; }
+@media (max-width: 900px) { header #origin { display: none; } }
+@media (max-width: 700px) { header nav, header .brand b { display: none; } }
+#notice { margin: auto; padding: 24px; text-align: center; color: var(--quiet); max-width: 520px; font-size: 14px; }
 /* While a file is being opened, a stretch of marker yellow runs along a line. */
 #notice.opening::before { content: ""; display: block; width: 180px; height: 3px; margin: 0 auto 14px; background: linear-gradient(90deg, var(--line) 0 35%, var(--marker) 35% 65%, var(--line) 65%) 0 0 / 300% 100%; animation: opening 1.4s linear infinite; }
 @keyframes opening { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) { #notice.opening::before { animation: none; } }
-#notice button { margin-top: 12px; padding: 6px 14px; border: 0; background: var(--marker); color: var(--on-marker); font-weight: 600; cursor: pointer; }
-[hidden] { display: none !important; }
-#root { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-/* What the viewers share: tabs, the bar that narrows a list, a note under a file. */
-.tabs { display: flex; align-items: stretch; padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.tabs button { padding: 8px 14px 5px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 15px var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+#notice button { margin-top: 12px; height: 32px; padding: 0 14px; border: 0; background: var(--marker); color: var(--on-marker); font-weight: 600; cursor: pointer; }
+#root { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
+
+/* The rows under the bar. The views of a file, in the console's capitals;
+   the count of what is shown stands at their right end. */
+.tabs, .narrow { flex: none; display: flex; flex-wrap: wrap; align-items: center; min-height: 40px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs { align-items: stretch; gap: 0 4px; }
+.tabs button { padding: 3px 12px 0; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 16px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.tabs button:first-child { margin-left: -12px; }
+.tabs button:hover { color: var(--ink); }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--marker); }
-.tabs .grow { flex: 1; }
-.tab { flex: 1; min-height: 0; overflow: auto; background: var(--surface); }
-.narrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--soft); }
-.narrow input[type=search], .narrow input[type=number], .narrow select, .narrow button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background-color: var(--surface); }
-.narrow input[type=search] { width: min(340px, 40vw); font-family: var(--mono); }
-.narrow input[type=number] { width: 80px; }
+.tally { align-self: center; margin-left: auto; color: var(--quiet); font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* What narrows a list: the search first, then the choices. Fields are the console's. */
+.narrow { gap: 6px 12px; padding-block: 5px; background: var(--soft); }
+.narrow input:not([type=checkbox]), .narrow select, .narrow button { height: 28px; padding: 0 10px; border: 1px solid var(--line); background-color: var(--surface); }
+.narrow input[type=search], .narrow input[type=text], .narrow input:not([type]) { width: min(360px, 40vw); font-family: var(--mono); font-size: 12px; }
+.narrow input[type=number] { width: 84px; }
+.narrow input.bad { border-color: var(--bad); }
 .narrow button { cursor: pointer; }
-.narrow label { display: flex; gap: 5px; align-items: center; }
-.narrow .grow { flex: 1; }
-.muted { color: var(--quiet); }
-#note { padding: 6px 12px; border-top: 2px solid var(--custody); background: var(--surface); color: var(--ink); }
+.narrow button:hover:not(:disabled), .narrow select:hover, .narrow input:hover { border-color: var(--quiet); }
+.narrow button:disabled { opacity: .45; cursor: default; }
+.narrow label { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.narrow .sep { width: 1px; height: 20px; background: var(--line); }
+/* A view of a file fills what is left. */
+.tab { flex: 1; min-height: 0; overflow: auto; background: var(--surface); }
+/* A view that is read like a page: a sheet on the ground, as a capture is in the console. */
+.tab:has(> .page) { background: var(--ground); }
+.tab:has(> .page) { scrollbar-gutter: stable; }
+.page { max-width: 1100px; margin: 16px auto 40px; padding: 4px 24px 24px; background: var(--surface); border: 1px solid var(--line); }
+/* On a sheet a table begins and ends where the text does. */
+.page .grid th:first-child, .page .grid td:first-child { padding-left: 0; } .page .grid th:last-child, .page .grid td:last-child { padding-right: 0; }
+.page > .grid:first-child { margin-top: 12px; }
+.page h2, .page h3.head { margin: 24px 0 10px; font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+/* The headings of a list's columns, and of a table's. */
+.cols, .grid th, .tab th { font: 500 11px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); text-align: left; white-space: nowrap; }
+.cols { position: sticky; top: 0; z-index: 1; height: 26px; line-height: 26px; background: var(--surface); border-bottom: 1px solid var(--ink); }
+.grid { border-collapse: collapse; width: 100%; }
+.grid th { padding: 6px 12px; border-bottom: 1px solid var(--ink); }
+.grid td { padding: 5px 12px; border-bottom: 1px solid var(--soft); vertical-align: top; }
+.grid th.n, .grid td.n, .n { text-align: right; font-family: var(--mono); font-size: 12px; }
+/* A state, in the console's capitals and colours. */
+.badge { display: inline-block; font: 600 15px/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em; vertical-align: baseline; }
+.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); } .badge.done { color: var(--quiet); }
+.badge.warn { padding: 0 6px; background: var(--marker); color: var(--on-marker); }
+/* What is selected in a list, spread out under it. */
+.drawer { flex: none; max-height: 35%; margin: 0; padding: 10px 16px; overflow: auto; border-top: 2px solid var(--marker); background: var(--surface); font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-all; }
+#note { flex: none; padding: 8px 16px; border-top: 2px solid var(--custody); background: var(--surface); color: var(--ink); }
 </style>
 </head>
 <body>
 <header>
   <a class="brand" href="/#captures" title="Back to the captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a>
-  <a class="back" href="/#captures" title="Back to the captures">&larr; Captures</a>
+  <nav><a href="/#captures" title="Back to the captures">Captures</a></nav>
   <span class="number" id="number" hidden></span>
   <span class="name" id="name"></span>
   <select class="name" id="files" hidden title="Open another file of this capture"></select>
-  <span class="muted" id="origin"></span>
+  <span id="origin"></span>
   <span class="grow"></span>
   <select id="moment" hidden title="Open another file of this capture at the moment of what is selected here"></select>
   <button id="copy" title="Copy a link to this spot in the file">Copy link</button>
-  <a id="download" title="Download the file for the tools on your machine. A local copy is outside Asservat's control.">Download</a>
+  <a class="button" id="download" title="Download the file for the tools on your machine. A local copy is outside Asservat's control.">Download</a>
 </header>
 <div id="notice" class="opening">Opening the file…</div>
 <main id="root" hidden></main>
@@ -97,7 +132,6 @@ async function open() {
   style.rel = 'stylesheet'; style.href = `/view/${artifact.viewer}.css`;
   document.head.append(style);
   const viewer = await import(`/view/${artifact.viewer}.js`);
-  $('root').classList.toggle('dark', !!viewer.dark);
   await viewer.default($('root'), {capture: c, artifact});
 }
 // The file's name becomes the choice among the capture's files that have a

@@ -1,74 +1,72 @@
-/* The packet viewer follows Wireshark's main window: toolbar, display
-   filter, packet list, packet details, packet bytes, status bar. Wireshark's
-   colouring rules colour the packets, and the filter is green or red as it
-   is there; everything around that is Asservat's. */
-.toolbar { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--soft); }
-.toolbar button { min-width: 28px; height: 26px; padding: 0 6px; border: 1px solid transparent; background: none; cursor: pointer; }
-.toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--surface); }
-.toolbar button:disabled { opacity: .4; cursor: default; }
-.toolbar .sep { width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
-.toolbar .grow { flex: 1; }
-.toolbar input[type=number] { width: 90px; height: 24px; padding: 0 4px; border: 1px solid var(--line); background: var(--surface); }
-.filter { display: flex; gap: 4px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--line); background: var(--soft); }
-.filter input { flex: 1; height: 26px; padding: 0 6px; border: 1px solid var(--line); font-family: var(--mono); background: var(--surface); }
+/* The packet viewer has the panes of Wireshark's main window: display
+   filter, packet list, packet details, packet bytes, status line. Rows,
+   headings and fields are those of every viewer. Colour that tells
+   something stays Wireshark's: its colouring rules colour the packets, the
+   filter is green or red as it is there, and so are the expert severities. */
+.filter input { flex: 1; width: auto !important; }
 /* Wireshark's own greens and reds, with dark text in either theme. */
 .filter input.valid { background: #afffaf; color: #14181A; }
 .filter input.invalid { background: #ffafaf; color: #14181A; }
-.filter button { height: 26px; padding: 0 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
-.filter button:disabled { opacity: .5; cursor: default; }
+.narrow #first, .narrow #prev, .narrow #next, .narrow #last, .filter #clear, .filter #apply { width: 28px; padding: 0; }
 #panes { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .pane { min-height: 40px; overflow: auto; background: var(--surface); }
-.splitter { height: 5px; flex: none; background: var(--line); cursor: row-resize; }
+.splitter { height: 5px; flex: none; background: var(--soft); border-block: 1px solid var(--line); cursor: row-resize; }
 #list { flex: 5; position: relative; outline: none; }
 #lower { flex: 5; display: flex; flex-direction: column; min-height: 40px; }
 #details { flex: 3; padding: 2px 0; outline: none; }
 #bytes { flex: 2; display: flex; flex-direction: column; overflow: hidden; }
 #panes.beside #lower { flex-direction: row; }
 #panes.beside #lower > .pane { flex: 1; min-width: 40px; }
-#panes.beside #lower > .splitter { width: 5px; height: auto; cursor: col-resize; }
+#panes.beside #lower > .splitter { width: 5px; height: auto; border-block: 0; border-inline: 1px solid var(--line); cursor: col-resize; }
 #head, .row { display: grid; grid-template-columns: 70px 100px minmax(110px, 1.2fr) minmax(110px, 1.2fr) 80px 70px minmax(200px, 5fr); }
-#head { position: sticky; top: 0; z-index: 1; height: 22px; line-height: 22px; background: var(--soft); border-bottom: 1px solid var(--line); font-weight: 600; }
-#head span { padding: 0 6px; border-right: 1px solid var(--line); overflow: hidden; white-space: nowrap; }
+#head, .row { padding: 0 10px; font-family: var(--mono); font-size: 12px; }
+#head span { padding: 0 6px; overflow: hidden; white-space: nowrap; }
+#head span:nth-child(1), #head span:nth-child(6) { text-align: right; }
 #rows { position: relative; }
 .row { position: absolute; left: 0; right: 0; height: 20px; line-height: 20px; cursor: default; white-space: nowrap; }
 .row span { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
 .row span:nth-child(1), .row span:nth-child(6) { text-align: right; }
-.row.selected { background: var(--marker) !important; color: var(--on-marker) !important; font-weight: 600; }
+.row:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.row.selected { background: var(--marker) !important; color: var(--on-marker) !important; }
 .row.loading { color: var(--quiet); }
-.node { line-height: 19px; white-space: nowrap; cursor: default; padding-right: 8px; }
+.node { line-height: 20px; white-space: nowrap; cursor: default; padding-right: 8px; font: 12px/20px var(--mono); }
+.node:hover { background: var(--soft); }
 .node .twist { display: inline-block; width: 14px; text-align: center; color: var(--quiet); font-size: 10px; }
 .node.selected { background: var(--marker); color: var(--on-marker); }
 .node.selected .twist { color: var(--on-marker); }
 /* Wireshark's expert severities. */
 .node.Chat, #statBody td.Chat { background: #80b7f7; color: #14181A; } .node.Note, #statBody td.Note { background: #b7f774; color: #14181A; }
 .node.Warn, #statBody td.Warn { background: #f7f240; color: #14181A; } .node.Error, #statBody td.Error { background: #ff5c5c; color: #14181A; }
-#sources, #statTabs { display: flex; padding: 0 8px; background: var(--soft); border-bottom: 1px solid var(--line); }
-#sources button, #statTabs button { padding: 5px 12px 3px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); cursor: pointer; }
-#sources button.on, #statTabs button.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--marker); }
-#hex { flex: 1; overflow: auto; margin: 0; padding: 4px 8px; font: 12px/17px var(--mono); white-space: pre; }
+#sources, #statTabs { flex: none; display: flex; padding: 0 16px; border-bottom: 1px solid var(--line); }
+#sources button, #statTabs button { padding: 8px 12px 5px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 15px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+#sources button:first-child, #statTabs button:first-child { margin-left: -12px; }
+#sources button.on, #statTabs button.on { color: var(--ink); border-bottom-color: var(--marker); }
+#hex { flex: 1; overflow: auto; margin: 0; padding: 6px 16px; font: 12px/17px var(--mono); white-space: pre; }
 #hex .off { color: var(--quiet); }
 #hex b { font-weight: normal; }
 #hex b.hl { background: var(--marker); color: var(--on-marker); }
-footer { display: flex; gap: 16px; padding: 3px 10px; border-top: 1px solid var(--line); background: var(--soft); white-space: nowrap; }
-footer #field { flex: 1; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); }
+footer { flex: none; display: flex; gap: 16px; align-items: center; min-height: 28px; padding: 0 16px; border-top: 1px solid var(--line); background: var(--soft); white-space: nowrap; }
+footer #field { flex: 1; overflow: hidden; text-overflow: ellipsis; font: 12px var(--mono); }
 dialog { width: min(900px, 92vw); height: min(640px, 86vh); padding: 0; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); }
 dialog[open] { display: flex; flex-direction: column; }
 dialog::backdrop { background: #14181A99; }
-dialog h2 { margin: 0; padding: 8px 12px; font: 700 20px var(--display); text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid var(--line); }
-dialog pre { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
+dialog h2 { margin: 0; padding: 12px 16px 10px; font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; border-bottom: 1px solid var(--line); }
+dialog pre { flex: 1; margin: 0; padding: 12px 16px; overflow: auto; font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
 /* The two sides of a followed stream, red and blue as in Wireshark. */
+dialog .bar .client, dialog .bar .server { padding: 2px 6px; margin-right: 6px; }
 dialog .client { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
 dialog .server { color: var(--custody-ink); background: color-mix(in srgb, var(--custody) 10%, var(--surface)); }
-dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--soft); }
+dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--soft); }
 dialog .bar .grow { flex: 1; }
-dialog .bar button { height: 28px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+dialog .bar button { height: 32px; padding: 0 14px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+dialog .bar button:hover { border-color: var(--quiet); }
 #stat { width: min(1200px, 94vw); }
 #statBody { flex: 1; overflow: auto; padding: 0 0 8px; }
 #statBody table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-#statBody th { position: sticky; top: 0; padding: 5px 10px; background: var(--soft); border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); }
-#statBody td { padding: 2px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--soft); font: 12px var(--mono); }
+#statBody th { position: sticky; top: 0; padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--ink); text-align: right; white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); }
+#statBody td { padding: 3px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--soft); font: 12px var(--mono); }
 #statBody th:first-child, #statBody td.text { text-align: left; }
 #statBody td.none { text-align: left; color: var(--quiet); padding: 12px 10px; font-family: var(--text); }
 #statBody tr[data-filter] { cursor: pointer; }
-#statBody tr[data-filter]:hover { background: color-mix(in srgb, var(--marker) 25%, var(--surface)); }
+#statBody tr[data-filter]:hover { background: var(--soft); }
 #statNote { color: var(--quiet); }

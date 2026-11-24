@@ -19,26 +19,18 @@
   --bar: #14181A; --on-bar: #FFFFFF; --on-bar-quiet: #C9CEC8; /* the bar at the top, dark in both themes */
   --ground: #EEF0EC; --surface: #FFFFFF; --ink: #14181A; --quiet: #4A5357; --line: #C9CEC8; --soft: #E4E7E2;
   --custody: #1F5FBF; --custody-ink: #174A96;                /* waits for a person */
-  --ok: #1E6B3E; --bad: #B3261E;
+  --ok: #1E6B3E; --bad: #B3261E; --warn: #7A5C00;            /* text that warns: marker yellow does not read on a light ground */
 }
-/* The dark values: with a dark system theme, and always under .dark, which
-   the viewers that are dark in their own tools carry (a terminal, a debugger). */
+/* The dark values, with a dark system theme: on every page alike. */
 @media (prefers-color-scheme: dark) { :root {
   --bar: #0C0F10;
   --ground: #14181A; --surface: #1D2326; --ink: #EEF0EC; --quiet: #A9B2B5; --line: #3A4246; --soft: #262D30;
   --custody: #8AB6F2; --custody-ink: #A9CBF7;
-  --ok: #7FD3A0; --bad: #F28B82;
+  --ok: #7FD3A0; --bad: #F28B82; --warn: #F2C200;
 } }
-.dark {
-  color-scheme: dark;
-  --ground: #14181A; --surface: #1D2326; --ink: #EEF0EC; --quiet: #A9B2B5; --line: #3A4246; --soft: #262D30;
-  --custody: #8AB6F2; --custody-ink: #A9CBF7;
-  --ok: #7FD3A0; --bad: #F28B82;
-  background: var(--ground); color: var(--ink);
-}
 /* Scrollbars are drawn in the palette, text is selected in marker yellow,
    and a link keeps its colour once visited. */
-:root, .dark { scrollbar-color: var(--line) var(--ground); }
+:root { scrollbar-color: var(--line) var(--ground); }
 ::selection { background: var(--marker); color: var(--on-marker); }
 a { color: var(--custody-ink); }
 /* A select field is square like every other field and draws its own arrow. */

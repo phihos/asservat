@@ -4,7 +4,7 @@
 import {$, esc, capture, file, headers, openView, show, spot} from './common.js';
 
 const markup = `
-  <div id="compare">
+  <div id="compare" class="narrow">
     <label>Compare with <select id="base"><option value="">nothing: this profile alone</option></select></label>
     <span id="comparing"></span>
   </div>

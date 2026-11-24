@@ -4,7 +4,7 @@
 import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
-  <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span class="grow"></span><span id="shown"></span></div>
+  <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span id="shown" class="tally"></span></div>
   <div id="calls" class="tab">
     <div class="narrow">
       <input id="text" type="search" placeholder="Search in arguments and results" autocomplete="off" spellcheck="false">
@@ -13,8 +13,8 @@ const markup = `
       <label><input type="checkbox" id="failed"> Failed only</label>
       <label>Slower than <input id="slower" type="number" min="0" step="any" placeholder="0"> ms</label>
     </div>
-    <div id="table" tabindex="0"><div id="thead"><span>Time</span><span>Process</span><span>System call</span><span>Arguments</span><span>Result</span><span>Duration</span></div><div id="trows"></div></div>
-    <pre id="call" hidden></pre>
+    <div id="table" tabindex="0"><div id="thead" class="cols"><span>Time</span><span>Process</span><span>System call</span><span>Arguments</span><span>Result</span><span>Duration</span></div><div id="trows"></div></div>
+    <pre id="call" class="drawer" hidden></pre>
   </div>
   <div id="summary" class="tab" hidden></div>
   <div id="note" hidden></div>
@@ -82,13 +82,13 @@ export default async function (root, {capture}) {
 
   const list = virtual($('table'), $('trows'), rowHeight, i => {
     const c = visible[i];
-    return `<div class="c ${c.kind}${i % 2 ? " alt" : ""}${c.failed ? ' failed' : ''}${c === selected ? ' selected' : ''}" data-i="${i}" style="top:${i * rowHeight}px"><span>${esc(c.time)}</span><span>${esc(c.pid)}</span><span class="name">${esc(c.name)}</span><span>${esc(c.args)}</span><span class="result">${esc(c.result)}</span><span class="dur">${duration(c.seconds)}</span></div>`;
+    return `<div class="c ${c.kind}${c.failed ? ' failed' : ''}${c === selected ? ' selected' : ''}" data-i="${i}" style="top:${i * rowHeight}px"><span>${esc(c.time)}</span><span>${esc(c.pid)}</span><span class="name">${esc(c.name)}</span><span>${esc(c.args)}</span><span class="result">${esc(c.result)}</span><span class="dur">${duration(c.seconds)}</span></div>`;
   });
   const narrow = () => {
     const words = $('text').value.toLowerCase(), name = $('syscall').value, pid = $('pid').value, failed = $('failed').checked, slower = Number($('slower').value) / 1000;
     visible = calls.filter(c => (!name || c.name === name) && (!pid || c.pid === pid) && (!failed || c.failed) && (!slower || c.seconds >= slower)
       && (!words || c.args.toLowerCase().includes(words) || c.result.toLowerCase().includes(words) || c.name.includes(words)));
-    $('shown').textContent = `${calls.length} entries · ${visible.length} shown`;
+    $('shown').textContent = `${calls.length.toLocaleString('en')} entries · ${visible.length.toLocaleString('en')} shown`;
     $('table').scrollTop = 0;
     list.count(visible.length);
   };

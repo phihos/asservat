@@ -1,9 +1,15 @@
-// The packet viewer follows Wireshark's main window. Wireshark's sharkd reads
+// The packet viewer has the panes of Wireshark's main window. Wireshark's sharkd reads
 // the capture in the hub; this page asks it for what is in sight.
 import {$, esc, headers, moment, notice, openView, show, spot, virtual} from './common.js';
 
 const markup = `
-  <div class="toolbar">
+  <form class="narrow filter" id="filterForm">
+    <input id="filter" list="fields" autocomplete="off" spellcheck="false" placeholder="Apply a display filter … for example  tcp.port == 8080 and http">
+    <datalist id="fields"></datalist>
+    <button type="button" id="clear" title="Clear the display filter" disabled>✕</button>
+    <button id="apply" title="Apply the display filter (Enter)">→</button>
+  </form>
+  <div class="narrow">
     <button id="first" title="Go to the first packet">⏮</button>
     <button id="prev" title="Go to the previous packet (↑)">▲</button>
     <button id="next" title="Go to the next packet (↓)">▼</button>
@@ -18,18 +24,12 @@ const markup = `
     <button data-stat="endpt" title="The addresses and ports, per protocol">Endpoints</button>
     <button data-stat="phs" title="The protocols in the capture and their share">Protocol hierarchy</button>
     <button data-stat="expert" title="What Wireshark's dissectors found notable">Expert information</button>
-    <span class="grow"></span>
+    <span class="sep"></span>
     <button id="layout" title="Packet details and bytes side by side, or one above the other">Layout</button>
   </div>
-  <form class="filter" id="filterForm">
-    <input id="filter" list="fields" autocomplete="off" spellcheck="false" placeholder="Apply a display filter … for example  tcp.port == 8080 and http">
-    <datalist id="fields"></datalist>
-    <button type="button" id="clear" title="Clear the display filter" disabled>✕</button>
-    <button id="apply" title="Apply the display filter (Enter)">→</button>
-  </form>
   <div id="panes">
     <div class="pane" id="list" tabindex="0">
-      <div id="head"></div>
+      <div id="head" class="cols"></div>
       <div id="rows"></div>
     </div>
     <div class="splitter" data-above="list" data-below="lower"></div>
@@ -42,7 +42,7 @@ const markup = `
       </div>
     </div>
   </div>
-  <footer><span id="field"></span><span id="counts"></span></footer>
+  <footer><span id="field"></span><span id="counts" class="tally"></span></footer>
 <dialog id="stream">
   <h2 id="streamTitle"></h2>
   <pre id="streamText"></pre>
@@ -98,7 +98,7 @@ async function applyFilter(filter) {
   $('clear').disabled = !filter;
   $('list').scrollTop = 0;
   list.count(shown);
-  $('counts').textContent = `Packets: ${total} · Displayed: ${shown} (${total ? (shown * 100 / total).toFixed(1) : '0.0'}%)`;
+  $('counts').textContent = `${total.toLocaleString('en')} packets · ${shown.toLocaleString('en')} shown`;
   showFrame(null);
   draw();
   if (shown) await select(0);

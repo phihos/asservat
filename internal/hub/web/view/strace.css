@@ -1,13 +1,12 @@
 /* The trace viewer: a table of calls and the summary of "strace -c". */
-.tabs #shown { align-self: center; color: var(--quiet); font: 12px var(--mono); }
 #calls { display: flex; flex-direction: column; overflow: hidden; }
 #table { flex: 1; min-height: 0; overflow: auto; font: 12px var(--mono); outline: none; }
-#thead, .c { display: grid; grid-template-columns: 130px 70px 150px minmax(300px, 1fr) minmax(120px, 280px) 90px; }
-#thead { position: sticky; top: 0; z-index: 1; height: 24px; line-height: 24px; background: var(--soft); border-bottom: 1px solid var(--line); font: 500 11px/24px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); }
+#thead, .c { display: grid; grid-template-columns: 140px 70px 150px minmax(300px, 1fr) minmax(120px, 280px) 100px; padding: 0 10px; }
 #thead span, .c span { padding: 0 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#thead span:last-child { text-align: right; }
 #trows { position: relative; }
 .c { position: absolute; left: 0; right: 0; height: 20px; line-height: 20px; cursor: default; }
-.c.alt { background: color-mix(in srgb, var(--soft) 45%, var(--surface)); }
+.c:hover { background: var(--soft); }
 .c .name { color: var(--custody-ink); font-weight: 500; }
 .c .dur { text-align: right; }
 .c.failed .result { color: var(--bad); }
@@ -15,13 +14,13 @@
 .c.exit { background: var(--soft); }
 .c.selected { background: var(--marker) !important; color: var(--on-marker); }
 .c.selected span { color: var(--on-marker) !important; }
-#call { flex: none; max-height: 35%; margin: 0; padding: 8px 12px; overflow: auto; border-top: 2px solid var(--marker); background: var(--surface); font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
-#summary { padding: 12px; }
+#summary { padding: 14px 16px; }
 #summary table { border-collapse: collapse; font: 12px var(--mono); }
-#summary th, #summary td { padding: 3px 14px; text-align: right; border-bottom: 1px solid var(--soft); }
-#summary th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--quiet); border-bottom: 1px solid var(--ink); }
+#summary th, #summary td { padding: 4px 14px; text-align: right; border-bottom: 1px solid var(--soft); }
+#summary th:first-child, #summary td:first-child { padding-left: 0; }
+#summary th { border-bottom: 1px solid var(--ink); }
 #summary td.name, #summary th:last-child { text-align: left; }
 #summary td.name { color: var(--custody-ink); font-weight: 500; }
 #summary tbody tr { cursor: pointer; }
-#summary tbody tr:hover { background: color-mix(in srgb, var(--marker) 25%, var(--surface)); }
+#summary tbody tr:hover { background: var(--soft); }
 #summary tfoot td { border-top: 1px solid var(--ink); font-weight: 600; }

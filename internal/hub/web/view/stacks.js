@@ -8,7 +8,7 @@ const markup = `
     <input id="text" type="search" placeholder="Search in names and stacks" autocomplete="off" spellcheck="false">
     <label>State <select id="state"></select></label>
     <label><input type="checkbox" id="group" checked> Same stacks together</label>
-    <span class="grow"></span><span id="shown"></span>
+    <span id="shown" class="tally"></span>
   </div>
   <div id="split"><div id="groups" tabindex="0"></div><pre id="stack"></pre></div>
   <div id="note" hidden></div>
@@ -58,7 +58,7 @@ export default async function (root) {
     // The stacks that most share come first, as the likeliest place of a pile-up.
     if ($('group').checked) groups.sort((a, b) => b.length - a.length);
     selected = 0;
-    $('shown').textContent = `${all.length} in the dump · ${kept.length} shown` + ($('group').checked ? ` in ${groups.length} stacks` : '');
+    $('shown').textContent = `${all.length.toLocaleString('en')} in the dump · ${kept.length.toLocaleString('en')} shown` + ($('group').checked ? ` in ${groups.length} stacks` : '');
     draw();
   };
   for (const id of ['text', 'state', 'group']) $(id).oninput = narrow;
