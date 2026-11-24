@@ -4,7 +4,10 @@
 // page that runs out of the screen sideways. It drives Chromium over its
 // DevTools protocol with what Node has, and needs no package.
 //
-//   node test/e2e/browser.mjs <hub URL> <token>
+//   node test/e2e/browser.mjs <hub URL> <token> [an administrator's token]
+//
+// With an administrator's token it also looks at what only administrators
+// see: the audit log, and the list of everyone's captures.
 //
 // $UNREADABLE names files, separated by commas, that are known not to be
 // what their names say: of those the viewer must say that the hub could not
@@ -19,7 +22,7 @@ import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
-const [hub, token] = process.argv.slice(2);
+const [hub, token, adminToken] = process.argv.slice(2);
 const chrome = process.env.CHROME || ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'].find(name => spawnSync('sh', ['-c', `command -v ${name}`]).status === 0);
 if (!hub || !token) { console.error('usage: browser.mjs <hub URL> <token>'); process.exit(2); }
 // 78 says that there is no browser, and nothing else does.
@@ -142,6 +145,26 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);
     for (const tab of tabs) { await run(`document.querySelector('#root [data-tab="${tab}"]').click()`); await sleep(150); }
     await run(`document.querySelector('#root .row, #root .c, #root .l, #root .g')?.click()`); await sleep(150);
+  });
+}
+if (adminToken) {
+  await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+  await check('desk: an administrator signing in', async () => {
+    signedOut = true;
+    await open(hub + '/');
+    await run(`sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload()`);
+    await until('the sign-in form', `return !document.getElementById('login').hidden`);
+    signedOut = false;
+    await run(`sessionStorage.setItem('token', ${JSON.stringify(adminToken)}); location.reload()`);
+    await until('the list of everyone\'s captures', `return !document.getElementById('app').hidden && document.querySelector('.capture')`);
+    await run(`document.querySelector('.capture .where')?.click()`); await sleep(300);
+  });
+  for (const [size, [width, height, mobile]] of Object.entries(widths)) await check(`${size}: the audit log`, async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+    await run(`location.hash = '#audit'`);
+    await until('entries of the audit log', `return !document.querySelector('[data-view=audit]').hidden && document.querySelectorAll('#auditRows tr').length > 0`);
+    // A page of a hundred was shown: the next one is asked for.
+    await run(`document.getElementById('auditOlder').offsetParent && document.getElementById('auditOlder').click()`); await sleep(500);
   });
 }
 ws.close();
