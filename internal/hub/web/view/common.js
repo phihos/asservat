@@ -49,7 +49,9 @@ export function openView(opened, query = '') {
     const again = new AbortController(), res = await fetch(views, {headers, signal: again.signal}).catch(() => null);
     const reason = res && !res.ok ? (await res.json().catch(() => null))?.error : '';
     again.abort();
-    notice('The hub could not open this file' + (reason ? ': ' + reason : '.'), true);
+    // A file that is not what its name says stays so: trying again is not offered, the download is in the bar.
+    const itself = res?.status === 422;
+    notice('The hub could not open this file' + (reason ? ': ' + reason : '') + '.' + (itself ? ' Download it to look at it with your own tools.' : ''), !itself);
   };
 }
 
