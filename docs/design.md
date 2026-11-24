@@ -18,7 +18,9 @@ what is deliberately left out. Change it together with the code.
 
 Both components are the same binary (`asservat hub`, `asservat agent`). The
 agent's image, which every node pulls, is the hub's without the viewers'
-tools (Wireshark's sharkd, graphviz, Go's trace tool): the same tag with
+tools (Wireshark's sharkd, graphviz, Go's trace tool) and without those
+that read the stacks of Python and .NET programs from a core (pystack and
+dotnet-dump, each with a runtime of its own): the same tag with
 `-agent`. The published images' layers are compressed with zstd, which
 containerd, CRI-O and Docker from version 23 read.
 
@@ -527,7 +529,7 @@ alone.
 
 A core of a Python program shows gdb the interpreter, whose threads all
 stand in its evaluation loop. What the program did is in the interpreter's
-memory. pystack (in the image, with a Python of its own) reads it from the
+memory. pystack (in the hub's image, with a Python of its own) reads it from the
 core and the interpreter's files, stripped or not: the describer adds the
 interpreter's threads with their Python frames (function, file, line,
 arguments and local variables) as `runtimeStacks`, and the viewer lists
@@ -538,9 +540,25 @@ numbers them as the node does: the description holds both numbers of each
 thread, so that a runtime's thread is told to be the core's, and the hub
 keeps them when it describes a core again.
 
+The tools that read a runtime's stacks, pystack and dotnet-dump, are a
+third of an image that has them, and every node would pull them for the
+few cores of such programs. So the agent's image has neither: the agent
+describes a core of a Python or .NET program with gdb and notes in the
+description which runtime's stacks it awaits. The hub gets the core and
+the program's files anyway. When the files have arrived, the last of a
+core's uploads, it adds the awaited stacks from them and stores the
+description in place of the agent's, which takes seconds for Python and up
+to a minute for .NET; a viewer or `read_artifact` that opens the core
+meanwhile waits for it, and after a restart of the hub the first opening
+does the work. The hub decrypts the core into its work directory for this,
+which so needs room for the largest such core. What a tool fails at is
+logged and not tried again, and the description stays gdb's. dotnet-dump
+reads cores of its own processor only: the .NET cores of a cluster of
+another architecture than the hub's are described without managed stacks.
+
 A core of a .NET program shows gdb the runtime: threads in `libcoreclr.so`
 and in code that the runtime compiled, which has no symbols. dotnet-dump
-(in the image, with a .NET runtime of its own under `/opt/asservat-dotnet`)
+(in the hub's image, with a .NET runtime of its own under `/opt/asservat-dotnet`)
 reads the runtime's memory, and the describer adds the managed threads in
 the same form: the methods of each stack, the source lines where the image
 has the program's PDBs, and the exception that a thread holds with its
@@ -549,12 +567,12 @@ only what the runtime uses the thread for. The frames that the runtime
 itself marks on a stack are left out. dotnet-dump reads the memory with a
 helper library that belongs to each build of the runtime
 (`libmscordaccore.so`) and that it loads into itself: the library's code
-runs in the agent and in the hub. So it is never taken from the workload's
+runs in the hub. So it is never taken from the workload's
 image, though every image has it. Microsoft's symbol server has the helper
 of each runtime that Microsoft built, under the build ID of that runtime's
 `libcoreclr.so`: the describer sends `msdl.microsoft.com` this build ID,
 follows its redirect to Azure's blob storage (`*.blob.core.windows.net`)
-and keeps the download in the scratch directory until unused for a week.
+and keeps the download in its work directory until unused for a week.
 Nothing verifies the download beyond HTTPS: Microsoft publishes no
 checksum or signature for it. It is fetched only where debuginfod servers
 are named, the same switch as for the other downloads, and dotnet-dump's
@@ -562,9 +580,9 @@ own asking of that server is turned off. The assemblies and PDBs of the
 image are data and are read from it. A core from gcore or the kernel does
 not hold the pages of mapped files that the process did not change, which
 dotnet-dump needs of the assemblies and of the runtime's libraries: the
-describer gives it a copy of the core in the scratch directory with those
+describer gives it a copy of the core in the work directory with those
 pages appended from the files, and removes the copy afterwards. While a
-.NET core is described, the scratch directory so needs room for the core
+.NET core is described, the work directory so needs room for the core
 once more and about 100 MiB; on a filesystem that shares the blocks of a
 copy, as Btrfs, for the 100 MiB only. Described without
 managed stacks are: a runtime that Microsoft's server does not have, as
@@ -572,7 +590,7 @@ those that distributions build from source; a program that maps no
 `libcoreclr.so` because it carries the runtime in its executable
 (NativeAOT, single-file programs); a runtime built for musl, as in
 Alpine images, whose helper library does not load in Asservat's image; a core of another processor than the
-describing agent's or hub's, whose helper is another file; and every .NET
+hub's, whose helper is another file; and every .NET
 core where no server may be asked.
 
 gdb walks a stack by the unwind tables of the functions on it. musl, the C

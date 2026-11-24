@@ -39,11 +39,11 @@ import (
 // that the server does not know is described without. The managed
 // assemblies and PDBs of the image are data and are read.
 
-// DotnetDir is the directory in Asservat's image with a .NET runtime
+// DotnetDir is the directory in Asservat's hub image with a .NET runtime
 // (dotnet) and dotnet-dump (dump/dotnet-dump.dll). No image of a .NET
 // program has its runtime there, so the tool finds no helper library at the
-// path that a core names. Where it is not there, .NET stacks are not
-// described.
+// path that a core names. Where it is not there, .NET stacks are left to a
+// describer that has it.
 const DotnetDir = "/opt/asservat-dotnet"
 
 // microsoftSymbols is Microsoft's public symbol server. It answers with a
@@ -91,13 +91,11 @@ type dotnetThreadStack struct {
 
 // describeDotnet adds the managed stacks of a .NET program to gdb's report
 // of its core. The report of another program returns unchanged, and so
-// does that of a .NET program where no server may be asked, where the tool
-// is not installed or where Microsoft does not have the runtime's helper.
+// does that of a .NET program where no server may be asked or where
+// Microsoft does not have the runtime's helper. Where the tool is not
+// installed, the report awaits a describer that has it.
 func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root string) ([]byte, error) {
-	dir := d.DotnetDir
-	if dir == "" {
-		dir = DotnetDir
-	}
+	dir := cmp.Or(d.DotnetDir, DotnetDir)
 	var fields struct{ Mappings []struct{ File string } }
 	if err := json.Unmarshal(report, &fields); err != nil {
 		return nil, err
@@ -107,7 +105,13 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 		mapped = append(mapped, m.File)
 	}
 	at := slices.IndexFunc(mapped, isCoreCLR)
-	if _, err := os.Stat(filepath.Join(dir, "dotnet")); at < 0 || err != nil || root == "" || d.DebuginfodURLs == "" {
+	if at < 0 || root == "" {
+		return report, nil
+	}
+	if !d.has(runtimeDotnet) {
+		return await(report, runtimeDotnet)
+	}
+	if d.DebuginfodURLs == "" {
 		return report, nil
 	}
 	runtimeFile, _ := resolve(root, strings.TrimSuffix(mapped[at], " (deleted)"))

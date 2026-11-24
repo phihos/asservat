@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/coredesc"
 )
 
 var errNoAgent = errors.New("no agent of this cluster is connected")
@@ -251,6 +252,11 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 		return err
 	}
 	h.notify(c.ID)
+	// The program's files come last of a core: with them here, the hub adds
+	// what the agent left of the description to it.
+	if core, is := strings.CutSuffix(a.Name, coredesc.FilesSuffix); is {
+		h.renew(r.Context(), User{}, c.ID, core)
+	}
 	return nil
 }
 

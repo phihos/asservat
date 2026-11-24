@@ -2,6 +2,7 @@ package coredesc
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -26,7 +27,8 @@ import (
 var pythonStacks []byte
 
 // PystackPython is the Python interpreter that has pystack, in Asservat's
-// image. Where it is not there, Python stacks are not described.
+// hub image. Where it is not there, Python stacks are left to a describer
+// that has it.
 const PystackPython = "/opt/pystack/bin/python"
 
 // A core is of a Python program if it maps the interpreter or its library.
@@ -44,10 +46,6 @@ type runtimeStack struct {
 // describePython adds the Python stacks of a Python program to gdb's
 // report of its core. The report of another program returns unchanged.
 func (d Describer) describePython(ctx context.Context, report []byte, core, root string) ([]byte, error) {
-	python := d.PystackPython
-	if python == "" {
-		python = PystackPython
-	}
 	var fields struct {
 		Executable string
 		Mappings   []struct{ File string }
@@ -60,8 +58,11 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 		interpreted = interpreted || pythonFile.MatchString(filepath.Base(m.File))
 	}
 	executable, _ := resolve(root, fields.Executable)
-	if _, err := os.Stat(python); !interpreted || err != nil || executable == "" || root == "" {
+	if !interpreted || executable == "" || root == "" {
 		return report, nil
+	}
+	if !d.has(runtimePython) {
+		return await(report, runtimePython)
 	}
 	// pystack looks for the libraries in directories: those of the files
 	// that the core maps.
@@ -86,7 +87,7 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, python, script.Name(), core, filepath.Join(root, executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
+	cmd := exec.CommandContext(ctx, cmp.Or(d.PystackPython, PystackPython), script.Name(), core, filepath.Join(root, executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
 	// Not in a directory of the program's: Python would import from it.
 	cmd.Dir = d.Scratch
 	var stderr bytes.Buffer
