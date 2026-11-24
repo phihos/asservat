@@ -173,3 +173,32 @@ func TestProgramFileAskedForThroughAnotherDirectory(t *testing.T) {
 		t.Fatalf("unpacked, the name asked for leads to %q", b)
 	}
 }
+
+// Archives from before the files of a name through another directory were
+// kept at the path it leads to hold such names, some beside the same file
+// at that path. They unpack to the path within the directory; a name that
+// leads out of it is refused as before.
+func TestArchiveWithANameThroughAnotherDirectoryUnpacks(t *testing.T) {
+	var archive bytes.Buffer
+	w := tar.NewWriter(&archive)
+	for _, name := range []string{"usr/local/bin/python3.13", "usr/local/lib/libpython3.13.so.1.0", "usr/local/bin/../lib/libpython3.13.so.1.0"} {
+		w.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o755, Size: int64(len("\x7fELF synthetic"))})
+		w.Write([]byte("\x7fELF synthetic"))
+	}
+	w.Close()
+	dir := t.TempDir()
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len())); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "usr/local/lib/libpython3.13.so.1.0")); string(b) != "\x7fELF synthetic" {
+		t.Fatalf("unpacked %q", b)
+	}
+	var out bytes.Buffer
+	w = tar.NewWriter(&out)
+	w.WriteHeader(&tar.Header{Name: "usr/../../outside", Typeflag: tar.TypeReg, Size: 1})
+	w.Write([]byte("x"))
+	w.Close()
+	if err := ExtractFiles(bytes.NewReader(out.Bytes()), t.TempDir(), int64(out.Len())); err == nil {
+		t.Fatal("a name that leads out of the directory was unpacked")
+	}
+}

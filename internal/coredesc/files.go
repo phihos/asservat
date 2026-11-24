@@ -205,11 +205,18 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 		if err != nil {
 			return err
 		}
-		link := header.Typeflag == tar.TypeSymlink && !filepath.IsAbs(header.Linkname) && fs.ValidPath(pathpkg.Join(pathpkg.Dir(header.Name), header.Linkname))
-		if header.Typeflag != tar.TypeReg && !link || !fs.ValidPath(header.Name) {
+		// An archive of an earlier Asservat may name a file through another
+		// directory (usr/local/bin/../lib/x): it is the file at the path
+		// that the name leads to, if that is within the directory.
+		name := header.Name
+		if !filepath.IsAbs(name) {
+			name = pathpkg.Clean(name)
+		}
+		link := header.Typeflag == tar.TypeSymlink && !filepath.IsAbs(header.Linkname) && fs.ValidPath(pathpkg.Join(pathpkg.Dir(name), header.Linkname))
+		if header.Typeflag != tar.TypeReg && !link || !fs.ValidPath(name) {
 			return errors.New("the archive holds more than program files: " + header.Name)
 		}
-		path := filepath.Join(dir, header.Name)
+		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return err
 		}
@@ -220,6 +227,15 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 			continue
 		}
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		// The same file a second time, as such an earlier archive holds it
+		// under both of its names: the first stands.
+		if errors.Is(err, fs.ErrExist) {
+			if _, err := io.CopyN(io.Discard, archive, header.Size); err != nil {
+				return err
+			}
+			left -= header.Size
+			continue
+		}
 		if err != nil {
 			return err
 		}
