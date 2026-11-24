@@ -46,7 +46,8 @@ const (
 	// 6: the managed stacks of .NET programs.
 	// 7: the threads of language runtimes told to be the core's threads.
 	// 8: a stack read from memory is read to the stack's end, not to the page's.
-	Version = 8
+	// 9: no names for Python threads, which were those of unrelated processes.
+	Version = 9
 )
 
 // Describer describes cores with gdb, Delve, pystack and dotnet-dump.

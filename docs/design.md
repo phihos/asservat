@@ -473,7 +473,7 @@ shows what the tool would show.
 | File | Viewer | Read by |
 | --- | --- | --- |
 | Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details and bytes side by side or stacked, follow stream; conversations, endpoints, protocol hierarchy and expert information, whose rows filter the list | Wireshark's `sharkd` in the hub |
-| Logs | Like the log panels of Lens and the Kubernetes dashboard: a dark terminal with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out) | The browser |
+| Logs | Like the log panels of Lens and the Kubernetes dashboard: a dark terminal with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out). The JVM's class histogram, text as well, opens in it | The browser |
 | Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
@@ -539,7 +539,9 @@ memory. pystack (in the hub's image, with a Python of its own) reads it from the
 core and the interpreter's files, stripped or not: the describer adds the
 interpreter's threads with their Python frames (function, file, line,
 arguments and local variables) as `runtimeStacks`, and the viewer lists
-them before the machine's threads, as it does goroutines. Other language
+them before the machine's threads, as it does goroutines. The threads
+have no names: a core holds none, and pystack would give each the name of
+whatever process has its number where the core is read. Other language
 runtimes are added in the same form. A runtime knows its threads by
 their numbers inside the container, and a core that the agent takes
 numbers them as the node does: the description holds both numbers of each

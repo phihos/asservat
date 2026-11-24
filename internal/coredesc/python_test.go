@@ -69,6 +69,7 @@ func TestPythonStacksOfACore(t *testing.T) {
 			Runtime, Title, Version string
 			Threads                 []struct {
 				ThreadSystemID int
+				Name           string
 				Frames         []struct {
 					Function, File string
 					Line           int
@@ -86,6 +87,12 @@ func TestPythonStacksOfACore(t *testing.T) {
 	}
 	found := map[string]bool{}
 	for _, thread := range report.RuntimeStacks[0].Threads {
+		// A core holds no names of threads. pystack takes one from the
+		// process that has the thread's number where it runs, which is
+		// another process once the core has left its node, or its container.
+		if thread.Name != "" {
+			t.Errorf("thread %d is named %q, which no core tells", thread.ThreadSystemID, thread.Name)
+		}
 		for _, f := range thread.Frames {
 			if filepath.Base(f.File) != "app.py" {
 				continue

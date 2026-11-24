@@ -356,7 +356,8 @@ func ViewerOf(name string) string {
 	switch {
 	case strings.HasSuffix(file, ".pcap"):
 		return "pcap"
-	case strings.HasSuffix(file, ".log"):
+	// Logs, and the JVM's class histogram, which is lines of text as well.
+	case strings.HasSuffix(file, ".log"), strings.HasSuffix(file, "histogram.txt"):
 		return "log"
 	// The archive of a core's program files is for a debugger.
 	case strings.HasSuffix(file, ".files.tar"):
