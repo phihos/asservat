@@ -118,6 +118,39 @@ func TestResultIsReportedWhenTheHubIsBack(t *testing.T) {
 	if len(got) != 1 || !strings.Contains(got[0], "/agent/captures/capture-1/status") || !strings.Contains(got[0], `"Completed"`) {
 		t.Fatal("the hub got:", got)
 	}
+	// A proxy that answers for a hub that is away is waited out as well; a
+	// hub that is there and fails is not, since no reconnection would follow.
+	for status, again := range map[int]bool{http.StatusServiceUnavailable: true, http.StatusBadGateway: true, http.StatusInternalServerError: false} {
+		asked := make(chan struct{}, 4)
+		answering := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			asked <- struct{}{}
+			w.WriteHeader(status)
+		}))
+		b := &Agent{HubURL: answering.URL, Token: "t", HTTP: answering.Client()}
+		b.connected = make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		ended := make(chan struct{})
+		go func() {
+			b.report(ctx, "capture-3", api.TaskStatus{Pod: "api-1", State: api.StateCompleted})
+			close(ended)
+		}()
+		<-asked
+		select {
+		case <-ended:
+			if again {
+				t.Errorf("the result was given up at status %d", status)
+			}
+		case <-time.After(300 * time.Millisecond):
+			if !again {
+				t.Errorf("the agent waits for a hub that answered with status %d", status)
+			}
+			b.reconnected()
+			<-asked // reported again once the stream is back
+		}
+		cancel()
+		<-ended
+		answering.Close()
+	}
 	// A capture that the hub no longer knows: said once, and that is that.
 	mu.Lock()
 	refuse = true

@@ -114,11 +114,13 @@ func (a *Agent) request(ctx context.Context, method, path string, body io.Reader
 		msg, _ := io.ReadAll(io.LimitReader(res.Body, 1<<10))
 		res.Body.Close()
 		err := fmt.Errorf("%s %s: %s %s", method, path, res.Status, bytes.TrimSpace(msg))
-		// The hub said no; a proxy in front of a hub that is away says 502 to 504.
-		if res.StatusCode < 500 {
-			return nil, refused{err}
+		// A proxy in front of a hub that is away says 502 to 504. Everything
+		// else is the hub's own answer, also its 500: it is there and said so.
+		switch res.StatusCode {
+		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return nil, err
 		}
-		return nil, err
+		return nil, refused{err}
 	}
 	return res, nil
 }
@@ -132,7 +134,8 @@ func (a *Agent) post(ctx context.Context, path string, v any) error {
 	return res.Body.Close()
 }
 
-// refused is the hub's own no to a request, which asking again does not change.
+// refused is the hub's own answer that a request failed, which the hub's
+// coming back does not change.
 type refused struct{ error }
 
 // reconnected tells what waits for the hub that the stream to it is open.
