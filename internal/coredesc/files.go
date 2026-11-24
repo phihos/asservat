@@ -221,19 +221,28 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 			return err
 		}
 		if link {
-			if err := os.Symlink(header.Linkname, path); err != nil {
+			err := os.Symlink(header.Linkname, path)
+			// The same link a second time, under both of its names in such an earlier archive.
+			if to, e := os.Readlink(path); errors.Is(err, fs.ErrExist) && e == nil && to == header.Linkname {
+				continue
+			}
+			if err != nil {
 				return err
 			}
 			continue
 		}
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		// The same file a second time, as such an earlier archive holds it
-		// under both of its names: the first stands.
-		if errors.Is(err, fs.ErrExist) {
-			if _, err := io.CopyN(io.Discard, archive, header.Size); err != nil {
+		// under both of its names: the first stands. What else is in the
+		// way, a link or a directory, is a fault of the archive.
+		if info, e := os.Lstat(path); errors.Is(err, fs.ErrExist) && e == nil && info.Mode().IsRegular() {
+			n, err := io.Copy(io.Discard, io.LimitReader(archive, left+1))
+			if left -= n; err == nil && left < 0 {
+				err = errors.New("the archive unpacks to more than it holds")
+			}
+			if err != nil {
 				return err
 			}
-			left -= header.Size
 			continue
 		}
 		if err != nil {
