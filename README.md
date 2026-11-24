@@ -81,6 +81,7 @@ helm install asservat charts/asservat -n asservat -f values.yaml
 ```yaml
 # values.yaml
 hub:
+  localCluster: prod-eu           # what this cluster is called in Asservat; "local" if you leave it out
   users:
     - name: alice                 # the subject your RBAC knows
       token: <32+ random characters>
@@ -94,7 +95,11 @@ The chart runs its own PostgreSQL and stores evidence on a volume unless you
 configure an external database (`hub.database.existingSecret`) or an S3 bucket
 (`hub.storage.s3`). Instead of static users you can use your OIDC issuer
 (`hub.oidc`): the console then signs in there and the API accepts its ID
-tokens. Register `https://<hub-host>/auth/callback` as redirect URI. The agent pods run as root with the node's PID namespace and extra
+tokens. Register `https://<hub-host>/auth/callback` as redirect URI. Name the
+hub's own cluster (`hub.localCluster`) before you record: captures and watches
+keep the name they were made under, so after a later change the finished
+captures still show the old name and watches for it no longer find a cluster
+and have to be made again. The agent pods run as root with the node's PID namespace and extra
 capabilities, so their namespace must allow Pod Security `privileged`.
 
 > [!NOTE]

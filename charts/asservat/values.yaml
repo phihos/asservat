@@ -43,7 +43,11 @@ hub:
   # Let an administrator approve their own sensitive capture. Enable it only
   # for installations with a single administrator.
   allowSelfApproval: false
-  # Name under which this cluster's own agents join. Empty: they do not.
+  # What this cluster is called in Asservat: the name under which its own
+  # agents join, shown wherever a cluster is chosen or named, as those of
+  # hub.clusters are. Lowercase letters, digits, dashes or dots. Captures
+  # and watches keep the name they were made under. Empty: the agents of
+  # this cluster do not join.
   localCluster: local
   # The other clusters of the installation. The agents of each join with its
   # token: install the chart there with hub.enabled=false, agent.hubURL and
