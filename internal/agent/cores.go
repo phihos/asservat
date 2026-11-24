@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -25,12 +26,41 @@ import (
 // points it at a copy of this binary in the spool directory, which exists at
 // the same path on the node and in the agent's container. The handler keeps
 // the core only if the process belongs to a pod that an approved core dump
-// watch marked; the agent uploads it with the capture of that crash.
+// watch marked; the agent uploads it with the capture of that crash. Every
+// other core it passes on to the program that the node's pattern named
+// before, such as apport or systemd-coredump (passOn).
 
 // CoreSpool is the spool directory.
 type CoreSpool string
 
 func (s CoreSpool) handler() string { return filepath.Join(string(s), "asservat") }
+
+// previous names the file that holds the node's core pattern from before
+// the agent's.
+func (s CoreSpool) previous() string { return filepath.Join(string(s), "previous-core-pattern") }
+
+// corePatternMost is the longest core pattern that the kernel takes
+// (Documentation/admin-guide/sysctl/kernel.rst).
+const corePatternMost = 127
+
+// A value that a core pattern asks the kernel for: %p, %E. %% is a
+// percent sign.
+var coreSpecifier = regexp.MustCompile(`%.`)
+
+// asked lists the values that the pattern of a handler asks the kernel
+// for, in their order; nil for a pattern that names a file.
+func asked(pattern string) []string {
+	if !strings.HasPrefix(pattern, "|") {
+		return nil
+	}
+	var specifiers []string
+	for _, s := range coreSpecifier.FindAllString(pattern, -1) {
+		if s != "%%" {
+			specifiers = append(specifiers, s)
+		}
+	}
+	return specifiers
+}
 
 // marker names the file that makes the handler keep the cores of a pod, for
 // one watch.
@@ -44,9 +74,11 @@ func (s CoreSpool) cores(podUID string) string { return filepath.Join(string(s),
 func (s CoreSpool) taken(trigger string) string { return filepath.Join(string(s), "taken", trigger) }
 
 // Install copies the running binary into the spool and makes it the node's
-// core handler. The returned function restores the previous settings. While the
-// agent's handler is installed, processes outside of watched pods leave no
-// core.
+// core handler. The returned function restores the previous settings. The
+// pattern also asks the kernel for the values that the node's handler from
+// before takes, which the agent's handler passes on with the cores that it
+// does not keep. Where the node wrote cores to files, processes outside of
+// watched pods leave no core while the agent's handler is installed.
 func (s CoreSpool) Install(patternFile string) (restore func(), err error) {
 	for _, dir := range []string{"watched", "cores", "taken"} {
 		// Markers and cores of an earlier run are stale.
@@ -70,13 +102,13 @@ func (s CoreSpool) Install(patternFile string) (restore func(), err error) {
 	}
 	// %P is the process ID on the node, %t the time of the dump.
 	pattern := "|" + s.handler() + " core-handler %P %t"
-	saved := filepath.Join(string(s), "previous-core-pattern")
+	saved := s.previous()
 	current, err := os.ReadFile(patternFile)
 	if err != nil {
 		return nil, err
 	}
 	previous := strings.TrimSpace(string(current))
-	if previous == pattern {
+	if strings.HasPrefix(previous, pattern) {
 		// An agent that ended without restoring: the pattern before it is saved.
 		b, err := os.ReadFile(saved)
 		if err != nil {
@@ -85,6 +117,13 @@ func (s CoreSpool) Install(patternFile string) (restore func(), err error) {
 		previous = string(b)
 	} else if err := os.WriteFile(saved, []byte(previous), 0o600); err != nil {
 		return nil, err
+	}
+	// The kernel puts each value in an argument of its own, also an empty
+	// one and one with spaces, since Linux 5.3.
+	if passing := strings.Join(append([]string{pattern}, asked(previous)...), " "); len(passing) <= corePatternMost {
+		pattern = passing
+	} else if strings.HasPrefix(previous, "|") {
+		slog.Warn("the node's core handler takes more than fits behind the agent's in a core pattern: it gets no cores while the agent runs", "pattern", previous)
 	}
 	if err := os.WriteFile(patternFile, []byte(pattern), 0o644); err != nil {
 		return nil, fmt.Errorf("set the core pattern: %w", err)
@@ -136,18 +175,20 @@ const minFreePercent = 10
 // Handle is the core handler: the kernel runs it on the node with the core
 // of process pid on standard input. It keeps the core if the process
 // belongs to a watched pod, replacing an earlier core of the same
-// container, and says what it did.
-func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string, err error) {
+// container, and says what it did. values are what the kernel put for the
+// values that the node's previous handler takes, which gets the other
+// cores.
+func (s CoreSpool) Handle(proc, pid, at string, core io.Reader, values ...string) (outcome string, err error) {
 	cgroup, err := os.ReadFile(filepath.Join(proc, pid, "cgroup"))
 	if err != nil {
 		return "", err
 	}
 	podUID, container := cgroupPod(string(cgroup))
 	if podUID == "" {
-		return "dropped, not a process of a pod", nil
+		return s.passOn("not a process of a pod", core, values), nil
 	}
 	if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
-		return "dropped, no core dump watch for pod " + podUID, nil
+		return s.passOn("no core dump watch for pod "+podUID, core, values), nil
 	}
 	dir := s.cores(podUID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -197,6 +238,49 @@ func (s CoreSpool) Handle(proc, pid, at string, core io.Reader) (outcome string,
 		outcome = ", without the program's files: " + err.Error()
 	}
 	return "kept for pod " + podUID + outcome, os.Rename(name+".part", name+".core")
+}
+
+// passOn runs the node's handler from before the agent's with a core that
+// the agent does not keep, as the kernel would have: the handler's pattern
+// with the kernel's values in it, the core on standard input. Where there
+// was none, or this handler was not given the values, the core is dropped.
+// It says what became of the core, which was not kept for the reason.
+func (s CoreSpool) passOn(reason string, core io.Reader, values []string) string {
+	pattern, _ := os.ReadFile(s.previous())
+	previous := strings.TrimSpace(string(pattern))
+	if !strings.HasPrefix(previous, "|") || len(values) != len(asked(previous)) {
+		return "dropped, " + reason
+	}
+	// The kernel splits a pattern into arguments before it puts the values in.
+	command := strings.Fields(previous[1:])
+	if len(command) == 0 {
+		return "dropped, " + reason
+	}
+	// A process as a file (%F) is open in this handler under the number
+	// that the kernel names, and stays so in the node's handler.
+	var files []*os.File
+	for i := range command {
+		command[i] = coreSpecifier.ReplaceAllStringFunc(command[i], func(specifier string) string {
+			if specifier == "%%" {
+				return "%"
+			}
+			value := values[0]
+			values = values[1:]
+			if n, err := strconv.Atoi(value); specifier == "%F" && err == nil && n > 2 {
+				for len(files) < n-2 {
+					files = append(files, nil)
+				}
+				files[n-3] = os.NewFile(uintptr(n), "process")
+			}
+			return value
+		})
+	}
+	cmd := exec.Command(command[0], command[1:]...)
+	cmd.Stdin, cmd.ExtraFiles = core, files
+	if err := cmd.Run(); err != nil {
+		return "passed on to " + command[0] + ", which failed (" + err.Error() + "), " + reason
+	}
+	return "passed on to " + command[0] + ", " + reason
 }
 
 // unmark stops keeping the pod's cores for a watch and removes those kept

@@ -12,17 +12,28 @@ import (
 	"time"
 )
 
+// spoolDir makes a spool with a short path, as on a node: the kernel takes
+// a core pattern, which names the spool, of 127 characters at most.
+func spoolDir(t *testing.T) CoreSpool {
+	dir, err := os.MkdirTemp("/tmp", "spool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return CoreSpool(dir)
+}
+
 func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
-	spool, proc := CoreSpool(t.TempDir()), t.TempDir()
+	spool, proc := spoolDir(t), t.TempDir()
 	pattern := filepath.Join(t.TempDir(), "core_pattern")
-	os.WriteFile(pattern, []byte("|/usr/lib/systemd/systemd-coredump %P %u\n"), 0o644)
+	os.WriteFile(pattern, []byte("|/usr/lib/no-such-handler %P %u\n"), 0o644)
 	pipeLimit := filepath.Join(filepath.Dir(pattern), "core_pipe_limit")
 	os.WriteFile(pipeLimit, []byte("0\n"), 0o644)
 	restore, err := spool.Install(pattern)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(pattern); string(b) != "|"+string(spool)+"/asservat core-handler %P %t" {
+	if b, _ := os.ReadFile(pattern); string(b) != "|"+string(spool)+"/asservat core-handler %P %t %P %u" {
 		t.Fatalf("core pattern %q", b)
 	}
 	if b, _ := os.ReadFile(pipeLimit); string(b) != "16" {
@@ -115,7 +126,7 @@ func TestCoreHandlerKeepsOnlyWatchedPods(t *testing.T) {
 		t.Fatal("a new agent kept the cores of the previous one")
 	}
 	again()
-	if b, _ := os.ReadFile(pattern); string(b) != "|/usr/lib/systemd/systemd-coredump %P %u" {
+	if b, _ := os.ReadFile(pattern); string(b) != "|/usr/lib/no-such-handler %P %u" {
 		t.Fatalf("restored core pattern %q", b)
 	}
 	restore()
@@ -254,5 +265,86 @@ func TestHandlerKeepsTheProgramsFiles(t *testing.T) {
 	left, _ := filepath.Glob(filepath.Join(spool.cores(uid), "*"))
 	if len(left) != 1 || filepath.Base(left[0]) != container+".101.1700000001.core" {
 		t.Fatal("in the spool:", left)
+	}
+}
+
+// The cores that the agent's handler does not keep go to the handler that
+// the node had before, as the kernel would have run it: with the values
+// that its pattern asks the kernel for, and the core on standard input.
+// The core of a watched pod is Asservat's alone.
+func TestHandlerPassesOtherCoresOnToTheNodesHandler(t *testing.T) {
+	spool, proc := spoolDir(t), t.TempDir()
+	dir := string(spoolDir(t))
+	// Stands in for the node's handler, as apport or systemd-coredump.
+	node := filepath.Join(dir, "node-handler")
+	script := "#!/bin/sh\nfor a in \"$@\"; do printf '[%s]' \"$a\"; done >" + dir + "/arguments\ncat >" + dir + "/core\n"
+	if err := os.WriteFile(node, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pattern := filepath.Join(t.TempDir(), "core_pattern")
+	os.WriteFile(pattern, []byte("|"+node+" -p%p -F%F 100%% -- %E\n"), 0o644)
+	os.WriteFile(filepath.Join(filepath.Dir(pattern), "core_pipe_limit"), []byte("16\n"), 0o644)
+	restore, err := spool.Install(pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore()
+	// The agent's pattern asks the kernel for what the node's handler takes.
+	installed := "|" + string(spool) + "/asservat core-handler %P %t %p %F %E"
+	if b, _ := os.ReadFile(pattern); string(b) != installed {
+		t.Fatalf("core pattern %q", b)
+	}
+	const uid, container = "0b7f2a56-6b6e-4bd4-9f3e-0c7d4c2a1e11", "5f3a9c1e7b2d4f6a8c0e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a"
+	for pid, cgroup := range map[string]string{"100": "0::/kubepods/besteffort/pod" + uid + "/" + container + "\n", "200": "0::/system.slice/sshd.service\n"} {
+		os.MkdirAll(filepath.Join(proc, pid), 0o755)
+		os.WriteFile(filepath.Join(proc, pid, "cgroup"), []byte(cgroup), 0o644)
+	}
+	passed := func() (arguments, core string) {
+		a, _ := os.ReadFile(filepath.Join(dir, "arguments"))
+		c, _ := os.ReadFile(filepath.Join(dir, "core"))
+		os.Remove(filepath.Join(dir, "arguments"))
+		os.Remove(filepath.Join(dir, "core"))
+		return string(a), string(c)
+	}
+	// What the kernel puts for %p, %F (nothing, where it does not know it) and %E.
+	for pid, content := range map[string]string{"200": "core of a node process", "100": "core of an unwatched pod"} {
+		outcome, err := spool.Handle(proc, pid, "1700000000", strings.NewReader(content), "7", "", "!usr!bin!my shop")
+		if arguments, core := passed(); err != nil || !strings.Contains(outcome, "passed on") || arguments != "[-p7][-F][100%][--][!usr!bin!my shop]" || core != content {
+			t.Fatalf("process %s: %q, %v; the node's handler got %s and %q", pid, outcome, err, arguments, core)
+		}
+	}
+	os.WriteFile(spool.marker(uid, "watch-1"), nil, 0o600)
+	if outcome, err := spool.Handle(proc, "100", "1700000000", strings.NewReader("core of a watched pod"), "7", "", "!usr!bin!shop"); err != nil || !strings.Contains(outcome, "kept") {
+		t.Fatal(outcome, err)
+	}
+	if arguments, core := passed(); arguments != "" || core != "" {
+		t.Fatalf("the core of a watched pod went to the node's handler: %s %q", arguments, core)
+	}
+	// A handler of an agent before this one was asked for fewer values
+	// than the node's handler takes: the core is dropped as before.
+	if outcome, err := spool.Handle(proc, "200", "1700000000", strings.NewReader("core"), "7"); err != nil || !strings.HasPrefix(outcome, "dropped") {
+		t.Fatal(outcome, err)
+	}
+	if arguments, _ := passed(); arguments != "" {
+		t.Fatal("the node's handler ran with too few values:", arguments)
+	}
+
+	// A node that writes cores to files has no handler to pass on to, and
+	// a pattern of more than the kernel's 127 characters is not written.
+	for previous, want := range map[string]string{
+		"core.%e.%p": "|" + string(spool) + "/asservat core-handler %P %t",
+		"|/usr/lib/a-handler-with-a-long-name " + strings.Repeat("%p ", 30): "|" + string(spool) + "/asservat core-handler %P %t",
+	} {
+		restore()
+		os.WriteFile(pattern, []byte(previous), 0o644)
+		if restore, err = spool.Install(pattern); err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := os.ReadFile(pattern); string(b) != want {
+			t.Fatalf("core pattern %q after %q", b, previous)
+		}
+		if outcome, err := spool.Handle(proc, "200", "1700000000", strings.NewReader("core")); err != nil || !strings.HasPrefix(outcome, "dropped") {
+			t.Fatal(outcome, err)
+		}
 	}
 }

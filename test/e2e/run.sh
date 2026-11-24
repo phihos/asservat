@@ -45,6 +45,7 @@ cleanup() {
     kind delete cluster --name "$HUB" >/dev/null 2>&1 || true
     kind delete cluster --name "$EDGE" >/dev/null 2>&1 || true
   fi
+  [ -z "${PATTERN_BEFORE:-}" ] || echo "$PATTERN_BEFORE" | sudo tee /proc/sys/kernel/core_pattern >/dev/null
 }
 trap cleanup EXIT
 
@@ -99,6 +100,12 @@ docker save "$IMAGE" "$IMAGE-agent" -o "$WORK/image.tar"
 SPOOL=/var/lib/asservat-e2e
 if [ -n "${CORE_HANDLER:-}" ]; then
   sudo mkdir -p "$SPOOL"
+  # The machine's core handler from before the agent's, which gets the cores
+  # that Asservat does not keep: here one that notes what it was given.
+  printf '#!/bin/sh\necho "$1 $2 $(wc -c)" >%s/passed-on\n' "$SPOOL" | sudo tee "$SPOOL/node-handler" >/dev/null
+  sudo chmod 755 "$SPOOL/node-handler"
+  PATTERN_BEFORE=$(cat /proc/sys/kernel/core_pattern)
+  echo "|$SPOOL/node-handler %s %e" | sudo tee /proc/sys/kernel/core_pattern >/dev/null
   printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n  - role: control-plane\n    extraMounts:\n      - {hostPath: %s, containerPath: %s}\n' "$SPOOL" "$SPOOL" >"$WORK/$EDGE.yaml"
 fi
 
@@ -669,6 +676,13 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   fetch "$ALICE" "$id" "$name.analysis.json" "$WORK/crash.core.analysis.json"
   jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0) and .symbols and .executable == "/bin/sh"' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
   [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "an uploaded core stayed on the node"
+  # The core of a process outside of watched pods, here one of the node
+  # itself, goes to the handler that the machine had before, with the
+  # values that its pattern asks the kernel for: the signal and the program.
+  docker exec "$EDGE-control-plane" sh -c 'sleep 60 & kill -SEGV $!'
+  for _ in $(seq 20); do sudo test -s "$SPOOL/passed-on" && break; sleep 0.5; done
+  read -r signal program size < <(sudo cat "$SPOOL/passed-on") || true
+  [ "${signal:-}" = 11 ] && [ "$program" = sleep ] && [ "$size" -gt 1000 ] || fail "the core of an unwatched process was not passed on to the machine's handler: ${signal:-} ${program:-} ${size:-}; $(sudo cat "$SPOOL/last-core" 2>&1)"
 fi
 
 mcp=$(ok "$ALICE" POST /mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_workloads","arguments":{"cluster":"local","namespace":"shop"}}}')

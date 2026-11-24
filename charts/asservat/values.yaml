@@ -134,7 +134,9 @@ agent:
   caCert: ""
   # Core dumps of crashed processes, for core dump watches. The agent then
   # replaces the node's kernel.core_pattern while it runs and restores it
-  # when it stops: other crashes on the node leave no core meanwhile.
+  # when it stops. The cores of other crashes on the node go on to the
+  # handler that the node had before (apport, systemd-coredump); a node that
+  # wrote cores to files writes none of them meanwhile.
   coreHandler:
     enabled: false
     # Directory on the node for the handler and for cores until their upload.
