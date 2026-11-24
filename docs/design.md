@@ -607,7 +607,10 @@ symbols. For a frame in a module without unwind tables (told by the size
 of its `.eh_frame` beside its code) an unwinder in the description script
 takes the first word above the stack pointer that is the address after a
 call instruction as the caller's return address, and gdb walks on by the
-caller's own tables (amd64 and arm64). The frames found so are marked `≈`
+caller's own tables (amd64 and arm64). On arm64 that word does not tell
+where the caller's stack begins, which its tables count from: there the
+frame pointer does, which arm64 compilers keep by default, and a caller
+built without one is walked wrongly from there on. The frames found so are marked `≈`
 in the viewer: a reading of the stack, most likely right, not certain.
 
 The stacks of a stripped program in another language show
