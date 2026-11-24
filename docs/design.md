@@ -757,7 +757,10 @@ decorated is gone. A viewer shows its capture's number on a marker beside the fi
 name. The pages that pprof and Go's trace tool draw themselves keep their
 layout and the colours of their graphs, and are light in either theme; the
 hub adds a stylesheet to them that sets them in Asservat's type and gives
-pprof's bar the look of a viewer's row.
+pprof's bar the look of a viewer's row. pprof draws a function's box as
+wide as its share, so that a small one cannot hold its name: the row above
+its page says how the name is read (point at the box) and how the box is
+made wide (click it), which pprof itself does not say.
 
 The list of captures shows one line per capture: its number, state, what
 was recorded and why, where, when and by whom. It lists the newest 50 and

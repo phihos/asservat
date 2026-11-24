@@ -94,16 +94,16 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 </head>
 <body>
 <header>
-  <a class="brand" href="/#captures" title="Back to the captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a>
-  <nav><a href="/#captures" title="Back to the captures">Captures</a></nav>
+  <a class="brand" href="/#captures" title="Back to all captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a>
+  <nav><a href="/#captures" title="Back to all captures">Captures</a></nav>
   <span class="number" id="number" hidden></span>
   <span class="name" id="name"></span>
   <select class="name" id="files" hidden title="Open another file of this capture"></select>
   <span id="origin"></span>
   <span class="grow"></span>
-  <select id="moment" hidden title="Open another file of this capture at the moment of what is selected here"></select>
-  <button id="copy" title="Copy a link to this spot in the file">Copy link</button>
-  <a class="button" id="download" title="Download the file for the tools on your machine. A local copy is outside Asservat's control.">Download</a>
+  <select id="moment" hidden title="Open another file of this capture at the time of the current selection"></select>
+  <button id="copy" title="Copy a link to this exact spot in the file">Copy link</button>
+  <a class="button" id="download" title="Download the file to open it with your own tools. Asservat has no control over local copies.">Download</a>
 </header>
 <div id="notice" class="opening">Opening the file…</div>
 <main id="root" hidden></main>
@@ -115,17 +115,17 @@ $('download').href = address;
 document.title = file.split('/').pop() + ' – Asservat';
 
 async function open() {
-  if (!capture || !file) return notice('No file was named.');
+  if (!capture || !file) return notice('No file was specified.');
   const res = await fetch(`/api/captures/${capture}`, {headers}).catch(() => null);
-  if (!res) return notice('The hub is not reachable.', true);
-  if (res.status === 401) return notice('Sign in to the console first.');
-  if (!res.ok) return notice('This capture does not exist any more.');
+  if (!res) return notice('Cannot reach the hub.', true);
+  if (res.status === 401) return notice('Please sign in to the console first.');
+  if (!res.ok) return notice('This capture no longer exists.');
   const c = await res.json(), artifact = c.artifacts.find(a => a.name === file);
   $('number').textContent = String(c.number).padStart(4, '0'); $('number').title = `Capture ${c.number}`; $('number').hidden = false;
   document.title = `${$('number').textContent} ${$('name').textContent} – Asservat`;
   $('origin').textContent = `pod ${file.split('/')[0]} · ${c.workload} in ${c.namespace} on ${c.cluster}`;
-  if (!artifact) return notice('This file does not exist any more.');
-  if (!artifact.viewer) return notice('This file cannot be shown here. Download it instead.');
+  if (!artifact) return notice('This file no longer exists.');
+  if (!artifact.viewer) return notice('This file has no viewer. Download it instead.');
   otherFiles(c);
   sameMoment(c);
   const style = document.createElement('link');
@@ -155,7 +155,7 @@ function sameMoment(c) {
   const timed = c.artifacts.filter(a => ['log', 'strace', 'pcap'].includes(a.viewer) && a.name !== file)
     .sort((a, b) => (b.name.startsWith(pod + '/') - a.name.startsWith(pod + '/')) || a.name.localeCompare(b.name));
   let at = null;
-  $('moment').innerHTML = '<option value="">Same moment in …</option>' + timed.map(a => {
+  $('moment').innerHTML = '<option value="">Jump to the same moment in …</option>' + timed.map(a => {
     const [where, name] = a.name.split('/');
     return `<option value="${esc(a.name)}">${esc(name)}${where === pod ? '' : ' of ' + esc(where)}</option>`;
   }).join('');

@@ -41,7 +41,7 @@ func (h *Hub) alerts(w http.ResponseWriter, r *http.Request) {
 	}
 	var notice alertNotice
 	if err := json.NewDecoder(r.Body).Decode(&notice); err != nil {
-		fail(w, errStatus{http.StatusBadRequest, "no notification of Alertmanager"})
+		fail(w, errStatus{http.StatusBadRequest, "not an Alertmanager notification"})
 		return
 	}
 	watches, err := h.Store.Watches(r.Context(), "")

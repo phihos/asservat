@@ -57,8 +57,8 @@ function draw(root, heap) {
     <h2>The dump</h2>
     <table class="plain">
       ${java ? `<tr><td>Written</td><td>${heap.time ? esc(new Date(heap.time).toISOString().replace('T', ' ').replace(/\.\d+Z/, ' UTC')) : 'unknown'}</td></tr>` : ''}
-      <tr><td>Format</td><td>${esc(heap.format)}${java ? `, references of ${heap.idSize} bytes` : ': the objects of the heap with their types and sizes, without their contents'}</td></tr>
-      <tr><td>Sizes</td><td>${!java ? 'As the .NET runtime reports them.' : heap.compressed ? 'As the JVM lays objects out with compressed references, its default below 32 GiB of heap: the figures of its own class histogram.' : 'As the JVM lays objects out with full references.'} They are the objects' own sizes ("shallow"). What an object keeps alive ("retained") needs the whole dump in an analyser such as ${java ? 'Eclipse MAT' : 'PerfView or Visual Studio'}: download it for that.</td></tr>
+      <tr><td>Format</td><td>${esc(heap.format)}${java ? `, references of ${heap.idSize} bytes` : '. Lists the heap\'s objects with their types and sizes, without their contents.'}</td></tr>
+      <tr><td>Sizes</td><td>${!java ? 'As reported by the .NET runtime.' : heap.compressed ? 'As the JVM lays objects out with compressed references (its default for heaps under 32 GiB). These match the JVM\'s own class histogram.' : 'As the JVM lays objects out with full-size references.'} These are shallow sizes: each object's own size. To see retained sizes (everything an object keeps alive), download the dump and open it in an analyser such as ${java ? 'Eclipse MAT' : 'PerfView or Visual Studio'}.</td></tr>
     </table></div>`;
 
   // The histogram: every class with objects, narrowed by name and sorted by a column.
@@ -87,12 +87,12 @@ function draw(root, heap) {
     narrow();
   };
 
-  $('biggest').innerHTML = `<div class="page"><p class="muted">The ${heap.biggest.length} single objects with the largest size of their own. A large array is often the storage of a collection, a buffer or a cache.</p>
+  $('biggest').innerHTML = `<div class="page"><p class="muted">The ${heap.biggest.length} single objects with the largest size of their own. A large array is often the backing store of a collection, a buffer or a cache.</p>
     <table class="grid"><thead><tr><th>${java ? 'Class' : 'Type'}</th><th class="n">Size</th>${java ? '<th class="n">Length</th>' : ''}</tr></thead><tbody>
     ${heap.biggest.map(o => `<tr><td class="name">${esc(o.class)}</td><td class="n">${size(o.bytes)}</td>${java ? `<td class="n">${o.array ? number(o.length || 0) : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
 
-  $('threads').innerHTML = `<div class="page"><p class="muted">The stacks of the threads when the dump was written. The dump numbers the threads; their names are among its objects.</p>
-    ${heap.threads.map(t => `<div class="thread"><h4>Thread ${t.serial}</h4><pre>${t.frames.length ? t.frames.map(f => 'at ' + esc(f)).join('\n') : '<span class="muted">no Java frames</span>'}</pre></div>`).join('') || '<p class="muted">The dump holds no thread stacks.</p>'}</div>`;
+  $('threads').innerHTML = `<div class="page"><p class="muted">Thread stacks at the moment the dump was written. The dump identifies threads by number. Their names are stored among its objects.</p>
+    ${heap.threads.map(t => `<div class="thread"><h4>Thread ${t.serial}</h4><pre>${t.frames.length ? t.frames.map(f => 'at ' + esc(f)).join('\n') : '<span class="muted">no Java frames</span>'}</pre></div>`).join('') || '<p class="muted">The dump contains no thread stacks.</p>'}</div>`;
 
   const open = name => {
     for (const b of root.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === name);

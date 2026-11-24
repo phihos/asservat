@@ -126,7 +126,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 				return err
 			}
 			if api.ViewerOf(b.Name) != "pprof" {
-				return errStatus{http.StatusBadRequest, "the base is no profile"}
+				return errStatus{http.StatusBadRequest, "the base is not a profile"}
 			}
 			base = &b
 		}

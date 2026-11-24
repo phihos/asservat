@@ -7,7 +7,7 @@ const markup = `
   <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span id="shown" class="tally"></span></div>
   <div id="calls" class="tab">
     <div class="narrow">
-      <input id="text" type="search" placeholder="Search in arguments and results" autocomplete="off" spellcheck="false">
+      <input id="text" type="search" placeholder="Search arguments and results" autocomplete="off" spellcheck="false">
       <label>System call <select id="syscall"></select></label>
       <label>Process <select id="pid"></select></label>
       <label><input type="checkbox" id="failed"> Failed only</label>
