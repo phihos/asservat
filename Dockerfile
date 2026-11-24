@@ -4,10 +4,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd cmd
 COPY internal internal
-RUN CGO_ENABLED=0 go build -trimpath -o /asservat ./cmd/asservat
+# Without symbol table and debug information (-s -w) the binary is 64 MB
+# instead of 90 MB. Stack traces of a panic keep their functions and lines.
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /asservat ./cmd/asservat
 # Go's trace tool shows execution traces in the hub; "go tool trace" is not
 # a program of its own, so it is built from the toolchain's source.
-RUN CGO_ENABLED=0 go build -trimpath -o /gotrace cmd/trace
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /gotrace cmd/trace
 
 # What the hub and the node agent both run: nsenter (util-linux), curl and,
 # to describe a core dump, gdb (with gcore) and bsdtar and bsdcat
@@ -16,7 +18,8 @@ RUN CGO_ENABLED=0 go build -trimpath -o /gotrace cmd/trace
 FROM docker.io/library/debian:stable-slim AS tools
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools python3-venv strace tcpdump && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
-RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2
+# pip is only needed to install it.
+RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2 && /opt/pystack/bin/pip uninstall -y pip
 # dotnet-dump reads the managed stacks of a .NET core dump for its
 # description. It needs a .NET runtime to run; both are in a directory that
 # no image of a .NET program has its runtime in (internal/coredesc/dotnet.go).

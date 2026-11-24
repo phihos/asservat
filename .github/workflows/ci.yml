@@ -61,9 +61,15 @@ jobs:
           image=ghcr.io/${{ github.repository }}
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           label=org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          docker build --target agent -t "$image:main-agent" -t "$image:${{ github.sha }}-agent" --label "$label" .
-          docker build -t "$image:main" -t "$image:${{ github.sha }}" --label "$label" .
-          docker push --all-tags "$image"
+          # The layers are compressed with zstd instead of gzip: measured on
+          # the agent's image 106 MiB instead of 125 MiB to pull, and faster
+          # to unpack. containerd, CRI-O and Docker from version 23 read it.
+          # The level is BuildKit's highest; the base image's layers are
+          # compressed again (force-compression) to be zstd as well.
+          docker buildx create --use >/dev/null
+          publish() { docker buildx build "$@" --label "$label" --output type=image,push=true,oci-mediatypes=true,compression=zstd,compression-level=19,force-compression=true .; }
+          publish --target agent -t "$image:main-agent" -t "$image:${{ github.sha }}-agent"
+          publish -t "$image:main" -t "$image:${{ github.sha }}"
   # The branch ruleset requires this one check.
   ci-ok:
     if: always()
