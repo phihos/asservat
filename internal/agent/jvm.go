@@ -456,11 +456,46 @@ func (c attacher) socket() (*os.File, error) {
 	return f, nil
 }
 
+// turn waits for this process's turn to make the JVM open its socket and
+// returns what holds it. Another of Asservat's processes holds the lock for
+// at most c.wait; a lock that is held longer is not Asservat's, and the JVM
+// is then not signalled at all.
+func (c attacher) turn() (*os.File, error) {
+	dir, err := os.Open(c.dir)
+	if err != nil {
+		return nil, err
+	}
+	locked := make(chan error, 1)
+	go func() { locked <- unix.Flock(int(dir.Fd()), unix.LOCK_EX) }()
+	select {
+	case err = <-locked:
+	case <-time.After(2 * c.wait):
+		err = errors.New("something holds a lock on it")
+	}
+	if err != nil {
+		dir.Close()
+		return nil, fmt.Errorf("no turn to signal the JVM came on the container's /tmp: %w", err)
+	}
+	return dir, nil
+}
+
 // open makes the JVM open its attach socket, if it has not yet: a marker
 // file in its /tmp tells the JVM that the SIGQUIT which follows asks for
 // the socket and not for a thread dump on its standard output. The marker
 // is removed afterwards.
 func (c attacher) open() error {
+	if s, err := c.socket(); err == nil {
+		return s.Close()
+	}
+	// Diagnostics asked at the same time are asked by a process each. Only
+	// one of them signals the JVM: they take turns by a lock on the JVM's
+	// /tmp, which writes nothing there and goes with the process. The
+	// others then find the socket.
+	turn, err := c.turn()
+	if err != nil {
+		return err
+	}
+	defer turn.Close()
 	if s, err := c.socket(); err == nil {
 		return s.Close()
 	}

@@ -346,7 +346,10 @@ container in place of a port (`<container>/<endpoint>`):
    and sends the JVM SIGQUIT, which makes it open the socket. It waits for
    the socket as long as the JDK's own client does, 10 seconds, told by the
    kernel (inotify), and removes the marker. It signals once: a JVM
-   that is opening its socket prints its threads at a second signal. A JVM that does not find the marker
+   that is opening its socket prints its threads at a second signal.
+   Diagnostics asked at the same time take turns for this step by a lock
+   (flock) on the container's `/tmp`, which writes nothing there, so that
+   only the first signals. A JVM that does not find the marker
    prints its threads to its standard output instead, as at any SIGQUIT.
    The JVM keeps the socket open from then on.
 3. The agent sends one of the commands above. It has no way to send
