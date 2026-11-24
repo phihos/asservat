@@ -129,6 +129,12 @@ postgres:
   image: docker.io/library/postgres:17-alpine
   size: 2Gi
   storageClassName: ""
+  # What the chart's own PostgreSQL asks its node for. Measured with a few
+  # hundred captures: 10 millicores and 180 MiB. No limit is set.
+  resources:
+    requests:
+      cpu: 20m
+      memory: 256Mi
 
 # The node agent: one pod per node that records evidence from the node's pods
 # and uploads it to the hub. It uses the node's PID namespace and the
