@@ -13,7 +13,10 @@ import (
 )
 
 // A synthetic library as musl is built: without unwind tables and frame
-// pointers, stripped. A thread that waits in it ends there for gdb.
+// pointers, stripped. A thread that waits in it ends there for gdb. It is
+// linked without the compiler's start files, whose few unwind entries are
+// a quarter of so small a library's code on arm64 and would pass for its
+// tables.
 const libraryWithoutTables = `#include <unistd.h>
 #include <string.h>
 static int deeper(int depth, volatile char *note) {
@@ -54,7 +57,7 @@ func buildWaiting(t *testing.T, dir, program string) {
 	os.Symlink("libblock.so.1.0", filepath.Join(dir, "libblock.so.1"))
 	os.Symlink("libblock.so.1", filepath.Join(dir, "libblock.so"))
 	for _, args := range [][]string{
-		{"-O1", "-fPIC", "-shared", "-fno-asynchronous-unwind-tables", "-fno-unwind-tables", "-fomit-frame-pointer", "-fno-optimize-sibling-calls", "-s", "-Wl,-soname,libblock.so.1", "-o", "libblock.so.1.0", "block.c"},
+		{"-O1", "-fPIC", "-shared", "-fno-asynchronous-unwind-tables", "-fno-unwind-tables", "-fomit-frame-pointer", "-fno-optimize-sibling-calls", "-s", "-nostartfiles", "-Wl,-soname,libblock.so.1", "-o", "libblock.so.1.0", "block.c"},
 		{"-O1", "-g", "-fno-optimize-sibling-calls", "-o", "waiting", "main.c", "-L.", "-lblock", "-Wl,-rpath,$ORIGIN"},
 	} {
 		build := exec.Command("gcc", args...)
