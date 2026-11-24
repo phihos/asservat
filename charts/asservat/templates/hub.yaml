@@ -87,6 +87,14 @@ spec:
             httpGet:
               path: /healthz
               port: http
+          # A hub that no longer answers is started anew: captures, approvals
+          # and queued tasks are in PostgreSQL, and agents reconnect.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 6
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

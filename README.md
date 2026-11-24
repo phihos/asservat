@@ -63,7 +63,7 @@ flowchart LR
   diagnostics, the agent writes an empty marker file into the container's
   `/tmp` and signals the JVM. No code is loaded into it.
 - **Evidence is encrypted** by the hub before it is stored, each file with its
-  own key. Only the requester and administrators can download it, every
+  own key. Only the requester, administrators and, once the requester shares it, the people who may capture in its namespace can download it, every
   download is recorded in the audit log, and evidence is deleted when its
   retention ends (7 days by default).
 

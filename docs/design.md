@@ -795,6 +795,12 @@ files asks first.
   does, an administrator's sensitive requests and watches start without a
   separate approval and are recorded as approved by themselves.
 - A capture and its files are visible to its requester and to administrators.
+  Its requester, or an administrator, can share it: it is then also there,
+  to look at and to download, for everyone who may capture in its
+  namespace, which the cluster's RBAC tells at every access as it does for
+  a new capture. Nobody else learns that it exists, and only its requester
+  and administrators change, stop or delete it. Sharing and taking it back
+  are in the audit log, as is every file that a colleague opens.
 
 ## Security
 
@@ -866,5 +872,4 @@ These are known gaps, in rough order of value:
   What there is instead: memory growth by sampling for every language, the
   heap dump and class histogram of a JVM, and the heap profile of a Go
   program that does serve an endpoint.
-- Sharing a capture with other users or teams.
 - Several hub replicas.
