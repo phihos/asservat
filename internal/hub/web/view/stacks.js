@@ -58,7 +58,7 @@ export default async function (root) {
     // The stacks that most share come first, as the likeliest place of a pile-up.
     if ($('group').checked) groups.sort((a, b) => b.length - a.length);
     selected = 0;
-    $('shown').textContent = `${all.length} in the dump · ${kept.length} shown` + ($('group').checked ? ` in ${groups.length} stacks` : '');
+    $('shown').textContent = `${all.length.toLocaleString('en')} in the dump · ${kept.length.toLocaleString('en')} shown` + ($('group').checked ? ` in ${groups.length} stacks` : '');
     draw();
   };
   for (const id of ['text', 'state', 'group']) $(id).oninput = narrow;

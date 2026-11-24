@@ -66,7 +66,7 @@ function draw(root, heap) {
   let rows = heap.classes, sort = 'bytes';
   const list = virtual($('scroll'), $('rows'), rowHeight, i => {
     const c = rows[i];
-    return `<div class="histogram" style="top:${i * rowHeight}px"><span class="name" title="${esc(c.name)}">${esc(c.name)}</span><span class="n">${number(c.instances)}</span><span class="n">${size(c.bytes)}</span><span class="track"><i style="width:${share(c.bytes).toFixed(2)}%"></i><em>${share(c.bytes).toFixed(1)} %</em></span></div>`;
+    return `<div class="histogram" style="top:${i * rowHeight}px"><span class="name" title="${esc(c.name)}">${esc(c.name)}</span><span class="n">${number(c.instances)}</span><span class="n">${size(c.bytes)}</span><span class="track labelled"><i style="width:calc((100% - 58px) * ${(share(c.bytes) / 100).toFixed(4)})"></i><em>${share(c.bytes).toFixed(1)} %</em></span></div>`;
   });
   const narrow = () => {
     const typed = $('find').value.trim(), re = /^\/(.*)\/$/.exec(typed);

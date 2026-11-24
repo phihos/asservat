@@ -104,7 +104,7 @@ export default async function (root) {
     select(order ? order[to] : to);
   };
   const first = parts(0)[0], last = lines.length ? parts(lines.length - 1)[0] : '';
-  $('span').textContent = `${lines.length} line${lines.length === 1 ? '' : 's'}` + (first && last ? ` · ${first.slice(0, 19).replace('T', ' ')} to ${last.slice(0, 19).replace('T', ' ')} UTC` : '');
+  $('span').textContent = `${lines.length.toLocaleString('en')} line${lines.length === 1 ? '' : 's'}` + (first && last ? ` · ${first.slice(0, 19).replace('T', ' ')} to ${last.slice(0, 19).replace('T', ' ')} UTC` : '');
   if (truncated) { $('note').hidden = false; $('note').textContent = truncatedNote; }
   if (!lines.length) { $('note').hidden = false; $('note').textContent = 'This log is empty.'; }
   show();

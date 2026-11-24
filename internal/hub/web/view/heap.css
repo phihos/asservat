@@ -8,7 +8,9 @@
 .bar .value { font: 12px var(--mono); color: var(--quiet); text-align: right; }
 .track { position: relative; height: 12px; background: var(--soft); }
 .track i { position: absolute; inset: 0 auto 0 0; background: var(--marker); min-width: 1px; }
-.track em { position: absolute; right: 4px; top: -3px; font: normal 11px var(--mono); color: var(--quiet); }
+/* A bar with its share written beside it, not on it. */
+.track.labelled { background: linear-gradient(var(--soft), var(--soft)) left / calc(100% - 58px) 100% no-repeat; }
+.track em { position: absolute; right: 0; top: 50%; width: 50px; transform: translateY(-50%); text-align: right; font: normal 12px/1 var(--mono); color: var(--quiet); }
 table.plain { border-collapse: collapse; }
 table.plain td { padding: 3px 24px 3px 0; vertical-align: top; }
 table.plain td:first-child { color: var(--quiet); white-space: nowrap; }

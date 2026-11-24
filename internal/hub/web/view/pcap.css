@@ -51,8 +51,9 @@ dialog { width: min(900px, 92vw); height: min(640px, 86vh); padding: 0; border: 
 dialog[open] { display: flex; flex-direction: column; }
 dialog::backdrop { background: #14181A99; }
 dialog h2 { margin: 0; padding: 12px 16px 10px; font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; border-bottom: 1px solid var(--line); }
-dialog pre { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
+dialog pre { flex: 1; margin: 0; padding: 12px 16px; overflow: auto; font: 12px/17px var(--mono); white-space: pre-wrap; word-break: break-all; }
 /* The two sides of a followed stream, red and blue as in Wireshark. */
+dialog .bar .client, dialog .bar .server { padding: 2px 6px; margin-right: 6px; }
 dialog .client { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
 dialog .server { color: var(--custody-ink); background: color-mix(in srgb, var(--custody) 10%, var(--surface)); }
 dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--soft); }

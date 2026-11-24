@@ -17,6 +17,7 @@
 #summary { padding: 14px 16px; }
 #summary table { border-collapse: collapse; font: 12px var(--mono); }
 #summary th, #summary td { padding: 4px 14px; text-align: right; border-bottom: 1px solid var(--soft); }
+#summary th:first-child, #summary td:first-child { padding-left: 0; }
 #summary th { border-bottom: 1px solid var(--ink); }
 #summary td.name, #summary th:last-child { text-align: left; }
 #summary td.name { color: var(--custody-ink); font-weight: 500; }

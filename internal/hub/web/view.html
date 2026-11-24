@@ -70,7 +70,11 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 .tab { flex: 1; min-height: 0; overflow: auto; background: var(--surface); }
 /* A view that is read like a page: a sheet on the ground, as a capture is in the console. */
 .tab:has(> .page) { background: var(--ground); }
+.tab:has(> .page) { scrollbar-gutter: stable; }
 .page { max-width: 1100px; margin: 16px auto 40px; padding: 4px 24px 24px; background: var(--surface); border: 1px solid var(--line); }
+/* On a sheet a table begins and ends where the text does. */
+.page .grid th:first-child, .page .grid td:first-child { padding-left: 0; } .page .grid th:last-child, .page .grid td:last-child { padding-right: 0; }
+.page > .grid:first-child { margin-top: 12px; }
 .page h2, .page h3.head { margin: 24px 0 10px; font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
 /* The headings of a list's columns, and of a table's. */
 .cols, .grid th, .tab th { font: 500 11px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); text-align: left; white-space: nowrap; }

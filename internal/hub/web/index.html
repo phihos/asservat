@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="/assets/identity.css">
 <style>
   /* The tokens, fonts and the wordmark are in identity.css. Corners are square, as on a label. */
+  /* The scrollbar is always there, so that a page does not shift beside one that needs none. */
+  html { overflow-y: scroll; }
   body { font: 14px/1.45 var(--text); margin: 0; background: var(--ground); color: var(--ink); }
   body > :not(header) { max-width: 1100px; margin-inline: auto; padding-inline: 16px; box-sizing: border-box; }
   h1 { margin: 0; } h2 { font: 700 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 24px 0 10px; }
@@ -61,7 +63,7 @@
   button:disabled { opacity: .6; cursor: progress; }
   :focus-visible { outline: 2px solid var(--custody); outline-offset: 1px; }
   table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; }
+  th { font: 500 11px var(--mono); color: var(--quiet); text-transform: uppercase; letter-spacing: .08em; border-bottom-color: var(--ink); }
   /* A list on a page of its own lies on a surface, as a capture does. */
   section[data-view] > table { background: var(--surface); border: 1px solid var(--line); } section[data-view] > table :is(th, td) { padding: 8px 12px; } section[data-view] > table tr:last-child td { border-bottom: 0; }
   .state { font-weight: 600; } .PendingApproval { color: var(--custody-ink); } .Completed { color: var(--ok); } .Failed, .Denied { color: var(--bad); }

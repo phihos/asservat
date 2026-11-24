@@ -98,7 +98,7 @@ async function applyFilter(filter) {
   $('clear').disabled = !filter;
   $('list').scrollTop = 0;
   list.count(shown);
-  $('counts').textContent = `Packets: ${total} · Displayed: ${shown} (${total ? (shown * 100 / total).toFixed(1) : '0.0'}%)`;
+  $('counts').textContent = `${total.toLocaleString('en')} packets · ${shown.toLocaleString('en')} shown`;
   showFrame(null);
   draw();
   if (shown) await select(0);
