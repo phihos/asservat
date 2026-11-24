@@ -696,5 +696,13 @@ for action in capture.request capture.approve capture.deny capture.stop artifact
   case " $audit " in *" $action "*) ;; *) fail "audit lacks $action" ;; esac
 done
 
+# What all of the above recorded is looked at as a person would: the console's
+# pages and one file per viewer in a headless browser, at a desk's and at a
+# phone's width. Scripts that fail, files that do not open and pages that run
+# out of the screen fail the run. Without a browser on the machine it is left out.
+log "the console and every viewer in a browser, wide and narrow"
+browsed=0; node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
+case $browsed in 0) ;; 3) log "left out: no Chromium or Chrome is installed here" ;; *) fail "the pages in a browser" ;; esac
+
 log "PASS"
 ls -l "$WORK"/pod.json "$WORK"/web.log "$WORK"/capture.pcap "$WORK"/web.strace "$WORK"/core.web "$WORK"/crash.pcap "$WORK"/crash.log
