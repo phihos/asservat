@@ -267,7 +267,11 @@ func (h *Hub) fire(ctx context.Context, id, key, pod, on, message string) (api.C
 	if watch.Reason != "" {
 		request.Reason += " (" + watch.Reason + ")"
 	}
-	capture, err := h.record(ctx, u, request, pods, "capture.trigger", watch.Approver)
+	// From here on the caller's time limit no longer applies: the cluster
+	// has answered, and a limit that ran out between making the capture and
+	// reading it back gave the count back for a capture that exists, so
+	// that the same moment was recorded again at the next try.
+	capture, err := h.record(context.WithoutCancel(ctx), u, request, pods, "capture.trigger", watch.Approver)
 	if err != nil {
 		if e := h.Store.RefundWatch(context.WithoutCancel(ctx), id, key); e != nil {
 			slog.Error("watch's count not given back", "watch", id, "error", e)
