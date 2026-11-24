@@ -31,6 +31,9 @@ export default async function (root) {
   if (lines.at(-1) === '') lines.pop();
   root.innerHTML = markup;
   let pattern = null, matches = [], at = -1, visible = null, selected = -1;
+  // Words such as "error" tell a log line's level. Text that is no log, as
+  // a class histogram with its exception classes, has no timestamps.
+  const leveled = lines.slice(0, 20).some(line => stamp.test(line));
 
   const parts = i => { const m = stamp.exec(lines[i]); return m ? [m[1], lines[i].slice(m[0].length)] : ['', lines[i]]; };
   const marked = s => {
@@ -44,7 +47,7 @@ export default async function (root) {
   };
   const index = i => visible ? visible[i] : i;
   const list = virtual($('log'), $('lines'), rowHeight, i => {
-    const n = index(i), [time, message] = parts(n), level = levels.find(([re]) => re.test(message))?.[1] || '';
+    const n = index(i), [time, message] = parts(n), level = leveled && levels.find(([re]) => re.test(message))?.[1] || '';
     return `<div class="l ${level}${n === selected ? ' selected' : ''}${n === matches[at] ? ' current' : ''}" data-n="${n}" style="top:${i * rowHeight}px"><span class="no">${n + 1}</span>${time && $('stamps').checked ? `<span class="ts">${esc(time)}</span> ` : ''}${marked(message)}</div>`;
   });
   const count = () => list.count(visible ? visible.length : lines.length);

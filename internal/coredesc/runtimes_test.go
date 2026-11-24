@@ -37,7 +37,7 @@ func TestRuntimeStacksAwaitADescriberWithTheirTool(t *testing.T) {
 	with := without
 	with.PystackPython = pystack
 	described := func(file string) []byte {
-		return []byte(`{"describer":8,"executable":"` + file + `","mappings":[{"file":"` + file + `"}]}`)
+		return []byte(`{"describer":9,"executable":"` + file + `","mappings":[{"file":"` + file + `"}]}`)
 	}
 	for file, awaited := range map[string][]string{python: {"python"}, coreclr: {"dotnet"}, plain: nil} {
 		if got := Awaits(without.runtimes(ctx, described(file), "core", root)); !slices.Equal(got, awaited) {
@@ -62,7 +62,7 @@ func TestRuntimeStacksAwaitADescriberWithTheirTool(t *testing.T) {
 	if err := json.Unmarshal(report, &completed); err != nil {
 		t.Fatal(err)
 	}
-	if len(Awaits(report)) != 0 || completed.Describer != 8 || len(completed.RuntimeStacks) != 1 || completed.RuntimeStacks[0].Runtime != "python" || completed.RuntimeStacks[0].Threads[0].Frames[0].Function != "handle_order" {
+	if len(Awaits(report)) != 0 || completed.Describer != 9 || len(completed.RuntimeStacks) != 1 || completed.RuntimeStacks[0].Runtime != "python" || completed.RuntimeStacks[0].Threads[0].Frames[0].Function != "handle_order" {
 		t.Fatalf("completed: %s", report)
 	}
 	// A tool that fails leaves the stacks awaited, for another try.

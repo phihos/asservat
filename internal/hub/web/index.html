@@ -274,17 +274,6 @@
         <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
         <label><input type="radio" name="when" value="time">At a time<small>All pods of the workload, once or again and again: a nightly job, a peak hour</small></label>
       </div>
-      <div id="beforeFields" hidden>
-        <h3>From before it happens</h3>
-        <p class="muted lead">These recordings can be kept running while the watch waits, so that their files begin before the moment and not at it.</p>
-        <div class="group">
-          <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">costs little</span></label>
-          <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of a CPU on the pod's node while the watch waits</span></label>
-          <label data-before="memory"><input type="checkbox" id="beforeMemory"> Memory growth <span class="muted">slows every page fault on the pod's node while the watch waits</span></label>
-          <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, much if it makes many calls; a core dump of it cannot be taken then</span></label>
-        </div>
-        <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
-      </div>
       <div class="fields" id="eventFields" hidden>
         <label class="wide">Reason of the events<input id="eventReason" placeholder="any warning; or one reason, such as Unhealthy, BackOff, FailedMount" spellcheck="false" autocomplete="off"></label>
       </div>
@@ -304,6 +293,17 @@
       <div class="fields" id="logFields" hidden>
         <label class="wide">The line matches, as a regular expression<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
         <label>Written by<select id="logContainer"></select></label>
+      </div>
+      <div id="beforeFields" hidden>
+        <h3>From before it happens</h3>
+        <p class="muted lead">These recordings can be kept running while the watch waits, so that their files begin before the moment and not at it.</p>
+        <div class="group">
+          <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">costs little</span></label>
+          <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of a CPU on the pod's node while the watch waits</span></label>
+          <label data-before="memory"><input type="checkbox" id="beforeMemory"> Memory growth <span class="muted">slows every page fault on the pod's node while the watch waits</span></label>
+          <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, much if it makes many calls; a core dump of it cannot be taken then</span></label>
+        </div>
+        <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
       </div>
       <div class="fields">
         <label id="countLabel" hidden>How many times to record<input id="count" type="number" min="1" placeholder="1"></label>

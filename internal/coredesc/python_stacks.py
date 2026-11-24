@@ -18,7 +18,9 @@ for thread in get_process_threads_for_core(core, executable, library_search_path
         variables = lambda found: [{"name": name, "type": "", "value": value if len(value) <= longest else value[:longest] + "…"} for name, value in found.items()]
         frames.append({"level": len(frames), "pc": "", "function": frame.code.scope, "file": frame.code.filename, "line": frame.code.location.lineno,
                        "arguments": variables(frame.arguments), "locals": variables(frame.locals)})
+    # No name: a core holds none, and pystack would take that of whatever
+    # process has the thread's number on the machine that reads the core.
     status = ", ".join(s for s in (thread.gil_status, thread.gc_status) if s)
-    threads.append({"id": thread.tid, "name": thread.name or "", "status": status, "current": False, "threadSystemId": thread.tid,
+    threads.append({"id": thread.tid, "name": "", "status": status, "current": False, "threadSystemId": thread.tid,
                     "frames": frames[:most], "cut": len(frames) > most})
 json.dump({"runtime": "python", "title": "Python threads", "version": ".".join(str(n) for n in version) if version else "", "threads": threads}, sys.stdout)
