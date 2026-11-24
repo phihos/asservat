@@ -8,6 +8,8 @@
 #   KEEP=1 test/e2e/run.sh   keep the clusters for inspection
 #   CORE_HANDLER=1 test/e2e/run.sh   also record the core of a crashed process
 #   SAMPLE_CPU=1 test/e2e/run.sh     also sample profiles of CPU time and memory growth
+#   CHROME=<path> test/e2e/run.sh    the browser that looks at the pages (default: the first of chromium, chromium-browser, google-chrome that is installed)
+#   REQUIRE_BROWSER=1 test/e2e/run.sh   fail where no browser is installed, instead of leaving the pages out
 #
 # CORE_HANDLER changes kernel.core_pattern of the machine that runs kind,
 # because kind nodes share its kernel. Use it only on a disposable machine
@@ -702,8 +704,13 @@ done
 # out of the screen fail the run. Without a browser on the machine it is left out.
 log "the console and every viewer in a browser, wide and narrow"
 # The demo's heap profile is a word, not a profile: the viewer has to say so.
-browsed=0; UNREADABLE=heap.pprof node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
-case $browsed in 0) ;; 3) log "left out: no Chromium or Chrome is installed here" ;; *) fail "the pages in a browser" ;; esac
+browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
+case $browsed in
+  0) ;;
+  78) [ -z "${REQUIRE_BROWSER:-}" ] || fail "no Chromium or Chrome is installed, and REQUIRE_BROWSER asks for the pages to be looked at"
+      log "left out: no Chromium or Chrome is installed here" ;;
+  *) fail "the pages in a browser" ;;
+esac
 
 log "PASS"
 ls -l "$WORK"/pod.json "$WORK"/web.log "$WORK"/capture.pcap "$WORK"/web.strace "$WORK"/core.web "$WORK"/crash.pcap "$WORK"/crash.log

@@ -20,7 +20,8 @@ import {join} from 'node:path';
 const [hub, token] = process.argv.slice(2);
 const chrome = process.env.CHROME || ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'].find(name => spawnSync('sh', ['-c', `command -v ${name}`]).status === 0);
 if (!hub || !token) { console.error('usage: browser.mjs <hub URL> <token>'); process.exit(2); }
-if (!chrome) { console.error('no Chromium or Chrome is installed'); process.exit(3); }
+// 78 says that there is no browser, and nothing else does.
+if (!chrome) { console.error('no Chromium or Chrome is installed'); process.exit(78); }
 
 const profile = mkdtempSync(join(tmpdir(), 'asservat-browser-'));
 const env = {...process.env}; delete env.LD_LIBRARY_PATH;
@@ -34,10 +35,11 @@ const listening = await new Promise((found, failed) => {
 });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let target;
-for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://${listening}/json`)).json()).find(t => t.type === 'page'); if (!target) await sleep(100); }
+for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://${listening}/json`).catch(() => null))?.json().catch(() => []) || []).find(t => t.type === 'page'); if (!target) await sleep(100); }
+if (!target) { console.error('the browser shows no page'); browser.kill(); process.exit(1); }
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(r => ws.onopen = r);
-let id = 0, seen = [];
+let id = 0, seen = [], signedOut = false;
 const waiting = new Map();
 ws.onmessage = m => {
   const d = JSON.parse(m.data);
@@ -45,9 +47,11 @@ ws.onmessage = m => {
   else if (d.method === 'Runtime.consoleAPICalled' && d.params.type === 'error') seen.push('console: ' + d.params.args.map(a => a.value ?? a.description).join(' '));
   else if (d.method === 'Runtime.exceptionThrown') seen.push('exception: ' + (d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text));
   // Before signing in the console asks who is there and is told nobody.
-  else if (d.method === 'Network.responseReceived' && d.params.response.status >= 400 && !d.params.response.url.endsWith('/api/me')) seen.push(`HTTP ${d.params.response.status} ${d.params.response.url}`);
+  else if (d.method === 'Network.responseReceived' && d.params.response.status >= 400 && !(signedOut && d.params.response.url.endsWith('/api/me'))) seen.push(`HTTP ${d.params.response.status} ${d.params.response.url}`);
 };
-const send = (method, params = {}) => new Promise(r => { waiting.set(++id, r); ws.send(JSON.stringify({id, method, params})); });
+// A browser that ends, or hangs up, answers nothing more: what waits for it fails.
+ws.onclose = () => { for (const answer of waiting.values()) answer({result: {exceptionDetails: {text: 'the browser hung up'}}}); waiting.clear(); };
+const send = (method, params = {}) => ws.readyState !== WebSocket.OPEN ? Promise.resolve({result: {exceptionDetails: {text: 'the browser hung up'}}}) : new Promise(r => { waiting.set(++id, r); ws.send(JSON.stringify({id, method, params})); });
 const run = async expression => {
   const r = await send('Runtime.evaluate', {expression: `(async () => { ${expression} })()`, awaitPromise: true, returnByValue: true});
   if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description || 'the page could not be asked');
@@ -77,10 +81,12 @@ const open = async url => { await send('Page.navigate', {url}); await until('the
 for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
   await check(`${size}: signing in`, async () => {
+    signedOut = true;
     await open(hub + '/');
     // As someone who has not signed in, also the second time round.
     await run(`sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload()`);
     await until('the sign-in form', `return !document.getElementById('login').hidden`);
+    signedOut = false;
     await run(`sessionStorage.setItem('token', ${JSON.stringify(token)}); location.reload()`);
     await until('the list of captures', `return !document.getElementById('app').hidden && document.querySelector('.capture, #noCaptures:not([hidden])')`);
   });
