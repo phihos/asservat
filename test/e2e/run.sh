@@ -456,6 +456,60 @@ fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/profile.out"
 [ "$(cat "$WORK/profile.out")" = hello ] || fail "content of the unknown endpoint"
 [ "$(status "$ALICE" POST /api/captures "$(target edge pprof)")" = 400 ] || fail "a profile without an endpoint was accepted"
 
+log "the managed stacks of .NET programs, on glibc and on Alpine's musl (edge)"
+# One synthetic program, built once on this machine, runs in Microsoft's
+# runtime image for glibc and in the one for Alpine. The core of each is
+# described with its managed stacks, which the hub reads: with the tool's
+# runtime for glibc and with the one for musl.
+mkdir -p "$WORK/dotnet"
+cat >"$WORK/dotnet/Program.cs" <<'EOF2'
+namespace Shop {
+    static class Billing {
+        public static void Charge(decimal amount) { Hold(new System.InvalidOperationException("card declined for " + amount)); }
+        static void Hold(System.Exception e) { System.Console.WriteLine("ready"); System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite); System.GC.KeepAlive(e); }
+    }
+    static class Program { static void Main() { Billing.Charge(12.5m); } }
+}
+EOF2
+docker run --rm -v "$WORK/dotnet:/work" mcr.microsoft.com/dotnet/sdk:10.0 sh -c 'mkdir /src && cd /src && dotnet new console -n shop -o . >/dev/null && cp /work/Program.cs . && dotnet build -c Debug -o /work/out >/work/build.log 2>&1 && chmod -R a+rX /work/out' \
+  || fail "the .NET program was not built: $(tail -5 "$WORK/dotnet/build.log" 2>&1)"
+edge -n shop create configmap dotnet-app --from-file="$WORK/dotnet/out/shop.dll" --from-file="$WORK/dotnet/out/shop.pdb" --from-file="$WORK/dotnet/out/shop.runtimeconfig.json" >/dev/null
+for libc in glibc musl; do
+  image=mcr.microsoft.com/dotnet/runtime:10.0; [ $libc = musl ] && image=$image-alpine
+  edge apply -f - >/dev/null <<EOF2
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: dotnet-$libc, namespace: shop}
+spec:
+  selector: {matchLabels: {app: dotnet-$libc}}
+  template:
+    metadata: {labels: {app: dotnet-$libc}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: app
+          image: $image
+          command: [dotnet, /app/shop.dll]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: app, mountPath: /app}]
+      volumes: [{name: app, configMap: {name: dotnet-app}}]
+EOF2
+done
+for libc in glibc musl; do
+  edge -n shop rollout status deployment/dotnet-$libc --timeout 240s >/dev/null
+  pod=$(edge -n shop get pods -l app=dotnet-$libc -o jsonpath='{.items[0].metadata.name}')
+  for _ in $(seq 60); do edge -n shop logs "$pod" | grep -q ready && break; sleep 1; done
+  id=$(capture "$ALICE" "{\"cluster\":\"edge\",\"namespace\":\"shop\",\"workload\":\"Deployment/dotnet-$libc\",\"recordings\":[{\"kind\":\"coredump\"}]}")
+  ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
+  completed "$ALICE" "$id"
+  # The hub adds the stacks when the core has arrived; who opens it meanwhile waits for that.
+  ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.app\"}" >/dev/null
+  fetch "$ALICE" "$id" "$pod/core.app.analysis.json" "$WORK/core.dotnet-$libc.analysis.json"
+  jq -e '(.awaits | not) and (.runtimeStacks[0] | .runtime == "dotnet" and (.version | startswith("10.")) and ([.threads[].frames[] | select((.function | startswith("Shop.Billing.Charge(")) and (.file | endswith("Program.cs")) and .line > 0)] | length == 1))' "$WORK/core.dotnet-$libc.analysis.json" >/dev/null \
+    || fail "the managed stacks of a .NET core on $libc: $(jq -c '[.awaits, .runtimeStacks]' "$WORK/core.dotnet-$libc.analysis.json" | head -c 700); the hub said: $(hub -n asservat logs deploy/asservat-hub --tail=8 2>&1 | tail -c 900)"
+  edge -n shop delete deployment dotnet-$libc --wait=false >/dev/null
+done
+
 log "a JVM's own diagnostics, asked over its attach socket (edge)"
 # A Java program that serves nothing: threads with names to recognize wait
 # in a method to recognize. It runs as any workload does, as a user that is
