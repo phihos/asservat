@@ -213,6 +213,9 @@ var mcpTools = []mcpTool{
 				if stale != "" && coredesc.DescribedBy(report.Bytes()) < coredesc.Version {
 					text = "Described by an older Asservat, which may show less (" + stale + "). A new dump is described in full.\n\n" + text
 				}
+				if awaited := coredesc.Awaits(report.Bytes()); len(awaited) > 0 {
+					text = "The program's own stacks (" + strings.Join(awaited, ", ") + ") could not be read from this core: the machine's threads show the runtime, not the program.\n\n" + text
+				}
 				from := min(max(in.Offset, 0), int64(len(text)))
 				return map[string]any{"size": len(text), "offset": from, "text": strings.ToValidUTF8(text[from:min(from+mcpReadLimit, int64(len(text)))], "")}, nil
 			}

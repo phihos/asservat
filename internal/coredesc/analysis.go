@@ -139,16 +139,18 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 
 // runtimes adds to a description the stacks of the language runtimes that
 // are read with a tool of their own. Where the tool is not installed, as
-// in the agent's image, the description says that it awaits them.
+// in the agent's image, or fails, the description says that it awaits them.
 func (d Describer) runtimes(ctx context.Context, report []byte, core, root string) []byte {
-	if with, err := d.describePython(ctx, report, core, root); err != nil {
-		slog.Warn("Python stacks not described", "core", core, "error", err)
-	} else {
-		report = with
-	}
-	if with, err := d.describeDotnet(ctx, report, core, root); err != nil {
-		slog.Warn(".NET stacks not described", "core", core, "error", err)
-	} else {
+	for runtime, describe := range map[string]func(context.Context, []byte, string, string) ([]byte, error){runtimePython: d.describePython, runtimeDotnet: d.describeDotnet} {
+		with, err := describe(ctx, report, core, root)
+		if err != nil {
+			// What the tool failed at this time it may read another time:
+			// the stacks stay awaited.
+			slog.Warn("a runtime's stacks not described", "runtime", runtime, "core", core, "error", err)
+			if with, err = await(report, runtime); err != nil {
+				continue
+			}
+		}
 		report = with
 	}
 	return report
@@ -205,8 +207,7 @@ func (d Describer) Completes(report []byte) bool {
 
 // Complete adds the stacks of the runtimes that a description awaits, as
 // far as this describer has their tools, from the core and the program's
-// files under root. What a tool fails at is logged and not awaited again,
-// as when the first describer has the tool.
+// files under root. What a tool fails at is logged and stays awaited.
 func (d Describer) Complete(ctx context.Context, report []byte, core, root string) []byte {
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(report, &fields) != nil {
