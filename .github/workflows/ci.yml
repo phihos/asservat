@@ -55,7 +55,8 @@ jobs:
         with:
           install_only: true
       # The runner is a disposable machine: the test may change its core pattern.
-      - run: CORE_HANDLER=1 SAMPLE_CPU=1 test/e2e/run.sh
+      # GitHub's amd64 runners have Chrome: there the pages must be looked at. The arm64 runners have no browser.
+      - run: CORE_HANDLER=1 SAMPLE_CPU=1 REQUIRE_BROWSER=${{ matrix.runner == 'ubuntu-latest' && '1' || '' }} test/e2e/run.sh
   # Every commit on main is published as ghcr.io/<owner>/asservat:main and
   # :<commit>, and the agent's image under the same tags with "-agent".
   image:
