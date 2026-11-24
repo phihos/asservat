@@ -173,3 +173,57 @@ func TestProgramFileAskedForThroughAnotherDirectory(t *testing.T) {
 		t.Fatalf("unpacked, the name asked for leads to %q", b)
 	}
 }
+
+// Archives from before the files of a name through another directory were
+// kept at the path it leads to hold such names, some beside the same file
+// at that path. They unpack to the path within the directory; a name that
+// leads out of it is refused as before.
+func TestArchiveWithANameThroughAnotherDirectoryUnpacks(t *testing.T) {
+	var archive bytes.Buffer
+	w := tar.NewWriter(&archive)
+	for _, name := range []string{"usr/local/bin/python3.13", "usr/local/lib/libpython3.13.so.1.0", "usr/local/bin/../lib/libpython3.13.so.1.0"} {
+		w.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o755, Size: int64(len("\x7fELF synthetic"))})
+		w.Write([]byte("\x7fELF synthetic"))
+	}
+	w.Close()
+	dir := t.TempDir()
+	if err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len())); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "usr/local/lib/libpython3.13.so.1.0")); string(b) != "\x7fELF synthetic" {
+		t.Fatalf("unpacked %q", b)
+	}
+	// A link under both of its names unpacks; a file where a link stands
+	// does not, and neither does a second copy that makes the archive
+	// unpack to more than its size.
+	entries := func(list ...tar.Header) *bytes.Buffer {
+		var b bytes.Buffer
+		w := tar.NewWriter(&b)
+		for _, h := range list {
+			w.WriteHeader(&h)
+			w.Write(bytes.Repeat([]byte("x"), int(h.Size)))
+		}
+		w.Close()
+		return &b
+	}
+	twice := entries(tar.Header{Name: "lib/libc.so.6", Typeflag: tar.TypeReg, Size: 4}, tar.Header{Name: "usr/lib/libc.so", Typeflag: tar.TypeSymlink, Linkname: "../../lib/libc.so.6"}, tar.Header{Name: "usr/bin/../lib/libc.so", Typeflag: tar.TypeSymlink, Linkname: "../../lib/libc.so.6"})
+	if err := ExtractFiles(twice, t.TempDir(), int64(twice.Len())); err != nil {
+		t.Fatal("a link under both of its names:", err)
+	}
+	inTheWay := entries(tar.Header{Name: "lib/libc.so", Typeflag: tar.TypeSymlink, Linkname: "libc.so.6"}, tar.Header{Name: "usr/../lib/libc.so", Typeflag: tar.TypeReg, Size: 4})
+	if err := ExtractFiles(inTheWay, t.TempDir(), int64(inTheWay.Len())); err == nil {
+		t.Fatal("a file was unpacked where a link stands")
+	}
+	more := entries(tar.Header{Name: "lib/x", Typeflag: tar.TypeReg, Size: 8}, tar.Header{Name: "usr/../lib/x", Typeflag: tar.TypeReg, Size: 8})
+	if err := ExtractFiles(more, t.TempDir(), 12); err == nil {
+		t.Fatal("a second copy made the archive unpack to more than its size")
+	}
+	var out bytes.Buffer
+	w = tar.NewWriter(&out)
+	w.WriteHeader(&tar.Header{Name: "usr/../../outside", Typeflag: tar.TypeReg, Size: 1})
+	w.Write([]byte("x"))
+	w.Close()
+	if err := ExtractFiles(bytes.NewReader(out.Bytes()), t.TempDir(), int64(out.Len())); err == nil {
+		t.Fatal("a name that leads out of the directory was unpacked")
+	}
+}

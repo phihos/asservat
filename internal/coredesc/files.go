@@ -205,21 +205,46 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 		if err != nil {
 			return err
 		}
-		link := header.Typeflag == tar.TypeSymlink && !filepath.IsAbs(header.Linkname) && fs.ValidPath(pathpkg.Join(pathpkg.Dir(header.Name), header.Linkname))
-		if header.Typeflag != tar.TypeReg && !link || !fs.ValidPath(header.Name) {
+		// An archive of an earlier Asservat may name a file through another
+		// directory (usr/local/bin/../lib/x): it is the file at the path
+		// that the name leads to, if that is within the directory.
+		name := header.Name
+		if !filepath.IsAbs(name) {
+			name = pathpkg.Clean(name)
+		}
+		link := header.Typeflag == tar.TypeSymlink && !filepath.IsAbs(header.Linkname) && fs.ValidPath(pathpkg.Join(pathpkg.Dir(name), header.Linkname))
+		if header.Typeflag != tar.TypeReg && !link || !fs.ValidPath(name) {
 			return errors.New("the archive holds more than program files: " + header.Name)
 		}
-		path := filepath.Join(dir, header.Name)
+		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return err
 		}
 		if link {
-			if err := os.Symlink(header.Linkname, path); err != nil {
+			err := os.Symlink(header.Linkname, path)
+			// The same link a second time, under both of its names in such an earlier archive.
+			if to, e := os.Readlink(path); errors.Is(err, fs.ErrExist) && e == nil && to == header.Linkname {
+				continue
+			}
+			if err != nil {
 				return err
 			}
 			continue
 		}
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		// The same file a second time, as such an earlier archive holds it
+		// under both of its names: the first stands. What else is in the
+		// way, a link or a directory, is a fault of the archive.
+		if info, e := os.Lstat(path); errors.Is(err, fs.ErrExist) && e == nil && info.Mode().IsRegular() {
+			n, err := io.Copy(io.Discard, io.LimitReader(archive, left+1))
+			if left -= n; err == nil && left < 0 {
+				err = errors.New("the archive unpacks to more than it holds")
+			}
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		if err != nil {
 			return err
 		}
