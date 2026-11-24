@@ -37,7 +37,15 @@ header select option { background: var(--bar); color: var(--on-bar); }
 header select:hover, header button:hover { border-color: var(--on-bar-quiet); }
 header a.button { display: flex; align-items: center; border-color: var(--marker); background: var(--marker); color: var(--on-marker); font-weight: 600; text-decoration: none; }
 @media (max-width: 900px) { header #origin { display: none; } }
-@media (max-width: 700px) { header nav, header .brand b { display: none; } }
+/* On a phone the bar has two rows: which file, then its ways out. */
+@media (max-width: 700px) {
+  header { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  header nav, header .brand b { display: none; }
+  header .name, header select.name { flex: 1 1 0; min-width: 0; max-width: none; }
+  header .grow { flex: 0 0 100%; height: 0; margin: -4px 0; }
+  header #moment { flex: 1 1 0; min-width: 0; }
+  header #copy, header #download { flex: 1 1 auto; justify-content: center; }
+}
 #notice { margin: auto; padding: 24px; text-align: center; color: var(--quiet); max-width: 520px; font-size: 14px; }
 /* While a file is being opened, a stretch of marker yellow runs along a line. */
 #notice.opening::before { content: ""; display: block; width: 180px; height: 3px; margin: 0 auto 14px; background: linear-gradient(90deg, var(--line) 0 35%, var(--marker) 35% 65%, var(--line) 65%) 0 0 / 300% 100%; animation: opening 1.4s linear infinite; }
@@ -49,9 +57,8 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 /* The rows under the bar. The views of a file, in the console's capitals;
    the count of what is shown stands at their right end. */
 .tabs, .narrow { flex: none; display: flex; flex-wrap: wrap; align-items: center; min-height: 40px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.tabs { align-items: stretch; gap: 0 4px; }
+.tabs { align-items: stretch; gap: 0 4px; padding-left: 4px; }
 .tabs button { padding: 3px 12px 0; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 16px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
-.tabs button:first-child { margin-left: -12px; }
 .tabs button:hover { color: var(--ink); }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--marker); }
 .tally { align-self: center; margin-left: auto; color: var(--quiet); font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -89,6 +96,17 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 .badge.warn { padding: 0 6px; background: var(--marker); color: var(--on-marker); }
 /* What is selected in a list, spread out under it. */
 .drawer { flex: none; max-height: 35%; margin: 0; padding: 10px 16px; overflow: auto; border-top: 2px solid var(--marker); background: var(--surface); font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-all; }
+/* On a phone: views scroll sideways in one row, a search fills its row, a sheet fills the screen, and wide tables scroll. */
+@media (max-width: 700px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-right: 4px; }
+  .tabs button, .tabs .tally { flex: none; }
+  .tabs .tally { padding: 0 12px; }
+  .narrow { padding-inline: 12px; }
+  .narrow input[type=search], .narrow input[type=text], .narrow input:not([type]) { width: 100%; flex: 1 1 100%; }
+  .narrow .tally { flex: 1 1 100%; margin-left: 0; }
+  .page { margin: 0; padding: 4px 16px 24px; border-inline: 0; overflow-x: auto; }
+  .drawer { max-height: 45%; }
+}
 #note { flex: none; padding: 8px 16px; border-top: 2px solid var(--custody); background: var(--surface); color: var(--ink); }
 </style>
 </head>

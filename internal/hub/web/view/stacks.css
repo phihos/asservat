@@ -12,3 +12,10 @@
 .g.selected span { color: var(--on-marker); }
 #stack { flex: 1; margin: 0; padding: 14px 16px; overflow: auto; font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-word; tab-size: 4; }
 p.muted { padding: 10px 16px; }
+/* On a phone the stacks stand above the selected one. */
+@media (max-width: 700px) {
+  #split { flex-direction: column; }
+  #groups { flex: 0 0 42%; border-right: 0; border-bottom: 1px solid var(--line); }
+  .g { grid-template-columns: 32px auto 1fr; padding: 0 12px; }
+  .g .who { display: none; }
+}

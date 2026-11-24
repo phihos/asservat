@@ -24,3 +24,5 @@
 #summary tbody tr { cursor: pointer; }
 #summary tbody tr:hover { background: var(--soft); }
 #summary tfoot td { border-top: 1px solid var(--ink); font-weight: 600; }
+/* On a phone the table keeps its columns and scrolls sideways. */
+@media (max-width: 700px) { #thead, #trows { min-width: 900px; } }
