@@ -99,8 +99,8 @@ capabilities, so their namespace must allow Pod Security `privileged`.
 
 > [!NOTE]
 > There are no releases yet. The chart installs the image of the latest
-> commit on `main` (`ghcr.io/phihos/asservat:main`). Set `image.tag` to a full
-> commit hash to pin a version.
+> commit on `main` (`ghcr.io/phihos/asservat:main`, and `:main-agent` for the
+> agents). Set `image.tag` to a full commit hash to pin a version.
 
 ### Join another cluster
 

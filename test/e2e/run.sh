@@ -86,10 +86,11 @@ first_artifact() { ok "$1" GET "/api/captures/$2" | jq -r '.artifacts[0].name'; 
 
 if [ -z "${SKIP_BUILD:-}" ]; then
   log "build image"
+  docker build -q --target agent -t "$IMAGE-agent" .
   docker build -q -t "$IMAGE" .
 fi
 rm -f "$WORK/image.tar"
-docker save "$IMAGE" -o "$WORK/image.tar"
+docker save "$IMAGE" "$IMAGE-agent" -o "$WORK/image.tar"
 
 # The kernel runs the core handler from the machine's own file system, so
 # the spool is one directory at the same path there, in the kind node and in

@@ -9,13 +9,12 @@ RUN CGO_ENABLED=0 go build -trimpath -o /asservat ./cmd/asservat
 # a program of its own, so it is built from the toolchain's source.
 RUN CGO_ENABLED=0 go build -trimpath -o /gotrace cmd/trace
 
-# One image serves the hub and the node agent. The agent runs the standard
-# tools: nsenter (util-linux), tcpdump, gcore (gdb), strace and curl. The hub
-# reads packet captures for their viewer with Wireshark's sharkd (tshark), and
-# pprof draws its graph view with dot (graphviz). Both unpack the debug
-# packages of distributions with bsdtar and bsdcat (libarchive-tools).
-FROM docker.io/library/debian:stable-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb graphviz libarchive-tools python3-venv strace tcpdump tshark && rm -rf /var/lib/apt/lists/*
+# What the hub and the node agent both run: nsenter (util-linux), curl and,
+# to describe a core dump, gdb (with gcore) and bsdtar and bsdcat
+# (libarchive-tools) for the debug packages of distributions. The agent
+# records with tcpdump and strace.
+FROM docker.io/library/debian:stable-slim AS tools
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools python3-venv strace tcpdump && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
 RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2
 # dotnet-dump reads the managed stacks of a .NET core dump for its
@@ -41,5 +40,15 @@ RUN set -e; runtime=10.0.15; dump=10.0.750501; \
     bsdtar -xf dump.zip -C /opt/asservat-dotnet/dump --strip-components 3 --include "tools/net8.0/any/*"; \
     find /opt/asservat-dotnet/dump -mindepth 1 -maxdepth 1 -type d ! -name "linux-$arch" -exec rm -r {} +; \
     rm runtime.tar.gz dump.zip
+# The node agent's image, which every node pulls: without the hub's viewers.
+FROM tools AS agent
+COPY --from=build /asservat /usr/local/bin/
+ENTRYPOINT ["/usr/local/bin/asservat"]
+
+# The hub's image, the default: it reads packet captures for their viewer
+# with Wireshark's sharkd (tshark), whose library alone is 130 MB, and pprof
+# draws its graph view with dot (graphviz).
+FROM tools
+RUN apt-get update && apt-get install -y --no-install-recommends graphviz tshark && rm -rf /var/lib/apt/lists/*
 COPY --from=build /asservat /gotrace /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/asservat"]

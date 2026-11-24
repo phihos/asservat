@@ -68,7 +68,7 @@ spec:
       tolerations: {{- toYaml .Values.agent.tolerations | nindent 8 }}
       containers:
         - name: agent
-          image: {{ include "asservat.image" . }}
+          image: {{ include "asservat.agentImage" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - agent

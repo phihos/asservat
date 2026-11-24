@@ -46,7 +46,8 @@ jobs:
           install_only: true
       # The runner is a disposable machine: the test may change its core pattern.
       - run: CORE_HANDLER=1 SAMPLE_CPU=1 test/e2e/run.sh
-  # Every commit on main is published as ghcr.io/<owner>/asservat:main and :<commit>.
+  # Every commit on main is published as ghcr.io/<owner>/asservat:main and
+  # :<commit>, and the agent's image under the same tags with "-agent".
   image:
     if: github.event_name == 'push'
     needs: [test, e2e]
@@ -59,8 +60,9 @@ jobs:
       - run: |
           image=ghcr.io/${{ github.repository }}
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker build -t "$image:main" -t "$image:${{ github.sha }}" \
-            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} .
+          label=org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          docker build --target agent -t "$image:main-agent" -t "$image:${{ github.sha }}-agent" --label "$label" .
+          docker build -t "$image:main" -t "$image:${{ github.sha }}" --label "$label" .
           docker push --all-tags "$image"
   # The branch ruleset requires this one check.
   ci-ok:
