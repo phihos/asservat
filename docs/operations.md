@@ -100,9 +100,10 @@ Plan disk space for three things:
 - **The hub's work directory** (an `emptyDir`): room for the largest core dump
   of a Python or .NET program, because the hub decrypts it there to read its
   stacks, and for a core dump that is described again.
-- **Each node**: a core dump rests in the agent's scratch volume, or for a
-  crashed process in the core handler's directory (`agent.coreHandler.hostPath`),
-  until its upload ends. The core handler stops writing when less than 10 %
+- **Each node**: a core dump rests unencrypted in the agent's scratch volume,
+  or for a crashed process in the core handler's directory
+  (`agent.coreHandler.hostPath`), until its upload ends, and is deleted then.
+  It holds the process's memory, so keep that directory readable by root only. The core handler stops writing when less than 10 %
   of the node's disk is free.
 
 The agent image, which every node pulls, is about 60 MiB to pull. The hub
