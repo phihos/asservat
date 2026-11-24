@@ -601,7 +601,8 @@ func TestHelperForMuslIsTold(t *testing.T) {
 	}
 	// A library that stands for musl's C library, by its name.
 	build("-Wl,-soname,libc.musl-x86_64.so.1", "-o", "libc.musl-x86_64.so.1", "empty.c")
-	build("-o", "for-musl.so", "empty.c", "-L.", "-l:libc.musl-x86_64.so.1")
+	// Asked for though nothing of it is used, which some linkers leave out.
+	build("-o", "for-musl.so", "empty.c", "-L.", "-Wl,--no-as-needed", "-l:libc.musl-x86_64.so.1")
 	build("-o", "for-glibc.so", "empty.c")
 	if !forMusl(filepath.Join(dir, "for-musl.so")) || forMusl(filepath.Join(dir, "for-glibc.so")) || forMusl(filepath.Join(dir, "none.so")) {
 		t.Fatal("for musl:", forMusl(filepath.Join(dir, "for-musl.so")), forMusl(filepath.Join(dir, "for-glibc.so")), forMusl(filepath.Join(dir, "none.so")))
