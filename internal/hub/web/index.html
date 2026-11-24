@@ -711,7 +711,7 @@ const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind
 // The audit log, a page at a time, newest first. An action is said in words;
 // its detail is what the hub recorded with it.
 const auditActions = {'capture.request': 'requested a capture', 'capture.approve': 'approved a capture', 'capture.deny': 'denied a capture', 'capture.cancel': 'withdrew a capture',
-  'capture.stop': 'stopped a capture', 'capture.delete': 'deleted a capture', 'capture.expire': 'capture expired', 'capture.trigger': 'a watch recorded',
+  'capture.stop': 'stopped a capture', 'capture.share': 'shared a capture', 'capture.unshare': 'stopped sharing a capture', 'capture.delete': 'deleted a capture', 'capture.expire': 'capture expired', 'capture.trigger': 'a watch recorded',
   'watch.create': 'created a watch', 'watch.approve': 'approved a watch', 'watch.delete': 'deleted a watch',
   'artifact.download': 'downloaded a file', 'artifact.view': 'opened a file in a viewer', 'artifact.read': 'read a file over MCP', 'artifact.describe': 'had a core dump described again',
   'profile.discover': 'looked for profile endpoints', 'traffic.sample': 'sampled live traffic'};
