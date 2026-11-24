@@ -392,3 +392,43 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 		t.Fatalf("after the hub started anew: %+v", result)
 	}
 }
+
+// The hub tells Prometheus how it stands: which clusters have agents
+// connected, how many captures it holds in which state, and how much
+// evidence. It names no workload and no person.
+func TestMetrics(t *testing.T) {
+	dsn := os.Getenv("ASSERVAT_TEST_DSN")
+	if dsn == "" {
+		t.Skip("ASSERVAT_TEST_DSN is not set")
+	}
+	ctx := context.Background()
+	store, err := OpenStore(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	c := api.Capture{ID: uuid.NewString(), Requester: "alice", State: api.StateRunning, ExpiresAt: time.Now().Add(time.Hour), Tasks: []api.Task{{Pod: "api-1", Node: "node-a", State: api.StateRunning}}}
+	c.Cluster, c.Namespace, c.Workload = "m"+c.ID[:8], "payments", "Deployment/api"
+	h, err := New(Config{Store: store, Blobs: DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, WorkDir: t.TempDir(),
+		Clusters: []Cluster{{Name: c.Cluster, Token: "join-token-of-the-cluster-that-is-counted-0123456789"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateCapture(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	defer h.remove(ctx, c.ID)
+	stream := h.agents.connect(c.Cluster, "node-a")
+	defer h.agents.disconnect(c.Cluster, "node-a", stream)
+	said := httptest.NewRecorder()
+	h.Metrics().ServeHTTP(said, httptest.NewRequest("GET", "/metrics", nil))
+	text := said.Body.String()
+	for _, line := range []string{`asservat_cluster_agents_connected{cluster="` + c.Cluster + `"} 1`, `asservat_captures{state="Running"} `, "asservat_evidence_bytes ", "asservat_views_open 0", "# TYPE asservat_watches gauge"} {
+		if !strings.Contains(text, line) {
+			t.Errorf("the metrics lack %q:\n%s", line, text)
+		}
+	}
+	if said.Code != 200 || strings.Contains(text, "alice") || strings.Contains(text, "payments") {
+		t.Fatal("the metrics name a person or a namespace, or failed:", said.Code)
+	}
+}

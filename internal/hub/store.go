@@ -147,6 +147,32 @@ func (s *Store) Captures(ctx context.Context, requester string, shared []Place, 
 	return pgx.CollectRows(rows, scanCapture)
 }
 
+// Counts is how much the hub holds, for its metrics.
+type Counts struct {
+	States []struct {
+		State string
+		Count int64
+	}
+	Watches, Files, Bytes int64
+}
+
+// Counts counts captures by state, watches and stored files.
+func (s *Store) Counts(ctx context.Context) (Counts, error) {
+	var c Counts
+	rows, err := s.db.Query(ctx, `SELECT state, count(*) FROM captures GROUP BY state ORDER BY state`)
+	if err != nil {
+		return c, err
+	}
+	if c.States, err = pgx.CollectRows(rows, pgx.RowToStructByPos[struct {
+		State string
+		Count int64
+	}]); err != nil {
+		return c, err
+	}
+	err = s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM watches), (SELECT count(*) FROM artifacts), (SELECT coalesce(sum(size), 0) FROM artifacts)`).Scan(&c.Watches, &c.Files, &c.Bytes)
+	return c, err
+}
+
 // Place is a namespace of a cluster.
 type Place struct{ Cluster, Namespace string }
 

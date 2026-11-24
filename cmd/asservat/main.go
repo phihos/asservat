@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -62,6 +63,7 @@ func secret(file string) (string, error) {
 func runHub(ctx context.Context, args []string) error {
 	f := flag.NewFlagSet("hub", flag.ExitOnError)
 	listen := f.String("listen", ":8080", "address to serve HTTP on")
+	metricsListen := f.String("metrics-listen", "", "address to serve the hub's own figures on for Prometheus, at /metrics and without sign-in; empty: not served")
 	dsnFile := f.String("dsn-file", "", "file with the PostgreSQL connection string")
 	keyFile := f.String("master-key-file", "", "file with the 32-byte master key as 64 hex digits")
 	dataDir := f.String("data-dir", "", "directory for encrypted evidence (instead of S3)")
@@ -206,6 +208,25 @@ func runHub(ctx context.Context, args []string) error {
 		<-ctx.Done()
 		server.Close()
 	}()
+	if *metricsListen != "" {
+		// Bound before the hub serves: a port that is taken fails the start, not the scrapes.
+		listener, err := net.Listen("tcp", *metricsListen)
+		if err != nil {
+			return fmt.Errorf("metrics-listen: %w", err)
+		}
+		mux := http.NewServeMux()
+		mux.Handle("GET /metrics", h.Metrics())
+		metrics := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			<-ctx.Done()
+			metrics.Close()
+		}()
+		go func() {
+			if err := metrics.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("metrics are not served", "address", *metricsListen, "error", err)
+			}
+		}()
+	}
 	slog.Info("hub listening", "address", *listen)
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
