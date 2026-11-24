@@ -837,8 +837,11 @@ files asks first.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves. A task that ends while the hub is away,
   as during an upgrade, reports its result when its agent's stream to the
-  hub is open again, and counts as running until then. A file whose upload
-  the restart cuts off is lost, and its recording is reported as failed.
+  hub is open again, and counts as running until then. A file that rests
+  on the node, as a core or a trace that was set aside does, is uploaded
+  again from its beginning then. What a tool writes while it runs (packets,
+  a profile from an endpoint) cannot be read again: a restart that cuts
+  such an upload off loses it, and its recording is reported as failed.
 - **The agent's own traffic.** An agent dials the hub from the source ports
   61000 to 61063, above Linux's default range for outgoing connections, and
   every packet capture, packet buffer and traffic sample leaves TCP on

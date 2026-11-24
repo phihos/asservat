@@ -354,12 +354,35 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 }
 
 // upload streams one file of a capture to the hub.
+//
+// A file that rests on the node, as a core does, is sent again from its
+// beginning when the hub was away, once the agent's stream to it is back:
+// a crashed process leaves its core once. What a running tool writes
+// cannot be read again, and its upload fails with the hub.
 func (a *Agent) upload(ctx context.Context, id, pod, name string, r io.Reader) error {
-	res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), &full{r: r})
-	if err != nil {
-		return err
+	for {
+		a.mu.Lock()
+		back := a.connected
+		a.mu.Unlock()
+		res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), &full{r: r})
+		if err == nil {
+			return res.Body.Close()
+		}
+		file, rests := r.(io.Seeker)
+		var no refused
+		if !rests || errors.As(err, &no) || ctx.Err() != nil {
+			return err
+		}
+		slog.Warn("file not uploaded; waiting for the hub", "capture", id, "pod", pod, "name", name, "error", err)
+		select {
+		case <-back:
+		case <-ctx.Done():
+			return err
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
 	}
-	return res.Body.Close()
 }
 
 // full reads from r until the caller's buffer is full or r ends. A tool

@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -129,5 +131,56 @@ func TestResultIsReportedWhenTheHubIsBack(t *testing.T) {
 	case <-finished:
 	case <-time.After(5 * time.Second):
 		t.Fatal("a refused result is reported again and again")
+	}
+}
+
+// A file that rests on the node, as a core does, is uploaded again from its
+// beginning when the hub was away for the first try: a crashed process
+// leaves its core once. What comes from a running tool is sent once.
+func TestFileIsUploadedWhenTheHubIsBack(t *testing.T) {
+	var mu sync.Mutex
+	away, got := true, map[string]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if away {
+			io.CopyN(io.Discard, r.Body, 4) // some of the file is on its way
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close()
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		got[r.URL.Path] = string(body)
+	}))
+	defer server.Close()
+	a := &Agent{HubURL: server.URL, Token: "t", HTTP: server.Client()}
+	a.connected = make(chan struct{})
+	core := filepath.Join(t.TempDir(), "core")
+	os.WriteFile(core, []byte("a synthetic core"), 0o600)
+	f, err := os.Open(core)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	done := make(chan error, 1)
+	go func() { done <- a.upload(context.Background(), "capture-1", "api-1", "core.app", f) }()
+	select {
+	case err := <-done:
+		t.Fatal("the upload was given up while the hub was away:", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	mu.Lock()
+	away = false
+	mu.Unlock()
+	a.reconnected()
+	if err := <-done; err != nil || got["/agent/captures/capture-1/artifacts/api-1/core.app"] != "a synthetic core" {
+		t.Fatal("the file after the hub was back:", err, got)
+	}
+	// A tool's output cannot be read again: its upload fails as before.
+	mu.Lock()
+	away = true
+	mu.Unlock()
+	if err := a.upload(context.Background(), "capture-1", "api-1", "capture.pcap", io.MultiReader(strings.NewReader("packets"))); err == nil {
+		t.Fatal("a stream was uploaded to a hub that is away")
 	}
 }
