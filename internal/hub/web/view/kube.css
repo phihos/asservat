@@ -26,3 +26,8 @@ code { font: 12px var(--mono); }
 /* Keys, text, numbers and the rest apart, as a browser's JSON viewer has them. */
 #tree .k { color: var(--custody-ink); }
 #tree .string { color: var(--bad); } #tree .number { color: var(--ok); } #tree .boolean, #tree .null { color: var(--quiet); font-weight: 500; }
+/* On a phone a property's name stands above its value. */
+@media (max-width: 700px) {
+  .props th, .props td { display: block; width: auto; } .props th { padding-bottom: 0; } .props td { padding-top: 0; }
+  .chip { white-space: normal; overflow-wrap: anywhere; }
+}

@@ -28,3 +28,9 @@ table.plain td:first-child { color: var(--quiet); white-space: nowrap; }
 .page > p.muted:first-child { margin-top: 20px; }
 .thread h4 { margin: 14px 0 2px; font: 600 13px var(--mono); }
 .thread pre { margin: 0 0 0 16px; font: 12px/18px var(--mono); white-space: pre-wrap; word-break: break-word; }
+/* On a phone a class's name stands above its bar, and the list shows names, objects and sizes. */
+@media (max-width: 700px) {
+  .bar { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 5px 0; } .bar .name { grid-column: 1 / -1; }
+  .histogram { grid-template-columns: minmax(0, 1fr) 64px 84px; gap: 10px; padding: 0 12px; }
+  .histogram > :nth-child(4) { display: none; }
+}

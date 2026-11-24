@@ -70,3 +70,6 @@ dialog .bar button:hover { border-color: var(--quiet); }
 #statBody tr[data-filter] { cursor: pointer; }
 #statBody tr[data-filter]:hover { background: var(--soft); }
 #statNote { color: var(--quiet); }
+/* On a phone the packet list keeps its columns and scrolls sideways. */
+@media (max-width: 700px) { #head, #rows { min-width: 820px; } }
+@media (max-width: 700px) { .narrow.filter input { flex: 1 1 0; width: auto; } .narrow .sep { display: none; } }

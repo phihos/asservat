@@ -45,3 +45,10 @@
 .registers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px 24px; }
 .registers div { display: flex; gap: 10px; }
 #root .registers .name { flex: 0 0 52px; }
+/* On a phone the lists stand above what is selected. */
+@media (max-width: 700px) {
+  #debugger { flex-direction: column; }
+  #side { flex: 0 0 46%; border-right: 0; border-bottom: 1px solid var(--line); }
+  #side h4:first-child { flex-wrap: wrap; height: auto; padding-block: 6px; gap: 6px 12px; }
+  #side h4 input { flex: 1 1 100%; }
+}
