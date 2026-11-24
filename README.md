@@ -67,7 +67,8 @@ flowchart LR
   download is recorded in the audit log, and evidence is deleted when its
   retention ends (7 days by default).
 
-Read more in the [design](docs/design.md).
+Read more in the [design](docs/design.md). For backups, upgrades, sizing and
+troubleshooting, see [operating Asservat](docs/operations.md).
 
 ## Install
 
