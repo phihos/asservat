@@ -6,7 +6,9 @@
 //
 //   node test/e2e/browser.mjs <hub URL> <token>
 //
-// With $ONLY_NAMESPACES, a regular expression, it opens only the files of
+// $UNREADABLE names files, separated by commas, that are known not to be
+// what their names say: of those the viewer must say that the hub could not
+// open them. With $ONLY_NAMESPACES, a regular expression, it opens only the files of
 // captures from namespaces that match: for a hub that holds more than tests.
 //
 // The browser is $CHROME, or the first of the usual names that is installed.
@@ -115,6 +117,12 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     // The file is open when the viewer shows and the notice has gone; a notice that stays says why not.
     await until('the file to open', `const n = document.getElementById('notice'); return !document.getElementById('root').hidden || (!n.hidden && !/^Opening/.test(n.textContent.trim()))`, 120);
     const notice = await run(`const n = document.getElementById('notice'); return document.getElementById('root').hidden ? n.textContent.trim() : ''`);
+    if ((process.env.UNREADABLE || '').split(',').includes(file.name.split('/').pop())) {
+      // The hub refused the file, which is the request that failed.
+      seen = seen.filter(problem => !problem.startsWith('HTTP 422 '));
+      if (!notice.startsWith('The hub could not open this file')) throw new Error('a file that is not what its name says opened, or the viewer did not say why not: ' + notice);
+      return;
+    }
     if (notice) throw new Error('the file did not open: ' + notice);
     // Every view of the file, and the first row of its list.
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);

@@ -701,7 +701,8 @@ done
 # phone's width. Scripts that fail, files that do not open and pages that run
 # out of the screen fail the run. Without a browser on the machine it is left out.
 log "the console and every viewer in a browser, wide and narrow"
-browsed=0; node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
+# The demo's heap profile is a word, not a profile: the viewer has to say so.
+browsed=0; UNREADABLE=heap.pprof node test/e2e/browser.mjs "$URL" "$ALICE" || browsed=$?
 case $browsed in 0) ;; 3) log "left out: no Chromium or Chrome is installed here" ;; *) fail "the pages in a browser" ;; esac
 
 log "PASS"
