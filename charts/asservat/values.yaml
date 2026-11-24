@@ -1,7 +1,9 @@
 image:
   repository: ghcr.io/phihos/asservat
   # "main" is the latest commit of the main branch. Every commit is also
-  # published under its full commit hash; set that to pin a version.
+  # published under its full commit hash; set that to pin a version. The
+  # agents run the image of the same tag with "-agent" appended, which is
+  # without the hub's viewers and a third smaller.
   tag: main
   pullPolicy: Always
 

@@ -16,7 +16,10 @@ what is deliberately left out. Change it together with the code.
 | PostgreSQL | Bundled or external | Captures, tasks, watches, artifact index, audit log |
 | Evidence store | Volume or S3 bucket | Encrypted artifact bytes |
 
-Both components are the same binary and image (`asservat hub`, `asservat agent`).
+Both components are the same binary (`asservat hub`, `asservat agent`). The
+agent's image, which every node pulls, is the hub's without the viewers'
+tools (Wireshark's sharkd, graphviz, Go's trace tool): the same tag with
+`-agent`.
 
 ## Capture lifecycle
 

@@ -2,6 +2,10 @@
 {{ .Values.image.repository }}:{{ .Values.image.tag }}
 {{- end }}
 
+{{- define "asservat.agentImage" -}}
+{{ include "asservat.image" . }}-agent
+{{- end }}
+
 {{- define "asservat.labels" -}}
 app.kubernetes.io/name: asservat
 app.kubernetes.io/instance: {{ .Release.Name }}
