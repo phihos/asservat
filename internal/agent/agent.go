@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -44,9 +45,12 @@ type Agent struct {
 	// Cores is the spool of the node's core handler; empty without it.
 	Cores CoreSpool
 
-	mu       sync.Mutex
-	running  map[string]task               // capture ID + pod -> the running task
-	watching map[string]context.CancelFunc // watch ID -> cancel
+	mu sync.Mutex
+	// connected is closed when the stream to the hub is open again, and
+	// then made anew: what waits for the hub waits for it.
+	connected chan struct{}
+	running   map[string]task               // capture ID + pod -> the running task
+	watching  map[string]context.CancelFunc // watch ID -> cancel
 	// pods is the Kubernetes watch of this node's pods, which all watches
 	// share, and how many of them use it.
 	pods struct {
@@ -74,7 +78,7 @@ type Agent struct {
 // Run keeps the stream to the hub open until ctx ends, reconnecting with a
 // growing delay after a failure.
 func (a *Agent) Run(ctx context.Context) {
-	a.running, a.watching = map[string]task{}, map[string]context.CancelFunc{}
+	a.running, a.watching, a.connected = map[string]task{}, map[string]context.CancelFunc{}, make(chan struct{})
 	a.rings, a.snapshots, a.kept, a.traces = map[string]*ring{}, map[string][]byte{}, map[string]*kept{}, map[string]*lines{}
 	a.calls = map[string]setAside{}
 	delay := time.Second
@@ -109,7 +113,12 @@ func (a *Agent) request(ctx context.Context, method, path string, body io.Reader
 	if res.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(res.Body, 1<<10))
 		res.Body.Close()
-		return nil, fmt.Errorf("%s %s: %s %s", method, path, res.Status, bytes.TrimSpace(msg))
+		err := fmt.Errorf("%s %s: %s %s", method, path, res.Status, bytes.TrimSpace(msg))
+		// The hub said no; a proxy in front of a hub that is away says 502 to 504.
+		if res.StatusCode < 500 {
+			return nil, refused{err}
+		}
+		return nil, err
 	}
 	return res, nil
 }
@@ -123,6 +132,44 @@ func (a *Agent) post(ctx context.Context, path string, v any) error {
 	return res.Body.Close()
 }
 
+// refused is the hub's own no to a request, which asking again does not change.
+type refused struct{ error }
+
+// reconnected tells what waits for the hub that the stream to it is open.
+func (a *Agent) reconnected() {
+	a.mu.Lock()
+	close(a.connected)
+	a.connected = make(chan struct{})
+	a.mu.Unlock()
+}
+
+// report tells the hub how a task ended. A hub that is away, as it is
+// while it is upgraded, is told when the agent's stream to it is back: the
+// stream's reconnection is the event, so nothing asks at intervals. What
+// the hub refuses, as the result of a capture that it has deleted, is not
+// told again.
+func (a *Agent) report(ctx context.Context, id string, status api.TaskStatus) {
+	for {
+		a.mu.Lock()
+		back := a.connected
+		a.mu.Unlock()
+		err := a.post(ctx, "/agent/captures/"+id+"/status", status)
+		var no refused
+		if err == nil || errors.As(err, &no) || ctx.Err() != nil {
+			if err != nil {
+				slog.Warn("task status", "capture", id, "pod", status.Pod, "error", err)
+			}
+			return
+		}
+		slog.Warn("task status not reported; waiting for the hub", "capture", id, "pod", status.Pod, "error", err)
+		select {
+		case <-back:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (a *Agent) stream(ctx context.Context) error {
 	res, err := a.request(ctx, http.MethodGet, "/agent/stream?node="+url.QueryEscape(a.Node), nil)
 	if err != nil {
@@ -130,6 +177,7 @@ func (a *Agent) stream(ctx context.Context) error {
 	}
 	defer res.Body.Close()
 	slog.Info("connected to the hub", "node", a.Node)
+	a.reconnected()
 	lines := bufio.NewReader(res.Body)
 	for {
 		line, err := lines.ReadBytes('\n')
@@ -236,7 +284,7 @@ func (p *progress) snapshot() []api.RecordingStatus {
 // again after a reconnect: one that is running here is not started twice,
 // and one that had started before this agent did is reported as lost.
 func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
-	key := id + "/" + t.Pod
+	key, agent := id+"/"+t.Pod, ctx
 	a.mu.Lock()
 	if _, ok := a.running[key]; ok {
 		a.mu.Unlock()
@@ -298,10 +346,10 @@ func (a *Agent) start(ctx context.Context, id string, t api.TaskAssignment) {
 		if status.Recordings = report.snapshot(); err != nil {
 			status.State, status.Message = api.StateFailed, err.Error()
 		}
-		// A cancelled task still reports; the hub ignores it if the capture ended.
-		if err := a.post(context.WithoutCancel(ctx), "/agent/captures/"+id+"/status", status); err != nil {
-			slog.Warn("task status", "capture", id, "pod", t.Pod, "error", err)
-		}
+		// A cancelled task still reports; the hub ignores it if the capture
+		// ended. The task counts as running here until the hub knows how it
+		// ended, so that a hub that comes back does not take it for lost.
+		a.report(agent, id, status)
 	}()
 }
 

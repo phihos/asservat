@@ -835,7 +835,10 @@ files asks first.
   into an event stream, a command that asks for nothing to an agent.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
-  agents reconnect by themselves.
+  agents reconnect by themselves. A task that ends while the hub is away,
+  as during an upgrade, reports its result when its agent's stream to the
+  hub is open again, and counts as running until then. A file whose upload
+  the restart cuts off is lost, and its recording is reported as failed.
 - **The agent's own traffic.** An agent dials the hub from the source ports
   61000 to 61063, above Linux's default range for outgoing connections, and
   every packet capture, packet buffer and traffic sample leaves TCP on
