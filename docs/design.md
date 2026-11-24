@@ -472,7 +472,7 @@ shows what the tool would show.
 
 | File | Viewer | Read by |
 | --- | --- | --- |
-| Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules as a mark on each row, packet details and bytes side by side or stacked, follow stream; conversations, endpoints, protocol hierarchy and expert information, whose rows filter the list | Wireshark's `sharkd` in the hub |
+| Packet capture | Like Wireshark's main window: display filter with validation and field completion, packet list with the colouring rules, packet details and bytes side by side or stacked, follow stream; conversations, endpoints, protocol hierarchy and expert information, whose rows filter the list | Wireshark's `sharkd` in the hub |
 | Logs | Like the log panels of Lens and the Kubernetes dashboard: numbered lines with timestamps, search by text or regular expression, only the matching lines, the selected line wrapped (JSON spread out). The JVM's class histogram, text as well, opens in it | The browser |
 | Pod object, events | Like the detail panels of Lens and the Kubernetes dashboard: properties, conditions, containers with their states, volumes; events as a table; the object as a folding JSON tree with a filter | The browser |
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
@@ -746,10 +746,11 @@ tables, and what is selected is marker yellow. A view that is read like a
 page, as a pod's state or a heap dump's summary, is a sheet on the ground
 as a capture is in the console's list. A viewer keeps the panes of the tool
 that people know for its kind of file (Wireshark's three, a debugger's
-threads and stack beside a frame), not its colours: Wireshark's colouring
-rules show as a mark at the start of a packet's row, a display filter's
-validity as the field's edge, a log's levels as the colour of the line's
-text. A viewer shows its capture's number on a marker beside the file's
+threads and stack beside a frame) and every colour that tells something:
+Wireshark's colouring rules colour the packets, its display filter is
+green or red, its expert severities have their colours, a log's levels
+colour the line's text, a warning event is tinted. Colour that only
+decorated is gone. A viewer shows its capture's number on a marker beside the file's
 name. The pages that pprof and Go's trace tool draw themselves keep their
 layout and the colours of their graphs, and are light in either theme; the
 hub adds a stylesheet to them that sets them in Asservat's type and gives

@@ -11,7 +11,7 @@
 .chip { display: inline-block; max-width: 100%; margin: 1px 4px 1px 0; padding: 1px 8px; background: var(--soft); font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 code { font: 12px var(--mono); }
 .grid.events td:nth-child(n+5) { white-space: nowrap; font: 12px var(--mono); }
-.grid tr.warning { box-shadow: inset 4px 0 0 var(--marker); }
+.grid tr.warning { background: color-mix(in srgb, var(--marker) 12%, var(--surface)); }
 .grid.events tbody tr { cursor: default; }
 .grid.events tbody tr:hover { background: var(--soft); }
 .grid tr.selected, .grid.events tbody tr.selected:hover { background: var(--marker); color: var(--on-marker); }

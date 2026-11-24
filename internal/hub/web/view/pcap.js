@@ -118,7 +118,7 @@ let list; // the packet list, of which only the rows in sight exist
 const draw = () => list.draw();
 function rowHtml(i) {
   const r = rowAt(i), top = `top:${i * rowHeight}px;`;
-  return r ? `<div class="row${i === selected ? ' selected' : ''}" data-i="${i}" style="${top}${r.bg ? `box-shadow:inset 4px 0 0 #${r.bg};` : ''}">${r.c.map(c => `<span>${esc(c)}</span>`).join('')}</div>`
+  return r ? `<div class="row${i === selected ? ' selected' : ''}" data-i="${i}" style="${top}${r.bg ? `background:#${r.bg};` : ''}${r.fg ? `color:#${r.fg};` : ''}">${r.c.map(c => `<span>${esc(c)}</span>`).join('')}</div>`
     : `<div class="row loading" style="${top}"><span>…</span></div>`;
 }
 async function rowWhenLoaded(i) {

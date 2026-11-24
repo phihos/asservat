@@ -1,10 +1,12 @@
 /* The packet viewer has the panes of Wireshark's main window: display
    filter, packet list, packet details, packet bytes, status line. Rows,
-   headings and fields are those of every viewer. Wireshark's colouring rules
-   show as a mark at the start of a packet's row, not as its ground. */
+   headings and fields are those of every viewer. Colour that tells
+   something stays Wireshark's: its colouring rules colour the packets, the
+   filter is green or red as it is there, and so are the expert severities. */
 .filter input { flex: 1; width: auto !important; }
-.filter input.valid { border-color: var(--ok); box-shadow: inset 4px 0 0 var(--ok); }
-.filter input.invalid { border-color: var(--bad); box-shadow: inset 4px 0 0 var(--bad); }
+/* Wireshark's own greens and reds, with dark text in either theme. */
+.filter input.valid { background: #afffaf; color: #14181A; }
+.filter input.invalid { background: #ffafaf; color: #14181A; }
 .narrow #first, .narrow #prev, .narrow #next, .narrow #last, .filter #clear, .filter #apply { width: 28px; padding: 0; }
 #panes { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .pane { min-height: 40px; overflow: auto; background: var(--surface); }
@@ -24,7 +26,7 @@
 .row { position: absolute; left: 0; right: 0; height: 20px; line-height: 20px; cursor: default; white-space: nowrap; }
 .row span { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
 .row span:nth-child(1), .row span:nth-child(6) { text-align: right; }
-.row:hover { background: var(--soft); }
+.row:hover { box-shadow: inset 0 0 0 1px var(--ink); }
 .row.selected { background: var(--marker) !important; color: var(--on-marker) !important; }
 .row.loading { color: var(--quiet); }
 .node { line-height: 20px; white-space: nowrap; cursor: default; padding-right: 8px; font: 12px/20px var(--mono); }
@@ -32,9 +34,9 @@
 .node .twist { display: inline-block; width: 14px; text-align: center; color: var(--quiet); font-size: 10px; }
 .node.selected { background: var(--marker); color: var(--on-marker); }
 .node.selected .twist { color: var(--on-marker); }
-/* Wireshark's expert severities, in the palette. */
-.node.Chat, #statBody td.Chat { box-shadow: inset 4px 0 0 var(--custody); } .node.Note, #statBody td.Note { box-shadow: inset 4px 0 0 var(--ok); }
-.node.Warn, #statBody td.Warn { background: var(--marker); color: var(--on-marker); } .node.Error, #statBody td.Error { background: color-mix(in srgb, var(--bad) 18%, var(--surface)); color: var(--bad); }
+/* Wireshark's expert severities. */
+.node.Chat, #statBody td.Chat { background: #80b7f7; color: #14181A; } .node.Note, #statBody td.Note { background: #b7f774; color: #14181A; }
+.node.Warn, #statBody td.Warn { background: #f7f240; color: #14181A; } .node.Error, #statBody td.Error { background: #ff5c5c; color: #14181A; }
 #sources, #statTabs { flex: none; display: flex; padding: 0 16px; border-bottom: 1px solid var(--line); }
 #sources button, #statTabs button { padding: 8px 12px 5px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 15px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
 #sources button:first-child, #statTabs button:first-child { margin-left: -12px; }
