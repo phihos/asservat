@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -244,31 +245,83 @@ func BenchmarkKeptProfile(b *testing.B) {
 }
 
 // The profiler's reader hands over a batch of traces without looking
-// whether sampling has stopped, and waits for each to be taken. It ends
-// when sampling stops in the middle of a batch: a reader left waiting would
-// keep the profiler's programs and maps in the kernel.
+// whether it was told to stop, and waits for each to be taken. The rest of
+// its batch is taken, and dropped, until those that take stop as well.
 func TestTheProfilersReaderEndsWhenSamplingStops(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	sending, stopSending := context.WithCancel(context.Background())
+	taking, stopTaking := context.WithCancel(context.Background())
+	defer stopTaking()
 	traces, ended, taken := make(chan int), make(chan struct{}), make(chan struct{}, 1)
+	var handled atomic.Int64
 	go func() { // as the profiler's startTraceEventMonitor does
 		defer close(ended)
-		for ctx.Err() == nil {
+		for sending.Err() == nil {
 			for i := range 4096 {
 				traces <- i
 			}
 		}
 	}()
-	go handOver(ctx, traces, func(int) {
+	go handOver(sending, taking, traces, func(int) {
+		handled.Add(1)
 		select {
 		case taken <- struct{}{}:
 		default:
 		}
-	}, 50*time.Millisecond)
+	})
 	<-taken
-	cancel()
+	stopSending()
+	before := handled.Load()
 	select {
 	case <-ended:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the reader still waits for a trace to be taken")
+	}
+	if after := handled.Load(); after > before+1 {
+		t.Errorf("%d traces were passed on after sampling stopped", after-before)
+	}
+}
+
+// Inside the profiler one goroutine hands the processes it found to another
+// and waits for each to be taken, without looking whether the profiler has
+// stopped. It ends when the profiler is wound down: the one that takes
+// stops after the one that hands over.
+func TestTheProfilersGoroutinesEndInOrder(t *testing.T) {
+	sending, stopSending := context.WithCancel(context.Background())
+	taking, stopTaking := context.WithCancel(context.Background())
+	found, ended, taken, closed := make(chan int, 10), make(chan struct{}), make(chan struct{}, 1), make(chan struct{})
+	go func() { // as the profiler's StartMapMonitors does
+		defer close(ended)
+		for sending.Err() == nil {
+			for i := range 4096 {
+				found <- i
+			}
+		}
+	}()
+	go func() { // as its processPIDEvents does
+		for {
+			select {
+			case <-found:
+				select {
+				case taken <- struct{}{}:
+				default:
+				}
+			case <-taking.Done():
+				return
+			}
+		}
+	}()
+	<-taken
+	windDown(stopSending, stopTaking, func() {
+		select {
+		case <-ended:
+		default:
+			t.Error("the profiler is closed while its goroutine still hands over")
+		}
+		close(closed)
+	}, 50*time.Millisecond)
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the profiler was not closed")
 	}
 }
