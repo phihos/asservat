@@ -4,7 +4,7 @@ import {$, esc, headers, moment, notice, openView, show, spot, virtual} from './
 
 const markup = `
   <form class="narrow filter" id="filterForm">
-    <input id="filter" list="fields" autocomplete="off" spellcheck="false" placeholder="Apply a display filter … for example  tcp.port == 8080 and http">
+    <input id="filter" list="fields" autocomplete="off" spellcheck="false" placeholder="Display filter, for example  tcp.port == 8080 and http">
     <datalist id="fields"></datalist>
     <button type="button" id="clear" title="Clear the display filter" disabled>✕</button>
     <button id="apply" title="Apply the display filter (Enter)">→</button>
@@ -20,12 +20,12 @@ const markup = `
     <button id="follow" disabled title="Show the payload of this packet's stream">Follow stream</button>
     <button id="asFilter" disabled title="Filter by the field selected in the packet details">Apply as filter</button>
     <span class="sep"></span>
-    <button data-stat="conv" title="Who talks to whom, per protocol">Conversations</button>
-    <button data-stat="endpt" title="The addresses and ports, per protocol">Endpoints</button>
-    <button data-stat="phs" title="The protocols in the capture and their share">Protocol hierarchy</button>
-    <button data-stat="expert" title="What Wireshark's dissectors found notable">Expert information</button>
+    <button data-stat="conv" title="Pairs of endpoints that exchanged packets, by protocol">Conversations</button>
+    <button data-stat="endpt" title="Addresses and ports seen, by protocol">Endpoints</button>
+    <button data-stat="phs" title="Protocols in the capture and their share of it">Protocol hierarchy</button>
+    <button data-stat="expert" title="Anything Wireshark's dissectors flagged as notable">Expert information</button>
     <span class="sep"></span>
-    <button id="layout" title="Packet details and bytes side by side, or one above the other">Layout</button>
+    <button id="layout" title="Switch between side-by-side and stacked panes for details and bytes">Layout</button>
   </div>
   <div id="panes">
     <div class="pane" id="list" tabindex="0">
@@ -61,7 +61,7 @@ let view = null;
 async function ask(method, params = {}) {
   const res = await fetch(`/api/views/${view}/${method}`, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify(params)});
   const data = await res.json().catch(() => null);
-  if (res.status === 404 || res.status === 410) { notice('This view has ended.', true); throw new Error('view ended'); }
+  if (res.status === 404 || res.status === 410) { notice('This view has closed. Open the file again to continue.', true); throw new Error('view ended'); }
   if (!res.ok) throw new Error(data?.error || res.statusText);
   return data;
 }
@@ -213,7 +213,7 @@ async function follow() {
   const s = await ask('follow', {follow: protocol, filter});
   $('streamTitle').textContent = `Follow ${protocol} stream (${filter})`;
   const text = bytes => new TextDecoder('latin1').decode(decode(bytes)).replace(/[^\x20-\x7e\n\r\t]/g, '.');
-  $('streamText').innerHTML = (s.payloads || []).map(p => `<span class="${p.s ? 'server' : 'client'}">${esc(text(p.d))}</span>`).join('') || 'This stream carries no payload.';
+  $('streamText').innerHTML = (s.payloads || []).map(p => `<span class="${p.s ? 'server' : 'client'}">${esc(text(p.d))}</span>`).join('') || 'This stream has no payload.';
   $('streamSides').innerHTML = `<span class="client">${esc(s.chost)}:${esc(s.cport)} → (${s.cbytes} bytes)</span> <span class="server">${esc(s.shost)}:${esc(s.sport)} → (${s.sbytes} bytes)</span>`;
   $('streamFilter').onclick = () => { $('stream').close(); run(() => applyFilter(filter)); };
   $('stream').showModal();
@@ -223,7 +223,7 @@ async function follow() {
 // packets that the display filter shows; a row's filter narrows the list.
 const count = n => Number(n).toLocaleString('en-US');
 const seconds = n => Number(n).toFixed(6);
-const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="none">None in these packets.</td></tr>`}</tbody></table>`;
+const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="none">Nothing found in these packets.</td></tr>`}</tbody></table>`;
 const cell = (value, text) => `<td${text ? ' class="text"' : ''}>${esc(value ?? '')}</td>`;
 const filtered = (filter, cells) => `<tr data-filter="${esc(filter)}" title="Show these packets">${cells.join('')}</tr>`;
 const statistics = {

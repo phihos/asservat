@@ -156,7 +156,7 @@ curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/a
 
 You do not need to know process names or filter syntax. The console lists
 the programs that run in the workload's pods for a core dump or trace, and
-**Look at current traffic** shows whom the pods talk to right now; ticking
+**Sample live traffic** shows whom the pods talk to right now; ticking
 connections there builds the packet filter.
 
 To catch a problem you cannot be present for, choose in the console's last

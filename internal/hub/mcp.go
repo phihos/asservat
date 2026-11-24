@@ -190,7 +190,7 @@ var mcpTools = []mcpTool{
 				case result := <-h.renew(ctx, u, c.ID, name):
 					if stale = result.reason; result.err != nil {
 						slog.Warn("core not described again", "capture", c.ID, "name", name, "error", result.err)
-						stale = "the hub could not describe the core again now"
+						stale = "the hub could not describe the core dump again right now"
 					}
 				case <-ctx.Done(): // the work goes on for the next reader
 					return nil, ctx.Err()
@@ -211,7 +211,7 @@ var mcpTools = []mcpTool{
 				}
 				text := coreText(report.Bytes())
 				if stale != "" && coredesc.DescribedBy(report.Bytes()) < coredesc.Version {
-					text = "Described by an older Asservat, which may show less (" + stale + "). A new dump is described in full.\n\n" + text
+					text = "Described by an older version of Asservat, so some details may be missing (" + stale + "). A new dump is described in full.\n\n" + text
 				}
 				if awaited := coredesc.Awaits(report.Bytes()); len(awaited) > 0 {
 					text = "The program's own stacks (" + strings.Join(awaited, ", ") + ") could not be read from this core: the machine's threads show the runtime, not the program.\n\n" + text

@@ -44,7 +44,7 @@ export function openView(opened, query = '') {
   stream.onmessage = e => { view = e.data; opened(view); };
   stream.onerror = async () => {
     stream.close();
-    if (view) return notice('This view has ended.', true);
+    if (view) return notice('This view has closed. Open the file again to continue.', true);
     // The stream gives no reason; asking again without it does, unless it works this time.
     const again = new AbortController(), res = await fetch(views, {headers, signal: again.signal}).catch(() => null);
     const reason = res && !res.ok ? (await res.json().catch(() => null))?.error : '';
@@ -58,7 +58,7 @@ export function openView(opened, query = '') {
 const textLimit = 64 << 20;
 export async function loadText(from = address) {
   const res = await fetch(from, {headers});
-  if (!res.ok) throw Object.assign(new Error('The file could not be read.'), {status: res.status});
+  if (!res.ok) throw Object.assign(new Error('Could not read the file.'), {status: res.status});
   const reader = res.body.getReader(), parts = [];
   let size = 0, truncated = false;
   for (;;) {
@@ -69,7 +69,7 @@ export async function loadText(from = address) {
   }
   return {text: await new Blob(parts).text(), truncated};
 }
-export const truncatedNote = 'This file is longer than the viewer reads (64 MiB). Download it to see all of it.';
+export const truncatedNote = 'This file is larger than the viewer loads (64 MiB), so only its beginning is shown. Download it to see the rest.';
 
 // virtual draws the rows of a long list that are in sight. The element
 // scrolls; row(i) returns the HTML of row i, which must be rowHeight high

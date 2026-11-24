@@ -5,11 +5,11 @@ import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './co
 
 const markup = `
   <div class="narrow">
-    <input id="search" type="search" placeholder="Search … text, or /regular expression/" autocomplete="off" spellcheck="false">
+    <input id="search" type="search" placeholder="Search text or /regular expression/" autocomplete="off" spellcheck="false">
     <button id="up" title="Previous match (Shift+Enter)">▲</button>
     <button id="down" title="Next match (Enter)">▼</button>
     <span id="found"></span>
-    <label><input type="checkbox" id="only"> Only matching lines</label>
+    <label><input type="checkbox" id="only"> Matching lines only</label>
     <label><input type="checkbox" id="stamps" checked> Timestamps</label>
     <span id="span" class="tally"></span>
   </div>

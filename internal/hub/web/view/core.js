@@ -33,7 +33,7 @@ export default async function (root) {
   // core and the program's files that the capture holds, before it shows.
   let kept = '';
   try {
-    notice('Opening the core…');
+    notice('Opening the core dump…');
     const res = await fetch(`/api/captures/${capture}/describe`, {method: 'POST', headers: {...headers, 'Content-Type': 'application/json'}, body: JSON.stringify({name: file.endsWith(suffix) ? file.slice(0, -suffix.length) : file})});
     if (res.ok) kept = (await res.json()).reason || '';
   } catch { /* the description as it is */ }
@@ -41,7 +41,7 @@ export default async function (root) {
   let report;
   try { report = JSON.parse((await loadText(file.endsWith(suffix) ? address : address + suffix)).text); }
   catch (err) {
-    if (err.status === 404) return notice('This core has no description: gdb could not read it on the node, or it was recorded before Asservat described cores. Download it and open it with gdb and the program\'s files.');
+    if (err.status === 404) return notice('This core dump has no description. Either gdb could not read it on the node, or it was recorded before Asservat described core dumps. Download it and open it with gdb and the program\'s files.');
     throw err;
   }
   root.innerHTML = markup;
@@ -63,10 +63,10 @@ export default async function (root) {
     <code>${esc(report.commandLine || report.executable || '')}</code>
     ${report.runtime ? `<span class="dim">${esc(report.runtime)}</span>` : ''}
     ${Object.values(runtimes).map(r => r.version ? `<span class="dim">${esc({python: 'Python', dotnet: '.NET'}[r.runtime] || r.runtime)} ${esc(r.version)}</span>` : '').join('')}
-    ${kept && !(report.describer > 1) ? `<span class="warn" title="${esc(kept)}">described by an older Asservat, which may show less; a new dump is described in full</span>` : ''}
-    ${report.withoutDebugInfo ? '<span class="dim" title="The program was built without debug information. Functions, files and lines are from the line table that every Go program carries; variables cannot be shown.">no debug information: functions and lines, no variables</span>' : ''}
-    ${(report.awaits || []).length ? `<span class="warn">The ${esc(report.awaits.map(r => ({python: 'Python', dotnet: '.NET'})[r] || r).join(' and '))} stacks of the program could not be read from this core: the machine's threads show the runtime, not the program.</span>` : ''}
-    ${report.symbols ? '' : '<span class="warn">The program\'s files were not at hand when the core was described: frames show addresses, not functions.</span>'}`;
+    ${kept && !(report.describer > 1) ? `<span class="warn" title="${esc(kept)}">Described by an older version of Asservat, so some details may be missing. A new dump gets the full description.</span>` : ''}
+    ${report.withoutDebugInfo ? '<span class="dim" title="The program was built without debug information. Functions, files and lines come from the line table every Go program carries. Variables cannot be shown.">No debug information: functions and lines are shown, variables are not.</span>' : ''}
+    ${(report.awaits || []).length ? `<span class="warn">The ${esc(report.awaits.map(r => ({python: 'Python', dotnet: '.NET'})[r] || r).join(' and '))} stacks of the program could not be read from this core dump. The machine threads below show the runtime, not your program.</span>` : ''}
+    ${report.symbols ? '' : '<span class="warn">The program\'s files were not available when the core dump was described, so frames show addresses instead of function names.</span>'}`;
 
   const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
   const variables = (title, list) => !list?.length ? '' : `<h5>${title}</h5>` + table(['Name', 'Value', 'Type'], list.map(v => `<tr><td class="name">${esc(v.name)}</td>${value(v.value)}<td class="type">${esc(v.type)}</td></tr>`));
@@ -84,15 +84,15 @@ export default async function (root) {
     for (const b of $('kinds').querySelectorAll('button')) b.classList.toggle('on', b.dataset.kind === kind);
     $('threads').innerHTML = (lists[kind].filter(t => !words || `${t.name || ''} ${t.status || ''} ${t.frames.map(named).join(' ')}`.toLowerCase().includes(words)).map(t =>
       `<div class="row${t === thread ? ' selected' : ''}" data-thread="${t.id}" title="${esc([t.name, t.status, t.function || (t.frames[0] ? named(t.frames[0]) : '')].filter(Boolean).join(' · '))}">${(rows[kind] || runtimeRow)(t)}</div>`).join('') || `<div class="dim pad">No ${kind === 'goroutines' ? 'goroutine' : 'thread'} matches.</div>`)
-      + (kind === 'goroutines' && report.goroutinesCut ? `<div class="dim pad">The program has more goroutines; ${lists.goroutines.length} are shown, with those that run on a thread.</div>` : '');
-    $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${f.level}" title="${esc(named(f))}"><span>${f.scanned ? '<span class="dim" title="Found by reading the stack">≈ </span>' : ''}${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
-      + (thread.frames.some(f => f.scanned) ? '<div class="dim pad">≈ A library on this stack carries no unwind tables (musl, the C library of Alpine images, is one). The frames above it were found by the return addresses on the stack: most likely right, not certain.</div>' : '')
-      + (thread.cut ? '<div class="dim pad">The stack goes deeper; the innermost 256 frames are shown.</div>' : '');
+      + (kind === 'goroutines' && report.goroutinesCut ? `<div class="dim pad">The program has more goroutines. ${lists.goroutines.length} are shown, including all that were running on a thread.</div>` : '');
+    $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${f.level}" title="${esc(named(f))}"><span>${f.scanned ? '<span class="dim" title="Found by scanning the stack">≈ </span>' : ''}${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
+      + (thread.frames.some(f => f.scanned) ? '<div class="dim pad">≈ A library on this stack has no unwind tables (musl, the C library of Alpine images, is one example). The frames above it were found from return addresses on the stack. They are very likely correct, but not certain.</div>' : '')
+      + (thread.cut ? '<div class="dim pad">The stack is deeper than this. Only the innermost 256 frames are shown.</div>' : '');
     $('frame').innerHTML = !frame ? '<p class="dim pad">No frames.</p>' : `
       <h3>#${frame.level} ${esc(named(frame))}</h3>
       <div class="dim">${[frame.file && `${frame.file}:${frame.line}`, frame.module, frame.pc].filter(Boolean).map(esc).join(' · ')}</div>
       ${variables('Arguments', frame.arguments)}${variables('Locals', frame.locals)}
-      ${frame.arguments?.length || frame.locals?.length ? '' : `<p class="dim">${runtimes[kind] ? 'No variables in this frame.' : 'No variables: the program carries no debug information for this frame.'}</p>`}
+      ${frame.arguments?.length || frame.locals?.length ? '' : `<p class="dim">${runtimes[kind] ? 'No variables in this frame.' : 'No variables: the program has no debug information for this frame.'}</p>`}
       ${frame.code?.length ? '<h5>Instructions</h5><pre class="code">' + frame.code.map((i, n) => `<span class="${n ? '' : 'pc'}">${n ? '  ' : '=&gt;'} ${esc(i.address)}  ${esc(i.instruction)}</span>`).join('\n') + '</pre>' : ''}
       ${frame.registers?.length ? '<h5>Registers</h5><div class="registers">' + frame.registers.map(r => `<div><span class="name">${esc(r.name)}</span><span class="value">${esc(r.value)}</span></div>`).join('') + '</div>'
         : `<p class="dim">${kind === 'threads' ? 'Registers are shown for the innermost frame.' : 'Registers and instructions are shown under Threads.'}</p>`}`;

@@ -8,7 +8,7 @@ const markup = `
   <div class="tabs"><button data-tab="overview" class="on">Overview</button><button data-tab="json">JSON</button></div>
   <div id="overview" class="tab"></div>
   <div id="json" class="tab" hidden>
-    <div class="narrow"><input id="filter" type="search" placeholder="Filter JSON" autocomplete="off" spellcheck="false"><button id="expand">Expand all</button><button id="collapse">Collapse all</button></div>
+    <div class="narrow"><input id="filter" type="search" placeholder="Filter keys and values" autocomplete="off" spellcheck="false"><button id="expand">Expand all</button><button id="collapse">Collapse all</button></div>
     <div id="tree"></div>
   </div>
 `;
@@ -87,7 +87,7 @@ function podOverview(pod) {
       (spec.volumes || []).map(v => { const k = volumeKind(v), src = v[k] || {}; return `<tr><td>${esc(v.name)}</td><td>${esc(k)}</td><td>${esc(src.secretName || src.claimName || src.name || src.path || src.medium || '')}</td></tr>`; }).join('')}</tbody></table>`;
 }
 function eventsOverview(events) {
-  if (!events.length) return '<p class="muted">The pod had no events when it was recorded. Kubernetes keeps events for about an hour.</p>';
+  if (!events.length) return '<p class="muted">The pod had no events at the time of recording. Kubernetes keeps events for about an hour.</p>';
   const last = e => e.lastTimestamp || e.eventTime || e.firstTimestamp || '';
   return `<table class="grid events"><thead><tr><th>Type</th><th>Reason</th><th>Message</th><th>From</th><th>Count</th><th>First seen</th><th>Last seen</th></tr></thead><tbody>${
     [...events].sort((a, b) => last(b).localeCompare(last(a))).map(e => `<tr class="${e.type === 'Warning' ? 'warning' : ''}" data-at="${esc(last(e))}" title="Select the event to open the logs, packets or calls of its moment"><td>${badge(e.type || 'Normal', e.type === 'Warning' ? 'warn' : 'done')}</td><td>${esc(e.reason || '')}</td><td>${esc(e.message || '')}</td><td>${esc(e.source?.component || e.reportingComponent || '')}</td><td>${e.count || 1}</td><td>${when(e.firstTimestamp || e.eventTime)}</td><td>${when(last(e))}</td></tr>`).join('')}</tbody></table>`;

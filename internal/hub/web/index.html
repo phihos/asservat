@@ -91,6 +91,8 @@
   .kinds small, .choice small { display: block; color: var(--quiet); margin: 2px 0 0 20px; }
   .choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-bottom: 8px; }
   .wide { grid-column: span 2; }
+  /* The rows of fields under the ways to start, and the section between them, stand apart. */
+  fieldset[data-step="4"] > .fields, #beforeFields { margin-top: 14px; }
   .badge { font: 500 11px var(--mono); color: var(--custody-ink); border: 1px solid var(--custody); padding: 0 6px; margin-left: 6px; white-space: nowrap; }
   .problem { color: var(--bad); margin: 4px 0 0; } .problem:empty { display: none; }
   .group { margin-top: 6px; } .group > div { font-size: 12px; color: var(--quiet); margin-bottom: 2px; }
@@ -138,7 +140,7 @@
 <section id="login" hidden>
   <img src="/assets/mark.svg" alt="">
   <h2>Asservat</h2>
-  <p class="muted">Evidence from running workloads. Sign in to record and to look at what was recorded.</p>
+  <p class="muted">Record evidence from running Kubernetes workloads and inspect it in your browser. Sign in to get started.</p>
   <p id="sso" hidden><button class="primary" onclick="location.href='/auth/login'">Sign in with single sign-on</button></p>
   <form id="loginForm" class="row"><label>Access token<input id="token" type="password" autocomplete="off" required></label><button>Sign in with a token</button></form>
 </section>
@@ -163,16 +165,16 @@
 
     <fieldset data-step="2">
       <legend>2 · What to record</legend>
-      <p class="muted lead">Choose one or several. They start together on the same pods and share one time frame and, if needed, one approval.</p>
+      <p class="muted lead">Pick one or more. They all start together on the same pods and share one time frame and, where needed, one approval.</p>
       <div class="kinds" id="kinds">
-        <label><input type="checkbox" name="kind" value="pod-state" checked>Pod state<small>The pod as Kubernetes sees it, and its events</small></label>
-        <label><input type="checkbox" name="kind" value="logs">Logs<small>What the containers wrote, also of the instance before a restart</small></label>
-        <label><input type="checkbox" name="kind" value="pcap">Network traffic<small>A packet capture for Wireshark, of all traffic or chosen connections</small></label>
-        <label><input type="checkbox" name="kind" value="strace">System calls<small>What a process asks the kernel for, with timing (strace)</small></label>
-        <label><input type="checkbox" name="kind" value="cpu">CPU profile<small>Where the pod's processes spend CPU time, sampled from the node. Needs nothing from the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, .NET</small></label>
-        <label><input type="checkbox" name="kind" value="memory">Memory growth<small>Which code makes the pod's memory grow while this records, from the stacks at its page faults. Needs nothing from the application; it slows page faults on the node meanwhile</small></label>
-        <label><input type="checkbox" name="kind" value="pprof">Profile endpoint<small>What the application's own profile endpoint returns, such as Go's pprof: also memory, blocking and traces. A Java program needs none: its JVM is asked</small></label>
-        <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>The memory of a process, for a debugger</small></label>
+        <label><input type="checkbox" name="kind" value="pod-state" checked>Pod state<small>The pod's status and its Kubernetes events.</small></label>
+        <label><input type="checkbox" name="kind" value="logs">Logs<small>Container logs, including those from before the last restart.</small></label>
+        <label><input type="checkbox" name="kind" value="pcap">Network traffic<small>A packet capture you can open in Wireshark: all traffic, or only the connections you choose.</small></label>
+        <label><input type="checkbox" name="kind" value="strace">System calls<small>Every call a process makes to the kernel, with timing (strace).</small></label>
+        <label><input type="checkbox" name="kind" value="cpu">CPU profile<small>Where the pod's processes spend CPU time, sampled from the node. Works without changes to the application: Go, C, C++, Rust, Python, Java, Node.js, Ruby, PHP, .NET.</small></label>
+        <label><input type="checkbox" name="kind" value="memory">Memory growth<small>Which code makes the pod's memory grow during the recording. Works without changes to the application. Page faults on the node are slower while it runs.</small></label>
+        <label><input type="checkbox" name="kind" value="pprof">Profile endpoint<small>Profiles from the application's own endpoint, such as Go's pprof: memory, blocking, traces and more. Java needs no endpoint, because Asservat asks the JVM directly.</small></label>
+        <label><input type="checkbox" name="kind" value="coredump">Core dump<span class="badge">needs approval</span><small>A snapshot of a process's memory, for a debugger.</small></label>
       </div>
       <p class="problem" id="kindProblem"></p>
     </fieldset>
@@ -184,39 +186,39 @@
           <h3>Logs</h3>
           <div class="fields">
             <label>Container<select id="container" data-param="container" data-of="logs"></select></label>
-            <label>Only the last lines<input data-param="tailLines" data-of="logs" type="number" min="1" placeholder="all lines"></label>
-            <label id="instanceLabel">Instance<select data-param="previous" data-of="logs"><option value="">the running one</option><option value="true">the one before the last restart</option></select></label>
+            <label>Last lines only<input data-param="tailLines" data-of="logs" type="number" min="1" placeholder="all lines"></label>
+            <label id="instanceLabel">Container instance<select data-param="previous" data-of="logs"><option value="">current</option><option value="true">before the last restart</option></select></label>
           </div>
         </section>
 
         <section data-kinds="pcap">
           <h3>Network traffic</h3>
           <div class="toolbar">
-            <button type="button" id="sample">Look at current traffic</button>
+            <button type="button" id="sample">Sample live traffic</button>
             <label style="display:flex;align-items:center;gap:6px">for<select id="sampleSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option></select></label>
             <span class="muted" id="sampleState"></span>
           </div>
           <table id="flowTable" hidden><thead><tr><th></th><th></th><th>Connection</th><th>Packets</th><th style="width:22%">Share of traffic</th></tr></thead><tbody id="flows"></tbody></table>
           <p class="problem" id="sampleProblem"></p>
-          <p id="chosen" class="muted">Records all traffic of the pods.</p>
-          <details><summary>As a tcpdump filter</summary><input id="filter" data-param="filter" data-of="pcap" placeholder="empty: all traffic" spellcheck="false" autocomplete="off"></details>
+          <p id="chosen" class="muted">Records all traffic to and from the pods.</p>
+          <details><summary>Edit as a tcpdump filter</summary><input id="filter" data-param="filter" data-of="pcap" placeholder="Leave empty for all traffic" spellcheck="false" autocomplete="off"></details>
           <div class="choice">
-            <label><input type="radio" name="payload" value="" checked>Headers only<small>Who talks to whom, when and how much. Every packet is cut after its transport header</small></label>
-            <label><input type="radio" name="payload" value="true">Full packets<span class="badge">needs approval</span><small>Includes the content, which can hold user data and credentials</small></label>
+            <label><input type="radio" name="payload" value="" checked>Headers only<small>Who talked to whom, when, and how much. Packets are cut off after the transport header.</small></label>
+            <label><input type="radio" name="payload" value="true">Full packets<span class="badge">needs approval</span><small>Includes payloads, which can contain user data and credentials.</small></label>
           </div>
         </section>
 
         <section id="processBlock">
           <h3 id="processTitle">Process</h3>
-          <label>Which process<select id="process"></select></label>
+          <label>Process<select id="process"></select></label>
           <p class="muted" id="processHint"></p>
         </section>
 
         <section data-kinds="strace">
           <h3>System calls</h3>
           <div class="choice">
-            <label><input type="radio" name="strings" value="" checked>Calls and timing only<small>Leaves out what the process reads and writes</small></label>
-            <label><input type="radio" name="strings" value="true">With data read and written<span class="badge">needs approval</span><small>The first 256 bytes of every buffer; they can hold user data</small></label>
+            <label><input type="radio" name="strings" value="" checked>Calls and timing only<small>Leaves out the data the process reads and writes.</small></label>
+            <label><input type="radio" name="strings" value="true">With data read and written<span class="badge">needs approval</span><small>The first 256 bytes of every buffer, which can contain user data.</small></label>
           </div>
         </section>
 
@@ -224,92 +226,92 @@
           <h3>Profile endpoint</h3>
           <p class="muted" id="profileState"></p>
           <div id="profileChoices"></div>
-          <details id="otherEndpoint"><summary>Another endpoint</summary>
+          <details id="otherEndpoint"><summary>Use a different endpoint</summary>
             <div class="fields">
               <label>Port<select id="profilePort"></select></label>
               <label class="wide">Path<input id="profilePath" placeholder="/debug/profile" spellcheck="false" autocomplete="off"></label>
             </div>
-            <p class="muted">Asservat does not know what such an endpoint returns, so it needs approval.</p>
+            <p class="muted">Asservat cannot tell what a custom endpoint returns, so this needs approval.</p>
           </details>
           <p class="problem" id="profileProblem"></p>
         </section>
 
         <section id="frameBlock">
           <h3>Time frame</h3>
-          <div class="fields"><label>Seconds<input id="duration" type="number" min="0" placeholder="30"></label></div>
+          <div class="fields"><label>Duration in seconds<input id="duration" type="number" min="0" placeholder="30"></label></div>
           <p class="muted" id="frameHint"></p>
         </section>
-        <p class="muted" id="nothing">Nothing to choose: the pod object and its events are saved as JSON.</p>
+        <p class="muted" id="nothing">Nothing to configure. The pod object and its events are saved as JSON.</p>
       </div>
     </fieldset>
 
     <fieldset data-step="4">
       <legend>4 · When</legend>
       <div class="choice">
-        <label><input type="radio" name="when" value="now" checked>Now<small>Starts at once on every pod of the workload</small></label>
+        <label><input type="radio" name="when" value="now" checked>Now<small>Starts right away on every pod of the workload.</small></label>
       </div>
       <h3>When something happens to the pod</h3>
       <div class="choice">
         <label><input type="radio" name="when" value="crash">When a container crashes<small id="crashHint"></small></label>
-        <label><input type="radio" name="when" value="restart">When a container restarts<small>Whatever ended it: a failure, a clean exit or a failed liveness probe. Records the pod as it runs again</small></label>
-        <label><input type="radio" name="when" value="not-ready">When the pod stops being ready<small>Its readiness probe starts to fail. Records the pod while it is in that state</small></label>
-        <label><input type="radio" name="when" value="event">When Kubernetes warns about the pod<small>A warning event: a failed probe, a failed mount, a back-off, an eviction. All warnings, or those of one reason</small></label>
-        <label><input type="radio" name="when" value="log">When a log line matches<small>A container writes a line that a pattern matches. Records the pod from that moment</small></label>
+        <label><input type="radio" name="when" value="restart">When a container restarts<small>For any reason: a failure, a clean exit, or a failed liveness probe. Records the pod once it is running again.</small></label>
+        <label><input type="radio" name="when" value="not-ready">When the pod becomes unready<small>Its readiness probe starts failing. Records the pod while it is unready.</small></label>
+        <label><input type="radio" name="when" value="event">When Kubernetes reports a warning<small>A warning event such as a failed probe, a failed mount, a back-off, or an eviction. Any warning, or only those with a given reason.</small></label>
+        <label><input type="radio" name="when" value="log">When a log line matches<small>A container writes a line that matches a pattern. Recording starts at that moment.</small></label>
       </div>
-      <h3>When it uses too much</h3>
+      <h3>When resource use is high</h3>
       <div class="choice">
-        <label><input type="radio" name="when" value="memory">When memory use is above<small>A share of the container's limit, or a size. Records it before the kernel ends it for using too much</small></label>
-        <label><input type="radio" name="when" value="memory-growth">When memory grows by<small>More than a size within a time: a leak in progress, whatever the limit</small></label>
-        <label><input type="radio" name="when" value="cpu">When CPU use is above<small>A number of CPUs, or a share of the container's limit. Records it while it is busy</small></label>
-        <label><input type="radio" name="when" value="throttled">When the CPU limit holds it back<small>The container wants more CPU than its limit allows, in more than a share of the time</small></label>
-        <label><input type="radio" name="when" value="pressure">When it stalls for memory, CPU or I/O<small>The kernel's own measure of a container that waits for a resource, in more than a share of the time</small></label>
-        <label><input type="radio" name="when" value="threads">When it has more threads than<small>Threads and processes of the container: a leak of them, or a fork storm</small></label>
-        <label><input type="radio" name="when" value="open-files">When it holds more files open than<small>Files, sockets and pipes of the container's processes: a leak of them</small></label>
+        <label><input type="radio" name="when" value="memory">When memory use is high<small>Above a share of the container's limit, or above a fixed size. Records the pod before the kernel kills it for running out of memory.</small></label>
+        <label><input type="radio" name="when" value="memory-growth">When memory keeps growing<small>By more than a given size within a given time. Catches a leak in progress, whatever the limit.</small></label>
+        <label><input type="radio" name="when" value="cpu">When CPU use is high<small>Above a number of CPUs, or above a share of the container's limit. Records the pod while it is busy.</small></label>
+        <label><input type="radio" name="when" value="throttled">When CPU is throttled<small>The container wants more CPU than its limit allows, for more than a given share of the time.</small></label>
+        <label><input type="radio" name="when" value="pressure">When it stalls on memory, CPU or I/O<small>The kernel's pressure measure: the container waits for a resource for more than a given share of the time.</small></label>
+        <label><input type="radio" name="when" value="threads">When the thread count is high<small>Threads and processes in the container. Catches a thread leak or a fork storm.</small></label>
+        <label><input type="radio" name="when" value="open-files">When many files are open<small>Open files, sockets and pipes of the container's processes. Catches a descriptor leak.</small></label>
       </div>
-      <h3>When its network has trouble</h3>
+      <h3>When the network misbehaves</h3>
       <div class="choice">
-        <label><input type="radio" name="when" value="tcp-retransmits">When it sends TCP segments again<small>More than a number per second in the pod: packets are lost on the way</small></label>
-        <label><input type="radio" name="when" value="tcp-failures">When TCP connections fail<small>More than a number of the pod's connection attempts per second are refused or time out</small></label>
+        <label><input type="radio" name="when" value="tcp-retransmits">When TCP retransmits rise<small>More than a given number of retransmitted segments per second in the pod, a sign of packet loss.</small></label>
+        <label><input type="radio" name="when" value="tcp-failures">When TCP connections fail<small>More than a given number of the pod's connection attempts per second are refused or time out.</small></label>
       </div>
-      <h3>When something else says so</h3>
+      <h3>On an external signal</h3>
       <div class="choice">
-        <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Any query, as an alerting rule: Alertmanager tells the hub. Records the pod that the alert names, or all pods of the workload</small></label>
-        <label><input type="radio" name="when" value="time">At a time<small>All pods of the workload, once or again and again: a nightly job, a peak hour</small></label>
+        <label><input type="radio" name="when" value="alert">When a Prometheus alert fires<small>Works with any alerting rule: Alertmanager notifies the hub. Records the pod named in the alert, or all pods of the workload.</small></label>
+        <label><input type="radio" name="when" value="time">At a set time<small>Records all pods of the workload once or on a repeating schedule, for example for a nightly job or a peak hour.</small></label>
       </div>
       <div class="fields" id="eventFields" hidden>
-        <label class="wide">Reason of the events<input id="eventReason" placeholder="any warning; or one reason, such as Unhealthy, BackOff, FailedMount" spellcheck="false" autocomplete="off"></label>
+        <label class="wide">Event reason<input id="eventReason" placeholder="Any warning, or one reason such as Unhealthy, BackOff or FailedMount" spellcheck="false" autocomplete="off"></label>
       </div>
       <div class="fields" id="timeFields" hidden>
-        <label>At<input id="timeAt" type="datetime-local"></label>
-        <label>Again every, in minutes<input id="timeEvery" type="number" min="1" placeholder="not again"></label>
+        <label>Start at<input id="timeAt" type="datetime-local"></label>
+        <label>Repeat every (minutes)<input id="timeEvery" type="number" min="1" placeholder="no repeat"></label>
       </div>
       <div class="fields" id="alertFields" hidden>
-        <label class="wide">Name of the alert (its alertname label)<input id="alertName" placeholder="HighErrorRate" spellcheck="false" autocomplete="off"></label>
+        <label class="wide">Alert name (the alertname label)<input id="alertName" placeholder="HighErrorRate" spellcheck="false" autocomplete="off"></label>
       </div>
       <div class="fields" id="usageFields" hidden>
-        <label>Above<input id="usageAbove" spellcheck="false" autocomplete="off"></label>
-        <label><span id="usageSecondsLabel">For at least, in seconds</span><input id="usageSeconds" type="number" min="0" placeholder="0: as soon as it is seen"></label>
+        <label>Threshold<input id="usageAbove" spellcheck="false" autocomplete="off"></label>
+        <label><span id="usageSecondsLabel">For at least (seconds)</span><input id="usageSeconds" type="number" min="0" placeholder="0 = as soon as it is seen"></label>
         <label>Container<select id="usageContainer"></select></label>
-        <label id="pressureOf" hidden>Stalls for<select id="usageOf"><option value="memory">memory</option><option value="cpu">CPU</option><option value="io">I/O</option></select></label>
+        <label id="pressureOf" hidden>Resource<select id="usageOf"><option value="memory">memory</option><option value="cpu">CPU</option><option value="io">I/O</option></select></label>
       </div>
       <div class="fields" id="logFields" hidden>
-        <label class="wide">The line matches, as a regular expression<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
-        <label>Written by<select id="logContainer"></select></label>
+        <label class="wide">Pattern (regular expression)<input id="logPattern" placeholder="timeout|connection refused" spellcheck="false" autocomplete="off"></label>
+        <label>Container<select id="logContainer"></select></label>
       </div>
       <div id="beforeFields" hidden>
-        <h3>From before it happens</h3>
-        <p class="muted lead">These recordings can be kept running while the watch waits, so that their files begin before the moment and not at it.</p>
+        <h3>Include the time before</h3>
+        <p class="muted lead">These recordings can run while the watch waits, so their files start before the moment instead of at it.</p>
         <div class="group">
-          <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">costs little</span></label>
-          <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of a CPU on the pod's node while the watch waits</span></label>
+          <label data-before="pcap"><input type="checkbox" id="beforePcap" checked> Network traffic <span class="muted">low overhead</span></label>
+          <label data-before="cpu"><input type="checkbox" id="beforeCpu" checked> CPU profile <span class="muted">about 1 % of one CPU on the pod's node while the watch waits</span></label>
           <label data-before="memory"><input type="checkbox" id="beforeMemory"> Memory growth <span class="muted">slows every page fault on the pod's node while the watch waits</span></label>
-          <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, much if it makes many calls; a core dump of it cannot be taken then</span></label>
+          <label data-before="strace"><input type="checkbox" id="beforeStrace"> System calls <span class="muted">slows the traced process while the watch waits, noticeably if it makes many calls; no core dump of it can be taken meanwhile</span></label>
         </div>
-        <div class="fields"><label>Seconds kept from before<input id="beforeSeconds" type="number" min="1" placeholder="as many as the time frame"></label></div>
+        <div class="fields"><label>Seconds to keep from before<input id="beforeSeconds" type="number" min="1" placeholder="same as the time frame"></label></div>
       </div>
       <div class="fields">
-        <label id="countLabel" hidden>How many times to record<input id="count" type="number" min="1" placeholder="1"></label>
-        <label class="wide"><span id="reasonLabel">Reason</span><input id="reason" placeholder="what you are looking for"></label>
+        <label id="countLabel" hidden>Number of recordings<input id="count" type="number" min="1" placeholder="1"></label>
+        <label class="wide"><span id="reasonLabel">Reason</span><input id="reason" placeholder="What are you looking for?"></label>
       </div>
       <p class="notice" id="approvalNotice" hidden></p>
     </fieldset>
@@ -325,7 +327,7 @@
  <section data-view="captures" hidden>
   <div class="toolbar head">
     <h2>Captures</h2>
-    <input id="captureFind" type="search" placeholder="Find: workload, namespace, recording, person, reason" autocomplete="off" spellcheck="false">
+    <input id="captureFind" type="search" placeholder="Search by workload, namespace, recording, person or reason" autocomplete="off" spellcheck="false">
     <span class="chips" id="states">
       <button type="button" data-filter="all" class="on">All</button><button type="button" data-filter="active">In progress</button><button type="button" data-filter="done">Finished</button>
     </span>
@@ -338,16 +340,16 @@
 
  <section data-view="watches" hidden>
   <h2>Watches</h2>
-  <p class="muted lead">A watch waits until a pod of its workload meets a condition, such as a container that crashes, and then records that pod. Its captures appear under Captures.</p>
+  <p class="muted lead">A watch waits until a pod of its workload meets a condition, such as a container crash, and then records that pod. The resulting captures appear under Captures.</p>
   <p class="problem" id="watchesProblem"></p>
-  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Waits for</th><th>Records</th><th>Times left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
-  <p class="empty" id="noWatches" hidden>No watch is waiting. To create one, start a <a href="#new">new capture</a> and choose in the last step when it is to record.</p>
+  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Condition</th><th>Records</th><th>Recordings left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
+  <p class="empty" id="noWatches" hidden>No watches yet. To create one, start a <a href="#new">new capture</a> and choose a condition in the last step.</p>
  </section>
 
  <section data-view="clusters" hidden>
   <h2>Clusters</h2>
-  <table><thead><tr><th>Cluster</th><th>Node agents connected</th></tr></thead><tbody id="clusterList"></tbody></table>
-  <p class="muted">Clusters are part of the hub's configuration (<code>hub.clusters</code> in its Helm values): a name and a join token each. The agents of a cluster are installed with the same token.</p>
+  <table><thead><tr><th>Cluster</th><th>Connected node agents</th></tr></thead><tbody id="clusterList"></tbody></table>
+  <p class="muted">Clusters are defined in the hub's configuration (<code>hub.clusters</code> in its Helm values), each with a name and a join token. Install a cluster's agents with the same token.</p>
  </section>
 </section>
 
@@ -403,8 +405,8 @@ window.onhashchange = route;
 
 async function loadClusters() {
   const clusters = await call('GET', '/api/clusters');
-  $('clusterList').innerHTML = clusters.map(c => `<tr><td>${esc(c.name)}</td><td>${c.nodes.length ? c.nodes.map(esc).join(', ') : '<span class="muted">none: no agent of this cluster is connected</span>'}</td></tr>`).join('')
-    || '<tr><td colspan="2" class="muted">No cluster yet.</td></tr>';
+  $('clusterList').innerHTML = clusters.map(c => `<tr><td>${esc(c.name)}</td><td>${c.nodes.length ? c.nodes.map(esc).join(', ') : '<span class="muted">None. No agent of this cluster is connected.</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="2" class="muted">No clusters yet.</td></tr>';
   const selected = $('cluster').value;
   $('cluster').innerHTML = clusters.map(c => `<option>${esc(c.name)}</option>`).join('');
   if (selected) $('cluster').value = selected;
@@ -461,7 +463,7 @@ async function loadProfiles() {
   try { found = await call('POST', namespacePath() + '/profiles?' + workloadQuery()); } catch (err) {
     if (of !== target()) return;
     $('profileState').className = 'problem';
-    $('profileState').textContent = `The profile endpoints could not be looked for: ${err.message}`;
+    $('profileState').textContent = `Could not look for profile endpoints: ${err.message}`;
     $('otherEndpoint').open = true;
     return showParams();
   }
@@ -477,12 +479,12 @@ async function loadProfiles() {
   const first = served.find(p => p.timed && !p.sensitive) || served.find(p => !p.sensitive);
   $('profileChoices').innerHTML = Object.entries(groups).map(([title, list]) => `<div class="group"><div>${esc(title)}</div>${list.map(p =>
     `<label><input type="checkbox" data-endpoint="${esc(where(p))}/${esc(p.endpoint)}" ${p.timed ? 'data-timed' : ''} ${p.sensitive ? 'data-sensitive' : ''} ${p === first ? 'checked' : ''}>${esc(p.name)}${
-      p.sensitive ? `<span class="badge">${badgeText()}</span>` : ''}${p.timed ? '<span class="muted">for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
+      p.sensitive ? `<span class="badge">${badgeText()}</span>` : ''}${p.timed ? '<span class="muted">runs for the time frame</span>' : ''}</label>`).join('')}</div>`).join('');
   $('profileState').textContent = (found.profiles.length ? 'Found on the pod. Tick what to record; everything ticked is taken at once.'
-    : `No profile endpoint that Asservat knows answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod: it listens on no TCP port'}. `
-      + 'It knows those of Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator and .NET with dotnet-monitor, and asks a HotSpot JVM itself.'
-      + (ports.length ? ' If the application serves another one, give it below.' : '')
-      + ' Without an endpoint, "CPU profile" and "Memory growth" in the step before record from outside the application.')
+    : `No known profile endpoint answers on ${ports.length ? `the pod's ${plural(ports.length, 'port')} (${ports.join(', ')})` : 'the pod, which listens on no TCP port'}. `
+      + 'Asservat recognises Go (net/http/pprof, also served by libraries for other languages), C and C++ with gperftools or brpc, Java with Spring Boot Actuator, and .NET with dotnet-monitor. It asks a HotSpot JVM directly.'
+      + (ports.length ? ' If the application serves a different endpoint, enter it below.' : '')
+      + ' Without an endpoint, "CPU profile" and "Memory growth" in the previous step record from outside the application.')
     + (found.notes || []).map(note => ' ' + note).join('');
   $('otherEndpoint').open = !found.profiles.length && ports.length > 0;
   showParams();
@@ -491,10 +493,10 @@ const profileBoxes = () => [...document.querySelectorAll('#profileChoices input:
 // What the profile recording asks for: found endpoints, or another one.
 function profileParams() {
   const ticked = profileBoxes(), path = $('profilePath').value.trim();
-  if (ticked.length && path) throw new Error('Either tick endpoints above or give another endpoint, not both.');
+  if (ticked.length && path) throw new Error('Either tick endpoints above or enter a different endpoint, not both.');
   if (ticked.length) return {endpoints: ticked.map(box => box.dataset.endpoint).join(',')};
   if (path && $('profilePort').value) return {port: $('profilePort').value, path};
-  throw new Error($('profileChoices').innerHTML ? 'Tick at least one profile, or untick "Profile endpoint" in the step before.' : 'No profile endpoint is chosen. Give one under "Another endpoint", or untick "Profile endpoint" in the step before.');
+  throw new Error($('profileChoices').innerHTML ? 'Tick at least one profile, or untick "Profile endpoint" in the previous step.' : 'No profile endpoint is selected. Enter one under "Use a different endpoint", or untick "Profile endpoint" in the previous step.');
 }
 
 const kinds = () => [...document.querySelectorAll('input[name=kind]:checked')].map(box => box.value);
@@ -503,10 +505,10 @@ const list = words => words.length < 2 ? words.join('') : words.slice(0, -1).joi
 // A core dump on a crash is that of the crashed process: nothing to choose.
 const wantsProcess = () => kinds().includes('strace') || kinds().includes('coredump') && picked('when') !== 'crash';
 // What a watch can wait for, as the end of a sentence.
-const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod stops being ready', log: 'when a log line matches',
-  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when the CPU limit holds it back in more than', alert: 'when the alert fires:', event: 'when Kubernetes warns about the pod', time: 'at', asked: 'when asked',
-  'memory-growth': 'when memory grows by more than', pressure: 'when it stalls in more than', threads: 'when it has more threads than', 'open-files': 'when it holds more files open than',
-  'tcp-retransmits': 'when it sends more TCP segments per second again than', 'tcp-failures': 'when more TCP connections per second fail than'};
+const conditions = {crash: 'when a container crashes', restart: 'when a container restarts', 'not-ready': 'when the pod becomes unready', log: 'when a log line matches',
+  memory: 'when memory use is above', cpu: 'when CPU use is above', throttled: 'when CPU is throttled for more than', alert: 'when the alert fires:', event: 'when Kubernetes reports a warning', time: 'at', asked: 'when asked',
+  'memory-growth': 'when memory grows by more than', pressure: 'when it stalls for more than', threads: 'when it has more threads than', 'open-files': 'when it has more open files than',
+  'tcp-retransmits': 'when TCP retransmits per second exceed', 'tcp-failures': 'when failed TCP connections per second exceed'};
 // The thresholds a usage condition takes, as an example in its field.
 const thresholds = {memory: '80% of the limit, or 500Mi', cpu: '1.5 CPUs, or 90% of the limit', throttled: '25% of the time', 'memory-growth': '100Mi', pressure: '20% of the time',
   threads: '500', 'open-files': '1000', 'tcp-retransmits': '10 per second', 'tcp-failures': '1 per second'};
@@ -522,13 +524,13 @@ function condition() {
   const kind = picked('when');
   if (kind === 'log') {
     const pattern = $('logPattern').value.trim();
-    if (!pattern) throw new Error('Give the pattern that a log line is to match.');
+    if (!pattern) throw new Error('Enter the pattern a log line has to match.');
     return {kind, params: {pattern, ...($('logContainer').value ? {container: $('logContainer').value} : {})}};
   }
   if (kind in thresholds) {
     const above = $('usageAbove').value.trim().replace(/\s+/g, '');
-    if (!above) throw new Error(`Give the threshold: ${thresholds[kind]}.`);
-    if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw new Error('Give the seconds within which the memory grows that much.');
+    if (!above) throw new Error(`Enter a threshold: ${thresholds[kind]}.`);
+    if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw new Error('Enter the number of seconds within which memory grows by that much.');
     return {kind, params: {above, ...(kind === 'pressure' ? {of: $('usageOf').value} : {}), ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
   }
   if (kind === 'event') {
@@ -537,12 +539,12 @@ function condition() {
   }
   if (kind === 'time') {
     const at = new Date($('timeAt').value);
-    if (isNaN(at)) throw new Error('Give the time at which to record.');
+    if (isNaN(at)) throw new Error('Enter the time to record at.');
     return {kind, params: {at: at.toISOString().replace(/\.\d+Z$/, 'Z'), ...($('timeEvery').value > 0 ? {every: String(Math.round($('timeEvery').value * 60))} : {})}};
   }
   if (kind === 'alert') {
     const name = $('alertName').value.trim();
-    if (!name) throw new Error('Give the name of the alert.');
+    if (!name) throw new Error('Enter the name of the alert.');
     return {kind, params: {name}};
   }
   return {kind};
@@ -577,8 +579,8 @@ async function loadProcesses() {
   }
   $('process').innerHTML = groups.join('');
   $('process').disabled = false;
-  $('process').dataset.note = problem ? `The processes could not be listed (${problem}), so only the main processes are offered. `
-    : found.notInspected?.length ? `${plural(found.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node, or the pod is restarting. ` : '';
+  $('process').dataset.note = problem ? `Could not list the processes (${problem}), so only the main processes are offered. `
+    : found.notInspected?.length ? `${plural(found.notInspected.length, 'pod')} could not be inspected: no agent is connected on their node, or the pod is restarting. ` : '';
   showParams();
 }
 
@@ -587,10 +589,10 @@ function processHint() {
   let text = $('process').dataset.note || '';
   if (dump && chosen) {
     const bytes = Number(chosen.dataset.bytes), count = Number(chosen.dataset.count);
-    if (bytes) text += `A core is about as large as the process's memory: ${size(bytes)}${count > 1 ? ` each, ${count} per pod` : ''}. `;
-    text += 'The process pauses while its core is written. ';
+    if (bytes) text += `A core dump is about as large as the process's memory: ${size(bytes)}${count > 1 ? ` each, ${count} per pod` : ''}. `;
+    text += 'The process pauses while the core dump is written. ';
   }
-  if (kinds().includes('strace')) text += dump ? 'The trace starts when the core is written, and slows the process down while it runs.' : 'Tracing slows the process down while it runs.';
+  if (kinds().includes('strace')) text += dump ? 'The trace starts once the core dump is written and slows the process down while it runs.' : 'Tracing slows the process down while it runs.';
   return text;
 }
 
@@ -607,11 +609,11 @@ function showFlows(sample) {
     return `<tr><td><input type="checkbox" data-flow="${i}" aria-label="${esc(f.label)}"></td><td class="arrow" title="${arrows[f.direction][1]}">${arrows[f.direction][0]}</td>
       <td>${esc(f.label)}<div class="muted">${esc(notes)}</div></td><td>${f.packets.toLocaleString()}</td><td><div class="bar" style="width:${Math.round(100 * f.bytes / most)}%"></div></td></tr>`;
   }).join('');
-  if (!sample) $('sampleState').textContent = 'Choose connections from what the pods are doing right now, instead of writing a filter.';
+  if (!sample) $('sampleState').textContent = 'Pick connections from what the pods are doing right now instead of writing a filter.';
   else {
     const where = `in ${plural(sample.seconds, 'second')} on ${plural(sample.pods.length, 'pod')}`;
-    const missed = sample.notInspected?.length ? ` ${plural(sample.notInspected.length, 'pod')} could not be looked at: no agent is connected on their node, or the pod is restarting.` : '';
-    $('sampleState').textContent = (flows.length ? `Seen ${where}. Tick what you want to record.` : `No packets ${where}. That does not mean the workload has no connections: look again, or record all traffic.`) + missed;
+    const missed = sample.notInspected?.length ? ` ${plural(sample.notInspected.length, 'pod')} could not be inspected: no agent is connected on their node, or the pod is restarting.` : '';
+    $('sampleState').textContent = (flows.length ? `Seen ${where}. Tick the connections you want to record.` : `No packets ${where}. The workload may still have connections: sample again, or record all traffic.`) + missed;
   }
   filterChanged();
 }
@@ -622,7 +624,7 @@ function filterChanged(typed) {
   if (typed) for (const box of document.querySelectorAll('#flows input:checked')) box.checked = false;
   else $('filter').value = chosen.length > 1 ? chosen.map(f => `(${f.filter})`).join(' or ') : chosen[0]?.filter || '';
   $('chosen').textContent = chosen.length ? 'Records only: ' + chosen.map(f => f.label).join('; ') + '.'
-    : $('filter').value ? 'Records what the filter below selects.' : 'Records all traffic of the pods.';
+    : $('filter').value ? 'Records what the filter below matches.' : 'Records all traffic to and from the pods.';
 }
 
 function showParams() {
@@ -642,15 +644,16 @@ function showParams() {
   // The packet buffer of a watch reaches back; everything else runs forward.
   const running = timed.filter(k => !(k === 'pcap' && crash)).map(k => kindNames[k]);
   $('frameHint').textContent = [
-    watching ? 'What the last step keeps running reaches back before that moment as well: as many seconds as this, or as given there.' : '',
+    watching ? 'Recordings that the last step keeps running also reach back before that moment, by this many seconds unless you set a number there.' : '',
     running.length ? `The ${list(running)} ${running.length > 1 ? 'recordings run' : 'recording runs'} this long${crash ? ' after the crash' : watching ? ' from that moment' : ''}.` : '',
-    follows ? (timed.length ? 'The logs are followed for the same time.' : 'With 0 the logs are saved as they are; otherwise they are followed this long.') : '',
+    follows ? (timed.length ? 'Logs are followed for the same time.' : 'With 0, the logs are saved as they are. Otherwise they are followed for this long.') : '',
   ].filter(Boolean).join(' ');
   $('nothing').hidden = !(chosen.length === 1 && has('pod-state'));
   $('crashHint').textContent = !chosen.length ? '' : 'For the crashed pod: ' + list(chosen.map(k => ({
-    pcap: 'the packets from before the crash', logs: 'the logs of the crashed instance and its successor',
-    coredump: 'the core of the process that crashed (the agents need the core handler)', 'pod-state': 'the pod with the reason of the crash',
-    strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container'}[k])));
+    pcap: 'the packets from before the crash', logs: 'the logs of the crashed container and of its replacement',
+    coredump: 'the core dump of the crashed process (requires the agents\' core handler)', 'pod-state': 'the pod with the crash reason',
+    strace: 'a trace of the restarted container', pprof: 'a profile of the restarted container',
+    cpu: 'a CPU profile of the restarted container', memory: 'a memory growth profile of the restarted container'}[k])));
   $('countLabel').hidden = !watching;
   $('logFields').hidden = picked('when') !== 'log';
   $('usageFields').hidden = !(picked('when') in thresholds);
@@ -662,18 +665,18 @@ function showParams() {
   $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
   $('usageAbove').placeholder = thresholds[picked('when')] || '';
   $('pressureOf').hidden = picked('when') !== 'pressure';
-  $('usageSecondsLabel').textContent = picked('when') === 'memory-growth' ? 'Within, in seconds' : 'For at least, in seconds';
-  $('usageSeconds').placeholder = picked('when') === 'memory-growth' ? '300' : '0: as soon as it is seen';
+  $('usageSecondsLabel').textContent = picked('when') === 'memory-growth' ? 'Within (seconds)' : 'For at least (seconds)';
+  $('usageSeconds').placeholder = picked('when') === 'memory-growth' ? '300' : '0 = as soon as it is seen';
   const sensitive = [has('coredump') && 'the core dump', has('pcap') && picked('payload') && 'full packets', has('strace') && picked('strings') && 'the data in system calls',
-    has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'an endpoint that Asservat does not know'].filter(Boolean);
+    has('pprof') && profileBoxes().some(box => 'sensitive' in box.dataset) && 'a memory dump', otherProfile && 'a custom endpoint'].filter(Boolean);
   $('approvalNotice').hidden = !sensitive.length;
   // Someone who may approve their own requests is not asked to.
   const asks = sensitive.length && !me?.selfApproval;
   $('approvalNotice').textContent = !sensitive.length ? '' : !asks
-    ? `Sensitive because of ${list(sensitive)}. It starts at once, because you may approve your own requests; the audit log records it as approved by you.`
+    ? `Sensitive because of ${list(sensitive)}. It starts right away because you may approve your own requests. The audit log records it as approved by you.`
     : `Needs approval because of ${list(sensitive)}. ` + (watching
-      ? 'An administrator approves the watch once, before it starts; its captures then need no further approval.'
-      : chosen.length > 1 ? 'One approval covers the whole request; nothing starts before it.' : 'It starts when an administrator has approved it.');
+      ? 'An administrator approves the watch once, before it starts. Its captures then need no further approval.'
+      : chosen.length > 1 ? 'One approval covers the whole request. Nothing starts before it.' : 'It starts once an administrator approves it.');
   $('reasonLabel').textContent = asks ? 'Reason, shown to the approver' : 'Reason';
   $('submit').textContent = watching ? (asks ? 'Request approval for this watch' : 'Start the watch') : asks ? 'Request approval' : 'Record now';
   $('done').textContent = $('formProblem').textContent = $('profileProblem').textContent = $('kindProblem').textContent = '';
@@ -690,17 +693,17 @@ async function loadWatches() {
   $('watchCount').textContent = list.length || '';
   $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
     <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(told(w.when))}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
-    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}${!w.sensitive || w.approver ? `<button data-id="${w.id}" data-act="record" title="Record all pods of the workload now, as one of the watch's times">Record now</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
+    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}${!w.sensitive || w.approver ? `<button data-id="${w.id}" data-act="record" title="Record all pods of the workload now. This counts as one of the watch's recordings.">Record now</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
 // How a recording gets on, as a mark before its name.
 // What a file is, for someone who did not name it.
-const whatIs = name => name === 'capture.pcap' ? 'packets, for Wireshark' : name === 'pod.json' ? 'the pod as Kubernetes holds it' : name === 'events.json' ? 'the pod\'s events'
-  : name.endsWith('.previous.log') ? 'log of the container\'s previous instance' : name.endsWith('.log') ? 'the container\'s log' : name.endsWith('.strace') ? 'system calls, as strace writes them'
-  : name === 'sampled-cpu.pprof' ? 'where CPU time went, for pprof' : name === 'sampled-memory.pprof' ? 'what made memory grow, for pprof'
-  : name.endsWith('.analysis.json') ? 'the core described: stacks and variables' : name.endsWith('.files.tar') ? 'the program\'s files, which a debugger needs with the core'
-  : name.startsWith('core.') ? 'memory image, for gdb or Delve' : name.endsWith('.pprof') ? 'profile, for pprof' : name.endsWith('.hprof') ? 'Java heap dump' : name.endsWith('.jfr') ? 'Java flight recording, for JDK Mission Control' : name.endsWith('threaddump.txt') ? 'the stacks of all threads' : name.endsWith('histogram.txt') ? 'objects and bytes by class' : name.endsWith('.nettrace') ? '.NET trace'
-  : name.endsWith('.gcdump') ? '.NET heap summary' : name.endsWith('.dmp') ? '.NET memory dump' : name === 'trace.out' ? 'Go execution trace' : name === 'goroutines.txt' ? 'the stacks of all goroutines' : name === 'threads.txt' ? 'the stacks of all threads' : '';
+const whatIs = name => name === 'capture.pcap' ? 'packet capture, for Wireshark' : name === 'pod.json' ? 'the pod object from Kubernetes' : name === 'events.json' ? 'the pod\'s events'
+  : name.endsWith('.previous.log') ? 'container log from before the last restart' : name.endsWith('.log') ? 'container log' : name.endsWith('.strace') ? 'system call trace, in strace format'
+  : name === 'sampled-cpu.pprof' ? 'CPU profile, for pprof' : name === 'sampled-memory.pprof' ? 'memory growth profile, for pprof'
+  : name.endsWith('.analysis.json') ? 'description of the core dump: stacks and variables' : name.endsWith('.files.tar') ? 'program files a debugger needs alongside the core dump'
+  : name.startsWith('core.') ? 'core dump, for gdb or Delve' : name.endsWith('.pprof') ? 'profile, for pprof' : name.endsWith('.hprof') ? 'Java heap dump' : name.endsWith('.jfr') ? 'Java flight recording, for JDK Mission Control' : name.endsWith('threaddump.txt') ? 'stacks of all threads' : name.endsWith('histogram.txt') ? 'object counts and sizes by class' : name.endsWith('.nettrace') ? '.NET trace'
+  : name.endsWith('.gcdump') ? '.NET heap summary' : name.endsWith('.dmp') ? '.NET memory dump' : name === 'trace.out' ? 'Go execution trace' : name === 'goroutines.txt' ? 'stacks of all goroutines' : name === 'threads.txt' ? 'stacks of all threads' : '';
 // How long a capture took.
 const took = c => { const s = Math.max(0, Math.round((new Date(c.finishedAt) - new Date(c.createdAt)) / 1000)); return s < 90 ? `${s} s` : `${Math.round(s / 60)} min`; };
 const marks = {Waiting: ['○', 'waits'], Running: ['●', 'runs'], Completed: ['✓', 'done'], Failed: ['✗', 'failed']};
@@ -746,8 +749,8 @@ async function loadCaptures() {
   $('captureCount').textContent = all.filter(inProgress).length || '';
   const list = all.filter(c => (captureFilter === 'all' || (captureFilter === 'active') === inProgress(c)) && words.every(w => text(c).includes(w)));
   $('noCaptures').hidden = !!list.length;
-  $('noCaptures').innerHTML = words.length && all.length ? 'No capture matches.' : captureFilter === 'active' ? 'No capture is in progress.' : captureFilter === 'done' ? 'No capture has finished yet.'
-    : 'Nothing here yet. <a href="#new">Record something</a>: pick a workload, choose what to record, and its files appear in this list.';
+  $('noCaptures').innerHTML = words.length && all.length ? 'No captures match.' : captureFilter === 'active' ? 'No captures in progress.' : captureFilter === 'done' ? 'No finished captures yet.'
+    : 'No captures yet. <a href="#new">Start one</a>: pick a workload, choose what to record, and the files show up here.';
   $('captures').innerHTML = list.map(c => {
     const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
     // Each pod's recordings, in the order they were asked for, and under
@@ -774,16 +777,16 @@ async function loadCaptures() {
       const others = of('').map(fileLine).join('');
       return `<div class="pod"><span>${esc(t.pod)}</span><span class="muted">on ${esc(t.node || 'no node')}${t.recordings?.length ? '' : ' · ' + esc(t.state)}</span></div>${groups}${others ? `<div class="rec"><div class="of"><b>Other files</b></div>${others}</div>` : ''}`
         + (t.message && !t.recordings?.some(r => r.message) ? `<div class="muted">${esc(t.message)}</div>` : '');
-    }).join('') || '<div class="muted">No pod was recorded.</div>';
+    }).join('') || '<div class="muted">No pods were recorded.</div>';
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
-    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse it; it never starts') : '') + button('cancel', 'Withdraw', 'Take the request back')
-      : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Abandon it and delete what it recorded')
-      : c.state === 'Running' ? button('stop', 'Stop and keep', 'End the recordings now and keep what they have recorded', true) + button('delete', 'Delete', 'Abandon it and delete what it recorded')
+    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
+      : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Stop it and delete what it has recorded')
+      : c.state === 'Running' ? button('stop', 'Stop and keep', 'Stop recording now and keep the files so far', true) + button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
-    const state = {PendingApproval: 'Waits for approval'}[c.state] || c.state;
+    const state = {PendingApproval: 'Awaiting approval'}[c.state] || c.state;
     const count = c.artifacts.length ? ` · ${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}` : '';
     // What tells this capture from the others like it: why it was made.
     const why = c.reason || (c.watch ? 'recorded by a watch' : '');
@@ -805,7 +808,7 @@ async function loadCaptures() {
 }
 const list2 = words => words.length > 3 ? `${words.slice(0, 3).join(', ')} +${words.length - 3}` : words.join(', ');
 
-$('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token is not accepted.'); });
+$('loginForm').onsubmit = guard(async () => { sessionStorage.setItem('token', $('token').value.trim()); await start(); if (!me) throw new Error('This token was not accepted.'); });
 $('signout').onclick = async () => {
   sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0';
   await fetch('/auth/logout', {method: 'POST'}).catch(() => {}); // ends a single sign-on session, if any
@@ -820,7 +823,7 @@ $('sample').onclick = guard(async () => {
   if (!$('workload').value) return;
   const of = target(), seconds = $('sampleSeconds').value;
   $('sample').disabled = true;
-  $('sampleState').textContent = `Looking at the traffic for ${seconds} seconds…`;
+  $('sampleState').textContent = `Sampling traffic for ${seconds} seconds…`;
   try {
     const sample = await call('POST', `${namespacePath()}/traffic?${workloadQuery()}&seconds=${seconds}`);
     if (of === target()) showFlows(sample);
@@ -863,8 +866,8 @@ $('captureForm').onsubmit = guard(async () => {
   const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1), ...($('beforeSeconds').value > 0 && !$('beforeFields').hidden ? {beforeSeconds: Math.round($('beforeSeconds').value)} : {})}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
-  $('done').textContent = watching ? (waits ? 'The watch waits for an administrator\'s approval.' : `Watching: the capture appears under Captures ${told(condition())}.`)
-    : waits ? 'Requested. It starts when an administrator has approved it.' : 'Started. Follow it in the first row below.';
+  $('done').textContent = watching ? (waits ? 'The watch is awaiting an administrator\'s approval.' : `Watching. The capture will appear under Captures ${told(condition())}.`)
+    : waits ? 'Requested. It starts once an administrator approves it.' : 'Started. Follow its progress in the first row below.';
   // Show where it went: the new capture, opened, in its list.
   if (!watching) toggled.set(created.id, true);
   fresh = {id: created.id, until: Date.now() + 4000};
@@ -899,7 +902,7 @@ function showStep(n) {
 // What the step needs before the next one; the message appears at the step.
 function stepProblem(n) {
   if (n === 1 && !$('workload').value) return ['whereProblem', 'Choose a cluster, a namespace and a workload.'];
-  if (n === 2 && !kinds().length) return ['kindProblem', 'Choose at least one kind of evidence.'];
+  if (n === 2 && !kinds().length) return ['kindProblem', 'Choose at least one recording.'];
   if (n === 3 && kinds().includes('pprof')) try { profileParams(); } catch (err) { return ['profileProblem', err.message]; }
   return null;
 }
@@ -949,7 +952,7 @@ $('captures').onclick = guard(async e => {
   if (act === 'delete' && running && !confirm('Abandon this capture and delete what it has recorded? "Stop and keep" ends it and keeps the files.')) return;
   // Files that are deleted are gone for everyone.
   const number = card.querySelector('.number'), files = card.querySelectorAll('.file').length;
-  if (act === 'delete' && !running && files && !confirm(`Delete capture ${number.textContent} and its ${files === 1 ? 'file' : files + ' files'}? They cannot be brought back.`)) return;
+  if (act === 'delete' && !running && files && !confirm(`Delete capture ${number.textContent} and its ${files === 1 ? 'file' : files + ' files'}? This cannot be undone.`)) return;
   await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
 }, 'capturesProblem');

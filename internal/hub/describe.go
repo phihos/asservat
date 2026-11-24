@@ -40,7 +40,7 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 		return err
 	}
 	if api.ViewerOf(in.Name) != "core" || strings.HasSuffix(in.Name, coredesc.Suffix) {
-		return errStatus{http.StatusBadRequest, "the file is no core"}
+		return errStatus{http.StatusBadRequest, "the file is not a core dump"}
 	}
 	// The work goes on when the viewer that asked is closed: the next one
 	// finds it done. It takes seconds, or minutes with debug information
@@ -62,7 +62,7 @@ func (h *Hub) describe(w http.ResponseWriter, r *http.Request, u User) error {
 			}
 			if result.err != nil {
 				slog.Error("core not described again", "capture", c.ID, "name", in.Name, "error", result.err)
-				result.described, result.reason = false, "the hub could not describe the core again now"
+				result.described, result.reason = false, "the hub could not describe the core dump again right now"
 			}
 			return reply(w, map[string]any{"described": result.described, "reason": result.reason})
 		case <-beat.C:
@@ -107,7 +107,7 @@ func (h *Hub) renew(ctx context.Context, u User, capture, name string) <-chan re
 			h.mu.Lock()
 			h.undescribed[capture+"/"+name] = true
 			h.mu.Unlock()
-			described, reason, err = false, "this Asservat could not describe the core again", nil
+			described, reason, err = false, "this version of Asservat could not describe the core dump again", nil
 		case err == nil && described:
 			// The description is stored: that is the answer, whatever
 			// becomes of its audit entry. Completing what the agent sent
@@ -143,7 +143,7 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 		h.mu.Lock()
 		if h.undescribed[key] {
 			h.mu.Unlock()
-			return false, "this Asservat could not describe the core again", nil
+			return false, "this version of Asservat could not describe the core dump again", nil
 		}
 		running := h.describing[key]
 		if running == nil {
