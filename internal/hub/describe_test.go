@@ -326,17 +326,17 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	if left := coredesc.Awaits(report.Bytes()); len(left) != 0 {
 		t.Fatal("still awaited:", left)
 	}
-	// It is complete: opening the core describes nothing again, and the
-	// work directory holds nothing of it.
+	// It is complete: opening the core describes nothing again.
 	if described, _, err := h.describeAgain(ctx, c.ID, name); err != nil || described {
 		t.Fatal("described twice:", described, err)
 	}
-	if left, _ := os.ReadDir(h.WorkDir); len(left) != 0 {
-		t.Fatal("left in the work directory:", left)
-	}
 	// Files that are no archive are the core's fault, not the hub's: who
-	// opens it is shown the description as it is.
+	// opens it is shown the description as it is. The work directory holds
+	// nothing of either core then.
 	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, bad); result.err != nil || result.described || result.reason == "" {
 		t.Fatalf("a core with files that are no archive: %+v", result)
+	}
+	if left, _ := os.ReadDir(h.WorkDir); len(left) != 0 {
+		t.Fatal("left in the work directory:", left)
 	}
 }
