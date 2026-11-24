@@ -19,7 +19,8 @@ what is deliberately left out. Change it together with the code.
 Both components are the same binary (`asservat hub`, `asservat agent`). The
 agent's image, which every node pulls, is the hub's without the viewers'
 tools (Wireshark's sharkd, graphviz, Go's trace tool): the same tag with
-`-agent`.
+`-agent`. The published images' layers are compressed with zstd, which
+containerd, CRI-O and Docker from version 23 read.
 
 ## Capture lifecycle
 
