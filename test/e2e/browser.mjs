@@ -11,9 +11,11 @@
 // open them. With $ONLY_NAMESPACES, a regular expression, it opens only the files of
 // captures from namespaces that match: for a hub that holds more than tests.
 //
+// With $SHOTS, a directory, it saves a picture of every page it checked.
+//
 // The browser is $CHROME, or the first of the usual names that is installed.
 import {spawn, spawnSync} from 'node:child_process';
-import {mkdtempSync, rmSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
@@ -73,6 +75,12 @@ const check = async (name, steps) => {
   // A page may be as wide as it likes inside its own scrolling parts, not as a whole.
   const wide = await run(`return document.documentElement.scrollWidth > innerWidth + 1 ? document.documentElement.scrollWidth + ' of ' + innerWidth : ''`).catch(() => '');
   if (wide) seen.push('the page is wider than the screen: ' + wide + ' px');
+  if (process.env.SHOTS) {
+    // The page as it stood when it was checked, for a person to look at.
+    const shot = await send('Page.captureScreenshot', {format: 'png'});
+    mkdirSync(process.env.SHOTS, {recursive: true});
+    if (shot.result?.data) writeFileSync(join(process.env.SHOTS, name.replace(/[^a-z0-9.]+/gi, '-') + '.png'), Buffer.from(shot.result.data, 'base64'));
+  }
   for (const problem of new Set(seen)) failures.push(`${name}: ${problem}`);
   console.log(`${seen.length ? 'FAIL' : 'ok  '} ${name}`);
 };
