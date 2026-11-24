@@ -114,6 +114,24 @@ def has_tables(objfile):
     return tables[name] or any(has_tables(o) for o in gdb.objfiles() if o.owner == objfile)
 
 
+code = None  # the ranges of memory that hold the modules' code
+
+
+def is_code(address):
+    """Whether the address is in a section of code of a module, by gdb's
+    list of the modules' sections. A word on a stack that points to data
+    is no return address, though the bytes before its target may look like
+    a call: on arm64 one word in sixteen does."""
+    global code
+    if code is None:
+        code = []
+        for line in run("info files").splitlines():
+            found = re.match(r"\s*(0x[0-9a-f]+) - (0x[0-9a-f]+) is (\.text|\.plt[.\w]*|\.init|\.fini)\b", line)
+            if found:
+                code.append((int(found.group(1), 16), int(found.group(2), 16)))
+    return not code or any(start <= address < end for start, end in code)
+
+
 def after_call(inferior, address, machine, callee, space):
     """Whether the instruction before the address is a call that can have
     led to callee, an address in the function that was called. A call to
@@ -169,7 +187,7 @@ class ScanUnwinder(gdb.unwinder.Unwinder):
                 break
         for at in range(0, len(stack) - 7, 8):
             caller, = WORD.unpack_from(stack, at)
-            if caller > 0x1000 and space.objfile_for_address(caller) is not None and after_call(inferior, caller, machine, pc, space):
+            if caller > 0x1000 and space.objfile_for_address(caller) is not None and is_code(caller) and after_call(inferior, caller, machine, pc, space):
                 unwound = pending.create_unwind_info(gdb.unwinder.FrameId(sp + at + 8, pc))
                 kind = pending.read_register("pc").type
                 unwound.add_saved_register("pc", gdb.Value(caller).cast(kind))
