@@ -56,7 +56,15 @@ jobs:
           install_only: true
       # The runner is a disposable machine: the test may change its core pattern.
       # GitHub's amd64 runners have Chrome: there the pages must be looked at. The arm64 runners have no browser.
-      - run: CORE_HANDLER=1 SAMPLE_CPU=1 REQUIRE_BROWSER=${{ matrix.runner == 'ubuntu-latest' && '1' || '' }} test/e2e/run.sh
+      - run: CORE_HANDLER=1 SAMPLE_CPU=1 REQUIRE_BROWSER=${{ matrix.runner == 'ubuntu-latest' && '1' || '' }} SHOTS=${{ runner.temp }}/pages test/e2e/run.sh
+      # The pages as the run saw them, with the test's synthetic evidence: to look at what a change did to them.
+      - if: always() && matrix.runner == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages
+          path: ${{ runner.temp }}/pages
+          if-no-files-found: ignore
+          retention-days: 7
   # Every commit on main is published as ghcr.io/<owner>/asservat:main and
   # :<commit>, and the agent's image under the same tags with "-agent".
   image:
