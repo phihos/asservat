@@ -2,3 +2,4 @@
 #compare select { max-width: min(560px, 60vw); }
 #comparing { color: var(--quiet); }
 #pprof { flex: 1; width: 100%; border: 0; background: var(--surface); }
+#compare .hint { margin-left: auto; color: var(--quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
