@@ -40,7 +40,8 @@ import (
 // assemblies and PDBs of the image are data and are read.
 
 // DotnetDir is the directory in Asservat's hub image with a .NET runtime
-// (dotnet) and dotnet-dump (dump/dotnet-dump.dll). No image of a .NET
+// (dotnet) and dotnet-dump (dump/dotnet-dump.dll); the same name with
+// "-musl" has both for the cores of runtimes built for musl. No image of a .NET
 // program has its runtime there, so the tool finds no helper library at the
 // path that a core names. Where it is not there, .NET stacks are left to a
 // describer that has it.
@@ -122,6 +123,17 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	if helper == "" || err != nil {
 		return report, err
 	}
+	// A runtime built for musl, as in Alpine images, has a helper library
+	// for musl, which a tool that runs on glibc cannot load: the hub's
+	// image has the tool's runtime a second time, built for musl.
+	musl := forMusl(filepath.Join(helper, dac))
+	if musl {
+		dir += "-musl"
+		if _, err := os.Stat(filepath.Join(dir, "dotnet")); err != nil {
+			slog.Info("no .NET stacks: the runtime is built for musl (an Alpine image), and no dotnet-dump for musl is installed", "libcoreclr", runtimeFile, "at", dir)
+			return report, nil
+		}
+	}
 	work, err := os.MkdirTemp(d.Scratch, "dotnet-*")
 	if err != nil {
 		return nil, err
@@ -147,6 +159,12 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	cmd := exec.CommandContext(ctx, filepath.Join(dir, "dotnet"), filepath.Join(dir, "dump", "dotnet-dump.dll"), "analyze", filled)
 	// The runtime and the tool write where HOME and TMPDIR say.
 	cmd.Env = append(os.Environ(), "HOME="+work, "TMPDIR="+work, "DOTNET_CLI_HOME="+work)
+	if musl {
+		// Alpine's C++ libraries, which the runtime for musl asks for. It
+		// finds no ICU in this image and needs none: the tool reads no
+		// text that depends on a language.
+		cmd.Env = append(cmd.Env, "LD_LIBRARY_PATH="+filepath.Join(dir, "lib"), "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1")
+	}
 	cmd.Dir = work
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -414,16 +432,9 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 		if err != nil {
 			return "", fmt.Errorf("%s: %w", address, err)
 		}
-		needs, _ := library.ImportedLibraries()
 		library.Close()
 		if library.Type != elf.ET_DYN || library.Machine != here {
 			return "", fmt.Errorf("%s: not a library for this processor", address)
-		}
-		// A runtime built for musl, as in Alpine images, has a helper
-		// library for musl, which this image, built on glibc, cannot load.
-		if slices.ContainsFunc(needs, func(name string) bool { return strings.HasPrefix(name, "libc.musl") }) {
-			slog.Info("no .NET stacks: the runtime is built for musl (an Alpine image), and its helper library does not load here", "libcoreclr", runtimeFile)
-			os.Remove(path)
 		}
 	}
 	// Another description may have fetched the same meanwhile.
@@ -434,6 +445,18 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 		return "", nil
 	}
 	return dir, nil
+}
+
+// forMusl tells whether a library is built for musl, the C library of
+// Alpine images, by the C library that it asks for.
+func forMusl(path string) bool {
+	library, err := elf.Open(path)
+	if err != nil {
+		return false
+	}
+	defer library.Close()
+	needs, _ := library.ImportedLibraries()
+	return slices.ContainsFunc(needs, func(name string) bool { return strings.HasPrefix(name, "libc.musl") })
 }
 
 // fillCore writes a copy of the core that also holds the pages of the
