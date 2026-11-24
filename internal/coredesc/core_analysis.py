@@ -173,7 +173,23 @@ class ScanUnwinder(gdb.unwinder.Unwinder):
                 unwound = pending.create_unwind_info(gdb.unwinder.FrameId(sp + at + 8, pc))
                 kind = pending.read_register("pc").type
                 unwound.add_saved_register("pc", gdb.Value(caller).cast(kind))
-                unwound.add_saved_register("sp", gdb.Value(sp + at + 8).cast(pending.read_register("sp").type))
+                # On x86-64 the caller's stack begins right above its return
+                # address. On arm64 a function keeps the return address
+                # where it likes in its frame, so that the word does not
+                # tell where the caller's stack begins, which a caller with
+                # unwind tables is walked on by. There the frame pointer
+                # tells: arm64 compilers keep it by default, a function's
+                # frame record lies at the bottom of its stack, and a
+                # library without one hands the register back as it got it.
+                above = sp + at + 8
+                if "aarch64" in machine and has_tables(space.objfile_for_address(caller)):
+                    try:
+                        record = int(pending.read_register("x29"))
+                        if above <= record < sp + len(stack) and record % 16 == 0:
+                            above = record
+                    except (gdb.error, ValueError):
+                        pass
+                unwound.add_saved_register("sp", gdb.Value(above).cast(pending.read_register("sp").type))
                 # The registers that a function must hand back as it got
                 # them are taken as unchanged: where this one saved them is
                 # not known. A caller that needs one it changed is walked

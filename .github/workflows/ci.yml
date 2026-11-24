@@ -9,8 +9,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # Both jobs run on amd64 and on arm64: the agent reads stacks, cores and
+  # the kernel's structures, which differ between the two.
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -38,7 +44,11 @@ jobs:
           ASSERVAT_TEST_S3: 127.0.0.1:8333,test,test-secret
       - run: helm lint charts/asservat
   e2e:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: helm/kind-action@v1
