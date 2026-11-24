@@ -812,7 +812,8 @@ files asks first.
 - **Audit.** Requests, watches and the captures they
   trigger, approvals, denials, stops, cancellations, deletions, expiries and
   every download and every file opened in a viewer are recorded with the
-  actor.
+  actor. Administrators read the log on the console's audit log page,
+  newest first, or from `GET /api/audit`.
 - A file that is open in a viewer rests decrypted in the hub's work
   directory until the program that reads it has opened it, and in that
   program's memory while the view lasts. The program (`sharkd` for packet
