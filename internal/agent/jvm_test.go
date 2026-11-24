@@ -474,3 +474,22 @@ func TestRealJVM(t *testing.T) {
 	}
 	t.Logf("flight recording, %d bytes", len(recording))
 }
+
+// Diagnostics asked of a JVM at the same time signal it once: each is asked
+// by a process of its own, and a JVM that is opening its socket takes a
+// second signal for a request to print its threads to its output.
+func TestJVMIsSignalledOnceByDiagnosticsAtTheSameTime(t *testing.T) {
+	s := newStandIn(t)
+	var wg sync.WaitGroup
+	for _, diagnostic := range []string{"jvm-threads", "jvm-histogram", "jvm-threads"} {
+		wg.Go(func() {
+			if err := s.client().run(diagnostic, 0, strings.NewReader(""), io.Discard); err != nil {
+				t.Error(diagnostic, err)
+			}
+		})
+	}
+	wg.Wait()
+	if s.signals != 1 || len(s.left()) != 0 {
+		t.Errorf("signals: %d, left in /tmp: %v", s.signals, s.left())
+	}
+}
