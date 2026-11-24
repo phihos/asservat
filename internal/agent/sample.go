@@ -334,6 +334,35 @@ func (s *sampler) halt() {
 	}()
 }
 
+// readerQuiet is how long the profiler's reader hands over nothing before
+// it is taken to have ended. Within a batch it does not wait at all, so a
+// second is far beyond what a busy node delays it.
+const readerQuiet = time.Second
+
+// handOver passes on the traces that the profiler's reader hands over
+// until ctx ends. The reader hands over a batch without looking whether ctx
+// has ended and waits for each trace to be taken: left waiting it would
+// never end, and keep the profiler's programs and maps in the kernel, some
+// hundred megabytes with every sampling. So the rest of its batch is taken
+// and dropped. Nothing tells when the reader has ended, only that it hands
+// over nothing more: after quiet without a trace handOver returns.
+func handOver[T any](ctx context.Context, traces <-chan T, handle func(T), quiet time.Duration) {
+	for {
+		select {
+		case trace := <-traces:
+			handle(trace)
+		case <-ctx.Done():
+			for {
+				select {
+				case <-traces:
+				case <-time.After(quiet):
+					return
+				}
+			}
+		}
+	}
+}
+
 // run loads the profiler's programs into the kernel. The order of the steps
 // is the profiler's own (its collector receiver); sampling the CPUs and
 // reporting page faults are turned on by the profiles that want them.
@@ -384,20 +413,11 @@ func (s *sampler) run() error {
 			return fmt.Errorf("the node's kernel does not let the profiler %s: %w", step.what, err)
 		}
 	}
-	go func() {
-		for {
-			select {
-			case trace := <-traces:
-				if trace != nil {
-					trc.HandleTrace(trace)
-				}
-			case <-trc.Done():
-				return
-			case <-ctx.Done():
-				return
-			}
+	go handOver(ctx, traces, func(trace *libpf.EbpfTrace) {
+		if trace != nil {
+			trc.HandleTrace(trace)
 		}
-	}()
+	}, readerQuiet)
 	s.tracer, s.cancel = trc, cancel
 	return nil
 }
