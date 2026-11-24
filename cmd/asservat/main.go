@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -208,11 +209,22 @@ func runHub(ctx context.Context, args []string) error {
 		server.Close()
 	}()
 	if *metricsListen != "" {
+		// Bound before the hub serves: a port that is taken fails the start, not the scrapes.
+		listener, err := net.Listen("tcp", *metricsListen)
+		if err != nil {
+			return fmt.Errorf("metrics-listen: %w", err)
+		}
 		mux := http.NewServeMux()
 		mux.Handle("GET /metrics", h.Metrics())
+		metrics := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 		go func() {
-			err := (&http.Server{Addr: *metricsListen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}).ListenAndServe()
-			slog.Error("metrics are not served", "address", *metricsListen, "error", err)
+			<-ctx.Done()
+			metrics.Close()
+		}()
+		go func() {
+			if err := metrics.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("metrics are not served", "address", *metricsListen, "error", err)
+			}
 		}()
 	}
 	slog.Info("hub listening", "address", *listen)
