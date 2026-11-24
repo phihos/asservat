@@ -795,6 +795,12 @@ files asks first.
   does, an administrator's sensitive requests and watches start without a
   separate approval and are recorded as approved by themselves.
 - A capture and its files are visible to its requester and to administrators.
+  Its requester, or an administrator, can share it: it is then also there,
+  to look at and to download, for everyone who may capture in its
+  namespace, which the cluster's RBAC tells at every access as it does for
+  a new capture. Nobody else learns that it exists, and only its requester
+  and administrators change, stop or delete it. Sharing and taking it back
+  are in the audit log, as is every file that a colleague opens.
 
 ## Security
 
@@ -812,7 +818,8 @@ files asks first.
 - **Audit.** Requests, watches and the captures they
   trigger, approvals, denials, stops, cancellations, deletions, expiries and
   every download and every file opened in a viewer are recorded with the
-  actor.
+  actor. Administrators read the log on the console's audit log page,
+  newest first, or from `GET /api/audit`.
 - A file that is open in a viewer rests decrypted in the hub's work
   directory until the program that reads it has opened it, and in that
   program's memory while the view lasts. The program (`sharkd` for packet
@@ -833,6 +840,14 @@ files asks first.
   load balancers after 60). The hub therefore writes a line every 20
   seconds into each open stream that has nothing to say: an empty comment
   into an event stream, a command that asks for nothing to an agent.
+- **Metrics.** With `hub.metrics.enabled` the hub serves its own figures
+  for Prometheus at `/metrics` on a port of its own, which the ingress does
+  not reach and which asks for no sign-in: the agents connected per
+  cluster, captures by state, watches, the stored evidence and the files
+  open in viewers. They are counted when they are asked for and name
+  clusters and states, no workload, namespace or person. A cluster with
+  fewer agents connected than it has nodes is what to alert on: it shows
+  otherwise only when evidence is wanted. Agents serve nothing.
 - **One hub replica.** Connected agents and event streams are in memory.
   Captures, approvals and queued tasks are in PostgreSQL and survive a restart;
   agents reconnect by themselves. A task that ends while the hub is away,
@@ -861,6 +876,15 @@ files asks first.
 These are known gaps, in rough order of value:
 
 - What a process holds in memory by allocation site, for applications that
-  serve no profile endpoint.
-- Sharing a capture with other users or teams.
+  serve no profile endpoint. Looked into on 2026-11-24 and not built, for
+  want of a way that pays: a Go program records its allocations by itself
+  only where it links the runtime's memory profile, which the linker turns
+  off in programs that never ask for it, the ones without an endpoint among
+  them (`runtime.disableMemoryProfiling`); the profiler's own heap probe
+  needs probe points in the allocator that applications do not carry; and
+  following every `malloc` and `free` of a process from the kernel slows
+  programs that allocate much and needs kernel programs of Asservat's own.
+  What there is instead: memory growth by sampling for every language, the
+  heap dump and class histogram of a JVM, and the heap profile of a Go
+  program that does serve an endpoint.
 - Several hub replicas.

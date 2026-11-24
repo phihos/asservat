@@ -58,6 +58,7 @@
     /* The search fills its own row above the choice of what to list. */
     .head { gap: 8px; } #captureFind { order: 2; margin-left: 0; width: 100%; } .chips { order: 3; } .chips button:first-child { margin-left: 0; }
     .head h2 { flex-basis: 100%; margin-bottom: 0; }
+    #auditTable { display: block; overflow-x: auto; white-space: nowrap; }
   }
   form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
@@ -115,6 +116,7 @@
   .rec .mark { width: 12px; } .rec-Completed .mark { color: var(--ok); } .rec-Failed .mark { color: var(--bad); } .rec-Waiting, .rec-Waiting b { color: var(--quiet); }
   .rec .given { font: 12px var(--mono); color: var(--quiet); overflow-wrap: anywhere; } .rec .said { font-size: 12px; color: var(--quiet); } .rec-Failed .said { color: var(--bad); }
   .facts { font-size: 12px; padding-top: 8px; }
+  .sharing { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding-top: 6px; } .sharing button { min-height: 28px; padding: 2px 10px; }
   .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; background: var(--line); overflow: hidden; }
   .track .bar { width: 0; transition: width 1s linear; }
   tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #F2C20055; } to { background: transparent; } }
@@ -137,6 +139,7 @@
     <a href="#captures" data-nav="captures">Captures<span class="count" id="captureCount"></span></a>
     <a href="#watches" data-nav="watches">Watches<span class="count" id="watchCount"></span></a>
     <a href="#clusters" data-nav="clusters">Clusters</a>
+    <a href="#audit" data-nav="audit" id="auditNav" hidden>Audit log</a>
   </nav>
   <span class="spacer"></span>
   <a href="#new" class="button primary" id="newButton" hidden>New capture</a>
@@ -358,6 +361,15 @@
   <table><thead><tr><th>Cluster</th><th>Connected node agents</th></tr></thead><tbody id="clusterList"></tbody></table>
   <p class="muted">Clusters are defined in the hub's configuration (<code>hub.clusters</code> in its Helm values), each with a name and a join token. Install a cluster's agents with the same token.</p>
  </section>
+
+ <section data-view="audit" hidden>
+  <h2>Audit log</h2>
+  <p class="muted lead">Everything people did with evidence: requests, approvals, downloads and files opened in a viewer. Only administrators see this page.</p>
+  <p class="problem" id="auditProblem"></p>
+  <table id="auditTable"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Capture</th><th>Details</th></tr></thead><tbody id="auditRows"></tbody></table>
+  <p id="auditOlderLine" hidden><button type="button" id="auditOlder">Show older entries</button></p>
+  <p class="empty" id="noAudit" hidden>Nothing has been recorded yet.</p>
+ </section>
 </section>
 
 <script>
@@ -394,6 +406,7 @@ async function start() {
   document.body.classList.toggle('own', !!me.selfApproval);
   for (const badge of document.querySelectorAll('.badge')) badge.textContent = badgeText();
   $('nav').hidden = $('newButton').hidden = false;
+  $('auditNav').hidden = !me.admin;
   route();
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
   new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
@@ -407,6 +420,7 @@ function route() {
   for (const a of document.querySelectorAll('[data-nav]')) a.classList.toggle('on', a.dataset.nav === view);
   $('newButton').hidden = !me || view === 'new';
   if (view === 'new') showStep(step);
+  if (view === 'audit' && me?.admin) guard(() => loadAudit(true), 'auditProblem')();
 }
 window.onhashchange = route;
 
@@ -694,6 +708,27 @@ function showParams() {
 const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</span></div>`).join('')
   + `<div class="muted">${c.durationSeconds ? `${c.durationSeconds} s` : ''}${c.durationSeconds && c.reason ? ' · ' : ''}${esc(c.reason)}</div>`;
 
+// The audit log, a page at a time, newest first. An action is said in words;
+// its detail is what the hub recorded with it.
+const auditActions = {'capture.request': 'requested a capture', 'capture.approve': 'approved a capture', 'capture.deny': 'denied a capture', 'capture.cancel': 'withdrew a capture',
+  'capture.stop': 'stopped a capture', 'capture.share': 'shared a capture', 'capture.unshare': 'stopped sharing a capture', 'capture.delete': 'deleted a capture', 'capture.expire': 'capture expired', 'capture.trigger': 'a watch recorded',
+  'watch.create': 'created a watch', 'watch.approve': 'approved a watch', 'watch.delete': 'deleted a watch',
+  'artifact.download': 'downloaded a file', 'artifact.view': 'opened a file in a viewer', 'artifact.read': 'read a file over MCP', 'artifact.describe': 'had a core dump described again',
+  'profile.discover': 'looked for profile endpoints', 'traffic.sample': 'sampled live traffic'};
+const auditPage = 100;
+let auditEntries = [];
+async function loadAudit(fresh) {
+  // A page begins where the last one ended: at its moment, below its entry.
+  const last = auditEntries.at(-1), before = fresh || !last ? '' : `&before=${encodeURIComponent(last.at)}&beforeId=${last.id}`;
+  const page = await call('GET', `/api/audit?limit=${auditPage}${before}`);
+  auditEntries = fresh ? page : auditEntries.concat(page);
+  const detail = d => d && typeof d === 'object' ? Object.entries(d).filter(([, v]) => v !== '' && v != null && v !== false).map(([k, v]) => `${esc(k === 'name' ? 'file' : k)}: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}`).join(' · ') : esc(d ?? '');
+  $('auditRows').innerHTML = auditEntries.map(e => `<tr><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
+    <td>${e.capture ? (e.number ? `<b>${String(e.number).padStart(4, '0')}</b>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail)}</td></tr>`).join('');
+  $('auditTable').hidden = !auditEntries.length; $('noAudit').hidden = !!auditEntries.length;
+  $('auditOlderLine').hidden = page.length < auditPage;
+}
+
 async function loadWatches() {
   const list = await call('GET', '/api/watches');
   $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
@@ -788,8 +823,12 @@ async function loadCaptures() {
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
+    // Its requester and administrators may change a capture; others see one that is shared with them.
+    const mine = me.admin || c.requester === me.name;
+    const sharing = c.shared ? `Shared with everyone who may capture in ${esc(c.namespace)}.` : mine ? `Only you${me.admin && c.requester !== me.name ? ', ' + esc(c.requester) : ''} and administrators see this capture.` : '';
+    const share = !mine ? '' : `<button data-act="share" data-id="${c.id}" data-shared="${c.shared ? '' : '1'}" title="${c.shared ? 'Make it visible to you and administrators only again' : `Let everyone who may capture in ${esc(c.namespace)} look at this capture and download its files. They cannot change or delete it.`}">${c.shared ? 'Stop sharing' : 'Share with the namespace'}</button>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
-    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
+    const actions = !mine ? '' : c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
       : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : c.state === 'Running' ? button('stop', 'Stop and keep', 'Stop recording now and keep the files so far', true) + button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
@@ -808,6 +847,7 @@ async function loadCaptures() {
       </div>
       <div class="more">
         <div class="facts muted">${facts}</div>
+        ${sharing || share ? `<div class="sharing muted">${sharing} ${share}</div>` : ''}
         ${pods}
       </div></div>`;
   }).join('');
@@ -941,6 +981,7 @@ $('watches').onclick = guard(async e => {
   await loadWatches();
 }, 'watchesProblem');
 $('captureFind').oninput = guard(loadCaptures, 'capturesProblem');
+$('auditOlder').onclick = guard(() => loadAudit(false), 'auditProblem');
 $('older').onclick = guard(async () => { pages++; await loadCaptures(); }, 'capturesProblem');
 $('states').onclick = guard(async e => {
   if (!e.target.dataset.filter) return;
@@ -960,7 +1001,8 @@ $('captures').onclick = guard(async e => {
   // Files that are deleted are gone for everyone.
   const number = card.querySelector('.number'), files = card.querySelectorAll('.file').length;
   if (act === 'delete' && !running && files && !confirm(`Delete capture ${number.textContent} and its ${files === 1 ? 'file' : files + ' files'}? This cannot be undone.`)) return;
-  await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
+  if (act === 'share') await call('POST', `/api/captures/${id}/share`, {shared: !!e.target.dataset.shared});
+  else await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
 }, 'capturesProblem');
 showParams();

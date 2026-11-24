@@ -115,7 +115,27 @@ hub:
     annotations: {}
     host: ""
     tlsSecretName: ""
-  resources: {}
+  # The hub's own figures for Prometheus, at /metrics on a port of their own
+  # that the ingress does not reach: agents connected per cluster, captures
+  # by state, stored evidence, open views. They name clusters and states, no
+  # workload, namespace or person, and ask for no sign-in.
+  metrics:
+    enabled: false
+    port: 9090
+    # A ServiceMonitor for the Prometheus operator, with the labels that
+    # your Prometheus selects ServiceMonitors by.
+    serviceMonitor:
+      enabled: false
+      labels: {}
+  # What the hub asks its node for. Measured idle: 2 millicores and 36 MiB.
+  # No limit is set: a file that is open in a viewer is held by a program in
+  # the hub's pod (150 MiB for a packet capture), and a core that is
+  # described again takes gdb about as much as the description of one on a
+  # node. Set limits that fit the largest files you record.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
 
 postgres:
   image: docker.io/library/postgres:17-alpine
@@ -147,4 +167,11 @@ agent:
     hostPath: /var/lib/asservat
   tolerations:
     - operator: Exists
-  resources: {}
+  # What every node gives the agent. Measured idle: 1 millicore and 10 MiB.
+  # No limit is set: while it records, the agent runs tcpdump, strace or gdb
+  # and the sampling profiler (some 100 MiB), and a limit that is met ends
+  # the recording, not only the agent. Set one that fits what you record.
+  resources:
+    requests:
+      cpu: 5m
+      memory: 32Mi

@@ -11,9 +11,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -115,7 +117,7 @@ func TestCaptureFlow(t *testing.T) {
 		Clusters: []hub.Cluster{joined, foreign},
 		Store:    store, Blobs: hub.DirBlobs(blobDir), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"},
 		AlertToken: "the-token-that-alertmanager-presents-0123456789", ScheduleRetry: 200 * time.Millisecond,
-		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"},
+		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token", Groups: []string{"payments"}}, {Name: "mallory", Token: "mallory-token"}, {Name: "bob", Token: "bob-token", Groups: []string{"payments"}},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "root2", Token: "root2-token", Groups: []string{"admins"}}},
 	})
 	if err != nil {
@@ -228,6 +230,42 @@ func TestCaptureFlow(t *testing.T) {
 	}
 	if code, _ := f.call("mallory-token", "GET", "/api/captures/"+c.ID, nil); code != 404 {
 		t.Fatal("another user read the capture", code)
+	}
+
+	// A capture is its requester's until they share it. Shared, it is
+	// there for everyone who may capture in its namespace, as Kubernetes
+	// tells, and for nobody else: to look at and download, not to change.
+	listed := func(token string) bool {
+		var list []api.Capture
+		_, b := f.call(token, "GET", "/api/captures", nil)
+		json.Unmarshal(b, &list)
+		return slices.ContainsFunc(list, func(other api.Capture) bool { return other.ID == c.ID })
+	}
+	if code, _ := f.call("bob-token", "GET", "/api/captures/"+c.ID, nil); code != 404 || listed("bob-token") {
+		t.Fatal("a colleague read a capture that is not shared", code)
+	}
+	if code, _ := f.call("bob-token", "POST", "/api/captures/"+c.ID+"/share", map[string]bool{"shared": true}); code != 404 {
+		t.Fatal("a colleague shared someone's capture", code)
+	}
+	if code, b := f.call("alice-token", "POST", "/api/captures/"+c.ID+"/share", map[string]bool{"shared": true}); code != 200 || !strings.Contains(string(b), `"shared":true`) {
+		t.Fatal("share", code, string(b))
+	}
+	if code, b := f.call("bob-token", "GET", "/api/captures/"+c.ID, nil); code != 200 || !strings.Contains(string(b), `"requester":"alice"`) || !listed("bob-token") {
+		t.Fatal("a colleague does not see the shared capture", code, string(b))
+	}
+	if code, b := f.call("bob-token", "GET", "/api/captures/"+c.ID+"/artifacts/api-1/pod.json", nil); code != 200 || !strings.Contains(string(b), `"nodeName": "node-a"`) {
+		t.Fatal("a colleague does not download a shared file", code)
+	}
+	if code, _ := f.call("mallory-token", "GET", "/api/captures/"+c.ID, nil); code != 404 || listed("mallory-token") {
+		t.Fatal("someone without the namespace's exec right read a shared capture", code)
+	}
+	for method, path := range map[string]string{"DELETE": "/api/captures/" + c.ID, "POST": "/api/captures/" + c.ID + "/share"} {
+		if code, _ := f.call("bob-token", method, path, map[string]bool{"shared": false}); code != 403 {
+			t.Fatal("a colleague changed a shared capture:", method, path, code)
+		}
+	}
+	if code, _ := f.call("alice-token", "POST", "/api/captures/"+c.ID+"/share", map[string]bool{"shared": false}); code != 200 || listed("bob-token") {
+		t.Fatal("the capture is still shared", code)
 	}
 
 	// The same file through MCP.
@@ -904,6 +942,33 @@ func TestCaptureFlow(t *testing.T) {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("audit log lacks", action)
 		}
+	}
+	// Read a few at a time, the log has every entry once: a page begins
+	// where the last one ended, also among entries of one moment. An entry
+	// names its capture's number while the capture exists.
+	var whole, paged []hub.AuditEntry
+	_, b = f.call("root-token", "GET", "/api/audit?limit=60", nil)
+	json.Unmarshal(b, &whole)
+	for cursor := ""; ; {
+		var page []hub.AuditEntry
+		_, b := f.call("root-token", "GET", "/api/audit?limit=7"+cursor, nil)
+		json.Unmarshal(b, &page)
+		paged = append(paged, page...)
+		if len(page) < 7 || len(paged) >= len(whole) {
+			break
+		}
+		last := page[len(page)-1]
+		cursor = "&before=" + url.QueryEscape(last.At.Format(time.RFC3339Nano)) + "&beforeId=" + strconv.FormatInt(last.ID, 10)
+	}
+	numbered := false
+	for i := range whole {
+		if i >= len(paged) || paged[i].ID != whole[i].ID {
+			t.Fatalf("the log in pages has %d entries and differs at %d from the %d read at once", len(paged), i, len(whole))
+		}
+		numbered = numbered || whole[i].Number != nil
+	}
+	if len(paged) < len(whole) || !numbered {
+		t.Fatal("pages:", len(paged), "at once:", len(whole), "an entry with its capture's number:", numbered)
 	}
 }
 

@@ -273,7 +273,9 @@ type Capture struct {
 	// by it, as an exhibit by its number.
 	Number int64 `json:"number"`
 	CaptureRequest
-	Requester  string     `json:"requester"`
+	Requester string `json:"requester"`
+	// Shared: also there, to look at, for everyone who may capture in its namespace.
+	Shared     bool       `json:"shared,omitempty"`
 	Sensitive  bool       `json:"sensitive"`
 	State      string     `json:"state"`
 	Message    string     `json:"message,omitempty"`
