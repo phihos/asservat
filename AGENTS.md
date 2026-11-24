@@ -47,6 +47,17 @@ stays only with a concrete resource cost, an external protocol constraint or a
 maintainer decision; write the reason next to it. Prefer pagination or
 streaming over caps on lists.
 
+## The agent is light on every node (maintainer, 2026-11-24)
+
+The agent is a DaemonSet: what it costs, every node pays. It must not put
+unnecessary stress on a node. Keep its image as small as possible: what
+only the hub needs stays out of it, and work that the hub can do as well
+is a candidate to move there. Keep its CPU, memory, disk and network use
+as small as possible, above all when idle, which it is most of the time:
+with no capture running and no watch on its node it should do next to
+nothing. A change to the agent states in its PR what it adds to the image
+and to the idle agent, measured.
+
 ## Threat model and security (maintainer, 2026-11-13)
 
 Operators keep every non-Asservat-administrator out of the Asservat
