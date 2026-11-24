@@ -156,6 +156,14 @@ watch. The capture's reason is the alert's `summary` or `description`. Who
 holds the alert token can make these watches record, as their creators and
 only what they asked for.
 
+For the Prometheus operator the chart can install the receiver as an
+`AlertmanagerConfig` (`hub.alertmanagerConfig`), with a route that sends
+every alert at once and on its own: a watch records the moment an alert
+fires, not the end of the wait that gathers a group. The operator lets the
+alerts go on to the other routes. An Alertmanager passes such an object
+only the alerts of its own namespace unless its
+`alertmanagerConfigMatcherStrategy` is `None`.
+
 For events the agent watches the warnings about each watched pod on its
 node, which the API server sends as they come; a warning that repeats is
 one event whose count rises, and each rise meets the condition. Warnings

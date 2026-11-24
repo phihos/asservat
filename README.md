@@ -193,6 +193,11 @@ Route the alerts that watches are to wait for to this receiver, with
 `continue: true` if they also go elsewhere. The alert's `pod` label names
 the pod that is recorded.
 
+With the Prometheus operator, `hub.alertmanagerConfig.enabled=true` installs
+this receiver and a route for every alert as an `AlertmanagerConfig`. An
+Alertmanager passes it only the alerts of the hub's own namespace unless its
+`alertmanagerConfigMatcherStrategy` is `None`.
+
 A crash watch for `coredump` records the core of the crashed process itself. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an

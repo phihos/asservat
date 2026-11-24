@@ -56,6 +56,16 @@ hub:
   # (a webhook receiver). Empty: the hub accepts no alerts. Make one with
   # "openssl rand -hex 32".
   alertToken: ""
+  # With the Prometheus operator: an AlertmanagerConfig that makes
+  # Alertmanager send every alert to the hub, so that no receiver has to be
+  # written by hand. It needs hub.alertToken. An Alertmanager passes such an
+  # object only the alerts of the object's own namespace unless its
+  # alertmanagerConfigMatcherStrategy is "None" (kube-prometheus-stack:
+  # alertmanager.alertmanagerSpec.alertmanagerConfigMatcherStrategy.type).
+  # The labels are those that its alertmanagerConfigSelector asks for.
+  alertmanagerConfig:
+    enabled: false
+    labels: {}
   # Users with fixed bearer tokens. The names and groups are the subjects that
   # each cluster's RBAC is asked about (pods/exec in the namespace).
   #   - name: alice
