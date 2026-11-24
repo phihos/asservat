@@ -212,6 +212,7 @@ func (h *Hub) Handler() http.Handler {
 	admin("POST /api/captures/{id}/deny", h.decide(api.StateDenied))
 	user("POST /api/captures/{id}/stop", h.stopCapture)
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
+	user("POST /api/captures/{id}/share", h.shareCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
 	user("POST /api/captures/{id}/describe", h.describe)
 	user("GET /api/captures/{id}/views/{name...}", h.openView)
@@ -523,11 +524,53 @@ func (h *Hub) visible(ctx context.Context, u User, id string) (api.Capture, erro
 	if err != nil {
 		return c, err
 	}
-	if !u.Admin && c.Requester != u.Name {
+	// A shared capture is also there for everyone who may capture in its
+	// namespace, which the cluster's RBAC tells; for anyone else it does
+	// not exist.
+	if !owns(u, c) && (!c.Shared || h.allowed(ctx, u, c.Cluster, c.Namespace) != nil) {
 		return c, ErrNotFound
 	}
 	c.RemainingSeconds = remaining(c, time.Now())
 	return c, nil
+}
+
+// owns tells whether the capture is the user's to change: its requester's
+// and every administrator's. Others may only look at one that is shared.
+func owns(u User, c api.Capture) bool { return u.Admin || c.Requester == u.Name }
+
+// own returns the capture if the user may change it.
+func (h *Hub) own(ctx context.Context, u User, id string) (api.Capture, error) {
+	c, err := h.visible(ctx, u, id)
+	if err == nil && !owns(u, c) {
+		err = errStatus{http.StatusForbidden, "only its requester and administrators may change a capture"}
+	}
+	return c, err
+}
+
+// shareCapture shares a capture with everyone who may capture in its
+// namespace, or takes that back.
+func (h *Hub) shareCapture(w http.ResponseWriter, r *http.Request, u User) error {
+	var in struct{ Shared bool }
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		return errStatus{http.StatusBadRequest, "invalid JSON"}
+	}
+	c, err := h.own(r.Context(), u, r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	if err := h.Store.Share(r.Context(), c.ID, in.Shared); err != nil {
+		return err
+	}
+	action := "capture.share"
+	if !in.Shared {
+		action = "capture.unshare"
+	}
+	if err := h.Store.Audit(r.Context(), u.Name, action, c.ID, nil); err != nil {
+		return err
+	}
+	h.notify(c.ID)
+	c.Shared = in.Shared
+	return reply(w, c)
 }
 
 // remaining returns how many seconds of the time frame the capture's
@@ -594,10 +637,23 @@ func (h *Hub) listCaptures(w http.ResponseWriter, r *http.Request, u User) error
 // captures lists the user's captures, or everyone's for an administrator.
 func (h *Hub) captures(ctx context.Context, u User, before time.Time, limit int) ([]api.Capture, error) {
 	requester := u.Name
+	var shared []Place
 	if u.Admin {
 		requester = ""
+	} else {
+		// Of the namespaces that hold what others shared, those in which
+		// this user may capture. A cluster that does not answer shares nothing.
+		places, err := h.Store.SharedPlaces(ctx, u.Name)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range places {
+			if h.allowed(ctx, u, p.Cluster, p.Namespace) == nil {
+				shared = append(shared, p)
+			}
+		}
 	}
-	list, err := h.Store.Captures(ctx, requester, before, limit)
+	list, err := h.Store.Captures(ctx, requester, shared, before, limit)
 	if list == nil {
 		list = []api.Capture{}
 	}
@@ -676,7 +732,7 @@ func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture
 // stopCapture ends the recordings that run over time now and keeps what
 // they recorded: the capture then completes as if its time frame had ended.
 func (h *Hub) stopCapture(w http.ResponseWriter, r *http.Request, u User) error {
-	c, err := h.visible(r.Context(), u, r.PathValue("id"))
+	c, err := h.own(r.Context(), u, r.PathValue("id"))
 	if err != nil {
 		return err
 	}
@@ -697,7 +753,7 @@ func (h *Hub) stopCapture(w http.ResponseWriter, r *http.Request, u User) error 
 }
 
 func (h *Hub) cancelCapture(w http.ResponseWriter, r *http.Request, u User) error {
-	c, err := h.visible(r.Context(), u, r.PathValue("id"))
+	c, err := h.own(r.Context(), u, r.PathValue("id"))
 	if err != nil {
 		return err
 	}
@@ -716,7 +772,7 @@ func (h *Hub) cancelCapture(w http.ResponseWriter, r *http.Request, u User) erro
 }
 
 func (h *Hub) deleteCapture(w http.ResponseWriter, r *http.Request, u User) error {
-	c, err := h.visible(r.Context(), u, r.PathValue("id"))
+	c, err := h.own(r.Context(), u, r.PathValue("id"))
 	if err != nil {
 		return err
 	}
