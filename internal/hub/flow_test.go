@@ -110,7 +110,9 @@ func TestCaptureFlow(t *testing.T) {
 	defer store.Close()
 	blobDir := t.TempDir()
 	// The clusters and their join tokens are configuration of the hub.
-	cluster := strings.ToLower("c" + strings.ReplaceAll(t.Name(), "/", "-") + hex.EncodeToString([]byte(time.Now().Format("150405.000")))[:8])
+	// A name of its own for every run: what an earlier run left open in
+	// the database, as the tasks of a node without an agent, is not this one's.
+	cluster := strings.ToLower("c" + strings.ReplaceAll(t.Name(), "/", "-") + hex.EncodeToString([]byte(time.Now().Format("05.000000000")))[6:22])
 	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-first-cluster-0123456789"}
 	foreign := hub.Cluster{Name: cluster + "-other", Token: "join-token-of-the-other-cluster-0123456789"}
 	h, err := hub.New(hub.Config{
@@ -152,9 +154,11 @@ func TestCaptureFlow(t *testing.T) {
 	// RBAC of the fake cluster: the payments group may exec in payments.
 	// The test can make the cluster fail to answer for a while.
 	var unavailable atomic.Bool
+	var slow atomic.Int64 // how long the cluster takes to answer, in nanoseconds
 	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		sar := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview)
 		a := sar.Spec.ResourceAttributes
+		time.Sleep(time.Duration(slow.Load()))
 		if unavailable.Load() {
 			return true, nil, errors.New("the API server does not answer")
 		}
@@ -901,6 +905,41 @@ func TestCaptureFlow(t *testing.T) {
 			t.Fatal("the time that failed at first was not tried again")
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+	// A cluster that answers just within the time it is given leaves the hub
+	// almost none to record in: the time is still recorded once, not once
+	// more for every try that ran out of time after its capture was made.
+	// The time left after the cluster's answer shrinks from a few
+	// milliseconds to none, a millisecond per watch.
+	var tight []string
+	for left := 12 * time.Millisecond; left >= 0; left -= time.Millisecond {
+		slow.Store(int64(200*time.Millisecond - left))
+		_, w := watch("alice-token", api.WatchRequest{CaptureRequest: onCrash.CaptureRequest, When: api.Condition{Kind: api.OnTime, Params: map[string]string{"at": time.Now().Add(30 * time.Millisecond).UTC().Format(time.RFC3339Nano)}}})
+		tight = append(tight, w.ID)
+		time.Sleep(450 * time.Millisecond)
+	}
+	slow.Store(0)
+	time.Sleep(600 * time.Millisecond)
+	// The watches go first, so that none records while their captures are counted.
+	for _, id := range tight {
+		f.call("alice-token", "DELETE", "/api/watches/"+id, nil)
+	}
+	time.Sleep(300 * time.Millisecond)
+	var after []api.Capture
+	_, b = f.call("alice-token", "GET", "/api/captures?limit=500", nil)
+	json.Unmarshal(b, &after)
+	perWatch := map[string]int{}
+	for _, c := range after {
+		if slices.Contains(tight, c.Watch) {
+			perWatch[c.Watch]++
+			// It waits for a node without an agent: it goes, so that it is not an open task of the next run.
+			f.call("alice-token", "DELETE", "/api/captures/"+c.ID, nil)
+		}
+	}
+	for id, n := range perWatch {
+		if n > 1 {
+			t.Fatalf("one time of watch %s was recorded %d times", id, n)
+		}
 	}
 	if len(atTimes) != 2 || atTimes[0].On != api.OnTime || atTimes[0].CreatedAt.Before(at) || atTimes[1].CreatedAt.Before(at.Add(time.Second)) ||
 		atTimes[0].Reason != "at the time set, "+at.Format(time.RFC3339)+" (flaky)" || len(atTimes[0].Tasks) < 2 || len(watches("alice-token")) != 0 {
