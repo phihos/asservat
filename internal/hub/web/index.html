@@ -116,6 +116,7 @@
   .rec .mark { width: 12px; } .rec-Completed .mark { color: var(--ok); } .rec-Failed .mark { color: var(--bad); } .rec-Waiting, .rec-Waiting b { color: var(--quiet); }
   .rec .given { font: 12px var(--mono); color: var(--quiet); overflow-wrap: anywhere; } .rec .said { font-size: 12px; color: var(--quiet); } .rec-Failed .said { color: var(--bad); }
   .facts { font-size: 12px; padding-top: 8px; }
+  .sharing { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding-top: 6px; } .sharing button { min-height: 28px; padding: 2px 10px; }
   .progress { margin: 4px 0; max-width: 220px; } .track { height: 6px; background: var(--line); overflow: hidden; }
   .track .bar { width: 0; transition: width 1s linear; }
   tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #F2C20055; } to { background: transparent; } }
@@ -822,8 +823,12 @@ async function loadCaptures() {
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
+    // Its requester and administrators may change a capture; others see one that is shared with them.
+    const mine = me.admin || c.requester === me.name;
+    const sharing = c.shared ? `Shared with everyone who may capture in ${esc(c.namespace)}.` : mine ? `Only you${me.admin && c.requester !== me.name ? ', ' + esc(c.requester) : ''} and administrators see this capture.` : '';
+    const share = !mine ? '' : `<button data-act="share" data-id="${c.id}" data-shared="${c.shared ? '' : '1'}" title="${c.shared ? 'Make it visible to you and administrators only again' : `Let everyone who may capture in ${esc(c.namespace)} look at this capture and download its files. They cannot change or delete it.`}">${c.shared ? 'Stop sharing' : 'Share with the namespace'}</button>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
-    const actions = c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
+    const actions = !mine ? '' : c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
       : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : c.state === 'Running' ? button('stop', 'Stop and keep', 'Stop recording now and keep the files so far', true) + button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
@@ -842,6 +847,7 @@ async function loadCaptures() {
       </div>
       <div class="more">
         <div class="facts muted">${facts}</div>
+        ${sharing || share ? `<div class="sharing muted">${sharing} ${share}</div>` : ''}
         ${pods}
       </div></div>`;
   }).join('');
@@ -995,7 +1001,8 @@ $('captures').onclick = guard(async e => {
   // Files that are deleted are gone for everyone.
   const number = card.querySelector('.number'), files = card.querySelectorAll('.file').length;
   if (act === 'delete' && !running && files && !confirm(`Delete capture ${number.textContent} and its ${files === 1 ? 'file' : files + ' files'}? This cannot be undone.`)) return;
-  await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
+  if (act === 'share') await call('POST', `/api/captures/${id}/share`, {shared: !!e.target.dataset.shared});
+  else await call(act === 'delete' ? 'DELETE' : 'POST', `/api/captures/${id}` + (act === 'delete' ? '' : '/' + act));
   await loadCaptures();
 }, 'capturesProblem');
 showParams();

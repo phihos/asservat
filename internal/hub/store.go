@@ -93,14 +93,14 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 	return tx.Commit(ctx)
 }
 
-const captureColumns = `c.id::text, c.number, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at,
+const captureColumns = `c.id::text, c.number, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at, c.shared,
  coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message, 'recordings', recordings) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
  coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
 
 func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	var c api.Capture
 	var request, tasks, artifacts []byte
-	if err := r.Scan(&c.ID, &c.Number, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &c.StoppedAt, &tasks, &artifacts); err != nil {
+	if err := r.Scan(&c.ID, &c.Number, &c.Requester, &request, &c.Sensitive, &c.State, &c.Message, &c.Approver, &c.CreatedAt, &c.FinishedAt, &c.ExpiresAt, &c.StoppedAt, &c.Shared, &tasks, &artifacts); err != nil {
 		return c, err
 	}
 	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {
@@ -133,12 +133,37 @@ func (s *Store) Capture(ctx context.Context, id string) (api.Capture, error) {
 
 // Captures lists captures created before the given time, newest first. An
 // empty requester lists everyone's.
-func (s *Store) Captures(ctx context.Context, requester string, before time.Time, limit int) ([]api.Capture, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+captureColumns+` FROM captures c WHERE ($1 = '' OR c.requester = $1) AND c.created_at < $2 ORDER BY c.created_at DESC LIMIT $3`, requester, before, limit)
+func (s *Store) Captures(ctx context.Context, requester string, shared []Place, before time.Time, limit int) ([]api.Capture, error) {
+	clusters, namespaces := make([]string, len(shared)), make([]string, len(shared))
+	for i, p := range shared {
+		clusters[i], namespaces[i] = p.Cluster, p.Namespace
+	}
+	rows, err := s.db.Query(ctx, `SELECT `+captureColumns+` FROM captures c WHERE ($1 = '' OR c.requester = $1
+  OR c.shared AND (c.cluster, c.request->>'namespace') IN (SELECT * FROM unnest($4::text[], $5::text[])))
+ AND c.created_at < $2 ORDER BY c.created_at DESC LIMIT $3`, requester, before, limit, clusters, namespaces)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, scanCapture)
+}
+
+// Place is a namespace of a cluster.
+type Place struct{ Cluster, Namespace string }
+
+// SharedPlaces lists the namespaces that hold shared captures of others
+// than the requester.
+func (s *Store) SharedPlaces(ctx context.Context, requester string) ([]Place, error) {
+	rows, err := s.db.Query(ctx, `SELECT DISTINCT cluster, request->>'namespace' FROM captures WHERE shared AND requester <> $1`, requester)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[Place])
+}
+
+// Share says whether a capture is shared.
+func (s *Store) Share(ctx context.Context, id string, shared bool) error {
+	_, err := s.db.Exec(ctx, `UPDATE captures SET shared = $2 WHERE id = $1::uuid`, id, shared)
+	return err
 }
 
 // Decide moves a capture out of PendingApproval. It reports false when the

@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS artifacts (
 );
 
 ALTER TABLE captures ADD COLUMN IF NOT EXISTS stopped_at timestamptz;
+-- Shared: also there for everyone who may capture in its namespace.
+ALTER TABLE captures ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT false;
 
 -- The progress of each recording of the task, as the agent reports it.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recordings jsonb NOT NULL DEFAULT '[]';

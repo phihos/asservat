@@ -146,7 +146,7 @@ var mcpTools = []mcpTool{
 			}
 			return "deleted", h.Unwatch(ctx, u, in.ID)
 		}},
-	{Name: "list_captures", Description: "List your most recent captures with their state and files.", InputSchema: object(""),
+	{Name: "list_captures", Description: "List your most recent captures, and those that colleagues shared with everyone who may capture in their namespace, with their state and files.", InputSchema: object(""),
 		call: func(ctx context.Context, h *Hub, u User, _ json.RawMessage) (any, error) {
 			return h.captures(ctx, u, time.Now().Add(time.Hour), defaultPage)
 		}},
