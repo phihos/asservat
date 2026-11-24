@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -239,5 +240,35 @@ func BenchmarkKeptProfile(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		busyProfile(1600, 70*time.Second)
+	}
+}
+
+// The profiler's reader hands over a batch of traces without looking
+// whether sampling has stopped, and waits for each to be taken. It ends
+// when sampling stops in the middle of a batch: a reader left waiting would
+// keep the profiler's programs and maps in the kernel.
+func TestTheProfilersReaderEndsWhenSamplingStops(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	traces, ended, taken := make(chan int), make(chan struct{}), make(chan struct{}, 1)
+	go func() { // as the profiler's startTraceEventMonitor does
+		defer close(ended)
+		for ctx.Err() == nil {
+			for i := range 4096 {
+				traces <- i
+			}
+		}
+	}()
+	go handOver(ctx, traces, func(int) {
+		select {
+		case taken <- struct{}{}:
+		default:
+		}
+	}, 50*time.Millisecond)
+	<-taken
+	cancel()
+	select {
+	case <-ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the reader still waits for a trace to be taken")
 	}
 }
