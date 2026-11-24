@@ -42,22 +42,29 @@ func (s *Store) Audit(ctx context.Context, actor, action, capture string, detail
 }
 
 type AuditEntry struct {
-	At      time.Time       `json:"at"`
-	Actor   string          `json:"actor"`
-	Action  string          `json:"action"`
-	Capture *string         `json:"capture,omitempty"`
-	Detail  json.RawMessage `json:"detail,omitempty"`
+	// ID tells entries of one moment apart: with At it is where a page ends.
+	ID      int64     `json:"id"`
+	At      time.Time `json:"at"`
+	Actor   string    `json:"actor"`
+	Action  string    `json:"action"`
+	Capture *string   `json:"capture,omitempty"`
+	// Number is the capture's, while the capture exists.
+	Number *int64          `json:"number,omitempty"`
+	Detail json.RawMessage `json:"detail,omitempty"`
 }
 
 // AuditLog returns up to limit entries older than before, newest first.
-func (s *Store) AuditLog(ctx context.Context, before time.Time, limit int) ([]AuditEntry, error) {
-	rows, err := s.db.Query(ctx, `SELECT at, actor, action, capture_id::text, detail FROM audit WHERE at < $1 ORDER BY at DESC, id DESC LIMIT $2`, before, limit)
+// Of the entries of the moment before itself it returns those with an ID
+// below beforeID, so that a page begins where the last one ended.
+func (s *Store) AuditLog(ctx context.Context, before time.Time, beforeID int64, limit int) ([]AuditEntry, error) {
+	rows, err := s.db.Query(ctx, `SELECT a.id, a.at, a.actor, a.action, a.capture_id::text, c.number, a.detail FROM audit a LEFT JOIN captures c ON c.id = a.capture_id
+ WHERE (a.at, a.id) < ($1, $2) ORDER BY a.at DESC, a.id DESC LIMIT $3`, before, beforeID, limit)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (AuditEntry, error) {
 		var e AuditEntry
-		return e, r.Scan(&e.At, &e.Actor, &e.Action, &e.Capture, &e.Detail)
+		return e, r.Scan(&e.ID, &e.At, &e.Actor, &e.Action, &e.Capture, &e.Number, &e.Detail)
 	})
 }
 

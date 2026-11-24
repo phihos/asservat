@@ -422,7 +422,6 @@ function route() {
   if (view === 'audit' && me?.admin) guard(() => loadAudit(true), 'auditProblem')();
 }
 window.onhashchange = route;
-let lastCaptures = [];
 
 async function loadClusters() {
   const clusters = await call('GET', '/api/clusters');
@@ -718,13 +717,13 @@ const auditActions = {'capture.request': 'requested a capture', 'capture.approve
 const auditPage = 100;
 let auditEntries = [];
 async function loadAudit(fresh) {
-  const before = fresh || !auditEntries.length ? '' : '&before=' + encodeURIComponent(auditEntries.at(-1).at);
+  // A page begins where the last one ended: at its moment, below its entry.
+  const last = auditEntries.at(-1), before = fresh || !last ? '' : `&before=${encodeURIComponent(last.at)}&beforeId=${last.id}`;
   const page = await call('GET', `/api/audit?limit=${auditPage}${before}`);
   auditEntries = fresh ? page : auditEntries.concat(page);
-  const numbers = new Map((lastCaptures || []).map(c => [c.id, c.number]));
   const detail = d => d && typeof d === 'object' ? Object.entries(d).filter(([, v]) => v !== '' && v != null && v !== false).map(([k, v]) => `${esc(k === 'name' ? 'file' : k)}: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}`).join(' · ') : esc(d ?? '');
   $('auditRows').innerHTML = auditEntries.map(e => `<tr><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
-    <td>${e.capture ? (numbers.has(e.capture) ? `<b>${String(numbers.get(e.capture)).padStart(4, '0')}</b>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail)}</td></tr>`).join('');
+    <td>${e.capture ? (e.number ? `<b>${String(e.number).padStart(4, '0')}</b>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail)}</td></tr>`).join('');
   $('auditTable').hidden = !auditEntries.length; $('noAudit').hidden = !!auditEntries.length;
   $('auditOlderLine').hidden = page.length < auditPage;
 }
@@ -785,7 +784,6 @@ async function loadCaptures() {
     all = all.concat(page);
     if (page.length < pageSize) { pages = i + 1; break; }
   }
-  lastCaptures = all;
   $('olderLine').hidden = all.length < pages * pageSize;
   const words = $('captureFind').value.toLowerCase().split(/\s+/).filter(Boolean);
   const text = c => [String(c.number).padStart(4, '0'), c.cluster, c.namespace, c.workload, c.requester, c.reason, c.state, ...c.recordings.map(r => kindNames[r.kind] || r.kind), ...c.tasks.map(t => t.pod)].join(' ').toLowerCase();

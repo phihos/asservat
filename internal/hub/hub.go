@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"path"
 	"slices"
@@ -783,7 +784,16 @@ func (h *Hub) auditLog(w http.ResponseWriter, r *http.Request, _ User) error {
 	if err != nil {
 		return err
 	}
-	list, err := h.Store.AuditLog(r.Context(), before, limit)
+	// beforeId narrows the entries of the moment "before" to those that a page has not shown yet.
+	beforeID := int64(math.MaxInt64)
+	if v := r.URL.Query().Get("beforeId"); v != "" {
+		if beforeID, err = strconv.ParseInt(v, 10, 64); err != nil {
+			return errStatus{http.StatusBadRequest, "beforeId must be a number"}
+		}
+	} else if r.URL.Query().Get("before") != "" {
+		beforeID = 0 // as before: everything older than the moment
+	}
+	list, err := h.Store.AuditLog(r.Context(), before, beforeID, limit)
 	if err != nil {
 		return err
 	}

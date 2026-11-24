@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -168,7 +169,7 @@ func TestCoreIsDescribedAgain(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	audited := func() bool {
-		log, err := store.AuditLog(ctx, time.Now().Add(time.Hour), 20)
+		log, err := store.AuditLog(ctx, time.Now().Add(time.Hour), math.MaxInt64, 20)
 		if err != nil {
 			t.Fatal(err)
 		}

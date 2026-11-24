@@ -11,9 +11,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -904,6 +906,33 @@ func TestCaptureFlow(t *testing.T) {
 		if !strings.Contains(string(b), `"`+action+`"`) {
 			t.Error("audit log lacks", action)
 		}
+	}
+	// Read a few at a time, the log has every entry once: a page begins
+	// where the last one ended, also among entries of one moment. An entry
+	// names its capture's number while the capture exists.
+	var whole, paged []hub.AuditEntry
+	_, b = f.call("root-token", "GET", "/api/audit?limit=60", nil)
+	json.Unmarshal(b, &whole)
+	for cursor := ""; ; {
+		var page []hub.AuditEntry
+		_, b := f.call("root-token", "GET", "/api/audit?limit=7"+cursor, nil)
+		json.Unmarshal(b, &page)
+		paged = append(paged, page...)
+		if len(page) < 7 || len(paged) >= len(whole) {
+			break
+		}
+		last := page[len(page)-1]
+		cursor = "&before=" + url.QueryEscape(last.At.Format(time.RFC3339Nano)) + "&beforeId=" + strconv.FormatInt(last.ID, 10)
+	}
+	numbered := false
+	for i := range whole {
+		if i >= len(paged) || paged[i].ID != whole[i].ID {
+			t.Fatalf("the log in pages has %d entries and differs at %d from the %d read at once", len(paged), i, len(whole))
+		}
+		numbered = numbered || whole[i].Number != nil
+	}
+	if len(paged) < len(whole) || !numbered {
+		t.Fatal("pages:", len(paged), "at once:", len(whole), "an entry with its capture's number:", numbered)
 	}
 }
 
