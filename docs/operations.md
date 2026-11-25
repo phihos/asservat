@@ -72,8 +72,8 @@ helm install <release> charts/asservat -n <namespace> -f values.yaml
 
 ```sh
 kubectl -n <namespace> scale deploy/<release>-hub --replicas=0
-kubectl -n <namespace> exec <release>-postgres-0 -- psql -U asservat postgres \
-  -c 'DROP DATABASE asservat' -c 'CREATE DATABASE asservat OWNER asservat'
+kubectl -n <namespace> exec <release>-postgres-0 -- psql -U asservat postgres -c 'DROP DATABASE asservat'
+kubectl -n <namespace> exec <release>-postgres-0 -- psql -U asservat postgres -c 'CREATE DATABASE asservat OWNER asservat'
 kubectl -n <namespace> exec -i <release>-postgres-0 -- psql -U asservat asservat < asservat.sql
 ```
 

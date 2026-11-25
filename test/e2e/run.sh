@@ -809,7 +809,8 @@ hub -n asservat annotate secret asservat-hub meta.helm.sh/release-name=asservat 
 install_hub
 hub -n asservat scale deploy/asservat-hub --replicas=0 >/dev/null
 hub -n asservat wait --for=delete pod -l app.kubernetes.io/component=hub --timeout=60s >/dev/null
-hub -n asservat exec asservat-postgres-0 -- psql -q -U asservat postgres -c 'DROP DATABASE asservat' -c 'CREATE DATABASE asservat OWNER asservat'
+hub -n asservat exec asservat-postgres-0 -- psql -q -U asservat postgres -c 'DROP DATABASE asservat'
+hub -n asservat exec asservat-postgres-0 -- psql -q -U asservat postgres -c 'CREATE DATABASE asservat OWNER asservat'
 hub -n asservat exec -i asservat-postgres-0 -- psql -q -U asservat asservat -v ON_ERROR_STOP=1 <"$WORK/asservat.sql" >/dev/null || fail "the dump does not load"
 hub -n asservat scale deploy/asservat-hub --replicas=1 >/dev/null
 hub -n asservat rollout status deploy/asservat-hub --timeout=120s >/dev/null
