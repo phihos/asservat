@@ -200,7 +200,10 @@ func (h *Hub) agentTrigger(w http.ResponseWriter, r *http.Request, cluster strin
 	if err != nil {
 		return err
 	}
-	u := h.withAdmin(User{Name: watch.Requester, Groups: groups})
+	u, err := h.creator(watch.Requester, groups)
+	if err != nil {
+		return err
+	}
 	if err := h.allowed(r.Context(), u, cluster, watch.Namespace); err != nil {
 		return err
 	}
@@ -243,7 +246,10 @@ func (h *Hub) fire(ctx context.Context, id, key, pod, on, message string) (api.C
 	if err != nil {
 		return api.Capture{}, err
 	}
-	u := h.withAdmin(User{Name: watch.Requester, Groups: groups})
+	u, err := h.creator(watch.Requester, groups)
+	if err != nil {
+		return api.Capture{}, err
+	}
 	if err := h.allowed(ctx, u, watch.Cluster, watch.Namespace); err != nil {
 		return api.Capture{}, err
 	}
@@ -285,6 +291,24 @@ func (h *Hub) fire(ctx context.Context, id, key, pod, on, message string) (api.C
 		h.pushWatches(ctx, watch.Cluster)
 	}
 	return capture, nil
+}
+
+// creator returns the user a watch records for, with what they may do
+// today where the hub knows that. A user of the hub's own list has the
+// groups that the list gives now, and one who was taken off it records
+// nothing more. Of a user of an identity provider the hub knows only the
+// groups that their token named when they made the watch, which are those
+// the watch was stored with.
+func (h *Hub) creator(name string, stored []string) (User, error) {
+	for _, s := range h.Users {
+		if s.Name == name {
+			return h.withAdmin(User{Name: name, Groups: s.Groups}), nil
+		}
+	}
+	if h.Verify == nil {
+		return User{}, errStatus{http.StatusForbidden, "the watch's requester is no longer a user of this hub"}
+	}
+	return h.withAdmin(User{Name: name, Groups: stored}), nil
 }
 
 // RecordNow makes a watch record at once, whatever it waits for: the pod
