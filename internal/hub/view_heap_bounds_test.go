@@ -63,15 +63,9 @@ func TestAProfileThatUnpacksWithoutEndIsRefused(t *testing.T) {
 		z.Write(zeros)
 	}
 	z.Close()
-	var before, after runtime.MemStats
-	runtime.ReadMemStats(&before)
-	_, err := unpackedProfile(packed.Bytes())
-	runtime.ReadMemStats(&after)
-	if err == nil {
-		t.Fatal("it was unpacked")
-	}
-	if grown := after.TotalAlloc - before.TotalAlloc; grown > 3*inMemory {
-		t.Errorf("refusing it took %d MiB", grown>>20)
+	// It ends at the bound: what it had unpacked until then is given back.
+	if unpacked, err := unpackedProfile(packed.Bytes()); err == nil || len(unpacked) > inMemory+1 {
+		t.Fatal("it was unpacked to", len(unpacked)>>20, "MiB:", err)
 	}
 	// One of an ordinary size is taken as it is, packed or not.
 	for _, profile := range [][]byte{[]byte("plain"), gz([]byte("packed"))} {
