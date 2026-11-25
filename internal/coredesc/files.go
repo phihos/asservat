@@ -240,6 +240,18 @@ func WriteFiles(w io.Writer, root string, files []string) error {
 // unless it is made to with files that are mostly holes, which program
 // files are not.
 func ExtractFiles(r io.Reader, dir string, size int64) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	// Every name is followed within the directory (os.Root): a link that
+	// the archive made before, each of which stays inside when looked at
+	// by itself, can together with others lead out of it, and a later
+	// entry named through them would be written there.
+	in, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
 	archive := tar.NewReader(r)
 	left := size
 	for {
@@ -261,14 +273,13 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 		if header.Typeflag != tar.TypeReg && !link || !fs.ValidPath(name) {
 			return errors.New("the archive holds more than program files: " + header.Name)
 		}
-		path := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			return err
+		if err := in.MkdirAll(pathpkg.Dir(name), 0o700); err != nil {
+			return fmt.Errorf("the archive leads out of its directory at %s: %w", header.Name, err)
 		}
 		if link {
-			err := os.Symlink(header.Linkname, path)
+			err := in.Symlink(header.Linkname, name)
 			// The same link a second time, under both of its names in such an earlier archive.
-			if to, e := os.Readlink(path); errors.Is(err, fs.ErrExist) && e == nil && to == header.Linkname {
+			if to, e := in.Readlink(name); errors.Is(err, fs.ErrExist) && e == nil && to == header.Linkname {
 				continue
 			}
 			if err != nil {
@@ -276,11 +287,11 @@ func ExtractFiles(r io.Reader, dir string, size int64) error {
 			}
 			continue
 		}
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		f, err := in.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		// The same file a second time, as such an earlier archive holds it
 		// under both of its names: the first stands. What else is in the
 		// way, a link or a directory, is a fault of the archive.
-		if info, e := os.Lstat(path); errors.Is(err, fs.ErrExist) && e == nil && info.Mode().IsRegular() {
+		if info, e := in.Lstat(name); errors.Is(err, fs.ErrExist) && e == nil && info.Mode().IsRegular() {
 			n, err := io.Copy(io.Discard, io.LimitReader(archive, left+1))
 			if left -= n; err == nil && left < 0 {
 				err = errors.New("the archive unpacks to more than it holds")
