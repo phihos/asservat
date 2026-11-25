@@ -134,8 +134,10 @@ What happens during an upgrade:
 !!! note
     The database schema is brought up to date by the hub when it starts.
     There is no separate migration step, and a newer hub can read what an
-    older one stored. Going back to an older hub after an upgrade is not
-    tested.
+    older one stored: after every change, the published images of the
+    commit before are installed, recorded with and upgraded, and what was
+    recorded before has to read the same after. Going back to an older hub
+    after an upgrade is not tested.
 
 Descriptions of core dumps improve between versions. When you open a core
 dump that an older version described, the hub describes it again from the
