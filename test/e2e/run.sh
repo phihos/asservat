@@ -802,7 +802,7 @@ hub -n asservat exec asservat-postgres-0 -- pg_dump -U asservat asservat >"$WORK
 hub -n asservat exec deploy/asservat-hub -- sh -c 'cd /data && tar -cf - -- *' >"$WORK/evidence.tar"
 helm --kube-context "kind-$HUB" uninstall asservat -n asservat --wait >/dev/null
 # What the chart keeps through an uninstall goes too: a lost cluster keeps nothing.
-hub -n asservat delete secret asservat-hub pvc/asservat-evidence pvc/data-asservat-postgres-0 --wait >/dev/null
+hub -n asservat delete secret/asservat-hub pvc/asservat-evidence pvc/data-asservat-postgres-0 --wait >/dev/null
 hub -n asservat create secret generic asservat-hub --from-literal=master-key="$(base64 -d <"$WORK/master-key.b64")" >/dev/null
 hub -n asservat label secret asservat-hub app.kubernetes.io/managed-by=Helm >/dev/null
 hub -n asservat annotate secret asservat-hub meta.helm.sh/release-name=asservat meta.helm.sh/release-namespace=asservat >/dev/null
