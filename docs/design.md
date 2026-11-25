@@ -28,6 +28,14 @@ architecture and pushed under the tag with `-amd64` or `-arm64` at its
 end, and the tags without it are lists that point to both, so that a node
 pulls its own.
 
+gdb takes the cores and describes them, as root on a node, from what a
+workload and the debug servers hand it. A program, a library or a debug
+file can carry scripts for gdb, which gdb runs where the file lies in a
+directory it trusts; the directories of downloaded debug files are such.
+Every gdb that Asservat starts is told to load none (`set auto-load off`):
+it runs the describer's own script and no other. For that the agent takes
+a core with gdb itself, as gdb's `gcore` script does, which cannot be told.
+
 ## Capture lifecycle
 
 1. A user requests a capture: cluster, namespace, workload and one or more
