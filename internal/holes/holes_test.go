@@ -89,3 +89,25 @@ func TestWhatIsNoPackedFileIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A reader of a part of the file, as a tool that reads a window of it,
+// passes over a hole without being written its zeros.
+func TestAHoleIsPassedOverAtOnce(t *testing.T) {
+	record := func(at, length uint64, data string) []byte {
+		b := binary.BigEndian.AppendUint64(nil, at)
+		return append(binary.BigEndian.AppendUint64(b, length), data...)
+	}
+	packed := bytes.Join([][]byte{[]byte(magic), record(0, 3, "abc"), record(200<<40, 3, "xyz"), record(200<<40+3, 0, "")}, nil)
+	var past passed
+	if n, err := Unpack(&past, bytes.NewReader(packed)); err != nil || n != 200<<40+3 || past.skipped != 200<<40-3 || past.written.String() != "abcxyz" {
+		t.Fatal(n, err, past.skipped, past.written.String())
+	}
+}
+
+type passed struct {
+	written bytes.Buffer
+	skipped int64
+}
+
+func (p *passed) Write(b []byte) (int, error) { return p.written.Write(b) }
+func (p *passed) Skip(zeros int64) error      { p.skipped += zeros; return nil }

@@ -271,6 +271,23 @@ type window struct {
 	skip, max int64
 }
 
+// Skip takes zeros of a hole (holes.Skipper): those before the window are
+// passed over at once, however many, and those in it are written.
+func (s *window) Skip(zeros int64) error {
+	if before := min(zeros, s.skip); before > 0 {
+		s.skip -= before
+		zeros -= before
+	}
+	for chunk := make([]byte, 32<<10); zeros > 0; {
+		n, err := s.Write(chunk[:min(zeros, int64(len(chunk)))])
+		zeros -= int64(n)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *window) Write(p []byte) (int, error) {
 	n := len(p)
 	if s.skip >= int64(n) {

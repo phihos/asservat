@@ -114,6 +114,11 @@ func Unpack(w io.Writer, r io.Reader) (int64, error) {
 				if _, err := file.Seek(gap, io.SeekCurrent); err != nil {
 					return written, err
 				}
+			} else if past, can := w.(Skipper); can {
+				// Who reads a part of the file passes over a hole at once.
+				if err := past.Skip(gap); err != nil {
+					return written, err
+				}
 			} else if _, err := io.CopyN(w, zeros{}, gap); err != nil {
 				return written, err
 			}
@@ -137,6 +142,12 @@ func Unpack(w io.Writer, r io.Reader) (int64, error) {
 			return written, errors.New("the packed file ends in the middle of its data")
 		}
 	}
+}
+
+// Skipper is a writer that can take a stretch of zeros without being
+// written them.
+type Skipper interface {
+	Skip(zeros int64) error
 }
 
 // zeros reads as zeros without end.

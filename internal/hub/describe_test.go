@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -319,7 +321,11 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 			t.Fatal(err)
 		}
 		report.Reset()
-		if err := h.plain(ctx, described, &report); err != nil {
+		// The hub may replace the description between the look at it and
+		// the reading: then it is looked at again.
+		if err := h.plain(ctx, described, &report); errors.Is(err, fs.ErrNotExist) {
+			continue
+		} else if err != nil {
 			t.Fatal(err)
 		}
 		if strings.Contains(report.String(), "handle_order") {
