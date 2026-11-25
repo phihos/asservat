@@ -41,7 +41,9 @@ jobs:
       # as the test of debug packages does without bsdtar.
       - run: sudo apt-get install -y --no-install-recommends gdb libarchive-tools python3-venv
       # As in the image: the test of a Python core's stacks skips without it.
-      - run: sudo python3 -m venv /opt/pystack && sudo /opt/pystack/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r internal/coredesc/pystack-requirements.txt
+      - run: |
+          sudo python3 -m venv /opt/pystack
+          sudo /opt/pystack/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r internal/coredesc/pystack-requirements.txt
       - run: go test -race ./...
         env:
           ASSERVAT_TEST_DSN: postgres://postgres:pw@127.0.0.1:5432/postgres
