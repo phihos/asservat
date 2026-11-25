@@ -32,14 +32,27 @@ if (!chrome) { console.error('no Chromium or Chrome is installed'); process.exit
 
 const profile = mkdtempSync(join(tmpdir(), 'asservat-browser-'));
 const env = {...process.env}; delete env.LD_LIBRARY_PATH;
-const browser = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], {env, stdio: ['ignore', 'ignore', 'pipe']});
-// Chromium says on its standard error where its DevTools listen.
-const listening = await new Promise((found, failed) => {
+// Chromium says on its standard error where its DevTools listen. On a busy
+// machine it was seen once to say nothing of the kind for half a minute,
+// for a reason its output did not tell: a browser that does not start is
+// ended and started again, twice at most, before the check gives up.
+const start = () => new Promise((found, failed) => {
+  const browser = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], {env, stdio: ['ignore', 'ignore', 'pipe']});
   let said = '';
-  browser.stderr.on('data', d => { said += d; const m = /DevTools listening on ws:\/\/([^/]+)\//.exec(said); if (m) found(m[1]); });
-  browser.on('exit', code => failed(new Error(`the browser ended with ${code}: ${said.slice(-400)}`)));
-  setTimeout(() => failed(new Error('the browser did not start: ' + said.slice(-400))), 30000);
+  const giveUp = why => { clearTimeout(late); browser.removeAllListeners('exit'); browser.kill('SIGKILL'); failed(new Error(why + ': ' + said.slice(-400))); };
+  const late = setTimeout(() => giveUp('the browser did not start'), 30000);
+  browser.on('exit', code => giveUp(`the browser ended with ${code}`));
+  browser.stderr.on('data', d => {
+    said += d;
+    const m = /DevTools listening on ws:\/\/([^/]+)\//.exec(said);
+    if (m) { clearTimeout(late); browser.removeAllListeners('exit'); found([browser, m[1]]); }
+  });
 });
+let started;
+for (let tries = 3; !started; tries--) {
+  started = await start().catch(e => { if (tries === 1) throw e; console.error(e.message.split('\n')[0] + '; starting it again'); });
+}
+const [browser, listening] = started;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let target;
 for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://${listening}/json`).catch(() => null))?.json().catch(() => []) || []).find(t => t.type === 'page'); if (!target) await sleep(100); }
