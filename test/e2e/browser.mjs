@@ -200,6 +200,9 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       // A stack's frame begins on the line of its "at", however long it is.
       const alone = await run(`return [...document.querySelectorAll('#threads:not([hidden]) .frames div')].some(frame => { const text = frame.firstChild; if (!text || text.nodeType !== 3 || text.length < 5) return false; const start = document.createRange(); start.setStart(text, 0); start.setEnd(text, 5); return start.getClientRects().length > 1; })`);
       if (alone) throw new Error('a frame of a stack stands on the line below its "at"');
+      // An address in a core's modules and mappings stands on one line.
+      const broken = await run(`return [...document.querySelectorAll('#modules:not([hidden]) td.value, #map:not([hidden]) td.value')].some(cell => { const range = document.createRange(); range.selectNodeContents(cell); return range.getClientRects().length > 1; })`);
+      if (broken) throw new Error('an address of a core is broken over several lines');
     }
     await run(`document.querySelector('#root .row, #root .c, #root .l, #root .g')?.click()`); await sleep(150);
     // A core's threads are gone through with the arrow keys.
