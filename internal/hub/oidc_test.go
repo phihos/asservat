@@ -96,6 +96,18 @@ func TestOIDCBearer(t *testing.T) {
 	if code, u := me(sign(key, claims("asservat", in))); code != 200 || u.Name != "alice" || len(u.Groups) != 2 || !u.Admin {
 		t.Fatal("valid token", code, u)
 	}
+	// Names that begin with "system:" are Kubernetes's own (system:masters
+	// may do everything): an identity provider's user is none of them, and
+	// neither is a group it names, whatever its users may call themselves.
+	reserved := claims("asservat", in)
+	reserved["groups"] = []string{"payments", "system:masters"}
+	if code, u := me(sign(key, reserved)); code != 200 || len(u.Groups) != 1 || u.Groups[0] != "payments" {
+		t.Fatal("a group of Kubernetes's own was taken from the token", code, u)
+	}
+	reserved["preferred_username"] = "system:admin"
+	if code, _ := me(sign(key, reserved)); code != 401 {
+		t.Fatal("a user name of Kubernetes's own was taken from the token", code)
+	}
 	other, _ := rsa.GenerateKey(rand.Reader, 2048)
 	for name, token := range map[string]string{
 		"another client": sign(key, claims("other-app", in)),
