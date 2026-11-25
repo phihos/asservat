@@ -757,7 +757,10 @@ as text, numbers and states included, a viewer takes only an ID for the
 capture it is asked for, and the hub takes from an agent only the states
 there are, for the recordings the capture has. The end-to-end run's
 browser check feeds the pages values that carry script and fails when
-any runs.
+any runs. As a second line the pages tell the browser to run scripts
+from the hub's own files only (a content security policy without
+`unsafe-inline` for scripts), so the console's script is a file and no
+page carries script in its markup.
 
 A viewer's address names the spot it shows (the packet and display filter,
 the log line, the trace entry, the stack, the base of a comparison), so a

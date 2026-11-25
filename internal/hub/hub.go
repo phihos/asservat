@@ -163,13 +163,27 @@ func New(c Config) (*Hub, error) {
 	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
+// pagePolicy is what the console's pages tell the browser to hold them to
+// (a content security policy). The pages show what workloads and agents
+// hand the hub; every value is written as text, and should one ever reach
+// a page as markup all the same, the browser runs no script of it: scripts
+// come from the hub's own files only, never from the markup. Styles may be
+// in the markup, where the viewers set sizes and positions; a tool's own
+// pages, pprof's and the trace tool's, are framed from the hub.
+const pagePolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"
+
 func (h *Hub) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", pagePolicy)
 		http.ServeFileFS(w, r, web, "web/index.html")
+	})
+	mux.HandleFunc("GET /console.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, web, "web/console.js")
 	})
 	// The viewer page and, under /view/, the script and style of each viewer.
 	mux.HandleFunc("GET /view", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", pagePolicy)
 		http.ServeFileFS(w, r, web, "web/view.html")
 	})
 	// The look: style, mark and fonts. They change only with the hub.
