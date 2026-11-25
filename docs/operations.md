@@ -118,10 +118,11 @@ What happens during an upgrade:
 - **The hub restarts once.** There is one hub replica, so the console and API
   are away for some seconds. Captures, approvals, watches and queued tasks are
   in PostgreSQL and survive.
-- **Agents reconnect by themselves** and take up their watches again,
-  within some ten seconds of the hub's return: an agent tries every five
-  seconds at the most and gives a try that meets no answer three. Until then the hub refuses requests for
-  their cluster ("no agent of this cluster is connected").
+- **Agents reconnect by themselves** and take up their watches again. An
+  agent waits five seconds at the most between two tries and gives a try
+  that meets no answer three, so it is back at the latest eight seconds
+  after the hub answers again. Until then the hub refuses requests for its
+  cluster ("no agent of this cluster is connected").
 - **A recording that ends while the hub is away** reports its result when the
   hub is back. Files that rest on the node (core dumps, system call traces)
   are uploaded again then. A packet capture or a profile whose upload the
