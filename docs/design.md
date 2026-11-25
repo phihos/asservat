@@ -839,10 +839,13 @@ files asks first.
 - A browser signs in at the OIDC issuer (authorization code flow with PKCE).
   The hub verifies the ID token and keeps the name and groups in a session
   cookie that it signs with a key derived from the master key. The session
-  lasts 12 hours, so the groups are at most that old. A watch is the
-  exception: it records for its requester with the groups they had when
-  they made it, for as long as it waits, so a watch of someone who has
-  left a group is to be deleted, or the group's rights in Kubernetes taken.
+  lasts 12 hours, so the groups are at most that old. A watch records
+  for its requester for as long as it waits. For a user of the hub's own
+  list it does so with the groups the list gives them at that moment, and
+  not at all once they are off the list. For a user of an identity
+  provider the hub knows only the groups their token named when they made
+  the watch: the watch of someone who has left a group there is to be
+  deleted, or the group's rights in Kubernetes taken.
 - Captures are owned by name, and the names go to the clusters as they
   are. The claim that names a user must therefore be one that the issuer
   keeps unique and that users cannot choose. A name or a group that begins
