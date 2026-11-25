@@ -788,13 +788,14 @@ WATCHES=2
 export WATCHES
 # The demo's heap profile is a word, not a profile: the viewer has to say so.
 browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" "$ROOT" || browsed=$?
-for id in "$seen1" "$seen2"; do ok "$ALICE" DELETE "/api/watches/$id" >/dev/null; done
 case $browsed in
   0) ;;
   78) [ -z "${REQUIRE_BROWSER:-}" ] || fail "no Chromium or Chrome is installed, and REQUIRE_BROWSER asks for the pages to be looked at"
       log "left out: no Chromium or Chrome is installed here" ;;
   *) fail "the pages in a browser" ;;
 esac
+# The page's watches go after the browser's result is told; a run that failed there keeps them to look at.
+for id in "$seen1" "$seen2"; do ok "$ALICE" DELETE "/api/watches/$id" >/dev/null; done
 
 # The backup and restore that docs/operations.md describes, done: the hub's
 # database, volumes and Secret go, and what was saved brings back a capture
