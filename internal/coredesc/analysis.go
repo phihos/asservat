@@ -106,18 +106,46 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	}
 	out := script.Name() + ".json"
 	defer os.Remove(out)
+	// gdb is handed its script, the file for its answer and the core open
+	// (see unprivileged.go), and after them the program's files.
+	hand := make([]*os.File, 3)
+	for i, open := range []func() (*os.File, error){
+		func() (*os.File, error) { return os.Open(script.Name()) },
+		func() (*os.File, error) { return os.OpenFile(out, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600) },
+		func() (*os.File, error) { return os.Open(core) },
+	} {
+		if hand[i], err = open(); err != nil {
+			return nil, err
+		}
+		defer hand[i].Close()
+	}
+	back, err := given(hand...)
+	if err != nil {
+		return nil, err
+	}
+	defer back()
 	// gdb reads the program's files through a view of the root.
 	view := ""
 	if root != "" {
 		var held func()
-		if view, held, err = d.view(ctx, core, root); err != nil {
+		var files []*os.File
+		if view, files, held, err = d.view(ctx, hand[2], root, len(hand)); err != nil {
 			return nil, err
 		}
 		defer held()
+		hand = append(hand, files...)
 	}
-	cmd := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-x", script.Name())...)
-	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+out,
-		"ASSERVAT_DEBUG_DIRS="+strings.Join(d.debugDirs(ctx, core, root), ":"),
+	dirs := d.debugDirs(ctx, core, root)
+	for _, dir := range dirs {
+		passable(d.Scratch, dir)
+	}
+	cmd := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-ex", "python exec(open('"+handed(0)+"').read())")...)
+	// gdb tells a script's language by its name's ending, which a file
+	// handed over open has none of: Python is told to run it.
+	cmd.ExtraFiles = hand
+	asNobody(cmd)
+	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+handed(2), "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+handed(1),
+		"ASSERVAT_DEBUG_DIRS="+strings.Join(dirs, ":"),
 		// gdb asks no debuginfod server: the describer has (debugDirs).
 		"DEBUGINFOD_URLS=")
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -252,14 +280,18 @@ func (d Describer) Complete(ctx context.Context, report []byte, core, root strin
 // libraries, often links to the mapped files, and the directory of debug
 // files. Only gdb knows the names asked by, from the program's memory: it
 // lists them first, with an empty view in which it finds no file.
-func (d Describer) view(ctx context.Context, core, root string) (string, func(), error) {
+//
+// The files are handed to gdb open, after first others: a link of the view
+// leads to its file by the place it has among them.
+func (d Describer) view(ctx context.Context, held *os.File, root string, first int) (string, []*os.File, func(), error) {
+	core := held.Name()
 	root, err := filepath.Abs(root)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	view, err := os.MkdirTemp(d.Scratch, "view-*")
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	// A link of the view leads to the file as this process holds it open,
 	// not to its path: the container can put a link in the path's place
@@ -274,7 +306,11 @@ func (d Describer) view(ctx context.Context, core, root string) (string, func(),
 	names := append(coreFiles(core), "/usr/lib/debug")
 	// Without the libraries gdb still describes, as it does without a
 	// root, but then without their functions: that is said.
-	listed, err := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary")...).Output()
+	passable(d.Scratch, view)
+	list := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+handed(0), "-ex", "info sharedlibrary")...)
+	list.ExtraFiles = []*os.File{held}
+	asNobody(list)
+	listed, err := list.Output()
 	if err != nil {
 		slog.Warn("the libraries that a core's program asked for are not known", "core", core, "error", err)
 	}
@@ -297,14 +333,15 @@ func (d Describer) view(ctx context.Context, core, root string) (string, func(),
 			err = os.MkdirAll(filepath.Dir(at), 0o700)
 		}
 		if err == nil {
-			err = os.Symlink(fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), f.Fd()), at)
+			err = os.Symlink(handed(first+len(open)-1), at)
 		}
 		// As a name under one that is a file's: gdb then does not find it.
 		if err != nil && !errors.Is(err, os.ErrExist) {
 			slog.Debug("a file of a core's program is not shown to gdb", "core", core, "file", name, "error", err)
 		}
 	}
-	return view, done, nil
+	passable(d.Scratch, view)
+	return view, open, done, nil
 }
 
 // DescribedBy tells which version of the describer made a description; 1
