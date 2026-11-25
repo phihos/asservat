@@ -104,6 +104,15 @@ export default async function (root) {
   $('find').oninput = draw;
   $('kinds').onclick = e => { if (e.target.dataset.kind) { choose(e.target.dataset.kind); draw(); } };
   $('threads').onclick = e => { const r = e.target.closest('[data-thread]'); if (r) { thread = lists[kind].find(t => t.id === Number(r.dataset.thread)); frame = thread.frames[0]; draw(); } };
+  // The arrow keys go through the threads that are listed, as they do through a thread's frames.
+  $('threads').onkeydown = e => {
+    const step = {ArrowDown: 1, ArrowUp: -1}[e.key], rows = [...$('threads').querySelectorAll('[data-thread]')];
+    const to = rows[rows.findIndex(r => Number(r.dataset.thread) === thread?.id) + step];
+    if (!step || !to) return;
+    e.preventDefault();
+    to.click();
+    $('threads').querySelector('.selected')?.scrollIntoView({block: 'nearest'});
+  };
   $('stack').onclick = e => { const r = e.target.closest('[data-level]'); if (r) { frame = thread.frames[Number(r.dataset.level)]; draw(); } };
   $('stack').onkeydown = e => {
     const step = {ArrowDown: 1, ArrowUp: -1}[e.key], to = thread?.frames[(frame?.level ?? 0) + step];
