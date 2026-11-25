@@ -9,6 +9,8 @@
 // With an administrator's token it also looks at what only administrators
 // see: the audit log, and the list of everyone's captures.
 //
+// $WATCHES is how many watches wait at least: the page of watches then has to
+// list them.
 // $UNREADABLE names files, separated by commas, that are known not to be
 // what their names say: of those the viewer must say that the hub could not
 // open them. With $ONLY_NAMESPACES, a regular expression, it opens only the files of
@@ -104,6 +106,12 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   for (const view of ['captures', 'watches', 'clusters']) await check(`${size}: ${view}`, async () => {
     await run(`location.hash = '#${view}'`);
     await until('the page ' + view, `return !document.querySelector('[data-view=${view}]').hidden`);
+    // Where the run says how many watches wait, the page lists them, each with its buttons on one line.
+    if (view === 'watches' && process.env.WATCHES) {
+      await until('the watches', `return document.querySelectorAll('#watches tr').length >= ${Number(process.env.WATCHES)}`);
+      const stacked = await run(`return [...document.querySelectorAll('#watches tr')].some(row => { const tops = [...row.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top)); return new Set(tops).size > 1; })`);
+      if (stacked) throw new Error('the buttons of a watch stand above one another');
+    }
     if (view === 'captures') {
       // A capture's details and files open with the keyboard alone.
       await run(`document.querySelector('.capture:not(.open) .chev')?.focus()`);
