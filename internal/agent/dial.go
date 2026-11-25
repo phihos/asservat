@@ -47,8 +47,14 @@ func DialHub(ctx context.Context, network, address string) (net.Conn, error) {
 // The kernel tries for two minutes to reach an address that does not
 // answer, as the hub's does while its pod is replaced, and the node is not
 // reachable for captures all that time; the agent tries anew by itself
-// after a second or more.
-const hubDialWait = 10 * time.Second
+// after a second or more. Three seconds: a connection that comes about
+// does so in milliseconds within a cluster, and across a slow network
+// within the kernel's first repeats of its request, after one and after
+// three seconds. With ten, as before, an agent whose try met the hub's
+// address just before the hub was back waited them out: measured after a
+// hub's restart on three nodes, two agents were back after 7 seconds and
+// the third after 21.
+const hubDialWait = 3 * time.Second
 
 func dialHub(ctx context.Context, network, address string, wait time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, wait)

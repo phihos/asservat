@@ -234,3 +234,11 @@ func TestReconnectDelayStaysShort(t *testing.T) {
 		t.Fatal("the delay does not grow", delay)
 	}
 }
+
+// An address that does not answer is given up within seconds, so that the
+// next try, which may meet a hub that is back, comes soon.
+func TestTheHubsAddressIsNotWaitedForLong(t *testing.T) {
+	if hubDialWait > 3*time.Second {
+		t.Fatalf("an agent waits %s for an address that does not answer", hubDialWait)
+	}
+}
