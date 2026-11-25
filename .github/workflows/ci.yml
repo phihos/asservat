@@ -71,10 +71,18 @@ jobs:
           retention-days: 7
   # Every commit on main is published as ghcr.io/<owner>/asservat:main and
   # :<commit>, and the agent's image under the same tags with "-agent".
+  # Each architecture's images are built on a runner of that architecture,
+  # without emulation, and pushed under a tag of their own; the manifest job
+  # then makes the tags that people use point to both.
   image:
     if: github.event_name == 'push'
     needs: [test, e2e]
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {runner: ubuntu-latest, arch: amd64}
+          - {runner: ubuntu-24.04-arm, arch: arm64}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -90,9 +98,23 @@ jobs:
           # The level is BuildKit's highest; the base image's layers are
           # compressed again (force-compression) to be zstd as well.
           docker buildx create --use >/dev/null
-          publish() { docker buildx build "$@" --label "$label" --output type=image,push=true,oci-mediatypes=true,compression=zstd,compression-level=19,force-compression=true .; }
-          publish --target agent -t "$image:main-agent" -t "$image:${{ github.sha }}-agent"
-          publish -t "$image:main" -t "$image:${{ github.sha }}"
+          publish() { docker buildx build "$@" --label "$label" --provenance=false --output type=image,push=true,oci-mediatypes=true,compression=zstd,compression-level=19,force-compression=true .; }
+          publish --target agent -t "$image:${{ github.sha }}-agent-${{ matrix.arch }}"
+          publish -t "$image:${{ github.sha }}-${{ matrix.arch }}"
+  manifest:
+    if: github.event_name == 'push'
+    needs: [image]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - run: |
+          image=ghcr.io/${{ github.repository }}
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for kind in "" -agent; do
+            docker buildx imagetools create -t "$image:main$kind" -t "$image:${{ github.sha }}$kind" \
+              "$image:${{ github.sha }}$kind-amd64" "$image:${{ github.sha }}$kind-arm64"
+          done
   # The branch ruleset requires this one check.
   ci-ok:
     if: always()

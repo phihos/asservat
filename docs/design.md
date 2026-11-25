@@ -22,7 +22,11 @@ tools (Wireshark's sharkd, graphviz, Go's trace tool) and without those
 that read the stacks of Python and .NET programs from a core (pystack and
 dotnet-dump, each with a runtime of its own): the same tag with
 `-agent`. The published images' layers are compressed with zstd, which
-containerd, CRI-O and Docker from version 23 read.
+containerd, CRI-O and Docker from version 23 read. They are published for
+amd64 and arm64: each architecture's images are built on a machine of that
+architecture and pushed under the tag with `-amd64` or `-arm64` at its
+end, and the tags without it are lists that point to both, so that a node
+pulls its own.
 
 ## Capture lifecycle
 
