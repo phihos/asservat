@@ -9,6 +9,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/google/pprof v0.0.0-20261118010117-084b33a85f63
 	github.com/google/uuid v1.6.0
+	github.com/grafana/jfr-parser v0.19.0
 	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/minio/minio-go/v7 v7.4.1

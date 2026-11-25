@@ -439,6 +439,34 @@ func TestDotnetTraceView(t *testing.T) {
 	}
 }
 
+// A JVM's flight recording opens in pprof's viewer as a profile of what the
+// recorder sampled: where the threads ran, and where they allocated.
+func TestFlightRecordingView(t *testing.T) {
+	// Of a program made for this test, which spins in Burn.spin and allocates in Burn.hold for three seconds.
+	recording, err := os.ReadFile("testdata/recording.jfr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if api.ViewerOf("api-1/jvm-recording.jfr") != "pprof" {
+		t.Fatal("a flight recording has no viewer")
+	}
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/jvm-recording.jfr": recording, "api-1/cut.jfr": recording[:len(recording)/2], "api-1/other.jfr": []byte("no recording")})
+	view := openedView(t, f, capture, "api-1/jvm-recording.jfr")
+	code, b := f.call("alice-token", "GET", "/api/views/"+view+"/pages/top", nil)
+	if code != 200 || !strings.Contains(string(b), "Burn.spin") || strings.Contains(string(b), "of 0 total") {
+		t.Fatal("where the threads ran", code, len(b))
+	}
+	code, b = f.call("alice-token", "GET", "/api/views/"+view+"/pages/top?si=allocated", nil)
+	if code != 200 || !strings.Contains(string(b), "Burn.hold") || !strings.Contains(string(b), "MB total") {
+		t.Fatal("where the threads allocated", code, len(b))
+	}
+	for _, name := range []string{"cut.jfr", "other.jfr"} {
+		if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/views/api-1/"+name, nil); code != 422 || !strings.Contains(string(b), "flight recording") {
+			t.Fatal(name, code, string(b))
+		}
+	}
+}
+
 // An event stream that has nothing to say still writes a line now and then:
 // a proxy in front of the hub ends a connection that stays silent (HAProxy
 // after 50 seconds by default), and with its stream a view would end.
