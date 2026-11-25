@@ -706,7 +706,9 @@ of a description; a profile, a .NET trace and a flight recording as pprof's list
 60 functions with the most weight, a heap dump as its 60 largest classes,
 its biggest objects and its threads' stacks, a packet capture as its
 protocols, conversations and Wireshark's expert information, or with a
-display filter as the packets that match. The viewers that read in
+display filter as the packets that match; where none does and the capture
+was recorded without payload, the answer says that a filter on what
+packets carry finds nothing in headers alone. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
