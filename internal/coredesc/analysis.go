@@ -78,6 +78,16 @@ type Describer struct {
 	symbols string
 }
 
+// NoScripts are the arguments that keep gdb from running scripts it finds
+// by itself: a program, a library or a debug file may carry Python for
+// gdb or name a file of it (the section .debug_gdb_scripts, a file named
+// after the library), and gdb runs it where the file lies in a directory
+// it trusts. The directories of debug files are such, and the debug files
+// come from servers: one of them was seen to run its script. gdb runs as
+// root on a node, on what a workload and those servers hand it; it runs
+// the describer's own script, which is named to it, and no other.
+var NoScripts = []string{"-iex", "set auto-load off"}
+
 // Describe returns the description of a core. root is the directory in
 // which the program's files are found, for example /proc/<pid>/root of a
 // process in the same container; empty if there is none.
@@ -104,7 +114,7 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 		}
 		defer os.RemoveAll(view)
 	}
-	cmd := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-x", script.Name())
+	cmd := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-x", script.Name())...)
 	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+out,
 		"ASSERVAT_DEBUG_DIRS="+strings.Join(d.debugDirs(ctx, core, root), ":"),
 		// gdb asks no debuginfod server: the describer has (debugDirs).
@@ -253,7 +263,7 @@ func (d Describer) view(ctx context.Context, core, root string) (string, error) 
 	names := append(coreFiles(core), "/usr/lib/debug")
 	// Without the libraries gdb still describes, as it does without a
 	// root, but then without their functions: that is said.
-	listed, err := exec.CommandContext(ctx, "gdb", "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary").Output()
+	listed, err := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary")...).Output()
 	if err != nil {
 		slog.Warn("the libraries that a core's program asked for are not known", "core", core, "error", err)
 	}

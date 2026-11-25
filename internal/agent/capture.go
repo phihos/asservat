@@ -337,8 +337,18 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 	if !same() {
 		return replaced(pid)
 	}
-	if out, err := exec.CommandContext(ctx, "gcore", "-o", prefix, strconv.Itoa(pid)).CombinedOutput(); err != nil {
+	// What the gcore script of gdb does, with gdb told to run no scripts
+	// of the program's (coredesc.NoScripts), which the script cannot be told.
+	dump := append(slices.Clone(coredesc.NoScripts), "--nx", "--batch", "--readnever", "-iex", "set debuginfod enabled off",
+		"-ex", "set pagination off", "-ex", "set height 0", "-ex", "set width 0",
+		"-ex", "attach "+strconv.Itoa(pid), "-ex", "gcore "+file, "-ex", "detach", "-ex", "quit")
+	cmd := exec.CommandContext(ctx, "gdb", dump...)
+	cmd.Stdin = nil
+	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gcore: %w: %s", err, tail(out))
+	} else if _, missing := os.Stat(file); missing != nil {
+		// gdb ends well also when it could not attach or write.
+		return fmt.Errorf("gcore: %s", tail(out))
 	}
 	if !same() {
 		return replaced(pid)

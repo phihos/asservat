@@ -63,6 +63,12 @@ func TestDebugPackages(t *testing.T) {
 	os.Mkdir(filepath.Dir(program), 0o755)
 	run("gcc", "-g", "-O0", "-Wl,--build-id=0x00112233445566778899aabbccddeeff00112233", "-o", "server.full", "main.c")
 	run("objcopy", "--only-keep-debug", "server.full", "server.debug")
+	// The debug file carries a script for gdb, as debug files may
+	// (.debug_gdb_scripts, here as Python text): it comes from a server,
+	// and gdb runs as root on a node, so it is not run.
+	ran := filepath.Join(dir, "the-debug-file's-script-ran")
+	os.WriteFile(filepath.Join(dir, "script"), []byte("\x04from-the-debug-file\nopen("+strconv.Quote(ran)+", 'w').close()\n\x00"), 0o644)
+	run("objcopy", "--add-section", ".debug_gdb_scripts=script", "--set-section-flags", ".debug_gdb_scripts=readonly", "server.debug")
 	run("objcopy", "--strip-debug", "--add-gnu-debuglink=server.debug", "server.full", program)
 
 	cmd := exec.Command(program)
@@ -176,6 +182,9 @@ func TestDebugPackages(t *testing.T) {
 		report, err := d.Describe(context.Background(), core, root)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if _, err := os.Stat(ran); err == nil {
+			t.Fatal("gdb ran the script that the debug file carries")
 		}
 		var described struct {
 			Threads []struct {

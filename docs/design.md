@@ -40,6 +40,14 @@ a trace it finds it out afterwards: strace takes a process by its number,
 so another one that came by the number in that instant is traced, and its
 trace is deleted instead of sent.
 
+gdb takes the cores and describes them, as root on a node, from what a
+workload and the debug servers hand it. A program, a library or a debug
+file can carry scripts for gdb, which gdb runs where the file lies in a
+directory it trusts; the directories of downloaded debug files are such.
+Every gdb that Asservat starts is told to load none (`set auto-load off`):
+it runs the describer's own script and no other. For that the agent takes
+a core with gdb itself, as gdb's `gcore` script does, which cannot be told.
+
 ## Capture lifecycle
 
 1. A user requests a capture: cluster, namespace, workload and one or more
