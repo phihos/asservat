@@ -46,9 +46,10 @@ one of security and tell to sandbox it for files that are not trusted. To
 take a core gdb has to be root, which attaching to another user's process
 needs; it reads no debug information then. To describe a core it is not:
 on a node, where the agent is root, the describing gdb runs as the user
-`nobody` without any capability, and is handed the core, its script and
-the program's files open. A fault in it reaches what that user may read,
-not the node. A program or library that a container lets only its own user
+`nobody` in root's group, without any capability, and is handed the core,
+its script and the program's files open; root's group may read them while
+it runs. A fault in it reaches what that user and group may read, not
+the node. A program or library that a container lets only its own user
 read is then not read by gdb either, and its frames show addresses. A program, a library or a debug
 file can carry scripts for gdb, which gdb runs where the file lies in a
 directory it trusts; the directories of downloaded debug files are such.

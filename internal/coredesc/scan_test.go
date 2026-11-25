@@ -106,8 +106,8 @@ func describeWaiting(t *testing.T, dir, root string) (waitingReport, string) {
 			// As on a node, where the describer is root: gdb then runs as
 			// nobody, which a stand-in for gdb on the path writes down.
 			// The test's directories lie under one that only root enters.
-			os.Chmod(filepath.Dir(scratch), 0o711)
-			os.Chmod(filepath.Dir(dir), 0o711)
+			os.Chmod(filepath.Dir(scratch), 0o750)
+			os.Chmod(filepath.Dir(dir), 0o750)
 			real, _ := exec.LookPath("gdb")
 			bin, _ := os.MkdirTemp("", "gdb-*")
 			t.Cleanup(func() { os.RemoveAll(bin) })
