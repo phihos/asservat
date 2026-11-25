@@ -77,6 +77,8 @@
   .state { font-weight: 600; } .PendingApproval { color: var(--custody-ink); } .Completed { color: var(--ok); } .Failed, .Denied { color: var(--bad); }
   .muted { color: var(--quiet); font-size: 12px; } .error { color: var(--bad); } code { font: 12px var(--mono); word-break: break-all; }
   td button { min-height: 28px; padding: 2px 10px; margin: 0 4px 2px 0; white-space: nowrap; }
+  /* A watch's buttons stay side by side. */
+  #watchTable td:last-child { white-space: nowrap; }
   /* On a narrow screen a watch is a card: its six columns do not fit side by side. */
   @media (max-width: 760px) {
     #watchTable thead { display: none; } #watchTable, #watchTable tbody, #watchTable tr, #watchTable td { display: block; }
@@ -354,7 +356,7 @@
   <h2>Watches</h2>
   <p class="muted lead">A watch waits until a pod of its workload meets a condition, such as a container crash, and then records that pod. The resulting captures appear under Captures.</p>
   <p class="problem" id="watchesProblem"></p>
-  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Condition</th><th>Records</th><th>Recordings left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
+  <table id="watchTable"><thead><tr><th>Created</th><th>Target</th><th>Condition</th><th>Records</th><th>Times left</th><th></th></tr></thead><tbody id="watches"></tbody></table>
   <p class="empty" id="noWatches" hidden>No watches yet. To create one, start a <a href="#new">new capture</a> and choose a condition in the last step.</p>
  </section>
 
