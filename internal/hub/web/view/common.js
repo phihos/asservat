@@ -3,7 +3,11 @@
 export const $ = id => document.getElementById(id);
 export const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const query = new URLSearchParams(location.search);
-export const capture = query.get('capture'), file = query.get('file') || '';
+// A capture is named by its ID and by nothing else: the name goes into the
+// addresses that the viewers fetch, and a link that puts a path there could
+// have a viewer take a recorded file for the capture itself.
+const named = query.get('capture') || '';
+export const capture = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(named) ? named : '', file = query.get('file') || '';
 export const filePath = file.split('/').map(encodeURIComponent).join('/');
 export const address = `/api/captures/${capture}/artifacts/${filePath}`;
 // A token typed into the console lives in this tab; a single sign-on session is a cookie.

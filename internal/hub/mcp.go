@@ -176,6 +176,9 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			a, err := h.Store.Artifact(ctx, c.ID, in.Name)
+			if err == ErrNotFound {
+				return nil, fmt.Errorf("the capture has no file %q; get_capture lists its files", in.Name)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +234,8 @@ var mcpTools = []mcpTool{
 				case "heap":
 					text, err = h.heapText(ctx, a)
 				default:
-					text, err = h.packetText(ctx, a, in.Filter)
+					packets := c.Recording(api.KindPcap)
+					text, err = h.packetText(ctx, a, in.Filter, packets == nil || packets.Params["payload"] != "true")
 				}
 				if err != nil {
 					return nil, err
