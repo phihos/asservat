@@ -288,6 +288,27 @@ func (f *framedPage) end() {
 	}
 }
 
+// inMemory is how much of one file the hub holds in memory at once: 256
+// MiB. It holds whole only what a tool can not read as a stream, a profile
+// and a core's description, of which the largest seen are some tens of
+// MiB, and several views can be open at once. Without the bound, a file
+// that a workload or an agent made large, or a small one that unpacks
+// without end, takes the hub's memory and with it everyone's views.
+const inMemory = 256 << 20
+
+// inMemory returns an artifact decrypted, if it is no larger than the hub
+// holds of a file in memory.
+func (h *Hub) inMemory(ctx context.Context, a storedArtifact) (*bytes.Buffer, error) {
+	if a.Size > inMemory {
+		return nil, errStatus{http.StatusUnprocessableEntity, fmt.Sprintf("the file is larger than the %d MiB that the hub reads of such a file; download it instead", inMemory>>20)}
+	}
+	var plain bytes.Buffer
+	if err := h.plain(ctx, a, &plain); err != nil {
+		return nil, fmt.Errorf("open artifact: %w", err)
+	}
+	return &plain, nil
+}
+
 // plain writes an artifact, decrypted, to w.
 func (h *Hub) plain(ctx context.Context, a storedArtifact, w io.Writer) error {
 	key, err := unwrapKey(h.MasterKey, a.Key)

@@ -173,8 +173,8 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	describer := coredesc.Describer{Scratch: h.WorkDir, DebuginfodURLs: h.DebuginfodURLs, PystackPython: h.pystack} // what gdb downloads stays for the next core
 	var begun []byte
 	if old, err := h.Store.Artifact(ctx, capture, name+coredesc.Suffix); err == nil {
-		var report bytes.Buffer
-		if err := h.plain(ctx, old, &report); err != nil {
+		report, err := h.inMemory(ctx, old)
+		if err != nil {
 			return false, "", err
 		}
 		switch {

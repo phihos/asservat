@@ -220,8 +220,16 @@ func summarizeHeap(dump io.Reader) (*heapSummary, error) {
 			if err != nil {
 				return nil, truncated(err)
 			}
-			text := make([]byte, int64(length)-int64(h.idSize))
-			if _, err := io.ReadFull(h.r, text); err != nil {
+			// The record says how long it is; the memory for it is taken
+			// as the bytes arrive, not on the record's word.
+			if int64(length) < int64(h.idSize) {
+				return nil, errors.New("a string record is shorter than its ID")
+			}
+			text, err := io.ReadAll(io.LimitReader(h.r, int64(length)-int64(h.idSize)))
+			if err == nil && int64(len(text)) != int64(length)-int64(h.idSize) {
+				err = io.ErrUnexpectedEOF
+			}
+			if err != nil {
 				return nil, truncated(err)
 			}
 			// Most strings name fields. Kept are those that a class, a
@@ -262,11 +270,14 @@ func summarizeHeap(dump io.Reader) (*heapSummary, error) {
 			if err != nil {
 				return nil, truncated(err)
 			}
-			ids := make([]uint64, n)
-			for i := range ids {
-				if ids[i], err = h.id(); err != nil {
+			// As many frames as the file holds, whatever number it names.
+			var ids []uint64
+			for range n {
+				id, err := h.id()
+				if err != nil {
 					return nil, truncated(err)
 				}
+				ids = append(ids, id)
 			}
 			traces[serial] = ids
 		case 0x0c, 0x1c: // a part of the heap
@@ -537,6 +548,7 @@ func javaName(name string) string {
 func (h *Hub) heapSummaryOf(ctx context.Context, a storedArtifact) (*heapSummary, error) {
 	dump, write := io.Pipe()
 	go func() { write.CloseWithError(h.plain(ctx, a, write)) }()
+	defer dump.Close() // also when reading the dump panics: the decryption does not wait for a reader that is gone
 	summarize := summarizeHeap
 	if strings.HasSuffix(a.Name, ".gcdump") {
 		summarize = summarizeDotnetHeap

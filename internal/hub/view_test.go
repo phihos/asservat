@@ -624,3 +624,21 @@ func TestAlertsNeedTheHubsToken(t *testing.T) {
 		t.Fatal("an alert", code)
 	}
 }
+
+// What the hub had decrypted into its work directory when it was killed is
+// still there when it starts in the same pod: it removes that, and keeps
+// the debug information that was downloaded.
+func TestAStartingHubClearsWhatWasDecrypted(t *testing.T) {
+	var work string
+	viewed(t, map[string][]byte{"api-1/pod.json": []byte("{}")}, func(c *hub.Config) {
+		work = c.WorkDir
+		for _, left := range []string{"describe-123/core", "view-9.pcap", "dotnet-7/core", "debuginfod/kept"} {
+			os.MkdirAll(filepath.Dir(filepath.Join(work, left)), 0o700)
+			os.WriteFile(filepath.Join(work, left), []byte("x"), 0o600)
+		}
+	})
+	left, _ := os.ReadDir(work)
+	if len(left) != 1 || left[0].Name() != "debuginfod" {
+		t.Fatal("after the start the work directory holds", left)
+	}
+}

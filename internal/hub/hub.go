@@ -13,7 +13,9 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -141,6 +143,20 @@ func New(c Config) (*Hub, error) {
 		for _, other := range c.Clusters[:i] {
 			if other.Name == cluster.Name || other.Token == cluster.Token {
 				return nil, fmt.Errorf("cluster %q repeats the name or the join token of another cluster", cluster.Name)
+			}
+		}
+	}
+	// A hub that was killed, as when its node ran out of memory, left what
+	// it had decrypted for a viewer or to describe a core in its work
+	// directory, which outlives the container. No view is open at the
+	// start: it goes. What was downloaded of debug information stays.
+	if c.WorkDir != "" {
+		for _, pattern := range []string{"describe-*", "view-*", "dotnet-*", "python-stacks-*", "analysis-*"} {
+			left, _ := filepath.Glob(filepath.Join(c.WorkDir, pattern))
+			for _, path := range left {
+				if err := os.RemoveAll(path); err != nil {
+					return nil, fmt.Errorf("what an earlier hub left decrypted in its work directory: %w", err)
+				}
 			}
 		}
 	}

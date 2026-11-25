@@ -688,6 +688,13 @@ the agent makes for each core: one by each name of a mapped file or a
 library asked for, to the file that the name leads to in the container.
 Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
+A file's own word of its sizes is not taken for memory: the hub reads a
+heap dump's records as their bytes arrive, holds at most 256 MiB of a
+profile or a core's description in memory (also of a compressed profile
+as it unpacks) and tells the reader to download what is larger. What it
+had decrypted into its work directory goes when it starts, in case it was
+killed with files open.
+
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core
 whose description is from an older one, the hub describes it anew from the
