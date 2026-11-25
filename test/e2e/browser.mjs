@@ -155,6 +155,13 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);
     for (const tab of tabs) { await run(`document.querySelector('#root [data-tab="${tab}"]').click()`); await sleep(150); }
     await run(`document.querySelector('#root .row, #root .c, #root .l, #root .g')?.click()`); await sleep(150);
+    // A core's threads are gone through with the arrow keys.
+    const second = await run(`const rows = document.querySelectorAll('#threads [data-thread]'); if (rows.length < 2) return ''; rows[0].click(); document.getElementById('threads').focus(); return rows[1].dataset.thread`);
+    if (second) {
+      for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', {type, key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40});
+      await sleep(150);
+      if (await run(`return document.querySelector('#threads .selected')?.dataset.thread`) !== second) throw new Error('the arrow key did not go to the next thread');
+    }
   });
 }
 if (adminToken) {
