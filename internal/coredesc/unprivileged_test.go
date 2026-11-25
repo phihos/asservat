@@ -1,6 +1,7 @@
 package coredesc
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -56,5 +57,21 @@ func TestOnlyProgramsKeptToTheirUserAreTold(t *testing.T) {
 	lowered = func() bool { return false }
 	if told("app2", "\x7fELF a program", 0o700) {
 		t.Fatal("where gdb runs as the describer itself, nothing is kept from it")
+	}
+}
+
+// A Go program's stacks are read by the describer itself, not by gdb: a Go
+// program that its container keeps private has its functions all the same
+// and is not told as the reason for frames without them.
+func TestAGoProgramReadAllTheSameIsNotTold(t *testing.T) {
+	fields := map[string]json.RawMessage{"unreadable": json.RawMessage(`["/app/server","/app/libprivate.so"]`)}
+	readAllTheSame(fields, "/app/server")
+	if string(fields["unreadable"]) != `["/app/libprivate.so"]` {
+		t.Fatal(string(fields["unreadable"]))
+	}
+	// The program's name as the kernel gives it once its file was replaced.
+	readAllTheSame(fields, "/app/libprivate.so (deleted)")
+	if _, still := fields["unreadable"]; still {
+		t.Fatal("an empty list is still told")
 	}
 }

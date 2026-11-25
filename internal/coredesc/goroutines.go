@@ -5,7 +5,10 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
+	pathpkg "path"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/go-delve/delve/pkg/goversion"
 	"github.com/go-delve/delve/pkg/proc"
@@ -77,6 +80,7 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 	if exe == "" || root == "" {
 		return report, nil
 	}
+	program := exe
 	if exe, _ = resolve(root, exe); exe == "" {
 		return report, nil
 	}
@@ -103,6 +107,13 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 		// along the frame pointers; its registers and instructions stay
 		// with each thread's innermost frame.
 		add["withoutDebugInfo"] = true
+		// The threads' stacks are then the describer's own as well, read
+		// from the program whoever its container keeps it to: no frame of
+		// it is left that shows an address for want of reading it, and it
+		// is not told as a file that gdb could not read. Where the
+		// program has debug information, gdb's stacks of the threads
+		// stay, and so does the reason for their addresses.
+		readAllTheSame(fields, program)
 		var described []map[string]json.RawMessage
 		if json.Unmarshal(fields["threads"], &described) == nil {
 			for _, thread := range described {
@@ -244,4 +255,22 @@ func goVariables(vars []*proc.Variable) []goVariable {
 		out = append(out, goVariable{Name: converted.Name, Type: converted.Type, Value: string(value)})
 	}
 	return out
+}
+
+// readAllTheSame takes a file from those that the description tells as not
+// readable to gdb, because its stacks were read another way.
+func readAllTheSame(fields map[string]json.RawMessage, name string) {
+	var unreadable []string
+	if json.Unmarshal(fields["unreadable"], &unreadable) != nil || len(unreadable) == 0 {
+		return
+	}
+	// As the files are named there: without the kernel's word for a file
+	// that was replaced, and without detours.
+	name = pathpkg.Clean("/" + strings.TrimSuffix(name, " (deleted)"))
+	left := slices.DeleteFunc(unreadable, func(file string) bool { return file == name })
+	if len(left) == 0 {
+		delete(fields, "unreadable")
+		return
+	}
+	fields["unreadable"], _ = json.Marshal(left)
 }
