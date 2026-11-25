@@ -109,10 +109,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	// gdb reads the program's files through a view of the root.
 	view := ""
 	if root != "" {
-		if view, err = d.view(ctx, core, root); err != nil {
+		var held func()
+		if view, held, err = d.view(ctx, core, root); err != nil {
 			return nil, err
 		}
-		defer os.RemoveAll(view)
+		defer held()
 	}
 	cmd := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-x", script.Name())...)
 	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+out,
@@ -251,14 +252,24 @@ func (d Describer) Complete(ctx context.Context, report []byte, core, root strin
 // libraries, often links to the mapped files, and the directory of debug
 // files. Only gdb knows the names asked by, from the program's memory: it
 // lists them first, with an empty view in which it finds no file.
-func (d Describer) view(ctx context.Context, core, root string) (string, error) {
+func (d Describer) view(ctx context.Context, core, root string) (string, func(), error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	view, err := os.MkdirTemp(d.Scratch, "view-*")
 	if err != nil {
-		return "", err
+		return "", nil, err
+	}
+	// A link of the view leads to the file as this process holds it open,
+	// not to its path: the container can put a link in the path's place
+	// while gdb reads, and gdb would follow that from the node's root.
+	var open []*os.File
+	done := func() {
+		for _, f := range open {
+			f.Close()
+		}
+		os.RemoveAll(view)
 	}
 	names := append(coreFiles(core), "/usr/lib/debug")
 	// Without the libraries gdb still describes, as it does without a
@@ -280,16 +291,20 @@ func (d Describer) view(ctx context.Context, core, root string) (string, error) 
 			continue
 		}
 		at := filepath.Join(view, name)
-		err := os.MkdirAll(filepath.Dir(at), 0o700)
+		f, err := openIn(root, file)
 		if err == nil {
-			err = os.Symlink(filepath.Join(root, file), at)
+			open = append(open, f)
+			err = os.MkdirAll(filepath.Dir(at), 0o700)
+		}
+		if err == nil {
+			err = os.Symlink(fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), f.Fd()), at)
 		}
 		// As a name under one that is a file's: gdb then does not find it.
 		if err != nil && !errors.Is(err, os.ErrExist) {
 			slog.Debug("a file of a core's program is not shown to gdb", "core", core, "file", name, "error", err)
 		}
 	}
-	return view, nil
+	return view, done, nil
 }
 
 // DescribedBy tells which version of the describer made a description; 1

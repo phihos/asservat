@@ -119,7 +119,14 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	if runtimeFile == "" {
 		return report, nil
 	}
-	helper, err := d.dotnetHelper(ctx, filepath.Join(root, runtimeFile))
+	// The runtime as it is held open here (see openIn), which is what its
+	// build ID is read from.
+	held, err := openIn(root, runtimeFile)
+	if err != nil {
+		return report, nil
+	}
+	helper, err := d.dotnetHelper(ctx, fmt.Sprintf("/proc/self/fd/%d", held.Fd()))
+	held.Close()
 	if helper == "" || err != nil {
 		return report, err
 	}
@@ -146,9 +153,16 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	if err := os.Mkdir(pdbs, 0o700); err != nil {
 		return nil, err
 	}
+	// A link leads to the PDB as it is held open here, not to its path,
+	// as for gdb's view of the program's files.
 	for _, name := range dotnetFiles(mapped, root) {
 		if file, _ := resolve(root, name); pathpkg.Ext(name) == ".pdb" && file != "" {
-			os.Symlink(filepath.Join(root, file), filepath.Join(pdbs, pathpkg.Base(name))) // of two with one name, the first
+			pdb, err := openIn(root, file)
+			if err != nil {
+				continue
+			}
+			defer pdb.Close()
+			os.Symlink(fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), pdb.Fd()), filepath.Join(pdbs, pathpkg.Base(name))) // of two with one name, the first
 		}
 	}
 	filled := filepath.Join(work, "core")
@@ -528,8 +542,8 @@ func fillCore(core, root, filled string, ids map[int]int) error {
 	for _, m := range coreMappings(file) {
 		source, seen := sources[m.name]
 		if !seen {
-			if path, _ := resolve(root, strings.TrimSuffix(m.name, " (deleted)")); path != "" && (isPE(filepath.Join(root, path)) || isELF(filepath.Join(root, path))) {
-				source, _ = os.Open(filepath.Join(root, path))
+			if path, _ := resolve(root, strings.TrimSuffix(m.name, " (deleted)")); path != "" && (isPE(root, path) || isELF(root, path)) {
+				source, _ = openIn(root, path)
 			}
 			sources[m.name] = source
 		}
@@ -586,9 +600,9 @@ func fillCore(core, root, filled string, ids map[int]int) error {
 	return out.Close()
 }
 
-// isPE tells whether the path is a regular file that starts as a managed
-// assembly does: as a program of Windows.
-func isPE(path string) bool { return startsWith(path, "MZ") }
+// isPE tells whether the name under root is a regular file that starts as
+// a managed assembly does: as a program of Windows.
+func isPE(root, name string) bool { return startsWith(root, name, "MZ") }
 
 // isCoreCLR tells whether a mapped file is the .NET runtime.
 func isCoreCLR(name string) bool {
@@ -614,7 +628,7 @@ func dotnetFiles(mapped []string, root string) []string {
 			continue
 		}
 		seen[name] = true
-		if file, _ := resolve(root, name); file == "" || !isPE(filepath.Join(root, file)) {
+		if file, _ := resolve(root, name); file == "" || !isPE(root, file) {
 			continue
 		}
 		files = append(files, name)

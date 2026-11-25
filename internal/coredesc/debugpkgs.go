@@ -130,15 +130,20 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 		if path == "" {
 			continue
 		}
-		file, err := elf.Open(filepath.Join(root, path))
+		opened, err := openIn(root, path)
 		if err != nil {
+			continue
+		}
+		file, err := elf.NewFile(opened)
+		if err != nil {
+			opened.Close()
 			continue
 		}
 		if file.Section(".debug_info") == nil {
 			stripped[path], stripped[name] = buildID(file), buildID(file)
 			arch = map[elf.Machine]string{elf.EM_X86_64: "x86_64", elf.EM_AARCH64: "aarch64"}[file.Machine]
 		}
-		file.Close()
+		opened.Close()
 	}
 	if len(stripped) == 0 {
 		return nil
@@ -218,7 +223,7 @@ func (d Describer) debugDirs(ctx context.Context, core, root string) []string {
 func osRelease(root string) map[string]string {
 	fields := map[string]string{}
 	path, _ := resolve(root, "/etc/os-release")
-	content, err := os.ReadFile(filepath.Join(root, path))
+	content, err := readIn(root, path)
 	if path == "" || err != nil {
 		return fields
 	}
@@ -329,7 +334,7 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 	var installed []byte
 	for _, name := range distributionFiles[1:] {
 		if path, _ := resolve(root, name); path != "" && installed == nil {
-			installed, _ = os.ReadFile(filepath.Join(root, path))
+			installed, _ = readIn(root, path)
 		}
 	}
 	// A release 3.22.1 is of the branch v3.22; one of the edge branch is
