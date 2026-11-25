@@ -437,7 +437,7 @@ async function loadCaptures() {
       // A file with a viewer opens in the browser; every file downloads in its own format.
       const address = `/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}`, name = a.name.split('/')[1];
       const open = a.viewer && a.size ? `<a class="open" href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here">Open</a>` : '<span></span>';
-      return `<div class="file${a.size ? '' : ' nothing'}"><span class="name" title="sha256 ${a.sha256}">${esc(name)}</span><span class="is">${esc(a.size ? whatIs(name) : 'empty: nothing was recorded')}</span><span class="size">${fileSize(a.size)}</span>${open}<a href="${address}" title="A copy in the file's own format, for your tools">Download</a></div>`;
+      return `<div class="file${a.size ? '' : ' nothing'}"><span class="name" title="sha256 ${a.sha256}">${esc(name)}</span><span class="is">${esc(a.size ? whatIs(name) : 'empty: nothing was recorded')}</span><span class="size"${a.stored ? ` title="${fileSize(a.size)} to download. The hub stores ${fileSize(a.stored)} of it: a core dump is as large as the memory its process mapped, and what the process never used is not stored."` : ''}>${fileSize(a.size)}</span>${open}<a href="${address}" title="A copy in the file's own format, for your tools">Download</a></div>`;
     };
     const pods = c.tasks.map(t => {
       const mine = c.artifacts.filter(a => a.name.startsWith(t.pod + '/'));

@@ -177,7 +177,9 @@ Plan disk space for three things:
   what you record within the retention. A core dump takes about as much as the
   memory its process used. Its size as shown and as downloaded is that of
   everything the process mapped, which can be far more: what the process
-  never touched is not stored.
+  never touched is not stored. The file's size in the console says on
+  hover what the hub stores of it, and `asservat_evidence_bytes` counts
+  that.
 - **The hub's work directory** (an `emptyDir`): room for the largest core dump
   of a Python or .NET program, because the hub decrypts it there to read its
   stacks, and for a core dump that is described again.

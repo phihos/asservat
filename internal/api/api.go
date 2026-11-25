@@ -319,6 +319,9 @@ type Artifact struct {
 	Name   string `json:"name"` // "<pod>/<file>"
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"`
+	// Stored is what the file takes of the hub's store, where that is
+	// less than its size: a core is stored without its holes.
+	Stored int64 `json:"stored,omitempty"`
 	// Viewer names the viewer that shows the file in the browser; a file
 	// without one only downloads.
 	Viewer string `json:"viewer,omitempty"`
