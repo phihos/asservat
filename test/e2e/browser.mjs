@@ -274,6 +274,9 @@ if (adminToken) {
     await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
     await run(`location.hash = '#audit'`);
     await until('entries of the audit log', `return !document.querySelector('[data-view=audit]').hidden && document.querySelectorAll('#auditRows tr').length > 0`);
+    // An entry says who did what to which capture without scrolling sideways.
+    const cut = await run(`return [...document.querySelectorAll('#auditRows td')].some(cell => cell.textContent.trim() && cell.getBoundingClientRect().right > innerWidth + 1)`);
+    if (cut) throw new Error('an entry of the audit log reaches beyond the screen');
     // A page of a hundred was shown: the next one is asked for.
     await run(`document.getElementById('auditOlder').offsetParent && document.getElementById('auditOlder').click()`); await sleep(500);
   });
