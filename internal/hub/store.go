@@ -119,6 +119,30 @@ func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	return c, nil
 }
 
+// TaskOf returns what an agent's report or upload for a pod of a capture
+// needs of the capture: its request and state, and whether the pod is one
+// of its tasks. It reads no other task and no file's record: a capture has
+// a task and files for every pod, each pod reports several times, and
+// reading all of them for each report took time and memory by the square
+// of the pods (measured with 2,000: 39 seconds of the hub's processor and
+// 2 GiB for one capture).
+func (s *Store) TaskOf(ctx context.Context, id, pod string) (c api.Capture, task bool, err error) {
+	var request []byte
+	err = s.db.QueryRow(ctx, `SELECT c.id::text, c.request, c.state, EXISTS (SELECT 1 FROM tasks WHERE capture_id = c.id AND pod = $2)
+ FROM captures c WHERE c.id = $1::uuid`, id, pod).Scan(&c.ID, &request, &c.State, &task)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c, false, ErrNotFound
+	}
+	if err != nil {
+		return c, false, err
+	}
+	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {
+		return c, false, err
+	}
+	c.Normalize()
+	return c, task, nil
+}
+
 func (s *Store) Capture(ctx context.Context, id string) (api.Capture, error) {
 	rows, err := s.db.Query(ctx, `SELECT `+captureColumns+` FROM captures c WHERE c.id = $1::uuid`, id)
 	if err != nil {

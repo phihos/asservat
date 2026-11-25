@@ -198,15 +198,18 @@ func (h *Hub) agentReply(w http.ResponseWriter, r *http.Request, cluster string)
 }
 
 // agentCapture returns the capture if it belongs to the agent's cluster.
-func (h *Hub) agentCapture(ctx context.Context, cluster, id string) (api.Capture, error) {
+// agentCapture returns the capture that an agent of the cluster reports on
+// for a pod, with its request and its state alone, and whether the pod is
+// one of its tasks (see Store.TaskOf).
+func (h *Hub) agentCapture(ctx context.Context, cluster, id, pod string) (api.Capture, bool, error) {
 	if uuid.Validate(id) != nil {
-		return api.Capture{}, ErrNotFound
+		return api.Capture{}, false, ErrNotFound
 	}
-	c, err := h.Store.Capture(ctx, id)
+	c, task, err := h.Store.TaskOf(ctx, id, pod)
 	if err == nil && c.Cluster != cluster {
 		err = ErrNotFound
 	}
-	return c, err
+	return c, task, err
 }
 
 func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string) error {
@@ -214,7 +217,7 @@ func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !slices.Contains([]string{api.StateRunning, api.StateCompleted, api.StateFailed}, in.State) {
 		return errStatus{http.StatusBadRequest, "invalid status"}
 	}
-	c, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"))
+	c, _, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), in.Pod)
 	if err != nil {
 		return err
 	}
@@ -235,16 +238,16 @@ func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string
 // agentUpload stores one file of a running capture. The body is encrypted
 // while it streams to the blob store.
 func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string) error {
-	c, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"))
+	// A file is "<pod>/<file>" of one of the capture's pods.
+	pod, file, _ := strings.Cut(r.PathValue("name"), "/")
+	c, task, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), pod)
 	if err != nil {
 		return err
 	}
 	if c.State != api.StateQueued && c.State != api.StateRunning {
 		return errStatus{http.StatusConflict, "the capture has ended"}
 	}
-	// A file is "<pod>/<file>" of one of the capture's pods.
-	pod, file, _ := strings.Cut(r.PathValue("name"), "/")
-	if file == "" || strings.Contains(file, "/") || !slices.ContainsFunc(c.Tasks, func(t api.Task) bool { return t.Pod == pod }) {
+	if file == "" || strings.Contains(file, "/") || !task {
 		return errStatus{http.StatusBadRequest, "the file name must be <pod>/<file> of a pod of the capture"}
 	}
 	// A core that is mostly holes comes packed, and is kept so.
