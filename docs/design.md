@@ -710,6 +710,14 @@ display filter as the packets that match. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
 
+What the pages show of a capture comes from workloads and from the
+clusters' agents and is not trusted: every value is written into a page
+as text, numbers and states included, a viewer takes only an ID for the
+capture it is asked for, and the hub takes from an agent only the states
+there are, for the recordings the capture has. The end-to-end run's
+browser check feeds the pages values that carry script and fails when
+any runs.
+
 A viewer's address names the spot it shows (the packet and display filter,
 the log line, the trace entry, the stack, the base of a comparison), so a
 copied link leads there. Logs, packets and system calls of a capture share

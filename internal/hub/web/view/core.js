@@ -74,22 +74,22 @@ export default async function (root) {
   // that the compiler kept in no place at this instruction is "optimised out".
   const value = v => /^<.*>$/.test(v || '') ? `<td class="value dim" title="${esc(v)}">${/loclist|optimized|OP stack/.test(v) ? 'optimised out' : esc(v.slice(1, -1))}</td>` : `<td class="value">${esc(v)}</td>`;
   // A thread of a language runtime: its name or number, what it does, and the machine's thread it is.
-  const runtimeRow = t => `<span>${t.current ? '<b title="The thread that the core selects">●</b> ' : ''}${t.name ? esc(t.name) : 'Thread ' + t.id} <span class="dim">${esc([t.status, t.threadSystemId ? 'LWP ' + t.threadSystemId : ''].filter(Boolean).join(' · '))}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`;
+  const runtimeRow = t => `<span>${t.current ? '<b title="The thread that the core selects">●</b> ' : ''}${t.name ? esc(t.name) : 'Thread ' + esc(t.id)} <span class="dim">${esc([t.status, t.threadSystemId ? 'LWP ' + t.threadSystemId : ''].filter(Boolean).join(' · '))}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`;
   const rows = {
-    threads: t => `<span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${t.id}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${t.systemId}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`,
-    goroutines: g => `<span>${g.current ? '<b title="The goroutine of the thread that the core selects: for a crash, the one that crashed">●</b> ' : ''}Goroutine ${g.id} <span class="dim">${esc(g.status)}${g.threadSystemId ? ` · LWP ${g.threadSystemId}` : ''}</span></span><span class="dim">${esc(g.function || (g.frames[0] ? named(g.frames[0]) : ''))}</span>`,
+    threads: t => `<span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${esc(t.id)}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${esc(t.systemId)}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`,
+    goroutines: g => `<span>${g.current ? '<b title="The goroutine of the thread that the core selects: for a crash, the one that crashed">●</b> ' : ''}Goroutine ${esc(g.id)} <span class="dim">${esc(g.status)}${g.threadSystemId ? ` · LWP ${esc(g.threadSystemId)}` : ''}</span></span><span class="dim">${esc(g.function || (g.frames[0] ? named(g.frames[0]) : ''))}</span>`,
   };
   const draw = () => {
     const words = $('find').value.toLowerCase();
     for (const b of $('kinds').querySelectorAll('button')) b.classList.toggle('on', b.dataset.kind === kind);
     $('threads').innerHTML = (lists[kind].filter(t => !words || `${t.name || ''} ${t.status || ''} ${t.frames.map(named).join(' ')}`.toLowerCase().includes(words)).map(t =>
-      `<div class="row${t === thread ? ' selected' : ''}" data-thread="${t.id}" title="${esc([t.name, t.status, t.function || (t.frames[0] ? named(t.frames[0]) : '')].filter(Boolean).join(' · '))}">${(rows[kind] || runtimeRow)(t)}</div>`).join('') || `<div class="dim pad">No ${kind === 'goroutines' ? 'goroutine' : 'thread'} matches.</div>`)
+      `<div class="row${t === thread ? ' selected' : ''}" data-thread="${esc(t.id)}" title="${esc([t.name, t.status, t.function || (t.frames[0] ? named(t.frames[0]) : '')].filter(Boolean).join(' · '))}">${(rows[kind] || runtimeRow)(t)}</div>`).join('') || `<div class="dim pad">No ${kind === 'goroutines' ? 'goroutine' : 'thread'} matches.</div>`)
       + (kind === 'goroutines' && report.goroutinesCut ? `<div class="dim pad">The program has more goroutines. ${lists.goroutines.length} are shown, including all that were running on a thread.</div>` : '');
-    $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${f.level}" title="${esc(named(f))}"><span>${f.scanned ? '<span class="dim" title="Found by scanning the stack">≈ </span>' : ''}${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
+    $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${esc(f.level)}" title="${esc(named(f))}"><span>${f.scanned ? '<span class="dim" title="Found by scanning the stack">≈ </span>' : ''}${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
       + (thread.frames.some(f => f.scanned) ? '<div class="dim pad">≈ A library on this stack has no unwind tables (musl, the C library of Alpine images, is one example). The frames above it were found from return addresses on the stack. They are very likely correct, but not certain.</div>' : '')
       + (thread.cut ? '<div class="dim pad">The stack is deeper than this. Only the innermost 256 frames are shown.</div>' : '');
     $('frame').innerHTML = !frame ? '<p class="dim pad">No frames.</p>' : `
-      <h3>#${frame.level} ${esc(named(frame))}</h3>
+      <h3>#${esc(frame.level)} ${esc(named(frame))}</h3>
       <div class="dim">${[frame.file && `${frame.file}:${frame.line}`, frame.module, frame.pc].filter(Boolean).map(esc).join(' · ')}</div>
       ${variables('Arguments', frame.arguments)}${variables('Locals', frame.locals)}
       ${frame.arguments?.length || frame.locals?.length ? '' : `<p class="dim">${runtimes[kind] ? 'No variables in this frame.' : 'No variables: the program has no debug information for this frame.'}</p>`}
