@@ -39,6 +39,9 @@
 /* Names, values and types apart, as a debugger's variables pane has them. */
 #root .name { color: var(--custody-ink); }
 #root .value { color: var(--ink); word-break: break-all; } #root .value.dim { color: var(--quiet); }
+/* An address is read whole: the lists of modules and of mappings scroll sideways on a narrow screen instead of breaking it. */
+#modules, #map { overflow-x: auto; }
+#root #modules .value, #root #map .value { word-break: normal; white-space: nowrap; }
 #root .type { color: var(--ok); }
 .code { margin: 0; line-height: 18px; }
 .code .pc { background: var(--marker); color: var(--on-marker); }
