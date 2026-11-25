@@ -10,3 +10,9 @@ agent.token.
 {{- else }}
 The node agents connect to {{ .Values.agent.hubURL }}.
 {{- end }}
+{{- if eq (toString .Values.image.tag) "main" }}
+
+The image tag is "main": every restart pulls whatever was built last, and the
+agents run as root on every node. Set image.tag to a full commit hash to
+decide yourself what runs.
+{{- end }}

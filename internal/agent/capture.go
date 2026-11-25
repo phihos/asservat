@@ -199,7 +199,23 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err != nil {
 			return err
 		}
-		return a.record(ctx, frame, duration, container+".strace", a.aside(up), "strace", straceArgs(rec, pids)...)
+		// The trace is taken aside first and sent when it is complete:
+		// it is sent only if the processes are still those that were
+		// found. strace is set on them by number, so between this look
+		// and its hold another process can come by a number: that one is
+		// then traced, and what was traced of it is deleted here, unsent.
+		theSame := func() error {
+			for _, pid := range pids {
+				if !known.same(a.Proc, pid) {
+					return replaced(pid)
+				}
+			}
+			return nil
+		}
+		if err := theSame(); err != nil {
+			return err
+		}
+		return a.record(ctx, frame, duration, container+".strace", a.aside(sentIf(theSame, up)), "strace", straceArgs(rec, pids)...)
 	case api.KindCPU:
 		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, known, up)
 	case api.KindMemory:
@@ -266,7 +282,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			if rec.Params["process"] != "" {
 				name += "." + strconv.Itoa(pid)
 			}
-			if err := a.gcore(ctx, id+"-"+t.Pod, pid, name, up); err != nil {
+			if err := a.gcore(ctx, id+"-"+t.Pod, pid, name, func() bool { return known.same(a.Proc, pid) }, up); err != nil {
 				return err
 			}
 		}
@@ -311,12 +327,31 @@ func (a *Agent) aside(up func(string, io.Reader) error) func(string, io.Reader) 
 
 // gcore dumps a running process. gcore cannot write to a pipe: the core
 // rests in the scratch directory until it is uploaded.
-func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string, up func(string, io.Reader) error) error {
+func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string, same func() bool, up func(string, io.Reader) error) error {
 	prefix := filepath.Join(a.Scratch, scratch)
 	file := prefix + "." + strconv.Itoa(pid)
 	defer os.Remove(file)
-	if out, err := exec.CommandContext(ctx, "gcore", "-o", prefix, strconv.Itoa(pid)).CombinedOutput(); err != nil {
+	// Whether the process is still the one that was found is asked before
+	// it is dumped and again before the core is sent (see same): a core of
+	// another process that came by the number is deleted here, unsent.
+	if !same() {
+		return replaced(pid)
+	}
+	// What the gcore script of gdb does, with gdb told to run no scripts
+	// of the program's (coredesc.NoScripts), which the script cannot be told.
+	dump := append(slices.Clone(coredesc.NoScripts), "--nx", "--batch", "--readnever", "-iex", "set debuginfod enabled off",
+		"-ex", "set pagination off", "-ex", "set height 0", "-ex", "set width 0",
+		"-ex", "attach "+strconv.Itoa(pid), "-ex", "gcore "+file, "-ex", "detach", "-ex", "quit")
+	cmd := exec.CommandContext(ctx, "gdb", dump...)
+	cmd.Stdin = nil
+	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gcore: %w: %s", err, tail(out))
+	} else if _, missing := os.Stat(file); missing != nil {
+		// gdb ends well also when it could not attach or write.
+		return fmt.Errorf("gcore: %s", tail(out))
+	}
+	if !same() {
+		return replaced(pid)
 	}
 	f, err := os.Open(file)
 	if err != nil {
@@ -518,6 +553,9 @@ type containerProcesses struct {
 	all  []int
 	main int
 	err  error
+	// started is when each process started, by which it is told from
+	// another that has its number later.
+	started map[int]uint64
 }
 
 // of returns the processes of a container of the pod, and its main process.
@@ -530,7 +568,7 @@ func (p *processes) of(a *Agent, pod *corev1.Pod, containerID string) ([]int, in
 	if find == nil {
 		// Who asks meanwhile waits for the one search.
 		find = sync.OnceValue(func() (c containerProcesses) {
-			c.all, c.main, c.err = containerPIDs(a.Proc, containerID, a.own(pod))
+			c.all, c.main, c.started, c.err = containerProcessesOf(a.Proc, containerID, a.own(pod))
 			return c
 		})
 		if p.found == nil {
@@ -541,6 +579,67 @@ func (p *processes) of(a *Agent, pod *corev1.Pod, containerID string) ([]int, in
 	p.mu.Unlock()
 	c := find()
 	return c.all, c.main, c.err
+}
+
+// replaced is said of a process that was found and is no longer the one
+// with its number.
+func replaced(pid int) error {
+	return fmt.Errorf("process %d of the container ended and its number went to another process: nothing of that one is kept", pid)
+}
+
+// sentIf sends what was recorded only if the check still holds when it is
+// complete.
+func sentIf(holds func() error, up func(string, io.Reader) error) func(string, io.Reader) error {
+	return func(name string, body io.Reader) error {
+		if err := holds(); err != nil {
+			return err
+		}
+		return up(name, body)
+	}
+}
+
+// startOf returns when a process started, in the kernel's ticks since the
+// node's start, or 0 for one that is gone.
+func startOf(proc string, pid int) uint64 {
+	stat, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return 0
+	}
+	// After the name, which may hold spaces and parentheses, the 20th field.
+	fields := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
+	if len(fields) < 20 {
+		return 0
+	}
+	started, _ := strconv.ParseUint(fields[19], 10, 64)
+	return started
+}
+
+// same tells whether a process is still the one that was found. The
+// processes are looked for once per capture, and a recording may come to
+// one of them minutes later, after a large core was written: by then the
+// process can have ended and its number been given to another one, of the
+// node or of someone else's pod, which a workload can bring about by
+// starting processes until the numbers come round. A process with the same
+// number and the same start is the same. Asked before a tool is set on a
+// process and again before what it recorded is sent, this keeps what is
+// uploaded to the container's own. A nil receiver looked just now and
+// remembers nothing.
+func (p *processes) same(proc string, pid int) bool {
+	if p == nil {
+		return true
+	}
+	p.mu.Lock()
+	finds := make([]func() containerProcesses, 0, len(p.found))
+	for _, find := range p.found {
+		finds = append(finds, find)
+	}
+	p.mu.Unlock()
+	for _, find := range finds {
+		if started, known := find().started[pid]; known {
+			return started != 0 && started == startOf(proc, pid)
+		}
+	}
+	return false
 }
 
 // runningID returns the ID of a container of the pod that runs. An empty
@@ -611,11 +710,21 @@ func (a *Agent) own(pod *corev1.Pod) bool { return a.Pod != "" && pod.Name == a.
 // cgroup as the root of its cgroup namespace. There the processes are those
 // whose cgroup reads like the agent's own.
 func containerPIDs(proc, containerID string, own bool) (all []int, main int, err error) {
+	all, main, _, err = containerProcessesOf(proc, containerID, own)
+	return all, main, err
+}
+
+// containerProcessesOf is containerPIDs with the time each process
+// started, from the same reading that showed it to be the container's: a
+// number that went to another process a moment later is then not taken
+// for the one that was found.
+func containerProcessesOf(proc, containerID string, own bool) (all []int, main int, begun map[int]uint64, err error) {
+	begun = map[int]uint64{}
 	mine := ownCgroup(proc, own)
 	inside := func(pid int) bool { return inContainer(proc, pid, containerID, mine) }
 	entries, err := os.ReadDir(proc)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	oldest := uint64(0)
 	for _, e := range entries {
@@ -636,14 +745,17 @@ func containerPIDs(proc, containerID string, own bool) (all []int, main int, err
 		}
 		ppid, err1 := strconv.Atoi(fields[1])
 		started, err2 := strconv.ParseUint(fields[19], 10, 64)
+		if err2 == nil {
+			begun[pid] = started
+		}
 		if err1 == nil && err2 == nil && !inside(ppid) && (main == 0 || started < oldest) {
 			main, oldest = pid, started
 		}
 	}
 	if main == 0 {
-		return nil, 0, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
+		return nil, 0, nil, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
 	}
-	return all, main, nil
+	return all, main, begun, nil
 }
 
 // ownCgroup returns how the agent's own cgroup reads, for a container that

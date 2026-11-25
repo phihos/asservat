@@ -2,6 +2,7 @@ package hub
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
@@ -33,9 +34,9 @@ var pprofStart sync.Mutex
 // parsedProfile decrypts a profile into memory and parses it. A .NET trace
 // and a JVM's flight recording become a profile of their samples.
 func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Profile, error) {
-	var plain bytes.Buffer
-	if err := h.plain(ctx, a, &plain); err != nil {
-		return nil, fmt.Errorf("open artifact: %w", err)
+	plain, err := h.inMemory(ctx, a)
+	if err != nil {
+		return nil, err
 	}
 	if strings.HasSuffix(a.Name, ".nettrace") {
 		converted, err := nettraceProfile(plain.Bytes())
@@ -51,11 +52,33 @@ func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Pro
 		}
 		return converted, nil
 	}
-	parsed, err := profile.Parse(&plain)
+	unpacked, err := unpackedProfile(plain.Bytes())
+	if err != nil {
+		return nil, errStatus{http.StatusUnprocessableEntity, "this profile cannot be shown: " + err.Error()}
+	}
+	parsed, err := profile.ParseUncompressed(unpacked)
 	if err != nil {
 		return nil, errStatus{http.StatusUnprocessableEntity, "pprof cannot read this profile: " + err.Error()}
 	}
 	return parsed, nil
+}
+
+// unpackedProfile unpacks a profile that is compressed, as profiles in
+// pprof's format are, up to what the hub holds of a file in memory.
+// pprof's own reader unpacks without end.
+func unpackedProfile(data []byte) ([]byte, error) {
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		return data, nil
+	}
+	z, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	unpacked, err := io.ReadAll(io.LimitReader(z, inMemory+1))
+	if err == nil && len(unpacked) > inMemory {
+		err = fmt.Errorf("it unpacks to more than %d MiB", inMemory>>20)
+	}
+	return unpacked, err
 }
 
 // profilePages returns pprof's pages for a profile; with a base, for the
