@@ -87,7 +87,9 @@ func (d Describer) describePython(ctx context.Context, report []byte, core, root
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, cmp.Or(d.PystackPython, PystackPython), script.Name(), core, filepath.Join(root, executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
+	// -P: Python does not look for modules next to the script, which lies
+	// in a directory that other work of the hub writes into.
+	cmd := exec.CommandContext(ctx, cmp.Or(d.PystackPython, PystackPython), "-P", script.Name(), core, filepath.Join(root, executable), strings.Join(dirs, ":"), strconv.Itoa(maxFrames), strconv.Itoa(maxValue))
 	// Not in a directory of the program's: Python would import from it.
 	cmd.Dir = d.Scratch
 	var stderr bytes.Buffer
