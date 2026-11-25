@@ -793,7 +793,9 @@ files asks first.
   lasts 12 hours, so the groups are at most that old.
 - The console and the MCP tools offer namespaces, workloads and containers
   from the cluster; nothing of that is typed. A user is offered the
-  namespaces in which they may capture.
+  namespaces in which they may capture. Where there is none, the console
+  says so in the first step of a new capture, names the right that is
+  missing (`pods/exec`) and does not go on to the next step.
 - A user may list and capture the workloads of a namespace if a
   `SubjectAccessReview` in that cluster allows them to create `pods/exec` in
   the namespace. Exec already exposes memory, files and traffic of a pod, so
