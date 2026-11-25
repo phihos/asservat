@@ -1,4 +1,8 @@
-FROM docker.io/library/golang:1.27 AS build
+# The base images are named by tag and by digest: the tag says which image
+# is meant, the digest which one it is. An image that is built again under
+# its tag then changes what runs on every node only with a commit here,
+# which Dependabot proposes (.github/dependabot.yml).
+FROM docker.io/library/golang:1.27@sha256:5f1b98fa02fe396ebce2a0227a0e08309e11792915b9dd2e1f71053d7e7e6666 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -15,10 +19,10 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /gotrace cmd/trace
 # to describe a core dump, gdb (with gcore) and bsdtar and bsdcat
 # (libarchive-tools) for the debug packages of distributions. The agent
 # records with tcpdump and strace.
-FROM docker.io/library/debian:stable-slim AS tools
+FROM docker.io/library/debian:stable-slim@sha256:a64d9dbf633e2a2503afac76be521dc25d9b5765150b30d31a3914d4ae969cab AS tools
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools strace tcpdump && rm -rf /var/lib/apt/lists/*
 # The C++ libraries of Alpine, which the .NET runtime for musl asks for.
-FROM docker.io/library/alpine:3.22 AS musl
+FROM docker.io/library/alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS musl
 RUN apk add --no-cache libstdc++ libgcc
 
 # The node agent's image, which every node pulls: without the hub's viewers
