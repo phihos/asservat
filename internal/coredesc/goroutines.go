@@ -5,8 +5,10 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
+	pathpkg "path"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/go-delve/delve/pkg/goversion"
 	"github.com/go-delve/delve/pkg/proc"
@@ -99,16 +101,19 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 		return nil, err
 	}
 	add := map[string]any{"runtime": info.GoVersion, "goroutines": goroutines, "goroutinesCut": cut}
-	// The program was read here, by the describer itself, whoever its
-	// container keeps it to: its frames have their functions, and it is
-	// not told as a file that could not be read.
-	readAllTheSame(fields, program)
 	if threads != nil {
 		// Functions and lines are from the line table; there are no
 		// variables. gdb's stacks of the threads give way to those walked
 		// along the frame pointers; its registers and instructions stay
 		// with each thread's innermost frame.
 		add["withoutDebugInfo"] = true
+		// The threads' stacks are then the describer's own as well, read
+		// from the program whoever its container keeps it to: no frame of
+		// it is left that shows an address for want of reading it, and it
+		// is not told as a file that gdb could not read. Where the
+		// program has debug information, gdb's stacks of the threads
+		// stay, and so does the reason for their addresses.
+		readAllTheSame(fields, program)
 		var described []map[string]json.RawMessage
 		if json.Unmarshal(fields["threads"], &described) == nil {
 			for _, thread := range described {
@@ -259,6 +264,9 @@ func readAllTheSame(fields map[string]json.RawMessage, name string) {
 	if json.Unmarshal(fields["unreadable"], &unreadable) != nil || len(unreadable) == 0 {
 		return
 	}
+	// As the files are named there: without the kernel's word for a file
+	// that was replaced, and without detours.
+	name = pathpkg.Clean("/" + strings.TrimSuffix(name, " (deleted)"))
 	left := slices.DeleteFunc(unreadable, func(file string) bool { return file == name })
 	if len(left) == 0 {
 		delete(fields, "unreadable")

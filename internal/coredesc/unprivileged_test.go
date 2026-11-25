@@ -69,7 +69,8 @@ func TestAGoProgramReadAllTheSameIsNotTold(t *testing.T) {
 	if string(fields["unreadable"]) != `["/app/libprivate.so"]` {
 		t.Fatal(string(fields["unreadable"]))
 	}
-	readAllTheSame(fields, "/app/libprivate.so")
+	// The program's name as the kernel gives it once its file was replaced.
+	readAllTheSame(fields, "/app/libprivate.so (deleted)")
 	if _, still := fields["unreadable"]; still {
 		t.Fatal("an empty list is still told")
 	}
