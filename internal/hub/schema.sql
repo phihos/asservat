@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   PRIMARY KEY (capture_id, pod)
 );
 
+-- Whether a capture still has an open task is asked at every report of a
+-- pod: this finds one without reading the tasks that have ended.
+CREATE INDEX IF NOT EXISTS tasks_open ON tasks (capture_id) WHERE state IN ('Queued','Running');
+
 CREATE TABLE IF NOT EXISTS artifacts (
   capture_id  uuid NOT NULL REFERENCES captures ON DELETE CASCADE,
   name        text NOT NULL,
