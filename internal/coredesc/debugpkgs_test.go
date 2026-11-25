@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -385,5 +387,51 @@ func TestOnlyPlainNamesFromTheContainer(t *testing.T) {
 		if plainName.MatchString(value) != plain {
 			t.Errorf("%q plain: %v", value, !plain)
 		}
+	}
+}
+
+// A server on the internet at times resets a connection or does not answer
+// one: the file is asked for a second time before the download counts as
+// failed, and a server that fails twice is not asked a third time.
+func TestADownloadIsAskedForAgainAfterAFailedConnection(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		fails  int32
+		served bool
+	}{{"once", 1, true}, {"twice", 2, false}} {
+		t.Run(test.name, func(t *testing.T) {
+			var asked atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if asked.Add(1) <= test.fails {
+					connection, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					connection.Close() // no answer at all
+					return
+				}
+				io.WriteString(w, "the file")
+			}))
+			defer server.Close()
+			body, err := Describer{Scratch: t.TempDir()}.fetcher(context.Background(), "test").get(server.URL + "/file")
+			if !test.served {
+				if err == nil {
+					body.Close()
+					t.Fatal("a server that failed twice was asked again")
+				}
+				if asked.Load() != 2 {
+					t.Fatalf("the server was asked %d times, want 2", asked.Load())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("the file was not asked for again: %v", err)
+			}
+			defer body.Close()
+			if got, _ := io.ReadAll(body); string(got) != "the file" {
+				t.Fatalf("got %q", got)
+			}
+		})
 	}
 }
