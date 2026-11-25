@@ -174,6 +174,12 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	var begun []byte
 	if old, err := h.Store.Artifact(ctx, capture, name+coredesc.Suffix); err == nil {
 		report, err := h.inMemory(ctx, old)
+		// A description too large to be read stays as it is, and the
+		// reader is told why it is not made anew.
+		var said errStatus
+		if errors.As(err, &said) {
+			return false, said.msg, nil
+		}
 		if err != nil {
 			return false, "", err
 		}

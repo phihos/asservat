@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
+	"io"
 	"runtime"
 	"testing"
 )
@@ -21,6 +22,18 @@ func TestAHeapDumpsClaimsAreNotAllocated(t *testing.T) {
 		return b.Bytes()
 	}
 	head := append([]byte("JAVA PROFILE 1.0.2\x00"), u(uint32(8), uint64(0))...)
+	// A string that is really there, and long, is not kept whole either:
+	// a dump made of strings would be held in memory at its full size.
+	long := append(u(byte(0x01), uint32(0), uint32(8+32<<20), uint64(1)), bytes.Repeat([]byte("x"), 32<<20)...)
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	if _, err := summarizeHeap(io.MultiReader(bytes.NewReader(head), bytes.NewReader(long), bytes.NewReader(long), bytes.NewReader(long), bytes.NewReader(long))); err != nil {
+		t.Fatal(err)
+	}
+	runtime.ReadMemStats(&after)
+	if grown := after.TotalAlloc - before.TotalAlloc; grown > 16<<20 {
+		t.Errorf("four strings of 32 MiB took %d MiB", grown>>20)
+	}
 	for name, record := range map[string][]byte{
 		"a string of 4 GiB":             append(u(byte(0x01), uint32(0), uint32(0xFFFFFFFF), uint64(1)), "short"...),
 		"a string shorter than its ID":  u(byte(0x01), uint32(0), uint32(3), uint64(1)),

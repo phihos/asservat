@@ -139,6 +139,10 @@ type heapLayout struct {
 	refs, bytes int64
 }
 
+// heapName is how much the hub keeps of a string of a heap dump: 64 KiB,
+// the longest name a class file can give a class, a method or a field.
+const heapName = 64 << 10
+
 // summarizeHeap reads a heap dump and returns its summary.
 //
 // The size of an object is computed as heap analysers do: the header (12
@@ -225,9 +229,18 @@ func summarizeHeap(dump io.Reader) (*heapSummary, error) {
 			if int64(length) < int64(h.idSize) {
 				return nil, errors.New("a string record is shorter than its ID")
 			}
-			text, err := io.ReadAll(io.LimitReader(h.r, int64(length)-int64(h.idSize)))
-			if err == nil && int64(len(text)) != int64(length)-int64(h.idSize) {
+			// Kept is what names a class, a method or a file, which is
+			// short: of a longer string its beginning, so that a dump of
+			// strings is not held in memory whole.
+			size := int64(length) - int64(h.idSize)
+			text, err := io.ReadAll(io.LimitReader(h.r, min(size, heapName)))
+			if err == nil && int64(len(text)) != min(size, heapName) {
 				err = io.ErrUnexpectedEOF
+			}
+			if err == nil && size > heapName {
+				if n, e := io.CopyN(io.Discard, h.r, size-heapName); e != nil || n != size-heapName {
+					err = io.ErrUnexpectedEOF
+				}
 			}
 			if err != nil {
 				return nil, truncated(err)
