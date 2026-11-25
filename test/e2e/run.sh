@@ -545,7 +545,7 @@ found=$(ok "$ALICE" POST '/api/clusters/edge/namespaces/shop/profiles?workload=D
 # Looking for them wrote nothing into the container.
 [ -z "$(edge -n shop exec "$jvm" -- ls -A /tmp | grep -v hsperfdata)" ] || fail "the search left something in the container's /tmp"
 id=$(capture "$ALICE" "$(jvm_target '{"durationSeconds":2,"params":{"endpoints":"app/jvm-threads,app/jvm-histogram,app/jvm-recording"}}')"); completed "$ALICE" "$id"
-[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.sensitive, ([.artifacts[] | [.name, .viewer // ""]] | sort)]')" = "[false,[[\"$jvm/jvm-histogram.txt\",\"log\"],[\"$jvm/jvm-recording.jfr\",\"\"],[\"$jvm/jvm-threaddump.txt\",\"stacks\"]]]" ] \
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.sensitive, ([.artifacts[] | [.name, .viewer // ""]] | sort)]')" = "[false,[[\"$jvm/jvm-histogram.txt\",\"log\"],[\"$jvm/jvm-recording.jfr\",\"pprof\"],[\"$jvm/jvm-threaddump.txt\",\"stacks\"]]]" ] \
   || fail "the files of a JVM's diagnostics: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.sensitive, .message, .artifacts]')"
 fetch "$ALICE" "$id" "$jvm/jvm-threaddump.txt" "$WORK/jvm-threaddump.txt"
 grep -q '"asservat-courier-2"' "$WORK/jvm-threaddump.txt" && grep -q 'Blocked.waitForParcel' "$WORK/jvm-threaddump.txt" || fail "the thread dump does not name the program's threads: $(head -5 "$WORK/jvm-threaddump.txt")"

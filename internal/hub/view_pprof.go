@@ -31,7 +31,7 @@ var pprofPages = []string{"/", "/flamegraph", "/top", "/graph", "/peek", "/downl
 var pprofStart sync.Mutex
 
 // parsedProfile decrypts a profile into memory and parses it. A .NET trace
-// becomes a profile of its stack samples.
+// and a JVM's flight recording become a profile of their samples.
 func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Profile, error) {
 	var plain bytes.Buffer
 	if err := h.plain(ctx, a, &plain); err != nil {
@@ -41,6 +41,13 @@ func (h *Hub) parsedProfile(ctx context.Context, a storedArtifact) (*profile.Pro
 		converted, err := nettraceProfile(plain.Bytes())
 		if err != nil {
 			return nil, errStatus{http.StatusUnprocessableEntity, "this .NET trace cannot be shown: " + err.Error()}
+		}
+		return converted, nil
+	}
+	if strings.HasSuffix(a.Name, ".jfr") {
+		converted, err := flightRecordingProfile(plain.Bytes())
+		if err != nil {
+			return nil, errStatus{http.StatusUnprocessableEntity, "this flight recording cannot be shown: " + err.Error()}
 		}
 		return converted, nil
 	}
@@ -129,9 +136,12 @@ func (h *Hub) profileText(ctx context.Context, a storedArtifact, sampleType stri
 // pprofOptions are the options of every start of pprof. pprof keeps its
 // options for the whole program, so each start names all of those that any
 // start sets; otherwise it would inherit them from the start before. The
-// kind of value is the profile's last one unless one is named, as pprof
-// chooses by itself.
+// kind of value is, unless one is named, the one that the profile names
+// as its default, or else its last, as pprof chooses by itself.
 func pprofOptions(p *profile.Profile, sampleType string, cumulative bool, functions int) []string {
+	if sampleType == "" {
+		sampleType = p.DefaultSampleType
+	}
 	if sampleType == "" && len(p.SampleType) > 0 {
 		sampleType = p.SampleType[len(p.SampleType)-1].Type
 	}

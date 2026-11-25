@@ -339,7 +339,7 @@ container in place of a port (`<container>/<endpoint>`):
 | `jvm-threads` | `Thread.print -l` | `jvm-threaddump.txt` | A stop of milliseconds |
 | `jvm-histogram` | `GC.class_histogram` | `jvm-histogram.txt` | The JVM stops for a full collection and a walk of its heap: seconds for a heap of gigabytes |
 | `jvm-heapdump` (needs approval) | `GC.heap_dump` | `jvm-heapdump.hprof` | The JVM stops as for the histogram and while it writes the dump, which takes about the size of the live heap of the container's ephemeral storage until the agent has read it |
-| `jvm-recording` | `JFR.start`, then `JFR.stop` when the time frame ends or the capture is stopped | `jvm-recording.jfr`, for JDK Mission Control | The flight recorder's own while it runs, which its makers give as about 1 % of CPU time; its file is written at the end |
+| `jvm-recording` | `JFR.start`, then `JFR.stop` when the time frame ends or the capture is stopped | `jvm-recording.jfr`, for JDK Mission Control; its samples open in the console | The flight recorder's own while it runs, which its makers give as about 1 % of CPU time; its file is written at the end |
 
 1. The agent tells a JVM from the node's `/proc`: a process of the
    container, its main process first, that has HotSpot's `libjvm.so`
@@ -478,6 +478,7 @@ shows what the tool would show.
 | System call trace | A table of calls, narrowed by system call, process, failure, duration and text, with interrupted calls joined; and the summary that `strace -c` prints | The browser |
 
 | Profile in pprof's format (`*.pprof`) | pprof's own web interface: flame graph, top, graph, peek; against a base, another profile of the same kind from the user's captures, the difference (pprof's `-diff_base`) | pprof in the hub (`dot` draws the graph) |
+| JVM flight recording (`*.jfr`) | pprof's web interface, as for a profile: the hub turns what the recorder sampled into a profile with two kinds of value, where the threads ran (`samples`, of `jdk.ExecutionSample`) and where they allocated (`allocated`, of `jdk.ObjectAllocationSample` or, before JDK 16, the events about allocation buffers). The recording's other events (locks, garbage collection, I/O) are for JDK Mission Control; a recording without such samples says so instead of opening | The hub, then pprof |
 | .NET trace (`*.nettrace`) | pprof's web interface, as for a profile: the hub turns the runtime's samples of the threads' stacks into a profile, with the methods' names that the trace holds. This is the view of PerfView's thread time stacks and of `dotnet-trace report`; the trace's other events are not shown | The hub, then pprof |
 | Go execution trace (`trace.out`) | Go's own trace tool (`go tool trace`): goroutine analysis, the trace viewer, blocking and scheduler profiles, user tasks and regions | Go's trace tool in the hub |
 | Goroutine dump, thread dump | Like the tools that analyse them (panicparse, the thread dump analysers of Java IDEs): the same stacks together with their number, by state, with search | The browser |
@@ -497,6 +498,11 @@ analyser on the user's machine.
 A .NET heap dump (gcdump) holds the objects' types and sizes without
 their contents; the hub counts them per type, as `dotnet-gcdump report`
 does.
+
+A flight recording is read with Grafana's parser for it
+(`github.com/grafana/jfr-parser`, the one Pyroscope takes recordings in
+with), of which the hub uses the part that reads events, not the one that
+makes profiles for Pyroscope.
 
 A .NET trace is read in the format that .NET 5 to 10 write ("Nettrace"
 version 4). Its samples are taken of every managed thread at an interval,
@@ -692,7 +698,7 @@ viewer shows, as text: a core, by its own name or its description's, as
 why the process stopped, then the stacks of its program as its runtime
 sees them, those with the same state and stack told once with their
 number, then the machine's threads, and not the memory map, which is most
-of a description; a profile and a .NET trace as pprof's list of the
+of a description; a profile, a .NET trace and a flight recording as pprof's list of the
 60 functions with the most weight, a heap dump as its 60 largest classes,
 its biggest objects and its threads' stacks, a packet capture as its
 protocols, conversations and Wireshark's expert information, or with a

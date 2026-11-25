@@ -367,8 +367,8 @@ func ViewerOf(name string) string {
 	// A core and gdb's description of it open in the same viewer.
 	case strings.HasPrefix(file, "core."):
 		return "core"
-	// A profile in pprof's format, and a .NET trace, whose stack samples the hub shows as one.
-	case strings.HasSuffix(file, ".pprof"), strings.HasSuffix(file, ".nettrace"):
+	// A profile in pprof's format; a .NET trace and a JVM's flight recording, whose samples the hub shows as one.
+	case strings.HasSuffix(file, ".pprof"), strings.HasSuffix(file, ".nettrace"), strings.HasSuffix(file, ".jfr"):
 		return "pprof"
 	// Go's execution trace, as the endpoint catalog names it.
 	case strings.HasSuffix(file, "trace.out"):
