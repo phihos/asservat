@@ -533,19 +533,36 @@ func (w waited) Read(b []byte) (int, error) {
 }
 
 // get asks for a file. One that the server does not have is errNotPublished.
+// A server that does not answer is asked a second time: servers on the
+// internet at times reset a connection or leave one unanswered, and a
+// description that fails for that is not made again before the hub starts
+// anew. It is not asked a third time, as a server that is down makes every
+// file of a core wait that long.
 func (f debugFetcher) get(address string) (io.ReadCloser, error) {
-	ctx, cancel := context.WithCancel(f.ctx)
-	wait := time.AfterFunc(f.wait, cancel)
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
+	var (
+		response *http.Response
+		wait     *time.Timer
+		cancel   context.CancelFunc
+	)
+	for attempt := 1; ; attempt++ {
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(f.ctx)
+		wait = time.AfterFunc(f.wait, cancel)
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+		if err != nil {
+			wait.Stop()
+			cancel()
+			return nil, err
+		}
+		response, err = http.DefaultClient.Do(request)
+		wait.Stop()
+		if err == nil {
+			break
+		}
 		cancel()
-		return nil, err
-	}
-	response, err := http.DefaultClient.Do(request)
-	wait.Stop()
-	if err != nil {
-		cancel()
-		return nil, err
+		if attempt == 2 || f.ctx.Err() != nil {
+			return nil, err
+		}
 	}
 	if response.StatusCode != http.StatusOK {
 		response.Body.Close()

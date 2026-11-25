@@ -638,7 +638,9 @@ and keeps the download in its work directory until unused for a week.
 Nothing verifies the download beyond HTTPS: Microsoft publishes no
 checksum or signature for it. It is fetched only where debuginfod servers
 are named, the same switch as for the other downloads, and dotnet-dump's
-own asking of that server is turned off. The assemblies and PDBs of the
+own asking of that server is turned off. A server that does not answer a
+download, this one or one of debug information, is asked a second time
+before the download counts as failed. The assemblies and PDBs of the
 image are data and are read from it. A core from gcore or the kernel does
 not hold the pages of mapped files that the process did not change, which
 dotnet-dump needs of the assemblies and of the runtime's libraries: the

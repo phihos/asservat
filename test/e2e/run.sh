@@ -517,14 +517,8 @@ for libc in glibc musl; do
   ok "$ROOT" POST "/api/captures/$id/approve" >/dev/null
   completed "$ALICE" "$id"
   # The hub adds the stacks when the core has arrived; who opens it meanwhile waits for that.
-  # Microsoft's symbol server is asked over the internet and at times resets a
-  # connection: the description then still awaits the stacks, and opening the
-  # core again asks for them again, as it does for a user.
-  for _ in 1 2 3; do
-    ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.app\"}" >/dev/null
-    fetch "$ALICE" "$id" "$pod/core.app.analysis.json" "$WORK/core.dotnet-$libc.analysis.json"
-    jq -e '.awaits | not' "$WORK/core.dotnet-$libc.analysis.json" >/dev/null && break
-  done
+  ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.app\"}" >/dev/null
+  fetch "$ALICE" "$id" "$pod/core.app.analysis.json" "$WORK/core.dotnet-$libc.analysis.json"
   jq -e '(.awaits | not) and (.runtimeStacks[0] | .runtime == "dotnet" and (.version | startswith("10.")) and ([.threads[].frames[] | select((.function | startswith("Shop.Billing.Charge(")) and (.file | endswith("Program.cs")) and .line > 0)] | length == 1))' "$WORK/core.dotnet-$libc.analysis.json" >/dev/null \
     || fail "the managed stacks of a .NET core on $libc: $(jq -c '[.awaits, .runtimeStacks]' "$WORK/core.dotnet-$libc.analysis.json" | head -c 700); the hub said: $(hub -n asservat logs deploy/asservat-hub --tail=8 2>&1 | tail -c 900)"
   edge -n shop delete deployment dotnet-$libc --wait=false >/dev/null
