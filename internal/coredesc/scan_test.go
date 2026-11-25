@@ -100,9 +100,31 @@ func describeWaiting(t *testing.T, dir, root string) (waitingReport, string) {
 		if out, err := exec.Command("gcore", "-o", filepath.Join(dir, "core"), pid).CombinedOutput(); err != nil {
 			t.Skipf("gcore cannot attach here: %v: %s", err, tail(out))
 		}
-		data, err := Describer{Scratch: t.TempDir()}.Describe(context.Background(), filepath.Join(dir, "core."+pid), root)
+		scratch := t.TempDir()
+		ran := filepath.Join(scratch, "gdb-ran-as")
+		if os.Geteuid() == 0 {
+			// As on a node, where the describer is root: gdb then runs as
+			// nobody, which a stand-in for gdb on the path writes down.
+			// The test's directories lie under one that only root enters.
+			os.Chmod(filepath.Dir(scratch), 0o711)
+			os.Chmod(filepath.Dir(dir), 0o711)
+			real, _ := exec.LookPath("gdb")
+			bin, _ := os.MkdirTemp("", "gdb-*")
+			t.Cleanup(func() { os.RemoveAll(bin) })
+			os.Chmod(bin, 0o755)
+			os.WriteFile(ran, nil, 0o666)
+			os.Chmod(ran, 0o666)
+			os.WriteFile(filepath.Join(bin, "gdb"), []byte("#!/bin/sh\ncase \"$*\" in *attach*) ;; *) id -u >> "+ran+" ;; esac\nexec "+real+" \"$@\"\n"), 0o755)
+			t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+		}
+		data, err := Describer{Scratch: scratch}.Describe(context.Background(), filepath.Join(dir, "core."+pid), root)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if os.Geteuid() == 0 {
+			if as, _ := os.ReadFile(ran); strings.Contains(string(as), "\n0\n") || strings.HasPrefix(string(as), "0\n") || !strings.Contains(string(as), "65534") {
+				t.Fatalf("the describing gdb ran as %q", as)
+			}
 		}
 		var report waitingReport
 		if err := json.Unmarshal(data, &report); err != nil || len(report.Threads) == 0 {
