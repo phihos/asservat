@@ -200,11 +200,14 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 			return err
 		}
 		// The trace is taken aside first and sent when it is complete:
-		// it is sent only if the processes are still those that were found.
+		// it is sent only if the processes are still those that were
+		// found. strace is set on them by number, so between this look
+		// and its hold another process can come by a number: that one is
+		// then traced, and what was traced of it is deleted here, unsent.
 		theSame := func() error {
 			for _, pid := range pids {
 				if !known.same(a.Proc, pid) {
-					return fmt.Errorf("process %d of the container ended and its number went to another process: nothing of that one is kept", pid)
+					return replaced(pid)
 				}
 			}
 			return nil
@@ -212,13 +215,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err := theSame(); err != nil {
 			return err
 		}
-		checked := func(name string, body io.Reader) error {
-			if err := theSame(); err != nil {
-				return err
-			}
-			return up(name, body)
-		}
-		return a.record(ctx, frame, duration, container+".strace", a.aside(checked), "strace", straceArgs(rec, pids)...)
+		return a.record(ctx, frame, duration, container+".strace", a.aside(sentIf(theSame, up)), "strace", straceArgs(rec, pids)...)
 	case api.KindCPU:
 		return a.sampled(ctx, frame, sampledCPU, r, t.Pod, duration, pod, known, up)
 	case api.KindMemory:
@@ -337,15 +334,14 @@ func (a *Agent) gcore(ctx context.Context, scratch string, pid int, name string,
 	// Whether the process is still the one that was found is asked before
 	// it is dumped and again before the core is sent (see same): a core of
 	// another process that came by the number is deleted here, unsent.
-	replaced := fmt.Errorf("process %d of the container ended and its number went to another process: nothing of that one is kept", pid)
 	if !same() {
-		return replaced
+		return replaced(pid)
 	}
 	if out, err := exec.CommandContext(ctx, "gcore", "-o", prefix, strconv.Itoa(pid)).CombinedOutput(); err != nil {
 		return fmt.Errorf("gcore: %w: %s", err, tail(out))
 	}
 	if !same() {
-		return replaced
+		return replaced(pid)
 	}
 	f, err := os.Open(file)
 	if err != nil {
@@ -562,11 +558,7 @@ func (p *processes) of(a *Agent, pod *corev1.Pod, containerID string) ([]int, in
 	if find == nil {
 		// Who asks meanwhile waits for the one search.
 		find = sync.OnceValue(func() (c containerProcesses) {
-			c.all, c.main, c.err = containerPIDs(a.Proc, containerID, a.own(pod))
-			c.started = map[int]uint64{}
-			for _, pid := range c.all {
-				c.started[pid] = startOf(a.Proc, pid)
-			}
+			c.all, c.main, c.started, c.err = containerProcessesOf(a.Proc, containerID, a.own(pod))
 			return c
 		})
 		if p.found == nil {
@@ -577,6 +569,23 @@ func (p *processes) of(a *Agent, pod *corev1.Pod, containerID string) ([]int, in
 	p.mu.Unlock()
 	c := find()
 	return c.all, c.main, c.err
+}
+
+// replaced is said of a process that was found and is no longer the one
+// with its number.
+func replaced(pid int) error {
+	return fmt.Errorf("process %d of the container ended and its number went to another process: nothing of that one is kept", pid)
+}
+
+// sentIf sends what was recorded only if the check still holds when it is
+// complete.
+func sentIf(holds func() error, up func(string, io.Reader) error) func(string, io.Reader) error {
+	return func(name string, body io.Reader) error {
+		if err := holds(); err != nil {
+			return err
+		}
+		return up(name, body)
+	}
 }
 
 // startOf returns when a process started, in the kernel's ticks since the
@@ -691,11 +700,21 @@ func (a *Agent) own(pod *corev1.Pod) bool { return a.Pod != "" && pod.Name == a.
 // cgroup as the root of its cgroup namespace. There the processes are those
 // whose cgroup reads like the agent's own.
 func containerPIDs(proc, containerID string, own bool) (all []int, main int, err error) {
+	all, main, _, err = containerProcessesOf(proc, containerID, own)
+	return all, main, err
+}
+
+// containerProcessesOf is containerPIDs with the time each process
+// started, from the same reading that showed it to be the container's: a
+// number that went to another process a moment later is then not taken
+// for the one that was found.
+func containerProcessesOf(proc, containerID string, own bool) (all []int, main int, begun map[int]uint64, err error) {
+	begun = map[int]uint64{}
 	mine := ownCgroup(proc, own)
 	inside := func(pid int) bool { return inContainer(proc, pid, containerID, mine) }
 	entries, err := os.ReadDir(proc)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	oldest := uint64(0)
 	for _, e := range entries {
@@ -716,14 +735,17 @@ func containerPIDs(proc, containerID string, own bool) (all []int, main int, err
 		}
 		ppid, err1 := strconv.Atoi(fields[1])
 		started, err2 := strconv.ParseUint(fields[19], 10, 64)
+		if err2 == nil {
+			begun[pid] = started
+		}
 		if err1 == nil && err2 == nil && !inside(ppid) && (main == 0 || started < oldest) {
 			main, oldest = pid, started
 		}
 	}
 	if main == 0 {
-		return nil, 0, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
+		return nil, 0, nil, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
 	}
-	return all, main, nil
+	return all, main, begun, nil
 }
 
 // ownCgroup returns how the agent's own cgroup reads, for a container that

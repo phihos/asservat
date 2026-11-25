@@ -34,7 +34,11 @@ come to one of them minutes later, and a process number is given out again
 once its process has ended, which a workload can bring about. So a process
 is known by its number and the time it started: both are compared before
 a tool is set on it and again before what the tool recorded is sent, and
-what is not the container's own is deleted on the node, unsent.
+what is not the container's own is deleted on the node, unsent. For a
+core that prevents it: gdb holds the process from its first look on. For
+a trace it finds it out afterwards: strace takes a process by its number,
+so another one that came by the number in that instant is traced, and its
+trace is deleted instead of sent.
 
 ## Capture lifecycle
 

@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,6 +72,21 @@ func TestMainPID(t *testing.T) {
 	}
 	add(1201, 1200, 110, "worker", scope)
 	add(1500, 900, 300, "sh", scope)
+	// What was recorded of a process that is no longer the one found is
+	// not sent: a core is not taken of it, and a trace that is complete
+	// stays on the node.
+	sent := 0
+	up := func(string, io.Reader) error { sent++; return nil }
+	if err := a.gcore(t.Context(), "scratch", 1201, "core.app", func() bool { return false }, up); err == nil || !strings.Contains(err.Error(), "another process") || sent != 0 {
+		t.Fatal("a core of a process that is not the one found:", err, sent)
+	}
+	gone := errors.New("another process")
+	if err := sentIf(func() error { return gone }, up)("app.strace", strings.NewReader("x")); err != gone || sent != 0 {
+		t.Fatal("a trace of a process that is not the one found:", err, sent)
+	}
+	if err := sentIf(func() error { return nil }, up)("app.strace", strings.NewReader("x")); err != nil || sent != 1 {
+		t.Fatal("a trace of the process that was found:", err, sent)
+	}
 
 	// The agent's own container: the kernel shows the agent the cgroup of
 	// its own processes as the root of its cgroup namespace, without the
