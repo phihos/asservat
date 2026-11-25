@@ -38,7 +38,7 @@ func (h *Hub) Metrics() http.Handler {
 		fmt.Fprintf(&b, "asservat_watches %d\n", counts.Watches)
 		metric("asservat_evidence_files", "Files of evidence that the hub stores.")
 		fmt.Fprintf(&b, "asservat_evidence_files %d\n", counts.Files)
-		metric("asservat_evidence_bytes", "Size of the stored evidence before encryption.")
+		metric("asservat_evidence_bytes", "What the stored evidence takes of the store, before encryption: a core dump without its holes.")
 		fmt.Fprintf(&b, "asservat_evidence_bytes %d\n", counts.Bytes)
 		h.views.mu.Lock()
 		open := len(h.views.open)

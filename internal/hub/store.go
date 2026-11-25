@@ -95,7 +95,7 @@ func (s *Store) CreateCapture(ctx context.Context, c api.Capture) error {
 
 const captureColumns = `c.id::text, c.number, c.requester, c.request, c.sensitive, c.state, c.message, c.approver, c.created_at, c.finished_at, c.expires_at, c.stopped_at, c.shared,
  coalesce((SELECT json_agg(json_build_object('pod', pod, 'node', node, 'state', state, 'message', message, 'recordings', recordings) ORDER BY pod) FROM tasks WHERE capture_id = c.id), '[]'),
- coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
+ coalesce((SELECT json_agg(json_build_object('name', name, 'size', size, 'sha256', sha256, 'stored', CASE WHEN packed THEN stored ELSE 0 END) ORDER BY name) FROM artifacts WHERE capture_id = c.id), '[]')`
 
 func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 	var c api.Capture
@@ -169,7 +169,7 @@ func (s *Store) Counts(ctx context.Context) (Counts, error) {
 	}]); err != nil {
 		return c, err
 	}
-	err = s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM watches), (SELECT count(*) FROM artifacts), (SELECT coalesce(sum(size), 0) FROM artifacts)`).Scan(&c.Watches, &c.Files, &c.Bytes)
+	err = s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM watches), (SELECT count(*) FROM artifacts), (SELECT coalesce(sum(coalesce(stored, size)), 0) FROM artifacts)`).Scan(&c.Watches, &c.Files, &c.Bytes)
 	return c, err
 }
 
@@ -330,11 +330,20 @@ type storedArtifact struct {
 	Packed bool
 }
 
+// stored is what the file takes of the store, before encryption: what a
+// packed file was sent as, and of the others their size.
+func (a storedArtifact) stored() int64 {
+	if a.Packed {
+		return a.Stored
+	}
+	return a.Size
+}
+
 // AddArtifact records a stored file of a capture that is still open. It
 // reports false when the capture has ended or is gone.
 func (s *Store) AddArtifact(ctx context.Context, capture string, a storedArtifact) (bool, error) {
-	tag, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed)
- SELECT id, $2, $3, $4, $5, $6, $7 FROM captures WHERE id = $1::uuid AND state IN ('Queued','Running') FOR SHARE`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed)
+	tag, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed, stored)
+ SELECT id, $2, $3, $4, $5, $6, $7, $8 FROM captures WHERE id = $1::uuid AND state IN ('Queued','Running') FOR SHARE`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed, a.stored())
 	return tag.RowsAffected() == 1, err
 }
 
@@ -354,7 +363,7 @@ func (s *Store) ReplaceArtifact(ctx context.Context, capture string, a storedArt
 	if err := tx.QueryRow(ctx, `DELETE FROM artifacts WHERE capture_id = $1::uuid AND name = $2 RETURNING blob`, capture, a.Name).Scan(&old); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", false, err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed, stored) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed, a.stored()); err != nil {
 		return "", false, err
 	}
 	return old, true, tx.Commit(ctx)

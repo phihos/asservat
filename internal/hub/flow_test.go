@@ -476,6 +476,20 @@ func TestCaptureFlow(t *testing.T) {
 	if stored > 1<<20 {
 		t.Fatalf("the store holds %d bytes after a core of holes", stored)
 	}
+	// What the core takes of the store is told next to its size, and is
+	// what the hub counts as stored.
+	var withCore api.Capture
+	_, coreListed := f.call("alice-token", "GET", "/api/captures/"+held.ID, nil)
+	json.Unmarshal(coreListed, &withCore)
+	for _, a := range withCore.Artifacts {
+		switch {
+		case a.Name == "api-4/core.app" && (a.Size != coreSize || a.Stored == 0 || a.Stored > 1<<10):
+			t.Fatalf("a core of a gigabyte of holes is told as %d bytes, %d stored", a.Size, a.Stored)
+		case a.Name != "api-4/core.app" && a.Stored != 0:
+			t.Fatalf("%s, which is stored as it is, is told as %d bytes and %d stored", a.Name, a.Size, a.Stored)
+		}
+	}
+
 	download, _ := http.NewRequest("GET", server.URL+"/api/captures/"+held.ID+"/artifacts/api-4/core.app", nil)
 	download.Header.Set("Authorization", "Bearer alice-token")
 	got, err := http.DefaultClient.Do(download)

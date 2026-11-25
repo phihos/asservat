@@ -346,7 +346,11 @@ func (h *Hub) kept(ctx context.Context, name string, content io.Reader, packed b
 		h.Blobs.Delete(context.WithoutCancel(ctx), blob)
 		return storedArtifact{}, fmt.Errorf("store artifact: %w", err)
 	}
-	return storedArtifact{Artifact: api.Artifact{Name: name, Size: size, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped, Packed: packed}, nil
+	kept := storedArtifact{Artifact: api.Artifact{Name: name, Size: size, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped, Packed: packed}
+	if packed {
+		kept.Stored = body.n
+	}
+	return kept, nil
 }
 
 // ending closes a pipe when its reader has ended, so that who reads the
