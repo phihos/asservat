@@ -35,8 +35,10 @@ ENTRYPOINT ["/usr/local/bin/asservat"]
 FROM tools
 RUN apt-get update && apt-get install -y --no-install-recommends graphviz musl python3-venv tshark && rm -rf /var/lib/apt/lists/*
 # pystack reads the Python stacks of a core dump for its description.
-# pip is only needed to install it.
-RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir pystack==1.7.2 && /opt/pystack/bin/pip uninstall -y pip
+# pip is only needed to install it. The wheel is checked against its
+# checksum, as the .NET downloads below are: this image holds the master key.
+COPY internal/coredesc/pystack-requirements.txt /tmp/pystack-requirements.txt
+RUN python3 -m venv /opt/pystack && /opt/pystack/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r /tmp/pystack-requirements.txt && /opt/pystack/bin/pip uninstall -y pip && rm /tmp/pystack-requirements.txt
 # dotnet-dump reads the managed stacks of a .NET core dump for its
 # description. It needs a .NET runtime to run; both are in a directory that
 # no image of a .NET program has its runtime in (internal/coredesc/dotnet.go).

@@ -1,0 +1,8 @@
+# pystack, which reads the Python stacks of a core dump, as the hub's image
+# and the test job install it: the release's wheels for amd64 and arm64 by
+# their checksums, as the package index publishes them. It needs no other
+# package. To change the version, take the two wheels' sha256 from
+# https://pypi.org/pypi/pystack/<version>/json.
+pystack==1.7.2 \
+    --hash=sha256:1d9bea3833fe74acece47a904bf1728a01daafae44cb1432e4c94c5312d6869b \
+    --hash=sha256:54048a6380fe7c71fa5935da53779234c1aa69e0172a7c11c6ced51f550eaae8
