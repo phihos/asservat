@@ -119,7 +119,14 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	if runtimeFile == "" {
 		return report, nil
 	}
-	helper, err := d.dotnetHelper(ctx, filepath.Join(root, runtimeFile))
+	// The runtime as it is held open here (see openIn), which is what its
+	// build ID is read from.
+	held, err := openIn(root, runtimeFile)
+	if err != nil {
+		return report, nil
+	}
+	helper, err := d.dotnetHelper(ctx, fmt.Sprintf("/proc/self/fd/%d", held.Fd()))
+	held.Close()
 	if helper == "" || err != nil {
 		return report, err
 	}
@@ -146,9 +153,16 @@ func (d Describer) describeDotnet(ctx context.Context, report []byte, core, root
 	if err := os.Mkdir(pdbs, 0o700); err != nil {
 		return nil, err
 	}
+	// A link leads to the PDB as it is held open here, not to its path,
+	// as for gdb's view of the program's files.
 	for _, name := range dotnetFiles(mapped, root) {
 		if file, _ := resolve(root, name); pathpkg.Ext(name) == ".pdb" && file != "" {
-			os.Symlink(filepath.Join(root, file), filepath.Join(pdbs, pathpkg.Base(name))) // of two with one name, the first
+			pdb, err := openIn(root, file)
+			if err != nil {
+				continue
+			}
+			defer pdb.Close()
+			os.Symlink(fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), pdb.Fd()), filepath.Join(pdbs, pathpkg.Base(name))) // of two with one name, the first
 		}
 	}
 	filled := filepath.Join(work, "core")
