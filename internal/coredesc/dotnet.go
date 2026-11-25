@@ -528,8 +528,8 @@ func fillCore(core, root, filled string, ids map[int]int) error {
 	for _, m := range coreMappings(file) {
 		source, seen := sources[m.name]
 		if !seen {
-			if path, _ := resolve(root, strings.TrimSuffix(m.name, " (deleted)")); path != "" && (isPE(filepath.Join(root, path)) || isELF(filepath.Join(root, path))) {
-				source, _ = os.Open(filepath.Join(root, path))
+			if path, _ := resolve(root, strings.TrimSuffix(m.name, " (deleted)")); path != "" && (isPE(root, path) || isELF(root, path)) {
+				source, _ = openIn(root, path)
 			}
 			sources[m.name] = source
 		}
@@ -586,9 +586,9 @@ func fillCore(core, root, filled string, ids map[int]int) error {
 	return out.Close()
 }
 
-// isPE tells whether the path is a regular file that starts as a managed
-// assembly does: as a program of Windows.
-func isPE(path string) bool { return startsWith(path, "MZ") }
+// isPE tells whether the name under root is a regular file that starts as
+// a managed assembly does: as a program of Windows.
+func isPE(root, name string) bool { return startsWith(root, name, "MZ") }
 
 // isCoreCLR tells whether a mapped file is the .NET runtime.
 func isCoreCLR(name string) bool {
@@ -614,7 +614,7 @@ func dotnetFiles(mapped []string, root string) []string {
 			continue
 		}
 		seen[name] = true
-		if file, _ := resolve(root, name); file == "" || !isPE(filepath.Join(root, file)) {
+		if file, _ := resolve(root, name); file == "" || !isPE(root, file) {
 			continue
 		}
 		files = append(files, name)

@@ -4,12 +4,15 @@ import (
 	"archive/tar"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	pathpkg "path"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 // FilesSuffix is appended to a core's name for the archive of its
@@ -47,7 +50,7 @@ func Files(report []byte, root string) []string {
 			return
 		}
 		seen[name] = true
-		if file, _ := resolve(root, name); file != "" && isELF(filepath.Join(root, file)) {
+		if file, _ := resolve(root, name); file != "" && isELF(root, file) {
 			files = append(files, name)
 		}
 	}
@@ -124,22 +127,61 @@ func Mapped(core string) []byte {
 	return listed
 }
 
-// isELF tells whether the path is a regular file that starts as an
-// executable or library does.
-func isELF(path string) bool { return startsWith(path, "\x7fELF") }
-
-// startsWith tells whether the path is a regular file that starts with the
-// bytes.
-func startsWith(path, start string) bool {
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() {
-		return false
+// openIn opens the file that a name leads to within root, for reading. The
+// kernel follows the name within that root (openat2 with RESOLVE_IN_ROOT,
+// Linux 5.6): what resolve found to be no link can have become one since,
+// as a container can exchange its files at any moment, and a link to an
+// absolute path then still leads to the file of that name under root, not
+// to the one on the node (the race of CVE-2018-15664 in docker cp). A
+// file is opened without waiting for it, so that a pipe put in its place
+// holds nobody up.
+func openIn(root, name string) (*os.File, error) {
+	at, err := unix.Open(root, unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
 	}
-	f, err := os.Open(path)
+	defer unix.Close(at)
+	fd, err := unix.Openat2(at, strings.TrimLeft(name, "/"), &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_NONBLOCK | unix.O_CLOEXEC, Resolve: unix.RESOLVE_IN_ROOT | unix.RESOLVE_NO_MAGICLINKS})
+	if err != nil {
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
+	}
+	return os.NewFile(uintptr(fd), name), nil
+}
+
+// readIn reads a file of the container that names its distribution or
+// lists its packages. It reads at most 64 MiB: the list of a large image
+// is a few, and what a container puts in its place would otherwise be
+// read into the agent's memory whole.
+func readIn(root, name string) ([]byte, error) {
+	if name == "" {
+		return nil, os.ErrNotExist
+	}
+	f, err := openIn(root, name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is no file", name)
+	}
+	return io.ReadAll(io.LimitReader(f, 64<<20))
+}
+
+// isELF tells whether the name under root is a regular file that starts
+// as an executable or library does.
+func isELF(root, name string) bool { return startsWith(root, name, "\x7fELF") }
+
+// startsWith tells whether the name under root is a regular file that
+// starts with the bytes.
+func startsWith(root, name, start string) bool {
+	f, err := openIn(root, name)
 	if err != nil {
 		return false
 	}
 	defer f.Close()
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return false
+	}
 	magic := make([]byte, len(start))
 	_, err = io.ReadFull(f, magic)
 	return err == nil && string(magic) == start
@@ -167,11 +209,14 @@ func WriteFiles(w io.Writer, root string, files []string) error {
 			files = append(files, file)
 			continue
 		}
-		f, err := os.Open(filepath.Join(root, name))
+		f, err := openIn(root, name)
 		if err != nil {
 			return err
 		}
 		info, err := f.Stat()
+		if err == nil && !info.Mode().IsRegular() {
+			err = fmt.Errorf("%s is no file any more", name)
+		}
 		if err == nil {
 			err = archive.WriteHeader(&tar.Header{Name: strings.TrimPrefix(name, "/"), Mode: 0o755, Size: info.Size(), ModTime: info.ModTime(), Typeflag: tar.TypeReg})
 		}

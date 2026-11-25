@@ -5,7 +5,6 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/go-delve/delve/pkg/goversion"
@@ -81,7 +80,14 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 	if exe, _ = resolve(root, exe); exe == "" {
 		return report, nil
 	}
-	exe = filepath.Join(root, exe)
+	// Delve reads the program by a path: the path of the file as it is
+	// held open here, which the container cannot put a link in the place of.
+	held, err := openIn(root, exe)
+	if err != nil {
+		return report, nil
+	}
+	defer held.Close()
+	exe = fmt.Sprintf("/proc/self/fd/%d", held.Fd())
 	info, err := buildinfo.ReadFile(exe)
 	if err != nil {
 		return report, nil // not a Go program
