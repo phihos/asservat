@@ -208,8 +208,8 @@ var mcpTools = []mcpTool{
 				if err := h.Store.Audit(ctx, u.Name, "artifact.read", c.ID, map[string]any{"name": described.Name, "summary": true, "offset": in.Offset}); err != nil {
 					return nil, err
 				}
-				var report bytes.Buffer
-				if err := h.plain(ctx, described, &report); err != nil {
+				report, err := h.inMemory(ctx, described)
+				if err != nil {
 					return nil, err
 				}
 				text := coreText(report.Bytes())

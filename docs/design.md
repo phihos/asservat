@@ -704,6 +704,14 @@ The hub unpacks such an archive, which a cluster's agent sent and is not
 trusted, with every name followed within the directory it unpacks into
 (Go's `os.Root`): links of the archive cannot lead a later entry out of
 it. The tools the hub starts take no code from its work directory.
+
+A file's own word of its sizes is not taken for memory: the hub reads a
+heap dump's records as their bytes arrive, holds at most 256 MiB of a
+profile or a core's description in memory (also of a compressed profile
+as it unpacks) and tells the reader to download what is larger. What it
+had decrypted into its work directory goes when it starts, in case it was
+killed with files open.
+
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core
 whose description is from an older one, the hub describes it anew from the
