@@ -21,16 +21,21 @@ func TestInternalErrorsAreNotTold(t *testing.T) {
 }
 
 // When a capture stops being shared, what colleagues have open of it
-// closes; what its requester has open stays.
+// closes; what its requester and administrators have open stays, since
+// they see it shared or not.
 func TestUnsharingEndsColleaguesViews(t *testing.T) {
 	ended := map[string]bool{}
 	v := views{open: map[string]*view{}}
-	for _, who := range []string{"alice", "bob"} {
-		v.open[who] = &view{user: who, capture: "c", end: func() { ended[who] = true }}
+	for who, shared := range map[string]bool{"alice": false, "root": false, "bob": true} {
+		v.open[who] = &view{user: who, capture: "c", shared: shared, end: func() { ended[who] = true }}
 	}
-	v.open["other"] = &view{user: "bob", capture: "d", end: func() { ended["other"] = true }}
-	v.endOf("c", "alice")
-	if ended["alice"] || !ended["bob"] || ended["other"] {
+	v.open["other"] = &view{user: "bob", capture: "d", shared: true, end: func() { ended["other"] = true }}
+	v.endOf("c", true)
+	if ended["alice"] || ended["root"] || !ended["bob"] || ended["other"] {
 		t.Fatal(ended)
+	}
+	v.endOf("c", false)
+	if !ended["alice"] || !ended["root"] || ended["other"] {
+		t.Fatal("deleting the capture left views of it open", ended)
 	}
 }

@@ -576,7 +576,7 @@ func (h *Hub) shareCapture(w http.ResponseWriter, r *http.Request, u User) error
 	}
 	// What a colleague has open of it closes with the sharing.
 	if !in.Shared {
-		h.views.endOf(c.ID, c.Requester)
+		h.views.endOf(c.ID, true)
 	}
 	action := "capture.share"
 	if !in.Shared {
@@ -809,7 +809,7 @@ func (h *Hub) remove(ctx context.Context, id string) error {
 		return err
 	}
 	// Nobody keeps looking at files that are gone.
-	h.views.endOf(id, "")
+	h.views.endOf(id, false)
 	for _, b := range blobs {
 		if err := h.Blobs.Delete(ctx, b); err != nil {
 			slog.Error("blob not deleted", "blob", b, "error", err)

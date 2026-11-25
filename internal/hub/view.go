@@ -33,6 +33,9 @@ import (
 type view struct {
 	user    string
 	capture string
+	// shared tells that the user sees the capture only because it is
+	// shared: neither its requester nor an administrator.
+	shared bool
 	// end closes the view; its stream ends with it.
 	end context.CancelFunc
 	// ask sends one question to the program that holds the file, for a
@@ -64,13 +67,13 @@ func (v *views) remove(id string) {
 }
 
 // endOf closes the views of a capture's files, when the capture is deleted.
-// endOf ends the views of a capture's files, but for those of one user if
-// one is named.
-func (v *views) endOf(capture, but string) {
+// endOf ends the views of a capture's files: all of them, or only those of
+// users who see the capture because it is shared.
+func (v *views) endOf(capture string, sharedOnly bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	for _, opened := range v.open {
-		if opened.capture == capture && (but == "" || opened.user != but) {
+		if opened.capture == capture && (!sharedOnly || opened.shared) {
 			opened.end()
 		}
 	}
@@ -104,7 +107,7 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 	// The view ends with the stream, whichever way the stream ends.
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	opened := &view{user: u.Name, capture: c.ID, end: cancel}
+	opened := &view{user: u.Name, capture: c.ID, end: cancel, shared: !owns(u, c)}
 	id := uuid.NewString()
 	switch viewer {
 	case "pcap":

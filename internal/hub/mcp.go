@@ -177,7 +177,7 @@ var mcpTools = []mcpTool{
 			}
 			a, err := h.Store.Artifact(ctx, c.ID, in.Name)
 			if err == ErrNotFound {
-				return nil, fmt.Errorf("the capture has no file %q; get_capture lists its files", in.Name)
+				return nil, errStatus{http.StatusNotFound, fmt.Sprintf("the capture has no file %q; get_capture lists its files", in.Name)}
 			}
 			if err != nil {
 				return nil, err
