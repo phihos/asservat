@@ -880,7 +880,7 @@ func (h *Hub) download(w http.ResponseWriter, r *http.Request, u User) error {
 	w.Header().Set("Content-Length", strconv.FormatInt(a.Size, 10))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", path.Base(a.Name)))
 	w.Header().Set("X-Checksum-Sha256", a.SHA256)
-	if err := decrypt(w, blob, key); err != nil {
+	if err := unpacked(w, blob, key, a.Packed); err != nil {
 		// The headers are sent; aborting the response tells the client.
 		panic(http.ErrAbortHandler)
 	}

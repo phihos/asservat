@@ -325,13 +325,16 @@ type storedArtifact struct {
 	api.Artifact
 	Blob string
 	Key  []byte
+	// Packed tells that the blob holds the file without its holes (see
+	// the package holes): it is unpacked for whoever reads it.
+	Packed bool
 }
 
 // AddArtifact records a stored file of a capture that is still open. It
 // reports false when the capture has ended or is gone.
 func (s *Store) AddArtifact(ctx context.Context, capture string, a storedArtifact) (bool, error) {
-	tag, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key)
- SELECT id, $2, $3, $4, $5, $6 FROM captures WHERE id = $1::uuid AND state IN ('Queued','Running') FOR SHARE`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key)
+	tag, err := s.db.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed)
+ SELECT id, $2, $3, $4, $5, $6, $7 FROM captures WHERE id = $1::uuid AND state IN ('Queued','Running') FOR SHARE`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed)
 	return tag.RowsAffected() == 1, err
 }
 
@@ -351,7 +354,7 @@ func (s *Store) ReplaceArtifact(ctx context.Context, capture string, a storedArt
 	if err := tx.QueryRow(ctx, `DELETE FROM artifacts WHERE capture_id = $1::uuid AND name = $2 RETURNING blob`, capture, a.Name).Scan(&old); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", false, err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key) VALUES ($1::uuid, $2, $3, $4, $5, $6)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO artifacts(capture_id, name, size, sha256, blob, wrapped_key, packed) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)`, capture, a.Name, a.Size, a.SHA256, a.Blob, a.Key, a.Packed); err != nil {
 		return "", false, err
 	}
 	return old, true, tx.Commit(ctx)
@@ -359,7 +362,7 @@ func (s *Store) ReplaceArtifact(ctx context.Context, capture string, a storedArt
 
 func (s *Store) Artifact(ctx context.Context, capture, name string) (storedArtifact, error) {
 	a := storedArtifact{}
-	err := s.db.QueryRow(ctx, `SELECT name, size, sha256, blob, wrapped_key FROM artifacts WHERE capture_id = $1::uuid AND name = $2`, capture, name).Scan(&a.Name, &a.Size, &a.SHA256, &a.Blob, &a.Key)
+	err := s.db.QueryRow(ctx, `SELECT name, size, sha256, blob, wrapped_key, packed FROM artifacts WHERE capture_id = $1::uuid AND name = $2`, capture, name).Scan(&a.Name, &a.Size, &a.SHA256, &a.Blob, &a.Key, &a.Packed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, ErrNotFound
 	}

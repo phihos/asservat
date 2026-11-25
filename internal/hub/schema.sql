@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS artifacts (
 );
 
 ALTER TABLE captures ADD COLUMN IF NOT EXISTS stopped_at timestamptz;
+-- Packed: a core that is mostly holes, stored as its data and their places.
+-- Its size and checksum are those of the file as it is downloaded.
+ALTER TABLE artifacts ADD COLUMN IF NOT EXISTS packed boolean NOT NULL DEFAULT false;
 -- Shared: also there for everyone who may capture in its namespace.
 ALTER TABLE captures ADD COLUMN IF NOT EXISTS shared boolean NOT NULL DEFAULT false;
 

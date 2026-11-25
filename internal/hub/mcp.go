@@ -255,7 +255,7 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			var buf bytes.Buffer
-			if err := decrypt(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key); err != nil && !errors.Is(err, errWindowFull) {
+			if err := unpacked(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key, a.Packed); err != nil && !errors.Is(err, errWindowFull) {
 				return nil, fmt.Errorf("read %s: %w", a.Name, err)
 			}
 			if bytes.IndexByte(buf.Bytes(), 0) >= 0 {
@@ -269,6 +269,23 @@ var mcpTools = []mcpTool{
 type window struct {
 	w         io.Writer
 	skip, max int64
+}
+
+// Skip takes zeros of a hole (holes.Skipper): those before the window are
+// passed over at once, however many, and those in it are written.
+func (s *window) Skip(zeros int64) error {
+	if before := min(zeros, s.skip); before > 0 {
+		s.skip -= before
+		zeros -= before
+	}
+	for chunk := make([]byte, 32<<10); zeros > 0; {
+		n, err := s.Write(chunk[:min(zeros, int64(len(chunk)))])
+		zeros -= int64(n)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *window) Write(p []byte) (int, error) {

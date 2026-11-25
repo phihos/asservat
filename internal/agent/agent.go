@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/holes"
 )
 
 type Agent struct {
@@ -111,12 +113,15 @@ func nextDelay(delay time.Duration) time.Duration {
 	return min(2*delay, 5*time.Second)
 }
 
-func (a *Agent) request(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+func (a *Agent) request(ctx context.Context, method, path string, body io.Reader, headers ...string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, a.HubURL+path, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+a.Token)
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
+	}
 	res, err := a.HTTP.Do(req)
 	if err != nil {
 		return nil, err
@@ -378,7 +383,14 @@ func (a *Agent) upload(ctx context.Context, id, pod, name string, r io.Reader) e
 		a.mu.Lock()
 		back := a.connected
 		a.mu.Unlock()
-		res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), &full{r: r})
+		// A core that is mostly holes is sent without them (see the
+		// package holes): read as it is, it would be zeros for all the
+		// memory its process mapped and never touched.
+		body, headers := r, []string(nil)
+		if core, is := r.(*os.File); is && holes.Sparse(core) {
+			body, headers = holes.Pack(core), []string{"Asservat-Holes", "1"}
+		}
+		res, err := a.request(ctx, http.MethodPut, "/agent/captures/"+id+"/artifacts/"+url.PathEscape(pod)+"/"+url.PathEscape(name), &full{r: body}, headers...)
 		if err == nil {
 			return res.Body.Close()
 		}

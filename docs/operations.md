@@ -174,8 +174,10 @@ they did no recording.
 Plan disk space for three things:
 
 - **Evidence storage** (`hub.storage.size`, 20 GiB by default): the sum of
-  what you record within the retention. A core dump is about as large as the
-  process's memory.
+  what you record within the retention. A core dump takes about as much as the
+  memory its process used. Its size as shown and as downloaded is that of
+  everything the process mapped, which can be far more: what the process
+  never touched is not stored.
 - **The hub's work directory** (an `emptyDir`): room for the largest core dump
   of a Python or .NET program, because the hub decrypts it there to read its
   stacks, and for a core dump that is described again.
