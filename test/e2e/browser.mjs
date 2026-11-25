@@ -111,6 +111,9 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       await sleep(300);
       const opened = await run(`return (() => { const b = document.activeElement; return !b.classList.contains('chev') || (b.closest('.capture').classList.contains('open') && b.getAttribute('aria-expanded') === 'true'); })()`);
       if (!opened) throw new Error('Enter on a capture did not open its details');
+      // The list is written anew with every change: the focus stays on the link it was on.
+      const kept = await run(`const link = document.querySelector('.capture.open a.open, .capture.open a[href*="/artifacts/"]'); if (!link) return true; link.focus(); const href = link.getAttribute('href'); await loadCaptures(); return document.activeElement.getAttribute('href') === href`);
+      if (!kept) throw new Error('the focus left a file\'s link when the list was written anew');
     }
   });
   await check(`${size}: a new capture, step by step`, async () => {

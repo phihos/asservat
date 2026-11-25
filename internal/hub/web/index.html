@@ -796,7 +796,10 @@ async function loadCaptures() {
   $('noCaptures').innerHTML = words.length && all.length ? 'No captures match.' : captureFilter === 'active' ? 'No captures in progress.' : captureFilter === 'done' ? 'No finished captures yet.'
     : 'No captures yet. <a href="#new">Start one</a>: pick a workload, choose what to record, and the files show up here.';
   // The list is written anew with every change: who works it with the keyboard stays where they were.
-  const focused = document.activeElement?.closest?.('#captures .capture')?.dataset.capture;
+  // They stay on the same control of the same capture (a button by what it does, a link by where it leads), or,
+  // when that capture has gone, at its place in the list.
+  const controls = 'a[href], button', held = document.activeElement?.closest?.('#captures .capture');
+  const focused = held && {id: held.dataset.capture, control: document.activeElement.dataset.act || document.activeElement.getAttribute('href'), place: [...$('captures').children].indexOf(held)};
   $('captures').innerHTML = list.map(c => {
     const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
     // Each pod's recordings, in the order they were asked for, and under
@@ -855,7 +858,10 @@ async function loadCaptures() {
         ${pods}
       </div></div>`;
   }).join('');
-  if (focused) document.querySelector(`.capture[data-capture="${focused}"] .chev`)?.focus();
+  if (focused) {
+    const card = document.querySelector(`.capture[data-capture="${focused.id}"]`), near = $('captures').children[Math.min(focused.place, $('captures').children.length - 1)];
+    (card ? [...card.querySelectorAll(controls)].find(c => (c.dataset.act || c.getAttribute('href')) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();
+  }
   countdown();
 }
 const list2 = words => words.length > 3 ? `${words.slice(0, 3).join(', ')} +${words.length - 3}` : words.join(', ');
