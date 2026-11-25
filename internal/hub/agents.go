@@ -217,6 +217,13 @@ func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string
 	if err != nil {
 		return err
 	}
+	// A recording's kind and state are shown as they are: they are of the
+	// capture and of the states there are, whoever holds the join token.
+	for _, rec := range in.Recordings {
+		if c.Recording(rec.Kind) == nil || !slices.Contains([]string{api.StateWaiting, api.StateRunning, api.StateCompleted, api.StateFailed}, rec.State) {
+			return errStatus{http.StatusBadRequest, "invalid status of a recording"}
+		}
+	}
 	if err := h.Store.SetTask(r.Context(), c.ID, in); err != nil {
 		return err
 	}

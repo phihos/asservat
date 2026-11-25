@@ -340,8 +340,10 @@ func (h *Hub) dissect(ctx context.Context, a storedArtifact) (func(string, json.
 	}
 
 	cmd := exec.CommandContext(ctx, h.Sharkd, "-")
-	// sharkd reads its settings from the home directory; it has none here.
-	cmd.Env = append(os.Environ(), "HOME="+h.WorkDir)
+	// sharkd reads settings and plugins (Lua, which is code) from its home
+	// directory: it has none, rather than the work directory, into which
+	// the hub unpacks what agents send.
+	cmd.Env = append(os.Environ(), "HOME=/nonexistent", "XDG_CONFIG_HOME=/nonexistent")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
