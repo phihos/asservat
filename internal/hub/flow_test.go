@@ -268,8 +268,24 @@ func TestCaptureFlow(t *testing.T) {
 			t.Fatal("a colleague changed a shared capture:", method, path, code)
 		}
 	}
+	// Everyone who is signed in is told that something changed, and nobody
+	// what: that a capture exists is not for those who may not see it.
+	hints, _ := http.NewRequestWithContext(t.Context(), "GET", f.url+"/api/events", nil)
+	hints.Header.Set("Authorization", "Bearer mallory-token")
+	told, err := http.DefaultClient.Do(hints)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer told.Body.Close()
 	if code, _ := f.call("alice-token", "POST", "/api/captures/"+c.ID+"/share", map[string]bool{"shared": false}); code != 200 || listed("bob-token") {
 		t.Fatal("the capture is still shared", code)
+	}
+	hint := make([]byte, 512)
+	for seen := ""; !strings.Contains(seen, "data:"); {
+		n, err := told.Body.Read(hint)
+		if seen += string(hint[:n]); err != nil || strings.Contains(seen, c.ID) {
+			t.Fatal("the hint to someone who may not see the capture:", seen, err)
+		}
 	}
 
 	// The same file through MCP.

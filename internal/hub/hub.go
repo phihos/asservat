@@ -247,7 +247,13 @@ func (h *Hub) Handler() http.Handler {
 	agent("POST /agent/captures/{id}/status", h.agentStatus)
 	agent("PUT /agent/captures/{id}/artifacts/{name...}", h.agentUpload)
 	agent("POST /agent/watches/{id}/trigger", h.agentTrigger)
-	return mux
+	// What the hub serves is of the type it names and of no other: a
+	// browser that guesses types could take a recorded file for a page
+	// (X-Content-Type-Options, as OWASP's secure headers list it).
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		mux.ServeHTTP(w, r)
+	})
 }
 
 type errStatus struct {
@@ -258,20 +264,32 @@ type errStatus struct {
 func (e errStatus) Error() string { return e.msg }
 
 func fail(w http.ResponseWriter, err error) {
+	s := told(err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(s.code)
+	json.NewEncoder(w).Encode(map[string]string{"error": s.msg})
+}
+
+// told is what a caller is told of an error: what the hub says itself, as
+// it says it, and of everything else (the database, the store, a path of
+// the hub's) only that it failed, with the error in the hub's log.
+func told(err error) errStatus {
 	var s errStatus
+	var syntax *json.SyntaxError
+	var mistyped *json.UnmarshalTypeError
 	switch {
 	case errors.As(err, &s):
 	case errors.Is(err, ErrNotFound):
 		s = errStatus{http.StatusNotFound, "not found"}
 	case errors.Is(err, errNoAgent):
 		s = errStatus{http.StatusServiceUnavailable, err.Error()}
+	case errors.As(err, &syntax), errors.As(err, &mistyped):
+		s = errStatus{http.StatusBadRequest, "invalid arguments: " + err.Error()}
 	default:
 		slog.Error("request failed", "error", err)
 		s = errStatus{http.StatusInternalServerError, "internal error"}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(s.code)
-	json.NewEncoder(w).Encode(map[string]string{"error": s.msg})
+	return s
 }
 
 func reply(w http.ResponseWriter, v any) error {
@@ -562,6 +580,10 @@ func (h *Hub) shareCapture(w http.ResponseWriter, r *http.Request, u User) error
 	if err := h.Store.Share(r.Context(), c.ID, in.Shared); err != nil {
 		return err
 	}
+	// What a colleague has open of it closes with the sharing.
+	if !in.Shared {
+		h.views.endOf(c.ID, true)
+	}
 	action := "capture.share"
 	if !in.Shared {
 		action = "capture.unshare"
@@ -793,7 +815,7 @@ func (h *Hub) remove(ctx context.Context, id string) error {
 		return err
 	}
 	// Nobody keeps looking at files that are gone.
-	h.views.endOf(id)
+	h.views.endOf(id, false)
 	for _, b := range blobs {
 		if err := h.Blobs.Delete(ctx, b); err != nil {
 			slog.Error("blob not deleted", "blob", b, "error", err)
@@ -864,15 +886,17 @@ func (h *Hub) notify(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.watchers {
+		// The hint names nothing: every signed-in user has this stream, and
+		// that a capture exists is its requester's to know.
 		select {
-		case ch <- id:
+		case ch <- "changed":
 		default: // a slow reader misses the hint and reloads on its next event
 		}
 	}
 }
 
-// events streams the IDs of changed captures (Server-Sent Events). A client
-// reloads the capture or its list; the hint itself carries no data.
+// events streams a hint whenever a capture or a watch changes (Server-Sent
+// Events). A client reloads what it shows; the hint itself carries no data.
 func (h *Hub) events(w http.ResponseWriter, r *http.Request, _ User) error {
 	ch := make(chan string, 64)
 	h.mu.Lock()

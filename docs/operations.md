@@ -24,6 +24,14 @@ evidence.
     `helm uninstall` (`helm.sh/resource-policy: keep`), but nothing can
     recreate it. Evidence without its master key cannot be read by anyone.
 
+!!! warning
+    The chart keeps the master key and the database password by looking
+    them up in the cluster when it renders. Tools that render without a
+    cluster (`helm template | kubectl apply`, Argo CD) get new ones at
+    every render: applying that replaces the master key, and the stored
+    evidence can no longer be read. Install and upgrade with `helm`
+    itself, or keep the Secret out of what such a tool applies.
+
 Save the master key:
 
 ```sh
@@ -133,6 +141,17 @@ Descriptions of core dumps improve between versions. When you open a core
 dump that an older version described, the hub describes it again from the
 stored core and program files. This can take a minute, and the viewer waits
 for it.
+
+### Removing Asservat from a node
+
+When the agents stop, they put the node's `kernel.core_pattern` back as it
+was. With the core handler enabled, its directory on the node
+(`agent.coreHandler.hostPath`, `/var/lib/asservat` by default) stays: it
+holds the handler's program and any core that was not uploaded yet,
+readable by root only. Delete it on each node after you uninstall. An agent
+that was killed instead of stopped could not put the pattern back; the next
+agent on that node does, so let the agents start once more before you
+remove the directory, or set the pattern yourself.
 
 ## Sizing
 
