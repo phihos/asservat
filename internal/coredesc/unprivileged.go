@@ -108,3 +108,26 @@ func passable(scratch, dir string) {
 		return nil
 	})
 }
+
+// kept tells of a file of the program whether the tool, as nobody in
+// root's group, may read it. A container may keep a file to its own user;
+// the describer, as root, opens it all the same, and the tool then fails
+// to: its frames show addresses, and the description names the file so
+// that the reader knows why.
+func kept(f *os.File) bool {
+	if !lowered() {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	need := fs.FileMode(0o004)
+	if info.IsDir() {
+		need = 0o005
+	}
+	mode := info.Mode().Perm()
+	stat, _ := info.Sys().(*syscall.Stat_t)
+	readable := mode&need == need || stat != nil && stat.Gid == 0 && mode&(need<<3) == need<<3
+	return !readable
+}
