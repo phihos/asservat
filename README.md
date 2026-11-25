@@ -256,6 +256,7 @@ go test ./...                    # unit tests
 ASSERVAT_TEST_DSN=postgres://... go test ./...   # plus the hub flow with PostgreSQL
 ASSERVAT_TEST_S3=host:port,key,secret go test ./internal/hub   # plus the S3 evidence store
 test/e2e/run.sh                  # two kind clusters, every evidence type
+test/e2e/published.sh            # the published images, installed as above in a fresh kind cluster
 ```
 
 ## History

@@ -118,6 +118,7 @@ jobs:
   # What was published is pulled as a node would pull it, on each
   # architecture, and its programs are started once: the tags lead to an
   # image of the machine's own architecture, and the tools in it run there.
+  # Then the chart installs it in a cluster of that architecture.
   published:
     if: github.event_name == 'push'
     needs: [manifest]
@@ -143,6 +144,13 @@ jobs:
           tool "$image" sharkd -v
           tool "$image" dot -V
           tool "$image" gdb --version
+      # And they are installed as the README says, in a cluster of this
+      # architecture, where a capture is recorded with them.
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+        with:
+          install_only: true
+      - run: test/e2e/published.sh ${{ github.sha }}
   # The branch ruleset requires this one check.
   ci-ok:
     if: always()
