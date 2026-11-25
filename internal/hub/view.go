@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/holes"
 )
 
 // A file is looked at in the browser without leaving the hub: the hub opens
@@ -348,7 +349,21 @@ func (h *Hub) plain(ctx context.Context, a storedArtifact, w io.Writer) error {
 		return err
 	}
 	defer blob.Close()
-	return decrypt(w, blob, key)
+	return unpacked(w, blob, key, a.Packed)
+}
+
+// unpacked writes a stored file, decrypted, to w: as it is stored, or, of
+// a core that is stored without its holes, the file with them. Into a
+// file the holes stay holes; in a stream they are zeros.
+func unpacked(w io.Writer, blob io.Reader, key []byte, packed bool) error {
+	if !packed {
+		return decrypt(w, blob, key)
+	}
+	plain, decrypted := io.Pipe()
+	go func() { decrypted.CloseWithError(decrypt(decrypted, blob, key)) }()
+	_, err := holes.Unpack(w, plain)
+	plain.CloseWithError(err)
+	return err
 }
 
 // dissect loads a packet capture into Wireshark's sharkd, which runs until

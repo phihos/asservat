@@ -255,7 +255,7 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			var buf bytes.Buffer
-			if err := decrypt(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key); err != nil && !errors.Is(err, errWindowFull) {
+			if err := unpacked(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key, a.Packed); err != nil && !errors.Is(err, errWindowFull) {
 				return nil, fmt.Errorf("read %s: %w", a.Name, err)
 			}
 			if bytes.IndexByte(buf.Bytes(), 0) >= 0 {

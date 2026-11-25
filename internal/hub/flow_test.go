@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -432,6 +434,61 @@ func TestCaptureFlow(t *testing.T) {
 		if got := agentCall(joined.Token, "POST", "/agent/captures/"+held.ID+"/status", strings.NewReader(report)); got != 400 {
 			t.Errorf("%s was taken: status %d", name, got)
 		}
+	}
+	// A core that is mostly holes arrives packed and is stored packed: a
+	// gigabyte by its size takes a few bytes of the store, and whoever
+	// downloads it gets the gigabyte, with the checksum of those bytes.
+	const coreSize = 1 << 30
+	record := func(at, length uint64, data string) string {
+		return string(binary.BigEndian.AppendUint64(binary.BigEndian.AppendUint64(nil, at), length)) + data
+	}
+	packed := "ASVHOLE1" + record(0, 4, "\x7fELF") + record(coreSize-3, 3, "end") + record(coreSize, 0, "")
+	sendPacked := func(name, body string) int {
+		req, _ := http.NewRequest("PUT", server.URL+"/agent/captures/"+held.ID+"/artifacts/"+name, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+joined.Token)
+		req.Header.Set("Asservat-Holes", "1")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	for name, sent := range map[string][2]string{
+		"a log sent as a packed file":   {"api-4/other.log", packed},
+		"a core that is not packed":     {"api-4/core.bad", "\x7fELF as it is"},
+		"a packed core without its end": {"api-4/core.cut", packed[:len(packed)-16]},
+	} {
+		if got := sendPacked(sent[0], sent[1]); got != 400 {
+			t.Errorf("%s: status %d", name, got)
+		}
+	}
+	if got := sendPacked("api-4/core.app", packed); got != 200 {
+		t.Fatal("a packed core was not taken:", got)
+	}
+	stored := int64(0)
+	filepath.WalkDir(blobDir, func(_ string, entry fs.DirEntry, _ error) error {
+		if info, err := entry.Info(); err == nil && info.Mode().IsRegular() {
+			stored += info.Size()
+		}
+		return nil
+	})
+	if stored > 1<<20 {
+		t.Fatalf("the store holds %d bytes after a core of holes", stored)
+	}
+	download, _ := http.NewRequest("GET", server.URL+"/api/captures/"+held.ID+"/artifacts/api-4/core.app", nil)
+	download.Header.Set("Authorization", "Bearer alice-token")
+	got, err := http.DefaultClient.Do(download)
+	if err != nil || got.StatusCode != 200 || got.ContentLength != coreSize {
+		t.Fatal("the core's download:", err, got.StatusCode, got.ContentLength)
+	}
+	digest, begins := sha256.New(), make([]byte, 4)
+	io.ReadFull(got.Body, begins)
+	digest.Write(begins)
+	rest, _ := io.Copy(digest, got.Body)
+	got.Body.Close()
+	if string(begins) != "\x7fELF" || rest+4 != coreSize || got.Header.Get("X-Checksum-Sha256") != hex.EncodeToString(digest.Sum(nil)) {
+		t.Fatal("the downloaded core is not the one that was packed:", string(begins), rest+4, got.Header.Get("X-Checksum-Sha256"))
 	}
 	if got := agentCall(foreign.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/api-4/x.log", strings.NewReader("x")); got != 404 {
 		t.Error("another cluster's agent uploaded", got)

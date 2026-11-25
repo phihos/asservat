@@ -20,6 +20,7 @@ import (
 
 	"asservat.local/asservat/internal/api"
 	"asservat.local/asservat/internal/coredesc"
+	"asservat.local/asservat/internal/holes"
 )
 
 var errNoAgent = errors.New("no agent of this cluster is connected")
@@ -246,7 +247,12 @@ func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string
 	if file == "" || strings.Contains(file, "/") || !slices.ContainsFunc(c.Tasks, func(t api.Task) bool { return t.Pod == pod }) {
 		return errStatus{http.StatusBadRequest, "the file name must be <pod>/<file> of a pod of the capture"}
 	}
-	a, err := h.keep(r.Context(), r.PathValue("name"), r.Body)
+	// A core that is mostly holes comes packed, and is kept so.
+	packed := r.Header.Get("Asservat-Holes") != ""
+	if packed && (api.ViewerOf(file) != "core" || strings.HasSuffix(file, coredesc.Suffix)) {
+		return errStatus{http.StatusBadRequest, "only a core dump is sent without its holes"}
+	}
+	a, err := h.kept(r.Context(), r.PathValue("name"), r.Body, packed)
 	if err != nil {
 		return err
 	}
@@ -283,6 +289,14 @@ func (h *Hub) complete(ctx context.Context, capture, core string) {
 // keep stores a file's content encrypted with a key of its own and returns
 // what to record of it.
 func (h *Hub) keep(ctx context.Context, name string, content io.Reader) (storedArtifact, error) {
+	return h.kept(ctx, name, content, false)
+}
+
+// kept is keep for content that may be packed (see the package holes).
+// Packed content is stored as it comes; its size and checksum are those
+// of the file it unpacks to, which the hub reads off it as it passes,
+// and content that does not unpack is not kept.
+func (h *Hub) kept(ctx context.Context, name string, content io.Reader, packed bool) (storedArtifact, error) {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return storedArtifact{}, err
@@ -295,6 +309,23 @@ func (h *Hub) keep(ctx context.Context, name string, content io.Reader) (storedA
 	sum := sha256.New()
 	pr, pw := io.Pipe()
 	body := &countingReader{r: io.TeeReader(content, sum)}
+	// What is stored of packed content is the content; what is counted
+	// and summed is the file, unpacked beside it as it passes.
+	var unpacked chan error
+	size := int64(0)
+	if packed {
+		beside, passing := io.Pipe()
+		body.r = io.TeeReader(content, passing)
+		unpacked = make(chan error, 1)
+		go func() {
+			n, err := holes.Unpack(sum, beside)
+			size = n
+			beside.CloseWithError(err) // content that does not unpack ends the storing
+			unpacked <- err
+		}()
+		defer passing.Close()
+		body.r = &ending{r: body.r, end: passing}
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -303,11 +334,34 @@ func (h *Hub) keep(ctx context.Context, name string, content io.Reader) (storedA
 	err = h.Blobs.Put(ctx, blob, pr)
 	pr.CloseWithError(err)
 	<-done
+	if packed {
+		if e := <-unpacked; e != nil {
+			h.Blobs.Delete(context.WithoutCancel(ctx), blob)
+			return storedArtifact{}, errStatus{http.StatusBadRequest, e.Error()}
+		}
+	} else {
+		size = body.n
+	}
 	if err != nil {
 		h.Blobs.Delete(context.WithoutCancel(ctx), blob)
 		return storedArtifact{}, fmt.Errorf("store artifact: %w", err)
 	}
-	return storedArtifact{Artifact: api.Artifact{Name: name, Size: body.n, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped}, nil
+	return storedArtifact{Artifact: api.Artifact{Name: name, Size: size, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped, Packed: packed}, nil
+}
+
+// ending closes a pipe when its reader has ended, so that who reads the
+// pipe's other end learns of the end too.
+type ending struct {
+	r   io.Reader
+	end *io.PipeWriter
+}
+
+func (e *ending) Read(p []byte) (int, error) {
+	n, err := e.r.Read(p)
+	if err != nil {
+		e.end.CloseWithError(err)
+	}
+	return n, err
 }
 
 type countingReader struct {

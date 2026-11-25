@@ -1,7 +1,10 @@
 package agent
 
 import (
+	"asservat.local/asservat/internal/holes"
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"io"
 	"net"
 	"net/http"
@@ -232,5 +235,73 @@ func TestReconnectDelayStaysShort(t *testing.T) {
 	}
 	if delay < 2*time.Second {
 		t.Fatal("the delay does not grow", delay)
+	}
+}
+
+// A core of a process that mapped much and touched little is mostly
+// holes. It is sent without them, and says so, also on the try after the
+// hub was away; a file without holes is sent as it is.
+func TestACoreIsSentWithoutItsHoles(t *testing.T) {
+	var mu sync.Mutex
+	away, sent, packed := true, map[string][]byte{}, map[string]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if away && strings.HasSuffix(r.URL.Path, "core.app") {
+			io.CopyN(io.Discard, r.Body, 4)
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close()
+			return
+		}
+		sent[r.URL.Path], _ = io.ReadAll(r.Body)
+		packed[r.URL.Path] = r.Header.Get("Asservat-Holes")
+	}))
+	defer server.Close()
+	a := &Agent{HubURL: server.URL, Token: "t", HTTP: server.Client()}
+	a.connected = make(chan struct{})
+	const size = 1 << 30
+	core, err := os.Create(filepath.Join(t.TempDir(), "core"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.Close()
+	core.WriteAt([]byte("\x7fELF"), 0)
+	core.WriteAt([]byte("end"), size-3)
+	if !holes.Sparse(core) {
+		t.Skip("this file system keeps no holes")
+	}
+	done := make(chan error, 1)
+	go func() { done <- a.upload(context.Background(), "capture-1", "api-1", "core.app", core) }()
+	select {
+	case err := <-done:
+		t.Fatal("the upload ended while the hub was away:", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	mu.Lock()
+	away = false
+	mu.Unlock()
+	a.reconnected()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	plain := filepath.Join(t.TempDir(), "web.log")
+	os.WriteFile(plain, []byte("a line\n"), 0o600)
+	lines, _ := os.Open(plain)
+	defer lines.Close()
+	if err := a.upload(context.Background(), "capture-1", "api-1", "web.log", lines); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	body := sent["/agent/captures/capture-1/artifacts/api-1/core.app"]
+	if packed["/agent/captures/capture-1/artifacts/api-1/core.app"] == "" || len(body) > 1<<20 {
+		t.Fatalf("a gigabyte of holes was sent as %d bytes, packed: %q", len(body), packed)
+	}
+	sum := sha256.New()
+	if n, err := holes.Unpack(sum, bytes.NewReader(body)); err != nil || n != size {
+		t.Fatal("what was sent does not unpack to the core:", n, err)
+	}
+	if string(sent["/agent/captures/capture-1/artifacts/api-1/web.log"]) != "a line\n" || packed["/agent/captures/capture-1/artifacts/api-1/web.log"] != "" {
+		t.Fatal("a file without holes was not sent as it is")
 	}
 }

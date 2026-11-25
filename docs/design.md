@@ -28,6 +28,17 @@ architecture and pushed under the tag with `-amd64` or `-arm64` at its
 end, and the tags without it are lists that point to both, so that a node
 pulls its own.
 
+A core is as large as the memory its process has mapped, and where the
+process never touched it gdb writes nothing: the file has holes, which
+take no room on the node. Read as it is it would be zeros for all of
+them, and a process that maps a terabyte it never uses would have the
+hub store a terabyte. So the agent sends a core without its holes, as its
+data with the places they belong at, and the hub stores it so and puts the
+holes back for whoever reads it: the size and the checksum of a core are
+those of the file as it is downloaded, which a debugger opens as before.
+The hub checks what it is sent, an agent's word, as it unpacks it to
+count and sum it, and takes no size beyond a process's address space.
+
 The agent finds a container's processes once per capture, in the node's
 `/proc`, by the container's ID in their cgroup. A core dump or a trace may
 come to one of them minutes later, and a process number is given out again
