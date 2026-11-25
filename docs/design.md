@@ -28,6 +28,14 @@ architecture and pushed under the tag with `-amd64` or `-arm64` at its
 end, and the tags without it are lists that point to both, so that a node
 pulls its own.
 
+The agent finds a container's processes once per capture, in the node's
+`/proc`, by the container's ID in their cgroup. A core dump or a trace may
+come to one of them minutes later, and a process number is given out again
+once its process has ended, which a workload can bring about. So a process
+is known by its number and the time it started: both are compared before
+a tool is set on it and again before what the tool recorded is sent, and
+what is not the container's own is deleted on the node, unsent.
+
 ## Capture lifecycle
 
 1. A user requests a capture: cluster, namespace, workload and one or more

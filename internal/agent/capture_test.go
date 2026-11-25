@@ -45,6 +45,33 @@ func TestMainPID(t *testing.T) {
 	if _, err := mainPID(proc, "absent", false); err == nil {
 		t.Fatal("found a process of an absent container")
 	}
+	// A capture finds a container's processes once and may come to one of
+	// them much later. A process that ended meanwhile, whose number went to
+	// another process, of the node or of someone else's pod, is not the one
+	// that was found: no tool is set on it and nothing of it is sent.
+	a := &Agent{Proc: proc}
+	known := &processes{}
+	pod := &corev1.Pod{}
+	if all, main, err := known.of(a, pod, id); err != nil || main != 1200 || len(all) != 3 {
+		t.Fatal(all, main, err)
+	}
+	if !known.same(proc, 1201) || !known.same(proc, 1200) {
+		t.Fatal("a process that is still there is taken for another")
+	}
+	add(1201, 1, 5000, "kubelet", "/system.slice/kubelet.service") // the number, given to a process of the node
+	if known.same(proc, 1201) {
+		t.Fatal("another process with the same number is taken for the one that was found")
+	}
+	os.RemoveAll(filepath.Join(proc, "1500"))
+	if known.same(proc, 1500) || known.same(proc, 1300) {
+		t.Fatal("a process that is gone, or one that was never found, is taken for one of the container")
+	}
+	if !(*processes)(nil).same(proc, 1300) {
+		t.Fatal("without a memory of the processes there is nothing to compare")
+	}
+	add(1201, 1200, 110, "worker", scope)
+	add(1500, 900, 300, "sh", scope)
+
 	// The agent's own container: the kernel shows the agent the cgroup of
 	// its own processes as the root of its cgroup namespace, without the
 	// container's ID.
