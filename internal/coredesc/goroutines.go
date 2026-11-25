@@ -5,6 +5,7 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/go-delve/delve/pkg/goversion"
@@ -77,6 +78,7 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 	if exe == "" || root == "" {
 		return report, nil
 	}
+	program := exe
 	if exe, _ = resolve(root, exe); exe == "" {
 		return report, nil
 	}
@@ -97,6 +99,10 @@ func describeGo(ctx context.Context, report []byte, corePath, root string) ([]by
 		return nil, err
 	}
 	add := map[string]any{"runtime": info.GoVersion, "goroutines": goroutines, "goroutinesCut": cut}
+	// The program was read here, by the describer itself, whoever its
+	// container keeps it to: its frames have their functions, and it is
+	// not told as a file that could not be read.
+	readAllTheSame(fields, program)
 	if threads != nil {
 		// Functions and lines are from the line table; there are no
 		// variables. gdb's stacks of the threads give way to those walked
@@ -244,4 +250,19 @@ func goVariables(vars []*proc.Variable) []goVariable {
 		out = append(out, goVariable{Name: converted.Name, Type: converted.Type, Value: string(value)})
 	}
 	return out
+}
+
+// readAllTheSame takes a file from those that the description tells as not
+// readable to gdb, because its stacks were read another way.
+func readAllTheSame(fields map[string]json.RawMessage, name string) {
+	var unreadable []string
+	if json.Unmarshal(fields["unreadable"], &unreadable) != nil || len(unreadable) == 0 {
+		return
+	}
+	left := slices.DeleteFunc(unreadable, func(file string) bool { return file == name })
+	if len(left) == 0 {
+		delete(fields, "unreadable")
+		return
+	}
+	fields["unreadable"], _ = json.Marshal(left)
 }
