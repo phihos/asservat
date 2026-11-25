@@ -781,8 +781,14 @@ ok "$ALICE" POST "/api/captures/$id/share" '{"shared":false}' >/dev/null
 # phone's width. Scripts that fail, files that do not open and pages that run
 # out of the screen fail the run. Without a browser on the machine it is left out.
 log "the console and every viewer in a browser, wide and narrow"
+# The page of watches has watches on it: one for a crash and one for a threshold with two recordings.
+seen1=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2,"reason":"for the page of watches"}')" | jq -r .id)
+seen2=$(ok "$ALICE" POST /api/watches "$(target edge "" '{"durationSeconds":20,"recordings":[{"kind":"logs"},{"kind":"pod-state"}],"when":{"kind":"memory","params":{"above":"900Mi"}}}')" | jq -r .id)
+WATCHES=2
+export WATCHES
 # The demo's heap profile is a word, not a profile: the viewer has to say so.
 browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" "$ROOT" || browsed=$?
+for id in "$seen1" "$seen2"; do ok "$ALICE" DELETE "/api/watches/$id" >/dev/null; done
 case $browsed in
   0) ;;
   78) [ -z "${REQUIRE_BROWSER:-}" ] || fail "no Chromium or Chrome is installed, and REQUIRE_BROWSER asks for the pages to be looked at"
