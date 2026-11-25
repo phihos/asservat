@@ -110,7 +110,8 @@
   .file { display: grid; grid-template-columns: minmax(12em, 27em) minmax(0, 1fr) 5.5em 3em 5em; gap: 14px; align-items: baseline; padding: 3px 0 3px 22px; border-top: 1px solid var(--soft); font-size: 12px; }
   .file .name { font: 13px var(--mono); overflow-wrap: anywhere; } .file .is { color: var(--quiet); } .file .size { font-family: var(--mono); color: var(--quiet); text-align: right; }
   .file.nothing .name, .file.nothing .size { color: var(--quiet); } .file a.open { font-weight: 600; }
-  @media (max-width: 760px) { .file { grid-template-columns: minmax(0, 1fr) auto auto auto; } .file .is { display: none; } }
+  /* On a phone the name has a line to itself, so that it is not broken in the middle of a word; size and links follow below. */
+  @media (max-width: 760px) { .file { grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 2px; } .file .name { grid-column: 1 / -1; } .file .size { text-align: left; } .file .is { display: none; } }
   .when { font-family: var(--mono); }
   .rec { margin-top: 8px; } .rec .of { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding-bottom: 2px; font-size: 13px; }
   .rec .mark { width: 12px; } .rec-Completed .mark { color: var(--ok); } .rec-Failed .mark { color: var(--bad); } .rec-Waiting, .rec-Waiting b { color: var(--quiet); }
@@ -749,7 +750,7 @@ const whatIs = name => name === 'capture.pcap' ? 'packet capture, for Wireshark'
   : name.startsWith('core.') ? 'core dump, for gdb or Delve' : name.endsWith('.pprof') ? 'profile, for pprof' : name.endsWith('.hprof') ? 'Java heap dump' : name.endsWith('.jfr') ? 'Java flight recording; all of it opens in JDK Mission Control' : name.endsWith('threaddump.txt') ? 'stacks of all threads' : name.endsWith('histogram.txt') ? 'object counts and sizes by class' : name.endsWith('.nettrace') ? '.NET trace'
   : name.endsWith('.gcdump') ? '.NET heap summary' : name.endsWith('.dmp') ? '.NET memory dump' : name === 'trace.out' ? 'Go execution trace' : name === 'goroutines.txt' ? 'stacks of all goroutines' : name === 'threads.txt' ? 'stacks of all threads' : '';
 // How long a capture took.
-const took = c => { const s = Math.max(0, Math.round((new Date(c.finishedAt) - new Date(c.createdAt)) / 1000)); return s < 90 ? `${s} s` : `${Math.round(s / 60)} min`; };
+const took = c => { const s = Math.round((new Date(c.finishedAt) - new Date(c.createdAt)) / 1000); return s < 1 ? 'under a second' : s < 90 ? `${s} s` : `${Math.round(s / 60)} min`; };
 const marks = {Waiting: ['○', 'waits'], Running: ['●', 'runs'], Completed: ['✓', 'done'], Failed: ['✗', 'failed']};
 function progressOf(c) {
   if (c.state !== 'Running') return '';
