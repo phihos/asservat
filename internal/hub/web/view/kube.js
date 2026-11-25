@@ -24,7 +24,7 @@ function stateOf(state) {
   if (state.running) return ['Running', 'ok', `since ${when(state.running.startedAt)}`];
   if (state.waiting) return [state.waiting.reason || 'Waiting', 'warn', esc(state.waiting.message || '')];
   const t = state.terminated;
-  return [t.reason || 'Terminated', t.exitCode ? 'bad' : 'done', `exit code ${t.exitCode}${t.signal ? `, signal ${t.signal}` : ''} · ${when(t.startedAt)} to ${when(t.finishedAt)}${t.message ? ' · ' + esc(t.message) : ''}`];
+  return [t.reason || 'Terminated', t.exitCode ? 'bad' : 'done', `exit code ${esc(t.exitCode)}${t.signal ? `, signal ${esc(t.signal)}` : ''} · ${when(t.startedAt)} to ${when(t.finishedAt)}${t.message ? ' · ' + esc(t.message) : ''}`];
 }
 // The pod's status as "kubectl get pods" words it: the reason of a container that is not running wins over the phase.
 function podStatus(pod) {
@@ -45,14 +45,14 @@ const volumeKind = v => Object.keys(v).find(k => k !== 'name') || '';
 
 function container(c, status, init) {
   const [state, kind, detail] = stateOf(status?.state), last = status?.lastState && Object.keys(status.lastState).length ? stateOf(status.lastState) : null;
-  return `<div class="container"><h3>${esc(c.name)} ${badge(state, kind)}${init ? ' <span class="muted">init container</span>' : ''}${status && !init ? ` <span class="muted">${status.ready ? 'ready' : 'not ready'} · ${status.restartCount} restart${status.restartCount === 1 ? '' : 's'}</span>` : ''}</h3>` + rows([
+  return `<div class="container"><h3>${esc(c.name)} ${badge(state, kind)}${init ? ' <span class="muted">init container</span>' : ''}${status && !init ? ` <span class="muted">${status.ready ? 'ready' : 'not ready'} · ${esc(status.restartCount)} restart${status.restartCount === 1 ? '' : 's'}</span>` : ''}</h3>` + rows([
     ['State', detail],
     ['Last state', last ? `${badge(last[0], last[1])} ${last[2]}` : ''],
     ['Image', esc(c.image)],
     ['Image ID', status?.imageID ? esc(status.imageID) : ''],
     ['Command', c.command ? `<code>${esc(c.command.join(' '))}</code>` : ''],
     ['Arguments', c.args ? `<code>${esc(c.args.join(' '))}</code>` : ''],
-    ['Ports', (c.ports || []).map(p => `${p.name ? esc(p.name) + ': ' : ''}${p.containerPort}/${esc(p.protocol || 'TCP')}`).join(', ')],
+    ['Ports', (c.ports || []).map(p => `${p.name ? esc(p.name) + ': ' : ''}${esc(p.containerPort)}/${esc(p.protocol || 'TCP')}`).join(', ')],
     ['Requests', quantity(c.resources?.requests)],
     ['Limits', quantity(c.resources?.limits)],
     ['Environment', (c.env || []).map(e => `<div><code>${esc(e.name)}</code> ${source(e)}</div>`).join('')],
@@ -90,7 +90,7 @@ function eventsOverview(events) {
   if (!events.length) return '<p class="muted">The pod had no events at the time of recording. Kubernetes keeps events for about an hour.</p>';
   const last = e => e.lastTimestamp || e.eventTime || e.firstTimestamp || '';
   return `<table class="grid events"><thead><tr><th>Type</th><th>Reason</th><th>Message</th><th>From</th><th>Count</th><th>First seen</th><th>Last seen</th></tr></thead><tbody>${
-    [...events].sort((a, b) => last(b).localeCompare(last(a))).map(e => `<tr class="${e.type === 'Warning' ? 'warning' : ''}" data-at="${esc(last(e))}" title="Select the event to open the logs, packets or calls of its moment"><td>${badge(e.type || 'Normal', e.type === 'Warning' ? 'warn' : 'done')}</td><td>${esc(e.reason || '')}</td><td>${esc(e.message || '')}</td><td>${esc(e.source?.component || e.reportingComponent || '')}</td><td>${e.count || 1}</td><td>${when(e.firstTimestamp || e.eventTime)}</td><td>${when(last(e))}</td></tr>`).join('')}</tbody></table>`;
+    [...events].sort((a, b) => last(b).localeCompare(last(a))).map(e => `<tr class="${e.type === 'Warning' ? 'warning' : ''}" data-at="${esc(last(e))}" title="Select the event to open the logs, packets or calls of its moment"><td>${badge(e.type || 'Normal', e.type === 'Warning' ? 'warn' : 'done')}</td><td>${esc(e.reason || '')}</td><td>${esc(e.message || '')}</td><td>${esc(e.source?.component || e.reportingComponent || '')}</td><td>${esc(e.count || 1)}</td><td>${when(e.firstTimestamp || e.eventTime)}</td><td>${when(last(e))}</td></tr>`).join('')}</tbody></table>`;
 }
 
 // The JSON tree. With a filter, only the values whose key or text matches

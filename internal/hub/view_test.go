@@ -37,6 +37,7 @@ while read -r line; do
 	summary/*'"method":"check"'*) result='{"status":"OK"}' ;;
 	summary/*'"method":"status"'*) result='{"frames":3,"duration":1.5}' ;;
 	summary/*'"method":"tap"'*) result='{"taps":[{"tap":"expert","type":"expert","details":[{"f":2,"s":"Warn","g":"Sequence","m":"Previous segment not captured","p":"TCP"},{"f":3,"s":"Warn","g":"Sequence","m":"Previous segment not captured","p":"TCP"}]},{"tap":"conv:TCP","type":"conv","convs":[{"saddr":"10.0.0.1","sport":"40000","daddr":"10.0.0.2","dport":"8080","txf":2,"txb":300,"rxf":1,"rxb":900,"start":0,"stop":1.5}]},{"tap":"phs","type":"phs","protos":[{"proto":"eth","frames":3,"bytes":1200,"protos":[{"proto":"tcp","frames":3,"bytes":1200,"protos":[{"proto":"http","frames":2,"bytes":1000}]}]}]},{"tap":"conv:UDP","type":"conv","convs":[]}]}' ;;
+	summary/*'"method":"frames"'*'dns'*) result='[]' ;;
 	summary/*'"method":"frames"'*) result='[{"c":["2","0.500000","10.0.0.2","10.0.0.1","HTTP","900","HTTP/1.1 500 Internal Server Error"],"num":2}]' ;;
 	*'"method":"check"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-5001,\"message\":\"Filter invalid\"}}"; continue ;;
 	esac
@@ -606,6 +607,16 @@ func TestBinaryEvidenceReadsAsTextOverMCP(t *testing.T) {
 	// With a display filter, as in Wireshark, it reads as the packets that match.
 	if text := read(map[string]any{"name": "api-1/capture.pcap", "filter": "http.response.code >= 500"}); !strings.Contains(text, "500 Internal Server Error") || !strings.Contains(text, "10.0.0.2") {
 		t.Fatal("packets by a display filter", text)
+	}
+	// A filter that matches nothing says so, and why that is likely: the
+	// capture was recorded without payload, so nothing of what the packets
+	// carry is there to match.
+	if text := read(map[string]any{"name": "api-1/capture.pcap", "filter": "dns"}); !strings.Contains(text, "No packet matches") || !strings.Contains(text, "without payload") || strings.Contains(text, "first 0") {
+		t.Fatal("a display filter that matches nothing", text)
+	}
+	// A file that the capture does not have is named, with the way to those it has.
+	if text := read(map[string]any{"name": "api-1/nope.pcap"}); !strings.Contains(text, "nope.pcap") || !strings.Contains(text, "get_capture") {
+		t.Fatal("a file that is not there", text)
 	}
 	if left, _ := os.ReadDir(workDir); len(left) != 0 {
 		t.Fatal("the decrypted capture is still in the work directory", left)

@@ -688,6 +688,10 @@ the agent makes for each core: one by each name of a mapped file or a
 library asked for, to the file that the name leads to in the container.
 Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
+The hub unpacks such an archive, which a cluster's agent sent and is not
+trusted, with every name followed within the directory it unpacks into
+(Go's `os.Root`): links of the archive cannot lead a later entry out of
+it. The tools the hub starts take no code from its work directory.
 They also let the hub describe a core again: a description names the
 version of the describer that made it, and when the viewer opens a core
 whose description is from an older one, the hub describes it anew from the
@@ -706,9 +710,19 @@ of a description; a profile, a .NET trace and a flight recording as pprof's list
 60 functions with the most weight, a heap dump as its 60 largest classes,
 its biggest objects and its threads' stacks, a packet capture as its
 protocols, conversations and Wireshark's expert information, or with a
-display filter as the packets that match. The viewers that read in
+display filter as the packets that match; where none does and the capture
+was recorded without payload, the answer says that a filter on what
+packets carry finds nothing in headers alone. The viewers that read in
 the browser fetch the file like a download and read at most 64 MiB of it,
 because the text and an index of its lines stay in the browser's memory.
+
+What the pages show of a capture comes from workloads and from the
+clusters' agents and is not trusted: every value is written into a page
+as text, numbers and states included, a viewer takes only an ID for the
+capture it is asked for, and the hub takes from an agent only the states
+there are, for the recordings the capture has. The end-to-end run's
+browser check feeds the pages values that carry script and fails when
+any runs.
 
 A viewer's address names the spot it shows (the packet and display filter,
 the log line, the trace entry, the stack, the base of a comparison), so a

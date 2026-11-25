@@ -423,6 +423,16 @@ func TestCaptureFlow(t *testing.T) {
 			t.Errorf("upload %s: status %d, want %d", name, got, want)
 		}
 	}
+	// What an agent reports of a recording is shown in the console: a state
+	// or a kind that the hub does not know is none, whatever it holds.
+	for name, report := range map[string]string{
+		"a made-up state": `{"pod":"api-4","state":"Running","recordings":[{"kind":"logs","state":"x\"><img src=x onerror=alert(1)>"}]}`,
+		"a made-up kind":  `{"pod":"api-4","state":"Running","recordings":[{"kind":"<img src=x>","state":"Running"}]}`,
+	} {
+		if got := agentCall(joined.Token, "POST", "/agent/captures/"+held.ID+"/status", strings.NewReader(report)); got != 400 {
+			t.Errorf("%s was taken: status %d", name, got)
+		}
+	}
 	if got := agentCall(foreign.Token, "PUT", "/agent/captures/"+held.ID+"/artifacts/api-4/x.log", strings.NewReader("x")); got != 404 {
 		t.Error("another cluster's agent uploaded", got)
 	}

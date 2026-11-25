@@ -827,7 +827,7 @@ async function loadCaptures() {
       const groups = asked.map(kind => {
         const r = states.get(kind) || {state: t.recordings?.length ? 'Waiting' : t.state === 'Failed' ? 'Failed' : 'Waiting'};
         const given = Object.entries(c.recordings.find(q => q.kind === kind)?.params || {}).filter(([k]) => k !== 'before').map(([k, v]) => v === 'true' ? k : `${k} ${v}`).join(' · ');
-        return `<div class="rec rec-${r.state}"><div class="of"><span class="mark" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''}</span><b>${esc(kindNames[kind] || kind)}</b>${given ? `<span class="given">${esc(given)}</span>` : ''}${r.message ? `<span class="said">${esc(r.message)}</span>` : ''}</div>${of(kind).map(fileLine).join('')}</div>`;
+        return `<div class="rec rec-${esc(r.state)}"><div class="of"><span class="mark" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''}</span><b>${esc(kindNames[kind] || kind)}</b>${given ? `<span class="given">${esc(given)}</span>` : ''}${r.message ? `<span class="said">${esc(r.message)}</span>` : ''}</div>${of(kind).map(fileLine).join('')}</div>`;
       }).join('');
       const others = of('').map(fileLine).join('');
       return `<div class="pod"><span>${esc(t.pod)}</span><span class="muted">on ${esc(t.node || 'no node')}${t.recordings?.length ? '' : ' · ' + esc(t.state)}</span></div>${groups}${others ? `<div class="rec"><div class="of"><b>Other files</b></div>${others}</div>` : ''}`
