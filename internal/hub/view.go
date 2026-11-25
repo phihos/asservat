@@ -387,8 +387,10 @@ var errViewEnded = errStatus{http.StatusGone, "this view has ended; open the fil
 // the protocols, the conversations and the expert information. With a
 // display filter, as Wireshark takes them, it is the packets that match, as
 // the rows of the packet list. Both list 60 entries: a page for a reader,
-// of whom most are language models with a limited context.
-func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (string, error) {
+// of whom most are language models with a limited context. headersOnly
+// says that the capture was recorded without payload, which is what a
+// filter that matches nothing most often comes from.
+func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string, headersOnly bool) (string, error) {
 	const entries = 60
 	ctx, done := context.WithCancel(ctx)
 	defer done() // ends sharkd
@@ -425,6 +427,13 @@ func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (
 		}
 		if err := asked("frames", map[string]any{"filter": filter, "limit": entries}, &frames); err != nil {
 			return "", err
+		}
+		if len(frames) == 0 {
+			fmt.Fprintf(&text, "\nNo packet matches %q.", filter)
+			if headersOnly {
+				text.WriteString(" The capture was recorded without payload: it holds the packets' headers only, so a filter on what packets carry (http, dns, tls fields) matches none. Filter on addresses, ports and TCP fields, or record again with payload, which needs approval.")
+			}
+			return text.String() + "\n", nil
 		}
 		fmt.Fprintf(&text, "\nThe first %d packets that match %q (number, seconds, source, destination, protocol, length, info):\n", len(frames), filter)
 		for _, f := range frames {
