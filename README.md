@@ -57,6 +57,12 @@ flowchart LR
   the workloads of a namespace if you may exec into its pods (`pods/exec`).
   That right already exposes a pod's memory, files and traffic. Administrators
   may capture everywhere.
+  To let a group capture in a namespace, bind it to a role with that right:
+
+  ```sh
+  kubectl -n payments create role capture --verb=create --resource=pods/exec
+  kubectl -n payments create rolebinding capture --role=capture --group=payments-devs
+  ```
 - **Workloads keep Pod Security `restricted`.** The agent works from the node:
   it enters the pod's network namespace or attaches to its process. Nothing is
   added to your pods, with one exception: to ask a JVM for its own

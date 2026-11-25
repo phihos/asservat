@@ -174,6 +174,7 @@
         <label>Namespace<select id="namespace" required></select></label>
         <label>Workload<select id="workload" required></select></label>
       </div>
+      <p class="muted" id="nowhere" hidden>You have no access to a namespace of this cluster. You can capture the workloads of a namespace when its RBAC lets you exec into its pods (<code>pods/exec</code>); ask whoever manages the cluster's permissions.</p>
       <p class="problem" id="whereProblem"></p>
     </fieldset>
 
@@ -454,6 +455,8 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 async function loadNamespaces() {
   $('namespace').innerHTML = $('workload').innerHTML = '';
   if ($('cluster').value) $('namespace').innerHTML = options(await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`));
+  // An empty list says nothing by itself: who may capture nowhere is told why.
+  $('nowhere').hidden = !$('cluster').value || !!$('namespace').value;
   await loadWorkloads();
 }
 
@@ -962,6 +965,7 @@ function showStep(n) {
 }
 // What the step needs before the next one; the message appears at the step.
 function stepProblem(n) {
+  if (n === 1 && !$('nowhere').hidden) return ['whereProblem', 'There is no namespace here that you may capture in.'];
   if (n === 1 && !$('workload').value) return ['whereProblem', 'Choose a cluster, a namespace and a workload.'];
   if (n === 2 && !kinds().length) return ['kindProblem', 'Choose at least one recording.'];
   if (n === 3 && kinds().includes('pprof')) try { profileParams(); } catch (err) { return ['profileProblem', err.message]; }
