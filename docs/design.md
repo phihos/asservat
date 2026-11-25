@@ -689,7 +689,10 @@ root (`openat2` with `RESOLVE_IN_ROOT`, Linux 5.6) and read from what was
 opened. gdb follows links as the kernel does, so it reads the program's
 files through a directory of links that the agent makes for each core: one
 by each name of a mapped file or a library asked for, to the file as the
-agent holds it open, not to its path.
+agent holds it open, not to its path. The tools that read Python and
+.NET stacks take paths and follow them as the kernel does: they are not in
+the agent's image and run at the hub only, on the files as they were
+unpacked there, which no container can exchange.
 Unpacked, they are what a debugger needs to open the core where
 it is downloaded to (`gdb -ex 'set sysroot <dir>' <dir>/<program> <core>`).
 They also let the hub describe a core again: a description names the
