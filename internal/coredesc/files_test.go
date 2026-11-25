@@ -3,6 +3,7 @@ package coredesc
 import (
 	"archive/tar"
 	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -225,5 +226,32 @@ func TestArchiveWithANameThroughAnotherDirectoryUnpacks(t *testing.T) {
 	w.Close()
 	if err := ExtractFiles(bytes.NewReader(out.Bytes()), t.TempDir(), int64(out.Len())); err == nil {
 		t.Fatal("a name that leads out of the directory was unpacked")
+	}
+}
+
+// An archive from a cluster's agent is not trusted: one that climbs out of
+// the directory through links that it made before, each of which stays
+// inside when looked at by itself, writes nothing outside.
+func TestAnArchiveCannotClimbThroughItsOwnLinks(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "work", "describe", "root")
+	var archive bytes.Buffer
+	w := tar.NewWriter(&archive)
+	for _, link := range []string{"x/l1", "x/l1/l2", "x/l1/l2/l3"} {
+		w.WriteHeader(&tar.Header{Name: link, Linkname: "..", Typeflag: tar.TypeSymlink, Mode: 0o777})
+	}
+	w.WriteHeader(&tar.Header{Name: "x/l1/l2/l3/json.py", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4})
+	w.Write([]byte("evil"))
+	w.Close()
+	err := ExtractFiles(bytes.NewReader(archive.Bytes()), dir, int64(archive.Len()))
+	var outside []string
+	filepath.WalkDir(parent, func(path string, d fs.DirEntry, _ error) error {
+		if d != nil && d.Type().IsRegular() {
+			outside = append(outside, path)
+		}
+		return nil
+	})
+	if err == nil || len(outside) != 0 {
+		t.Fatal("the archive wrote", outside, "and unpacking said", err)
 	}
 }

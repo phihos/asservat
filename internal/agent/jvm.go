@@ -216,6 +216,10 @@ func openInside(root, dir string) (*os.File, error) {
 	return os.NewFile(uintptr(fd), dir), nil
 }
 
+// jvmSays is how much the agent reads of what a JVM says about a request, as
+// opposed to what it was asked to give: 64 KiB, where a JVM says a line.
+const jvmSays = 64 << 10
+
 // askJVM has the JVM of a container run a diagnostic and uploads what it
 // gives. A flight recording runs for the time frame, or until frame ends,
 // and keeps what it has until then.
@@ -382,7 +386,13 @@ func (c attacher) run(diagnostic string, frame time.Duration, stop io.Reader, ou
 			return "", err
 		}
 		defer answer.Close()
-		text, err := io.ReadAll(answer)
+		// A JVM says in a line or two what it did. What answers is the
+		// workload's process, though, and what it sends would be kept in
+		// the agent's memory: no more than said is read.
+		text, err := io.ReadAll(io.LimitReader(answer, jvmSays+1))
+		if err == nil && len(text) > jvmSays {
+			err = errors.New("the JVM's answer does not end")
+		}
 		return string(text), err
 	}
 	switch diagnostic {
@@ -562,10 +572,16 @@ func (c attacher) ask(request string, words *strings.Replacer) (io.ReadCloser, e
 		return nil, err
 	}
 	answer := bufio.NewReader(conn)
-	status, err := answer.ReadString('\n')
-	if err == nil && strings.TrimSpace(status) != "0" {
-		said, _ := io.ReadAll(answer)
-		err = fmt.Errorf("the JVM failed at %s (status %s): %s", strings.Fields(argument)[0], strings.TrimSpace(status), tail(said))
+	// The status is a number on a line of its own: a line that does not
+	// end within the reader's buffer is none.
+	line, err := answer.ReadSlice('\n')
+	status := strings.TrimSpace(string(line))
+	if errors.Is(err, bufio.ErrBufferFull) {
+		err = errors.New("what answers on the JVM's attach socket is no JVM: its answer begins with no status")
+	}
+	if err == nil && status != "0" {
+		why, _ := io.ReadAll(io.LimitReader(answer, jvmSays))
+		err = fmt.Errorf("the JVM failed at %s (status %s): %s", strings.Fields(argument)[0], status, tail(why))
 	}
 	if err != nil {
 		conn.Close()
