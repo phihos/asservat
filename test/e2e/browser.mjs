@@ -71,12 +71,18 @@ for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://$
 if (!target) { console.error('the browser shows no page'); browser.kill(); process.exit(1); }
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(r => ws.onopen = r);
-let id = 0, seen = [], signedOut = false;
+let id = 0, seen = [], signedOut = false, hostile = [];
 const waiting = new Map();
 ws.onmessage = m => {
   const d = JSON.parse(m.data);
   if (d.id) { waiting.get(d.id)?.(d); waiting.delete(d.id); }
   else if (d.method === 'Runtime.consoleAPICalled' && d.params.type === 'error') seen.push('console: ' + d.params.args.map(a => a.value ?? a.description).join(' '));
+  // A request that is held up while hostile answers are on: answered with the hostile one for its address, or let go.
+  else if (d.method === 'Fetch.requestPaused') {
+    const answer = hostile.find(([at]) => at.test(new URL(d.params.request.url).pathname + new URL(d.params.request.url).search));
+    if (answer) send('Fetch.fulfillRequest', {requestId: d.params.requestId, responseCode: 200, responseHeaders: [{name: 'Content-Type', value: 'application/json'}], body: Buffer.from(JSON.stringify(answer[1])).toString('base64')});
+    else send('Fetch.continueRequest', {requestId: d.params.requestId});
+  }
   else if (d.method === 'Runtime.exceptionThrown') seen.push('exception: ' + (d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text));
   // Before signing in the console asks who is there and is told nobody.
   else if (d.method === 'Network.responseReceived' && d.params.response.status >= 400 && !(signedOut && d.params.response.url.endsWith('/api/me'))) seen.push(`HTTP ${d.params.response.status} ${d.params.response.url}`);
@@ -196,6 +202,50 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       if (await run(`return document.querySelector('#threads .selected')?.dataset.thread`) !== second) throw new Error('the arrow key did not go to the next thread');
     }
   });
+}
+// What a cluster's agent or a workload can make the hub hand out is not
+// trusted by the pages: values that carry script where numbers and states
+// belong, and a link that names a recorded file as the capture, run none.
+{
+  const script = '<img src="data:image/png,x" onerror="window.scripted = 1">', made = '00000000-0000-4000-8000-00000000000a';
+  const capture = {id: made, number: 9, cluster: 'c', namespace: 'n', workload: 'Deployment/w', requester: 'someone', state: 'Completed', createdAt: new Date().toISOString(), recordings: [{kind: 'logs'}],
+    reason: script, message: script,
+    tasks: [{pod: 'p', node: script, state: 'Completed', message: script, recordings: [{kind: 'logs', state: 'x"> ' + script, message: script}]}],
+    artifacts: [{name: 'p/pod.json', size: 1, sha256: script, viewer: 'kube'}, {name: 'p/core.x', size: 1, sha256: 'a', viewer: 'core'}, {name: 'p/core.x.analysis.json', size: 1, sha256: 'a', viewer: 'core'}]};
+  const pod = {metadata: {name: script, namespace: script, labels: {[script]: script}}, spec: {nodeName: script, containers: [{name: 'a', image: script, ports: [{containerPort: script, protocol: script}],
+      livenessProbe: {tcpSocket: {port: script}, periodSeconds: script}}]},
+    status: {phase: script, containerStatuses: [{name: 'a', restartCount: script, ready: true, state: {terminated: {exitCode: script, signal: script, reason: script}}}], conditions: [{type: script, status: script}]}};
+  const frame = {level: script, function: script, file: script, line: script, pc: script, registers: [{name: script, value: script}], code: [{address: script, instruction: script}], arguments: [{name: script, value: script, type: script}]};
+  const core = {describer: 99, executable: script, stopped: script, signal: script, threads: [{id: script, systemId: script, name: script, current: true, frames: [frame]}],
+    goroutines: [{id: script, status: script, threadSystemId: script, function: script, frames: [frame]}], runtimeStacks: [{runtime: script, title: script, threads: [{id: script, threadSystemId: script, frames: [frame]}]}],
+    modules: [{file: script, from: script, to: script}], mappings: [{start: script, end: script, size: script, offset: script, file: script}]};
+  hostile = [[new RegExp(`^/api/captures/${made}$`), capture], [new RegExp(`^/api/captures/${made}/artifacts/p/pod\\.json$`), pod], [new RegExp(`^/api/captures/${made}/artifacts/p/core\\.x\\.analysis\\.json$`), core],
+    [new RegExp(`^/api/captures/${made}/describe$`), {described: false}], [/^\/api\/captures(\?.*)?$/, [capture]]];
+  await send('Fetch.enable', {patterns: [{urlPattern: '*/api/captures*'}]});
+  const scripted = () => run(`return window.scripted || document.querySelector('img[onerror]') ? 'script from hostile data reached the page' : ''`);
+  for (const file of ['p/pod.json', 'p/core.x']) await check(`hostile data in the ${file.includes('pod') ? 'pod' : 'core'} viewer`, async () => {
+    await open(`${hub}/view?capture=${made}&file=${encodeURIComponent(file)}`);
+    await until('the viewer', `return !document.getElementById('root').hidden || !document.getElementById('notice').classList.contains('opening')`);
+    await sleep(300);
+    for (const tab of await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`)) { await run(`document.querySelector('#root [data-tab="${tab}"]').click()`); await sleep(100); }
+    for (const kind of await run(`return [...document.querySelectorAll('#kinds button')].map((b, i) => i)`)) { await run(`document.querySelectorAll('#kinds button')[${kind}].click()`); await sleep(100); }
+    const problem = await scripted();
+    if (problem) throw new Error(problem);
+  });
+  await check('hostile data in the list of captures', async () => {
+    await open(hub + '/#captures');
+    await until('the list', `return document.querySelector('.capture')`);
+    await run(`document.querySelector('.capture .chev').click()`); await sleep(200);
+    const problem = await scripted();
+    if (problem) throw new Error(problem);
+  });
+  await check('a link that names a file as the capture', async () => {
+    await open(`${hub}/view?capture=${made}%2Fartifacts%2Fp%2Fpod.json%3F&file=p/pod.json`);
+    await until('the refusal', `return !document.getElementById('notice').classList.contains('opening')`);
+    if (!/No file was specified/.test(await run(`return document.getElementById('notice').innerText`))) throw new Error('the viewer took a path for a capture');
+  });
+  await send('Fetch.disable');
+  hostile = [];
 }
 if (adminToken) {
   await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});

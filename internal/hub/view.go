@@ -321,8 +321,10 @@ func (h *Hub) dissect(ctx context.Context, a storedArtifact) (func(string, json.
 	}
 
 	cmd := exec.CommandContext(ctx, h.Sharkd, "-")
-	// sharkd reads its settings from the home directory; it has none here.
-	cmd.Env = append(os.Environ(), "HOME="+h.WorkDir)
+	// sharkd reads settings and plugins (Lua, which is code) from its home
+	// directory: it has none, rather than the work directory, into which
+	// the hub unpacks what agents send.
+	cmd.Env = append(os.Environ(), "HOME=/nonexistent", "XDG_CONFIG_HOME=/nonexistent")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -387,8 +389,10 @@ var errViewEnded = errStatus{http.StatusGone, "this view has ended; open the fil
 // the protocols, the conversations and the expert information. With a
 // display filter, as Wireshark takes them, it is the packets that match, as
 // the rows of the packet list. Both list 60 entries: a page for a reader,
-// of whom most are language models with a limited context.
-func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (string, error) {
+// of whom most are language models with a limited context. headersOnly
+// says that the capture was recorded without payload, which is what a
+// filter that matches nothing most often comes from.
+func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string, headersOnly bool) (string, error) {
 	const entries = 60
 	ctx, done := context.WithCancel(ctx)
 	defer done() // ends sharkd
@@ -425,6 +429,13 @@ func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string) (
 		}
 		if err := asked("frames", map[string]any{"filter": filter, "limit": entries}, &frames); err != nil {
 			return "", err
+		}
+		if len(frames) == 0 {
+			fmt.Fprintf(&text, "\nNo packet matches %q.", filter)
+			if headersOnly {
+				text.WriteString(" The capture was recorded without payload and holds the packets' headers only: if the filter is on what packets carry (http, dns, tls fields), that is why. Such a filter needs a capture with payload, which needs approval; filters on addresses, ports and TCP fields work as they are.")
+			}
+			return text.String() + "\n", nil
 		}
 		fmt.Fprintf(&text, "\nThe first %d packets that match %q (number, seconds, source, destination, protocol, length, info):\n", len(frames), filter)
 		for _, f := range frames {
