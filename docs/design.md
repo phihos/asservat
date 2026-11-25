@@ -28,6 +28,18 @@ architecture and pushed under the tag with `-amd64` or `-arm64` at its
 end, and the tags without it are lists that point to both, so that a node
 pulls its own.
 
+The agent finds a container's processes once per capture, in the node's
+`/proc`, by the container's ID in their cgroup. A core dump or a trace may
+come to one of them minutes later, and a process number is given out again
+once its process has ended, which a workload can bring about. So a process
+is known by its number and the time it started: both are compared before
+a tool is set on it and again before what the tool recorded is sent, and
+what is not the container's own is deleted on the node, unsent. For a
+core that prevents it: gdb holds the process from its first look on. For
+a trace it finds it out afterwards: strace takes a process by its number,
+so another one that came by the number in that instant is traced, and its
+trace is deleted instead of sent.
+
 ## Capture lifecycle
 
 1. A user requests a capture: cluster, namespace, workload and one or more
@@ -812,7 +824,16 @@ files asks first.
 - A browser signs in at the OIDC issuer (authorization code flow with PKCE).
   The hub verifies the ID token and keeps the name and groups in a session
   cookie that it signs with a key derived from the master key. The session
-  lasts 12 hours, so the groups are at most that old.
+  lasts 12 hours, so the groups are at most that old. A watch is the
+  exception: it records for its requester with the groups they had when
+  they made it, for as long as it waits, so a watch of someone who has
+  left a group is to be deleted, or the group's rights in Kubernetes taken.
+- Captures are owned by name, and the names go to the clusters as they
+  are. The claim that names a user must therefore be one that the issuer
+  keeps unique and that users cannot choose. A name or a group that begins
+  with `system:` is Kubernetes's own (`system:masters` may do everything)
+  and is not taken from a token: such a user is refused, such a group left
+  out.
 - The console and the MCP tools offer namespaces, workloads and containers
   from the cluster; nothing of that is typed. A user is offered the
   namespaces in which they may capture. Where there is none, the console
@@ -834,7 +855,9 @@ files asks first.
   namespace, which the cluster's RBAC tells at every access as it does for
   a new capture. Nobody else learns that it exists, and only its requester
   and administrators change, stop or delete it. Sharing and taking it back
-  are in the audit log, as is every file that a colleague opens.
+  are in the audit log, as is every file that a colleague opens. What a colleague has open
+  closes when the sharing ends. The hint that the hub sends every signed-in
+  browser when something changed names no capture.
 
 ## Security
 

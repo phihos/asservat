@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -32,9 +33,18 @@ func OIDCVerifier(ctx context.Context, issuer, clientID, userClaim, groupsClaim 
 		if u.Name == "" {
 			return User{}, fmt.Errorf("token has no %s claim", userClaim)
 		}
+		// The names go to the clusters as they are, to ask what the user
+		// may do. Those that begin with "system:" are Kubernetes's own, and
+		// system:masters may do everything: where users choose their names
+		// or groups at the identity provider, a token must not carry them
+		// (Kubernetes's documentation on OIDC tokens warns of the same and
+		// prefixes names for it).
+		if strings.HasPrefix(u.Name, "system:") {
+			return User{}, fmt.Errorf("the token's %s claim is a name of Kubernetes's own", userClaim)
+		}
 		groups, _ := claims[groupsClaim].([]any)
 		for _, g := range groups {
-			if s, ok := g.(string); ok {
+			if s, ok := g.(string); ok && !strings.HasPrefix(s, "system:") {
 				u.Groups = append(u.Groups, s)
 			}
 		}

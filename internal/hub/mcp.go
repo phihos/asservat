@@ -177,7 +177,7 @@ var mcpTools = []mcpTool{
 			}
 			a, err := h.Store.Artifact(ctx, c.ID, in.Name)
 			if err == ErrNotFound {
-				return nil, fmt.Errorf("the capture has no file %q; get_capture lists its files", in.Name)
+				return nil, errStatus{http.StatusNotFound, fmt.Sprintf("the capture has no file %q; get_capture lists its files", in.Name)}
 			}
 			if err != nil {
 				return nil, err
@@ -200,7 +200,7 @@ var mcpTools = []mcpTool{
 				}
 				described, err := h.Store.Artifact(ctx, c.ID, name+coredesc.Suffix)
 				if err == ErrNotFound {
-					return nil, fmt.Errorf("%s has no description; download /api/captures/%s/artifacts/%s and open it with a debugger", name, c.ID, name)
+					return nil, errStatus{http.StatusUnprocessableEntity, fmt.Sprintf("%s has no description; download /api/captures/%s/artifacts/%s and open it with a debugger", name, c.ID, name)}
 				}
 				if err != nil {
 					return nil, err
@@ -259,7 +259,7 @@ var mcpTools = []mcpTool{
 				return nil, fmt.Errorf("read %s: %w", a.Name, err)
 			}
 			if bytes.IndexByte(buf.Bytes(), 0) >= 0 {
-				return nil, fmt.Errorf("%s is binary; download /api/captures/%s/artifacts/%s", a.Name, c.ID, a.Name)
+				return nil, errStatus{http.StatusUnprocessableEntity, fmt.Sprintf("%s is binary; download /api/captures/%s/artifacts/%s", a.Name, c.ID, a.Name)}
 			}
 			return map[string]any{"size": a.Size, "offset": in.Offset, "text": string(bytes.ToValidUTF8(buf.Bytes(), nil))}, nil
 		}},
@@ -329,7 +329,7 @@ func (h *Hub) mcp(w http.ResponseWriter, r *http.Request, u User) error {
 			}
 			out, err := t.call(r.Context(), h, u, req.Params.Arguments)
 			if err != nil {
-				text = err.Error()
+				text = told(err).msg
 			} else {
 				b, _ := json.Marshal(out)
 				text, isError = string(b), false
