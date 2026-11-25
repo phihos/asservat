@@ -139,7 +139,14 @@ sign in with your token and choose **New capture**: four steps take you from
 the workload to what to record and when. **Captures** lists what was
 recorded, with the progress and the files of each. One request can hold several
 recordings: they start together on the same pods, share the time frame and,
-if one of them needs approval, a single approval. The same with the API:
+if one of them needs approval, a single approval.
+
+A capture is yours and the administrators'. **Share with the namespace** in
+its details lets everyone who may capture in that namespace open and
+download it; they cannot change or delete it. Administrators see who
+requested, approved, opened and downloaded what under **Audit log**.
+
+The same with the API:
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/captures -d '{
@@ -207,7 +214,9 @@ Alertmanager passes it only the alerts of the hub's own namespace unless its
 A crash watch for `coredump` records the core of the crashed process itself. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an
-administrator's approval of the watch.
+administrator's approval of the watch. Cores of other processes on the node
+go on to the handler the node had before, such as apport or
+systemd-coredump.
 
 Every core comes with its program's executable and libraries, so that it
 opens in a debugger wherever you download it to, and with a description for
