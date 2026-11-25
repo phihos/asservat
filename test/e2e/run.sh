@@ -170,18 +170,27 @@ TOKEN=edge-join-token-0123456789abcdef0123456789abcdef
 BOB=bob-token-0123456789abcdef0123456789abc ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
 ALERTS=alert-token-0123456789abcdef0123456789abcd
 hub create namespace asservat --dry-run=client -o yaml | hub apply -f - >/dev/null
-helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
-  --set image.repository=localhost/asservat,image.tag=e2e,image.pullPolicy=Never \
-  --set hub.service.type=NodePort,hub.service.nodePort=30080 \
-  --set hub.users[0].name=alice,hub.users[0].token=$ALICE,hub.users[0].groups[0]=devs \
-  --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
-  --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
-  --set hub.users[3].name=bob,hub.users[3].token=$BOB,hub.users[3].groups[0]=devs \
-  --set hub.alertToken=$ALERTS \
-  --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
-hub -n asservat port-forward svc/asservat-hub "$PORT:80" >/dev/null 2>&1 &
-FORWARD=$!
-for _ in $(seq 50); do curl -s -o /dev/null "$URL/healthz" && break; sleep 0.2; done
+# The restore at the end installs the hub once more, the same way.
+install_hub() {
+  helm --kube-context "kind-$HUB" upgrade --install asservat charts/asservat -n asservat --wait --timeout 5m \
+    --set image.repository=localhost/asservat,image.tag=e2e,image.pullPolicy=Never \
+    --set hub.service.type=NodePort,hub.service.nodePort=30080 \
+    --set hub.users[0].name=alice,hub.users[0].token=$ALICE,hub.users[0].groups[0]=devs \
+    --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
+    --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
+    --set hub.users[3].name=bob,hub.users[3].token=$BOB,hub.users[3].groups[0]=devs \
+    --set hub.alertToken=$ALERTS \
+    --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
+}
+# The hub is reached through a forwarded port, which ends with the hub's pod.
+forward_hub() {
+  [ -z "${FORWARD:-}" ] || kill "$FORWARD" 2>/dev/null || true
+  hub -n asservat port-forward svc/asservat-hub "$PORT:80" >/dev/null 2>&1 &
+  FORWARD=$!
+  for _ in $(seq 50); do curl -s -o /dev/null "$URL/healthz" && break; sleep 0.2; done
+}
+install_hub
+forward_hub
 
 log "join the edge cluster"
 # The edge cluster and its join token are part of the hub's configuration.
@@ -780,6 +789,35 @@ case $browsed in
       log "left out: no Chromium or Chrome is installed here" ;;
   *) fail "the pages in a browser" ;;
 esac
+
+# The backup and restore that docs/operations.md describes, done: the hub's
+# database, volumes and Secret go, and what was saved brings back a capture
+# with its file, to the byte.
+log "an installation is restored from its backup"
+id=$(ok "$ALICE" GET /api/captures | jq -r '[.[] | select(.state == "Completed" and (.artifacts | length > 0) and .requester == "alice")][0].id')
+kept=$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.number, .artifacts[0].name, .artifacts[0].sha256]')
+file=$(jq -r '.[1]' <<<"$kept")
+hub -n asservat get secret asservat-hub -o jsonpath='{.data.master-key}' >"$WORK/master-key.b64"
+hub -n asservat exec asservat-postgres-0 -- pg_dump -U asservat asservat >"$WORK/asservat.sql"
+hub -n asservat exec deploy/asservat-hub -- sh -c 'cd /data && tar -cf - -- *' >"$WORK/evidence.tar"
+helm --kube-context "kind-$HUB" uninstall asservat -n asservat --wait >/dev/null
+# What the chart keeps through an uninstall goes too: a lost cluster keeps nothing.
+hub -n asservat delete secret asservat-hub pvc/asservat-evidence pvc/data-asservat-postgres-0 --wait >/dev/null
+hub -n asservat create secret generic asservat-hub --from-literal=master-key="$(base64 -d <"$WORK/master-key.b64")" >/dev/null
+hub -n asservat label secret asservat-hub app.kubernetes.io/managed-by=Helm >/dev/null
+hub -n asservat annotate secret asservat-hub meta.helm.sh/release-name=asservat meta.helm.sh/release-namespace=asservat >/dev/null
+install_hub
+hub -n asservat scale deploy/asservat-hub --replicas=0 >/dev/null
+hub -n asservat wait --for=delete pod -l app.kubernetes.io/component=hub --timeout=60s >/dev/null
+hub -n asservat exec asservat-postgres-0 -- psql -q -U asservat postgres -c 'DROP DATABASE asservat' -c 'CREATE DATABASE asservat OWNER asservat'
+hub -n asservat exec -i asservat-postgres-0 -- psql -q -U asservat asservat -v ON_ERROR_STOP=1 <"$WORK/asservat.sql" >/dev/null || fail "the dump does not load"
+hub -n asservat scale deploy/asservat-hub --replicas=1 >/dev/null
+hub -n asservat rollout status deploy/asservat-hub --timeout=120s >/dev/null
+hub -n asservat exec -i deploy/asservat-hub -- tar -C /data -xf - <"$WORK/evidence.tar"
+forward_hub
+[ "$(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.number, .artifacts[0].name, .artifacts[0].sha256]')" = "$kept" ] || fail "the restored hub does not know the capture"
+fetch "$ALICE" "$id" "$file" "$WORK/restored"
+[ "$(sha256sum <"$WORK/restored" | cut -d' ' -f1)" = "$(jq -r '.[2]' <<<"$kept")" ] || fail "the restored file is not the one that was recorded"
 
 log "PASS"
 ls -l "$WORK"/pod.json "$WORK"/web.log "$WORK"/capture.pcap "$WORK"/web.strace "$WORK"/core.web "$WORK"/crash.pcap "$WORK"/crash.log

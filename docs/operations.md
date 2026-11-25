@@ -36,9 +36,59 @@ Back up the chart's PostgreSQL with `pg_dump`:
 kubectl -n <namespace> exec <release>-postgres-0 -- pg_dump -U asservat asservat > asservat.sql
 ```
 
-To restore, install the chart with the saved Secret in place, load the dump
-into the empty database, and put the evidence volume or bucket back. The hub
-finds the files by the names in the database.
+Back up the evidence on the hub's volume (with an S3 bucket, use your
+bucket's own backup instead):
+
+```sh
+kubectl -n <namespace> exec deploy/<release>-hub -- sh -c 'cd /data && tar -cf - -- *' > evidence.tar
+```
+
+### Restore
+
+The end-to-end test runs these steps on every change: it deletes the hub's
+database, volumes and Secret and brings a capture back with its file.
+
+1. Put the master key back before you install. The Secret belongs to the
+   chart's release, so mark it as Helm's; the chart then keeps the key and
+   fills in the rest:
+
+```sh
+kubectl -n <namespace> create secret generic <release>-hub \
+  --from-literal=master-key="$(base64 -d < master-key.b64)"
+kubectl -n <namespace> label secret <release>-hub app.kubernetes.io/managed-by=Helm
+kubectl -n <namespace> annotate secret <release>-hub \
+  meta.helm.sh/release-name=<release> meta.helm.sh/release-namespace=<namespace>
+```
+
+2. Install the chart with your values:
+
+```sh
+helm install <release> charts/asservat -n <namespace> -f values.yaml
+```
+
+3. Stop the hub and load the dump into a database that is empty. The hub
+   creates its tables when it starts, so the database it has just made has to
+   go first:
+
+```sh
+kubectl -n <namespace> scale deploy/<release>-hub --replicas=0
+kubectl -n <namespace> exec <release>-postgres-0 -- psql -U asservat postgres \
+  -c 'DROP DATABASE asservat' -c 'CREATE DATABASE asservat OWNER asservat'
+kubectl -n <namespace> exec -i <release>-postgres-0 -- psql -U asservat asservat < asservat.sql
+```
+
+4. Start the hub and put the evidence back. The hub finds the files by the
+   names in the database:
+
+```sh
+kubectl -n <namespace> scale deploy/<release>-hub --replicas=1
+kubectl -n <namespace> rollout status deploy/<release>-hub
+kubectl -n <namespace> exec -i deploy/<release>-hub -- tar -C /data -xf - < evidence.tar
+```
+
+!!! note
+    `DROP DATABASE` fails while the hub is still connected. Wait until the
+    hub's pod is gone after scaling it down.
 
 Evidence is deleted when its retention ends (`hub.retention`, 7 days by
 default), so a backup of the evidence is only worth as much as its age
