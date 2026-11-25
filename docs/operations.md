@@ -170,8 +170,16 @@ what you record.
 The hub's idle cost grows with the nodes whose agents are connected, by
 about 30 KiB each: with 1,000 connections held open it used 78 MiB and
 1 millicore, with 5,000 it used 194 MiB and 3 millicores, and answered the
-API as fast as before. These connections were simulated on one machine;
-they did no recording.
+API as fast as before. These connections were simulated on one machine.
+
+A capture costs the hub by the pods it records. With agents that were
+simulated but did their part, a status at the start and the end and a
+file of 64 KiB for each pod, one capture took the hub 0.8 seconds of
+processor time and 116 MiB at its peak for 500 pods, 3.4 seconds and
+352 MiB for 2,000, and 8.8 seconds and 777 MiB for 5,000; it was complete
+after 4, 21 and 66 seconds, most of which PostgreSQL spends on the tasks'
+states. The memory is what the files take while they arrive, about
+150 KiB for each that is being stored at that moment.
 
 Plan disk space for three things:
 

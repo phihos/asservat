@@ -909,7 +909,7 @@ files asks first.
   any cluster administrator, is trusted.
 - **Clusters** are configuration of the hub (`hub.clusters`: a name and a
   join token each), like its users. Nothing registers a cluster at run time.
-- **Agents** authenticate with their cluster's join token. A token can upload files for the pods of open captures of its
+- **Agents** authenticate with their cluster's join token. For a report or a file of a pod the hub reads the capture's request and state and whether the pod is one of its tasks, nothing of its other pods, so that a capture costs the hub by its pods and not by their square. A token can upload files for the pods of open captures of its
   own cluster, report their status and answer queries about that cluster,
   and nothing else. Use HTTPS between clusters.
 - **Evidence at rest** is encrypted by the hub: AES-256-GCM in 64 KiB chunks
