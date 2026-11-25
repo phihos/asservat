@@ -790,7 +790,16 @@ files asks first.
 - A browser signs in at the OIDC issuer (authorization code flow with PKCE).
   The hub verifies the ID token and keeps the name and groups in a session
   cookie that it signs with a key derived from the master key. The session
-  lasts 12 hours, so the groups are at most that old.
+  lasts 12 hours, so the groups are at most that old. A watch is the
+  exception: it records for its requester with the groups they had when
+  they made it, for as long as it waits, so a watch of someone who has
+  left a group is to be deleted, or the group's rights in Kubernetes taken.
+- Captures are owned by name, and the names go to the clusters as they
+  are. The claim that names a user must therefore be one that the issuer
+  keeps unique and that users cannot choose. A name or a group that begins
+  with `system:` is Kubernetes's own (`system:masters` may do everything)
+  and is not taken from a token: such a user is refused, such a group left
+  out.
 - The console and the MCP tools offer namespaces, workloads and containers
   from the cluster; nothing of that is typed. A user is offered the
   namespaces in which they may capture. Where there is none, the console
@@ -812,7 +821,9 @@ files asks first.
   namespace, which the cluster's RBAC tells at every access as it does for
   a new capture. Nobody else learns that it exists, and only its requester
   and administrators change, stop or delete it. Sharing and taking it back
-  are in the audit log, as is every file that a colleague opens.
+  are in the audit log, as is every file that a colleague opens. What a colleague has open
+  closes when the sharing ends. The hint that the hub sends every signed-in
+  browser when something changed names no capture.
 
 ## Security
 

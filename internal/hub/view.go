@@ -64,11 +64,13 @@ func (v *views) remove(id string) {
 }
 
 // endOf closes the views of a capture's files, when the capture is deleted.
-func (v *views) endOf(capture string) {
+// endOf ends the views of a capture's files, but for those of one user if
+// one is named.
+func (v *views) endOf(capture, but string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	for _, opened := range v.open {
-		if opened.capture == capture {
+		if opened.capture == capture && (but == "" || opened.user != but) {
 			opened.end()
 		}
 	}
@@ -127,6 +129,10 @@ func (h *Hub) openView(w http.ResponseWriter, r *http.Request, u User) error {
 			}
 			if api.ViewerOf(b.Name) != "pprof" {
 				return errStatus{http.StatusBadRequest, "the base is not a profile"}
+			}
+			// The difference shows the base as well: it is opened too.
+			if err := h.Store.Audit(ctx, u.Name, "artifact.view", from.ID, map[string]string{"name": b.Name}); err != nil {
+				return err
 			}
 			base = &b
 		}
