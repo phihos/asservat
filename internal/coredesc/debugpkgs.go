@@ -594,6 +594,10 @@ func (f debugFetcher) unpack(name string, urls []string) (string, error) {
 		// nothing that would land outside of the directory. The debug
 		// files are named with ./ in the one and without in the other.
 		cmd := exec.CommandContext(f.ctx, "bsdtar", "-x", "-f", "-", "-C", unpacked, "--include", "usr/lib/debug/*", "--include", "./usr/lib/debug/*")
+		// As gdb, it reads what a server sent, and is no root for it
+		// where the describer is (see unprivileged.go).
+		writable(filepath.Dir(f.cache), unpacked)
+		asNobody(cmd)
 		cmd.Stdin = body
 		output, err := cmd.CombinedOutput()
 		body.Close()
@@ -758,6 +762,7 @@ func (f debugFetcher) buildIDs(list, base *url.URL, w io.Writer) error {
 	}
 	defer body.Close()
 	cmd := exec.CommandContext(f.ctx, "bsdcat")
+	asNobody(cmd)
 	cmd.Stdin = body
 	plain, err := cmd.StdoutPipe()
 	if err != nil {
