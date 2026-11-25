@@ -1,0 +1,8 @@
+# Dependabot proposes a pull request when a base image of the Dockerfile
+# has a newer digest under its tag. Nothing is merged by itself.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
