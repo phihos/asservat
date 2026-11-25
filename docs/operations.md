@@ -146,6 +146,12 @@ what you record.
 | Hub | 2 millicores, 36 MiB | Each open packet capture runs a reader of about 150 MiB. Describing a core dump runs `gdb`, and for Python and .NET programs their own tools. |
 | PostgreSQL (chart's own) | 10 millicores, 180 MiB | Grows with the audit log, which is kept after captures are deleted. |
 
+The hub's idle cost grows with the nodes whose agents are connected, by
+about 30 KiB each: with 1,000 connections held open it used 78 MiB and
+1 millicore, with 5,000 it used 194 MiB and 3 millicores, and answered the
+API as fast as before. These connections were simulated on one machine;
+they did no recording.
+
 Plan disk space for three things:
 
 - **Evidence storage** (`hub.storage.size`, 20 GiB by default): the sum of
