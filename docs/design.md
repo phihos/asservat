@@ -62,7 +62,8 @@ its script and the program's files open; root's group may read them while
 it runs. A fault in it reaches what that user and group may read, not
 the node. A program or library that a container lets only its own user
 read is then not read by gdb either, and its frames show addresses. The
-description names such files, and the viewer says so. A program, a library or a debug
+description names such programs and libraries, and the viewer says so. The
+tools that unpack downloaded debug packages run the same way. A program, a library or a debug
 file can carry scripts for gdb, which gdb runs where the file lies in a
 directory it trusts; the directories of downloaded debug files are such.
 Every gdb that Asservat starts is told to load none (`set auto-load off`):

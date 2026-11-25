@@ -110,24 +110,46 @@ func passable(scratch, dir string) {
 }
 
 // kept tells of a file of the program whether the tool, as nobody in
-// root's group, may read it. A container may keep a file to its own user;
-// the describer, as root, opens it all the same, and the tool then fails
-// to: its frames show addresses, and the description names the file so
-// that the reader knows why.
+// root's group, is kept from reading it. A container may keep a program or
+// a library to its own user; the describer, as root, opens it all the
+// same, and the tool then fails to: its frames show addresses, and the
+// description names the file so that the reader knows why. Only programs
+// and libraries are told: a core maps data files too, which have no frames.
 func kept(f *os.File) bool {
 	if !lowered() {
 		return false
 	}
 	info, err := f.Stat()
-	if err != nil {
+	if err != nil || !info.Mode().IsRegular() {
 		return false
 	}
-	need := fs.FileMode(0o004)
-	if info.IsDir() {
-		need = 0o005
+	magic := make([]byte, 4)
+	if _, err := f.ReadAt(magic, 0); err != nil || string(magic) != "\x7fELF" {
+		return false
 	}
-	mode := info.Mode().Perm()
 	stat, _ := info.Sys().(*syscall.Stat_t)
-	readable := mode&need == need || stat != nil && stat.Gid == 0 && mode&(need<<3) == need<<3
-	return !readable
+	if stat == nil {
+		return false
+	}
+	return !readableAs(info.Mode().Perm(), stat.Uid, stat.Gid)
+}
+
+// readableAs tells whether nobody, in root's group, may read a file of
+// the permissions, the owner and the group: as everyone, as a member of
+// root's group, or as the file's owner.
+func readableAs(mode fs.FileMode, uid, gid uint32) bool {
+	return mode&0o004 != 0 || gid == 0 && mode&0o040 != 0 || uid == nobody && mode&0o400 != 0
+}
+
+// writable lets a tool that runs as nobody, in root's group, write into a
+// directory that the describer made for it, and pass through those above
+// it from scratch down.
+func writable(scratch, dir string) {
+	if !lowered() {
+		return
+	}
+	passable(scratch, dir)
+	if info, err := os.Stat(dir); err == nil {
+		os.Chmod(dir, info.Mode().Perm()|0o070)
+	}
 }
