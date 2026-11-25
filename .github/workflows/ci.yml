@@ -148,10 +148,10 @@ jobs:
           tool "$image" gdb --version
       # And they are installed as the README says, in a cluster of this
       # architecture, where a capture is recorded with them.
-      # And upgraded to, from the commit before, which is fetched for its chart.
+      # And upgraded to, from the commit that main stood at before, which is
+      # fetched for its chart: it is not always the one below this one.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+      - run: git fetch --no-tags --depth=1 origin ${{ github.event.before }} || true
       - uses: helm/kind-action@v1
         with:
           install_only: true

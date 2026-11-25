@@ -86,7 +86,8 @@ if [ -n "${FROM:-}" ] && [ "$FROM" != "$TAG" ]; then
     watch=$(api -X POST "$URL/api/watches" -d '{"cluster":"local","namespace":"asservat","workload":"Deployment/asservat-hub","kind":"logs","count":2}' | jq -r .id)
     upgraded=" after an upgrade from ${FROM:0:8}"
   else
-    echo "left out: $FROM has no published images or is not in this checkout"
+    # Said so that it shows on the run: an upgrade that was not tried is not one that passed.
+    echo "::warning::the upgrade from $FROM was left out: it has no published images, the registry did not answer, or the commit is not in this checkout"
   fi
 fi
 
