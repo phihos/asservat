@@ -217,3 +217,20 @@ func TestFileIsUploadedWhenTheHubIsBack(t *testing.T) {
 		t.Fatal("a stream was uploaded to a hub that is away")
 	}
 }
+
+// After a hub's restart the agents are back within seconds: until they are,
+// the hub answers every request for their cluster with "no agent of this
+// cluster is connected".
+func TestReconnectDelayStaysShort(t *testing.T) {
+	delay, waited := time.Second, time.Duration(0)
+	for range 20 {
+		if delay > 5*time.Second {
+			t.Fatalf("an agent waits %s before it tries the hub again", delay)
+		}
+		waited += delay
+		delay = nextDelay(delay)
+	}
+	if delay < 2*time.Second {
+		t.Fatal("the delay does not grow", delay)
+	}
+}
