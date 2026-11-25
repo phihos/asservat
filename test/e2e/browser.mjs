@@ -30,29 +30,41 @@ if (!hub || !token) { console.error('usage: browser.mjs <hub URL> <token>'); pro
 // 78 says that there is no browser, and nothing else does.
 if (!chrome) { console.error('no Chromium or Chrome is installed'); process.exit(78); }
 
-const profile = mkdtempSync(join(tmpdir(), 'asservat-browser-'));
 const env = {...process.env}; delete env.LD_LIBRARY_PATH;
+// The browser's helpers write into the profile for a moment after the browser has ended.
+const removed = dir => { try { rmSync(dir, {recursive: true, force: true, maxRetries: 25, retryDelay: 200}); } catch {} };
 // Chromium says on its standard error where its DevTools listen. On a busy
 // machine it was seen once to say nothing of the kind for half a minute,
 // for a reason its output did not tell: a browser that does not start is
-// ended and started again, twice at most, before the check gives up.
+// ended and started again, twice at most, before the check gives up. Each
+// start has a profile of its own, since a browser that is killed leaves its
+// lock in the one it had.
 const start = () => new Promise((found, failed) => {
+  const profile = mkdtempSync(join(tmpdir(), 'asservat-browser-'));
   const browser = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], {env, stdio: ['ignore', 'ignore', 'pipe']});
-  let said = '';
-  const giveUp = why => { clearTimeout(late); browser.removeAllListeners('exit'); browser.kill('SIGKILL'); failed(new Error(why + ': ' + said.slice(-400))); };
+  let said = '', gone = false;
+  // The next start waits until this browser has ended and its profile is removed.
+  const giveUp = why => {
+    clearTimeout(late);
+    const over = () => { removed(profile); failed(new Error(why + ': ' + said.slice(-400))); };
+    if (gone) return over();
+    browser.once('exit', over);
+    browser.kill('SIGKILL');
+  };
   const late = setTimeout(() => giveUp('the browser did not start'), 30000);
-  browser.on('exit', code => giveUp(`the browser ended with ${code}`));
+  const ended = code => { gone = true; giveUp(`the browser ended with ${code}`); };
+  browser.on('exit', ended);
   browser.stderr.on('data', d => {
     said += d;
     const m = /DevTools listening on ws:\/\/([^/]+)\//.exec(said);
-    if (m) { clearTimeout(late); browser.removeAllListeners('exit'); found([browser, m[1]]); }
+    if (m) { clearTimeout(late); browser.off('exit', ended); found([browser, m[1], profile]); }
   });
 });
 let started;
 for (let tries = 3; !started; tries--) {
   started = await start().catch(e => { if (tries === 1) throw e; console.error(e.message.split('\n')[0] + '; starting it again'); });
 }
-const [browser, listening] = started;
+const [browser, listening, profile] = started;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let target;
 for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://${listening}/json`).catch(() => null))?.json().catch(() => []) || []).find(t => t.type === 'page'); if (!target) await sleep(100); }
@@ -208,5 +220,5 @@ if (adminToken) {
 ws.close();
 // The browser writes into its profile until it has ended.
 await new Promise(ended => { browser.on('exit', ended); browser.kill(); });
-try { rmSync(profile, {recursive: true, force: true, maxRetries: 5, retryDelay: 200}); } catch {}
+removed(profile);
 if (failures.length) { console.error('\n' + failures.join('\n')); process.exit(1); }
