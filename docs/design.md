@@ -879,7 +879,13 @@ files asks first.
 
 ## Not built yet
 
-These are known gaps, in rough order of value:
+No known gaps are listed at present. What use of Asservat shows to be
+missing goes here, in rough order of value.
+
+## Decided against (maintainer, 2026-11-25)
+
+These were looked into and are not to be built unless the maintainer asks
+for them again:
 
 - What a process holds in memory by allocation site, for applications that
   serve no profile endpoint. Looked into on 2026-11-24 and not built, for
@@ -893,4 +899,10 @@ These are known gaps, in rough order of value:
   What there is instead: memory growth by sampling for every language, the
   heap dump and class histogram of a JVM, and the heap profile of a Go
   program that does serve an endpoint.
-- Several hub replicas.
+- Several hub replicas. An agent holds one stream to one hub, and a view of
+  a file lives in the hub that opened it, so replicas would have to pass
+  requests on to one another. Against that stands what one hub costs: a
+  restart, as in every upgrade, takes it away for some seconds (four,
+  measured on a three-node cluster), captures, watches and queued tasks are
+  in PostgreSQL and survive it, a recording that ends meanwhile reports when
+  the hub is back, and agents return within seconds.
