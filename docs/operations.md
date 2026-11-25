@@ -177,8 +177,8 @@ simulated but did their part, a status at the start and the end and a
 file of 64 KiB for each pod, one capture took the hub 0.8 seconds of
 processor time and 116 MiB at its peak for 500 pods, 3.4 seconds and
 352 MiB for 2,000, and 8.8 seconds and 777 MiB for 5,000; it was complete
-after 4, 21 and 66 seconds, most of which PostgreSQL spends on the tasks'
-states. The memory is what the files take while they arrive, about
+after 4, 17 and about 45 seconds, most of which PostgreSQL spends
+committing the pods' reports one after another. The memory is what the files take while they arrive, about
 150 KiB for each that is being stored at that moment.
 
 Plan disk space for three things:

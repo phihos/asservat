@@ -316,6 +316,20 @@ func (s *Store) SetTask(ctx context.Context, id string, st api.TaskStatus) error
 			return err
 		}
 	}
+	// While a task of the capture is open, the capture runs, and that is
+	// told without counting its tasks: a capture has two reports for every
+	// pod, and counting all pods at each took PostgreSQL time by their
+	// square. The tasks are counted once, when the last one has ended.
+	var open bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM tasks WHERE capture_id = $1::uuid AND state IN ('Queued','Running'))`, id).Scan(&open); err != nil {
+		return err
+	}
+	if open {
+		if _, err := tx.Exec(ctx, `UPDATE captures SET state = 'Running', message = '' WHERE id = $1::uuid AND (state = 'Queued' OR state = 'Running' AND message <> '')`, id); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
+	}
 	if _, err := tx.Exec(ctx, `UPDATE captures c SET
   state = CASE WHEN t.open > 0 THEN 'Running' WHEN t.completed > 0 THEN 'Completed' ELSE 'Failed' END,
   message = CASE WHEN t.open > 0 THEN '' ELSE concat_ws('; ',
