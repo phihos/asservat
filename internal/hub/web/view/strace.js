@@ -107,7 +107,7 @@ export default async function (root, {capture}) {
     if (name === 'calls') list.draw();
   };
 
-  // The summary, as "strace -c" prints it.
+  // The summary: what "strace -c" prints, with the call's name first, so that it is in sight on a narrow screen too.
   const per = new Map();
   for (const c of calls) if (c.kind === 'call') {
     const s = per.get(c.name) || {name: c.name, calls: 0, errors: 0, seconds: 0};
@@ -115,8 +115,8 @@ export default async function (root, {capture}) {
     per.set(c.name, s);
   }
   const rows = [...per.values()].sort((a, b) => b.seconds - a.seconds), all = rows.reduce((t, s) => ({calls: t.calls + s.calls, errors: t.errors + s.errors, seconds: t.seconds + s.seconds}), {calls: 0, errors: 0, seconds: 0});
-  const line = (s, name) => `<td>${all.seconds ? (s.seconds * 100 / all.seconds).toFixed(2) : '0.00'}</td><td>${s.seconds.toFixed(6)}</td><td>${s.calls ? Math.round(s.seconds * 1e6 / s.calls) : 0}</td><td>${s.calls}</td><td>${s.errors || ''}</td><td class="name">${name}</td>`;
-  $('summary').innerHTML = `<table><thead><tr><th>% time</th><th>seconds</th><th>usecs/call</th><th>calls</th><th>errors</th><th>syscall</th></tr></thead>
+  const line = (s, name) => `<td class="name">${name}</td><td>${all.seconds ? (s.seconds * 100 / all.seconds).toFixed(2) : '0.00'}</td><td>${s.seconds.toFixed(6)}</td><td>${s.calls ? Math.round(s.seconds * 1e6 / s.calls) : 0}</td><td>${s.calls}</td><td>${s.errors || ''}</td>`;
+  $('summary').innerHTML = `<table><thead><tr><th>syscall</th><th>% time</th><th>seconds</th><th>usecs/call</th><th>calls</th><th>errors</th></tr></thead>
     <tbody>${rows.map(s => `<tr data-name="${esc(s.name)}" title="Show these calls">${line(s, esc(s.name))}</tr>`).join('')}</tbody>
     <tfoot><tr>${line(all, 'total')}</tr></tfoot></table>`;
 

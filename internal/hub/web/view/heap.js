@@ -92,7 +92,7 @@ function draw(root, heap) {
     ${heap.biggest.map(o => `<tr><td class="name">${esc(o.class)}</td><td class="n">${size(o.bytes)}</td>${java ? `<td class="n">${o.array ? number(o.length || 0) : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
 
   $('threads').innerHTML = `<div class="page"><p class="muted">Thread stacks at the moment the dump was written. The dump identifies threads by number. Their names are stored among its objects.</p>
-    ${heap.threads.map(t => `<div class="thread"><h4>Thread ${t.serial}</h4><pre>${t.frames.length ? t.frames.map(f => 'at ' + esc(f)).join('\n') : '<span class="muted">no Java frames</span>'}</pre></div>`).join('') || '<p class="muted">The dump contains no thread stacks.</p>'}</div>`;
+    ${heap.threads.map(t => `<div class="thread"><h4>Thread ${t.serial}</h4><div class="frames">${t.frames.length ? t.frames.map(f => `<div>at ${esc(f)}</div>`).join('') : '<span class="muted">no Java frames</span>'}</div></div>`).join('') || '<p class="muted">The dump contains no thread stacks.</p>'}</div>`;
 
   const open = name => {
     for (const b of root.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === name);
