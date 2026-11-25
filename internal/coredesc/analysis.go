@@ -114,7 +114,7 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 		}
 		defer os.RemoveAll(view)
 	}
-	cmd := exec.CommandContext(ctx, "gdb", append(NoScripts, "--batch", "-nx", "-x", script.Name())...)
+	cmd := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-x", script.Name())...)
 	cmd.Env = append(os.Environ(), "ASSERVAT_CORE="+core, "ASSERVAT_ROOT="+view, "ASSERVAT_OUT="+out,
 		"ASSERVAT_DEBUG_DIRS="+strings.Join(d.debugDirs(ctx, core, root), ":"),
 		// gdb asks no debuginfod server: the describer has (debugDirs).
@@ -263,7 +263,7 @@ func (d Describer) view(ctx context.Context, core, root string) (string, error) 
 	names := append(coreFiles(core), "/usr/lib/debug")
 	// Without the libraries gdb still describes, as it does without a
 	// root, but then without their functions: that is said.
-	listed, err := exec.CommandContext(ctx, "gdb", append(NoScripts, "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary")...).Output()
+	listed, err := exec.CommandContext(ctx, "gdb", append(slices.Clone(NoScripts), "--batch", "-nx", "-ex", "set debuginfod enabled off", "-ex", "set sysroot "+view, "-ex", "core-file "+core, "-ex", "info sharedlibrary")...).Output()
 	if err != nil {
 		slog.Warn("the libraries that a core's program asked for are not known", "core", core, "error", err)
 	}
