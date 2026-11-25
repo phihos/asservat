@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /gotrace cmd/trace
 FROM docker.io/library/debian:stable-slim@sha256:a64d9dbf633e2a2503afac76be521dc25d9b5765150b30d31a3914d4ae969cab AS tools
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gdb libarchive-tools strace tcpdump && rm -rf /var/lib/apt/lists/*
 # The C++ libraries of Alpine, which the .NET runtime for musl asks for.
-FROM docker.io/library/alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS musl
+FROM docker.io/library/alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS musl
 RUN apk add --no-cache libstdc++ libgcc
 
 # The node agent's image, which every node pulls: without the hub's viewers
