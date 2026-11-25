@@ -126,10 +126,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 	defer back()
 	// gdb reads the program's files through a view of the root.
 	view := ""
+	var private []string
 	if root != "" {
 		var held func()
 		var files []*os.File
-		if view, files, held, err = d.view(ctx, hand[2], root, len(hand)); err != nil {
+		if view, files, private, held, err = d.view(ctx, hand[2], root, len(hand)); err != nil {
 			return nil, err
 		}
 		defer held()
@@ -160,6 +161,11 @@ func (d Describer) Describe(ctx context.Context, core, root string) ([]byte, err
 		return nil, err
 	}
 	fields["describer"] = json.RawMessage(fmt.Sprint(Version))
+	if len(private) > 0 {
+		if fields["unreadable"], err = json.Marshal(private); err != nil {
+			return nil, err
+		}
+	}
 	if len(d.ThreadIDs) > 0 {
 		if fields["threadIds"], err = json.Marshal(d.ThreadIDs); err != nil {
 			return nil, err
@@ -283,16 +289,17 @@ func (d Describer) Complete(ctx context.Context, report []byte, core, root strin
 //
 // The files are handed to gdb open, after first others: a link of the view
 // leads to its file by the place it has among them.
-func (d Describer) view(ctx context.Context, held *os.File, root string, first int) (string, []*os.File, func(), error) {
+func (d Describer) view(ctx context.Context, held *os.File, root string, first int) (string, []*os.File, []string, func(), error) {
 	core := held.Name()
 	root, err := filepath.Abs(root)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, err
 	}
 	view, err := os.MkdirTemp(d.Scratch, "view-*")
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, err
 	}
+	var private []string
 	// A link of the view leads to the file as this process holds it open,
 	// not to its path: the container can put a link in the path's place
 	// while gdb reads, and gdb would follow that from the node's root.
@@ -330,6 +337,9 @@ func (d Describer) view(ctx context.Context, held *os.File, root string, first i
 		f, err := openIn(root, file)
 		if err == nil {
 			open = append(open, f)
+			if kept(f) {
+				private = append(private, name)
+			}
 			err = os.MkdirAll(filepath.Dir(at), 0o700)
 		}
 		if err == nil {
@@ -341,7 +351,7 @@ func (d Describer) view(ctx context.Context, held *os.File, root string, first i
 		}
 	}
 	passable(d.Scratch, view)
-	return view, open, done, nil
+	return view, open, private, done, nil
 }
 
 // DescribedBy tells which version of the describer made a description; 1

@@ -109,6 +109,38 @@ func passable(scratch, dir string) {
 	})
 }
 
+// kept tells of a file of the program whether the tool, as nobody in
+// root's group, is kept from reading it. A container may keep a program or
+// a library to its own user; the describer, as root, opens it all the
+// same, and the tool then fails to: its frames show addresses, and the
+// description names the file so that the reader knows why. Only programs
+// and libraries are told: a core maps data files too, which have no frames.
+func kept(f *os.File) bool {
+	if !lowered() {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	magic := make([]byte, 4)
+	if _, err := f.ReadAt(magic, 0); err != nil || string(magic) != "\x7fELF" {
+		return false
+	}
+	stat, _ := info.Sys().(*syscall.Stat_t)
+	if stat == nil {
+		return false
+	}
+	return !readableAs(info.Mode().Perm(), stat.Uid, stat.Gid)
+}
+
+// readableAs tells whether nobody, in root's group, may read a file of
+// the permissions, the owner and the group: as everyone, as a member of
+// root's group, or as the file's owner.
+func readableAs(mode fs.FileMode, uid, gid uint32) bool {
+	return mode&0o004 != 0 || gid == 0 && mode&0o040 != 0 || uid == nobody && mode&0o400 != 0
+}
+
 // writable lets a tool that runs as nobody, in root's group, write into a
 // directory that the describer made for it, and pass through those above
 // it from scratch down.

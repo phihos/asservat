@@ -37,7 +37,10 @@ func coreText(report []byte) string {
 			Title, Version string
 			Threads        []thread
 		}
-		Modules []struct {
+		// Unreadable are the program's files that the describer's gdb
+		// could not read, because their container keeps them to its user.
+		Unreadable []string
+		Modules    []struct {
 			File    string
 			Symbols bool
 		}
@@ -148,6 +151,9 @@ func coreText(report []byte) string {
 	}
 	if len(without) > 0 {
 		fmt.Fprintf(&b, "\nWithout symbols: %s\n", strings.Join(without, ", "))
+	}
+	if len(core.Unreadable) > 0 {
+		fmt.Fprintf(&b, "\nReadable only by the container's own user, so frames in them show addresses: %s\n", strings.Join(core.Unreadable, ", "))
 	}
 	return b.String()
 }
