@@ -96,8 +96,19 @@ func (a *Agent) Run(ctx context.Context) {
 		case <-ctx.Done():
 		case <-time.After(delay):
 		}
-		delay = min(2*delay, 30*time.Second)
+		delay = nextDelay(delay)
 	}
+}
+
+// nextDelay is how long an agent waits after the delay before, when the hub
+// was still away. It grows to five seconds and no further: a hub that
+// restarts, as in every upgrade, is away for some seconds, and until its
+// agents are back it answers every request for their cluster with "no agent
+// of this cluster is connected". With 30 seconds, as before, that lasted
+// half a minute longer than the restart. What a try costs a node is one
+// connection that is refused.
+func nextDelay(delay time.Duration) time.Duration {
+	return min(2*delay, 5*time.Second)
 }
 
 func (a *Agent) request(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
