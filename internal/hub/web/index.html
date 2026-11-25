@@ -58,7 +58,6 @@
     /* The search fills its own row above the choice of what to list. */
     .head { gap: 8px; } #captureFind { order: 2; margin-left: 0; width: 100%; } .chips { order: 3; } .chips button:first-child { margin-left: 0; }
     .head h2 { flex-basis: 100%; margin-bottom: 0; }
-    #auditTable { display: block; overflow-x: auto; white-space: nowrap; }
   }
   form.row, .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; align-items: end; }
   label { display: grid; gap: 2px; font-size: 12px; }
@@ -84,6 +83,12 @@
     #watchTable thead { display: none; } #watchTable, #watchTable tbody, #watchTable tr, #watchTable td { display: block; }
     #watchTable tr { padding: 8px 0; border-bottom: 1px solid var(--line); } #watchTable td { border: 0; padding: 2px 8px; }
     #watchTable td:nth-child(5)::before { content: "Times left: "; color: var(--quiet); }
+    /* An entry of the audit log: when on its own line, then who did what to which capture, then the details. */
+    #auditTable thead { display: none; } #auditTable, #auditTable tbody, #auditTable tr { display: block; }
+    #auditTable tr { padding: 8px 12px; border-bottom: 1px solid var(--line); } #auditTable tr:last-child { border-bottom: 0; }
+    #auditTable td { display: inline; border: 0; padding: 0 6px 0 0; overflow-wrap: anywhere; }
+    #auditTable td.when, #auditTable td:last-child { display: block; padding: 0; font-size: 12px; color: var(--quiet); }
+    #auditTable td:empty { display: none; }
   }
   [hidden] { display: none !important; }
   /* Signing in: the mark, large, over the two ways in. */
