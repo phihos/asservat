@@ -104,7 +104,17 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   for (const view of ['captures', 'watches', 'clusters']) await check(`${size}: ${view}`, async () => {
     await run(`location.hash = '#${view}'`);
     await until('the page ' + view, `return !document.querySelector('[data-view=${view}]').hidden`);
-    if (view === 'captures') { await run(`document.querySelector('.capture .where')?.click()`); await sleep(300); }
+    if (view === 'captures') {
+      // A capture's details and files open with the keyboard alone.
+      await run(`document.querySelector('.capture:not(.open) .chev')?.focus()`);
+      for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
+      await sleep(300);
+      const opened = await run(`return (() => { const b = document.activeElement; return !b.classList.contains('chev') || (b.closest('.capture').classList.contains('open') && b.getAttribute('aria-expanded') === 'true'); })()`);
+      if (!opened) throw new Error('Enter on a capture did not open its details');
+      // The list is written anew with every change: the focus stays on the link it was on.
+      const kept = await run(`const link = document.querySelector('.capture.open a.open, .capture.open a[href*="/artifacts/"]'); if (!link) return true; link.focus(); const href = link.getAttribute('href'); await loadCaptures(); return document.activeElement.getAttribute('href') === href`);
+      if (!kept) throw new Error('the focus left a file\'s link when the list was written anew');
+    }
   });
   await check(`${size}: a new capture, step by step`, async () => {
     await run(`location.hash = '#new'`);
