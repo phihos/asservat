@@ -781,6 +781,11 @@ ok "$ALICE" POST "/api/captures/$id/share" '{"shared":false}' >/dev/null
 # phone's width. Scripts that fail, files that do not open and pages that run
 # out of the screen fail the run. Without a browser on the machine it is left out.
 log "the console and every viewer in a browser, wide and narrow"
+# The page of watches has watches on it: one for a crash and one for a threshold with two recordings.
+seen1=$(ok "$ALICE" POST /api/watches "$(target edge logs '{"count":2,"reason":"for the page of watches"}')" | jq -r .id)
+seen2=$(ok "$ALICE" POST /api/watches "$(target edge "" '{"durationSeconds":20,"recordings":[{"kind":"logs"},{"kind":"pod-state"}],"when":{"kind":"memory","params":{"above":"900Mi"}}}')" | jq -r .id)
+WATCHES=2
+export WATCHES
 # The demo's heap profile is a word, not a profile: the viewer has to say so.
 browsed=0; UNREADABLE=heap.pprof timeout 900 node test/e2e/browser.mjs "$URL" "$ALICE" "$ROOT" || browsed=$?
 case $browsed in
@@ -789,6 +794,8 @@ case $browsed in
       log "left out: no Chromium or Chrome is installed here" ;;
   *) fail "the pages in a browser" ;;
 esac
+# The page's watches go after the browser's result is told; a run that failed there keeps them to look at.
+for id in "$seen1" "$seen2"; do ok "$ALICE" DELETE "/api/watches/$id" >/dev/null; done
 
 # The backup and restore that docs/operations.md describes, done: the hub's
 # database, volumes and Secret go, and what was saved brings back a capture
