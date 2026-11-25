@@ -192,7 +192,15 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     if (notice) throw new Error('the file did not open: ' + notice);
     // Every view of the file, and the first row of its list.
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);
-    for (const tab of tabs) { await run(`document.querySelector('#root [data-tab="${tab}"]').click()`); await sleep(150); }
+    for (const tab of tabs) {
+      await run(`document.querySelector('#root [data-tab="${tab}"]').click()`); await sleep(150);
+      // A summary says which call its numbers are of without scrolling sideways.
+      const hidden = await run(`const name = document.querySelector('#summary:not([hidden]) tbody td.name'); if (!name) return false; const at = name.getBoundingClientRect(); return at.left < 0 || at.right > innerWidth`);
+      if (hidden) throw new Error('the summary\'s numbers stand without the name of their call in sight');
+      // A stack's frame begins on the line of its "at", however long it is.
+      const alone = await run(`return [...document.querySelectorAll('#threads:not([hidden]) .frames div')].some(frame => { const text = frame.firstChild; if (!text || text.nodeType !== 3 || text.length < 5) return false; const start = document.createRange(); start.setStart(text, 0); start.setEnd(text, 5); return start.getClientRects().length > 1; })`);
+      if (alone) throw new Error('a frame of a stack stands on the line below its "at"');
+    }
     await run(`document.querySelector('#root .row, #root .c, #root .l, #root .g')?.click()`); await sleep(150);
     // A core's threads are gone through with the arrow keys.
     const second = await run(`const rows = document.querySelectorAll('#threads [data-thread]'); if (rows.length < 2) return ''; rows[0].click(); document.getElementById('threads').focus(); return rows[1].dataset.thread`);
