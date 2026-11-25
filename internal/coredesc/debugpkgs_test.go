@@ -216,7 +216,7 @@ func TestDebugPackages(t *testing.T) {
 	}
 
 	t.Run("RPM", func(t *testing.T) {
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}
+		d := Describer{Scratch: scratchDir(t), DebuginfodURLs: server.URL, sources: sources}
 		root := root(t, rocky)
 		at, report := describe(t, d, root)
 		if !strings.HasSuffix(at, "main.c:true") {
@@ -240,14 +240,14 @@ func TestDebugPackages(t *testing.T) {
 	// A repository that fails does not take away what the one before it found.
 	t.Run("RPM, with a later repository that fails", func(t *testing.T) {
 		failing := &debugSources{RPM: map[string][]string{"rocky": {server.URL + "/rpm/{version}/{arch}/", server.URL + "/broken/{version}/{arch}/"}}, Alpine: sources.Alpine}
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: failing}
+		d := Describer{Scratch: scratchDir(t), DebuginfodURLs: server.URL, sources: failing}
 		if at, _ := describe(t, d, root(t, rocky)); !strings.HasSuffix(at, "main.c:true") {
 			t.Fatalf("the function is at %q, asked %v", at, requests())
 		}
 		requests()
 	})
 	t.Run("Alpine", func(t *testing.T) {
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}
+		d := Describer{Scratch: scratchDir(t), DebuginfodURLs: server.URL, sources: sources}
 		elsewhere := root(t, alpine)
 		root := root(t, alpine)
 		at, report := describe(t, d, root)
@@ -274,13 +274,13 @@ func TestDebugPackages(t *testing.T) {
 		if err := os.Symlink(to, dir); err != nil {
 			t.Fatal(err)
 		}
-		if at, _ := describe(t, Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}, elsewhere); !strings.HasSuffix(at, "main.c:true") {
+		if at, _ := describe(t, Describer{Scratch: scratchDir(t), DebuginfodURLs: server.URL, sources: sources}, elsewhere); !strings.HasSuffix(at, "main.c:true") {
 			t.Fatalf("with the program's directory a link, the function is at %q", at)
 		}
 		requests()
 	})
 	t.Run("a package that is not published", func(t *testing.T) {
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: server.URL, sources: sources}
+		d := Describer{Scratch: scratchDir(t), DebuginfodURLs: server.URL, sources: sources}
 		// An earlier revision than the mirror has, and the edge branch.
 		older := map[string]string{"/etc/os-release": "ID=alpine\nVERSION_ID=3.23.0_alpha20250612\n", "/lib/apk/db/installed": strings.ReplaceAll(installed, "1.0-r2", "1.0-r1")}
 		root := root(t, older)
@@ -330,7 +330,7 @@ func TestDebugPackages(t *testing.T) {
 			http.NotFound(w, r)
 		}))
 		defer knows.Close()
-		d := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL + " " + knows.URL + "/", sources: sources, wait: 300 * time.Millisecond}
+		d := Describer{Scratch: scratchDir(t), DebuginfodURLs: silent.URL + " " + knows.URL + "/", sources: sources, wait: 300 * time.Millisecond}
 		began := time.Now()
 		if at, _ := describe(t, d, root(t, map[string]string{})); !strings.HasSuffix(at, "main.c:true") {
 			t.Fatalf("the function is at %q", at)
@@ -340,7 +340,7 @@ func TestDebugPackages(t *testing.T) {
 		}
 		// What a server did not answer for is not taken as unknown: asked
 		// again, with only the silent server, it is asked for again.
-		lone := Describer{Scratch: t.TempDir(), DebuginfodURLs: silent.URL, sources: sources, wait: 300 * time.Millisecond}
+		lone := Describer{Scratch: scratchDir(t), DebuginfodURLs: silent.URL, sources: sources, wait: 300 * time.Millisecond}
 		describe(t, lone, root(t, map[string]string{}))
 		if _, err := os.Stat(filepath.Join(lone.Scratch, "debuginfo/.build-id/00/112233445566778899aabbccddeeff00112233.debug")); err == nil {
 			t.Fatal("a file that the server did not answer for is remembered as unknown")
@@ -349,7 +349,7 @@ func TestDebugPackages(t *testing.T) {
 	})
 	t.Run("nothing is fetched without debuginfod servers", func(t *testing.T) {
 		for _, files := range []map[string]string{rocky, alpine} {
-			if at, _ := describe(t, Describer{Scratch: t.TempDir(), sources: sources}, root(t, files)); at != ":false" {
+			if at, _ := describe(t, Describer{Scratch: scratchDir(t), sources: sources}, root(t, files)); at != ":false" {
 				t.Fatalf("the function is at %q", at)
 			}
 		}

@@ -108,3 +108,16 @@ func passable(scratch, dir string) {
 		return nil
 	})
 }
+
+// writable lets a tool that runs as nobody, in root's group, write into a
+// directory that the describer made for it, and pass through those above
+// it from scratch down.
+func writable(scratch, dir string) {
+	if !lowered() {
+		return
+	}
+	passable(scratch, dir)
+	if info, err := os.Stat(dir); err == nil {
+		os.Chmod(dir, info.Mode().Perm()|0o070)
+	}
+}
