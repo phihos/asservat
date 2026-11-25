@@ -176,6 +176,25 @@ func allowedTaps(params json.RawMessage) bool {
 	if json.Unmarshal(params, &asked) != nil {
 		return false
 	}
+	// The question goes to sharkd as it came. A key named twice is its
+	// last value here and may be its first there: each is named once.
+	keys := 0
+	for read := json.NewDecoder(bytes.NewReader(params)); ; {
+		token, err := read.Token()
+		if err != nil {
+			break
+		}
+		if _, isKey := token.(string); isKey && read.More() {
+			keys++
+			var value json.RawMessage
+			if read.Decode(&value) != nil {
+				return false
+			}
+		}
+	}
+	if keys != len(asked) {
+		return false
+	}
 	for key, value := range asked {
 		var text string
 		if json.Unmarshal(value, &text) != nil {

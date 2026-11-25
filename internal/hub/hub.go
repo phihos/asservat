@@ -247,7 +247,13 @@ func (h *Hub) Handler() http.Handler {
 	agent("POST /agent/captures/{id}/status", h.agentStatus)
 	agent("PUT /agent/captures/{id}/artifacts/{name...}", h.agentUpload)
 	agent("POST /agent/watches/{id}/trigger", h.agentTrigger)
-	return mux
+	// What the hub serves is of the type it names and of no other: a
+	// browser that guesses types could take a recorded file for a page
+	// (X-Content-Type-Options, as OWASP's secure headers list it).
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		mux.ServeHTTP(w, r)
+	})
 }
 
 type errStatus struct {

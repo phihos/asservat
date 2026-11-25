@@ -122,6 +122,9 @@ spec:
         - name: agent
           secret:
             secretName: {{ include "asservat.agentSecret" . }}
+            # For root alone: the agent starts a program under a workload's
+            # user to speak to a JVM, which has no business with the token.
+            defaultMode: 0400
         # A core file rests here until it is uploaded.
         - name: scratch
           emptyDir: {}
