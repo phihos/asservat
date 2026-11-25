@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,10 @@ type standIn struct {
 	signals  int
 	requests []string
 	deaf     bool // never opens its socket
+	// floods is what it answers without end instead of a JVM's answer:
+	// "status" a status line that never ends, "answer" a status and then
+	// words that never end.
+	floods string
 }
 
 const standInPID = 7
@@ -104,6 +109,16 @@ func (s *standIn) answer(conn net.Conn) {
 	s.mu.Lock()
 	s.requests = append(s.requests, string(request))
 	s.mu.Unlock()
+	if s.floods != "" {
+		if s.floods == "answer" {
+			fmt.Fprint(conn, "0\n")
+		}
+		for chunk := bytes.Repeat([]byte("x"), 1<<20); ; {
+			if _, err := conn.Write(chunk); err != nil {
+				return
+			}
+		}
+	}
 	words := strings.Split(string(request), "\x00")
 	if words[0] != "1" || words[1] != "jcmd" || words[3] != "" || words[4] != "" {
 		fmt.Fprint(conn, "101\nOperation not recognized\n")
@@ -491,5 +506,31 @@ func TestJVMIsSignalledOnceByDiagnosticsAtTheSameTime(t *testing.T) {
 	wg.Wait()
 	if s.signals != 1 || len(s.left()) != 0 {
 		t.Errorf("signals: %d, left in /tmp: %v", s.signals, s.left())
+	}
+}
+
+// What answers on the attach socket is the workload's process, which may be
+// no JVM at all: an answer that never ends is not read into the agent's
+// memory, which is the node's and not the workload's to fill.
+func TestJVMAnswerWithoutEndIsNotKept(t *testing.T) {
+	for floods, diagnostic := range map[string]string{"status": "jvm-threads", "answer": "jvm-heapdump"} {
+		s := newStandIn(t)
+		s.floods = floods
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		done := make(chan error, 1)
+		go func() { done <- s.client().run(diagnostic, 0, strings.NewReader(""), io.Discard) }()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Errorf("an answer without end to %s was taken", diagnostic)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("the agent still reads the answer to %s", diagnostic)
+		}
+		runtime.ReadMemStats(&after)
+		if grown := after.TotalAlloc - before.TotalAlloc; grown > 64<<20 {
+			t.Errorf("the answer to %s took %d MiB", diagnostic, grown>>20)
+		}
 	}
 }
