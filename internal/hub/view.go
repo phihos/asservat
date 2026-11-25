@@ -431,7 +431,7 @@ func (h *Hub) packetText(ctx context.Context, a storedArtifact, filter string, h
 		if len(frames) == 0 {
 			fmt.Fprintf(&text, "\nNo packet matches %q.", filter)
 			if headersOnly {
-				text.WriteString(" The capture was recorded without payload: it holds the packets' headers only, so a filter on what packets carry (http, dns, tls fields) matches none. Filter on addresses, ports and TCP fields, or record again with payload, which needs approval.")
+				text.WriteString(" The capture was recorded without payload and holds the packets' headers only: if the filter is on what packets carry (http, dns, tls fields), that is why. Such a filter needs a capture with payload, which needs approval; filters on addresses, ports and TCP fields work as they are.")
 			}
 			return text.String() + "\n", nil
 		}
