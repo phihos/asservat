@@ -126,21 +126,32 @@ func scanCapture(r pgx.CollectableRow) (api.Capture, error) {
 // reading all of them for each report took time and memory by the square
 // of the pods (measured with 2,000: 39 seconds of the hub's processor and
 // 2 GiB for one capture).
-func (s *Store) TaskOf(ctx context.Context, id, pod string) (c api.Capture, task bool, err error) {
+func (s *Store) TaskOf(ctx context.Context, id, pod string) (reported, error) {
+	c := reported{}
 	var request []byte
-	err = s.db.QueryRow(ctx, `SELECT c.id::text, c.request, c.state, EXISTS (SELECT 1 FROM tasks WHERE capture_id = c.id AND pod = $2)
- FROM captures c WHERE c.id = $1::uuid`, id, pod).Scan(&c.ID, &request, &c.State, &task)
+	err := s.db.QueryRow(ctx, `SELECT c.id::text, c.request, c.state, EXISTS (SELECT 1 FROM tasks WHERE capture_id = c.id AND pod = $2)
+ FROM captures c WHERE c.id = $1::uuid`, id, pod).Scan(&c.ID, &request, &c.State, &c.Task)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return c, false, ErrNotFound
+		return c, ErrNotFound
 	}
 	if err != nil {
-		return c, false, err
+		return c, err
 	}
-	if err := json.Unmarshal(request, &c.CaptureRequest); err != nil {
-		return c, false, err
+	if err := json.Unmarshal(request, &c.Request); err != nil {
+		return c, err
 	}
-	c.Normalize()
-	return c, task, nil
+	c.Request.Normalize()
+	return c, nil
+}
+
+// reported is what the hub reads of a capture when an agent reports on a
+// pod of it or sends a file: no more than these.
+type reported struct {
+	ID      string
+	Request api.CaptureRequest
+	State   string
+	// Task tells whether the pod is one of the capture's.
+	Task bool
 }
 
 func (s *Store) Capture(ctx context.Context, id string) (api.Capture, error) {

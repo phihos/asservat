@@ -197,19 +197,18 @@ func (h *Hub) agentReply(w http.ResponseWriter, r *http.Request, cluster string)
 	return nil
 }
 
-// agentCapture returns the capture if it belongs to the agent's cluster.
 // agentCapture returns the capture that an agent of the cluster reports on
 // for a pod, with its request and its state alone, and whether the pod is
 // one of its tasks (see Store.TaskOf).
-func (h *Hub) agentCapture(ctx context.Context, cluster, id, pod string) (api.Capture, bool, error) {
+func (h *Hub) agentCapture(ctx context.Context, cluster, id, pod string) (reported, error) {
 	if uuid.Validate(id) != nil {
-		return api.Capture{}, false, ErrNotFound
+		return reported{}, ErrNotFound
 	}
-	c, task, err := h.Store.TaskOf(ctx, id, pod)
-	if err == nil && c.Cluster != cluster {
+	c, err := h.Store.TaskOf(ctx, id, pod)
+	if err == nil && c.Request.Cluster != cluster {
 		err = ErrNotFound
 	}
-	return c, task, err
+	return c, err
 }
 
 func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string) error {
@@ -217,14 +216,14 @@ func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !slices.Contains([]string{api.StateRunning, api.StateCompleted, api.StateFailed}, in.State) {
 		return errStatus{http.StatusBadRequest, "invalid status"}
 	}
-	c, _, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), in.Pod)
+	c, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), in.Pod)
 	if err != nil {
 		return err
 	}
 	// A recording's kind and state are shown as they are: they are of the
 	// capture and of the states there are, whoever holds the join token.
 	for _, rec := range in.Recordings {
-		if c.Recording(rec.Kind) == nil || !slices.Contains([]string{api.StateWaiting, api.StateRunning, api.StateCompleted, api.StateFailed}, rec.State) {
+		if c.Request.Recording(rec.Kind) == nil || !slices.Contains([]string{api.StateWaiting, api.StateRunning, api.StateCompleted, api.StateFailed}, rec.State) {
 			return errStatus{http.StatusBadRequest, "invalid status of a recording"}
 		}
 	}
@@ -240,14 +239,14 @@ func (h *Hub) agentStatus(w http.ResponseWriter, r *http.Request, cluster string
 func (h *Hub) agentUpload(w http.ResponseWriter, r *http.Request, cluster string) error {
 	// A file is "<pod>/<file>" of one of the capture's pods.
 	pod, file, _ := strings.Cut(r.PathValue("name"), "/")
-	c, task, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), pod)
+	c, err := h.agentCapture(r.Context(), cluster, r.PathValue("id"), pod)
 	if err != nil {
 		return err
 	}
 	if c.State != api.StateQueued && c.State != api.StateRunning {
 		return errStatus{http.StatusConflict, "the capture has ended"}
 	}
-	if file == "" || strings.Contains(file, "/") || !task {
+	if file == "" || strings.Contains(file, "/") || !c.Task {
 		return errStatus{http.StatusBadRequest, "the file name must be <pod>/<file> of a pod of the capture"}
 	}
 	// A core that is mostly holes comes packed, and is kept so.
