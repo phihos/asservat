@@ -80,6 +80,9 @@ export default async function (root) {
     threads: t => `<span>${t.current ? '<b title="The thread that gdb selected: for a crash, the one that crashed">●</b> ' : ''}Thread ${esc(t.id)}${t.name ? ` "${esc(t.name)}"` : ''} <span class="dim">LWP ${esc(t.systemId)}</span></span><span class="dim">${esc(t.frames[0] ? named(t.frames[0]) : '')}</span>`,
     goroutines: g => `<span>${g.current ? '<b title="The goroutine of the thread that the core selects: for a crash, the one that crashed">●</b> ' : ''}Goroutine ${esc(g.id)} <span class="dim">${esc(g.status)}${g.threadSystemId ? ` · LWP ${esc(g.threadSystemId)}` : ''}</span></span><span class="dim">${esc(g.function || (g.frames[0] ? named(g.frames[0]) : ''))}</span>`,
   };
+  // Why a stack is empty: a runtime's thread that runs none of the runtime's code has its machine stack under Threads.
+  const noFrames = t => kind !== 'threads' && kind !== 'goroutines' && t.threadSystemId && lists.threads?.some(m => String(m.systemId) === String(t.threadSystemId))
+    ? `This thread runs no code of the runtime. Its machine stack is under Threads, LWP ${esc(t.threadSystemId)}.` : 'The core holds no frames of this stack.';
   const draw = () => {
     const words = $('find').value.toLowerCase();
     for (const b of $('kinds').querySelectorAll('button')) b.classList.toggle('on', b.dataset.kind === kind);
@@ -87,6 +90,7 @@ export default async function (root) {
       `<div class="row${t === thread ? ' selected' : ''}" data-thread="${esc(t.id)}" title="${esc([t.name, t.status, t.function || (t.frames[0] ? named(t.frames[0]) : '')].filter(Boolean).join(' · '))}">${(rows[kind] || runtimeRow)(t)}</div>`).join('') || `<div class="dim pad">No ${kind === 'goroutines' ? 'goroutine' : 'thread'} matches.</div>`)
       + (kind === 'goroutines' && report.goroutinesCut ? `<div class="dim pad">The program has more goroutines. ${lists.goroutines.length} are shown, including all that were running on a thread.</div>` : '');
     $('stack').innerHTML = !thread ? '' : thread.frames.map(f => `<div class="row${f === frame ? ' selected' : ''}" data-level="${esc(f.level)}" title="${esc(named(f))}"><span>${f.scanned ? '<span class="dim" title="Found by scanning the stack">≈ </span>' : ''}${esc(named(f))}</span><span class="dim">${esc(where(f))}</span></div>`).join('')
+      + (thread.frames.length ? '' : `<div class="dim pad">${noFrames(thread)}</div>`)
       + (thread.frames.some(f => f.scanned) ? '<div class="dim pad">≈ A library on this stack has no unwind tables (musl, the C library of Alpine images, is one example). The frames above it were found from return addresses on the stack. They are very likely correct, but not certain.</div>' : '')
       + (thread.cut ? '<div class="dim pad">The stack is deeper than this. Only the innermost 256 frames are shown.</div>' : '');
     $('frame').innerHTML = !frame ? '<p class="dim pad">No frames.</p>' : `
