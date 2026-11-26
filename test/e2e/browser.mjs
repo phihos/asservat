@@ -206,7 +206,7 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     }
     await run(`document.querySelector('#root .row, #root .c, #root .l, #root .g')?.click()`); await sleep(150);
     // A thread without frames says so where its stack would stand.
-    const silent = await run(`for (const kind of [...document.querySelectorAll('#kinds button')].map(b => b.dataset.kind)) { document.querySelector('#kinds [data-kind="' + kind + '"]').click(); for (const id of [...document.querySelectorAll('#threads [data-thread]')].slice(0, 50).map(r => r.dataset.thread)) { document.querySelector('#threads [data-thread="' + id + '"]').click(); if (!document.getElementById('stack').textContent.trim()) return kind + ' ' + id; } } document.querySelector('#kinds button')?.click(); return ''`);
+    const silent = await run(`const kinds = [...document.querySelectorAll('#kinds button')].map(b => b.dataset.kind); for (const kind of kinds.length ? kinds : ['']) { if (kind) document.querySelector('#kinds [data-kind="' + kind + '"]').click(); for (const id of [...document.querySelectorAll('#threads [data-thread]')].slice(0, 50).map(r => r.dataset.thread)) { document.querySelector('#threads [data-thread="' + id + '"]').click(); if (!document.getElementById('stack').textContent.trim()) return (kind || 'threads') + ' ' + id; } } document.querySelector('#kinds button')?.click(); return ''`);
     if (silent) throw new Error('the stack of a thread without frames is left empty: ' + silent);
     // A core's threads are gone through with the arrow keys.
     const second = await run(`const rows = document.querySelectorAll('#threads [data-thread]'); if (rows.length < 2) return ''; rows[0].click(); document.getElementById('threads').focus(); return rows[1].dataset.thread`);
