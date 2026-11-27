@@ -277,9 +277,8 @@ for Go programs Asservat reads function names from the binary itself.
 The sampling profiler reads the programs of every process on the node, not
 only of the pods it records, and logs each one it cannot read, such as
 `Failed to load /app/erts-17.0.2/bin/beam.smp ... symbol not found`. These
-lines come from the profiler itself, as warnings or errors. A profile misses
-function names only for the program that a line names; everything else in it
-is complete.
+lines come from the profiler itself, as warnings or errors. In a profile
+only the stacks of the program that a line names are incomplete.
 
 ### The audit log
 
