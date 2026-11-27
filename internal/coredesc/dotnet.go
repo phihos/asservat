@@ -53,6 +53,13 @@ const DotnetDir = "/opt/asservat-dotnet"
 // trusted as far as HTTPS to these hosts is.
 const microsoftSymbols = "https://msdl.microsoft.com/download/symbols"
 
+// symbolServerPatience is how many times longer Microsoft's symbol server
+// may be silent than a server of debug packages: four minutes, the time
+// that Microsoft's own client (Microsoft.SymbolStore) gives it. It takes
+// long over a file that it is rarely asked for, as the helper of a new
+// runtime for musl: ten seconds were too short for that twice in a row.
+const symbolServerPatience = 4 * time.Minute / debugPackageWait
+
 const (
 	coreclr = "libcoreclr.so"
 	dac     = "libmscordaccore.so"
@@ -399,6 +406,7 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 		server = microsoftSymbols
 	}
 	f := d.fetcher(ctx, "dotnet-helpers")
+	f.wait *= symbolServerPatience
 	if err := os.MkdirAll(f.cache, 0o700); err != nil {
 		return "", err
 	}
