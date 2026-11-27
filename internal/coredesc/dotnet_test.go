@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // What dotnet-dump says of the threads, stacks and an exception of a
@@ -606,5 +607,26 @@ func TestHelperForMuslIsTold(t *testing.T) {
 	build("-o", "for-glibc.so", "empty.c")
 	if !forMusl(filepath.Join(dir, "for-musl.so")) || forMusl(filepath.Join(dir, "for-glibc.so")) || forMusl(filepath.Join(dir, "none.so")) {
 		t.Fatal("for musl:", forMusl(filepath.Join(dir, "for-musl.so")), forMusl(filepath.Join(dir, "for-glibc.so")), forMusl(filepath.Join(dir, "none.so")))
+	}
+}
+
+// Microsoft's symbol server takes its time over a helper that it is rarely
+// asked for: it is waited for longer than a server of debug packages is.
+func TestDotnetHelperIsWaitedForLonger(t *testing.T) {
+	here, known := map[string]elf.Machine{"amd64": elf.EM_X86_64, "arm64": elf.EM_AARCH64}[runtime.GOARCH]
+	if !known {
+		t.Skip("no helper libraries for this processor")
+	}
+	const wait = 50 * time.Millisecond
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(6 * wait) // longer than both attempts at a debug package would wait
+		w.Write(syntheticLibrary(here, []byte("the helper, late")))
+	}))
+	defer server.Close()
+	runtimeFile := filepath.Join(t.TempDir(), "libcoreclr.so")
+	os.WriteFile(runtimeFile, syntheticLibrary(here, []byte{0xdd, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33}), 0o755)
+	dir, err := Describer{Scratch: t.TempDir(), symbols: server.URL, wait: wait}.dotnetHelper(context.Background(), runtimeFile)
+	if err != nil || dir == "" {
+		t.Fatalf("a helper that the server took its time over: %q, %v", dir, err)
 	}
 }
