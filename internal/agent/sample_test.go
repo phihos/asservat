@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/google/pprof/profile"
 	"go.opentelemetry.io/ebpf-profiler/libpf"
+	"go.opentelemetry.io/ebpf-profiler/tracer"
 )
 
 // Sampled stacks become a profile that pprof reads: interpreted frames by
@@ -323,5 +325,40 @@ func TestTheProfilersGoroutinesEndInOrder(t *testing.T) {
 	case <-closed:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the profiler was not closed")
+	}
+}
+
+// The profiler finds out at its start how to tell a pod's processes from
+// their numbers, and now and then fails at it. Left to itself it then goes
+// on in a way that sees no process of a pod, and every profile is empty:
+// the start is tried again, and only a kernel that cannot do it at all gets
+// the profiler's own choice.
+func TestTheProfilerIsStartedSoThatItSeesPods(t *testing.T) {
+	unavailable := errors.New("failed to load rodata: recursive PID namespace translation requires reading PID namespace level: read task_struct thread_pid: system analysis helper failed")
+	for _, test := range []struct {
+		name    string
+		answers []error
+		modes   []tracer.PIDNamespaceTranslationMode
+		fails   bool
+	}{
+		{"at once", []error{nil}, []tracer.PIDNamespaceTranslationMode{tracer.PIDNamespaceTranslationModeRecursive}, false},
+		{"the second time", []error{unavailable, nil}, []tracer.PIDNamespaceTranslationMode{tracer.PIDNamespaceTranslationModeRecursive, tracer.PIDNamespaceTranslationModeRecursive}, false},
+		{"not on this kernel", []error{unavailable, unavailable, nil}, []tracer.PIDNamespaceTranslationMode{tracer.PIDNamespaceTranslationModeRecursive, tracer.PIDNamespaceTranslationModeRecursive, tracer.PIDNamespaceTranslationModeAuto}, false},
+		// Whatever else fails is tried the profiler's way, as before, and fails as that does.
+		{"another failure", []error{errors.New("operation not permitted"), errors.New("operation not permitted")}, []tracer.PIDNamespaceTranslationMode{tracer.PIDNamespaceTranslationModeRecursive, tracer.PIDNamespaceTranslationModeAuto}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var modes []tracer.PIDNamespaceTranslationMode
+			started, err := seeingPods(func(mode tracer.PIDNamespaceTranslationMode) (int, error) {
+				modes = append(modes, mode)
+				return len(modes), test.answers[len(modes)-1]
+			})
+			if !slices.Equal(modes, test.modes) {
+				t.Errorf("started with %v, want %v", modes, test.modes)
+			}
+			if (err != nil) != test.fails || (!test.fails && started != len(test.modes)) {
+				t.Errorf("got %d, %v", started, err)
+			}
+		})
 	}
 }
