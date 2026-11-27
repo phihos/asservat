@@ -229,7 +229,7 @@ fetch "$ALICE" "$id" "$name" "$WORK/pod.json"
 [ "$(jq -r .metadata.namespace "$WORK/pod.json")" = shop ] || fail "pod.json"
 # The pod and its events as kubectl prints them, without the managers of their fields.
 fetch "$ALICE" "$id" "${name%pod.json}events.json" "$WORK/events.json"
-grep -L managedFields "$WORK/pod.json" "$WORK/events.json" | wc -l | grep -qx 2 || fail "pod state holds managedFields"
+if grep -q managedFields "$WORK/pod.json" "$WORK/events.json"; then fail "pod state holds managedFields: $(grep -m2 -B3 managedFields "$WORK/pod.json" "$WORK/events.json" | head -c 500)"; fi
 [ "$(status "$MALLORY" GET "/api/captures/$id/artifacts/$name")" = 404 ] || fail "mallory downloaded evidence"
 id=$(capture "$ALICE" "$(target edge logs '{"params":{"tailLines":"20"}}')"); completed "$ALICE" "$id"
 fetch "$ALICE" "$id" "$(first_artifact "$ALICE" "$id")" "$WORK/web.log"
