@@ -1,7 +1,7 @@
 // The trace viewer shows strace's output as a table of calls that can be
 // narrowed, and the summary that "strace -c" prints: time, calls and errors
 // per system call.
-import {$, esc, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
+import {$, esc, filePath, headers, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
   <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span id="shown" class="tally"></span></div>
@@ -114,11 +114,19 @@ export default async function (root, {capture}) {
     s.calls++; s.errors += c.failed ? 1 : 0; s.seconds += c.seconds || 0;
     per.set(c.name, s);
   }
-  const rows = [...per.values()].sort((a, b) => b.seconds - a.seconds), all = rows.reduce((t, s) => ({calls: t.calls + s.calls, errors: t.errors + s.errors, seconds: t.seconds + s.seconds}), {calls: 0, errors: 0, seconds: 0});
-  const line = (s, name) => `<td class="name">${name}</td><td>${all.seconds ? (s.seconds * 100 / all.seconds).toFixed(2) : '0.00'}</td><td>${s.seconds.toFixed(6)}</td><td>${s.calls ? Math.round(s.seconds * 1e6 / s.calls) : 0}</td><td>${s.calls}</td><td>${s.errors || ''}</td>`;
-  $('summary').innerHTML = `<table><thead><tr><th>syscall</th><th>% time</th><th>seconds</th><th>usecs/call</th><th>calls</th><th>errors</th></tr></thead>
-    <tbody>${rows.map(s => `<tr data-name="${esc(s.name)}" title="Show these calls">${line(s, esc(s.name))}</tr>`).join('')}</tbody>
-    <tfoot><tr>${line(all, 'total')}</tr></tfoot></table>`;
+  const sum = (rows, all, said = '') => {
+    const line = (s, name) => `<td class="name">${name}</td><td>${all.seconds ? (s.seconds * 100 / all.seconds).toFixed(2) : '0.00'}</td><td>${s.seconds.toFixed(6)}</td><td>${s.calls ? Math.round(s.seconds * 1e6 / s.calls) : 0}</td><td>${s.calls}</td><td>${s.errors || ''}</td>`;
+    $('summary').innerHTML = (said && `<p class="said">${esc(said)}</p>`) + `<table><thead><tr><th>syscall</th><th>% time</th><th>seconds</th><th>usecs/call</th><th>calls</th><th>errors</th></tr></thead>
+      <tbody>${rows.map(s => `<tr data-name="${esc(s.name)}" title="Show these calls">${line(s, esc(s.name))}</tr>`).join('')}</tbody>
+      <tfoot><tr>${line(all, 'total')}</tr></tfoot></table>`;
+  };
+  const rows = [...per.values()].sort((a, b) => b.seconds - a.seconds);
+  sum(rows, rows.reduce((t, s) => ({calls: t.calls + s.calls, errors: t.errors + s.errors, seconds: t.seconds + s.seconds}), {calls: 0, errors: 0, seconds: 0}),
+    truncated ? 'Of the beginning of the trace that is shown.' : '');
+  // Of a trace larger than is loaded, the hub sums up the whole.
+  if (truncated) fetch(`/api/captures/${capture.id}/summaries/${filePath}`, {headers}).then(r => r.ok ? r.json() : null).then(whole => {
+    if (whole) sum(whole.calls, whole.total, 'Of the whole trace. The list of calls holds its beginning only.');
+  }).catch(() => {});
 
   for (const id of ['text', 'syscall', 'pid', 'failed', 'slower']) $(id).oninput = narrow;
   $('trows').onclick = e => { const r = e.target.closest('.c'); if (r && !getSelection().toString()) select(Number(r.dataset.i)); };
