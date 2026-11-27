@@ -625,8 +625,11 @@ meanwhile waits for it, and after a restart of the hub the first opening
 does the work. The hub decrypts the core into its work directory for this,
 which so needs room for the largest such core. Where a tool fails, as
 when a server does not answer, the description stays gdb's and goes on
-awaiting the stacks: the hub tries again when the core is opened after it
-has started anew, not at every opening. dotnet-dump
+awaiting the stacks: the hub tries again when the core is opened ten
+minutes or more after the last try. Not at every opening, as a try
+decrypts the whole core and may wait minutes for a server; and not only
+after the hub has started anew, as it was until Microsoft's symbol server
+was seen to be down for some minutes at a time. dotnet-dump
 reads cores of its own processor only: the .NET cores of a cluster of
 another architecture than the hub's are described without managed stacks.
 

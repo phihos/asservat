@@ -353,7 +353,7 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	}
 
 	// The tool fails on a third core: its description awaits the stacks as
-	// before, who opens it is told so, and the tool is not run for it again.
+	// before, who opens it is told so, and the tool is not run for it again at once.
 	const later = "api-1/core.later"
 	runs := func() int {
 		b, _ := os.ReadFile(h.pystack + ".runs")
@@ -389,13 +389,18 @@ func TestHubAddsTheRuntimeStacksThatTheAgentLeft(t *testing.T) {
 	if left := coredesc.Awaits(report.Bytes()); len(left) != 1 || runs() != before+1 {
 		t.Fatalf("after the tool failed the description awaits %v, and the tool ran %d times", left, runs()-before)
 	}
-	// A hub that starts anew, here with the tool mended, tries once more.
+	// What the tool failed at may pass, as a symbol server that was down:
+	// with the tool mended, who opens the core a while later gets its
+	// stacks, without the hub starting anew. Until then it is not run again.
 	os.Remove(h.pystack + ".broken")
+	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, later); result.err != nil || result.described || result.reason == "" || runs() != before+1 {
+		t.Fatalf("right after the tool failed: %+v, and the tool ran %d times", result, runs()-before)
+	}
 	h.mu.Lock()
-	h.undescribed = map[string]bool{}
+	h.awaited[c.ID+"/"+later] = time.Now().Add(-describeAgainAfter - time.Second)
 	h.mu.Unlock()
 	if result := <-h.renew(ctx, User{Name: "alice"}, c.ID, later); result.err != nil || !result.described {
-		t.Fatalf("after the hub started anew: %+v", result)
+		t.Fatalf("a while after the tool failed: %+v", result)
 	}
 }
 
