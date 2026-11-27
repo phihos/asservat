@@ -400,6 +400,10 @@ const freshClass = id => id === fresh.id && Date.now() < fresh.until ? ' fresh' 
 
 // Which captures are opened: those in progress by themselves, any other by a click.
 const toggled = new Map();
+// A capture of more pods than these lists them a line each, and a pod's
+// files when it is opened: more of them with their files fill screen after
+// screen. podsToggled says which pods the user opened or closed.
+const podsOpen = 5, podsToggled = new Map();
 let captureFilter = 'all';
 const inProgress = c => ['PendingApproval', 'Queued', 'Running'].includes(c.state);
 
@@ -425,8 +429,9 @@ async function loadCaptures() {
   // The list is written anew with every change: who works it with the keyboard stays where they were.
   // They stay on the same control of the same capture (a button by what it does, a link by where it leads), or,
   // when that capture has gone, at its place in the list.
-  const controls = 'a[href], button', held = document.activeElement?.closest?.('#captures .capture');
-  const focused = held && {id: held.dataset.capture, control: document.activeElement.dataset.act || document.activeElement.getAttribute('href'), place: [...$('captures').children].indexOf(held)};
+  // A control is told by what it does, the pod it opens or where it leads.
+  const controls = 'a[href], button', control = c => c.dataset.act || c.dataset.pod || c.getAttribute('href'), held = document.activeElement?.closest?.('#captures .capture');
+  const focused = held && {id: held.dataset.capture, control: control(document.activeElement), place: [...$('captures').children].indexOf(held)};
   $('captures').innerHTML = list.map(c => {
     const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
     // Each pod's recordings, in the order they were asked for, and under
@@ -439,6 +444,7 @@ async function loadCaptures() {
       const open = a.viewer && a.size ? `<a class="open" href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here">Open</a>` : '<span></span>';
       return `<div class="file${a.size ? '' : ' nothing'}"><span class="name" title="sha256 ${a.sha256}">${esc(name)}</span><span class="is">${esc(a.size ? whatIs(name) : 'empty: nothing was recorded')}</span><span class="size"${a.stored ? ` title="${fileSize(a.size)} to download. The hub stores ${fileSize(a.stored)} of it: a core dump is as large as the memory its process mapped, and what the process never used is not stored."` : ''}>${fileSize(a.size)}</span>${open}<a href="${address}" title="A copy in the file's own format, for your tools">Download</a></div>`;
     };
+    const folds = c.tasks.length > podsOpen;
     const pods = c.tasks.map(t => {
       const mine = c.artifacts.filter(a => a.name.startsWith(t.pod + '/'));
       // A file whose recording was not asked for, which should not be, is shown all the same.
@@ -451,8 +457,14 @@ async function loadCaptures() {
         return `<div class="rec rec-${esc(r.state)}"><div class="of"><span class="mark" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''}</span><b>${esc(kindNames[kind] || kind)}</b>${given ? `<span class="given">${esc(given)}</span>` : ''}${r.message ? `<span class="said">${esc(r.message)}</span>` : ''}</div>${of(kind).map(fileLine).join('')}</div>`;
       }).join('');
       const others = of('').map(fileLine).join('');
-      return `<div class="pod"><span>${esc(t.pod)}</span><span class="muted">on ${esc(t.node || 'no node')}${t.recordings?.length ? '' : ' · ' + esc(t.state)}</span></div>${groups}${others ? `<div class="rec"><div class="of"><b>Other files</b></div>${others}</div>` : ''}`
+      const head = `<span>${esc(t.pod)}</span><span class="muted">on ${esc(t.node || 'no node')}${t.recordings?.length ? '' : ' · ' + esc(t.state)}</span>`;
+      const body = `${groups}${others ? `<div class="rec"><div class="of"><b>Other files</b></div>${others}</div>` : ''}`
         + (t.message && !t.recordings?.some(r => r.message) ? `<div class="muted">${esc(t.message)}</div>` : '');
+      if (!folds) return `<div class="podbox open"><div class="pod">${head}</div>${body}</div>`;
+      // The line of a folded pod says how each recording went on it and what it left.
+      const key = c.id + '/' + t.pod, shown = !!podsToggled.get(key);
+      const went = asked.map(kind => { const state = states.get(kind)?.state || (t.state === 'Failed' ? 'Failed' : 'Waiting'); return `<span class="rec-${esc(state)}"><span class="mark" title="${marks[state]?.[1] || ''}">${marks[state]?.[0] || ''}</span>${esc(kindNames[kind] || kind)}</span>`; }).join('');
+      return `<div class="podbox folds${shown ? ' open' : ''}"><button class="pod" data-pod="${esc(key)}" aria-expanded="${shown}">${head}<span class="went">${went}</span><span class="muted">${mine.length ? `${plural(mine.length, 'file')}, ${fileSize(mine.reduce((n, a) => n + a.size, 0))}` : 'no files'}</span></button><div class="podbody">${body}</div></div>`;
     }).join('') || '<div class="muted">No pods were recorded.</div>';
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
@@ -487,7 +499,7 @@ async function loadCaptures() {
   }).join('');
   if (focused) {
     const card = document.querySelector(`.capture[data-capture="${focused.id}"]`), near = $('captures').children[Math.min(focused.place, $('captures').children.length - 1)];
-    (card ? [...card.querySelectorAll(controls)].find(c => (c.dataset.act || c.getAttribute('href')) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();
+    (card ? [...card.querySelectorAll(controls)].find(c => control(c) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();
   }
   countdown();
 }
@@ -631,6 +643,13 @@ $('states').onclick = guard(async e => {
 $('captures').onclick = guard(async e => {
   const {act, id} = e.target.dataset, card = e.target.closest('.capture');
   if (!act) {
+    // A click on the line of a folded pod opens or closes its files.
+    const pod = e.target.closest('button.pod');
+    if (pod) {
+      podsToggled.set(pod.dataset.pod, pod.parentElement.classList.toggle('open'));
+      pod.setAttribute('aria-expanded', pod.parentElement.classList.contains('open'));
+      return;
+    }
     // A click on the line opens or closes the capture; links and text selection in the details are left alone.
     if (card && e.target.closest('.line')) {
       toggled.set(card.dataset.capture, card.classList.toggle('open'));

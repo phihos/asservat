@@ -258,6 +258,42 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     await until('the refusal', `return !document.getElementById('notice').classList.contains('opening')`);
     if (!/No file was specified/.test(await run(`return document.getElementById('notice').innerText`))) throw new Error('the viewer took a path for a capture');
   });
+  // A capture of a workload with many pods lists them a line each, and a
+  // pod's files when it is opened: with all of them open, a capture of 200
+  // pods was a page of 55,000 pixels.
+  const kinds = ['logs', 'pod-state', 'pcap'], podsOf = n => Array.from({length: n}, (_, i) => `web-${String(i).padStart(3, '0')}`);
+  const captureOf = pods => ({id: made, number: 9, cluster: 'c', namespace: 'n', workload: 'Deployment/w', requester: 'someone', state: 'Completed', createdAt: new Date().toISOString(), recordings: kinds.map(kind => ({kind})),
+    tasks: pods.map((pod, i) => ({pod, node: 'node', state: 'Completed', recordings: kinds.map(kind => ({kind, state: i === 7 && kind === 'pcap' ? 'Failed' : 'Completed', message: i === 7 && kind === 'pcap' ? 'tcpdump said no' : ''}))})),
+    artifacts: pods.flatMap(pod => [{name: pod + '/app.log', size: 100, sha256: 'a', recording: 'logs'}, {name: pod + '/pod.json', size: 100, sha256: 'a', recording: 'pod-state'}, {name: pod + '/capture.pcap', size: 100, sha256: 'a', recording: 'pcap'}])});
+  const shown = () => run(`return [...document.querySelectorAll('.capture.open .file')].filter(f => f.offsetParent).length`);
+  for (const [size, [width, height, mobile]] of Object.entries(widths)) await check(`${size}: a capture of many pods`, async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+    hostile = [[/^\/api\/captures(\?.*)?$/, [captureOf(podsOf(40))]]];
+    await open(hub + '/#captures');
+    await until('the list', `return document.querySelector('.capture')`);
+    // Asked for anew: the page may be at the list already, with the capture of few pods.
+    await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
+    await run(`document.querySelector('.capture:not(.open) .chev')?.click()`); await sleep(200);
+    if (await shown()) throw new Error(`${await shown()} files are listed before a pod is opened`);
+    const tall = await run(`return document.querySelector('.capture.open').getBoundingClientRect().height`);
+    if (tall > 3 * height) throw new Error(`the capture is ${Math.round(tall)} px tall, more than three screens`);
+    // The line of a pod says what failed on it, and opens its files.
+    if (!/failed|✗/.test(await run(`return document.querySelectorAll('.capture.open .podbox')[7].querySelector('.pod').innerText`))) throw new Error('the line of a pod does not say that a recording failed on it');
+    await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].click()`); await sleep(100);
+    if (await shown() !== 3) throw new Error(`${await shown()} files are listed for the opened pod, want 3`);
+    if (!/tcpdump said no/.test(await run(`return document.querySelectorAll('.capture.open .podbox')[7].innerText`))) throw new Error('the opened pod does not say why its recording failed');
+    // It stays open when the list is written anew, with the keyboard still on its line, and closes again.
+    await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].focus()`);
+    await run(`loadCaptures()`); await sleep(400);
+    if (await shown() !== 3) throw new Error('the opened pod closed when the list was written anew');
+    if (!await run(`return document.activeElement === document.querySelectorAll('.capture.open .podbox .pod')[7]`)) throw new Error('the keyboard left the line of the pod when the list was written anew');
+    await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].click()`); await sleep(100);
+    if (await shown()) throw new Error('the pod did not close');
+    // A few pods are shown with their files, as before.
+    hostile = [[/^\/api\/captures(\?.*)?$/, [captureOf(podsOf(3))]]];
+    await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
+    if (await shown() !== 9) throw new Error(`${await shown()} files are listed for three pods, want 9`);
+  });
   await send('Fetch.disable');
   hostile = [];
 }
