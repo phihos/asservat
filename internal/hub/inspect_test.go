@@ -99,6 +99,18 @@ func TestInspection(t *testing.T) {
 	if code, _ := get("mallory-token", "GET", "/processes?workload=Deployment/api"); code != 403 {
 		t.Fatal("processes listed without the exec right", code)
 	}
+	// A request that names no workload, or none of a kind there is, is the
+	// caller's mistake and not a failure of the cluster's agents (502).
+	for _, path := range []string{"/processes", "/processes?workload=Job/api", "/containers?workload=api"} {
+		if code, _ := get("alice-token", "GET", path); code != 400 {
+			t.Fatalf("%s: %d, want 400", path, code)
+		}
+	}
+	for _, path := range []string{"/traffic", "/profiles?workload=CronJob/api"} {
+		if code, _ := get("alice-token", "POST", path); code != 400 {
+			t.Fatalf("%s: %d, want 400", path, code)
+		}
+	}
 	code, in := get("alice-token", "GET", "/processes?workload=Deployment/api")
 	if code != 200 || strings.Join(in.Pods, ",") != "api-1,api-2" || strings.Join(in.NotInspected, ",") != "api-3" || len(in.Processes) != 3 {
 		t.Fatalf("processes %d %+v", code, in)

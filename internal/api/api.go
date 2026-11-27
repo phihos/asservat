@@ -126,6 +126,10 @@ var (
 // ValidName reports whether s can name a cluster, namespace, pod or container.
 func ValidName(s string) bool { return namePattern.MatchString(s) }
 
+// ValidWorkload reports whether s names a workload as Kind/name, of a kind
+// that can be recorded.
+func ValidWorkload(s string) bool { return workloadPattern.MatchString(s) }
+
 // params lists the parameters each kind accepts.
 var params = map[string][]string{
 	KindPodState: {},
@@ -142,7 +146,7 @@ var params = map[string][]string{
 // defaults to 30 seconds if a recording runs over time.
 func (r *CaptureRequest) Validate() error {
 	r.Normalize()
-	if !namePattern.MatchString(r.Cluster) || !namePattern.MatchString(r.Namespace) || !workloadPattern.MatchString(r.Workload) {
+	if !ValidName(r.Cluster) || !ValidName(r.Namespace) || !ValidWorkload(r.Workload) {
 		return fmt.Errorf("cluster, namespace and workload (Kind/name) are required")
 	}
 	for _, p := range r.Pods {
