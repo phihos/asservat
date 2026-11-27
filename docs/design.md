@@ -513,6 +513,14 @@ cgroup by the container's ID in its path, except for its own container,
 whose cgroup the kernel shows it without one: there it takes the processes
 whose cgroup reads like its own.
 
+For a capture the agent asks the API server for each pod it records, and
+for its events and logs where those are recorded: a few requests for
+each pod of the workload on its node, all at once. Its client does not
+limit them by itself, as client-go would to 5 a second, behind which the
+recordings of 200 pods on one node started 40 seconds late and their logs
+failed. The API server limits its clients itself, with API Priority and
+Fairness.
+
 ## Looking at files in the browser
 
 A file can be looked at in the console without downloading it. Each kind of
