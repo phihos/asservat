@@ -645,7 +645,9 @@ are named, the same switch as for the other downloads, and dotnet-dump's
 own asking of that server is turned off. A server that does not answer a
 download, this one or one of debug information, or answers that it cannot
 serve right now (429, 502, 503, 504), is asked a second time
-before the download counts as failed. Microsoft's server may be silent for
+before the download counts as failed. So is Microsoft's server when it
+forbids a helper (403): it says 404 for one that it does not have, and was
+seen to forbid one that it has. Microsoft's server may be silent for
 four minutes, as its own client lets it, the others for ten seconds. The
 assemblies and PDBs of the
 image are data and are read from it. A core from gcore or the kernel does
