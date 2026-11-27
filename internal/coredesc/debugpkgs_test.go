@@ -390,19 +390,25 @@ func TestOnlyPlainNamesFromTheContainer(t *testing.T) {
 	}
 }
 
-// A server on the internet at times resets a connection or does not answer
-// one: the file is asked for a second time before the download counts as
-// failed, and a server that fails twice is not asked a third time.
+// A server on the internet at times resets a connection, does not answer
+// one, or says that it cannot serve right now: the file is asked for a
+// second time before the download counts as failed, and a server that
+// fails twice is not asked a third time.
 func TestADownloadIsAskedForAgainAfterAFailedConnection(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		fails  int32
 		served bool
-	}{{"once", 1, true}, {"twice", 2, false}} {
+		status int // what the server says while it fails; 0 for no answer at all
+	}{{"once", 1, true, 0}, {"twice", 2, false, 0}, {"unavailable once", 1, true, http.StatusServiceUnavailable}, {"unavailable twice", 2, false, http.StatusServiceUnavailable}, {"too many requests once", 1, true, http.StatusTooManyRequests}} {
 		t.Run(test.name, func(t *testing.T) {
 			var asked atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if asked.Add(1) <= test.fails {
+				if asked.Add(1) <= test.fails && test.status != 0 {
+					w.WriteHeader(test.status) // as Microsoft's symbol server said on a bad day
+					return
+				}
+				if asked.Load() <= test.fails {
 					connection, _, err := w.(http.Hijacker).Hijack()
 					if err != nil {
 						t.Error(err)
