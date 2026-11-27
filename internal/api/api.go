@@ -4,6 +4,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
 	"slices"
@@ -177,7 +178,7 @@ func (r *CaptureRequest) Validate() error {
 func (rec Recording) validate() error {
 	allowed, ok := params[rec.Kind]
 	if !ok {
-		return fmt.Errorf("unknown kind %q", rec.Kind)
+		return fmt.Errorf("unknown kind %q: the kinds are %s", rec.Kind, strings.Join(slices.Sorted(maps.Keys(params)), ", "))
 	}
 	for k := range rec.Params {
 		found := false

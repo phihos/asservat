@@ -321,3 +321,16 @@ func TestRecordingsThatReachBack(t *testing.T) {
 		t.Fatal(w.Before())
 	}
 }
+
+// Who names a kind that does not exist is told which ones do.
+func TestUnknownKindNamesTheKinds(t *testing.T) {
+	err := (Recording{Kind: "thoughts"}).validate()
+	if err == nil {
+		t.Fatal("an unknown kind was accepted")
+	}
+	for _, kind := range []string{KindPodState, KindLogs, KindPcap, KindStrace, KindPprof, KindCPU, KindMemory, KindCoredump} {
+		if !strings.Contains(err.Error(), kind) {
+			t.Errorf("%q does not name %s", err, kind)
+		}
+	}
+}
