@@ -181,6 +181,14 @@ after 4, 17 and about 45 seconds, most of which PostgreSQL spends
 committing the pods' reports one after another. The memory is what the files take while they arrive, about
 150 KiB for each that is being stored at that moment.
 
+An agent's cost while recording grows with the pods it records on its
+node, since each recording runs its own `tcpdump` or `strace`. Measured
+with 200 pods on one node (8 CPUs), all recorded at once for 5 seconds: a
+capture of logs, pod state and packet headers was complete after 12 seconds
+and took the agent's memory to 285 MiB at its peak, about 1.4 MiB for each
+pod; system call traces of all 200 were complete after 12 seconds as well.
+Two minutes later the agent was back at 26 MiB.
+
 Plan disk space for three things:
 
 - **Evidence storage** (`hub.storage.size`, 20 GiB by default): the sum of
