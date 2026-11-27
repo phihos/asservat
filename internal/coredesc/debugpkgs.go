@@ -532,8 +532,20 @@ func (w waited) Read(b []byte) (int, error) {
 	return w.ReadCloser.Read(b)
 }
 
+// unavailable tells the answers with which a server says that it could not
+// serve this time and may the next: too many requests, and the failures of
+// a gateway or of the service behind it. Microsoft's symbol server was seen
+// to say 503 for a file that it has.
+func unavailable(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
+}
+
 // get asks for a file. One that the server does not have is errNotPublished.
-// A server that does not answer is asked a second time: servers on the
+// A server that does not answer, or says that it cannot right now, is asked a second time: servers on the
 // internet at times reset a connection or leave one unanswered, and a
 // description that fails for that is not made again before the hub starts
 // anew. It is not asked a third time, as a server that is down makes every
@@ -556,6 +568,12 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 		}
 		response, err = http.DefaultClient.Do(request)
 		wait.Stop()
+		// A server that says it cannot serve right now is one that did not answer.
+		if err == nil && attempt < 2 && unavailable(response.StatusCode) {
+			response.Body.Close()
+			cancel()
+			continue
+		}
 		if err == nil {
 			break
 		}

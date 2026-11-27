@@ -643,7 +643,8 @@ Nothing verifies the download beyond HTTPS: Microsoft publishes no
 checksum or signature for it. It is fetched only where debuginfod servers
 are named, the same switch as for the other downloads, and dotnet-dump's
 own asking of that server is turned off. A server that does not answer a
-download, this one or one of debug information, is asked a second time
+download, this one or one of debug information, or answers that it cannot
+serve right now (429, 502, 503, 504), is asked a second time
 before the download counts as failed. Microsoft's server may be silent for
 four minutes, as its own client lets it, the others for ten seconds. The
 assemblies and PDBs of the
