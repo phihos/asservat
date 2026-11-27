@@ -1,7 +1,7 @@
 // The trace viewer shows strace's output as a table of calls that can be
 // narrowed, and the summary that "strace -c" prints: time, calls and errors
 // per system call.
-import {$, capture, esc, filePath, headers, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
+import {$, esc, filePath, headers, loadText, moment, spot, truncatedNote, show, virtual} from './common.js';
 
 const markup = `
   <div class="tabs"><button data-tab="calls" class="on">Calls</button><button data-tab="summary">Summary</button><span id="shown" class="tally"></span></div>
@@ -124,7 +124,7 @@ export default async function (root, {capture}) {
   sum(rows, rows.reduce((t, s) => ({calls: t.calls + s.calls, errors: t.errors + s.errors, seconds: t.seconds + s.seconds}), {calls: 0, errors: 0, seconds: 0}),
     truncated ? 'Of the beginning of the trace that is shown.' : '');
   // Of a trace larger than is loaded, the hub sums up the whole.
-  if (truncated) fetch(`/api/captures/${capture}/summaries/${filePath}`, {headers}).then(r => r.ok ? r.json() : null).then(whole => {
+  if (truncated) fetch(`/api/captures/${capture.id}/summaries/${filePath}`, {headers}).then(r => r.ok ? r.json() : null).then(whole => {
     if (whole) sum(whole.calls, whole.total, 'Of the whole trace. The list of calls holds its beginning only.');
   }).catch(() => {});
 
