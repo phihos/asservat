@@ -272,6 +272,15 @@ that the hub and agents can reach the servers in `debuginfodURLs`. Programs
 built outside a distribution's packages have no debug information to fetch;
 for Go programs Asservat reads function names from the binary itself.
 
+### The agent's log says "Failed to load" while a profile is recorded
+
+The sampling profiler reads the programs of every process on the node, not
+only of the pods it records, and logs each one it cannot read, such as
+`Failed to load /app/erts-17.0.2/bin/beam.smp ... symbol not found`. These
+lines come from the profiler itself, as warnings or errors. A profile misses
+function names only for the program that a line names; everything else in it
+is complete.
+
 ### The audit log
 
 Administrators see who requested, approved, downloaded and opened what under
