@@ -239,6 +239,7 @@ off.
 AI agents connect to `https://<hub-host>/mcp` with the same bearer token and
 get tools to list workloads, look at their processes and traffic, request
 captures, watch for crashes and other conditions, and read evidence: text files as they are, a
+system call trace also as its summary by call, a
 profile as its list of the heaviest functions, a heap dump as its classes
 by size, a packet capture as its statistics or the packets that match a
 display filter, a core dump as the stacks of its program and threads. The
