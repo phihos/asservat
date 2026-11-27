@@ -492,6 +492,10 @@ type debugFetcher struct {
 	// wait is how long a server may be silent: debugPackageWait, or what
 	// a test sets.
 	wait time.Duration
+	// missingIs404 is set for a server that says 404 for a file it does not
+	// have. Its 403 is then a refusal like the answers of unavailable, and
+	// not the missing file that it is on Amazon's servers.
+	missingIs404 bool
 }
 
 // fetcher returns what downloads into a directory of the scratch space.
@@ -544,6 +548,12 @@ func unavailable(status int) bool {
 	return false
 }
 
+// refused tells whether a server's answer says that it did not serve this
+// time and may the next.
+func (f debugFetcher) refused(status int) bool {
+	return unavailable(status) || f.missingIs404 && status == http.StatusForbidden
+}
+
 // get asks for a file. One that the server does not have is errNotPublished.
 // A server that does not answer, or says that it cannot right now, is asked a second time: servers on the
 // internet at times reset a connection or leave one unanswered, and a
@@ -569,7 +579,7 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 		response, err = http.DefaultClient.Do(request)
 		wait.Stop()
 		// A server that says it cannot serve right now is one that did not answer.
-		if err == nil && attempt < 2 && unavailable(response.StatusCode) {
+		if err == nil && attempt < 2 && f.refused(response.StatusCode) {
 			response.Body.Close()
 			cancel()
 			continue
@@ -585,12 +595,13 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 	if response.StatusCode != http.StatusOK {
 		response.Body.Close()
 		cancel()
+		if response.StatusCode == http.StatusNotFound {
+			return nil, errNotPublished
+		}
 		// A file that is not there is forbidden on Amazon's servers.
-		if response.StatusCode == http.StatusForbidden {
+		if response.StatusCode == http.StatusForbidden && !f.missingIs404 {
 			// Said, so that a server that forbids for another reason, as one that has had enough requests, can be told from one without the file.
 			slog.Info("a server forbids a file, which is taken as a file that it does not have", "address", address)
-		}
-		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusForbidden {
 			return nil, errNotPublished
 		}
 		return nil, fmt.Errorf("%s: %s", address, response.Status)

@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -628,5 +629,48 @@ func TestDotnetHelperIsWaitedForLonger(t *testing.T) {
 	dir, err := Describer{Scratch: t.TempDir(), symbols: server.URL, wait: wait}.dotnetHelper(context.Background(), runtimeFile)
 	if err != nil || dir == "" {
 		t.Fatalf("a helper that the server took its time over: %q, %v", dir, err)
+	}
+}
+
+// Microsoft's symbol server says 404 for a helper that it does not have. It
+// was seen to say 403 for one that it has, and a helper taken as missing is
+// not asked for again for a week.
+func TestDotnetHelperThatIsForbiddenIsNotTakenAsMissing(t *testing.T) {
+	here, known := map[string]elf.Machine{"amd64": elf.EM_X86_64, "arm64": elf.EM_AARCH64}[runtime.GOARCH]
+	if !known {
+		t.Skip("no helper libraries for this processor")
+	}
+	for _, test := range []struct {
+		name   string
+		forbid int32
+	}{{"once", 1}, {"twice", 2}} {
+		t.Run(test.name, func(t *testing.T) {
+			var asked atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if asked.Add(1) <= test.forbid {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+				w.Write(syntheticLibrary(here, []byte("the helper")))
+			}))
+			defer server.Close()
+			runtimeFile := filepath.Join(t.TempDir(), "libcoreclr.so")
+			os.WriteFile(runtimeFile, syntheticLibrary(here, []byte{0xee, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33}), 0o755)
+			d := Describer{Scratch: t.TempDir(), symbols: server.URL}
+			dir, err := d.dotnetHelper(context.Background(), runtimeFile)
+			if test.forbid == 1 {
+				if err != nil || dir == "" {
+					t.Fatalf("a helper that the server forbade once: %q, %v", dir, err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("a helper that the server forbade twice is taken as one it does not have: %q", dir)
+			}
+			// The server is asked again the next time, not after a week.
+			if dir, err := d.dotnetHelper(context.Background(), runtimeFile); err != nil || dir == "" {
+				t.Fatalf("the helper was not asked for again: %q, %v", dir, err)
+			}
+		})
 	}
 }

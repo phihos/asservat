@@ -407,6 +407,9 @@ func (d Describer) dotnetHelper(ctx context.Context, runtimeFile string) (string
 	}
 	f := d.fetcher(ctx, "dotnet-helpers")
 	f.wait *= symbolServerPatience
+	// Microsoft's server says 404 for a helper it does not have, and was
+	// seen to say 403 for one that it has.
+	f.missingIs404 = true
 	if err := os.MkdirAll(f.cache, 0o700); err != nil {
 		return "", err
 	}
