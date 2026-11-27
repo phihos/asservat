@@ -253,7 +253,7 @@ var mcpTools = []mcpTool{
 			}
 			defer blob.Close()
 			if in.Summary && api.ViewerOf(a.Name) != "strace" {
-				return nil, errStatus{http.StatusBadRequest, "summary is for system call traces (*.strace)"}
+				return nil, errNoTrace
 			}
 			detail := map[string]any{"name": a.Name, "offset": in.Offset}
 			if in.Summary {
@@ -263,15 +263,11 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			if in.Summary {
-				// The whole trace, read as it is unpacked.
-				trace, unpacking := io.Pipe()
-				go func() { unpacking.CloseWithError(unpacked(unpacking, blob, key, a.Packed)) }()
-				text, err := straceSummary(trace)
-				trace.CloseWithError(err)
+				rows, all, err := h.traceSummary(ctx, a)
 				if err != nil {
-					return nil, fmt.Errorf("read %s: %w", a.Name, err)
+					return nil, err
 				}
-				return map[string]any{"size": a.Size, "text": text}, nil
+				return map[string]any{"size": a.Size, "text": straceText(rows, all)}, nil
 			}
 			var buf bytes.Buffer
 			if err := unpacked(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key, a.Packed); err != nil && !errors.Is(err, errWindowFull) {

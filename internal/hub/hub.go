@@ -245,6 +245,7 @@ func (h *Hub) Handler() http.Handler {
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("POST /api/captures/{id}/share", h.shareCapture)
 	user("GET /api/captures/{id}/artifacts/{name...}", h.download)
+	user("GET /api/captures/{id}/summaries/{name...}", h.summary)
 	user("POST /api/captures/{id}/describe", h.describe)
 	user("GET /api/captures/{id}/views/{name...}", h.openView)
 	user("POST /api/views/{view}/{method}", h.askView)

@@ -720,6 +720,25 @@ func TestATraceIsReadAsItsSummary(t *testing.T) {
 	if !strings.Contains(lines[0], "6 calls") {
 		t.Errorf("the first line does not say how many calls: %q", lines[0])
 	}
+	// The viewer asks for the same numbers, for a trace that is larger than it loads.
+	code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/summaries/api-1/api.strace", nil)
+	var whole struct {
+		Calls []struct {
+			Name          string
+			Calls, Errors int
+			Seconds       float64
+		}
+		Total struct{ Calls, Errors int }
+	}
+	if err := json.Unmarshal(b, &whole); code != 200 || err != nil || len(whole.Calls) != 5 || whole.Calls[0].Name != "futex" || whole.Calls[0].Errors != 1 || whole.Calls[0].Seconds != 2 || whole.Total.Calls != 6 || whole.Total.Errors != 2 {
+		t.Fatalf("the summary for the viewer: %d %v %s", code, err, b)
+	}
+	if code, b := f.call("alice-token", "GET", "/api/captures/"+capture+"/summaries/api-1/api.log", nil); code != 400 {
+		t.Errorf("the summary of a log for the viewer: %d %s", code, b)
+	}
+	if code, _ := f.call("mallory-token", "GET", "/api/captures/"+capture+"/summaries/api-1/api.strace", nil); code != 403 && code != 404 {
+		t.Errorf("someone else got the summary: %d", code)
+	}
 	// Without the word, the text as before; and a summary of what is no trace is refused.
 	if text, _ := read(map[string]any{"name": "api-1/api.strace"}); !strings.Contains(text, "FUTEX_WAIT_PRIVATE") {
 		t.Errorf("the trace's text: %.200s", text)
