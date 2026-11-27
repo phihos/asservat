@@ -111,6 +111,24 @@ func straceArgs(rec api.Recording, pids []int) []string {
 	return args
 }
 
+// podState is a pod and its events as the files of a capture. They are
+// written as kubectl prints them: without the record of which manager set
+// which field, which is most of an event and says nothing about the pod.
+func podState(pod *corev1.Pod, events []corev1.Event) map[string][]byte {
+	shown := pod.DeepCopy()
+	shown.ManagedFields = nil
+	list := make([]corev1.Event, len(events))
+	for i := range events {
+		list[i] = *events[i].DeepCopy()
+		list[i].ManagedFields = nil
+	}
+	files := map[string][]byte{}
+	for name, v := range map[string]any{"pod.json": shown, "events.json": list} {
+		files[name], _ = json.MarshalIndent(v, "", "  ")
+	}
+	return files
+}
+
 // partialError is the failure of a recording that still delivered files.
 type partialError struct{ error }
 
@@ -125,9 +143,7 @@ func (a *Agent) recording(ctx, frame context.Context, id string, t api.TaskAssig
 		if err != nil {
 			return err
 		}
-		pod.ManagedFields = nil
-		for name, v := range map[string]any{"pod.json": pod, "events.json": events.Items} {
-			b, _ := json.MarshalIndent(v, "", "  ")
+		for name, b := range podState(pod, events.Items) {
 			if err := up(name, bytes.NewReader(b)); err != nil {
 				return err
 			}

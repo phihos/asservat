@@ -494,7 +494,7 @@ either:
 
 | Kind | How | Sensitive |
 | --- | --- | --- |
-| `pod-state` | Kubernetes API: pod object and events | No |
+| `pod-state` | Kubernetes API: pod object and events, as kubectl prints them (without `managedFields`) | No |
 | `logs` | Kubernetes API: per container; `tailLines`, `previous`, followed for `durationSeconds` | No |
 | `pcap` | `tcpdump` in the pod's network namespace; `filter`; every packet is cut after its transport header unless `payload=true`. The agent's own connections to the hub are left out | With `payload=true` |
 | `strace` | `strace -f` on the container's main process, or on every process of `process`; buffer contents omitted unless `strings=true`. The trace rests in the agent's scratch directory and is uploaded when it is complete, so that the traced process does not wait for the way to the hub | With `strings=true` |
