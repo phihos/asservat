@@ -13,7 +13,7 @@ require (
 	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/minio/minio-go/v7 v7.4.1
-	go.opentelemetry.io/ebpf-profiler v0.0.202646-0.20261120173755-50edbb45c361
+	go.opentelemetry.io/ebpf-profiler v0.0.202646-0.20261126101054-6dea5aab9ca0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.50.0
 	k8s.io/api v0.37.1
@@ -53,7 +53,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/mdlayher/kobject v0.0.0-20200520190114-19ca17470d7d // indirect
@@ -71,11 +71,11 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	go.opentelemetry.io/collector/consumer v1.71.0 // indirect
-	go.opentelemetry.io/collector/consumer/xconsumer v0.165.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.71.0 // indirect
-	go.opentelemetry.io/collector/pdata v1.71.0 // indirect
-	go.opentelemetry.io/collector/pdata/pprofile v0.165.0 // indirect
+	go.opentelemetry.io/collector/consumer v1.72.0 // indirect
+	go.opentelemetry.io/collector/consumer/xconsumer v0.166.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.72.0 // indirect
+	go.opentelemetry.io/collector/pdata v1.72.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.166.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/proto/slim/otlp v1.11.1 // indirect
@@ -85,7 +85,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/arch v0.33.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/exp v0.0.0-20261119141654-b15d094f3610 // indirect
+	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/telemetry v0.0.0-20241106142447-58a1122356f5 // indirect
