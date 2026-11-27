@@ -270,7 +270,7 @@ func runAgent(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	kube, err := kubernetes.NewForConfig(config)
+	kube, err := kubeClient(config)
 	if err != nil {
 		return err
 	}
@@ -315,4 +315,16 @@ const debuginfodHelp = "debuginfod servers, separated by spaces or commas, from 
 // debuginfodServers reads the list of servers as the debuginfod client takes it.
 func debuginfodServers(list string) string {
 	return strings.Join(strings.FieldsFunc(list, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), " ")
+}
+
+// kubeClient returns the agent's client for the API server, without the
+// limit of 5 requests a second that client-go sets by itself: a capture asks
+// for every pod of the workload on the node at once, and behind that limit
+// the recordings of 200 pods started 40 seconds late and their logs failed.
+// What an agent may ask of the API server is for the server to say, which
+// it does with API Priority and Fairness.
+func kubeClient(config *rest.Config) (*kubernetes.Clientset, error) {
+	config = rest.CopyConfig(config)
+	config.QPS = -1
+	return kubernetes.NewForConfig(config)
 }
