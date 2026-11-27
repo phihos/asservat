@@ -568,6 +568,10 @@ func (f debugFetcher) get(address string) (io.ReadCloser, error) {
 		response.Body.Close()
 		cancel()
 		// A file that is not there is forbidden on Amazon's servers.
+		if response.StatusCode == http.StatusForbidden {
+			// Said, so that a server that forbids for another reason, as one that has had enough requests, can be told from one without the file.
+			slog.Info("a server forbids a file, which is taken as a file that it does not have", "address", address)
+		}
 		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusForbidden {
 			return nil, errNotPublished
 		}
