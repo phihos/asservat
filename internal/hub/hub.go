@@ -451,11 +451,14 @@ func (h *Hub) namespaces(ctx context.Context, u User, cluster string) ([]string,
 
 // listContainers names the containers of the workload in the query.
 func (h *Hub) listContainers(w http.ResponseWriter, r *http.Request, u User) error {
-	cluster, namespace := r.PathValue("cluster"), r.PathValue("namespace")
+	cluster, namespace, workload := r.PathValue("cluster"), r.PathValue("namespace"), r.URL.Query().Get("workload")
+	if !api.ValidWorkload(workload) {
+		return errWorkloadRequired
+	}
 	if err := h.allowed(r.Context(), u, cluster, namespace); err != nil {
 		return err
 	}
-	res, err := h.agents.query(r.Context(), cluster, "", api.Query{Op: "workload", Namespace: namespace, Workload: r.URL.Query().Get("workload")})
+	res, err := h.agents.query(r.Context(), cluster, "", api.Query{Op: "workload", Namespace: namespace, Workload: workload})
 	if err != nil {
 		return err
 	}

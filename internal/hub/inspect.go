@@ -17,12 +17,17 @@ import (
 // they need not know a process's path or the syntax of a packet filter:
 // the programs that run in a workload's pods, and whom the pods talk to.
 
+// errWorkloadRequired answers a question about a workload that names none
+// that could be asked about: the caller's mistake, which the cluster's
+// agents are not asked for.
+var errWorkloadRequired = errStatus{http.StatusBadRequest, "cluster, namespace and workload (Kind/name) are required"}
+
 // inspect asks the node agents about the workload's pods and hands every
 // reply to merge.
 func (h *Hub) inspect(ctx context.Context, u User, cluster, namespace, workload string, q api.Query, merge func(api.Reply)) (api.Inspection, error) {
 	in := api.Inspection{Pods: []string{}}
-	if !api.ValidName(cluster) || !api.ValidName(namespace) {
-		return in, errStatus{http.StatusBadRequest, "cluster and namespace are required"}
+	if !api.ValidName(cluster) || !api.ValidName(namespace) || !api.ValidWorkload(workload) {
+		return in, errWorkloadRequired
 	}
 	if err := h.allowed(ctx, u, cluster, namespace); err != nil {
 		return in, err
