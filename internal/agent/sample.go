@@ -385,6 +385,29 @@ func handOver[T any](sending, taking context.Context, traces <-chan T, handle fu
 	}
 }
 
+// seeingPods starts the profiler so that it tells the processes of pods from
+// their numbers: a pod's processes are in a PID namespace below the agent's
+// (two below where the node is itself a container, as in kind), and the
+// profiler has to follow that down ("recursive"). To do so it reads a
+// structure of the kernel at its start, which now and then fails; left to
+// choose itself ("auto") it then goes on following nothing, sees no process
+// of a pod, and every profile is empty without a word. So it is asked for
+// what is needed and, where the reading failed, started a second time. A
+// kernel that cannot do it at all (one without BTF) gets the profiler's own
+// choice, as does any other failure, which then fails as it would have.
+func seeingPods[T any](start func(tracer.PIDNamespaceTranslationMode) (T, error)) (T, error) {
+	started, err := start(tracer.PIDNamespaceTranslationModeRecursive)
+	if err != nil && strings.Contains(err.Error(), "recursive PID namespace translation") {
+		slog.Warn("the profiler could not read how PID namespaces nest; starting it again", "error", err)
+		started, err = start(tracer.PIDNamespaceTranslationModeRecursive)
+	}
+	if err != nil {
+		slog.Warn("the profiler does not follow PID namespaces down: it may see no process of a pod", "error", err)
+		return start(tracer.PIDNamespaceTranslationModeAuto)
+	}
+	return started, nil
+}
+
 // run loads the profiler's programs into the kernel. The order of the steps
 // is the profiler's own (its collector receiver); sampling the CPUs and
 // reporting page faults are turned on by the profiles that want them.
@@ -405,21 +428,21 @@ func (s *sampler) run() error {
 	times.StartRealtimeSync(taking, 0)
 	// The intervals at which the profiler looks after its own state: its defaults.
 	intervals := times.New(5*time.Second, 5*time.Second, time.Minute)
-	trc, err := tracer.NewTracer(taking, &tracer.Config{
-		TraceReporter:          s,
-		ExecutableReporter:     s,
-		Intervals:              intervals,
-		InterpretersConfig:     interpreterconfig.AllInterpreters(),
-		SamplesPerSecond:       sampleRate,
-		FrameCacheSize:         processmanager.DefaultFrameCacheSize,
-		FilterErrorFrames:      true,
-		FilterIdleFrames:       true,
-		KernelVersionCheck:     true,
-		ProbabilisticInterval:  time.Minute,
-		ProbabilisticThreshold: tracer.ProbabilisticThresholdMax, // every sample, not a share of them
-		// The agent sees the process IDs of the kernel on a node, but not
-		// where the node is itself a container (kind).
-		PIDNamespaceTranslationMode: tracer.PIDNamespaceTranslationModeAuto,
+	trc, err := seeingPods(func(mode tracer.PIDNamespaceTranslationMode) (*tracer.Tracer, error) {
+		return tracer.NewTracer(taking, &tracer.Config{
+			PIDNamespaceTranslationMode: mode,
+			TraceReporter:               s,
+			ExecutableReporter:          s,
+			Intervals:                   intervals,
+			InterpretersConfig:          interpreterconfig.AllInterpreters(),
+			SamplesPerSecond:            sampleRate,
+			FrameCacheSize:              processmanager.DefaultFrameCacheSize,
+			FilterErrorFrames:           true,
+			FilterIdleFrames:            true,
+			KernelVersionCheck:          true,
+			ProbabilisticInterval:       time.Minute,
+			ProbabilisticThreshold:      tracer.ProbabilisticThresholdMax, // every sample, not a share of them
+		})
 	})
 	if err != nil {
 		cancel()
