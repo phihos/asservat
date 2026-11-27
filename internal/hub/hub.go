@@ -111,6 +111,9 @@ type Hub struct {
 	describing map[string]chan struct{}
 	// undescribed holds the cores that could not be described again.
 	undescribed map[string]bool
+	// awaited holds the cores whose runtime's tool failed, with the time
+	// of that try (describeAgainAfter).
+	awaited map[string]time.Time
 	// completing is held while the hub completes a description that an
 	// agent sent (agents.go).
 	completing sync.Mutex
@@ -160,7 +163,7 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, awaited: map[string]time.Time{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
 }
 
 // pagePolicy is what the console's pages tell the browser to hold them to

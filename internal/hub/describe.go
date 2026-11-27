@@ -128,6 +128,16 @@ func (h *Hub) renew(ctx context.Context, u User, capture, name string) <-chan re
 // its files, not in what the hub needs around them.
 type undescribable struct{ error }
 
+// describeAgainAfter is how long a core whose runtime's tool failed is
+// left alone. What the tool failed at may pass, as a symbol server that is
+// down for some minutes, so it is run again; but every opening of the core
+// asks for that, and a try decrypts the whole core into the work directory
+// and may wait minutes for a server, so not each of them runs it.
+const describeAgainAfter = 10 * time.Minute
+
+// stacksAwaited tells who opens such a core meanwhile.
+const stacksAwaited = "Asservat could not read the program's own stacks from the core this time. Opening it tries again, ten minutes after the last try at the earliest."
+
 // describeAgain describes the core of the name anew if its description is
 // older than this hub makes them, or adds the stacks of the runtimes that
 // it awaits, if the capture holds the program's files. Otherwise it says
@@ -144,6 +154,10 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 		if h.undescribed[key] {
 			h.mu.Unlock()
 			return false, "this version of Asservat could not describe the core dump again", nil
+		}
+		if at, failed := h.awaited[key]; failed && time.Since(at) < describeAgainAfter {
+			h.mu.Unlock()
+			return false, stacksAwaited, nil
 		}
 		running := h.describing[key]
 		if running == nil {
@@ -248,16 +262,17 @@ func (h *Hub) describeAgain(ctx context.Context, capture, name string) (describe
 	if err != nil {
 		return false, "", undescribable{err}
 	}
-	// A tool that failed leaves its runtime's stacks awaited. It is not run
-	// for this core again until the hub starts anew: what it failed at, as
-	// a server that does not answer, may have passed by then.
+	// A tool that failed leaves its runtime's stacks awaited, and is run
+	// for this core again after a while (describeAgainAfter).
+	h.mu.Lock()
 	if describer.Completes(report) {
-		h.mu.Lock()
-		h.undescribed[key] = true
-		h.mu.Unlock()
-		if begun != nil && slices.Equal(coredesc.Awaits(report), coredesc.Awaits(begun)) {
-			return false, "this Asservat could not read the program's own stacks from the core", nil
-		}
+		h.awaited[key] = time.Now()
+	} else {
+		delete(h.awaited, key)
+	}
+	h.mu.Unlock()
+	if begun != nil && slices.Equal(coredesc.Awaits(report), coredesc.Awaits(begun)) {
+		return false, stacksAwaited, nil
 	}
 	a, err := h.keep(ctx, name+coredesc.Suffix, bytes.NewReader(report))
 	if err != nil {
