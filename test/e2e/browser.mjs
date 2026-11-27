@@ -282,9 +282,11 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].click()`); await sleep(100);
     if (await shown() !== 3) throw new Error(`${await shown()} files are listed for the opened pod, want 3`);
     if (!/tcpdump said no/.test(await run(`return document.querySelectorAll('.capture.open .podbox')[7].innerText`))) throw new Error('the opened pod does not say why its recording failed');
-    // It stays open when the list is written anew, and closes again.
-    await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
+    // It stays open when the list is written anew, with the keyboard still on its line, and closes again.
+    await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].focus()`);
+    await run(`loadCaptures()`); await sleep(400);
     if (await shown() !== 3) throw new Error('the opened pod closed when the list was written anew');
+    if (!await run(`return document.activeElement === document.querySelectorAll('.capture.open .podbox .pod')[7]`)) throw new Error('the keyboard left the line of the pod when the list was written anew');
     await run(`document.querySelectorAll('.capture.open .podbox .pod')[7].click()`); await sleep(100);
     if (await shown()) throw new Error('the pod did not close');
     // A few pods are shown with their files, as before.

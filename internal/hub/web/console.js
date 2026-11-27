@@ -429,8 +429,9 @@ async function loadCaptures() {
   // The list is written anew with every change: who works it with the keyboard stays where they were.
   // They stay on the same control of the same capture (a button by what it does, a link by where it leads), or,
   // when that capture has gone, at its place in the list.
-  const controls = 'a[href], button', held = document.activeElement?.closest?.('#captures .capture');
-  const focused = held && {id: held.dataset.capture, control: document.activeElement.dataset.act || document.activeElement.getAttribute('href'), place: [...$('captures').children].indexOf(held)};
+  // A control is told by what it does, the pod it opens or where it leads.
+  const controls = 'a[href], button', control = c => c.dataset.act || c.dataset.pod || c.getAttribute('href'), held = document.activeElement?.closest?.('#captures .capture');
+  const focused = held && {id: held.dataset.capture, control: control(document.activeElement), place: [...$('captures').children].indexOf(held)};
   $('captures').innerHTML = list.map(c => {
     const open = toggled.has(c.id) ? toggled.get(c.id) : inProgress(c);
     // Each pod's recordings, in the order they were asked for, and under
@@ -463,7 +464,7 @@ async function loadCaptures() {
       // The line of a folded pod says how each recording went on it and what it left.
       const key = c.id + '/' + t.pod, shown = !!podsToggled.get(key);
       const went = asked.map(kind => { const state = states.get(kind)?.state || (t.state === 'Failed' ? 'Failed' : 'Waiting'); return `<span class="rec-${esc(state)}"><span class="mark" title="${marks[state]?.[1] || ''}">${marks[state]?.[0] || ''}</span>${esc(kindNames[kind] || kind)}</span>`; }).join('');
-      return `<div class="podbox folds${shown ? ' open' : ''}" data-pod="${esc(key)}"><button class="pod" aria-expanded="${shown}">${head}<span class="went">${went}</span><span class="muted">${mine.length ? `${plural(mine.length, 'file')}, ${fileSize(mine.reduce((n, a) => n + a.size, 0))}` : 'no files'}</span></button><div class="podbody">${body}</div></div>`;
+      return `<div class="podbox folds${shown ? ' open' : ''}"><button class="pod" data-pod="${esc(key)}" aria-expanded="${shown}">${head}<span class="went">${went}</span><span class="muted">${mine.length ? `${plural(mine.length, 'file')}, ${fileSize(mine.reduce((n, a) => n + a.size, 0))}` : 'no files'}</span></button><div class="podbody">${body}</div></div>`;
     }).join('') || '<div class="muted">No pods were recorded.</div>';
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
@@ -498,7 +499,7 @@ async function loadCaptures() {
   }).join('');
   if (focused) {
     const card = document.querySelector(`.capture[data-capture="${focused.id}"]`), near = $('captures').children[Math.min(focused.place, $('captures').children.length - 1)];
-    (card ? [...card.querySelectorAll(controls)].find(c => (c.dataset.act || c.getAttribute('href')) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();
+    (card ? [...card.querySelectorAll(controls)].find(c => control(c) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();
   }
   countdown();
 }
@@ -645,7 +646,7 @@ $('captures').onclick = guard(async e => {
     // A click on the line of a folded pod opens or closes its files.
     const pod = e.target.closest('button.pod');
     if (pod) {
-      podsToggled.set(pod.parentElement.dataset.pod, pod.parentElement.classList.toggle('open'));
+      podsToggled.set(pod.dataset.pod, pod.parentElement.classList.toggle('open'));
       pod.setAttribute('aria-expanded', pod.parentElement.classList.contains('open'));
       return;
     }
