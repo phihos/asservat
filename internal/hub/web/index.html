@@ -129,6 +129,12 @@
   .track .bar { width: 0; transition: width 1s linear; }
   tr.fresh { animation: fresh 4s ease-out; } @keyframes fresh { from { background: #F2C20055; } to { background: transparent; } }
   .pod { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font: 600 13px var(--mono); margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); } .pod .muted { font-weight: 400; font-size: 12px; }
+  /* A capture of many pods: a line for each, which opens the pod's files. */
+  .podbox.folds:not(.open) .podbody { display: none; }
+  button.pod { width: 100%; min-height: 0; margin-top: 0; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; color: inherit; text-align: left; cursor: pointer; }
+  button.pod::before { content: ""; align-self: center; width: 6px; height: 6px; margin: 0 2px; border: solid var(--quiet); border-width: 0 2px 2px 0; transform: rotate(-45deg); } .podbox.open > button.pod::before { transform: rotate(45deg); }
+  button.pod .went { display: flex; flex-wrap: wrap; gap: 2px 12px; font: 400 12px var(--text); } button.pod .went .mark { margin-right: 4px; } button.pod .went .rec-Completed .mark { color: var(--ok); } button.pod .went .rec-Failed { color: var(--bad); }
+  button.pod > .muted:last-child { margin-left: auto; } .podbox.folds.open > .podbody { padding: 0 0 10px 14px; }
   .options > * + * { margin-top: 14px; }
   h3 { font-size: 13px; margin: 0 0 6px; } .choice + h3 { margin-top: 14px; } .lead { margin: 0 0 8px; }
   .options section > * + * { margin-top: 8px; }

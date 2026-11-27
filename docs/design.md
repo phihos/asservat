@@ -873,7 +873,10 @@ more on request, and a find box narrows it by any of those words. An open
 capture shows each pod with its recordings in the order they were asked
 for, and under each recording the files it made, with their full names,
 what each file is, its size, and the ways to it: **Open** where a viewer
-exists, and **Download**. The hub tells which recording a file is from by
+exists, and **Download**. A capture of more than five pods shows a line
+for each pod instead, which says how each recording went on it and how
+much it left, and opens the pod's files: with all of them open, a capture
+of 200 pods was a page of 55,000 pixels. The hub tells which recording a file is from by
 the name the agent gave it; the files of a profile endpoint are named by
 the application and are those that remain. Deleting a capture that holds
 files asks first.
