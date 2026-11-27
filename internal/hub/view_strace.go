@@ -17,6 +17,7 @@ var straceLine = regexp.MustCompile(`^(?:\[pid\s+)?(\d+)?\]?\s*\d\d:\d\d:\d\d(?:
 
 // The end of a call: its result and how long it took.
 var (
+	straceName    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	straceResumed = regexp.MustCompile(`^<\.\.\. (\S+) resumed>`)
 	straceTook    = regexp.MustCompile(` <(\d+\.\d+)>$`)
 	straceFailed  = regexp.MustCompile(`\)\s+= -1\b[^)]*(?:\([^)]*\))?$`)
@@ -90,7 +91,8 @@ func straceSummary(trace io.Reader) (string, error) {
 			continue
 		}
 		paren := strings.IndexByte(rest, '(')
-		if strings.HasPrefix(rest, "---") || strings.HasPrefix(rest, "+++") || paren < 0 {
+		// A call has the name of a function: anything else before a bracket is no call, and would be a row of its own.
+		if strings.HasPrefix(rest, "---") || strings.HasPrefix(rest, "+++") || paren < 0 || !straceName.MatchString(rest[:paren]) {
 			continue
 		}
 		s := of(rest[:paren])

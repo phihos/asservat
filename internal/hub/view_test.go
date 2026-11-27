@@ -666,6 +666,7 @@ func TestATraceIsReadAsItsSummary(t *testing.T) {
 		`42 10:00:02.000300 <... futex resumed>)   = -1 ETIMEDOUT (Connection timed out) <2.000000>`,
 		`41 10:00:02.000400 write(1, "` + strings.Repeat("x", 200<<10) + `", 204800) = 204800 <0.001000>`,
 		`41 10:00:02.000500 --- SIGCHLD {si_signo=SIGCHLD} ---`,
+		`41 10:00:02.000550 what a program wrote (not a call) = 0 <9.000000>`,
 		`43 10:00:02.000600 epoll_pwait(5,  <unfinished ...>`,
 		`41 10:00:02.000700 +++ exited with 0 +++`, ``,
 	}, "\n")
