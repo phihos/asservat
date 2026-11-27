@@ -761,7 +761,9 @@ description in place of the old. That can take a minute or more with
 debug information to download: the answer to the viewer begins with a
 space for every beat of the hub's streams, so that a proxy keeps waiting,
 and the work goes on if the viewer is closed. A capture from before the files were
-kept stays as it was described, and the viewer says so. For the binary
+kept stays as it was described, and the viewer says so. A trace of
+system calls, which is text and large, is with `summary` returned as the
+viewer's summary: what `strace -c` prints. For the binary
 files that have a viewer in the hub, MCP's `read_artifact` returns what the
 viewer shows, as text: a core, by its own name or its description's, as
 why the process stopped, then the stacks of its program as its runtime

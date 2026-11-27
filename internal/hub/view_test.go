@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/trace"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -651,5 +652,78 @@ func TestAStartingHubClearsWhatWasDecrypted(t *testing.T) {
 	left, _ := os.ReadDir(work)
 	if len(left) != 1 || left[0].Name() != "debuginfod" {
 		t.Fatal("after the start the work directory holds", left)
+	}
+}
+
+// A trace of system calls is megabytes of text: over MCP it is also read as
+// the summary that the viewer shows, which "strace -c" would print.
+func TestATraceIsReadAsItsSummary(t *testing.T) {
+	trace := strings.Join([]string{
+		`41 10:00:00.000001 read(3, "abc", 4096) = 3 <0.000100>`,
+		`41 10:00:00.000200 read(3, "", 4096)    = 0 <0.000300>`,
+		`42 10:00:00.000300 futex(0x1, FUTEX_WAIT_PRIVATE, 0, NULL <unfinished ...>`,
+		`41 10:00:00.000400 openat(AT_FDCWD, "/missing", O_RDONLY) = -1 ENOENT (No such file or directory) <0.000050>`,
+		`42 10:00:02.000300 <... futex resumed>)   = -1 ETIMEDOUT (Connection timed out) <2.000000>`,
+		`41 10:00:02.000400 write(1, "` + strings.Repeat("x", 200<<10) + `", 204800) = 204800 <0.001000>`,
+		`41 10:00:02.000500 --- SIGCHLD {si_signo=SIGCHLD} ---`,
+		`43 10:00:02.000600 epoll_pwait(5,  <unfinished ...>`,
+		`41 10:00:02.000700 +++ exited with 0 +++`, ``,
+	}, "\n")
+	f, capture, _ := viewed(t, map[string][]byte{"api-1/api.strace": []byte(trace), "api-1/api.log": []byte("a line\n")})
+	read := func(arguments map[string]any) (string, bool) {
+		t.Helper()
+		arguments["id"] = capture
+		code, b := f.call("alice-token", "POST", "/mcp", map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "read_artifact", "arguments": arguments}})
+		if code != 200 {
+			t.Fatal(code, string(b))
+		}
+		var reply struct {
+			Result struct {
+				IsError bool
+				Content []struct{ Text string }
+			}
+		}
+		if err := json.Unmarshal(b, &reply); err != nil || len(reply.Result.Content) != 1 {
+			t.Fatal(err, string(b))
+		}
+		return reply.Result.Content[0].Text, reply.Result.IsError
+	}
+	text, failed := read(map[string]any{"name": "api-1/api.strace", "summary": true})
+	if failed {
+		t.Fatal(text)
+	}
+	var answer struct{ Text string }
+	if err := json.Unmarshal([]byte(text), &answer); err != nil {
+		t.Fatal(err, text)
+	}
+	// Each call once, the interrupted one with the time and failure of its end,
+	// the one that never returned counted too, the longest time first.
+	lines := strings.Split(strings.TrimSpace(answer.Text), "\n")
+	var rows []string
+	for _, line := range lines {
+		if fields := strings.Fields(line); len(fields) >= 5 && strings.Contains(fields[1], ".") {
+			rows = append(rows, strings.Join(fields, " "))
+		}
+	}
+	want := []string{
+		"99.93 2.000000 2000000 1 1 futex",
+		"0.05 0.001000 1000 1 write",
+		"0.02 0.000400 200 2 read",
+		"0.00 0.000050 50 1 1 openat",
+		"0.00 0.000000 0 1 epoll_pwait",
+		"100.00 2.001450 333575 6 2 total",
+	}
+	if !slices.Equal(rows, want) {
+		t.Fatalf("the summary:\n%s\nwant rows:\n%s", answer.Text, strings.Join(want, "\n"))
+	}
+	if !strings.Contains(lines[0], "6 calls") {
+		t.Errorf("the first line does not say how many calls: %q", lines[0])
+	}
+	// Without the word, the text as before; and a summary of what is no trace is refused.
+	if text, _ := read(map[string]any{"name": "api-1/api.strace"}); !strings.Contains(text, "FUTEX_WAIT_PRIVATE") {
+		t.Errorf("the trace's text: %.200s", text)
+	}
+	if text, failed := read(map[string]any{"name": "api-1/api.log", "summary": true}); !failed || !strings.Contains(text, "strace") {
+		t.Errorf("a summary of a log: %v %.200s", failed, text)
 	}
 }

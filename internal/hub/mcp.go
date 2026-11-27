@@ -158,8 +158,8 @@ var mcpTools = []mcpTool{
 			}
 			return h.visible(ctx, u, in.ID)
 		}},
-	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace) is returned 64 KiB at a time from a byte offset. A core dump (core.*, or its description core.*.analysis.json) is returned as text, 64 KiB at a time from offset: why the process stopped, then the stacks of its program as its runtime sees them (goroutines, Python threads, .NET threads; those with the same state and stack once, with their number), then the machine's threads, with variables where there are any. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) a .NET trace (*.nettrace) and a JVM's flight recording (*.jfr: where its threads ran, sampleType samples, and allocated, sampleType allocated) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. A packet capture (*.pcap) is returned as its statistics (protocols, conversations, Wireshark's expert information), or with filter, a Wireshark display filter, as the packets that match. A core is downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
-		InputSchema: object(`"id":{"type":"string"},"name":{"type":"string"},"offset":{"type":"integer","description":"Text files: the byte to start at"},"sampleType":{"type":"string","description":"Profiles: the kind of value, such as cpu, samples, inuse_space or alloc_space"},"cumulative":{"type":"boolean","description":"Profiles: sort by weight including callees"},"filter":{"type":"string","description":"Packet captures: a Wireshark display filter; the packets that match are listed"}`, "id", "name"),
+	{Name: "read_artifact", Description: "Read a capture's file. A text file (logs, JSON, strace) is returned 64 KiB at a time from a byte offset. A system call trace (*.strace) is with summary returned as what strace -c prints: for each call its share of the time, seconds, calls and errors; read that first, a trace is large. A core dump (core.*, or its description core.*.analysis.json) is returned as text, 64 KiB at a time from offset: why the process stopped, then the stacks of its program as its runtime sees them (goroutines, Python threads, .NET threads; those with the same state and stack once, with their number), then the machine's threads, with variables where there are any. A profile (*.pprof, also the sampled sampled-cpu.pprof and sampled-memory.pprof) a .NET trace (*.nettrace) and a JVM's flight recording (*.jfr: where its threads ran, sampleType samples, and allocated, sampleType allocated) are returned as pprof's list of the functions with the most weight; sampleType chooses the kind of value if the profile has several (the answer names them), cumulative sorts by a function's weight including what it calls. A heap dump (*.hprof, *.gcdump) is returned as its classes with the number and size of their objects. A packet capture (*.pcap) is returned as its statistics (protocols, conversations, Wireshark's expert information), or with filter, a Wireshark display filter, as the packets that match. A core is downloaded from /api/captures/{id}/artifacts/{name} with the same bearer token, for local tools.",
+		InputSchema: object(`"id":{"type":"string"},"name":{"type":"string"},"offset":{"type":"integer","description":"Text files: the byte to start at"},"sampleType":{"type":"string","description":"Profiles: the kind of value, such as cpu, samples, inuse_space or alloc_space"},"cumulative":{"type":"boolean","description":"Profiles: sort by weight including callees"},"filter":{"type":"string","description":"Packet captures: a Wireshark display filter; the packets that match are listed"},"summary":{"type":"boolean","description":"System call traces: the summary instead of the text"}`, "id", "name"),
 		call: func(ctx context.Context, h *Hub, u User, args json.RawMessage) (any, error) {
 			var in struct {
 				ID, Name   string
@@ -167,6 +167,7 @@ var mcpTools = []mcpTool{
 				SampleType string
 				Cumulative bool
 				Filter     string
+				Summary    bool
 			}
 			if err := json.Unmarshal(args, &in); err != nil {
 				return nil, err
@@ -251,8 +252,26 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			defer blob.Close()
-			if err := h.Store.Audit(ctx, u.Name, "artifact.read", c.ID, map[string]any{"name": a.Name, "offset": in.Offset}); err != nil {
+			if in.Summary && api.ViewerOf(a.Name) != "strace" {
+				return nil, errStatus{http.StatusBadRequest, "summary is for system call traces (*.strace)"}
+			}
+			detail := map[string]any{"name": a.Name, "offset": in.Offset}
+			if in.Summary {
+				detail = map[string]any{"name": a.Name, "summary": true}
+			}
+			if err := h.Store.Audit(ctx, u.Name, "artifact.read", c.ID, detail); err != nil {
 				return nil, err
+			}
+			if in.Summary {
+				// The whole trace, read as it is unpacked.
+				trace, unpacking := io.Pipe()
+				go func() { unpacking.CloseWithError(unpacked(unpacking, blob, key, a.Packed)) }()
+				text, err := straceSummary(trace)
+				trace.CloseWithError(err)
+				if err != nil {
+					return nil, fmt.Errorf("read %s: %w", a.Name, err)
+				}
+				return map[string]any{"size": a.Size, "text": text}, nil
 			}
 			var buf bytes.Buffer
 			if err := unpacked(&window{w: &buf, skip: in.Offset, max: mcpReadLimit}, blob, key, a.Packed); err != nil && !errors.Is(err, errWindowFull) {
