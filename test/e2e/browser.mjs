@@ -393,6 +393,30 @@ if (adminToken) {
     // A page of a hundred was shown: the next one is asked for.
     await run(`document.getElementById('auditOlder').offsetParent && document.getElementById('auditOlder').click()`); await sleep(500);
   });
+  // What the audit log names is a link to it: the capture, and the file
+  // that was opened or downloaded. The capture's link leads to the capture
+  // itself, open and in sight, also where it is far down the list.
+  await check('desk: the audit log leads to what it names', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    await run(`location.hash = '#audit'`);
+    await until('entries of the audit log', `return document.querySelectorAll('#auditRows tr').length > 0`);
+    const named = JSON.parse(await run(`const file = [...document.querySelectorAll('#auditRows a[href^="/view?capture="]')].at(-1), capture = [...document.querySelectorAll('#auditRows a[href^="#capture="]')].at(-1);
+      return JSON.stringify({file: file?.getAttribute('href') || '', capture: capture?.getAttribute('href') || ''})`));
+    if (!named.capture) throw new Error('no entry of the audit log links to its capture');
+    if (!/^\/view\?capture=[0-9a-f-]{36}&file=./.test(named.file)) throw new Error('no entry of the audit log links to its file: ' + named.file);
+    const id = named.capture.slice('#capture='.length);
+    await run(`document.querySelector('#auditRows a[href="${named.capture}"]').click()`);
+    await until('the capture, open', `return !document.querySelector('[data-view=captures]').hidden && document.querySelector('.capture.open[data-capture="${id}"]')`);
+    await sleep(400);
+    const seen = await run(`const box = document.querySelector('.capture[data-capture="${id}"]').getBoundingClientRect(); return box.top < innerHeight && box.bottom > 0`);
+    if (!seen) throw new Error('the capture that the audit log named is not in sight');
+    // In its viewer, a file's capture is one step away.
+    await open(hub + named.file);
+    await until('the viewer', `return !document.getElementById('number').hidden`);
+    const back = await run(`return document.getElementById('number').getAttribute('href')`);
+    if (!/^\/#capture=[0-9a-f-]{36}$/.test(back || '')) throw new Error('the capture\'s number in the viewer leads to ' + back);
+    await open(hub + '/#audit');
+  });
 }
 ws.close();
 // The browser writes into its profile until it has ended.
