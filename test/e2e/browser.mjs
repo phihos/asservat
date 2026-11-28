@@ -319,6 +319,29 @@ await check('desk: a step with nothing to set says so', async () => {
     await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
     if (await shown() !== 9) throw new Error(`${await shown()} files are listed for three pods, want 9`);
   });
+  // The button of a capture's line that is the thing to do, as "Stop and
+  // keep", is filled like every such button: without its ground, its dark
+  // words stood on the dark page of a dark system and were hardly read.
+  await check('dark: the button to stop a capture can be read', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-color-scheme', value: 'dark'}]});
+    // Its requester's to stop: this user's.
+    const running = {id: made, number: 9, cluster: 'c', namespace: 'n', workload: 'Deployment/w', requester: await run(`return me.name`), state: 'Running', createdAt: new Date().toISOString(), durationSeconds: 600, remainingSeconds: 500,
+      recordings: [{kind: 'pcap'}], tasks: [{pod: 'p', node: 'node', state: 'Running', recordings: [{kind: 'pcap', state: 'Running'}]}], artifacts: []};
+    hostile = [[/^\/api\/captures(\?.*)?$/, [running]]];
+    await open(hub + '/#captures');
+    await until('the list', `return !document.getElementById('app').hidden`);
+    await run(`loadCaptures()`); await sleep(400);
+    // The luminance of the words against that of what they stand on (WCAG): 4.5 to 1 reads.
+    const contrast = await run(`const b = [...document.querySelectorAll('.capture .acts button')].find(b => /Stop and keep/.test(b.innerText)); if (!b) return 0;
+      const rgb = c => { const m = c.match(/[\\d.]+/g).map(Number); return m.length > 3 && m[3] === 0 ? null : m.slice(0, 3); };
+      let ground = null; for (let e = b; e && !ground; e = e.parentElement) ground = rgb(getComputedStyle(e).backgroundColor);
+      const lum = c => { const [r, g, bl] = c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
+      const a = lum(rgb(getComputedStyle(b).color)), g = lum(ground || [255, 255, 255]); return (Math.max(a, g) + 0.05) / (Math.min(a, g) + 0.05)`);
+    await send('Emulation.setEmulatedMedia', {features: []});
+    if (!contrast) throw new Error('no button to stop the capture');
+    if (contrast < 4.5) throw new Error(`"Stop and keep" stands out by ${contrast.toFixed(1)} to 1, less than 4.5`);
+  });
   await send('Fetch.disable');
   hostile = [];
 }
