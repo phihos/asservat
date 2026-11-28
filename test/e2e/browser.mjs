@@ -277,6 +277,11 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
         const r = document.createRange(); r.selectNodeContents(said); return r.getClientRects().length`);
       if (broken > 2) throw new Error(`"optimised out" is broken into ${broken} lines`);
     }
+    // Text without timestamps, as a class histogram, offers no switch for them.
+    if (file.viewer === 'log') {
+      const offered = JSON.parse(await run(`const s = document.getElementById('stamps'); return JSON.stringify({shown: !!s.offsetParent, stamped: !!document.querySelector('#root .l .ts')})`));
+      if (offered.shown !== offered.stamped) throw new Error(`timestamps ${offered.stamped ? 'are there and no switch is offered' : 'are not there and a switch is offered'}`);
+    }
     // How many system calls there are is said once while all of them are shown.
     if (file.viewer === 'strace') {
       const tally = await run(`return document.getElementById('shown').innerText`);
