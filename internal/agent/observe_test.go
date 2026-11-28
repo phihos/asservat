@@ -150,8 +150,11 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 	const uid = "uid-shop-api-1"
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "shop", Name: "api-1", UID: uid, Labels: map[string]string{"app": "api"}},
-		Spec:       corev1.PodSpec{NodeName: "node-a", Containers: []corev1.Container{{Name: "app"}}},
-		Status:     corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "app", ContainerID: "containerd://c0ffee", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}},
+		Spec:       corev1.PodSpec{NodeName: "node-a", Containers: []corev1.Container{{Name: "app"}, {Name: "side"}}},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{
+			{Name: "app", ContainerID: "containerd://c0ffee", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+			{Name: "side", ContainerID: "containerd://decaf", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+		}},
 	}
 	kube := fake.NewClientset(pod)
 	reports := make(chan api.Trigger, 100)
@@ -163,28 +166,33 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 	defer hub.Close()
 	spool := CoreSpool(t.TempDir())
 	os.MkdirAll(filepath.Dir(spool.marker(uid, "cores")), 0o700) // as the handler's installation leaves it
-	a := &Agent{HubURL: hub.URL, Node: "node-a", Kube: kube, HTTP: http.DefaultClient, Proc: t.TempDir(), Cores: spool, watching: map[string]context.CancelFunc{}}
+	const wait = 400 * time.Millisecond
+	a := &Agent{HubURL: hub.URL, Node: "node-a", Kube: kube, HTTP: http.DefaultClient, Proc: t.TempDir(), Cores: spool, coreWait: wait, watching: map[string]context.CancelFunc{}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	defer func(was time.Duration) { coreWaitsForCrash = was }(coreWaitsForCrash)
-	coreWaitsForCrash = 300 * time.Millisecond
 
-	a.setWatches(ctx, []api.Watch{{ID: "cores", Selector: "app=api", CaptureRequest: api.CaptureRequest{Namespace: "shop", Workload: "Deployment/api", Recordings: []api.Recording{{Kind: api.KindCoredump}}}}})
+	// Two watches for the same workload: a core is one's, not both's.
+	watch := func(id string) api.Watch {
+		return api.Watch{ID: id, Selector: "app=api", CaptureRequest: api.CaptureRequest{Namespace: "shop", Workload: "Deployment/api", Recordings: []api.Recording{{Kind: api.KindCoredump}}}}
+	}
+	a.setWatches(ctx, []api.Watch{watch("cores"), watch("cores-too")})
 	// The pod is marked for the node's handler, which then keeps its cores.
-	for i := 0; ; i++ {
-		if _, err := os.Stat(spool.marker(uid, "cores")); err == nil {
-			break
-		} else if i == 250 {
-			t.Fatal("the pod was not marked for the core handler:", err)
+	for _, id := range []string{"cores", "cores-too"} {
+		for i := 0; ; i++ {
+			if _, err := os.Stat(spool.marker(uid, id)); err == nil {
+				break
+			} else if i == 250 {
+				t.Fatal("the pod was not marked for the core handler:", err)
+			}
+			time.Sleep(20 * time.Millisecond)
 		}
-		time.Sleep(20 * time.Millisecond)
 	}
 	// core is what the handler does with a core: written, then named as finished.
-	core := func(pid string) {
+	core := func(container, pid string) {
 		t.Helper()
 		dir := spool.cores(uid)
 		os.MkdirAll(dir, 0o700)
-		name := filepath.Join(dir, "c0ffee."+pid+".1700000000")
+		name := filepath.Join(dir, container+"."+pid+".1700000000")
 		if err := os.WriteFile(name+".part", []byte("core of "+pid), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -197,45 +205,74 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 		select {
 		case report := <-reports:
 			return report
-		case <-time.After(5 * time.Second):
+		// A crash's report waits five seconds for a core that another watch took.
+		case <-time.After(15 * time.Second):
 			t.Fatal("no report of", what)
 			return api.Trigger{}
 		}
 	}
+	quiet := func(what string, long time.Duration) {
+		t.Helper()
+		select {
+		case again := <-reports:
+			t.Fatalf("%s: %+v", what, again)
+		case <-time.After(long):
+		}
+	}
+	taken := func(report api.Trigger) []string {
+		files, _ := filepath.Glob(filepath.Join(spool.taken(report.ID), "*.core"))
+		return files
+	}
 
-	// A worker dies; its container goes on.
-	core("4711")
+	// A worker dies; its container goes on. One of the two watches records.
+	core("c0ffee", "4711")
 	report := next("a core whose container goes on")
-	if report.Pod != "api-1" || !strings.Contains(report.Message, "core") || !strings.Contains(report.Message, "app") {
+	if report.Pod != "api-1" || !strings.Contains(report.Message, "process 4711 of container app left a core dump") {
 		t.Fatalf("reported %+v", report)
 	}
-	if taken, _ := filepath.Glob(filepath.Join(spool.taken(report.ID), "*.core")); len(taken) != 1 {
-		t.Fatalf("the core was not set aside for the report: %v", taken)
+	if len(taken(report)) != 1 {
+		t.Fatalf("the core was not set aside for the report: %v", taken(report))
 	}
 	if left, _ := filepath.Glob(filepath.Join(spool.cores(uid), "*.core")); len(left) != 0 {
 		t.Fatalf("the core stayed on the node: %v", left)
 	}
+	quiet("the other watch reported the same core, which it does not have", 3*wait)
 
-	// The next one takes its container with it: one report, the crash's.
-	core("4712")
+	// Each core waits its own time: one that comes while another waits is
+	// not reported with it, as its container may yet end.
+	core("c0ffee", "4712")
+	time.Sleep(wait * 3 / 4)
+	core("decaf", "4713")
+	report = next("the first of two cores")
+	if got := taken(report); len(got) != 1 || !strings.Contains(got[0], "4712") {
+		t.Fatalf("the first report took %v", got)
+	}
+	report = next("the second of two cores")
+	if got := taken(report); len(got) != 1 || !strings.Contains(got[0], "4713") || !strings.Contains(report.Message, "container side") {
+		t.Fatalf("the second report took %v and said %q", got, report.Message)
+	}
+
+	// The next one takes its container with it: the crash is reported, by
+	// both watches as before, and the core is not reported once more.
+	core("c0ffee", "4714")
 	crashed, err := kube.CoreV1().Pods("shop").Get(ctx, "api-1", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	crashed.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "app", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ContainerID: "containerd://c0ffee", ExitCode: 139, Reason: "Error"}}}}
+	crashed.Status.ContainerStatuses[0] = corev1.ContainerStatus{Name: "app", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ContainerID: "containerd://c0ffee", ExitCode: 139, Reason: "Error"}}}
 	if _, err := kube.CoreV1().Pods("shop").Update(ctx, crashed, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	report = next("a crash")
-	if !strings.Contains(report.Message, "crashed") {
-		t.Fatalf("reported %+v", report)
+	with := 0
+	for range 2 {
+		report = next("a crash")
+		if !strings.Contains(report.Message, "crashed") {
+			t.Fatalf("reported %+v", report)
+		}
+		with += len(taken(report))
 	}
-	if taken, _ := filepath.Glob(filepath.Join(spool.taken(report.ID), "*.core")); len(taken) != 1 {
-		t.Fatalf("the crash's report is without the core: %v", taken)
+	if with != 1 {
+		t.Fatalf("the crash's reports hold %d cores, want 1", with)
 	}
-	select {
-	case again := <-reports:
-		t.Fatalf("the core of a crash was reported a second time: %+v", again)
-	case <-time.After(4 * coreWaitsForCrash):
-	}
+	quiet("the core of a crash was reported once more", 4*wait)
 }

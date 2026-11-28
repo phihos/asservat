@@ -46,6 +46,8 @@ type Agent struct {
 	Pod string
 	// Cores is the spool of the node's core handler; empty without it.
 	Cores CoreSpool
+	// coreWait is coreWaitsForCrash, or what a test sets.
+	coreWait time.Duration
 
 	mu sync.Mutex
 	// connected is closed when the stream to the hub is open again, and

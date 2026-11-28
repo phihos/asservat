@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 
 	"asservat.local/asservat/internal/api"
@@ -344,16 +345,30 @@ func (s CoreSpool) take(podUID, trigger string) {
 		}
 	}
 	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+	s.setAside(cores, trigger)
+}
+
+// setAside moves finished cores, each with the program's files that the
+// handler kept with it, to where the capture of one report finds them, and
+// returns those it moved: a core that another report took first is not
+// among them.
+func (s CoreSpool) setAside(cores []string, trigger string) (moved []string) {
 	if len(cores) == 0 {
-		return
+		return nil
 	}
 	os.MkdirAll(s.taken(trigger), 0o700)
 	for _, file := range cores {
-		os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file)))
-		// And the program's files that the handler kept with it.
+		if os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file))) != nil {
+			continue
+		}
+		moved = append(moved, file)
 		kept := strings.TrimSuffix(file, ".core") + programFiles
 		os.Rename(kept, filepath.Join(s.taken(trigger), filepath.Base(kept)))
 	}
+	if len(moved) == 0 {
+		os.Remove(s.taken(trigger))
+	}
+	return moved
 }
 
 // coreWaitsForCrash is how long a core that the handler kept waits for the
@@ -362,7 +377,7 @@ func (s CoreSpool) take(podUID, trigger string) {
 // second or two, and that report takes the core with the crash's other
 // recordings. Nothing tells that a container will go on, so this is a time:
 // long enough for the kubelet's report, short against what a core is for.
-var coreWaitsForCrash = 10 * time.Second
+const coreWaitsForCrash = 10 * time.Second
 
 // dumped has a core dump watch record a core that came without a crash: a
 // process of the pod died and left one while its container goes on, as a
@@ -382,6 +397,12 @@ func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Poin
 		return
 	}
 	defer changes.Close()
+	wait := a.coreWait
+	if wait == 0 {
+		wait = coreWaitsForCrash
+	}
+	// due is when the next of the cores that still wait has waited its time.
+	var due <-chan time.Time
 	for {
 		select {
 		case <-ctx.Done():
@@ -390,20 +411,39 @@ func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Poin
 			if !reports {
 				return
 			}
+		case <-due:
 		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(coreWaitsForCrash):
-		}
+		// Each core waits its own time: one that came a moment ago is not
+		// taken with one that has waited, as its container may yet end.
+		due = nil
+		var waited []string
+		var soonest time.Duration
 		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
-		if len(cores) == 0 {
-			continue // a crash's report took it
+		for _, file := range cores {
+			info, err := os.Stat(file)
+			if err != nil {
+				continue // a crash's report took it
+			}
+			if left := wait - time.Since(info.ModTime()); left <= 0 {
+				waited = append(waited, file)
+			} else if soonest == 0 || left < soonest {
+				soonest = left
+			}
+		}
+		if soonest > 0 {
+			due = time.After(soonest)
+		}
+		// Set aside before it is reported: of several watches for the pod,
+		// the one that gets the core records, and the others say nothing.
+		id := uuid.NewString()
+		taken := a.Cores.setAside(waited, id)
+		if len(taken) == 0 {
+			continue
 		}
 		now := pod.Load()
 		names := containerNames(now)
 		var of []string
-		for _, file := range cores {
+		for _, file := range taken {
 			// "<container ID>.<pid>.<time>.core"
 			if parts := strings.Split(filepath.Base(file), "."); len(parts) > 1 {
 				name := names[parts[0]]
@@ -413,7 +453,7 @@ func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Poin
 				of = append(of, fmt.Sprintf("process %s of container %s", parts[1], name))
 			}
 		}
-		a.trigger(agent, w, now, strings.Join(of, ", ")+" left a core dump; its container goes on")
+		a.tell(agent, w, now, id, strings.Join(of, ", ")+" left a core dump; its container goes on")
 	}
 }
 

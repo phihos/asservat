@@ -357,10 +357,17 @@ func crashes(pod *corev1.Pod, seen map[string]string) string {
 // answers with a capture task for the pod. The packets from before and, after
 // a crash, the cores of the crashed processes are set aside for that task.
 func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, message string) {
-	id, pod := uuid.NewString(), crashed.Name
+	id := uuid.NewString()
 	if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" {
 		a.Cores.take(string(crashed.UID), id)
 	}
+	a.tell(ctx, w, crashed, id, message)
+}
+
+// tell is trigger for a report whose cores, if it has any, are set aside
+// under id already.
+func (a *Agent) tell(ctx context.Context, w api.Watch, crashed *corev1.Pod, id, message string) {
+	pod := crashed.Name
 	// After a crash the packets up to it are set aside. A pod that goes on
 	// is recorded on by its buffer, which the capture reads when it is done.
 	a.mu.Lock()
