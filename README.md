@@ -207,6 +207,17 @@ curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d
 }'
 ```
 
+A condition other than a crash goes into `when`, with what it needs under
+`params`, all as strings:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/watches -d '{
+  "cluster": "prod-eu", "namespace": "payments", "workload": "Deployment/api",
+  "kind": "logs",
+  "when": {"kind": "log", "params": {"pattern": "connection (refused|reset)"}}
+}'
+```
+
 With `"alert"` and a `name`, a watch waits for a Prometheus alert. Give the
 hub a secret (`hub.alertToken`) and Alertmanager a receiver that presents it:
 
