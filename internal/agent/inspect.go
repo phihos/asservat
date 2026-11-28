@@ -17,7 +17,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"asservat.local/asservat/internal/api"
@@ -29,18 +28,28 @@ import (
 // stores nothing.
 
 // nodePods returns the named pods that run on this node, and the names of
-// those that do not, or no longer.
+// those that do not, or no longer. It asks the API server once, for the
+// node's pods in the namespace: asked for each pod, one after another, the
+// 150 pods of a workload on a node took 7 seconds.
 func (a *Agent) nodePods(ctx context.Context, namespace string, names []string) (pods []*corev1.Pod, skipped []string) {
-	for _, name := range names {
-		pod, err := a.Kube.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil || pod.Spec.NodeName != a.Node {
-			if err != nil && !apierrors.IsNotFound(err) {
-				slog.Warn("inspection: pod not read", "pod", name, "error", err)
-			}
-			skipped = append(skipped, name)
-			continue
+	here, err := a.Kube.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{FieldSelector: "spec.nodeName=" + a.Node})
+	if err != nil {
+		slog.Warn("inspection: pods not read", "namespace", namespace, "error", err)
+		return nil, names
+	}
+	byName := map[string]*corev1.Pod{}
+	for i := range here.Items {
+		// Asked of the pod too: not every server of pods filters by node.
+		if pod := &here.Items[i]; pod.Spec.NodeName == a.Node {
+			byName[pod.Name] = pod
 		}
-		pods = append(pods, pod)
+	}
+	for _, name := range names {
+		if pod := byName[name]; pod != nil {
+			pods = append(pods, pod)
+		} else {
+			skipped = append(skipped, name)
+		}
 	}
 	return pods, skipped
 }
