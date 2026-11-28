@@ -189,6 +189,15 @@ and took the agent's memory to 285 MiB at its peak, about 1.4 MiB for each
 pod; system call traces of all 200 were complete after 12 seconds as well.
 Two minutes later the agent was back at 26 MiB.
 
+A watch for packets keeps one `tcpdump` running for each pod it watches, so
+that a capture can begin before the moment it waited for. On the same node
+a watch on all 200 pods held the agent at 329 MiB, about 1.6 MiB for each
+pod, and at 2 millicores while nothing happened; idle it uses 9 MiB. When
+all 200 containers were killed at once, the watch started a capture for
+each. The memory is
+taken as long as the watch waits: watch the workloads you expect to fail,
+not every pod of a cluster.
+
 Plan disk space for three things:
 
 - **Evidence storage** (`hub.storage.size`, 20 GiB by default): the sum of
