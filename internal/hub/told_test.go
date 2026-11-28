@@ -58,13 +58,14 @@ func TestAStoreThatTakesNoFileIsSaid(t *testing.T) {
 	h := &Hub{Config: Config{Blobs: refusingBlobs{}, MasterKey: bytes.Repeat([]byte{7}, 32)}}
 	_, err := h.keep(context.Background(), "api-1/app.log", strings.NewReader("a line\n"))
 	said := told(err)
-	if said.code != http.StatusServiceUnavailable || !strings.Contains(said.msg, "evidence store") || strings.Contains(said.msg, "minio") {
+	// Not 502, 503 or 504: with those an agent waits for the hub to come back.
+	if said.code != http.StatusInsufficientStorage || !strings.Contains(said.msg, "evidence store") || strings.Contains(said.msg, "minio") {
 		t.Fatalf("told %d %q", said.code, said.msg)
 	}
 	// Who stopped waiting is not told that the store failed.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := h.keep(ctx, "api-1/app.log", strings.NewReader("a line\n")); told(err).code == http.StatusServiceUnavailable {
+	if _, err := h.keep(ctx, "api-1/app.log", strings.NewReader("a line\n")); told(err).code == http.StatusInsufficientStorage {
 		t.Fatalf("a request that was given up is told %q", told(err).msg)
 	}
 }

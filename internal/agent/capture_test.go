@@ -375,3 +375,34 @@ func TestAsideDoesNotHoldTheTool(t *testing.T) {
 		t.Fatal("left in the scratch directory:", left)
 	}
 }
+
+// A hub whose evidence store did not take a file says so (507). The agent
+// gives the file up with the hub's words, also a core, which it would keep
+// and send again for a hub that is away (502 to 504): this hub is there.
+func TestAnUploadThatTheHubCouldNotStoreFailsAtOnce(t *testing.T) {
+	asked := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked++
+		io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusInsufficientStorage)
+		io.WriteString(w, `{"error":"the hub could not store the file: its evidence store did not take it (the hub's log says why)"}`)
+	}))
+	defer server.Close()
+	a := &Agent{HubURL: server.URL, HTTP: server.Client()}
+	core := filepath.Join(t.TempDir(), "core.app")
+	os.WriteFile(core, bytes.Repeat([]byte("core"), 1000), 0o600)
+	file, err := os.Open(core)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	err = a.upload(ctx, "capture", "pod", "core.app", file)
+	if err == nil || ctx.Err() != nil || asked != 1 {
+		t.Fatalf("the upload waited or was sent again: %v, context %v, asked %d times", err, ctx.Err(), asked)
+	}
+	if !strings.Contains(err.Error(), "evidence store did not take it") {
+		t.Fatalf("the hub's words are not in what the recording says: %v", err)
+	}
+}

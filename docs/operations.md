@@ -285,7 +285,7 @@ Common causes:
 - **The hub could not store the file.** Its evidence store did not take it:
   the volume is full, or the S3 bucket is not there or refuses the hub's
   credentials. The hub's log has the store's own words, and says when it
-  starts if the bucket does not answer.
+  starts if the server did not confirm the bucket.
 
 ### A crash left no core dump
 

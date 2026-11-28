@@ -128,10 +128,11 @@ func runHub(ctx context.Context, args []string) error {
 		}
 		c.Blobs = blobs
 		// Said at the start and not a reason to stop: the server may come
-		// later, and credentials that may write need not be allowed to ask.
+		// later, and credentials that may write need not be allowed to ask,
+		// so the warning says what was asked and not what will happen.
 		check, cancel := context.WithTimeout(ctx, 10*time.Second)
 		if err := blobs.Check(check); err != nil {
-			slog.Warn("the evidence store does not answer for its bucket: recordings will fail to upload until it does", "endpoint", *s3Endpoint, "bucket", *s3Bucket, "error", err)
+			slog.Warn("the evidence store did not confirm its bucket: uploads fail if the bucket is not there or the server not reachable, and work if the credentials may only not ask", "endpoint", *s3Endpoint, "bucket", *s3Bucket, "error", err)
 		}
 		cancel()
 	default:

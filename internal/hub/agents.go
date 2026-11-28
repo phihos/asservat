@@ -363,8 +363,10 @@ func (h *Hub) kept(ctx context.Context, name string, content io.Reader, packed b
 
 // errStoreFailed answers an upload that the evidence store did not take:
 // a volume that is full, a bucket that is not there or refuses the hub. It
-// is the store's failure and may pass, so it is no internal error (500).
-var errStoreFailed = errStatus{http.StatusServiceUnavailable, "the hub could not store the file: its evidence store did not take it (the hub's log says why)"}
+// is 507 and none of 502, 503 and 504: those an agent takes for a hub that
+// is away, and keeps a core to send it again when the hub is back, which
+// here it is already.
+var errStoreFailed = errStatus{http.StatusInsufficientStorage, "the hub could not store the file: its evidence store did not take it (the hub's log says why)"}
 
 // ending closes a pipe when its reader has ended, so that who reads the
 // pipe's other end learns of the end too.
