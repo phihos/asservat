@@ -78,9 +78,11 @@ troubleshooting, see [operating Asservat](docs/operations.md).
 
 ## Install
 
-Install the hub together with the agents of its own cluster:
+Install the hub together with the agents of its own cluster, from a copy of
+this repository:
 
 ```sh
+git clone https://github.com/phihos/asservat && cd asservat
 kubectl create namespace asservat
 helm install asservat charts/asservat -n asservat -f values.yaml
 ```
@@ -102,7 +104,10 @@ The chart runs its own PostgreSQL and stores evidence on a volume unless you
 configure an external database (`hub.database.existingSecret`) or an S3 bucket
 (`hub.storage.s3`). Instead of static users you can use your OIDC issuer
 (`hub.oidc`): the console then signs in there and the API accepts its ID
-tokens. Register `https://<hub-host>/auth/callback` as redirect URI. Name the
+tokens. Register `https://<hub-host>/auth/callback` as redirect URI. To
+reach the hub from outside its cluster, as other clusters' agents and your
+browser do, give it a host name with `hub.ingress.enabled`, `hub.ingress.host`
+and, for HTTPS, `hub.ingress.tlsSecretName`. Name the
 hub's own cluster (`hub.localCluster`) before you record: captures and watches
 keep the name they were made under, so after a later change the finished
 captures still show the old name and watches for it no longer find a cluster
@@ -167,6 +172,13 @@ curl -H "Authorization: Bearer $TOKEN" -X POST https://<hub-host>/api/captures -
 }'
 curl -H "Authorization: Bearer $TOKEN" https://<hub-host>/api/captures/<id>
 curl -H "Authorization: Bearer $TOKEN" -O https://<hub-host>/api/captures/<id>/artifacts/<pod>/capture.pcap
+```
+
+This request asks for a core dump, so it waits (`"state": "PendingApproval"`)
+until an administrator approves it in the console or with their own token:
+
+```sh
+curl -H "Authorization: Bearer $ADMIN_TOKEN" -X POST https://<hub-host>/api/captures/<id>/approve
 ```
 
 You do not need to know process names or filter syntax. The console lists
