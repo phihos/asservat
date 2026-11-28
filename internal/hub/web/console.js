@@ -470,7 +470,20 @@ const approvedByMe = r => (r.approvals || []).includes(me.name);
 // many of them the list shows.
 let pages = 1;
 const pageSize = 50;
+// The requests of others that wait for this user's word. An administrator
+// has them in the list of captures and of watches; for someone whom a
+// cluster lets approve in a namespace they are shown here.
+async function loadApprovals() {
+  const waiting = me.admin ? {captures: [], watches: []} : await call('GET', '/api/approvals').catch(() => ({captures: [], watches: []}));
+  const asks = [...waiting.captures.map(c => ({...c, path: 'captures', is: `capture ${String(c.number).padStart(4, '0')}`})), ...waiting.watches.map(w => ({...w, path: 'watches', is: `a watch (${told(w.when)})`}))];
+  $('approvals').hidden = !asks.length;
+  $('approvals').innerHTML = !asks.length ? '' : `<h3>Awaiting your approval</h3>` + asks.map(a => `<div class="ask">
+    <span class="what"><b>${esc(a.requester)}</b> asks for ${esc(a.is)}: ${esc(list2((a.recordings || []).map(r => kindNames[r.kind] || r.kind)))} of ${esc(a.workload)} in ${esc(a.cluster)} / ${esc(a.namespace)}
+      <div class="muted">${a.reason ? `“${esc(a.reason)}”` : 'No reason given.'}${approvalsOf(a) ? ' · ' + approvalsOf(a) : ''}</div></span>
+    <span class="acts"><button class="primary" data-path="${a.path}" data-id="${a.id}" data-act="approve" title="${me.approvalsNeeded > 1 ? 'Give your approval. It starts with the last one it needs.' : 'Let it start'}">Approve</button>${a.path === 'captures' ? `<button data-path="captures" data-id="${a.id}" data-act="deny" title="Refuse the request. It will not start.">Deny</button>` : ''}</span></div>`).join('');
+}
 async function loadCaptures() {
+  await loadApprovals();
   let all = [];
   for (let i = 0; i < pages; i++) {
     const page = await call('GET', '/api/captures' + (all.length ? '?before=' + encodeURIComponent(all.at(-1).createdAt) : ''));
@@ -710,6 +723,12 @@ $('states').onclick = guard(async e => {
   if (!e.target.dataset.filter) return;
   captureFilter = e.target.dataset.filter;
   for (const b of $('states').children) b.classList.toggle('on', b === e.target);
+  await loadCaptures();
+}, 'capturesProblem');
+$('approvals').onclick = guard(async e => {
+  const {path, id, act} = e.target.dataset;
+  if (!act) return;
+  await call('POST', `/api/${path}/${id}/${act}`);
   await loadCaptures();
 }, 'capturesProblem');
 $('captures').onclick = guard(async e => {
