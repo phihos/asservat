@@ -24,6 +24,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"asservat.local/asservat/internal/api"
+	"asservat.local/asservat/internal/coredesc"
 )
 
 // A HotSpot JVM answers diagnostic commands over a socket in its /tmp, the
@@ -209,7 +210,7 @@ func openInside(root, dir string) (*os.File, error) {
 		return nil, err
 	}
 	defer unix.Close(at)
-	fd, err := unix.Openat2(at, strings.TrimLeft(dir, "/"), &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC, Resolve: unix.RESOLVE_IN_ROOT})
+	fd, err := coredesc.OpenWithin(at, dir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, fmt.Errorf("%s of the container: %w", dir, err)
 	}
