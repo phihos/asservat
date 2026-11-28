@@ -41,12 +41,13 @@ async function start() {
 }
 
 // Who comes back with the browser's own way back, as from a file's viewer,
-// finds the page where it stood. The browser cannot put it there itself:
+// or loads the page anew, finds the page where it stood. The browser cannot put it there itself:
 // the lists are filled after the page has loaded.
 history.scrollRestoration = 'manual';
 addEventListener('pagehide', () => { try { sessionStorage.setItem('stood', JSON.stringify({at: scrollY, view: location.hash})); } catch { /* then it starts at the top */ } });
 function comeBack() {
-  if (performance.getEntriesByType('navigation')[0]?.type !== 'back_forward') return;
+  // Also after a reload, which the browser would have put back itself.
+  if (!['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type)) return;
   try {
     const stood = JSON.parse(sessionStorage.getItem('stood') || 'null');
     if (stood && stood.view === location.hash) scrollTo(0, stood.at);
