@@ -598,6 +598,7 @@ function showStep(n) {
   for (const li of $('steps').children) {
     const k = Number(li.dataset.go);
     li.className = k === step ? 'on' : !stepNeeded(k) ? 'skip' : k < step ? 'done' : '';
+    li.title = li.className === 'skip' ? 'Nothing to set for what you chose to record. Choose a recording that has settings, such as network traffic, and this step opens.' : '';
   }
   $('back').hidden = step === 1;
   $('next').hidden = step === 4;

@@ -29,7 +29,8 @@
   #steps li { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 0; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 13px; color: var(--quiet); }
   #steps li b { display: inline-block; min-width: 1.5em; padding: 2px 4px; text-align: center; background: var(--soft); font: 700 18px var(--display); color: var(--quiet); }
   #steps li.on { color: var(--ink); border-color: var(--ink); font-weight: 600; } #steps li.on b, #steps li.done b { background: var(--marker); color: var(--on-marker); } #steps li.done { color: var(--ink); }
-  #steps li.skip { text-decoration: line-through; cursor: default; }
+  /* A step with nothing to set for what is chosen says so, and is not gone to. */
+  #steps li.skip { cursor: default; opacity: .7; } #steps li .none { display: none; } #steps li.skip .none { display: inline; }
   #summary { min-height: 1.4em; margin: 0 0 8px; }
   .footer { margin-top: 4px; }
   /* A capture: one line, opened for its recordings and files. Its number is on a marker: filled once it holds files. */
@@ -174,7 +175,7 @@
  <section data-view="new" hidden>
   <h2>New capture</h2>
   <ol id="steps">
-    <li data-go="1"><b>1</b> Where</li><li data-go="2"><b>2</b> What to record</li><li data-go="3"><b>3</b> Details</li><li data-go="4"><b>4</b> When</li>
+    <li data-go="1"><b>1</b> Where</li><li data-go="2"><b>2</b> What to record</li><li data-go="3"><b>3</b> Details<span class="none">: none needed</span></li><li data-go="4"><b>4</b> When</li>
   </ol>
   <p id="summary" class="muted"></p>
   <form id="captureForm">
