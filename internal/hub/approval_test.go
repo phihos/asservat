@@ -2,8 +2,8 @@ package hub_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -16,7 +16,9 @@ import (
 
 // approving starts a hub with one cluster, whose agent lets alice and bob
 // capture in every namespace, and with the people of an installation:
-// alice and bob who request, root and olga who administer.
+// alice and bob who request, root and olga who administer, carol whom the
+// cluster's RBAC lets approve in the namespace payments, as it does bob,
+// and dave who may nothing.
 func approving(t *testing.T, change func(*hub.Config)) (fixture, string) {
 	t.Helper()
 	dsn := os.Getenv("ASSERVAT_TEST_DSN")
@@ -28,10 +30,10 @@ func approving(t *testing.T, change func(*hub.Config)) (fixture, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(store.Close)
-	cluster := "apv" + hex.EncodeToString([]byte(time.Now().Format("150405.000000")))[:14]
+	cluster := fmt.Sprintf("apv%x", time.Now().UnixNano()) // one of its own for every hub of a test
 	joined := hub.Cluster{Name: cluster, Token: "join-token-of-the-cluster-that-approves-" + cluster}
 	c := hub.Config{Store: store, Blobs: hub.DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, AdminGroups: []string{"admins"}, Clusters: []hub.Cluster{joined},
-		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "bob", Token: "bob-token"},
+		Users: []hub.StaticUser{{Name: "alice", Token: "alice-token"}, {Name: "bob", Token: "bob-token"}, {Name: "carol", Token: "carol-token"}, {Name: "dave", Token: "dave-token"},
 			{Name: "root", Token: "root-token", Groups: []string{"admins"}}, {Name: "olga", Token: "olga-token", Groups: []string{"admins"}}}}
 	if change != nil {
 		change(&c)
@@ -44,7 +46,11 @@ func approving(t *testing.T, change func(*hub.Config)) (fixture, string) {
 	t.Cleanup(server.Close) // after the agent's stream, which is closed by a later cleanup
 	f := fixture{t, server.URL}
 	scriptedAgent(t, f, joined.Token, "node-a", func(q api.Query) api.Reply {
-		return api.Reply{Allowed: q.User == "alice" || q.User == "bob", Pods: []api.Pod{{Name: "api-1", Node: "node-a"}}, Selector: "app=api"}
+		allowed := q.User == "alice" || q.User == "bob"
+		if q.Op == "approves" {
+			allowed = (q.User == "carol" || q.User == "bob") && q.Namespace == "payments"
+		}
+		return api.Reply{Allowed: allowed, Pods: []api.Pod{{Name: "api-1", Node: "node-a"}}, Selector: "app=api"}
 	})
 	// The database is the other tests' too, which know these people: what
 	// was requested here goes with the test.
@@ -227,5 +233,125 @@ func TestApprovalsFromBeforeNameTheirApprover(t *testing.T) {
 		if c.Approver != "root" || strings.Join(c.Approvals, ",") != want {
 			t.Fatalf("a capture that was decided (%s) before: approver %q, approvals %v", decision, c.Approver, c.Approvals)
 		}
+	}
+}
+
+// Who may approve in a namespace is the cluster's RBAC's to say, as who may
+// capture there is: someone it lets approve sees the requests that wait
+// in that namespace and decides them, without being an administrator and
+// without getting at what is recorded.
+func TestApprovingIsARightOfItsOwn(t *testing.T) {
+	f, cluster := approving(t, nil)
+	sensitive := func(namespace, reason string) api.CaptureRequest {
+		return api.CaptureRequest{Cluster: cluster, Namespace: namespace, Workload: "Deployment/api", Reason: reason, Recordings: []api.Recording{{Kind: api.KindCoredump}}}
+	}
+	type request struct {
+		ID, State, Approver, Requester, Namespace, Reason string
+	}
+	make1 := func(token, path string, in api.CaptureRequest) request {
+		t.Helper()
+		code, b := f.call(token, "POST", path, in)
+		var r request
+		json.Unmarshal(b, &r)
+		if code != 201 {
+			t.Fatalf("%s: %d %s", path, code, b)
+		}
+		return r
+	}
+	waiting := func(token string) (captures, watches []request) {
+		t.Helper()
+		code, b := f.call(token, "GET", "/api/approvals", nil)
+		var list struct{ Captures, Watches []request }
+		if json.Unmarshal(b, &list) != nil || code != 200 {
+			t.Fatalf("approvals of %s: %d %s", token, code, b)
+		}
+		return list.Captures, list.Watches
+	}
+	payments := make1("alice-token", "/api/captures", sensitive("payments", "the api hangs"))
+	orders := make1("alice-token", "/api/captures", sensitive("orders", "the orders too"))
+	watch := make1("alice-token", "/api/watches", sensitive("payments", "when it crashes"))
+
+	// Carol is shown what waits where she may approve, with who asks and why.
+	captures, watches := waiting("carol-token")
+	if len(captures) != 1 || captures[0].ID != payments.ID || captures[0].Requester != "alice" || captures[0].Reason != "the api hangs" || len(watches) != 1 || watches[0].ID != watch.ID {
+		t.Fatalf("what waits for carol: %+v %+v", captures, watches)
+	}
+	// Others are shown nothing: not who may nothing, not the requester of her own.
+	for _, token := range []string{"dave-token", "alice-token"} {
+		if captures, watches := waiting(token); len(captures) != 0 || len(watches) != 0 {
+			t.Fatalf("what waits for %s: %+v %+v", token, captures, watches)
+		}
+	}
+	// An administrator approves everywhere, as before.
+	if captures, watches := waiting("root-token"); len(captures) < 2 || len(watches) < 1 {
+		t.Fatalf("what waits for an administrator: %+v %+v", captures, watches)
+	}
+	if code, _ := f.call("carol-token", "GET", "/api/captures/"+payments.ID, nil); code != 200 {
+		t.Fatal("carol does not see the request she is to decide:", code)
+	}
+	for token, path := range map[string]string{"dave-token": payments.ID, "carol-token": orders.ID} {
+		for _, act := range []string{"", "/approve", "/deny"} {
+			method := "POST"
+			if act == "" {
+				method = "GET"
+			}
+			if code, _ := f.call(token, method, "/api/captures/"+path+act, nil); code != 404 {
+				t.Fatalf("%s %s of a request that is not theirs to decide: %d", token, act, code)
+			}
+		}
+	}
+	if code, _ := f.call("dave-token", "POST", "/api/watches/"+watch.ID+"/approve", nil); code != 404 {
+		t.Fatal("dave approved a watch:", code)
+	}
+
+	code, b := f.call("carol-token", "POST", "/api/captures/"+payments.ID+"/approve", nil)
+	var decided request
+	json.Unmarshal(b, &decided)
+	if code != 200 || decided.Approver != "carol" || decided.State == api.StatePendingApproval {
+		t.Fatalf("carol's approval: %d %s", code, b)
+	}
+	// What is recorded is not hers: with her decision the request is gone for her.
+	if code, _ := f.call("carol-token", "GET", "/api/captures/"+payments.ID, nil); code != 404 {
+		t.Fatal("carol sees the capture that she approved:", code)
+	}
+	code, b = f.call("carol-token", "POST", "/api/watches/"+watch.ID+"/approve", nil)
+	json.Unmarshal(b, &decided)
+	if code != 200 || decided.Approver != "carol" {
+		t.Fatalf("carol's approval of a watch: %d %s", code, b)
+	}
+	if captures, watches := waiting("carol-token"); len(captures) != 0 || len(watches) != 0 {
+		t.Fatalf("what waits for carol after she decided: %+v %+v", captures, watches)
+	}
+	// She may refuse as well.
+	refused := make1("alice-token", "/api/captures", sensitive("payments", "once more"))
+	if code, b := f.call("carol-token", "POST", "/api/captures/"+refused.ID+"/deny", nil); code != 200 || !strings.Contains(string(b), api.StateDenied) {
+		t.Fatalf("carol's refusal: %d %s", code, b)
+	}
+	// Nobody approves their own request, also not who may approve there.
+	own := make1("bob-token", "/api/captures", sensitive("payments", "bob's own"))
+	if code, _ := f.call("bob-token", "POST", "/api/captures/"+own.ID+"/approve", nil); code != 403 {
+		t.Fatal("bob approved his own request:", code)
+	}
+	if captures, _ := waiting("bob-token"); len(captures) != 0 {
+		t.Fatalf("bob is shown his own request to approve: %+v", captures)
+	}
+	// A requester who may not approve is told so, of a request that is theirs to see.
+	if code, _ := f.call("alice-token", "POST", "/api/captures/"+orders.ID+"/approve", nil); code != 403 {
+		t.Fatal("alice approving her own:", code)
+	}
+
+	// Where several approvals are needed, hers and an administrator's count alike.
+	f, cluster = approving(t, func(c *hub.Config) { c.Approvals = 2 })
+	two := make1("alice-token", "/api/captures", sensitive("payments", "two are needed"))
+	if code, _ := f.call("carol-token", "POST", "/api/captures/"+two.ID+"/approve", nil); code != 200 {
+		t.Fatal("the first of two approvals, carol's:", code)
+	}
+	if captures, _ := waiting("carol-token"); len(captures) != 0 {
+		t.Fatalf("carol is shown a request that has her approval: %+v", captures)
+	}
+	code, b = f.call("root-token", "POST", "/api/captures/"+two.ID+"/approve", nil)
+	json.Unmarshal(b, &decided)
+	if code != 200 || decided.Approver != "carol, root" {
+		t.Fatalf("the second of two approvals: %d %s", code, b)
 	}
 }

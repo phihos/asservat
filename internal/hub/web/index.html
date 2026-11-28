@@ -94,6 +94,11 @@
   }
   [hidden] { display: none !important; }
   /* Signing in: the mark, large, over the two ways in. */
+  /* The requests that wait for this user's approval, above the user's own captures. */
+  #approvals { margin-bottom: 20px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--marker); }
+  #approvals h3 { margin: 0 0 4px; font: 700 18px/1.2 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+  #approvals .ask { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); }
+  #approvals .ask .what { flex: 1 1 320px; min-width: 0; overflow-wrap: anywhere; } #approvals .ask .acts { display: flex; gap: 8px; }
   #login { max-width: 420px; margin: 12vh auto 0; text-align: center; }
   #login img { width: 96px; height: 96px; }
   #login h2 { font-size: 44px; letter-spacing: .05em; margin: 12px 0 4px; }
@@ -363,6 +368,7 @@
     </span>
   </div>
   <p class="problem" id="capturesProblem"></p>
+  <div id="approvals" hidden></div>
   <div id="captures"></div>
   <p id="olderLine" hidden><button type="button" id="older">Show older captures</button></p>
   <p class="empty" id="noCaptures" hidden></p>

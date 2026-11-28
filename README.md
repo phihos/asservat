@@ -35,7 +35,8 @@ a stopped program in a debugger.
 | Core dump | An ELF core of the container's main process, taken with `gcore` while it keeps running, with the program's files that a debugger needs next to it and a description of its threads and stacks, with goroutines, Python and .NET stacks | Yes |
 
 A capture that can contain memory or payload contents waits until an
-administrator approves it. Everything else starts at once.
+administrator, or someone you let approve for its namespace, approves it.
+Everything else starts at once.
 
 ## How it works
 
@@ -63,6 +64,33 @@ flowchart LR
   kubectl -n payments create role capture --verb=create --resource=pods/exec
   kubectl -n payments create rolebinding capture --role=capture --group=payments-devs
   ```
+- **Who may approve** a capture that waits for approval is decided the same
+  way. Administrators may everywhere. To let others approve for a
+  namespace, without making them administrators and without giving them
+  what is recorded, bind them to a role with the verb `approve` on
+  `captures` of the group `asservat.io`. No such resource exists in the
+  cluster; its RBAC answers for the rule all the same:
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata: {name: approve-captures, namespace: payments}
+  rules:
+    - apiGroups: [asservat.io]
+      resources: [captures]
+      verbs: [approve]
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata: {name: approve-captures, namespace: payments}
+  roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: approve-captures}
+  subjects:
+    - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: payments-leads}
+  ```
+
+  Nobody approves their own request. `hub.approvals` asks for more than
+  one approval, each of another person, and `hub.requireReason` for the
+  reason of every such request.
 - **Workloads keep Pod Security `restricted`.** The agent works from the node:
   it enters the pod's network namespace or attaches to its process. Nothing is
   added to your pods, with one exception: to ask a JVM for its own

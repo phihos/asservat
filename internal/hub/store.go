@@ -582,6 +582,20 @@ func (s *Store) watches(ctx context.Context, where, arg string) ([]api.Watch, er
 	})
 }
 
+// Awaiting lists the captures and watches that await approval.
+func (s *Store) Awaiting(ctx context.Context) ([]api.Capture, []api.Watch, error) {
+	rows, err := s.db.Query(ctx, `SELECT `+captureColumns+` FROM captures c WHERE c.state = 'PendingApproval' ORDER BY c.created_at`)
+	if err != nil {
+		return nil, nil, err
+	}
+	captures, err := pgx.CollectRows(rows, scanCapture)
+	if err != nil {
+		return nil, nil, err
+	}
+	watches, err := s.watches(ctx, `sensitive AND approver = '' AND $1 = ''`, "")
+	return captures, watches, err
+}
+
 func (s *Store) Watch(ctx context.Context, id string) (api.Watch, []string, error) {
 	w, groups, err := scanWatch(s.db.QueryRow(ctx, `SELECT `+watchColumns+` FROM watches WHERE id = $1::uuid`, id))
 	if errors.Is(err, pgx.ErrNoRows) {

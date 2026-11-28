@@ -286,7 +286,7 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     modules: [{file: script, from: script, to: script}], mappings: [{start: script, end: script, size: script, offset: script, file: script}]};
   hostile = [[new RegExp(`^/api/captures/${made}$`), capture], [new RegExp(`^/api/captures/${made}/artifacts/p/pod\\.json$`), pod], [new RegExp(`^/api/captures/${made}/artifacts/p/core\\.x\\.analysis\\.json$`), core],
     [new RegExp(`^/api/captures/${made}/describe$`), {described: false}], [/^\/api\/captures(\?.*)?$/, [capture]]];
-  await send('Fetch.enable', {patterns: [{urlPattern: '*/api/captures*'}]});
+  await send('Fetch.enable', {patterns: [{urlPattern: '*/api/captures*'}, {urlPattern: '*/api/approvals*'}]});
   const scripted = () => run(`return window.scripted || document.querySelector('img[onerror]') ? 'script from hostile data reached the page' : ''`);
   for (const file of ['p/pod.json', 'p/core.x']) await check(`hostile data in the ${file.includes('pod') ? 'pod' : 'core'} viewer`, async () => {
     await open(`${hub}/view?capture=${made}&file=${encodeURIComponent(file)}`);
@@ -367,6 +367,28 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     await send('Emulation.setEmulatedMedia', {features: []});
     if (!contrast) throw new Error('no button to stop the capture');
     if (contrast < 4.5) throw new Error(`"Stop and keep" stands out by ${contrast.toFixed(1)} to 1, less than 4.5`);
+  });
+  // Who may approve in a namespace, and is no administrator, is shown what
+  // waits for them above their own captures, and decides it there.
+  const waiting = {captures: [{id: made, number: 12, cluster: 'c', namespace: 'payments', workload: 'Deployment/api', requester: 'alice', reason: 'the api hangs after the deploy', state: 'PendingApproval', recordings: [{kind: 'coredump'}], approvals: []}],
+    watches: [{id: made, cluster: 'c', namespace: 'payments', workload: 'Deployment/a-workload-with-a-long-name-that-has-to-wrap-on-a-phone', requester: 'bob', reason: '', when: {kind: 'crash'}, recordings: [{kind: 'coredump'}], approvals: []}]};
+  for (const [size, [width, height, mobile]] of Object.entries(widths)) await check(`${size}: requests that await this user's approval`, async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+    hostile = [[/^\/api\/approvals$/, waiting], [/^\/api\/captures(\?.*)?$/, []]];
+    await open(hub + '/#captures');
+    await until('the list', `return !document.getElementById('app').hidden`);
+    await run(`loadCaptures()`); await sleep(400);
+    const said = await run(`const a = document.getElementById('approvals'); return a.hidden ? '' : a.innerText`);
+    for (const word of ['Awaiting your approval', 'alice', 'capture 0012', 'the api hangs after the deploy', 'payments', 'bob', 'a watch', 'No reason given']) {
+      // The heading is shown in capitals.
+      if (!said.toLowerCase().includes(word.toLowerCase())) throw new Error(`what awaits approval does not say "${word}": ${said}`);
+    }
+    const buttons = await run(`return [...document.querySelectorAll('#approvals button')].map(b => b.dataset.act + ' ' + b.dataset.path).join(', ')`);
+    if (buttons !== 'approve captures, deny captures, approve watches') throw new Error('the decisions offered: ' + buttons);
+    // With nothing to decide there is nothing of it.
+    hostile = [[/^\/api\/approvals$/, {captures: [], watches: []}], [/^\/api\/captures(\?.*)?$/, []]];
+    await run(`loadCaptures()`); await sleep(400);
+    if (!await run(`return document.getElementById('approvals').hidden`)) throw new Error('an empty list of approvals is shown');
   });
   await send('Fetch.disable');
   hostile = [];

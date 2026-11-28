@@ -44,7 +44,7 @@ const captureProperties = `"cluster":{"type":"string"},"namespace":{"type":"stri
 "kind":{"enum":["pod-state","logs","pcap","coredump","strace","pprof","cpu","memory"],"description":"Short form for a single recording, with params"},
 "params":{"type":"object","additionalProperties":{"type":"string"}},
 "durationSeconds":{"type":"integer","description":"The time frame of pcap, strace, cpu, memory, pprof and followed logs; default 30"},
-"reason":{"type":"string","description":"Shown to the approving administrator"}`
+"reason":{"type":"string","description":"Shown to who approves"}`
 
 // mcpReadLimit bounds one read_artifact result so that it fits a model's
 // context; a caller pages with offset.

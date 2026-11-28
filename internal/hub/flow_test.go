@@ -606,7 +606,8 @@ func TestCaptureFlow(t *testing.T) {
 	if got := trigger(awaiting.ID); got != 404 {
 		t.Fatal("a watch fired before its approval", got)
 	}
-	if code, _ := f.call("alice-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 403 {
+	// For who may not approve in its namespace, another's watch is not there.
+	if code, _ := f.call("alice-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 404 {
 		t.Fatal("a user approved a watch", code)
 	}
 	if code, _ := f.call("root-token", "POST", "/api/watches/"+awaiting.ID+"/approve", nil); code != 403 {
