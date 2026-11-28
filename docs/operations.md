@@ -282,6 +282,10 @@ Common causes:
   which need nothing from the application.
 - **A JVM cannot be asked.** It runs OpenJ9, or was started with attach
   disabled or with `-Xrs`. The message says which.
+- **The hub could not store the file.** Its evidence store did not take it:
+  the volume is full, or the S3 bucket is not there or refuses the hub's
+  credentials. The hub's log has the store's own words, and says when it
+  starts if the bucket does not answer.
 
 ### A crash left no core dump
 

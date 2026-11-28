@@ -122,9 +122,18 @@ func runHub(ctx context.Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("s3-secret-key-file: %w", err)
 		}
-		if c.Blobs, err = hub.NewS3Blobs(*s3Endpoint, *s3Bucket, access, secretKey, !*s3Insecure); err != nil {
+		blobs, err := hub.NewS3Blobs(*s3Endpoint, *s3Bucket, access, secretKey, !*s3Insecure)
+		if err != nil {
 			return err
 		}
+		c.Blobs = blobs
+		// Said at the start and not a reason to stop: the server may come
+		// later, and credentials that may write need not be allowed to ask.
+		check, cancel := context.WithTimeout(ctx, 10*time.Second)
+		if err := blobs.Check(check); err != nil {
+			slog.Warn("the evidence store does not answer for its bucket: recordings will fail to upload until it does", "endpoint", *s3Endpoint, "bucket", *s3Bucket, "error", err)
+		}
+		cancel()
 	default:
 		return errors.New("set data-dir or s3-endpoint")
 	}

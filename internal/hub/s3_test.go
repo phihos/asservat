@@ -39,6 +39,13 @@ func TestS3Blobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A hub that starts is told whether its bucket is there.
+	if err := blobs.Check(t.Context()); err != nil {
+		t.Fatal("a bucket that is there:", err)
+	}
+	if missing, err := hub.NewS3Blobs(parts[0], "asservat-no-such-bucket", parts[1], parts[2], false); err != nil || missing.Check(t.Context()) == nil {
+		t.Fatal("a bucket that is not there is taken for one that is", err)
+	}
 	data := make([]byte, 20<<20) // more than one multipart part
 	rand.Read(data)
 	// io.MultiReader hides the length, like an upload that is still recording.

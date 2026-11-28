@@ -346,7 +346,13 @@ func (h *Hub) kept(ctx context.Context, name string, content io.Reader, packed b
 	}
 	if err != nil {
 		h.Blobs.Delete(context.WithoutCancel(ctx), blob)
-		return storedArtifact{}, fmt.Errorf("store artifact: %w", err)
+		if ctx.Err() != nil {
+			return storedArtifact{}, fmt.Errorf("store artifact: %w", err)
+		}
+		// The store's own words, which name hosts and buckets, are for the
+		// hub's log; who recorded is told what it was that failed.
+		slog.Error("the evidence store did not take a file", "name", name, "error", err)
+		return storedArtifact{}, errStoreFailed
 	}
 	kept := storedArtifact{Artifact: api.Artifact{Name: name, Size: size, SHA256: hex.EncodeToString(sum.Sum(nil))}, Blob: blob, Key: wrapped, Packed: packed}
 	if packed {
@@ -354,6 +360,11 @@ func (h *Hub) kept(ctx context.Context, name string, content io.Reader, packed b
 	}
 	return kept, nil
 }
+
+// errStoreFailed answers an upload that the evidence store did not take:
+// a volume that is full, a bucket that is not there or refuses the hub. It
+// is the store's failure and may pass, so it is no internal error (500).
+var errStoreFailed = errStatus{http.StatusServiceUnavailable, "the hub could not store the file: its evidence store did not take it (the hub's log says why)"}
 
 // ending closes a pipe when its reader has ended, so that who reads the
 // pipe's other end learns of the end too.

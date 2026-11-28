@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -62,6 +63,16 @@ func NewS3Blobs(endpoint, bucket, accessKey, secretKey string, secure bool) (*S3
 		return nil, err
 	}
 	return &S3Blobs{client: c, bucket: bucket}, nil
+}
+
+// Check asks the server whether the bucket is there, for a hub that starts
+// to say at once what every upload would otherwise fail on later.
+func (s *S3Blobs) Check(ctx context.Context) error {
+	exists, err := s.client.BucketExists(ctx, s.bucket)
+	if err == nil && !exists {
+		err = fmt.Errorf("the bucket %q does not exist", s.bucket)
+	}
+	return err
 }
 
 func (s *S3Blobs) Put(ctx context.Context, key string, r io.Reader) error {
