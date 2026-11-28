@@ -6,6 +6,8 @@
 #stopped .crash { color: var(--bad); } #stopped .snap { color: var(--ok); }
 #stopped .warn { flex-basis: 100%; color: var(--warn); }
 #stopped code, .code, .value, .registers { font-family: var(--mono); font-size: 12px; }
+#stopped .command { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; cursor: pointer; }
+#stopped .command.all { display: block; max-height: 40vh; overflow: auto; }
 #debugger { flex: 1; display: flex; min-height: 0; }
 /* Fixed in width whatever the names are long: a .NET or C++ signature can be hundreds of characters. */
 #side { flex: 0 0 min(460px, 42%); min-width: 0; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-right: 1px solid var(--line); }
@@ -38,7 +40,7 @@
 .tab td { padding: 2px 18px 2px 0; vertical-align: top; border-bottom: 1px solid var(--soft); font: 12px var(--mono); }
 /* Names, values and types apart, as a debugger's variables pane has them. */
 #root .name { color: var(--custody-ink); }
-#root .value { color: var(--ink); word-break: break-all; } #root .value.dim { color: var(--quiet); }
+#root .value { color: var(--ink); word-break: break-all; } #root .value.dim { color: var(--quiet); word-break: normal; overflow-wrap: anywhere; min-width: 13ch; } /* words in place of a value, as "optimised out", break between words */
 /* An address is read whole: the lists of modules and of mappings scroll sideways on a narrow screen instead of breaking it. */
 #modules, #map { overflow-x: auto; }
 #root #modules .value, #root #map .value { word-break: normal; white-space: nowrap; }

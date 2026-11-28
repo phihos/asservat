@@ -262,6 +262,31 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       return;
     }
     if (notice) throw new Error('the file did not open: ' + notice);
+    // The pod's events are read on a phone without moving the page sideways: what happened stands below its reason.
+    if (size === 'phone' && file.name.endsWith('/events.json')) {
+      const wider = await run(`const page = document.querySelector('#overview .page'); return page.scrollWidth - page.clientWidth`);
+      if (wider > 1) throw new Error(`the pod's events are ${wider} px wider than the phone's page`);
+    }
+    // What a core dump is of leaves the lists their room: a long command line is cut short until it is asked for.
+    if (file.viewer === 'core' && !file.name.endsWith('.json')) {
+      const share = await run(`const top = document.getElementById('stopped'); if (!top) return 0; const code = top.querySelector('code');
+        if (code) code.textContent = '/usr/local/bin/app ' + '--an-option-with-a-long-name=and-a-long-value '.repeat(20); return top.getBoundingClientRect().height / innerHeight`);
+      if (share > 0.3) throw new Error(`what the core dump is of takes ${Math.round(share * 100)} % of the window's height`);
+      // Words in place of a value that the debugger could not read are not broken inside a word.
+      const broken = await run(`const said = [...document.querySelectorAll('#root .value.dim')].find(v => v.offsetParent && v.textContent === 'optimised out'); if (!said) return 0;
+        const r = document.createRange(); r.selectNodeContents(said); return r.getClientRects().length`);
+      if (broken > 2) throw new Error(`"optimised out" is broken into ${broken} lines`);
+    }
+    // Text without timestamps, as a class histogram, offers no switch for them.
+    if (file.viewer === 'log') {
+      const offered = JSON.parse(await run(`const s = document.getElementById('stamps'); return JSON.stringify({shown: !!s.offsetParent, stamped: !!document.querySelector('#root .l .ts')})`));
+      if (offered.shown !== offered.stamped) throw new Error(`timestamps ${offered.stamped ? 'are there and no switch is offered' : 'are not there and a switch is offered'}`);
+    }
+    // How many system calls there are is said once while all of them are shown.
+    if (file.viewer === 'strace') {
+      const tally = await run(`return document.getElementById('shown').innerText`);
+      if (!/^[\d,]+ entr(y|ies)$/.test(tally)) throw new Error(`with nothing narrowed the trace says "${tally}"`);
+    }
     // Every view of the file, and the first row of its list.
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);
     for (const tab of tabs) {

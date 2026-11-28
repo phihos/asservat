@@ -31,6 +31,8 @@ export default async function (root) {
   // Words such as "error" tell a log line's level. Text that is no log, as
   // a class histogram with its exception classes, has no timestamps.
   const leveled = lines.slice(0, 20).some(line => stamp.test(line));
+  // The switch for timestamps is there where there are some.
+  $('stamps').closest('label').hidden = !leveled;
 
   const parts = i => { const m = stamp.exec(lines[i]); return m ? [m[1], lines[i].slice(m[0].length)] : ['', lines[i]]; };
   const marked = s => {
