@@ -65,6 +65,8 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 /* What narrows a list: the search first, then the choices. Fields are the console's. */
 .narrow { gap: 6px 12px; padding-block: 5px; background: var(--soft); }
 .narrow input:not([type=checkbox]), .narrow select, .narrow button { height: 28px; padding: 0 10px; border: 1px solid var(--line); background-color: var(--surface); }
+/* Room for the arrow that a select draws itself, also where what is chosen is longer than the field. */
+.narrow select { padding-right: 26px; text-overflow: ellipsis; }
 .narrow input[type=search], .narrow input[type=text], .narrow input:not([type]) { width: min(360px, 40vw); font-family: var(--mono); font-size: 12px; }
 .narrow input[type=number] { width: 84px; }
 .narrow input.bad { border-color: var(--bad); }

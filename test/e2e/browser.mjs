@@ -132,6 +132,8 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     // As someone who has not signed in, also the second time round.
     await run(`sessionStorage.clear(); document.cookie = 'asservat_token=; path=/; max-age=0'; location.reload()`);
     await until('the sign-in form', `return !document.getElementById('login').hidden`);
+    const off = await run(`const box = document.getElementById('login').getBoundingClientRect(); return Math.round(Math.abs(box.left + box.width / 2 - document.documentElement.clientWidth / 2))`);
+    if (off > 2) throw new Error(`the sign-in form stands ${off} px off the middle of the page`);
     signedOut = false;
     await run(`sessionStorage.setItem('token', ${JSON.stringify(token)}); location.reload()`);
     await until('the list of captures', `return !document.getElementById('app').hidden && document.querySelector('.capture, #noCaptures:not([hidden])')`);

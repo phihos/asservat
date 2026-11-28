@@ -35,4 +35,6 @@ table.plain td:first-child { color: var(--quiet); white-space: nowrap; }
   .bar { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 5px 0; } .bar .name { grid-column: 1 / -1; }
   .histogram { grid-template-columns: minmax(0, 1fr) 64px 84px; gap: 10px; padding: 0 12px; }
   .histogram > :nth-child(4) { display: none; }
+  /* The sizes of the biggest objects stay on the screen: a class's name is cut short for them. */
+  #biggest table.grid { table-layout: fixed; width: 100%; } #biggest th.n { width: 96px; } #biggest td.n { white-space: nowrap; }
 }

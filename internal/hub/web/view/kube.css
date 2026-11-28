@@ -11,6 +11,8 @@
 .props td { padding: 5px 0; border-bottom: 1px solid var(--soft); word-break: break-word; }
 .chip { display: inline-block; max-width: 100%; margin: 1px 4px 1px 0; padding: 1px 8px; background: var(--soft); font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 code { font: 12px var(--mono); }
+/* A line breaks between arguments, and inside one only where it is longer than the line. */
+code .arg { display: inline-block; max-width: 100%; overflow-wrap: anywhere; vertical-align: top; }
 .grid.events td:nth-child(n+5) { white-space: nowrap; font: 12px var(--mono); }
 .grid tr.warning { background: color-mix(in srgb, var(--marker) 12%, var(--surface)); }
 .grid.events tbody tr { cursor: default; }
