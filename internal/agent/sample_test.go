@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/api"
 	"github.com/google/pprof/profile"
 	"go.opentelemetry.io/ebpf-profiler/libpf"
 	"go.opentelemetry.io/ebpf-profiler/tracer"
@@ -425,5 +426,30 @@ func TestAProfileWithoutSamplesSaysWhatThePodUsed(t *testing.T) {
 	}
 	if said := noSamples(sampledMemory, nil, 30*time.Second).Error(); !strings.Contains(said, "no new memory") {
 		t.Errorf("a memory profile without a fault says %q", said)
+	}
+}
+
+// A recording that ran and found nothing to record has not failed: a pod
+// that took no new memory while it was watched is a result, and so is an
+// idle pod on which no sample fell. It is reported as completed, with what
+// it found, and does not make its capture one "with failed recordings".
+func TestARecordingThatFoundNothingHasNotFailed(t *testing.T) {
+	used := 30 * time.Millisecond
+	for _, found := range []error{noSamples(sampledMemory, nil, 30*time.Second), noSamples(sampledCPU, &used, 30*time.Second), noSamples(sampledCPU, nil, 0)} {
+		state, message, failure := outcome(found, false)
+		if state != api.StateCompleted || failure != nil || message != found.Error() {
+			t.Errorf("%q is reported as %s (%q), failure %v", found, state, message, failure)
+		}
+	}
+	// A failure stays one, and what was stopped early says so.
+	broken := errors.New("the profiler did not start")
+	if state, message, failure := outcome(broken, false); state != api.StateFailed || message != broken.Error() || failure != broken {
+		t.Errorf("a failure is reported as %s (%q), failure %v", state, message, failure)
+	}
+	if state, message, failure := outcome(nil, true); state != api.StateCompleted || message != "stopped early" || failure != nil {
+		t.Errorf("a recording that was stopped early is reported as %s (%q), failure %v", state, message, failure)
+	}
+	if state, message, _ := outcome(nil, false); state != api.StateCompleted || message != "" {
+		t.Errorf("a recording that went well is reported as %s (%q)", state, message)
 	}
 }

@@ -406,6 +406,21 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
     if (await shown() !== 9) throw new Error(`${await shown()} files are listed for three pods, want 9`);
   });
+  // A recording that found nothing to record has not failed: it stands as
+  // done with what it found, and its capture says that it has no files.
+  await check('desk: a recording that found nothing has not failed', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    const found = 'no sample fell on the pod\'s processes: they used about 30ms of CPU time in 30s, and a CPU is looked at 99 times a second. Record for longer, or while the pod is busy';
+    const idle = {...captureOf(podsOf(1)), recordings: [{kind: 'cpu'}], artifacts: []};
+    idle.tasks[0].recordings = [{kind: 'cpu', state: 'Completed', message: found}];
+    hostile = [[/^\/api\/captures(\?.*)?$/, [idle]]];
+    await run(`toggled.set(${JSON.stringify(made)}, true); await loadCaptures()`); await sleep(400);
+    const shown = JSON.parse(await run(`const said = document.querySelector('.capture .rec .said'), line = document.querySelector('.capture .line');
+      return JSON.stringify({said: said?.innerText || '', red: said ? getComputedStyle(said).color === getComputedStyle(document.querySelector('.problem') || document.body).color : false, failed: !!document.querySelector('.capture .rec-Failed'), line: line.innerText})`));
+    if (!shown.said.includes('30ms of CPU time')) throw new Error(`the recording says "${shown.said}"`);
+    if (shown.failed) throw new Error('a recording that found nothing is shown as failed');
+    if (!/no files/.test(shown.line) || /failed/.test(shown.line)) throw new Error(`the capture's line reads "${shown.line.replace(/\n+/g, ' | ')}"`);
+  });
   // What a recording was asked with is said in words: the endpoints of a
   // profile by their names and where they are, not by the catalog's IDs,
   // and a setting by what it means, not by its name in the request.
@@ -454,6 +469,8 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     hostile = [[/^\/api\/approvals$/, waiting], [/^\/api\/captures(\?.*)?$/, []]];
     await open(hub + '/#captures');
     await until('the list', `return !document.getElementById('app').hidden`);
+    // An administrator decides in the list itself, where every request that waits is shown: this is for who is none.
+    if (await run(`return me.admin`)) return;
     await run(`loadCaptures()`); await sleep(400);
     const said = await run(`const a = document.getElementById('approvals'); return a.hidden ? '' : a.innerText`);
     for (const word of ['Awaiting your approval', 'alice', 'capture 0012', 'the api hangs after the deploy', 'payments', 'bob', 'a watch', 'No reason given']) {

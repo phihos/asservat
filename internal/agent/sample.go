@@ -645,14 +645,15 @@ func usedSince(before, after map[int]time.Duration) *time.Duration {
 // nearly idle uses a few milliseconds of CPU time in half a minute, of
 // which 99 looks a second at each CPU can miss all: it is told what its
 // processes used, where that was measured, and not that they used nothing.
+// That is a result of the recording and not its failure.
 func noSamples(kind sampledKind, used *time.Duration, lasted time.Duration) error {
 	switch {
 	case kind.memory || used == nil:
-		return errors.New(kind.nothing)
+		return nothing{errors.New(kind.nothing)}
 	case *used <= 0:
-		return fmt.Errorf("the pod's processes used no CPU time in the %s they were sampled", lasted)
+		return nothing{fmt.Errorf("the pod's processes used no CPU time in the %s they were sampled", lasted)}
 	}
-	return fmt.Errorf("no sample fell on the pod's processes: they used about %s of CPU time in %s, and a CPU is looked at %d times a second. Record for longer, or while the pod is busy", *used, lasted, sampleRate)
+	return nothing{fmt.Errorf("no sample fell on the pod's processes: they used about %s of CPU time in %s, and a CPU is looked at %d times a second. Record for longer, or while the pod is busy", *used, lasted, sampleRate)}
 }
 
 // sampled records a sampled profile for a capture: from the profile that the

@@ -487,6 +487,9 @@ give arrive. A recording without
 a sample therefore says what the pod's processes used in that time, as the
 kernel counted it ("about 30ms of CPU time in 30s"), and to record for
 longer or while the pod is busy; only a pod that used nothing is told so.
+A recording that found nothing to record, this one or a memory growth
+recording of a pod that took no new memory, has not failed: it is completed
+and says what it found, and its capture is not one with failed recordings.
 
 ### Memory growth by sampling
 
