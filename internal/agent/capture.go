@@ -617,17 +617,23 @@ func sentIf(holds func() error, up func(string, io.Reader) error) func(string, i
 // startOf returns when a process started, in the kernel's ticks since the
 // node's start, or 0 for one that is gone.
 func startOf(proc string, pid int) uint64 {
-	stat, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "stat"))
-	if err != nil {
-		return 0
-	}
-	// After the name, which may hold spaces and parentheses, the 20th field.
-	fields := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
+	fields, _ := statOf(proc, pid)
 	if len(fields) < 20 {
 		return 0
 	}
-	started, _ := strconv.ParseUint(fields[19], 10, 64)
+	started, _ := strconv.ParseUint(fields[19], 10, 64) // the 20th field after the name
 	return started
+}
+
+// statOf returns what the kernel says of a process in its "stat" file,
+// from the state on: "pid (comm) state ppid ...", where comm may hold
+// spaces and parentheses, so the fields are those after the last one.
+func statOf(proc string, pid int) ([]string, error) {
+	stat, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:])), nil
 }
 
 // same tells whether a process is still the one that was found. The
@@ -783,14 +789,12 @@ func (c cgroups) processesOf(containerID string, mine []byte) (all []int, main i
 		if !inside(pid) {
 			continue
 		}
-		stat, err := os.ReadFile(filepath.Join(c.proc, strconv.Itoa(pid), "stat"))
+		fields, err := statOf(c.proc, pid)
 		if err != nil {
 			continue
 		}
 		all = append(all, pid)
-		// "pid (comm) state ppid ... starttime ..."; comm may contain spaces
-		// and parentheses. After it, ppid is field 2 and starttime field 20.
-		fields := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
+		// After the name, ppid is field 2 and starttime field 20.
 		if len(fields) < 20 {
 			continue
 		}

@@ -480,6 +480,14 @@ code the agent reads the names from the binaries' symbol tables in the
 container; a function of a stripped binary appears as `file+0xaddress`,
 except for the functions it exports.
 
+A CPU is looked at 99 times a second. A pod that is nearly idle uses a few
+milliseconds of CPU time in half a minute, which can fall between the
+looks: about one in three of its samples is lost besides, the first of
+every process to the profiler learning of the process. A recording without
+a sample therefore says what the pod's processes used in that time, as the
+kernel counted it ("about 30ms of CPU time in 30s"), and to record for
+longer or while the pod is busy; only a pod that used nothing is told so.
+
 ### Memory growth by sampling
 
 The kind `memory` uses the same profiler to show which code makes a pod's
