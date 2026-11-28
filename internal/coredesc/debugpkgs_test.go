@@ -505,3 +505,30 @@ func TestCoresDescribedTogetherAskADebuginfodServerOnce(t *testing.T) {
 		t.Errorf("%d of the files have debug information, want 6", have)
 	}
 }
+
+// A debuginfod server that fails is left alone by all the cores that are
+// described together, not asked by each of them in its turn: a hundred
+// cores would otherwise wait for it one after another.
+func TestCoresDescribedTogetherLeaveAFailingDebuginfodServerAlone(t *testing.T) {
+	var asked atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	files := map[string]string{}
+	for i := range 12 {
+		files[fmt.Sprintf("/lib/lib%d.so", i)] = fmt.Sprintf("bb%038d", i)
+	}
+	d := Describer{Scratch: t.TempDir()}
+	var cores sync.WaitGroup
+	for range 20 {
+		cores.Go(func() { debuginfo(d.fetcher(context.Background(), "debuginfo"), []string{server.URL}, files) })
+	}
+	cores.Wait()
+	// Those that were asking when it first failed, and no one after them.
+	if asked.Load() > debuginfodAskers {
+		t.Fatalf("a failing server was asked %d times", asked.Load())
+	}
+}

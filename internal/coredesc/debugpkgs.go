@@ -378,7 +378,7 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 // A server is asked for one file at a time by each of a few askers, and
 // by all the cores that are described at the same time together no more
 // than by one (debuginfodTurn). One that fails, other than by not having a
-// file, is not asked again for this core. What no server has is remembered
+// file, is left alone for a while (debuginfodRest). What no server has is remembered
 // for a day, as an empty file, which a server's index may take to learn of
 // a new build.
 func debuginfo(f debugFetcher, servers []string, files map[string]string) (string, map[string]bool) {
@@ -405,7 +405,6 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 		}
 	}
 	var mu sync.Mutex
-	failed := map[string]bool{}
 	todo := make(chan string)
 	var askers sync.WaitGroup
 	for range debuginfodAskers {
@@ -443,10 +442,7 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 				// unknown: every server was asked and has it not.
 				got, unknown := false, true
 				for _, server := range servers {
-					mu.Lock()
-					skip := failed[server]
-					mu.Unlock()
-					if skip {
+					if debuginfodRests(server) {
 						unknown = false
 						continue
 					}
@@ -471,11 +467,8 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 					}
 					if err != errNotPublished {
 						unknown = false
-						if ctx.Err() == nil {
-							slog.Warn("debuginfod server not asked further for this core", "server", server, "error", err)
-							mu.Lock()
-							failed[server] = true
-							mu.Unlock()
+						if ctx.Err() == nil && debuginfodFailed(server) {
+							slog.Warn("debuginfod server not asked for a while", "server", server, "error", err)
 						}
 					}
 				}
@@ -510,7 +503,32 @@ var debuginfodTurns = struct {
 	places chan struct{}
 	mu     sync.Mutex
 	asking map[string]chan struct{}
-}{places: make(chan struct{}, debuginfodAskers), asking: map[string]chan struct{}{}}
+	// failed holds when a server last failed.
+	failed map[string]time.Time
+}{places: make(chan struct{}, debuginfodAskers), asking: map[string]chan struct{}{}, failed: map[string]time.Time{}}
+
+// debuginfodRest is how long a debuginfod server that failed, other than by
+// not having a file, is not asked by any core: long enough for the cores of
+// one capture, which are described together and would otherwise each wait
+// for it in turn, and short enough that the next capture asks it again.
+const debuginfodRest = time.Minute
+
+// debuginfodRests tells whether a server failed a moment ago.
+func debuginfodRests(server string) bool {
+	debuginfodTurns.mu.Lock()
+	defer debuginfodTurns.mu.Unlock()
+	return time.Since(debuginfodTurns.failed[server]) < debuginfodRest
+}
+
+// debuginfodFailed notes that a server failed, and tells whether it is the
+// first to note it: the others that were asking it then say nothing more.
+func debuginfodFailed(server string) bool {
+	debuginfodTurns.mu.Lock()
+	defer debuginfodTurns.mu.Unlock()
+	first := time.Since(debuginfodTurns.failed[server]) >= debuginfodRest
+	debuginfodTurns.failed[server] = time.Now()
+	return first
+}
 
 // debuginfodTurn waits until no other core asks for the same file of the
 // cache and a place is free, and returns what ends the turn. An agent
