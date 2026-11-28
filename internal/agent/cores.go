@@ -10,12 +10,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
+
+	"asservat.local/asservat/internal/api"
 
 	"asservat.local/asservat/internal/coredesc"
 )
@@ -326,8 +331,14 @@ func (s CoreSpool) take(podUID, trigger string) {
 	for waiting, late := true, false; waiting; {
 		parts, _ := filepath.Glob(filepath.Join(dir, "*.part"))
 		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
-		if len(parts) == 0 && (len(cores) > 0 || late) {
-			break
+		if len(parts) == 0 {
+			// Another report may be quicker, as that of a second watch for
+			// the pod. If the hub does not take that one, the cores come
+			// back: so this goes on waiting for them, for the few seconds
+			// that it waits for a core to appear at all.
+			if len(s.setAside(cores, trigger)) > 0 || late {
+				return
+			}
 		}
 		select {
 		case _, reports := <-changed:
@@ -340,17 +351,165 @@ func (s CoreSpool) take(podUID, trigger string) {
 			waiting = false
 		}
 	}
+	// The time is up: what is finished by now is taken.
 	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+	s.setAside(cores, trigger)
+}
+
+// setAside moves finished cores, each with the program's files that the
+// handler kept with it, to where the capture of one report finds them, and
+// returns those it moved: a core that another report took first is not
+// among them.
+func (s CoreSpool) setAside(cores []string, trigger string) (moved []string) {
 	if len(cores) == 0 {
-		return
+		return nil
 	}
 	os.MkdirAll(s.taken(trigger), 0o700)
 	for _, file := range cores {
-		os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file)))
-		// And the program's files that the handler kept with it.
+		if os.Rename(file, filepath.Join(s.taken(trigger), filepath.Base(file))) != nil {
+			continue
+		}
+		moved = append(moved, file)
 		kept := strings.TrimSuffix(file, ".core") + programFiles
 		os.Rename(kept, filepath.Join(s.taken(trigger), filepath.Base(kept)))
 	}
+	if len(moved) == 0 {
+		os.Remove(s.taken(trigger))
+	}
+	return moved
+}
+
+// giveBack returns the cores that were set aside for a report that the hub
+// did not take to the pod's cores, where another watch for the pod finds
+// them.
+func (s CoreSpool) giveBack(podUID, trigger string) {
+	dir := s.taken(trigger)
+	defer os.RemoveAll(dir)
+	files, _ := filepath.Glob(filepath.Join(dir, "*"))
+	if len(files) == 0 {
+		return
+	}
+	// Only while a watch still wants the pod's cores: without one they go.
+	if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
+		return
+	}
+	os.MkdirAll(s.cores(podUID), 0o700)
+	// The program's files first: a core is looked for by its own name, and
+	// is found with them.
+	slices.SortFunc(files, func(a, b string) int {
+		return strings.Compare(strings.TrimSuffix(b, ".core"), strings.TrimSuffix(a, ".core"))
+	})
+	// A core that comes back waits its time anew before a watch records it
+	// by itself: the report of a crash, which looks for it now, goes first.
+	now := time.Now()
+	for _, file := range files {
+		os.Chtimes(file, now, now)
+		os.Rename(file, filepath.Join(s.cores(podUID), filepath.Base(file)))
+	}
+}
+
+// coreWaitsForCrash is how long a core that the handler kept waits for the
+// kubelet to report its container as crashed, before the watch records it
+// by itself. A container that ends with its process is reported within a
+// second or two, and that report takes the core with the crash's other
+// recordings. Nothing tells that a container will go on, so this is a time:
+// long enough for the kubelet's report, short against what a core is for.
+const coreWaitsForCrash = 10 * time.Second
+
+// dumped has a core dump watch record a core that came without a crash: a
+// process of the pod died and left one while its container goes on, as a
+// worker that its parent starts again. The kubelet reports nothing then,
+// and the core that the watch was approved for would rest on the node
+// unread. The kernel tells when the handler has finished a core; if no
+// crash's report has taken it after coreWaitsForCrash, the watch records
+// with it. It ends with ctx.
+func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Pointer[corev1.Pod]) {
+	dir := a.Cores.cores(string(pod.Load().UID))
+	// The handler makes the directory for the pod's first core. It is made
+	// here to be watched from before that.
+	os.MkdirAll(dir, 0o700)
+	changes, err := watchDir(dir, syscall.IN_MOVED_TO)
+	if err != nil {
+		slog.Warn("cores that come without a crash are not recorded for this pod", "pod", pod.Load().Name, "error", err)
+		return
+	}
+	defer changes.Close()
+	wait := a.coreWait
+	if wait == 0 {
+		wait = coreWaitsForCrash
+	}
+	// due is when the next of the cores that still wait has waited its time.
+	var due <-chan time.Time
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, reports := <-changes.happened:
+			if !reports {
+				return
+			}
+		case <-due:
+		}
+		// Each core waits its own time: one that came a moment ago is not
+		// taken with one that has waited, as its container may yet end.
+		due = nil
+		var waited []string
+		var soonest time.Duration
+		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+		for _, file := range cores {
+			info, err := os.Stat(file)
+			if err != nil {
+				continue // a crash's report took it
+			}
+			if left := wait - time.Since(info.ModTime()); left <= 0 {
+				waited = append(waited, file)
+			} else if soonest == 0 || left < soonest {
+				soonest = left
+			}
+		}
+		if soonest > 0 {
+			due = time.After(soonest)
+		}
+		// Set aside before it is reported: of several watches for the pod,
+		// the one that gets the core records, and the others say nothing.
+		id := uuid.NewString()
+		taken := a.Cores.setAside(waited, id)
+		if len(taken) == 0 {
+			continue
+		}
+		now := pod.Load()
+		names := containerNames(now)
+		var of []string
+		for _, file := range taken {
+			// "<container ID>.<pid>.<time>.core"
+			if parts := strings.Split(filepath.Base(file), "."); len(parts) > 1 {
+				name := names[parts[0]]
+				if name == "" {
+					name = fmt.Sprintf("%.12s", parts[0])
+				}
+				of = append(of, fmt.Sprintf("process %s of container %s", parts[1], name))
+			}
+		}
+		if !a.tell(agent, w, now, id, strings.Join(of, ", ")+" left a core dump; its container goes on") {
+			// The hub does not record for this watch: it has ended, and the
+			// agent observes it a while longer. It looks at no more cores,
+			// which are another watch's to record.
+			return
+		}
+	}
+}
+
+// containerNames returns the names of a pod's containers by the IDs of
+// their instances, the running and the last ended ones.
+func containerNames(pod *corev1.Pod) map[string]string {
+	names := map[string]string{}
+	for _, status := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
+		for _, id := range []string{status.ContainerID, terminatedID(status.State), terminatedID(status.LastTerminationState)} {
+			_, id, _ = strings.Cut(id, "://")
+			names[id] = status.Name
+		}
+	}
+	return names
 }
 
 // crashCores uploads the cores that were set aside for a crash report and
@@ -361,13 +520,7 @@ func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string,
 	}
 	dir := a.Cores.taken(trigger)
 	defer os.RemoveAll(dir)
-	names := map[string]string{}
-	for _, status := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
-		for _, id := range []string{status.ContainerID, terminatedID(status.State), terminatedID(status.LastTerminationState)} {
-			_, id, _ = strings.Cut(id, "://")
-			names[id] = status.Name
-		}
-	}
+	names := containerNames(pod)
 	files, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	if len(files) == 0 {
 		return errors.New("the crashed process left no core: it did not die of a signal that dumps core (a memory limit kills without one), or the node's disk is nearly full")

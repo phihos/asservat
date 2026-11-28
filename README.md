@@ -241,12 +241,14 @@ this receiver and a route for every alert as an `AlertmanagerConfig`. An
 Alertmanager passes it only the alerts of the hub's own namespace unless its
 `alertmanagerConfigMatcherStrategy` is `None`.
 
-A crash watch for `coredump` records the core of the crashed process itself. It
+A crash watch for `coredump` records the core of the crashed process itself,
+also of one whose container goes on, as a worker that its parent starts
+again. It
 needs the agents' core handler (`agent.coreHandler.enabled=true`), which
 replaces the node's `kernel.core_pattern` while the agents run, and an
 administrator's approval of the watch. Cores of other processes on the node
 go on to the handler the node had before, such as apport or
-systemd-coredump.
+systemd-coredump: Asservat keeps none of them.
 
 Every core comes with its program's executable and libraries, so that it
 opens in a debugger wherever you download it to, and with a description for
