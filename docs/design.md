@@ -124,7 +124,10 @@ one recording.
 
 A watch is a standing capture request for problems nobody is present for:
 whenever a pod of the workload meets the watch's condition, the capture is
-made for that pod.
+made for that pod. A request names the condition as `when.kind` and gives
+what the condition needs under `when.params`, every value as a string:
+`"when": {"kind": "log", "params": {"pattern": "timeout"}}`. Without
+`when` the watch waits for a crash.
 
 | Condition (`when.kind`) | Met when | The capture finds |
 | --- | --- | --- |
