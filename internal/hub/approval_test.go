@@ -46,6 +46,20 @@ func approving(t *testing.T, change func(*hub.Config)) (fixture, string) {
 	scriptedAgent(t, f, joined.Token, "node-a", func(q api.Query) api.Reply {
 		return api.Reply{Allowed: q.User == "alice" || q.User == "bob", Pods: []api.Pod{{Name: "api-1", Node: "node-a"}}, Selector: "app=api"}
 	})
+	// The database is the other tests' too, which know these people: what
+	// was requested here goes with the test.
+	t.Cleanup(func() {
+		for _, kind := range []string{"watches", "captures"} {
+			var made []struct{ ID, Cluster string }
+			_, b := f.call("root-token", "GET", "/api/"+kind, nil)
+			json.Unmarshal(b, &made)
+			for _, m := range made {
+				if m.Cluster == cluster {
+					f.call("root-token", "DELETE", "/api/"+kind+"/"+m.ID, nil)
+				}
+			}
+		}
+	})
 	return f, cluster
 }
 
