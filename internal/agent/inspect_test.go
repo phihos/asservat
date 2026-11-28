@@ -42,12 +42,18 @@ func TestProcessesAndTargets(t *testing.T) {
 			State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}}}
 	elsewhere := pod.DeepCopy()
 	elsewhere.Name, elsewhere.Spec.NodeName = "api-2", "node-b"
-	a := &Agent{Node: "node-a", Proc: proc, Kube: fake.NewClientset(pod, elsewhere)}
+	kube := fake.NewClientset(pod, elsewhere)
+	a := &Agent{Node: "node-a", Proc: proc, Kube: kube}
 
 	// A pod of another node and one that is gone are skipped, not an error.
 	got, skipped := a.processes(t.Context(), api.Query{Namespace: "payments", Pods: []string{"api-1", "api-2", "gone"}})
 	if len(got) != 4 || !slices.Equal(skipped, []string{"api-2", "gone"}) {
 		t.Fatal("processes", got, skipped)
+	}
+	// The API server is asked once for the node's pods, not for each pod:
+	// asked one after another, the 150 pods of a node took 7 seconds.
+	if asked := kube.Actions(); len(asked) != 1 || asked[0].GetVerb() != "list" {
+		t.Fatalf("the API server was asked %d times: %v", len(asked), asked)
 	}
 	slices.SortFunc(got, func(x, y api.Process) int { return x.PID - y.PID })
 	want := api.Process{Pod: "api-1", Container: "app", PID: 1, Executable: "/usr/local/bin/python3.12", Name: "gunicorn", Main: true, ResidentBytes: 30 << 20, Threads: 4}
