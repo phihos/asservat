@@ -926,6 +926,10 @@ files asks first.
   allows it (`hub.allowSelfApproval`, for a single administrator). Where it
   does, an administrator's sensitive requests and watches start without a
   separate approval and are recorded as approved by themselves.
+- With `hub.requireReason` a request that needs approval must say why it
+  is made, an administrator's own as well: the approver decides by the
+  reason, and the audit log keeps it with the request. Requests that need
+  no approval need none.
 - A capture and its files are visible to its requester and to administrators.
   Its requester, or an administrator, can share it: it is then also there,
   to look at and to download, for everyone who may capture in its
