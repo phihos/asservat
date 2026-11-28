@@ -452,6 +452,36 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     if (!await run(`return document.getElementById('approvals').hidden`)) throw new Error('an empty list of approvals is shown');
   });
   await send('Fetch.disable');
+  // A watch is a line of the table at a desk: when it was made, its target
+  // and how often it still records stand on one line each, and what is long,
+  // the condition and the reason, takes the room that is left. The page
+  // leads to the captures that it says appear.
+  await check('desk: a watch is a line of its table', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    await open(hub + '/#watches');
+    await until('the watches', `return !document.getElementById('app').hidden && !document.querySelector('[data-view=watches]').hidden`);
+    const watch = {id: 'w1', cluster: 'production-eu', namespace: 'payments', workload: 'Deployment/payment-gateway', requester: 'someone', createdAt: new Date(2026, 10, 28, 20, 43, 57).toISOString(), remaining: 2,
+      recordings: [{kind: 'pod-state'}, {kind: 'logs'}], durationSeconds: 30, reason: 'the gateway loses connections to the ledger every few hours', when: {kind: 'log', params: {pattern: 'connection (reset|refused) by ledger'}}};
+    const lines = JSON.parse(await run(`const real = window.fetch;
+      window.fetch = (url, options) => String(url).endsWith('/api/watches') ? Promise.resolve(new Response(${JSON.stringify(JSON.stringify([watch]))}, {headers: {'Content-Type': 'application/json'}})) : real(url, options);
+      try { await loadWatches(); } finally { window.fetch = real; }
+      const line = parseFloat(getComputedStyle(document.querySelector('#watches td')).lineHeight) || 20, cells = document.querySelectorAll('#watches tr td');
+      const of = (node) => { const r = document.createRange(); r.selectNodeContents(node); return Math.round(r.getBoundingClientRect().height / line); };
+      const out = {made: of(cells[0].firstChild), workload: of(cells[1].lastChild), head: Math.round(document.querySelector('#watchTable th:nth-child(5)').getBoundingClientRect().height),
+        wide: document.getElementById('watchTable').scrollWidth > document.getElementById('watchTable').clientWidth + 1, link: document.querySelector('[data-view=watches] .lead a')?.getAttribute('href') || ''};
+      await loadWatches(); return JSON.stringify(out)`));
+    if (lines.made > 1 || lines.workload > 1) throw new Error(`a watch's date stands on ${lines.made} lines and its workload on ${lines.workload}`);
+    if (lines.head > 40) throw new Error(`the heading "Times left" is ${lines.head} px high: broken into lines`);
+    if (lines.wide) throw new Error('the table of watches is wider than its page');
+    // Names as long as Kubernetes allows break and do not make the table wider than its page.
+    const long = {...watch, id: 'w2', cluster: 'c'.repeat(60), namespace: 'n'.repeat(63), workload: 'Deployment/' + 'w'.repeat(120)};
+    const wide = await run(`const real = window.fetch;
+      window.fetch = (url, options) => String(url).endsWith('/api/watches') ? Promise.resolve(new Response(${JSON.stringify(JSON.stringify([watch, long]))}, {headers: {'Content-Type': 'application/json'}})) : real(url, options);
+      try { await loadWatches(); } finally { window.fetch = real; }
+      const wide = document.documentElement.scrollWidth > innerWidth + 1; await loadWatches(); return wide`);
+    if (wide) throw new Error('a watch with long names makes the page wider than the window');
+    if (lines.link !== '#captures') throw new Error(`the page says the captures appear under Captures and leads to "${lines.link}"`);
+  });
   hostile = [];
 }
 if (adminToken) {
