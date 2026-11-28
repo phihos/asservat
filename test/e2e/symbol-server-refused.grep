@@ -1,0 +1,2 @@
+error="https://msdl\.microsoft\.com/[^" ]*: (403|408|429|5[0-9][0-9]) 
+error="Get \\"https://msdl\.microsoft\.com/[^" ]*\\": 

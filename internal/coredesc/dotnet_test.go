@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -670,6 +671,68 @@ func TestDotnetHelperThatIsForbiddenIsNotTakenAsMissing(t *testing.T) {
 			// The server is asked again the next time, not after a week.
 			if dir, err := d.dotnetHelper(context.Background(), runtimeFile); err != nil || dir == "" {
 				t.Fatalf("the helper was not asked for again: %q, %v", dir, err)
+			}
+		})
+	}
+}
+
+// The end-to-end test leaves out its check of .NET stacks when the hub's
+// log says that Microsoft's symbol server refused the helper or did not
+// answer (test/e2e/symbol-server-refused.grep), and fails for everything
+// else. This holds the log lines the hub makes against that file.
+func TestWhatTheEndToEndTestTakesForARefusedHelper(t *testing.T) {
+	here, known := map[string]elf.Machine{"amd64": elf.EM_X86_64, "arm64": elf.EM_AARCH64}[runtime.GOARCH]
+	if !known {
+		t.Skip("no helper libraries for this processor")
+	}
+	file, err := os.ReadFile("../../test/e2e/symbol-server-refused.grep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var patterns []*regexp.Regexp
+	for _, line := range strings.Split(strings.TrimRight(string(file), "\n"), "\n") {
+		patterns = append(patterns, regexp.MustCompile(line))
+	}
+	other := elf.EM_AARCH64
+	if here == other {
+		other = elf.EM_X86_64
+	}
+	for _, test := range []struct {
+		name    string
+		answer  func(http.ResponseWriter)
+		refused bool
+	}{
+		{"unavailable", func(w http.ResponseWriter) { w.WriteHeader(http.StatusServiceUnavailable) }, true},
+		{"forbidden", func(w http.ResponseWriter) { w.WriteHeader(http.StatusForbidden) }, true},
+		{"too many requests", func(w http.ResponseWriter) { w.WriteHeader(http.StatusTooManyRequests) }, true},
+		{"no answer", func(w http.ResponseWriter) {
+			connection, _, _ := w.(http.Hijacker).Hijack()
+			connection.Close()
+		}, true},
+		{"a bad request", func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadRequest) }, false},
+		{"cut off", func(w http.ResponseWriter) {
+			w.Header().Set("Content-Length", "100000")
+			w.Write(syntheticLibrary(here, []byte("the beginning of the helper")))
+		}, false},
+		{"no library", func(w http.ResponseWriter) { io.WriteString(w, "<html>an answer of something on the way</html>") }, false},
+		{"for another processor", func(w http.ResponseWriter) { w.Write(syntheticLibrary(other, []byte("the helper"))) }, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { test.answer(w) }))
+			defer server.Close()
+			runtimeFile := filepath.Join(t.TempDir(), "libcoreclr.so")
+			os.WriteFile(runtimeFile, syntheticLibrary(here, []byte{0xab, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33}), 0o755)
+			_, err := Describer{Scratch: t.TempDir(), symbols: server.URL}.dotnetHelper(context.Background(), runtimeFile)
+			if err == nil {
+				t.Fatal("the helper was taken")
+			}
+			// The line as the hub logs it, with Microsoft's address for the test's.
+			var logged bytes.Buffer
+			slog.New(slog.NewTextHandler(&logged, nil)).Warn("a runtime's stacks not described", "runtime", runtimeDotnet, "core", "/work/describe-1/core", "error", err)
+			line := strings.ReplaceAll(logged.String(), server.URL, "https://msdl.microsoft.com/download/symbols")
+			refused := slices.ContainsFunc(patterns, func(p *regexp.Regexp) bool { return p.MatchString(line) })
+			if refused != test.refused {
+				t.Fatalf("taken for refused: %v, want %v: %s", refused, test.refused, line)
 			}
 		})
 	}
