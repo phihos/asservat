@@ -221,6 +221,27 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     }
   });
 }
+// A step of the new capture that has nothing to set for what is chosen, as
+// "Details" has for the pod state that is chosen at first, says so. Struck
+// through, as it was, it read as something broken.
+await check('desk: a step with nothing to set says so', async () => {
+  await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+  await open(hub + '/#new');
+  await until('the steps', `return document.querySelector('#steps li.on')`);
+  await run(`for (const box of document.querySelectorAll('input[name=kind]')) box.checked = box.value === 'pod-state'; document.querySelector('input[name=kind]').dispatchEvent(new Event('change', {bubbles: true}))`);
+  await sleep(200);
+  const details = await run(`const li = document.querySelector('#steps li[data-go="3"]'); return JSON.stringify({text: li.innerText.replace(/\s+/g, ' ').trim(), line: getComputedStyle(li).textDecorationLine, title: li.title, skipped: li.classList.contains('skip')})`);
+  const {text, line, title, skipped} = JSON.parse(details);
+  if (!skipped) throw new Error('the pod state has details to set: ' + details);
+  if (line.includes('line-through')) throw new Error('the step is struck through');
+  if (!/none needed/i.test(text) || !/nothing to set/i.test(title)) throw new Error('the step does not say why it is left out: ' + details);
+  // With something to set it is a step like the others.
+  await run(`for (const box of document.querySelectorAll('input[name=kind]')) box.checked = box.value === 'pcap'; document.querySelector('input[name=kind]').dispatchEvent(new Event('change', {bubbles: true}))`);
+  await sleep(200);
+  const with_ = JSON.parse(await run(`const li = document.querySelector('#steps li[data-go="3"]'); return JSON.stringify({text: li.innerText.replace(/\s+/g, ' ').trim(), title: li.title, skipped: li.classList.contains('skip')})`));
+  if (with_.skipped || /none needed/i.test(with_.text) || with_.title) throw new Error('a step with something to set: ' + JSON.stringify(with_));
+});
+
 // What a cluster's agent or a workload can make the hub hand out is not
 // trusted by the pages: values that carry script where numbers and states
 // belong, and a link that names a recorded file as the capture, run none.
