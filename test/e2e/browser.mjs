@@ -125,9 +125,12 @@ const check = async (name, steps) => {
 const open = async url => { await send('Page.navigate', {url}); await until('the page', `return document.readyState === 'complete'`); };
 
 // choose picks a workload in the form for a new capture, as its user does:
-// a namespace that these checks may use, and the first workload in it. It
+// the first cluster, a namespace that these checks may use, and the first workload in it. It
 // says whether there was one.
 const choose = async () => {
+  // Of several clusters none is chosen for the user either.
+  await until('clusters to choose from', `return [...document.getElementById('cluster').options].some(o => o.value)`);
+  await run(`const c = document.getElementById('cluster'); if (!c.value) { c.value = [...c.options].find(o => o.value).value; c.dispatchEvent(new Event('change', {bubbles: true})); }`);
   await until('namespaces to choose from', `return [...document.getElementById('namespace').options].some(o => o.value)`);
   const namespace = (await run(`return [...document.getElementById('namespace').options].map(o => o.value)`)).find(n => n && new RegExp(process.env.ONLY_NAMESPACES || '').test(n));
   if (!namespace) return false;
