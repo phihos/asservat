@@ -234,6 +234,7 @@ func TestApprovalsFromBeforeNameTheirApprover(t *testing.T) {
 			t.Fatalf("a capture that was decided (%s) before: approver %q, approvals %v", decision, c.Approver, c.Approvals)
 		}
 	}
+}
 
 // Who may approve in a namespace is the cluster's RBAC's to say, as who may
 // capture there is: someone it lets approve sees the requests that wait
