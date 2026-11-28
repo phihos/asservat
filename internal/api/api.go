@@ -280,11 +280,14 @@ type Capture struct {
 	CaptureRequest
 	Requester string `json:"requester"`
 	// Shared: also there, to look at, for everyone who may capture in its namespace.
-	Shared     bool       `json:"shared,omitempty"`
-	Sensitive  bool       `json:"sensitive"`
-	State      string     `json:"state"`
-	Message    string     `json:"message,omitempty"`
-	Approver   string     `json:"approver,omitempty"`
+	Shared    bool   `json:"shared,omitempty"`
+	Sensitive bool   `json:"sensitive"`
+	State     string `json:"state"`
+	Message   string `json:"message,omitempty"`
+	Approver  string `json:"approver,omitempty"`
+	// Approvals names who has approved so far, where a request needs more
+	// than one approval. Approver names them all once it is approved.
+	Approvals  []string   `json:"approvals,omitempty"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	ExpiresAt  time.Time  `json:"expiresAt"`
@@ -643,6 +646,8 @@ type Watch struct {
 	// captures then need no further approval.
 	Sensitive bool   `json:"sensitive"`
 	Approver  string `json:"approver,omitempty"`
+	// Approvals names who has approved so far, as a capture's.
+	Approvals []string `json:"approvals,omitempty"`
 	// Selector is the label selector of the workload's pods; empty for Pod/name.
 	Selector  string    `json:"selector,omitempty"`
 	Remaining int       `json:"remaining"`

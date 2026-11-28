@@ -72,6 +72,10 @@ CREATE TABLE IF NOT EXISTS watches (
 );
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS sensitive boolean NOT NULL DEFAULT false;
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
+-- Who has approved so far, where a request needs more than one approval;
+-- approver names them all once the last has approved.
+ALTER TABLE watches ADD COLUMN IF NOT EXISTS approvals text[] NOT NULL DEFAULT '{}';
+ALTER TABLE captures ADD COLUMN IF NOT EXISTS approvals text[] NOT NULL DEFAULT '{}';
 -- What the watch waits for; a watch from before conditions waits for a crash.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS condition jsonb NOT NULL DEFAULT '{"kind":"crash"}';
 -- How far the watch's running recordings reach back; 0: its time frame.

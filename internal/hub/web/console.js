@@ -70,6 +70,8 @@ const target = () => [$('cluster').value, $('namespace').value, $('workload').va
 const picked = name => document.querySelector(`input[name=${name}]:checked`).value;
 const size = bytes => bytes >= 1 << 30 ? (bytes / (1 << 30)).toFixed(1) + ' GiB' : Math.max(1, Math.round(bytes / (1 << 20))) + ' MiB';
 const fileSize = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1 << 20 ? Math.round(bytes / 1024) + ' KiB' : size(bytes);
+// Who approves a sensitive request here: one administrator, or as many as the installation asks for.
+const approvers = () => me?.approvalsNeeded > 1 ? `${me.approvalsNeeded} administrators approve` : 'An administrator approves';
 const badgeText = () => me?.selfApproval ? 'sensitive' : 'needs approval';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -325,8 +327,8 @@ function showParams() {
   $('approvalNotice').textContent = !sensitive.length ? '' : !asks
     ? `Sensitive because of ${list(sensitive)}. It starts right away because you may approve your own requests. The audit log records it as approved by you.`
     : `Needs approval because of ${list(sensitive)}. ` + (watching
-      ? 'An administrator approves the watch once, before it starts. Its captures then need no further approval.'
-      : chosen.length > 1 ? 'One approval covers the whole request. Nothing starts before it.' : 'It starts once an administrator approves it.');
+      ? `${approvers()} the watch once, before it starts. Its captures then need no further approval.`
+      : chosen.length > 1 ? `${approvers()} the whole request at once. Nothing starts before that.` : `It starts once ${approvers().toLowerCase().replace(/ approves?$/, '')} ${me?.approvalsNeeded > 1 ? 'have' : 'has'} approved it.`);
   // An installation can ask for the reason of every request that is sensitive.
   const must = !!(sensitive.length && me?.reasonRequired);
   $('reasonLabel').textContent = (asks ? 'Reason, shown to the approver' : 'Reason') + (must ? ' (required)' : '');
@@ -366,8 +368,8 @@ async function loadWatches() {
   $('watchTable').hidden = !list.length; $('noWatches').hidden = !!list.length;
   $('watchCount').textContent = list.length || '';
   $('watches').innerHTML = list.map(w => `<tr class="${freshClass(w.id)}" data-watch="${w.id}"><td>${new Date(w.createdAt).toLocaleString()}<div class="muted">${esc(w.requester)}</div></td>
-    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(told(w.when))}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : '<span class="state PendingApproval">awaits approval</span>'}</div>` : ''}</td>
-    <td>${me.admin && w.sensitive && !w.approver ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}${!w.sensitive || w.approver ? `<button data-id="${w.id}" data-act="record" title="Record all pods of the workload now. This counts as one of the watch's recordings.">Record now</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
+    <td>${esc(w.cluster)} / ${esc(w.namespace)}<br>${esc(w.workload)}</td><td>${esc(told(w.when))}</td><td>${describe(w)}</td><td>${w.remaining}${w.sensitive ? `<div class="muted">${w.approver ? 'approved by ' + esc(w.approver) : `<span class="state PendingApproval">awaits approval</span>${approvalsOf(w) ? '<br>' + approvalsOf(w) : ''}`}</div>` : ''}</td>
+    <td>${me.admin && w.sensitive && !w.approver && !approvedByMe(w) ? `<button data-id="${w.id}" data-act="approve">Approve</button>` : ''}${!w.sensitive || w.approver ? `<button data-id="${w.id}" data-act="record" title="Record all pods of the workload now. This counts as one of the watch's recordings.">Record now</button>` : ''}<button data-id="${w.id}">Delete</button></td></tr>`).join('');
 }
 
 // How a recording gets on, as a mark before its name.
@@ -409,6 +411,9 @@ const toggled = new Map();
 const podsOpen = 5, podsToggled = new Map();
 let captureFilter = 'all';
 const inProgress = c => ['PendingApproval', 'Queued', 'Running'].includes(c.state);
+// Where a request needs several approvals: how far it is, and whether this user has given theirs.
+const approvalsOf = r => me.approvalsNeeded > 1 ? `${(r.approvals || []).length} of ${me.approvalsNeeded} approvals${(r.approvals || []).length ? ': ' + esc(r.approvals.join(', ')) : ''}` : '';
+const approvedByMe = r => (r.approvals || []).includes(me.name);
 
 // The hub lists captures a page at a time, the newest first; pages is how
 // many of them the list shows.
@@ -470,14 +475,14 @@ async function loadCaptures() {
       return `<div class="podbox folds${shown ? ' open' : ''}"><button class="pod" data-pod="${esc(key)}" aria-expanded="${shown}">${head}<span class="went">${went}</span><span class="muted">${mine.length ? `${plural(mine.length, 'file')}, ${fileSize(mine.reduce((n, a) => n + a.size, 0))}` : 'no files'}</span></button><div class="podbody">${body}</div></div>`;
     }).join('') || '<div class="muted">No pods were recorded.</div>';
     const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
-      c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? 'needs approval' : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
+      c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? (c.state === 'PendingApproval' && approvalsOf(c) || 'needs approval') : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
     // Its requester and administrators may change a capture; others see one that is shared with them.
     const mine = me.admin || c.requester === me.name;
     const sharing = c.shared ? `Shared with everyone who may capture in ${esc(c.namespace)}.` : mine ? `Only you${me.admin && c.requester !== me.name ? ', ' + esc(c.requester) : ''} and administrators see this capture.` : '';
     const share = !mine ? '' : `<button data-act="share" data-id="${c.id}" data-shared="${c.shared ? '' : '1'}" title="${c.shared ? 'Make it visible to you and administrators only again' : `Let everyone who may capture in ${esc(c.namespace)} look at this capture and download its files. They cannot change or delete it.`}">${c.shared ? 'Stop sharing' : 'Share with the namespace'}</button>`;
     const button = (act, text, title, primary) => `<button data-act="${act}" data-id="${c.id}" title="${title}"${primary ? ' class="primary"' : ''}>${text}</button>`;
-    const actions = !mine ? '' : c.state === 'PendingApproval' ? (me.admin ? button('approve', 'Approve', 'Let it start', true) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
+    const actions = !mine ? '' : c.state === 'PendingApproval' ? (me.admin ? (approvedByMe(c) ? '' : button('approve', 'Approve', me.approvalsNeeded > 1 ? 'Give your approval. It starts with the last one it needs.' : 'Let it start', true)) + button('deny', 'Deny', 'Refuse the request. It will not start.') : '') + button('cancel', 'Withdraw', 'Withdraw the request')
       : c.state === 'Running' && c.stoppedAt ? button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : c.state === 'Running' ? button('stop', 'Stop and keep', 'Stop recording now and keep the files so far', true) + button('delete', 'Delete', 'Stop it and delete what it has recorded')
       : button('delete', 'Delete', 'Delete the capture and its files');
@@ -566,7 +571,7 @@ $('captureForm').onsubmit = guard(async () => {
   const created = watching ? await call('POST', '/api/watches', {...request, when: condition(), count: Number($('count').value || 1), ...($('beforeSeconds').value > 0 && !$('beforeFields').hidden ? {beforeSeconds: Math.round($('beforeSeconds').value)} : {})}) : await call('POST', '/api/captures', request);
   await Promise.all([loadCaptures(), loadWatches()]);
   const waits = created.sensitive && !created.approver && created.state !== 'Queued';
-  $('done').textContent = watching ? (waits ? 'The watch is awaiting an administrator\'s approval.' : `Watching. The capture will appear under Captures ${told(condition())}.`)
+  $('done').textContent = watching ? (waits ? 'The watch is awaiting approval.' : `Watching. The capture will appear under Captures ${told(condition())}.`)
     : waits ? 'Requested. It starts once an administrator approves it.' : 'Started. Follow its progress in the first row below.';
   // Show where it went: the new capture, opened, in its list.
   if (!watching) toggled.set(created.id, true);

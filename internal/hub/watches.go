@@ -54,7 +54,11 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	}
 	w := api.Watch{ID: uuid.NewString(), CaptureRequest: in.CaptureRequest, When: in.When, BeforeSeconds: in.BeforeSeconds, Requester: u.Name, Sensitive: in.Sensitive(), Selector: res.Selector, Remaining: max(in.Count, 1)}
 	if w.Sensitive && h.approvesOwn(u) {
-		w.Approver = u.Name
+		// Their own approval is the first, and the only one where one is enough.
+		w.Approvals = []string{u.Name}
+		if h.startsOwn(u) {
+			w.Approver = u.Name
+		}
 	}
 	if err := h.Store.CreateWatch(ctx, w, u.Groups); err != nil {
 		return w, err
@@ -62,7 +66,7 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if err := h.Store.Audit(ctx, u.Name, "watch.create", "", w); err != nil {
 		return w, err
 	}
-	if w.Approver != "" {
+	if len(w.Approvals) > 0 {
 		if err := h.Store.Audit(ctx, u.Name, "watch.approve", "", map[string]any{"id": w.ID, "own": true}); err != nil {
 			return w, err
 		}
@@ -117,7 +121,10 @@ func (h *Hub) ApproveWatch(ctx context.Context, u User, id string) (api.Watch, e
 	if err := h.mayApprove(u, w.Requester); err != nil {
 		return w, err
 	}
-	ok, err := h.Store.ApproveWatch(ctx, id, u.Name)
+	if slices.Contains(w.Approvals, u.Name) && w.Approver == "" {
+		return w, errStatus{http.StatusConflict, "you have approved this watch; it needs another person's approval"}
+	}
+	ok, err := h.Store.ApproveWatch(ctx, id, u.Name, h.needed())
 	if err != nil {
 		return w, err
 	}

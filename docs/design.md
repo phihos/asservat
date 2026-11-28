@@ -944,6 +944,13 @@ files asks first.
   allows it (`hub.allowSelfApproval`, for a single administrator). Where it
   does, an administrator's sensitive requests and watches start without a
   separate approval and are recorded as approved by themselves.
+- With `hub.approvals` above 1 a request that needs approval needs that
+  many, each of another person and none of the requester. It stays
+  `PendingApproval`, with the names of those who approved so far
+  (`approvals`), until the last approves; `approver` then names them all.
+  One refusal denies it. Where an administrator may approve their own
+  requests, theirs counts as the first, and the request waits for the
+  others. A watch is approved the same way, once, for all its captures.
 - With `hub.requireReason` a request that needs approval must say why it
   is made, an administrator's own as well: the approver decides by the
   reason, and the audit log keeps it with the request. Requests that need
