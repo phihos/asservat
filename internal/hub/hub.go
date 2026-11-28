@@ -245,7 +245,9 @@ func (h *Hub) Handler() http.Handler {
 			ReasonRequired bool `json:"reasonRequired,omitempty"`
 			// ApprovalsNeeded is how many approvals a sensitive request needs.
 			ApprovalsNeeded int `json:"approvalsNeeded"`
-		}{u, h.startsOwn(u), h.RequireReason, h.needed()})
+			// ProfileNames names the endpoints that a profile recording lists by their IDs.
+			ProfileNames map[string]string `json:"profileNames"`
+		}{u, h.startsOwn(u), h.RequireReason, h.needed(), api.ProfileNames()})
 	})
 	user("GET /api/clusters", h.listClusters)
 	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)

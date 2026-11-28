@@ -406,6 +406,22 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     await run(`document.getElementById('captureFind').dispatchEvent(new Event('input'))`); await sleep(400);
     if (await shown() !== 9) throw new Error(`${await shown()} files are listed for three pods, want 9`);
   });
+  // What a recording was asked with is said in words: the endpoints of a
+  // profile by their names and where they are, not by the catalog's IDs,
+  // and a setting by what it means, not by its name in the request.
+  await check('desk: the settings of a recording are said in words', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    const asked = {...captureOf(podsOf(1)), recordings: [{kind: 'pprof', params: {endpoints: '6060/go-cpu,6060/go-heap,app/jvm-threads'}}, {kind: 'pcap', params: {payload: 'true', filter: 'tcp port 80', before: 'true'}},
+      {kind: 'logs', params: {previous: 'true', tailLines: '200', container: 'app'}}, {kind: 'strace', params: {strings: 'true'}}]};
+    asked.tasks[0].recordings = asked.recordings.map(r => ({kind: r.kind, state: 'Completed'}));
+    hostile = [[/^\/api\/captures(\?.*)?$/, [asked]]];
+    await run(`toggled.set(${JSON.stringify(made)}, true); await loadCaptures()`); await sleep(400);
+    const said = await run(`return [...document.querySelectorAll('.capture .given')].map(g => g.innerText).join(' | ')`);
+    for (const want of ['CPU profile and Heap on port 6060', 'Thread dump in app', 'full packets', 'filter tcp port 80', 'the last 200 lines', 'before the last restart', 'container app', 'with the data read and written'])
+      if (!said.includes(want)) throw new Error(`the settings read "${said}", without "${want}"`);
+    for (const raw of ['go-cpu', 'endpoints', 'payload', 'tailLines', 'previous', 'strings', 'true'])
+      if (said.includes(raw)) throw new Error(`the settings read "${said}", with "${raw}" as it is in the request`);
+  });
   // The button of a capture's line that is the thing to do, as "Stop and
   // keep", is filled like every such button: without its ground, its dark
   // words stood on the dark page of a dark system and were hardly read.
