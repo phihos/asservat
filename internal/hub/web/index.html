@@ -127,6 +127,9 @@
   /* On a phone the name has a line to itself, so that it is not broken in the middle of a word; size and links follow below. */
   @media (max-width: 760px) { .file { grid-template-columns: minmax(0, 1fr) auto auto; row-gap: 2px; } .file .name { grid-column: 1 / -1; } .file .size { text-align: left; } .file .is { display: none; } }
   .when { font-family: var(--mono); }
+  /* Whether the audit log follows what happens, and the way to hold it still. */
+  .following { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; } .following button { min-height: 28px; padding: 2px 12px; }
+  #auditState.live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--ok); }
   /* When, who, what and which capture stand on one line each; the details take what is left. */
   @media (min-width: 761px) { #auditTable td:not(:last-child) { white-space: nowrap; } #auditTable td:last-child { overflow-wrap: anywhere; } }
   .rec { margin-top: 8px; } .rec .of { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding-bottom: 2px; font-size: 13px; }
@@ -392,6 +395,7 @@
   <h2>Audit log</h2>
   <p class="muted lead">Everything people did with evidence: requests, approvals, downloads and files opened in a viewer. Only administrators see this page.</p>
   <p class="problem" id="auditProblem"></p>
+  <p class="following"><span id="auditState" class="muted"></span><button type="button" id="auditLive" aria-pressed="false">Pause</button></p>
   <table id="auditTable"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Capture</th><th>Details</th></tr></thead><tbody id="auditRows"></tbody></table>
   <p id="auditOlderLine" hidden><button type="button" id="auditOlder">Show older entries</button></p>
   <p class="empty" id="noAudit" hidden>Nothing has been recorded yet.</p>

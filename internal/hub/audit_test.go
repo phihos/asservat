@@ -117,3 +117,44 @@ func TestAuditEntriesAreAlsoWrittenAsLines(t *testing.T) {
 	}
 	t.Fatal("the line names no entry of the log:", lines[0])
 }
+
+// The console's audit log follows what happens: every entry is hinted at
+// on the stream of events, as "audit", which names nothing. A change of a
+// capture is hinted at as "changed", as before, and the two are told apart:
+// who watches captures is not made to load them anew for every file that
+// someone opens.
+func TestAnAuditEntryIsHintedAt(t *testing.T) {
+	dsn := os.Getenv("ASSERVAT_TEST_DSN")
+	if dsn == "" {
+		t.Skip("ASSERVAT_TEST_DSN is not set")
+	}
+	ctx := context.Background()
+	store, err := OpenStore(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	h, err := New(Config{Store: store, Blobs: DirBlobs(t.TempDir()), MasterKey: bytes.Repeat([]byte{7}, 32), Retention: time.Hour, WorkDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hints := make(chan string, 8)
+	h.mu.Lock()
+	h.watchers[hints] = struct{}{}
+	h.mu.Unlock()
+	if err := store.Audit(ctx, "auditor", "artifact.view", "", map[string]string{"name": "api-1/app.log"}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case hint := <-hints:
+		if hint != "audit" {
+			t.Fatalf("an audit entry is hinted at as %q", hint)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("an audit entry is not hinted at")
+	}
+	h.notify("")
+	if hint := <-hints; hint != "changed" {
+		t.Fatalf("a change is hinted at as %q", hint)
+	}
+}

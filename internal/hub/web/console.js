@@ -37,7 +37,7 @@ async function start() {
   route();
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
   comeBack();
-  new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
+  new EventSource('/api/events').onmessage = guard(e => e.data === 'audit' ? followAudit() : Promise.all([loadCaptures(), loadWatches()]));
 }
 
 // Who comes back with the browser's own way back, as from a file's viewer,
@@ -379,11 +379,53 @@ const auditActions = {'capture.request': 'requested a capture', 'capture.approve
   'profile.discover': 'looked for profile endpoints', 'traffic.sample': 'sampled live traffic'};
 const auditPage = 100;
 let auditEntries = [];
+// The audit log follows what happens while it is shown and not paused: the
+// hub hints at every entry, and the entries that are new go on top. Paused,
+// it stands still to be read, and says how many it holds back.
+let auditLive = true, auditHeld = 0, auditNew = new Set(), auditAsking = null, auditAgain = false;
+// One request at a time: a hint that comes while the entries are asked for
+// has them asked for once more after that, so that two answers never put
+// the same entries on top.
+function followAudit() {
+  if (!me?.admin || $('auditTable').closest('[data-view]').hidden) return;
+  if (auditAsking) { auditAgain = true; return auditAsking; }
+  auditAsking = (async () => {
+    try { do { auditAgain = false; await takeAudit(); } while (auditAgain); } finally { auditAsking = null; }
+  })();
+  return auditAsking;
+}
+async function takeAudit() {
+  const page = await call('GET', `/api/audit?limit=${auditPage}`);
+  const known = new Set(auditEntries.map(e => e.id));
+  const news = page.filter(e => !known.has(e.id));
+  // A whole page of new entries reaches none that is shown: more may lie between.
+  const beyond = auditEntries.length > 0 && page.length === auditPage && news.length === page.length;
+  // Paused, what waits is counted from the entries themselves, not from the hints, of which one can be missed.
+  if (!auditLive) { auditHeld = beyond ? Infinity : news.length; return showAuditLive(); }
+  if (beyond) return loadAudit(true);
+  if (!news.length) return;
+  auditEntries = news.concat(auditEntries);
+  auditNew = new Set(news.map(e => e.id));
+  drawAudit();
+}
+function showAuditLive() {
+  $('auditLive').textContent = auditLive ? 'Pause' : auditHeld ? `Resume · ${auditHeld === Infinity ? `more than ${auditPage}` : auditHeld} new ${auditHeld === 1 ? 'entry' : 'entries'}` : 'Resume';
+  $('auditLive').setAttribute('aria-pressed', String(!auditLive));
+  $('auditLive').title = auditLive ? 'Hold the list still to read it. New entries wait until you resume.' : 'Show what happened meanwhile and follow again.';
+  $('auditState').textContent = auditLive ? 'Live: new entries appear as they happen.' : 'Paused.';
+  $('auditState').classList.toggle('live', auditLive);
+}
 async function loadAudit(fresh) {
   // A page begins where the last one ended: at its moment, below its entry.
   const last = auditEntries.at(-1), before = fresh || !last ? '' : `&before=${encodeURIComponent(last.at)}&beforeId=${last.id}`;
   const page = await call('GET', `/api/audit?limit=${auditPage}${before}`);
   auditEntries = fresh ? page : auditEntries.concat(page);
+  if (fresh) { auditHeld = 0; auditNew = new Set(); }
+  $('auditOlderLine').hidden = page.length < auditPage;
+  showAuditLive();
+  drawAudit();
+}
+function drawAudit() {
   // What an entry names is a link to it while it is there: the capture, its file, the watches.
   const linked = (e, k, v) => (k === 'name' || k === 'file') && e.number && typeof v === 'string' ? `<a href="/view?capture=${encodeURIComponent(e.capture)}&file=${encodeURIComponent(v)}" title="Look at the file">${esc(v)}</a>`
     : k === 'id' && e.action.startsWith('watch.') && e.action !== 'watch.delete' ? `<a href="#watches" title="The watches">${esc(v)}</a>` : esc(typeof v === 'object' ? JSON.stringify(v) : v);
@@ -403,10 +445,9 @@ async function loadAudit(fresh) {
     ];
     return said.filter(Boolean).join(' · ');
   };
-  $('auditRows').innerHTML = auditEntries.map(e => `<tr><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
+  $('auditRows').innerHTML = auditEntries.map(e => `<tr${auditNew.has(e.id) ? ' class="fresh"' : ''} data-entry="${e.id}"><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
     <td>${e.capture ? (e.number ? `<a class="number" href="#capture=${encodeURIComponent(e.capture)}" title="Go to the capture"><b>${String(e.number).padStart(4, '0')}</b></a>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail, e)}</td></tr>`).join('');
   $('auditTable').hidden = !auditEntries.length; $('noAudit').hidden = !!auditEntries.length;
-  $('auditOlderLine').hidden = page.length < auditPage;
 }
 
 async function loadWatches() {
@@ -719,6 +760,13 @@ $('watches').onclick = guard(async e => {
 }, 'watchesProblem');
 $('captureFind').oninput = guard(loadCaptures, 'capturesProblem');
 $('auditOlder').onclick = guard(() => loadAudit(false), 'auditProblem');
+$('auditLive').onclick = guard(async () => {
+  auditLive = !auditLive;
+  auditHeld = 0;
+  showAuditLive();
+  // What happened meanwhile is asked for anew: also what no hint told of.
+  if (auditLive) await followAudit();
+}, 'auditProblem');
 $('older').onclick = guard(async () => { pages++; await loadCaptures(); }, 'capturesProblem');
 $('states').onclick = guard(async e => {
   if (!e.target.dataset.filter) return;

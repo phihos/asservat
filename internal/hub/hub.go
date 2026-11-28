@@ -170,7 +170,12 @@ func New(c Config) (*Hub, error) {
 			}
 		}
 	}
-	return &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, awaited: map[string]time.Time{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}, nil
+	h := &Hub{Config: c, agents: newAgents(), changed: make(chan struct{}, 1), scheduled: make(chan struct{}, 1), undescribed: map[string]bool{}, awaited: map[string]time.Time{}, watchers: map[chan string]struct{}{}, views: views{open: map[string]*view{}}}
+	// The console's audit log follows what happens: it is told of every entry.
+	if c.Store != nil {
+		c.Store.audited = func() { h.hint("audit") }
+	}
+	return h, nil
 }
 
 // pagePolicy is what the console's pages tell the browser to hold them to
@@ -1063,15 +1068,19 @@ func (h *Hub) auditLog(w http.ResponseWriter, r *http.Request, _ User) error {
 }
 
 // notify tells the event streams that a capture or the watches changed.
-func (h *Hub) notify(id string) {
+func (h *Hub) notify(id string) { h.hint("changed") }
+
+// hint tells every open console that something changed: "changed" for
+// captures and watches, "audit" for an entry of the audit log.
+func (h *Hub) hint(what string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.watchers {
 		// The hint names nothing: every signed-in user has this stream, and
 		// that a capture exists is its requester's to know.
 		select {
-		case ch <- "changed":
-		default: // a slow reader misses the hint and reloads on its next event
+		case ch <- what:
+		default: // a slow reader misses the hint and loads on its next one what it has not got
 		}
 	}
 }
