@@ -80,8 +80,8 @@
   td button { min-height: 28px; padding: 2px 10px; margin: 0 4px 2px 0; white-space: nowrap; }
   /* A watch's buttons stay side by side. */
   #watchTable td:last-child { white-space: nowrap; }
-  /* At a desk, when a watch was made, its target and how often it still records stand on one line each; the condition and the reason, which are long, take what is left. */
-  @media (min-width: 1000px) { #watchTable th, #watchTable td:is(:nth-child(1), :nth-child(2), :nth-child(5)) { white-space: nowrap; } }
+  /* At a desk, when a watch was made and how often it still records stand on one line each, and so does a target of usual length; a longer one breaks. The condition and the reason, which are long, take what is left. */
+  @media (min-width: 1000px) { #watchTable th, #watchTable td:is(:nth-child(1), :nth-child(5)) { white-space: nowrap; } #watchTable td:nth-child(2) { min-width: 30ch; overflow-wrap: anywhere; } }
   /* On a narrow screen a watch is a card: its six columns do not fit side by side. */
   @media (max-width: 760px) {
     #watchTable thead { display: none; } #watchTable, #watchTable tbody, #watchTable tr, #watchTable td { display: block; }

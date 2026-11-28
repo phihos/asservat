@@ -473,6 +473,13 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     if (lines.made > 1 || lines.workload > 1) throw new Error(`a watch's date stands on ${lines.made} lines and its workload on ${lines.workload}`);
     if (lines.head > 40) throw new Error(`the heading "Times left" is ${lines.head} px high: broken into lines`);
     if (lines.wide) throw new Error('the table of watches is wider than its page');
+    // Names as long as Kubernetes allows break and do not make the table wider than its page.
+    const long = {...watch, id: 'w2', cluster: 'c'.repeat(60), namespace: 'n'.repeat(63), workload: 'Deployment/' + 'w'.repeat(120)};
+    const wide = await run(`const real = window.fetch;
+      window.fetch = (url, options) => String(url).endsWith('/api/watches') ? Promise.resolve(new Response(${JSON.stringify(JSON.stringify([watch, long]))}, {headers: {'Content-Type': 'application/json'}})) : real(url, options);
+      try { await loadWatches(); } finally { window.fetch = real; }
+      const wide = document.documentElement.scrollWidth > innerWidth + 1; await loadWatches(); return wide`);
+    if (wide) throw new Error('a watch with long names makes the page wider than the window');
     if (lines.link !== '#captures') throw new Error(`the page says the captures appear under Captures and leads to "${lines.link}"`);
   });
   hostile = [];
