@@ -938,7 +938,13 @@ files asks first.
   out.
 - The console and the MCP tools offer namespaces, workloads and containers
   from the cluster; nothing of that is typed. A user is offered the
-  namespaces in which they may capture. Where there is none, the console
+  namespaces in which they may capture. Where there are several to choose
+  from, the console chooses none: its form begins without a namespace and
+  a workload, as the first of a list is one click away from a request
+  nobody meant. What a condition of a watch asks for, such as the pattern
+  of a log line, stands at the chosen condition and comes into sight with
+  it, and the cursor goes to a field that was left empty. Where there is
+  no namespace, the console
   says so in the first step of a new capture, names the right that is
   missing (`pods/exec`) and does not go on to the next step.
 - A user may list and capture the workloads of a namespace if a

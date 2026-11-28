@@ -124,6 +124,18 @@ const check = async (name, steps) => {
 };
 const open = async url => { await send('Page.navigate', {url}); await until('the page', `return document.readyState === 'complete'`); };
 
+// choose picks a workload in the form for a new capture, as its user does:
+// a namespace that these checks may use, and the first workload in it. It
+// says whether there was one.
+const choose = async () => {
+  await until('namespaces to choose from', `return [...document.getElementById('namespace').options].some(o => o.value)`);
+  const namespace = (await run(`return [...document.getElementById('namespace').options].map(o => o.value)`)).find(n => n && new RegExp(process.env.ONLY_NAMESPACES || '').test(n));
+  if (!namespace) return false;
+  await run(`const n = document.getElementById('namespace'); if (n.value !== ${JSON.stringify(namespace)}) { n.value = ${JSON.stringify(namespace)}; n.dispatchEvent(new Event('change', {bubbles: true})); }`);
+  await until('workloads to choose from', `return [...document.getElementById('workload').options].some(o => o.value)`);
+  await run(`const w = document.getElementById('workload'); if (!w.value) { w.value = [...w.options].find(o => o.value).value; w.dispatchEvent(new Event('change', {bubbles: true})); }`);
+  return true;
+};
 for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
   await check(`${size}: signing in`, async () => {
@@ -161,7 +173,7 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   });
   await check(`${size}: a new capture, step by step`, async () => {
     await run(`location.hash = '#new'`);
-    await until('a workload to choose', `return document.getElementById('workload').options.length > 0`);
+    if (!await choose()) return;
     const next = `[...document.querySelectorAll('[data-view=new] button')].find(b => b.offsetParent && /Next/.test(b.innerText))?.click()`;
     await run(next); await sleep(300);
     // Every recording but the profile endpoint, which needs an endpoint chosen.
@@ -172,6 +184,46 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     // Every way to start shows its own fields.
     const ways = await run(`return [...document.querySelectorAll('input[name=when]')].map(i => i.value)`);
     for (const way of ways) { await run(`document.querySelector('input[name=when][value="${way}"]').click()`); await sleep(50); }
+  });
+  // The form chooses nothing for its user where there is a choice, says in
+  // its line of choices what is chosen from the start, and shows what a
+  // condition asks for at the condition, in sight, and not below all of them.
+  await check(`${size}: the form chooses nothing by itself and asks at the condition`, async () => {
+    // Loaded anew: what an earlier check chose is gone.
+    await run(`location.hash = '#new'; location.reload()`); await sleep(1500);
+    await until('namespaces to choose from', `return document.getElementById('namespace')?.options.length > 0 && !document.getElementById('app').hidden`);
+    await sleep(800);
+    const begun = JSON.parse(await run(`const n = document.getElementById('namespace'), w = document.getElementById('workload');
+      const none = document.querySelector('#steps li.skip .none'), text = document.createRange(); if (none) text.selectNodeContents(none.previousSibling);
+      return JSON.stringify({namespaces: [...n.options].map(o => o.value), namespace: n.value, workload: w.value, summary: document.getElementById('summary').innerText,
+        gap: none ? none.getBoundingClientRect().left - text.getBoundingClientRect().right : 0})`));
+    if (begun.namespaces.filter(Boolean).length > 1 && (begun.namespace || begun.workload)) throw new Error(`with ${begun.namespaces.length} namespaces to choose from, the form began with ${begun.namespace} and ${begun.workload}`);
+    if (begun.workload && !begun.summary.includes(begun.workload)) throw new Error(`the form began with ${begun.workload} chosen and its line of choices says "${begun.summary}"`);
+    if (begun.gap > 2) throw new Error(`"none needed" stands ${begun.gap} px away from the step it belongs to`);
+    // The rest is done where this check may: in a namespace of its own.
+    if (!await choose()) return;
+    await until('the workload in the line of choices', `return document.getElementById('summary').innerText.includes(document.getElementById('workload').value)`, 10);
+    const next = `document.getElementById('next').offsetParent && document.getElementById('next').click()`;
+    await run(next); await sleep(300);
+    await run(`for (const box of document.querySelectorAll('input[name=kind]')) if (box.checked !== ['pod-state', 'cpu'].includes(box.value)) box.click()`);
+    await run(next); await sleep(600); await run(next); await sleep(500);
+    await until('the last step', `return !!document.querySelector('input[name=when]')?.offsetParent`);
+    await run(`document.querySelector('input[name=when][value=log]').click()`);
+    await until('what the chosen condition asks for, in sight', `const fields = document.getElementById('logFields').getBoundingClientRect(); return fields.bottom <= innerHeight + 1 && fields.top >= 0`, 5).catch(() => {});
+    await sleep(300);
+    // Wide, the conditions stand in rows and it is below them; narrow, right below the chosen one.
+    const asked = JSON.parse(await run(`const fields = document.getElementById('logFields').getBoundingClientRect(), group = document.querySelector('input[name=when]:checked').closest(${JSON.stringify(size === 'phone' ? 'label' : '.choice')}).getBoundingClientRect();
+      const name = document.createRange(); name.selectNodeContents([...document.querySelector('[data-before=cpu]').childNodes].find(n => n.nodeType === 3 && n.textContent.trim()));
+      return JSON.stringify({below: fields.top - group.bottom, seen: fields.bottom <= innerHeight + 1 && fields.top >= 0, lines: name.getClientRects().length,
+        pattern: document.getElementById('logPattern').getBoundingClientRect().right, container: document.getElementById('logContainer').getBoundingClientRect().right})`));
+    if (asked.below < 0 || asked.below > 40) throw new Error(`what the condition asks for stands ${asked.below} px below its group`);
+    if (!asked.seen) throw new Error('what the chosen condition asks for is out of sight');
+    if (asked.lines > 1) throw new Error(`the name of a recording to keep running is broken into ${asked.lines} lines`);
+    if (size === 'phone' && Math.abs(asked.pattern - asked.container) > 1) throw new Error(`the fields of the condition end at ${asked.pattern} and ${asked.container} px`);
+    // What is missing is said, and the cursor stands where it is to be entered.
+    await run(`document.getElementById('submit').click()`); await sleep(500);
+    const missing = JSON.parse(await run(`return JSON.stringify({said: document.getElementById('formProblem').innerText, at: document.activeElement.id})`));
+    if (!/pattern/.test(missing.said) || missing.at !== 'logPattern') throw new Error(`without a pattern the form says "${missing.said}" and the cursor is in "${missing.at}"`);
   });
   // One file per viewer and kind of file, of the captures that this user sees.
   const files = await run(`const list = await (await fetch('/api/captures', {headers: {Authorization: 'Bearer ' + sessionStorage.getItem('token')}})).json();
