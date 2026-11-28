@@ -80,6 +80,7 @@ func runHub(ctx context.Context, args []string) error {
 	adminGroups := f.String("admin-groups", "asservat-admins", "comma-separated groups whose members are administrators")
 	retention := f.Duration("retention", 7*24*time.Hour, "how long evidence is kept")
 	selfApproval := f.Bool("allow-self-approval", false, "let an administrator approve their own sensitive capture")
+	auditToLog := f.Bool("audit-to-log", false, "write every entry of the audit log to standard output as well, one line of JSON each")
 	clustersFile := f.String("clusters-file", "", "YAML file with the clusters whose agents may join: a list of name and token")
 	localCluster := f.String("local-cluster", "", "name of the hub's own cluster, whose agents join with the token of local-token-file")
 	localTokenFile := f.String("local-token-file", "", "file with the join token of local-cluster")
@@ -190,6 +191,9 @@ func runHub(ctx context.Context, args []string) error {
 		}
 	}
 	defer c.Store.Close()
+	if *auditToLog {
+		c.Store.AuditTo(os.Stdout)
+	}
 	h, err := hub.New(c)
 	if err != nil {
 		return err

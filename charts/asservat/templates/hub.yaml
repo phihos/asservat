@@ -51,6 +51,9 @@ spec:
             - --debuginfod-urls={{ join " " . }}
             {{- end }}
             - --allow-self-approval={{ .Values.hub.allowSelfApproval }}
+            {{- if .Values.hub.auditToLog }}
+            - --audit-to-log
+            {{- end }}
             {{- if $s3.endpoint }}
             - --s3-endpoint={{ $s3.endpoint }}
             - --s3-bucket={{ required "hub.storage.s3.bucket is required" $s3.bucket }}

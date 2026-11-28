@@ -313,6 +313,33 @@ Administrators see who requested, approved, downloaded and opened what under
 **Audit log** in the console, or from `GET /api/audit`. The log is kept after
 the captures it describes are deleted.
 
+### Sending the audit log to a SIEM
+
+Set `hub.auditToLog=true`. The hub then writes every entry of the audit log
+to its standard output as well, one line of JSON each, and the log
+collector that your cluster already runs (Fluent Bit, Vector, Promtail)
+carries it to your SIEM like any other pod log. The hub needs no address or
+credentials of the SIEM for this, and the SIEM none of the hub.
+
+```json
+{"log":"audit","id":4711,"at":"2026-11-28T09:28:47.512Z","actor":"alice","action":"artifact.download","capture":"1e8fa4a6-8f8a-4a71-a9cd-435a0ed857da","number":71,"detail":{"file":"api-7d9c/capture.pcap"}}
+```
+
+| Field | What it holds |
+| --- | --- |
+| `log` | Always `audit`: what tells these lines from the hub's other output, which is plain text on standard error |
+| `id`, `at` | The entry's number and time, the same as `GET /api/audit` returns |
+| `actor` | Who did it: the user's name, or `retention` where the hub deleted evidence whose time was up |
+| `action` | What was done, such as `capture.request`, `capture.approve`, `artifact.download`, `artifact.view`, `watch.create` |
+| `capture`, `number` | The capture it was done to, where there is one: its ID, and the number the console shows it under |
+| `detail` | What the action is about: the file, the workload, the reason given |
+
+Select the lines by `log` being `audit` in your collector. The switch is off
+by default because the lines name people, workloads and files, and so put
+user data into your cluster's logs: whoever may read the hub's pod log may
+read them. Entries from before you set it are in the database only;
+`GET /api/audit` returns them, the newest first.
+
 ## Further reading
 
 - [Design](./design.md): how each kind of evidence is recorded, the

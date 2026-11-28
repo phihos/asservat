@@ -5,6 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,7 +20,13 @@ import (
 var schema string
 
 // Store is the hub's PostgreSQL state.
-type Store struct{ db *pgxpool.Pool }
+type Store struct {
+	db *pgxpool.Pool
+	// audit is where every entry of the audit log is also written, as a
+	// line of JSON; nil for nowhere (AuditTo).
+	audit   io.Writer
+	auditMu sync.Mutex
+}
 
 var ErrNotFound = errors.New("not found")
 
@@ -35,10 +44,37 @@ func OpenStore(ctx context.Context, dsn string) (*Store, error) {
 
 func (s *Store) Close() { s.db.Close() }
 
+// AuditTo has every entry of the audit log written to w as well, one line
+// of JSON each: for an installation whose logs go to a SIEM, which so gets
+// the audit log without credentials of the hub. Call it before the store
+// is used.
+func (s *Store) AuditTo(w io.Writer) { s.audit = w }
+
 func (s *Store) Audit(ctx context.Context, actor, action, capture string, detail any) error {
 	b, _ := json.Marshal(detail)
-	_, err := s.db.Exec(ctx, `INSERT INTO audit(actor, action, capture_id, detail) VALUES ($1,$2,nullif($3,'')::uuid,$4)`, actor, action, capture, b)
-	return err
+	e := AuditEntry{Actor: actor, Action: action, Detail: b}
+	if capture != "" {
+		e.Capture = &capture
+	}
+	// With the capture's number, as the log shows the entry while the capture exists.
+	err := s.db.QueryRow(ctx, `WITH a AS (INSERT INTO audit(actor, action, capture_id, detail) VALUES ($1,$2,nullif($3,'')::uuid,$4) RETURNING id, at, capture_id)
+ SELECT a.id, a.at, c.number FROM a LEFT JOIN captures c ON c.id = a.capture_id`, actor, action, capture, b).Scan(&e.ID, &e.At, &e.Number)
+	if err != nil || s.audit == nil {
+		return err
+	}
+	// The entry as the API returns it, marked as what it is among the other lines of a log.
+	line, _ := json.Marshal(struct {
+		Log string `json:"log"`
+		AuditEntry
+	}{"audit", e})
+	s.auditMu.Lock()
+	defer s.auditMu.Unlock()
+	// The entry is in the database: a line that cannot be written does not
+	// undo what was done, and is said where the other output goes.
+	if _, err := s.audit.Write(append(line, '\n')); err != nil {
+		slog.Error("audit line not written", "id", e.ID, "error", err)
+	}
+	return nil
 }
 
 type AuditEntry struct {

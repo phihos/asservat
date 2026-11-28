@@ -43,6 +43,11 @@ hub:
   # Let an administrator approve their own sensitive capture. Enable it only
   # for installations with a single administrator.
   allowSelfApproval: false
+  # Write every entry of the audit log to the hub's standard output as well,
+  # one line of JSON each ("log":"audit"), so that the cluster's log
+  # collector carries the audit log to a SIEM. The lines name people,
+  # workloads and files: they put user data into the cluster's logs.
+  auditToLog: false
   # What this cluster is called in Asservat: the name under which its own
   # agents join, shown wherever a cluster is chosen or named, as those of
   # hub.clusters are. Lowercase letters, digits, dashes or dots. Captures
