@@ -393,6 +393,34 @@ if (adminToken) {
     // A page of a hundred was shown: the next one is asked for.
     await run(`document.getElementById('auditOlder').offsetParent && document.getElementById('auditOlder').click()`); await sleep(500);
   });
+  // The audit log follows what happens: an entry that is made while it is
+  // shown goes on top without anyone asking for it. Paused, the list stands
+  // still, says that something waits, and takes it up when it goes on.
+  await check('desk: the audit log follows what happens, and can be held still', async () => {
+    await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
+    await run(`location.hash = '#audit'`);
+    await until('entries of the audit log', `return document.querySelectorAll('#auditRows tr').length > 0`);
+    const file = await run(`const list = await (await fetch('/api/captures', {headers: {Authorization: 'Bearer ' + sessionStorage.getItem('token')}})).json();
+      const c = list.find(c => c.artifacts.some(a => a.size && a.size < 1e6)); if (!c) return '';
+      return '/api/captures/' + c.id + '/artifacts/' + c.artifacts.find(a => a.size && a.size < 1e6).name.split('/').map(encodeURIComponent).join('/')`);
+    if (!file) throw new Error('no small file to download for an entry');
+    const download = `await (await fetch(${JSON.stringify(file)}, {headers: {Authorization: 'Bearer ' + sessionStorage.getItem('token')}})).arrayBuffer()`;
+    const top = () => run(`return document.querySelector('#auditRows tr')?.dataset.entry || ''`);
+    const first = await top();
+    await run(download);
+    await until('the new entry on top', `return (document.querySelector('#auditRows tr')?.dataset.entry || '') !== ${JSON.stringify(first)}`, 10);
+    if (!/downloaded a file/.test(await run(`return document.querySelector('#auditRows tr').innerText`))) throw new Error('the entry on top is not the download');
+    // Held still.
+    await run(`document.getElementById('auditLive').click()`);
+    const held = await top();
+    await run(download);
+    await until('word of what waits', `return /1 new entry/.test(document.getElementById('auditLive').innerText)`, 10);
+    if (await top() !== held) throw new Error('the paused audit log moved');
+    if (!/Paused/.test(await run(`return document.getElementById('auditState').innerText`))) throw new Error('the paused audit log does not say that it is paused');
+    await run(`document.getElementById('auditLive').click()`);
+    await until('the entry that waited', `return (document.querySelector('#auditRows tr')?.dataset.entry || '') !== ${JSON.stringify(held)}`, 10);
+    if (!/^Pause$/.test(await run(`return document.getElementById('auditLive').innerText.trim()`))) throw new Error('the audit log does not follow again');
+  });
   // What the audit log names is a link to it: the capture, and the file
   // that was opened or downloaded. The capture's link leads to the capture
   // itself, open and in sight, also where it is far down the list.

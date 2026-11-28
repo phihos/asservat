@@ -989,7 +989,10 @@ files asks first.
   trigger, approvals, denials, stops, cancellations, deletions, expiries and
   every download and every file opened in a viewer are recorded with the
   actor. Administrators read the log on the console's audit log page,
-  newest first, or from `GET /api/audit`. With `hub.auditToLog`
+  newest first, or from `GET /api/audit`. The page follows what happens:
+  the hub hints at every entry on the console's stream of events, and the
+  new entries go on top, until **Pause** holds the list still to be read;
+  it then says how many wait. With `hub.auditToLog`
   (`--audit-to-log`) the hub also writes each entry to its standard output
   as a line of JSON, for the cluster's log collector to carry to a SIEM:
   the hub is given no address or credentials of one, and connects to none.

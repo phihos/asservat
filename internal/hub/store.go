@@ -27,6 +27,8 @@ type Store struct {
 	// line of JSON; nil for nowhere (AuditTo).
 	audit   io.Writer
 	auditMu sync.Mutex
+	// audited is called after every entry of the audit log, if set.
+	audited func()
 }
 
 var ErrNotFound = errors.New("not found")
@@ -60,6 +62,9 @@ func (s *Store) Audit(ctx context.Context, actor, action, capture string, detail
 	// With the capture's number, as the log shows the entry while the capture exists.
 	err := s.db.QueryRow(ctx, `WITH a AS (INSERT INTO audit(actor, action, capture_id, detail) VALUES ($1,$2,nullif($3,'')::uuid,$4) RETURNING id, at, capture_id)
  SELECT a.id, a.at, c.number FROM a LEFT JOIN captures c ON c.id = a.capture_id`, actor, action, capture, b).Scan(&e.ID, &e.At, &e.Number)
+	if err == nil && s.audited != nil {
+		s.audited()
+	}
 	if err != nil || s.audit == nil {
 		return err
 	}
