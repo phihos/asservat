@@ -141,11 +141,30 @@ func openIn(root, name string) (*os.File, error) {
 		return nil, err
 	}
 	defer unix.Close(at)
-	fd, err := unix.Openat2(at, strings.TrimLeft(name, "/"), &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_NONBLOCK | unix.O_CLOEXEC, Resolve: unix.RESOLVE_IN_ROOT | unix.RESOLVE_NO_MAGICLINKS})
+	fd, err := OpenWithin(at, name, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC, unix.RESOLVE_NO_MAGICLINKS)
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 	return os.NewFile(uintptr(fd), name), nil
+}
+
+// OpenWithin opens what a path leads to within the directory at, which the
+// kernel does not let the path leave (openat2 with RESOLVE_IN_ROOT). The
+// kernel answers EAGAIN to a path that goes upwards when something was
+// renamed on the machine at that moment: it could not be sure that the path
+// stayed inside, and says that the caller may ask again. On a node
+// something is renamed all the time, so this asks again, until the kernel
+// could tell: a thousand times at the most, which is over within a moment
+// and so that it ends where a kernel should go on saying so. resolve is
+// what else the path must keep to (unix.RESOLVE_NO_MAGICLINKS and the like).
+func OpenWithin(at int, path string, flags int, resolve uint64) (fd int, err error) {
+	how := &unix.OpenHow{Flags: uint64(flags), Resolve: unix.RESOLVE_IN_ROOT | resolve}
+	for range 1000 {
+		if fd, err = unix.Openat2(at, strings.TrimLeft(path, "/"), how); err != unix.EAGAIN {
+			break
+		}
+	}
+	return fd, err
 }
 
 // readIn reads a file of the container that names its distribution or

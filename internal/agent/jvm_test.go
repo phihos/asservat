@@ -534,3 +534,44 @@ func TestJVMAnswerWithoutEndIsNotKept(t *testing.T) {
 		}
 	}
 }
+
+// The kernel answers "try again" (EAGAIN) to a path that it follows within
+// a root when something was renamed on the machine at that moment and the
+// path goes upwards: it could not be sure that the path stayed inside. On
+// a node something is renamed all the time, so the agent asks again.
+func TestAPathInsideARootIsAskedForAgain(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "a/b/c"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Join(root, "tmp"), 0o755)
+	// Renames elsewhere on the machine, as fast as they go.
+	busy := t.TempDir()
+	os.WriteFile(filepath.Join(busy, "x"), nil, 0o600)
+	stop := make(chan struct{})
+	var renaming sync.WaitGroup
+	for range 4 {
+		renaming.Go(func() {
+			dir, _ := os.MkdirTemp(busy, "r")
+			os.WriteFile(filepath.Join(dir, "x"), nil, 0o600)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					os.Rename(filepath.Join(dir, "x"), filepath.Join(dir, "y"))
+					os.Rename(filepath.Join(dir, "y"), filepath.Join(dir, "x"))
+				}
+			}
+		})
+	}
+	defer renaming.Wait()
+	defer close(stop)
+	for i := range 20000 {
+		dir, err := openInside(root, "/a/b/c/../../../tmp")
+		if err != nil {
+			t.Fatalf("the path at the %d. time: %v", i+1, err)
+		}
+		dir.Close()
+	}
+}
