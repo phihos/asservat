@@ -512,7 +512,18 @@ spec:
       volumes: [{name: app, configMap: {name: dotnet-app}}]
 EOF2
 done
+# refused prints the hub's word, since a time, that Microsoft's symbol server
+# refused it the helper library that reads .NET stacks, or did not answer.
+# The server does that to GitHub's runners at times (403, 503, a reset), and
+# a run must not fail for it: the check of the stacks is then left out, and
+# said so where the run's summary shows it. A server that says the helper
+# does not exist (404), and everything else, still fails the check.
+refused() {
+  hub -n asservat logs deploy/asservat-hub --since-time="$1" 2>/dev/null | grep -F "a runtime's stacks not described" | grep -F 'runtime=dotnet' \
+    | grep -E 'msdl\.microsoft\.com[^"]*: (403|408|429|5[0-9][0-9]) |msdl\.microsoft\.com.*(connection reset|timeout|deadline exceeded|EOF|refused)' | tail -1
+}
 for libc in glibc musl; do
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   edge -n shop rollout status deployment/dotnet-$libc --timeout 240s >/dev/null
   pod=$(edge -n shop get pods -l app=dotnet-$libc -o jsonpath='{.items[0].metadata.name}')
   for _ in $(seq 60); do edge -n shop logs "$pod" | grep -q ready && break; sleep 1; done
@@ -522,8 +533,12 @@ for libc in glibc musl; do
   # The hub adds the stacks when the core has arrived; who opens it meanwhile waits for that.
   ok "$ALICE" POST "/api/captures/$id/describe" "{\"name\":\"$pod/core.app\"}" >/dev/null
   fetch "$ALICE" "$id" "$pod/core.app.analysis.json" "$WORK/core.dotnet-$libc.analysis.json"
-  jq -e '(.awaits | not) and (.runtimeStacks[0] | .runtime == "dotnet" and (.version | startswith("10.")) and ([.threads[].frames[] | select((.function | startswith("Shop.Billing.Charge(")) and (.file | endswith("Program.cs")) and .line > 0)] | length == 1))' "$WORK/core.dotnet-$libc.analysis.json" >/dev/null \
-    || fail "the managed stacks of a .NET core on $libc: $(jq -c '[.awaits, .runtimeStacks]' "$WORK/core.dotnet-$libc.analysis.json" | head -c 700); the hub said: $(hub -n asservat logs deploy/asservat-hub --tail=8 2>&1 | tail -c 900)"
+  if ! jq -e '(.awaits | not) and (.runtimeStacks[0] | .runtime == "dotnet" and (.version | startswith("10.")) and ([.threads[].frames[] | select((.function | startswith("Shop.Billing.Charge(")) and (.file | endswith("Program.cs")) and .line > 0)] | length == 1))' "$WORK/core.dotnet-$libc.analysis.json" >/dev/null; then
+    said=$(refused "$since" || true)
+    [ -n "$said" ] || fail "the managed stacks of a .NET core on $libc: $(jq -c '[.awaits, .runtimeStacks]' "$WORK/core.dotnet-$libc.analysis.json" | head -c 700); the hub said: $(hub -n asservat logs deploy/asservat-hub --tail=8 2>&1 | tail -c 900)"
+    printf 'SKIPPED: the managed stacks of a .NET core on %s: Microsoft'"'"'s symbol server refused the helper library: %s\n' "$libc" "${said##*error=}"
+    echo "::warning title=.NET stacks not checked on $libc::Microsoft's symbol server refused the helper library, so the end-to-end test left this check out: ${said##*error=}"
+  fi
   edge -n shop delete deployment dotnet-$libc --wait=false >/dev/null
 done
 
