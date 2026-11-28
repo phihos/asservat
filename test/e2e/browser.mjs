@@ -184,6 +184,13 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
     await run(next); await sleep(1500);
     await run(next); await sleep(300);
     await until('the last step', `return !!document.querySelector('input[name=when]')?.offsetParent`);
+    // The fields of an endpoint of one's own stand in a line: their names at one height. They are shown for the look only.
+    const apart = await run(`const step = document.querySelector('fieldset[data-step="3"]'), part = document.getElementById('profileSection'), other = document.getElementById('otherEndpoint'), was = [step.hidden, part.hidden, other.open];
+      step.hidden = part.hidden = false; other.open = true;
+      const top = id => document.getElementById(id).closest('label').firstChild, at = id => { const r = document.createRange(); r.selectNodeContents(top(id)); return r.getBoundingClientRect().top; };
+      const apart = Math.abs(at('profilePort') - at('profilePath'));
+      [step.hidden, part.hidden, other.open] = was; return apart`);
+    if (size === 'desk' && apart > 1) throw new Error(`"Port" and "Path" of a custom endpoint stand ${apart} px apart in height`);
     // Every way to start shows its own fields.
     const ways = await run(`return [...document.querySelectorAll('input[name=when]')].map(i => i.value)`);
     for (const way of ways) { await run(`document.querySelector('input[name=when][value="${way}"]').click()`); await sleep(50); }
