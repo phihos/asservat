@@ -322,7 +322,7 @@ carries it to your SIEM like any other pod log. The hub needs no address or
 credentials of the SIEM for this, and the SIEM none of the hub.
 
 ```json
-{"log":"audit","id":4711,"at":"2026-11-28T09:28:47.512Z","actor":"alice","action":"artifact.download","capture":"1e8fa4a6-8f8a-4a71-a9cd-435a0ed857da","number":71,"detail":{"file":"api-7d9c/capture.pcap"}}
+{"log":"audit","id":4711,"at":"2026-11-28T09:28:47.512Z","actor":"alice","action":"artifact.download","capture":"1e8fa4a6-8f8a-4a71-a9cd-435a0ed857da","number":71,"detail":{"name":"api-7d9c/capture.pcap"}}
 ```
 
 | Field | What it holds |
