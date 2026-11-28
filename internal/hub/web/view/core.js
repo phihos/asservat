@@ -59,8 +59,10 @@ export default async function (root) {
   choose(kind);
   if (kinds.length > 1) $('kinds').innerHTML = kinds.map(k => `<button data-kind="${esc(k)}">${esc(titles[k])}</button>`).join('');
 
+  // A command line can be a screen long: it is cut short until it is asked for, so that the lists keep their room.
+  $('stopped').onclick = e => { if (e.target.closest('.command') && !String(getSelection())) e.target.closest('.command').classList.toggle('all'); };
   $('stopped').innerHTML = `<span class="${report.stopped ? 'crash' : 'snap'}">${esc(report.stopped || 'Snapshot of a running process; it continued afterwards.')}</span>
-    <code>${esc(report.commandLine || report.executable || '')}</code>
+    <code class="command" title="Click to see all of the command line, or less of it">${esc(report.commandLine || report.executable || '')}</code>
     ${report.runtime ? `<span class="dim">${esc(report.runtime)}</span>` : ''}
     ${Object.values(runtimes).map(r => r.version ? `<span class="dim">${esc({python: 'Python', dotnet: '.NET'}[r.runtime] || r.runtime)} ${esc(r.version)}</span>` : '').join('')}
     ${kept && !(report.describer > 1) ? `<span class="warn" title="${esc(kept)}">Described by an older version of Asservat, so some details may be missing. A new dump gets the full description.</span>` : ''}

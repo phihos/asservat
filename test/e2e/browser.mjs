@@ -267,6 +267,16 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       const wider = await run(`const page = document.querySelector('#overview .page'); return page.scrollWidth - page.clientWidth`);
       if (wider > 1) throw new Error(`the pod's events are ${wider} px wider than the phone's page`);
     }
+    // What a core dump is of leaves the lists their room: a long command line is cut short until it is asked for.
+    if (file.viewer === 'core' && !file.name.endsWith('.json')) {
+      const share = await run(`const top = document.getElementById('stopped'); if (!top) return 0; const code = top.querySelector('code');
+        if (code) code.textContent = '/usr/local/bin/app ' + '--an-option-with-a-long-name=and-a-long-value '.repeat(20); return top.getBoundingClientRect().height / innerHeight`);
+      if (share > 0.3) throw new Error(`what the core dump is of takes ${Math.round(share * 100)} % of the window's height`);
+      // Words in place of a value that the debugger could not read are not broken inside a word.
+      const broken = await run(`const said = [...document.querySelectorAll('#root .value.dim')].find(v => v.offsetParent && v.textContent === 'optimised out'); if (!said) return 0;
+        const r = document.createRange(); r.selectNodeContents(said); return r.getClientRects().length`);
+      if (broken > 2) throw new Error(`"optimised out" is broken into ${broken} lines`);
+    }
     // How many system calls there are is said once while all of them are shown.
     if (file.viewer === 'strace') {
       const tally = await run(`return document.getElementById('shown').innerText`);
