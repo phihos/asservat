@@ -482,8 +482,8 @@ except for the functions it exports.
 
 A CPU is looked at 99 times a second. A pod that is nearly idle uses a few
 milliseconds of CPU time in half a minute, which can fall between the
-looks: about one in three of its samples is lost besides, the first of
-every process to the profiler learning of the process. A recording without
+looks; measured, about two thirds of the samples that its CPU time would
+give arrive. A recording without
 a sample therefore says what the pod's processes used in that time, as the
 kernel counted it ("about 30ms of CPU time in 30s"), and to record for
 longer or while the pod is busy; only a pod that used nothing is told so.
