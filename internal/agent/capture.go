@@ -66,14 +66,9 @@ func (a *Agent) capture(ctx, frame context.Context, id string, t api.TaskAssignm
 			if rec.Kind == api.KindCoredump && !r.AfterCrash() {
 				close(dumped)
 			}
-			switch {
-			case errs[i] != nil:
-				report.set(rec.Kind, api.StateFailed, errs[i].Error())
-			case frame.Err() != nil && rec.Timed(r.DurationSeconds > 0):
-				report.set(rec.Kind, api.StateCompleted, "stopped early")
-			default:
-				report.set(rec.Kind, api.StateCompleted, "")
-			}
+			var state, message string
+			state, message, errs[i] = outcome(errs[i], frame.Err() != nil && rec.Timed(r.DurationSeconds > 0))
+			report.set(rec.Kind, state, message)
 		})
 	}
 	wg.Wait()
@@ -127,6 +122,27 @@ func podState(pod *corev1.Pod, events []corev1.Event) map[string][]byte {
 		files[name], _ = json.MarshalIndent(v, "", "  ")
 	}
 	return files
+}
+
+// nothing is what a recording says that ran and found nothing to record,
+// as a pod that took no new memory while it was watched: a result, not a
+// failure.
+type nothing struct{ error }
+
+// outcome is how a recording that has ended is reported: its state, what
+// is said with it, and its failure if it has failed. One that found
+// nothing to record is completed and says what it found; early tells one
+// that was stopped before its time.
+func outcome(err error, early bool) (state, message string, failure error) {
+	switch {
+	case errors.As(err, &nothing{}):
+		return api.StateCompleted, err.Error(), nil
+	case err != nil:
+		return api.StateFailed, err.Error(), err
+	case early:
+		return api.StateCompleted, "stopped early", nil
+	}
+	return api.StateCompleted, "", nil
 }
 
 // partialError is the failure of a recording that still delivered files.

@@ -644,8 +644,8 @@ async function loadCaptures() {
     const why = c.reason || (c.watch ? 'recorded by a watch' : '');
     return `<div class="capture${open ? ' open' : ''}${freshClass(c.id)}" data-capture="${c.id}">
       <div class="line">
-        <span class="number${c.artifacts.length ? ' filed' : ''}" title="Capture ${c.number}${c.artifacts.length ? '' : ': no files yet'}">${String(c.number).padStart(4, '0')}</span>
-        <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted${c.message && !inProgress(c) ? ' error' : ''}" title="${esc(c.message || '')}">${inProgress(c) ? '' : esc(c.message) || count.slice(3)}</div>`}</span>
+        <span class="number${c.artifacts.length ? ' filed' : ''}" title="Capture ${c.number}${c.artifacts.length ? '' : inProgress(c) ? ': no files yet' : ': no files'}">${String(c.number).padStart(4, '0')}</span>
+        <span><span class="pill state ${c.state}">${state}</span>${c.state === 'Running' ? progressOf(c) : `<div class="muted${c.message && !inProgress(c) ? ' error' : ''}" title="${esc(c.message || '')}">${inProgress(c) ? '' : esc(c.message) || count.slice(3) || 'no files'}</div>`}</span>
         <span class="what" title="${esc(c.recordings.map(r => kindNames[r.kind] || r.kind).join(', '))}${why ? '\n' + esc(why) : ''}">${esc(list2(c.recordings.map(r => kindNames[r.kind] || r.kind)))}${why ? `<div class="muted why">${esc(why)}</div>` : ''}</span>
         <span class="where" title="${esc(c.cluster)} / ${esc(c.namespace)} / ${esc(c.workload)}">${esc(c.workload)}<div class="muted">${esc(c.cluster)} / ${esc(c.namespace)}</div></span>
         <span class="when muted">${new Date(c.createdAt).toLocaleString()}<div>${esc(c.requester)}</div></span>
