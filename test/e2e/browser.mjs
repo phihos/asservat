@@ -83,9 +83,11 @@ ws.onmessage = m => {
     if (answer) send('Fetch.fulfillRequest', {requestId: d.params.requestId, responseCode: 200, responseHeaders: [{name: 'Content-Type', value: 'application/json'}], body: Buffer.from(JSON.stringify(answer[1])).toString('base64')});
     else send('Fetch.continueRequest', {requestId: d.params.requestId});
   }
-  else if (d.method === 'Runtime.exceptionThrown') seen.push('exception: ' + (d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text));
-  // Before signing in the console asks who is there and is told nobody.
-  else if (d.method === 'Network.responseReceived' && d.params.response.status >= 400 && !(signedOut && d.params.response.url.endsWith('/api/me'))) seen.push(`HTTP ${d.params.response.status} ${d.params.response.url}`);
+  // Before signing in the console asks who is there and is told nobody. What a
+  // page had begun to ask when the check signed it out is refused as well,
+  // and says so.
+  else if (d.method === 'Runtime.exceptionThrown') { const said = d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text; if (!(signedOut && /sign in with a bearer token/.test(said))) seen.push('exception: ' + said); }
+  else if (d.method === 'Network.responseReceived' && d.params.response.status >= 400 && !(signedOut && d.params.response.status === 401)) seen.push(`HTTP ${d.params.response.status} ${d.params.response.url}`);
 };
 // A browser that ends, or hangs up, answers nothing more: what waits for it fails.
 ws.onclose = () => { for (const answer of waiting.values()) answer({result: {exceptionDetails: {text: 'the browser hung up'}}}); waiting.clear(); };
