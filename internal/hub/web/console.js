@@ -36,7 +36,21 @@ async function start() {
   $('auditNav').hidden = !me.admin;
   route();
   await Promise.all([loadClusters(), loadCaptures(), loadWatches()]);
+  comeBack();
   new EventSource('/api/events').onmessage = guard(() => Promise.all([loadCaptures(), loadWatches()]));
+}
+
+// Who comes back with the browser's own way back, as from a file's viewer,
+// finds the page where it stood. The browser cannot put it there itself:
+// the lists are filled after the page has loaded.
+history.scrollRestoration = 'manual';
+addEventListener('pagehide', () => { try { sessionStorage.setItem('stood', JSON.stringify({at: scrollY, view: location.hash})); } catch { /* then it starts at the top */ } });
+function comeBack() {
+  if (performance.getEntriesByType('navigation')[0]?.type !== 'back_forward') return;
+  try {
+    const stood = JSON.parse(sessionStorage.getItem('stood') || 'null');
+    if (stood && stood.view === location.hash) scrollTo(0, stood.at);
+  } catch { /* then it starts at the top */ }
 }
 
 // One view at a time, named by the address: #captures, #new, #watches, #clusters.
@@ -404,11 +418,16 @@ let fresh = {id: '', until: 0};
 const freshClass = id => id === fresh.id && Date.now() < fresh.until ? ' fresh' : '';
 
 // Which captures are opened: those in progress by themselves, any other by a click.
-const toggled = new Map();
+// What the user opened stays open over a visit to one of its files and the
+// way back, for which the browser loads this page anew: it is kept with
+// the session, as the token is.
+const kept = name => { try { return new Map(JSON.parse(sessionStorage.getItem(name) || '[]')); } catch { return new Map(); } };
+const keep = (name, map) => { try { sessionStorage.setItem(name, JSON.stringify([...map])); } catch { /* a session that keeps nothing forgets it */ } };
+const toggled = kept('openCaptures');
 // A capture of more pods than these lists them a line each, and a pod's
 // files when it is opened: more of them with their files fill screen after
 // screen. podsToggled says which pods the user opened or closed.
-const podsOpen = 5, podsToggled = new Map();
+const podsOpen = 5, podsToggled = kept('openPods');
 let captureFilter = 'all';
 const inProgress = c => ['PendingApproval', 'Queued', 'Running'].includes(c.state);
 // Where a request needs several approvals: how far it is, and whether this user has given theirs.
@@ -574,7 +593,7 @@ $('captureForm').onsubmit = guard(async () => {
   $('done').textContent = watching ? (waits ? 'The watch is awaiting approval.' : `Watching. The capture will appear under Captures ${told(condition())}.`)
     : waits ? 'Requested. It starts once an administrator approves it.' : 'Started. Follow its progress in the first row below.';
   // Show where it went: the new capture, opened, in its list.
-  if (!watching) toggled.set(created.id, true);
+  if (!watching) { toggled.set(created.id, true); keep('openCaptures', toggled); }
   fresh = {id: created.id, until: Date.now() + 4000};
   captureFilter = 'all';
   for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
@@ -656,12 +675,14 @@ $('captures').onclick = guard(async e => {
     const pod = e.target.closest('button.pod');
     if (pod) {
       podsToggled.set(pod.dataset.pod, pod.parentElement.classList.toggle('open'));
+      keep('openPods', podsToggled);
       pod.setAttribute('aria-expanded', pod.parentElement.classList.contains('open'));
       return;
     }
     // A click on the line opens or closes the capture; links and text selection in the details are left alone.
     if (card && e.target.closest('.line')) {
       toggled.set(card.dataset.capture, card.classList.toggle('open'));
+      keep('openCaptures', toggled);
       card.querySelector('.chev').setAttribute('aria-expanded', card.classList.contains('open'));
     }
     return;

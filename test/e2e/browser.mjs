@@ -241,6 +241,32 @@ await check('desk: a step with nothing to set says so', async () => {
   const with_ = JSON.parse(await run(`const li = document.querySelector('#steps li[data-go="3"]'); return JSON.stringify({text: li.innerText.replace(/\s+/g, ' ').trim(), title: li.title, skipped: li.classList.contains('skip')})`));
   if (with_.skipped || /none needed/i.test(with_.text) || with_.title) throw new Error('a step with something to set: ' + JSON.stringify(with_));
 });
+// Who opens a capture, goes to one of its files and comes back with the
+// browser's own way back finds the list as it was left: the capture open,
+// and the page where it stood.
+for (const [size, [width, height, mobile]] of Object.entries(widths)) await check(`${size}: back from a file to the capture that was open`, async () => {
+  await send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+  await open(hub + '/#captures');
+  await until('the list', `return document.querySelector('.capture')`);
+  // The last capture with a file that opens in a viewer: far down, where there are several.
+  const id = await run(`for (const c of document.querySelectorAll('.capture.open .chev')) c.click();
+    const with_ = [...document.querySelectorAll('.capture')].filter(c => c.querySelector('a.open'));
+    const card = with_.at(-1); if (!card) return '';
+    card.querySelector('.chev').click(); card.querySelector('a.open').scrollIntoView({block: 'center'});
+    return card.dataset.capture`);
+  if (!id) throw new Error('no capture with a file to open');
+  await sleep(200);
+  const before = await run(`return JSON.stringify({open: [...document.querySelectorAll('.capture.open')].map(c => c.dataset.capture), at: Math.round(scrollY)})`);
+  await run(`document.querySelector('.capture[data-capture="${id}"] a.open').click()`);
+  await until('the viewer', `return location.pathname === '/view'`);
+  await sleep(500);
+  await run(`history.back()`);
+  await until('the list again', `return location.pathname === '/' && document.querySelector('.capture')`);
+  await sleep(700);
+  const after = await run(`return JSON.stringify({open: [...document.querySelectorAll('.capture.open')].map(c => c.dataset.capture), at: Math.round(scrollY)})`);
+  if (JSON.parse(after).open.join() !== JSON.parse(before).open.join()) throw new Error(`open before: ${before}, after coming back: ${after}`);
+  if (Math.abs(JSON.parse(after).at - JSON.parse(before).at) > 40) throw new Error(`the page stood at ${JSON.parse(before).at} px and came back at ${JSON.parse(after).at} px`);
+});
 
 // What a cluster's agent or a workload can make the hub hand out is not
 // trusted by the pages: values that carry script where numbers and states
