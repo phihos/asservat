@@ -386,15 +386,26 @@ func TestAProfileWithoutSamplesSaysWhatThePodUsed(t *testing.T) {
 	pids := map[int]bool{11: true, 12: true, 13: true}
 	stat(11, 100, 50)
 	stat(12, 7, 0)
-	// 13 has ended: it counts for nothing.
-	before := cpuTime(proc, pids)
-	if before != 1570*time.Millisecond {
-		t.Fatalf("the processes have used %s, want 1.57s", before)
+	// 13 had ended before: it is not among them.
+	before := cpuTimes(proc, pids)
+	if len(before) != 2 || before[11] != 1500*time.Millisecond || before[12] != 70*time.Millisecond {
+		t.Fatalf("the processes have used %v, want 1.5s and 70ms", before)
 	}
 	stat(11, 102, 51)
-	used := cpuTime(proc, pids) - before
+	used := usedSince(before, cpuTimes(proc, pids))
+	if used == nil || *used != 30*time.Millisecond {
+		t.Fatalf("the processes used %v, want 30ms", used)
+	}
+	// A process that ended in between took its time with it: what the pod
+	// used is then not known, and it is not told that it used nothing.
+	if err := os.RemoveAll(filepath.Join(proc, "12")); err != nil {
+		t.Fatal(err)
+	}
+	if gone := usedSince(before, cpuTimes(proc, pids)); gone != nil {
+		t.Fatalf("with a process that ended, the pod is said to have used %s", *gone)
+	}
 
-	said := noSamples(sampledCPU, &used, 30*time.Second).Error()
+	said := noSamples(sampledCPU, used, 30*time.Second).Error()
 	for _, want := range []string{"30ms", "30s", "99 times a second", "longer"} {
 		if !strings.Contains(said, want) {
 			t.Errorf("a profile without a sample of a pod that used 30 ms says %q, without %q", said, want)

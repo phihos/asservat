@@ -594,24 +594,24 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 	if err := a.sampler.begin(p); err != nil {
 		return err
 	}
-	before := cpuTime(a.Proc, p.pids)
+	// What the processes use is measured over the time they are sampled, which begins once the profiler runs.
+	before, from := cpuTimes(a.Proc, p.pids), time.Now()
 	select {
 	case <-frame.Done():
 	case <-time.After(duration):
 	}
-	used := cpuTime(a.Proc, p.pids) - before
+	used, lasted := usedSince(before, cpuTimes(a.Proc, p.pids)), time.Since(from).Round(time.Second)
 	binaries := a.sampler.end(p)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return a.uploadSampled(p, p.since(time.Time{}), binaries, began, noSamples(kind, &used, time.Since(began).Round(time.Second)), up)
+	return a.uploadSampled(p, p.since(time.Time{}), binaries, began, noSamples(kind, used, lasted), up)
 }
 
-// cpuTime is the CPU time that processes have used so far, as the kernel
-// counts it for each: in ticks of 10 ms. One that has ended counts for
-// nothing.
-func cpuTime(proc string, pids map[int]bool) time.Duration {
-	var ticks int64
+// cpuTimes is the CPU time that each of the processes has used so far, as
+// the kernel counts it: in ticks of 10 ms. One that has ended is not among them.
+func cpuTimes(proc string, pids map[int]bool) map[int]time.Duration {
+	times := make(map[int]time.Duration, len(pids))
 	for pid := range pids {
 		// After the name the 12th and 13th field: the time in user mode and in the kernel.
 		fields, _ := statOf(proc, pid)
@@ -620,9 +620,25 @@ func cpuTime(proc string, pids map[int]bool) time.Duration {
 		}
 		user, _ := strconv.ParseInt(fields[11], 10, 64)
 		system, _ := strconv.ParseInt(fields[12], 10, 64)
-		ticks += user + system
+		times[pid] = time.Duration(user+system) * 10 * time.Millisecond
 	}
-	return time.Duration(ticks) * 10 * time.Millisecond
+	return times
+}
+
+// usedSince is the CPU time that the processes used between two readings,
+// or nil where that is not known: a process that ended in between took
+// what it had used with it, and a pod whose container crashes again and
+// again must not be told that it used nothing.
+func usedSince(before, after map[int]time.Duration) *time.Duration {
+	var used time.Duration
+	for pid, was := range before {
+		is, there := after[pid]
+		if !there {
+			return nil
+		}
+		used += is - was
+	}
+	return &used
 }
 
 // noSamples is what a recording without a sample says. A pod that is
