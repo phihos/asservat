@@ -398,7 +398,22 @@ function showParams() {
   if (!$('app').hidden) showStep(step);
 }
 
-const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(', '))}</span></div>`).join('')
+// What a recording was asked with, in words: a setting by what it means and
+// not by its name in the request, and the endpoints of a profile by their
+// names and where they are ("CPU profile and Heap on port 6060"), not by
+// the catalog's IDs. What a watch keeps running before its moment is not a
+// setting of the recording and is left out.
+function settings(params) {
+  const words = {payload: () => 'full packets', strings: () => 'with the data read and written', previous: () => 'before the last restart', tailLines: v => `the last ${v} lines`,
+    container: v => `container ${v}`, filter: v => `filter ${v}`, before: () => '', endpoints: v => {
+      // "<port>/<id>" for an endpoint, "<container>/<id>" for what a JVM is asked directly.
+      const at = new Map();
+      for (const one of v.split(',')) { const [where, id] = one.split('/'); at.set(where, [...(at.get(where) || []), me?.profileNames?.[id] || id]); }
+      return [...at].map(([where, names]) => `${list(names)} ${/^\d+$/.test(where) ? 'on port' : 'in'} ${where}`).join(', ');
+    }};
+  return Object.entries(params || {}).map(([k, v]) => words[k] ? words[k](v) : `${k} ${v}`).filter(Boolean).join(' · ');
+}
+const describe = c => (c.recordings || []).map(r => `<div>${esc(kindNames[r.kind] || r.kind)}<span class="muted"> ${esc(settings(r.params))}</span></div>`).join('')
   + `<div class="muted">${c.durationSeconds ? `${c.durationSeconds} s` : ''}${c.durationSeconds && c.reason ? ' · ' : ''}${esc(c.reason)}</div>`;
 
 // The audit log, a page at a time, newest first. An action is said in words;
@@ -598,7 +613,7 @@ async function loadCaptures() {
       const states = new Map((t.recordings || []).map(r => [r.kind, r]));
       const groups = asked.map(kind => {
         const r = states.get(kind) || {state: t.recordings?.length ? 'Waiting' : t.state === 'Failed' ? 'Failed' : 'Waiting'};
-        const given = Object.entries(c.recordings.find(q => q.kind === kind)?.params || {}).filter(([k]) => k !== 'before').map(([k, v]) => v === 'true' ? k : `${k} ${v}`).join(' · ');
+        const given = settings(c.recordings.find(q => q.kind === kind)?.params);
         return `<div class="rec rec-${esc(r.state)}"><div class="of"><span class="mark" title="${marks[r.state]?.[1] || ''}">${marks[r.state]?.[0] || ''}</span><b>${esc(kindNames[kind] || kind)}</b>${given ? `<span class="given">${esc(given)}</span>` : ''}${r.message ? `<span class="said">${esc(r.message)}</span>` : ''}</div>${of(kind).map(fileLine).join('')}</div>`;
       }).join('');
       const others = of('').map(fileLine).join('');

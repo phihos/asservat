@@ -334,3 +334,22 @@ func TestUnknownKindNamesTheKinds(t *testing.T) {
 		}
 	}
 }
+
+// The console says what a profile recording fetched in words, not by the
+// catalog's IDs ("6060/go-cpu,6060/go-heap"): it is told the short name of
+// every endpoint, without what the long name says about its cost.
+func TestProfileNames(t *testing.T) {
+	names := ProfileNames()
+	for id, want := range map[string]string{"go-cpu": "CPU profile", "go-heap": "Heap", "jvm-histogram": "Class histogram", "jvm-heapdump": "Heap dump", "jvm-recording": "Flight recording"} {
+		if names[id] != want {
+			t.Errorf("%s is called %q, want %q", id, names[id], want)
+		}
+	}
+	for _, f := range ProfileFamilies {
+		for _, e := range f.Endpoints {
+			if names[e.ID] == "" {
+				t.Errorf("%s has no name", e.ID)
+			}
+		}
+	}
+}

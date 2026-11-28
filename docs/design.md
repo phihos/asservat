@@ -907,7 +907,9 @@ The list of captures shows one line per capture: its number, state, what
 was recorded and why, where, when and by whom. It lists the newest 50 and
 more on request, and a find box narrows it by any of those words. An open
 capture shows each pod with its recordings in the order they were asked
-for, and under each recording the files it made, with their full names,
+for, each with what it was asked with in words ("CPU profile and Heap on
+port 6060", "full packets", "the last 200 lines") and not as the request
+names it, and under each recording the files it made, with their full names,
 what each file is, its size, and the ways to it: **Open** where a viewer
 exists, and **Download**; a file's name leads to the file as well. A capture
 has an address of its own, `/#capture=<id>`, under which the list opens it

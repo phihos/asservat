@@ -91,6 +91,27 @@ var JVMDiagnostics = []ProfileEndpoint{
 	{ID: "jvm-recording", Runtime: runtimeJVM, Name: "Flight recording, for JDK Mission Control", Attach: true, Timed: true, File: "jvm-recording.jfr"},
 }
 
+// ProfileNames returns the short name of every endpoint of the catalog by
+// its ID: the name up to what it adds about the endpoint's content or cost
+// ("Heap: memory in use", "Heap dump: the whole memory; the JVM stops
+// meanwhile"), to say in a line what a recording fetched.
+func ProfileNames() map[string]string {
+	names := map[string]string{}
+	short := func(e ProfileEndpoint) {
+		names[e.ID], _, _ = strings.Cut(e.Name, ":")
+		names[e.ID], _, _ = strings.Cut(names[e.ID], ",")
+	}
+	for _, e := range JVMDiagnostics {
+		short(e)
+	}
+	for _, f := range ProfileFamilies {
+		for _, e := range f.Endpoints {
+			short(e)
+		}
+	}
+	return names
+}
+
 // FindProfileEndpoint returns the catalog's endpoint of an ID.
 func FindProfileEndpoint(id string) (ProfileEndpoint, bool) {
 	for _, e := range JVMDiagnostics {
