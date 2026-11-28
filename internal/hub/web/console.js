@@ -40,9 +40,21 @@ async function start() {
 }
 
 // One view at a time, named by the address: #captures, #new, #watches, #clusters.
+// sought is the capture that an address names (#capture=<id>), until the
+// list has shown it: it is opened and brought into sight.
+let sought = '';
 function route() {
   const views = [...document.querySelectorAll('[data-view]')].map(v => v.dataset.view);
+  const named = location.hash.startsWith('#capture=') ? decodeURIComponent(location.hash.slice(9)) : '';
   const view = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'captures';
+  if (named) {
+    sought = named;
+    toggled.set(named, true);
+    // Whatever narrows the list could hide it.
+    captureFilter = 'all'; $('captureFind').value = '';
+    for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
+    if (me) guard(loadCaptures, 'capturesProblem')();
+  }
   for (const v of document.querySelectorAll('[data-view]')) v.hidden = v.dataset.view !== view;
   for (const a of document.querySelectorAll('[data-nav]')) a.classList.toggle('on', a.dataset.nav === view);
   $('newButton').hidden = !me || view === 'new';
@@ -356,9 +368,27 @@ async function loadAudit(fresh) {
   const last = auditEntries.at(-1), before = fresh || !last ? '' : `&before=${encodeURIComponent(last.at)}&beforeId=${last.id}`;
   const page = await call('GET', `/api/audit?limit=${auditPage}${before}`);
   auditEntries = fresh ? page : auditEntries.concat(page);
-  const detail = d => d && typeof d === 'object' ? Object.entries(d).filter(([, v]) => v !== '' && v != null && v !== false).map(([k, v]) => `${esc(k === 'name' ? 'file' : k)}: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}`).join(' · ') : esc(d ?? '');
+  // What an entry names is a link to it while it is there: the capture, its file, the watches.
+  const linked = (e, k, v) => (k === 'name' || k === 'file') && e.number && typeof v === 'string' ? `<a href="/view?capture=${e.capture}&file=${encodeURIComponent(v)}" title="Look at the file">${esc(v)}</a>`
+    : k === 'id' && e.action.startsWith('watch.') && e.action !== 'watch.delete' ? `<a href="#watches" title="The watches">${esc(v)}</a>` : esc(typeof v === 'object' ? JSON.stringify(v) : v);
+  // A request reads as a sentence, not as the fields it was sent with: what
+  // of which workload, for how long, on what condition, and why. What else
+  // an entry holds follows as it is, without what only the hub needs.
+  const aside = ['cluster', 'namespace', 'workload', 'recordings', 'kind', 'params', 'durationSeconds', 'reason', 'when', 'requester', 'selector', 'remaining', 'createdAt', 'sensitive', 'approver', 'approvals', 'groups', 'count', 'beforeSeconds'];
+  const detail = (d, e) => {
+    if (!d || typeof d !== 'object') return esc(d ?? '');
+    const recorded = d.recordings?.length ? d.recordings : d.kind ? [{kind: d.kind}] : [];
+    const said = [
+      recorded.length ? esc(list2(recorded.map(r => kindNames[r.kind] || r.kind))) + (d.durationSeconds ? ` for ${d.durationSeconds} s` : '') : '',
+      d.workload ? `${esc(d.workload)} in ${esc(d.cluster || '')} / ${esc(d.namespace || '')}` : '',
+      d.when?.kind ? esc(told(d.when)) + (d.count > 1 ? `, ${d.count} times` : '') : '',
+      d.reason ? `“${esc(d.reason)}”` : '',
+      ...Object.entries(d).filter(([k, v]) => !aside.includes(k) && v !== '' && v != null && v !== false).map(([k, v]) => `${esc(k === 'name' ? 'file' : k)}: ${linked(e, k, v)}`),
+    ];
+    return said.filter(Boolean).join(' · ');
+  };
   $('auditRows').innerHTML = auditEntries.map(e => `<tr><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
-    <td>${e.capture ? (e.number ? `<b>${String(e.number).padStart(4, '0')}</b>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail)}</td></tr>`).join('');
+    <td>${e.capture ? (e.number ? `<a class="number" href="#capture=${e.capture}" title="Go to the capture"><b>${String(e.number).padStart(4, '0')}</b></a>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail, e)}</td></tr>`).join('');
   $('auditTable').hidden = !auditEntries.length; $('noAudit').hidden = !!auditEntries.length;
   $('auditOlderLine').hidden = page.length < auditPage;
 }
@@ -450,7 +480,7 @@ async function loadCaptures() {
       // A file with a viewer opens in the browser; every file downloads in its own format.
       const address = `/api/captures/${c.id}/artifacts/${a.name.split('/').map(encodeURIComponent).join('/')}`, name = a.name.split('/')[1];
       const open = a.viewer && a.size ? `<a class="open" href="/view?capture=${c.id}&file=${encodeURIComponent(a.name)}" title="Look at the file here">Open</a>` : '<span></span>';
-      return `<div class="file${a.size ? '' : ' nothing'}"><span class="name" title="sha256 ${a.sha256}">${esc(name)}</span><span class="is">${esc(a.size ? whatIs(name) : 'empty: nothing was recorded')}</span><span class="size"${a.stored ? ` title="${fileSize(a.size)} to download. The hub stores ${fileSize(a.stored)} of it: a core dump is as large as the memory its process mapped, and what the process never used is not stored."` : ''}>${fileSize(a.size)}</span>${open}<a href="${address}" title="A copy in the file's own format, for your tools">Download</a></div>`;
+      return `<div class="file${a.size ? '' : ' nothing'}"><span class="name" title="sha256 ${a.sha256}">${a.size ? `<a href="${a.viewer ? `/view?capture=${c.id}&file=${encodeURIComponent(a.name)}` : address}">${esc(name)}</a>` : esc(name)}</span><span class="is">${esc(a.size ? whatIs(name) : 'empty: nothing was recorded')}</span><span class="size"${a.stored ? ` title="${fileSize(a.size)} to download. The hub stores ${fileSize(a.stored)} of it: a core dump is as large as the memory its process mapped, and what the process never used is not stored."` : ''}>${fileSize(a.size)}</span>${open}<a href="${address}" title="A copy in the file's own format, for your tools">Download</a></div>`;
     };
     const folds = c.tasks.length > podsOpen;
     const pods = c.tasks.map(t => {
@@ -474,7 +504,7 @@ async function loadCaptures() {
       const went = asked.map(kind => { const state = states.get(kind)?.state || (t.state === 'Failed' ? 'Failed' : 'Waiting'); return `<span class="rec-${esc(state)}"><span class="mark" title="${marks[state]?.[1] || ''}">${marks[state]?.[0] || ''}</span>${esc(kindNames[kind] || kind)}</span>`; }).join('');
       return `<div class="podbox folds${shown ? ' open' : ''}"><button class="pod" data-pod="${esc(key)}" aria-expanded="${shown}">${head}<span class="went">${went}</span><span class="muted">${mine.length ? `${plural(mine.length, 'file')}, ${fileSize(mine.reduce((n, a) => n + a.size, 0))}` : 'no files'}</span></button><div class="podbody">${body}</div></div>`;
     }).join('') || '<div class="muted">No pods were recorded.</div>';
-    const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by a watch${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
+    const facts = [c.reason && `“${esc(c.reason)}”`, c.durationSeconds ? `time frame ${c.durationSeconds} s` : '', c.watch ? `recorded by <a href="#watches" title="The watches that still wait">a watch</a>${c.on ? ' (' + esc(conditions[c.on] || c.on) + ')' : ''}` : '',
       c.approver ? (c.approver === c.requester ? '' : 'approved by ' + esc(c.approver)) : c.sensitive ? (c.state === 'PendingApproval' && approvalsOf(c) || 'needs approval') : '', c.finishedAt && !inProgress(c) && new Date(c.finishedAt) > new Date(c.createdAt) ? `took ${took(c)}` : '',
       c.artifacts.length ? `${plural(c.artifacts.length, 'file')}, ${fileSize(c.artifacts.reduce((n, a) => n + a.size, 0))}, kept until ${new Date(c.expiresAt).toLocaleDateString()}` : ''].filter(Boolean).join(' · ');
     // Its requester and administrators may change a capture; others see one that is shared with them.
@@ -505,6 +535,18 @@ async function loadCaptures() {
         ${pods}
       </div></div>`;
   }).join('');
+  if (sought) {
+    const card = document.querySelector(`.capture[data-capture="${CSS.escape(sought)}"]`);
+    if (card) {
+      card.scrollIntoView({block: 'center'}); card.classList.add('fresh'); sought = '';
+    } else if (!$('olderLine').hidden) {
+      pages++;
+      return loadCaptures(); // it is further back
+    } else {
+      sought = '';
+      $('capturesProblem').textContent = 'This capture is not there any more, or not yours to see.';
+    }
+  }
   if (focused) {
     const card = document.querySelector(`.capture[data-capture="${focused.id}"]`), near = $('captures').children[Math.min(focused.place, $('captures').children.length - 1)];
     (card ? [...card.querySelectorAll(controls)].find(c => control(c) === focused.control) || card.querySelector('.chev') : near?.querySelector('.chev') || $('captureFind')).focus();

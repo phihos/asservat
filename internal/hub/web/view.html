@@ -28,7 +28,7 @@ header > * { flex: none; white-space: nowrap; }
 header nav { display: flex; align-self: stretch; }
 header nav a { display: flex; align-items: center; padding: 0 10px; border-block: 3px solid transparent; border-bottom-color: var(--marker); color: var(--on-bar); font-weight: 600; text-decoration: none; }
 /* The capture's number on its marker, as in the console's list. */
-header .number { padding: 5px 7px; background: var(--marker); color: var(--on-marker); font: 700 20px/1 var(--display); }
+header .number { padding: 5px 7px; background: var(--marker); color: var(--on-marker); font: 700 20px/1 var(--display); text-decoration: none; }
 header .name { flex: 0 1 auto; min-width: 3em; font: 500 13px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 header select.name { max-width: 34vw; }
 header #origin { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--on-bar-quiet); font-size: 13px; }
@@ -116,7 +116,7 @@ header a.button { display: flex; align-items: center; border-color: var(--marker
 <header>
   <a class="brand" href="/#captures" title="Back to all captures"><img src="/assets/mark.svg" alt=""><b>Asservat</b></a>
   <nav><a href="/#captures" title="Back to all captures">Captures</a></nav>
-  <span class="number" id="number" hidden></span>
+  <a class="number" id="number" hidden></a>
   <span class="name" id="name"></span>
   <select class="name" id="files" hidden title="Open another file of this capture"></select>
   <span id="origin"></span>
