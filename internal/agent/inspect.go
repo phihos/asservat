@@ -59,13 +59,22 @@ func (a *Agent) nodePods(ctx context.Context, namespace string, names []string) 
 func (a *Agent) processes(ctx context.Context, q api.Query) ([]api.Process, []string) {
 	pods, skipped := a.nodePods(ctx, q.Namespace, q.Pods)
 	out := []api.Process{}
+	// One reading of the node's processes for all the containers.
+	read, err := readCgroups(a.Proc)
+	if err != nil {
+		slog.Warn("inspection: processes not read", "error", err)
+		for _, pod := range pods {
+			skipped = append(skipped, pod.Name)
+		}
+		return out, skipped
+	}
 	for _, pod := range pods {
 		for _, s := range pod.Status.ContainerStatuses {
 			_, id, ok := strings.Cut(s.ContainerID, "://")
 			if !ok || s.State.Running == nil {
 				continue
 			}
-			pids, main, err := containerPIDs(a.Proc, id, a.own(pod))
+			pids, main, _, err := read.processesOf(id, ownCgroup(a.Proc, a.own(pod)))
 			if err != nil {
 				continue // the container ended meanwhile
 			}

@@ -731,24 +731,59 @@ func containerPIDs(proc, containerID string, own bool) (all []int, main int, err
 }
 
 // containerProcessesOf is containerPIDs with the time each process
-// started, from the same reading that showed it to be the container's: a
+// started, from the reading that showed it to be the container's: a
 // number that went to another process a moment later is then not taken
 // for the one that was found.
 func containerProcessesOf(proc, containerID string, own bool) (all []int, main int, begun map[int]uint64, err error) {
-	begun = map[int]uint64{}
-	mine := ownCgroup(proc, own)
-	inside := func(pid int) bool { return inContainer(proc, pid, containerID, mine) }
-	entries, err := os.ReadDir(proc)
+	read, err := readCgroups(proc)
 	if err != nil {
 		return nil, 0, nil, err
 	}
-	oldest := uint64(0)
+	return read.processesOf(containerID, ownCgroup(proc, own))
+}
+
+// cgroups is one reading of the node's /proc: the cgroup of every process.
+// Who asks about many containers reads it once for all of them: read anew
+// for each of the 150 containers of a workload on a node, the list of their
+// processes took a second.
+type cgroups struct {
+	proc string
+	of   map[int][]byte
+}
+
+// readCgroups reads the cgroup of every process on the node.
+func readCgroups(proc string) (cgroups, error) {
+	entries, err := os.ReadDir(proc)
+	if err != nil {
+		return cgroups{}, err
+	}
+	read := cgroups{proc, make(map[int][]byte, len(entries))}
 	for _, e := range entries {
 		pid, err := strconv.Atoi(e.Name())
-		if err != nil || !inside(pid) {
+		if err != nil {
 			continue
 		}
-		stat, err := os.ReadFile(filepath.Join(proc, e.Name(), "stat"))
+		if b, err := os.ReadFile(filepath.Join(proc, e.Name(), "cgroup")); err == nil {
+			read.of[pid] = b
+		}
+	}
+	return read, nil
+}
+
+// processesOf finds the processes of a container in the reading, its main
+// process and when each started.
+func (c cgroups) processesOf(containerID string, mine []byte) (all []int, main int, begun map[int]uint64, err error) {
+	begun = map[int]uint64{}
+	inside := func(pid int) bool {
+		b, read := c.of[pid]
+		return read && inCgroup(b, containerID, mine)
+	}
+	oldest := uint64(0)
+	for pid := range c.of {
+		if !inside(pid) {
+			continue
+		}
+		stat, err := os.ReadFile(filepath.Join(c.proc, strconv.Itoa(pid), "stat"))
 		if err != nil {
 			continue
 		}
@@ -764,13 +799,15 @@ func containerProcessesOf(proc, containerID string, own bool) (all []int, main i
 		if err2 == nil {
 			begun[pid] = started
 		}
-		if err1 == nil && err2 == nil && !inside(ppid) && (main == 0 || started < oldest) {
+		// Of two that started in the same tick, the lower number: the order does not depend on how the reading is walked.
+		if err1 == nil && err2 == nil && !inside(ppid) && (main == 0 || started < oldest || started == oldest && pid < main) {
 			main, oldest = pid, started
 		}
 	}
 	if main == 0 {
 		return nil, 0, nil, fmt.Errorf("no process of the container (%.12s) is visible on this node", containerID)
 	}
+	slices.Sort(all)
 	return all, main, begun, nil
 }
 
@@ -784,11 +821,16 @@ func ownCgroup(proc string, own bool) []byte {
 	return mine
 }
 
-// inContainer tells whether a process is in a container's cgroup: one with
-// the container's ID in its path, or one that reads like mine.
+// inContainer tells whether a process is in a container's cgroup.
 func inContainer(proc string, pid int, containerID string, mine []byte) bool {
 	b, err := os.ReadFile(filepath.Join(proc, strconv.Itoa(pid), "cgroup"))
-	return err == nil && (bytes.Contains(b, []byte(containerID)) || len(mine) > 0 && bytes.Equal(b, mine))
+	return err == nil && inCgroup(b, containerID, mine)
+}
+
+// inCgroup tells whether a cgroup, as /proc shows it, is a container's: one
+// with the container's ID in its path, or one that reads like mine.
+func inCgroup(cgroup []byte, containerID string, mine []byte) bool {
+	return bytes.Contains(cgroup, []byte(containerID)) || len(mine) > 0 && bytes.Equal(cgroup, mine)
 }
 
 // executable returns the path of a process's program, as the process sees it.
