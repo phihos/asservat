@@ -304,7 +304,8 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
   await check('dark: the button to stop a capture can be read', async () => {
     await send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
     await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-color-scheme', value: 'dark'}]});
-    const running = {id: made, number: 9, cluster: 'c', namespace: 'n', workload: 'Deployment/w', requester: 'someone', state: 'Running', createdAt: new Date().toISOString(), durationSeconds: 600, remainingSeconds: 500,
+    // Its requester's to stop: this user's.
+    const running = {id: made, number: 9, cluster: 'c', namespace: 'n', workload: 'Deployment/w', requester: await run(`return me.name`), state: 'Running', createdAt: new Date().toISOString(), durationSeconds: 600, remainingSeconds: 500,
       recordings: [{kind: 'pcap'}], tasks: [{pod: 'p', node: 'node', state: 'Running', recordings: [{kind: 'pcap', state: 'Running'}]}], artifacts: []};
     hostile = [[/^\/api\/captures(\?.*)?$/, [running]]];
     await open(hub + '/#captures');
