@@ -12,7 +12,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"asservat.local/asservat/internal/api"
 )
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, os.ErrClosed }
 
 // An installation that sends its logs to a SIEM gets the audit log there
 // too: with AuditTo, every entry is also written as one line of JSON, the
@@ -71,6 +77,31 @@ func TestAuditEntriesAreAlsoWrittenAsLines(t *testing.T) {
 	if first.Log != "audit" || first.Actor != actor || first.Action != "artifact.download" || first.Detail["file"] != "api-1/capture.pcap" || time.Since(first.At) > time.Minute {
 		t.Fatalf("the line: %s", lines[0])
 	}
+	// An entry about a capture names it by its ID and its number.
+	c := api.Capture{ID: uuid.NewString(), Requester: actor, State: api.StateRunning, ExpiresAt: time.Now().Add(time.Hour)}
+	c.Cluster, c.Namespace, c.Workload = "a"+c.ID[:8], "payments", "Deployment/api"
+	if err := store.CreateCapture(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	defer store.DeleteCapture(ctx, c.ID)
+	out.Reset()
+	if err := store.Audit(ctx, actor, "capture.request", c.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	var about struct {
+		Capture string `json:"capture"`
+		Number  int64  `json:"number"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &about); err != nil || about.Capture != c.ID || about.Number == 0 {
+		t.Fatalf("the line of an entry about a capture: %s (%v)", out.String(), err)
+	}
+	// A line that cannot be written leaves the entry in the log.
+	store.AuditTo(failingWriter{})
+	if err := store.Audit(ctx, actor, "capture.stop", c.ID, nil); err != nil {
+		t.Fatal("an entry whose line could not be written:", err)
+	}
+	store.AuditTo(&out)
+
 	// The line is the entry of the log: the same number and moment.
 	log, err := store.AuditLog(ctx, time.Now().Add(time.Hour), math.MaxInt64, 200)
 	if err != nil {

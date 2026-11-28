@@ -322,7 +322,7 @@ carries it to your SIEM like any other pod log. The hub needs no address or
 credentials of the SIEM for this, and the SIEM none of the hub.
 
 ```json
-{"log":"audit","id":4711,"at":"2026-11-28T09:28:47.512Z","actor":"alice","action":"artifact.download","capture":"1e8fa4a6-8f8a-4a71-a9cd-435a0ed857da","detail":{"file":"api-7d9c/capture.pcap"}}
+{"log":"audit","id":4711,"at":"2026-11-28T09:28:47.512Z","actor":"alice","action":"artifact.download","capture":"1e8fa4a6-8f8a-4a71-a9cd-435a0ed857da","number":71,"detail":{"file":"api-7d9c/capture.pcap"}}
 ```
 
 | Field | What it holds |
@@ -331,7 +331,7 @@ credentials of the SIEM for this, and the SIEM none of the hub.
 | `id`, `at` | The entry's number and time, the same as `GET /api/audit` returns |
 | `actor` | Who did it: the user's name, or `retention` where the hub deleted evidence whose time was up |
 | `action` | What was done, such as `capture.request`, `capture.approve`, `artifact.download`, `artifact.view`, `watch.create` |
-| `capture` | The capture it was done to, where there is one |
+| `capture`, `number` | The capture it was done to, where there is one: its ID, and the number the console shows it under |
 | `detail` | What the action is about: the file, the workload, the reason given |
 
 Select the lines by `log` being `audit` in your collector. The switch is off

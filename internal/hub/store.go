@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -55,7 +56,9 @@ func (s *Store) Audit(ctx context.Context, actor, action, capture string, detail
 	if capture != "" {
 		e.Capture = &capture
 	}
-	err := s.db.QueryRow(ctx, `INSERT INTO audit(actor, action, capture_id, detail) VALUES ($1,$2,nullif($3,'')::uuid,$4) RETURNING id, at`, actor, action, capture, b).Scan(&e.ID, &e.At)
+	// With the capture's number, as the log shows the entry while the capture exists.
+	err := s.db.QueryRow(ctx, `WITH a AS (INSERT INTO audit(actor, action, capture_id, detail) VALUES ($1,$2,nullif($3,'')::uuid,$4) RETURNING id, at, capture_id)
+ SELECT a.id, a.at, c.number FROM a LEFT JOIN captures c ON c.id = a.capture_id`, actor, action, capture, b).Scan(&e.ID, &e.At, &e.Number)
 	if err != nil || s.audit == nil {
 		return err
 	}
@@ -66,8 +69,11 @@ func (s *Store) Audit(ctx context.Context, actor, action, capture string, detail
 	}{"audit", e})
 	s.auditMu.Lock()
 	defer s.auditMu.Unlock()
-	// The entry is in the database: a line that cannot be written does not undo what was done.
-	s.audit.Write(append(line, '\n'))
+	// The entry is in the database: a line that cannot be written does not
+	// undo what was done, and is said where the other output goes.
+	if _, err := s.audit.Write(append(line, '\n')); err != nil {
+		slog.Error("audit line not written", "id", e.ID, "error", err)
+	}
 	return nil
 }
 
