@@ -187,7 +187,12 @@ with 200 pods on one node (8 CPUs), all recorded at once for 5 seconds: a
 capture of logs, pod state and packet headers was complete after 12 seconds
 and took the agent's memory to 285 MiB at its peak, about 1.4 MiB for each
 pod; system call traces of all 200 were complete after 12 seconds as well.
-Two minutes later the agent was back at 26 MiB.
+Two minutes later the agent was back at 26 MiB. Core dumps cost more: the
+agent runs a debugger for each process and holds each core in its scratch
+volume until it is uploaded. For the cores of 100 pods of a small program
+at once, 5 MiB each, its memory as Kubernetes counts it peaked at
+1.2 GiB, which includes the cache of the core files, and the capture was
+complete after 7 seconds; the debugger takes more for a larger program.
 
 A watch for packets keeps one `tcpdump` running for each pod it watches, so
 that a capture can begin before the moment it waited for. On the same node
