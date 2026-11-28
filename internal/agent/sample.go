@@ -64,7 +64,8 @@ type sampledKind struct {
 	// was seen, and what that stands for, each sample standing for unit.
 	count, amount profile.ValueType
 	unit          int64
-	// nothing is what a pod without a sample is told.
+	// nothing is what a pod without a sample is told, where nothing more
+	// is known about why.
 	nothing string
 }
 
@@ -74,7 +75,7 @@ var (
 		recording: api.KindCPU, file: "sampled-cpu.pprof",
 		count: profile.ValueType{Type: "samples", Unit: "count"}, amount: profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		unit:    int64(time.Second / sampleRate),
-		nothing: "the pod's processes used no CPU time while they were sampled",
+		nothing: fmt.Sprintf("no sample fell on the pod's processes: a CPU is looked at %d times a second, and what a nearly idle pod does falls between. Record for longer, or while the pod is busy", sampleRate),
 	}
 	// sampledMemory counts page faults. The kernel gives a process a page of
 	// memory when the process first touches it, which is a page fault: the
@@ -593,15 +594,65 @@ func (a *Agent) sample(ctx, frame context.Context, kind sampledKind, duration ti
 	if err := a.sampler.begin(p); err != nil {
 		return err
 	}
+	// What the processes use is measured over the time they are sampled, which begins once the profiler runs.
+	before, from := cpuTimes(a.Proc, p.pids), time.Now()
 	select {
 	case <-frame.Done():
 	case <-time.After(duration):
 	}
+	used, lasted := usedSince(before, cpuTimes(a.Proc, p.pids)), time.Since(from).Round(time.Second)
 	binaries := a.sampler.end(p)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return a.uploadSampled(p, p.since(time.Time{}), binaries, began, up)
+	return a.uploadSampled(p, p.since(time.Time{}), binaries, began, noSamples(kind, used, lasted), up)
+}
+
+// cpuTimes is the CPU time that each of the processes has used so far, as
+// the kernel counts it: in ticks of 10 ms. One that has ended is not among them.
+func cpuTimes(proc string, pids map[int]bool) map[int]time.Duration {
+	times := make(map[int]time.Duration, len(pids))
+	for pid := range pids {
+		// After the name the 12th and 13th field: the time in user mode and in the kernel.
+		fields, _ := statOf(proc, pid)
+		if len(fields) < 13 {
+			continue
+		}
+		user, _ := strconv.ParseInt(fields[11], 10, 64)
+		system, _ := strconv.ParseInt(fields[12], 10, 64)
+		times[pid] = time.Duration(user+system) * 10 * time.Millisecond
+	}
+	return times
+}
+
+// usedSince is the CPU time that the processes used between two readings,
+// or nil where that is not known: a process that ended in between took
+// what it had used with it, and a pod whose container crashes again and
+// again must not be told that it used nothing.
+func usedSince(before, after map[int]time.Duration) *time.Duration {
+	var used time.Duration
+	for pid, was := range before {
+		is, there := after[pid]
+		if !there {
+			return nil
+		}
+		used += is - was
+	}
+	return &used
+}
+
+// noSamples is what a recording without a sample says. A pod that is
+// nearly idle uses a few milliseconds of CPU time in half a minute, of
+// which 99 looks a second at each CPU can miss all: it is told what its
+// processes used, where that was measured, and not that they used nothing.
+func noSamples(kind sampledKind, used *time.Duration, lasted time.Duration) error {
+	switch {
+	case kind.memory || used == nil:
+		return errors.New(kind.nothing)
+	case *used <= 0:
+		return fmt.Errorf("the pod's processes used no CPU time in the %s they were sampled", lasted)
+	}
+	return fmt.Errorf("no sample fell on the pod's processes: they used about %s of CPU time in %s, and a CPU is looked at %d times a second. Record for longer, or while the pod is busy", *used, lasted, sampleRate)
 }
 
 // sampled records a sampled profile for a capture: from the profile that the
@@ -683,14 +734,14 @@ func (a *Agent) sampleKept(ctx, frame context.Context, k *kept, after time.Durat
 		binaries[id] = b
 	}
 	a.sampler.mu.Unlock()
-	return a.uploadSampled(k.profile, stacks, binaries, from, up)
+	return a.uploadSampled(k.profile, stacks, binaries, from, noSamples(k.profile.kind, nil, 0), up)
 }
 
 // uploadSampled names the functions of the stacks and uploads them as a
 // profile in pprof's format.
-func (a *Agent) uploadSampled(p *sampledProfile, stacks map[stackKey]*sampledStack, binaries map[libpf.FileID]mappedFile, began time.Time, up func(string, io.Reader) error) error {
+func (a *Agent) uploadSampled(p *sampledProfile, stacks map[stackKey]*sampledStack, binaries map[libpf.FileID]mappedFile, began time.Time, nothing error, up func(string, io.Reader) error) error {
 	if len(stacks) == 0 {
-		return errors.New(p.kind.nothing)
+		return nothing
 	}
 	// The symbols of native code are in the binaries, which the pod's own processes lead to first.
 	a.sampler.mu.Lock()

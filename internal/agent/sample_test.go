@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -360,5 +362,68 @@ func TestTheProfilerIsStartedSoThatItSeesPods(t *testing.T) {
 				t.Errorf("got %d, %v", started, err)
 			}
 		})
+	}
+}
+
+// A pod that is nearly idle uses a few milliseconds of CPU time in half a
+// minute, and a profile that looks at a CPU 99 times a second can miss all
+// of it. That is then what the recording says, with what the processes
+// used as the kernel counted it. It said "used no CPU time", which was
+// untrue and read as a defect of the profile.
+func TestAProfileWithoutSamplesSaysWhatThePodUsed(t *testing.T) {
+	proc := t.TempDir()
+	stat := func(pid int, user, system int) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(proc, strconv.Itoa(pid)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		// A name with a space and a parenthesis, as a process may have.
+		line := fmt.Sprintf("%d (my app) x) S 1 %d %d 0 -1 4194560 100 0 0 0 %d %d 0 0 20 0 3 0 5000 1000000 100 18446744073709551615", pid, pid, pid, user, system)
+		if err := os.WriteFile(filepath.Join(proc, strconv.Itoa(pid), "stat"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pids := map[int]bool{11: true, 12: true, 13: true}
+	stat(11, 100, 50)
+	stat(12, 7, 0)
+	// 13 had ended before: it is not among them.
+	before := cpuTimes(proc, pids)
+	if len(before) != 2 || before[11] != 1500*time.Millisecond || before[12] != 70*time.Millisecond {
+		t.Fatalf("the processes have used %v, want 1.5s and 70ms", before)
+	}
+	stat(11, 102, 51)
+	used := usedSince(before, cpuTimes(proc, pids))
+	if used == nil || *used != 30*time.Millisecond {
+		t.Fatalf("the processes used %v, want 30ms", used)
+	}
+	// A process that ended in between took its time with it: what the pod
+	// used is then not known, and it is not told that it used nothing.
+	if err := os.RemoveAll(filepath.Join(proc, "12")); err != nil {
+		t.Fatal(err)
+	}
+	if gone := usedSince(before, cpuTimes(proc, pids)); gone != nil {
+		t.Fatalf("with a process that ended, the pod is said to have used %s", *gone)
+	}
+
+	said := noSamples(sampledCPU, used, 30*time.Second).Error()
+	for _, want := range []string{"30ms", "30s", "99 times a second", "longer"} {
+		if !strings.Contains(said, want) {
+			t.Errorf("a profile without a sample of a pod that used 30 ms says %q, without %q", said, want)
+		}
+	}
+	if strings.Contains(said, "no CPU time") {
+		t.Errorf("a pod that used 30 ms is told %q", said)
+	}
+	// A pod that used nothing is told so.
+	idle := time.Duration(0)
+	if said := noSamples(sampledCPU, &idle, 30*time.Second).Error(); !strings.Contains(said, "used no CPU time") {
+		t.Errorf("a pod that used no CPU time is told %q", said)
+	}
+	// Where it was not measured, as for a profile that a watch kept running, nothing is claimed about it.
+	if said := noSamples(sampledCPU, nil, 30*time.Second).Error(); strings.Contains(said, "no CPU time") || !strings.Contains(said, "99 times a second") {
+		t.Errorf("without a measurement the pod is told %q", said)
+	}
+	if said := noSamples(sampledMemory, nil, 30*time.Second).Error(); !strings.Contains(said, "no new memory") {
+		t.Errorf("a memory profile without a fault says %q", said)
 	}
 }
