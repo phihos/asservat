@@ -706,7 +706,8 @@ type Query struct {
 	// "workload" (the label selector of its pods and its containers),
 	// "workloads" (the workloads of a namespace), "namespaces" (the
 	// namespaces in which the user may exec into pods, or all without a
-	// user), "review" (may the user exec into pods of the namespace) or
+	// user), "review" (may the user exec into pods of the namespace),
+	// "approves" (may the user approve requests for the namespace) or
 	// "peers" (what the IPs belong to: Services and pods of the namespace,
 	// or of all namespaces with All). About Pods of the agent's node:
 	// "processes" (what runs in them), "traffic" (their connections, from

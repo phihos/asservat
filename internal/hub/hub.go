@@ -252,8 +252,9 @@ func (h *Hub) Handler() http.Handler {
 	user("GET /api/captures", h.listCaptures)
 	user("GET /api/captures/{id}", h.getCapture)
 	user("DELETE /api/captures/{id}", h.deleteCapture)
-	admin("POST /api/captures/{id}/approve", h.decide(api.StateQueued))
-	admin("POST /api/captures/{id}/deny", h.decide(api.StateDenied))
+	user("POST /api/captures/{id}/approve", h.decide(api.StateQueued))
+	user("POST /api/captures/{id}/deny", h.decide(api.StateDenied))
+	user("GET /api/approvals", h.listApprovals)
 	user("POST /api/captures/{id}/stop", h.stopCapture)
 	user("POST /api/captures/{id}/cancel", h.cancelCapture)
 	user("POST /api/captures/{id}/share", h.shareCapture)
@@ -266,7 +267,7 @@ func (h *Hub) Handler() http.Handler {
 	user("POST /api/watches", h.createWatch)
 	user("GET /api/watches", h.listWatches)
 	user("DELETE /api/watches/{id}", h.deleteWatch)
-	admin("POST /api/watches/{id}/approve", h.approveWatch)
+	user("POST /api/watches/{id}/approve", h.approveWatch)
 	user("POST /api/watches/{id}/record", h.recordNow)
 	user("GET /api/events", h.events)
 	admin("GET /api/audit", h.auditLog)
@@ -604,7 +605,11 @@ func (h *Hub) visible(ctx context.Context, u User, id string) (api.Capture, erro
 	// A shared capture is also there for everyone who may capture in its
 	// namespace, which the cluster's RBAC tells; for anyone else it does
 	// not exist.
-	if !owns(u, c) && (!c.Shared || h.allowed(ctx, u, c.Cluster, c.Namespace) != nil) {
+	// And a request that awaits approval for who may approve it: to decide
+	// it they see who asks, for what and why. With the decision it is gone
+	// for them again: what is recorded is not theirs.
+	if !owns(u, c) && (!c.Shared || h.allowed(ctx, u, c.Cluster, c.Namespace) != nil) &&
+		(c.State != api.StatePendingApproval || !h.approves(ctx, u, c.Cluster, c.Namespace)) {
 		return c, ErrNotFound
 	}
 	c.RemainingSeconds = remaining(c, time.Now())
@@ -783,23 +788,91 @@ func (h *Hub) needed() int { return max(h.Approvals, 1) }
 // their own approval counts, and it is the only one that is needed.
 func (h *Hub) startsOwn(u User) bool { return h.approvesOwn(u) && h.needed() == 1 }
 
-// mayApprove refuses an administrator's approval of their own request,
-// unless the installation allows it.
+// mayApprove refuses the approval of one's own request, unless the
+// installation allows it to its administrators.
 func (h *Hub) mayApprove(u User, requester string) error {
-	if requester == u.Name && !h.AllowSelfApproval {
-		return errStatus{http.StatusForbidden, "another administrator must approve your request"}
+	if requester == u.Name && !h.approvesOwn(u) {
+		return errStatus{http.StatusForbidden, "another person must approve your request"}
 	}
 	return nil
 }
 
+// approves reports whether the user may approve and deny requests for a
+// namespace: an administrator may everywhere, anyone else where the
+// cluster's RBAC lets them (the verb "approve" on "captures" of the group
+// asservat.io in the namespace). A cluster that does not answer lets
+// nobody.
+func (h *Hub) approves(ctx context.Context, u User, cluster, namespace string) bool {
+	if u.Admin {
+		return true
+	}
+	r, err := h.agents.query(ctx, cluster, "", api.Query{Op: "approves", Namespace: namespace, User: u.Name, Groups: u.Groups})
+	return err == nil && r.Allowed
+}
+
+// decides returns nil if the user may decide a request of the requester
+// for the namespace. Who may not is told so if the request is theirs to
+// see, and otherwise that there is none.
+func (h *Hub) decides(ctx context.Context, u User, cluster, namespace, requester string) error {
+	if h.approves(ctx, u, cluster, namespace) {
+		return nil
+	}
+	if requester == u.Name {
+		return errStatus{http.StatusForbidden, "approving takes an administrator, or someone whom the cluster lets approve in this namespace"}
+	}
+	return ErrNotFound
+}
+
+// listApprovals lists the requests that wait for this user's word: those
+// of others, in namespaces where the user may approve, which the user has
+// not approved yet.
+func (h *Hub) listApprovals(w http.ResponseWriter, r *http.Request, u User) error {
+	captures, watches, err := h.Store.Awaiting(r.Context())
+	if err != nil {
+		return err
+	}
+	// Each namespace is asked about once.
+	asked := map[Place]bool{}
+	mine := func(cluster, namespace, requester string, approvals []string) bool {
+		if requester == u.Name || slices.Contains(approvals, u.Name) {
+			return false
+		}
+		place := Place{cluster, namespace}
+		may, known := asked[place]
+		if !known {
+			may = h.approves(r.Context(), u, cluster, namespace)
+			asked[place] = may
+		}
+		return may
+	}
+	list := struct {
+		Captures []api.Capture `json:"captures"`
+		Watches  []api.Watch   `json:"watches"`
+	}{[]api.Capture{}, []api.Watch{}}
+	for _, c := range captures {
+		if mine(c.Cluster, c.Namespace, c.Requester, c.Approvals) {
+			list.Captures = append(list.Captures, c)
+		}
+	}
+	for _, watch := range watches {
+		if mine(watch.Cluster, watch.Namespace, watch.Requester, watch.Approvals) {
+			list.Watches = append(list.Watches, watch)
+		}
+	}
+	return reply(w, list)
+}
+
 // Decide approves (Queued) or denies a capture that awaits approval.
 func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture, error) {
-	c, err := h.visible(ctx, u, id)
+	if uuid.Validate(id) != nil {
+		return api.Capture{}, ErrNotFound
+	}
+	c, err := h.Store.Capture(ctx, id)
 	if err != nil {
 		return c, err
 	}
-	if !u.Admin {
-		return c, errStatus{http.StatusForbidden, "administrators only"}
+	if err := h.decides(ctx, u, c.Cluster, c.Namespace, c.Requester); err != nil {
+		return api.Capture{}, err
 	}
 	if state == api.StateQueued {
 		if err := h.mayApprove(u, c.Requester); err != nil {

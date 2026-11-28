@@ -20,6 +20,8 @@ func (a *Agent) answer(ctx context.Context, q api.Query) api.Reply {
 	switch q.Op {
 	case "review":
 		r.Allowed, err = a.review(ctx, q)
+	case "approves":
+		r.Allowed, err = a.approves(ctx, q)
 	case "workloads":
 		r.Workloads, err = a.workloads(ctx, q.Namespace)
 	case "resolve":
@@ -51,6 +53,21 @@ func (a *Agent) review(ctx context.Context, q api.Query) (bool, error) {
 	sar, err := a.Kube.AuthorizationV1().SubjectAccessReviews().Create(ctx, &authorizationv1.SubjectAccessReview{Spec: authorizationv1.SubjectAccessReviewSpec{
 		User: q.User, Groups: q.Groups,
 		ResourceAttributes: &authorizationv1.ResourceAttributes{Namespace: q.Namespace, Verb: "create", Resource: "pods", Subresource: "exec"},
+	}}, metav1.CreateOptions{})
+	if err != nil {
+		return false, err
+	}
+	return sar.Status.Allowed, nil
+}
+
+// approves asks the cluster's RBAC whether the user may approve requests
+// for the namespace: the verb "approve" on "captures" of the group
+// asservat.io. No such resource exists in the cluster; RBAC answers for
+// whatever a role names, and a role in the namespace gives the right.
+func (a *Agent) approves(ctx context.Context, q api.Query) (bool, error) {
+	sar, err := a.Kube.AuthorizationV1().SubjectAccessReviews().Create(ctx, &authorizationv1.SubjectAccessReview{Spec: authorizationv1.SubjectAccessReviewSpec{
+		User: q.User, Groups: q.Groups,
+		ResourceAttributes: &authorizationv1.ResourceAttributes{Namespace: q.Namespace, Verb: "approve", Group: "asservat.io", Resource: "captures"},
 	}}, metav1.CreateOptions{})
 	if err != nil {
 		return false, err

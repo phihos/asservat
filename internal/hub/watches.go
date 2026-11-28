@@ -118,6 +118,9 @@ func (h *Hub) ApproveWatch(ctx context.Context, u User, id string) (api.Watch, e
 	if err != nil {
 		return w, err
 	}
+	if err := h.decides(ctx, u, w.Cluster, w.Namespace, w.Requester); err != nil {
+		return api.Watch{}, err
+	}
 	if err := h.mayApprove(u, w.Requester); err != nil {
 		return w, err
 	}
