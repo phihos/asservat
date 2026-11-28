@@ -19,7 +19,10 @@ const guard = (f, at = 'error') => async e => {
   // Only a form's own submit is replaced; a click on a link, such as a file to download, takes its course.
   if (e?.type === 'submit') e.preventDefault();
   $(at).textContent = '';
-  try { await f(e); } catch (err) { $(at).textContent = err.message; $(at).scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+  try { await f(e); } catch (err) {
+    $(at).textContent = err.message; $(at).scrollIntoView({block: 'nearest', behavior: 'smooth'});
+    if (err.field) $(err.field).focus();
+  }
 };
 
 async function start() {
@@ -84,7 +87,7 @@ async function loadClusters() {
   $('clusterList').innerHTML = clusters.map(c => `<tr><td>${esc(c.name)}</td><td>${c.nodes.length ? c.nodes.map(esc).join(', ') : '<span class="muted">None. No agent of this cluster is connected.</span>'}</td></tr>`).join('')
     || '<tr><td colspan="2" class="muted">No clusters yet.</td></tr>';
   const selected = $('cluster').value;
-  $('cluster').innerHTML = clusters.map(c => `<option>${esc(c.name)}</option>`).join('');
+  $('cluster').innerHTML = choice(clusters.map(c => c.name), 'a cluster');
   if (selected) $('cluster').value = selected;
   else await loadNamespaces();
 }
@@ -92,6 +95,12 @@ async function loadClusters() {
 // Everything that exists in the cluster is offered, never typed: each list
 // follows the choice before it.
 const options = list => list.map(v => `<option>${esc(v)}</option>`).join('');
+// Where there is a choice, the form makes none: the first of a list is not
+// what its user wants more often than any other, and a request for it is
+// one click away. A single thing to choose is chosen.
+const choice = (list, what) => (list.length > 1 ? `<option value="">Choose ${what}</option>` : '') + options(list);
+// A list that waits for the choice before it says so, and cannot be opened.
+const waitsFor = (select, what) => { select.disabled = !!what; if (what) select.innerHTML = `<option value="">Choose ${what} first</option>`; };
 const namespacePath = () => `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces/${encodeURIComponent($('namespace').value)}`;
 const workloadQuery = () => 'workload=' + encodeURIComponent($('workload').value);
 const target = () => [$('cluster').value, $('namespace').value, $('workload').value].join('/');
@@ -105,15 +114,18 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 async function loadNamespaces() {
   $('namespace').innerHTML = $('workload').innerHTML = '';
-  if ($('cluster').value) $('namespace').innerHTML = options(await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`));
+  waitsFor($('namespace'), $('cluster').value ? '' : 'a cluster');
+  const namespaces = $('cluster').value ? await call('GET', `/api/clusters/${encodeURIComponent($('cluster').value)}/namespaces`) : [];
+  if ($('cluster').value) $('namespace').innerHTML = choice(namespaces, 'a namespace');
   // An empty list says nothing by itself: who may capture nowhere is told why.
-  $('nowhere').hidden = !$('cluster').value || !!$('namespace').value;
+  $('nowhere').hidden = !$('cluster').value || namespaces.length > 0;
   await loadWorkloads();
 }
 
 async function loadWorkloads() {
   $('workload').innerHTML = '';
-  if ($('namespace').value) $('workload').innerHTML = options(await call('GET', namespacePath() + '/workloads'));
+  waitsFor($('workload'), $('namespace').value ? '' : 'a namespace');
+  if ($('namespace').value) $('workload').innerHTML = choice(await call('GET', namespacePath() + '/workloads'), 'a workload');
   await workloadChanged();
 }
 
@@ -124,6 +136,7 @@ async function workloadChanged() {
   $('container').innerHTML = $('process').innerHTML = $('profileChoices').innerHTML = $('profilePort').innerHTML = '';
   $('profileState').textContent = $('profilePath').value = '';
   showFlows(null);
+  summarize();
   if (!$('workload').value) return;
   containers = await call('GET', namespacePath() + '/containers?' + workloadQuery());
   $('container').innerHTML = '<option value="">all containers</option>' + options(containers);
@@ -200,17 +213,34 @@ function told(when) {
     : when?.kind === 'time' ? ` ${new Date(given.at).toLocaleString()}${given.every ? `, again every ${Math.round(given.every / 60)} min` : ''}` : '');
 }
 // The condition that the form's last step describes.
+// conditionFields is what the chosen condition asks for, if anything.
+const conditionFields = () => ['logFields', 'usageFields', 'alertFields', 'eventFields', 'timeFields'].map($).find(fields => !fields.hidden);
+// What the chosen condition asks for stands at the condition, not below all
+// of them, a screen or more further down: below the row of conditions it
+// is among, or right below it where they stand in one column. How they
+// stand is only known while the step is shown, and changes with the
+// window's width.
+function placeConditionFields() {
+  const fields = conditionFields(), mine = document.querySelector('input[name=when]:checked').closest('label');
+  if (!fields || !mine.offsetParent) return;
+  const among = mine.closest('.choice'), columns = getComputedStyle(among).gridTemplateColumns.split(' ').length;
+  fields.classList.add('of');
+  (columns > 1 ? among : mine).after(fields);
+}
+window.addEventListener('resize', placeConditionFields);
+// missing is the problem of a field that is left empty: the cursor goes there.
+const missing = (field, message) => Object.assign(new Error(message), {field});
 function condition() {
   const kind = picked('when');
   if (kind === 'log') {
     const pattern = $('logPattern').value.trim();
-    if (!pattern) throw new Error('Enter the pattern a log line has to match.');
+    if (!pattern) throw missing('logPattern', 'Enter the pattern a log line has to match.');
     return {kind, params: {pattern, ...($('logContainer').value ? {container: $('logContainer').value} : {})}};
   }
   if (kind in thresholds) {
     const above = $('usageAbove').value.trim().replace(/\s+/g, '');
     if (!above) throw new Error(`Enter a threshold: ${thresholds[kind]}.`);
-    if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw new Error('Enter the number of seconds within which memory grows by that much.');
+    if (kind === 'memory-growth' && !($('usageSeconds').value > 0)) throw missing('usageSeconds', 'Enter the number of seconds within which memory grows by that much.');
     return {kind, params: {above, ...(kind === 'pressure' ? {of: $('usageOf').value} : {}), ...($('usageSeconds').value > 0 ? {seconds: String(Math.round($('usageSeconds').value))} : {}), ...($('usageContainer').value ? {container: $('usageContainer').value} : {})}};
   }
   if (kind === 'event') {
@@ -219,12 +249,12 @@ function condition() {
   }
   if (kind === 'time') {
     const at = new Date($('timeAt').value);
-    if (isNaN(at)) throw new Error('Enter the time to record at.');
+    if (isNaN(at)) throw missing('timeAt', 'Enter the time to record at.');
     return {kind, params: {at: at.toISOString().replace(/\.\d+Z$/, 'Z'), ...($('timeEvery').value > 0 ? {every: String(Math.round($('timeEvery').value * 60))} : {})}};
   }
   if (kind === 'alert') {
     const name = $('alertName').value.trim();
-    if (!name) throw new Error('Enter the name of the alert.');
+    if (!name) throw missing('alertName', 'Enter the name of the alert.');
     return {kind, params: {name}};
   }
   return {kind};
@@ -340,6 +370,7 @@ function showParams() {
   $('alertFields').hidden = picked('when') !== 'alert';
   $('eventFields').hidden = picked('when') !== 'event';
   $('timeFields').hidden = picked('when') !== 'time';
+  placeConditionFields();
   // What a watch can keep running, of what is chosen.
   for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
   $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
@@ -640,7 +671,12 @@ $('signout').onclick = async () => {
 $('cluster').onchange = guard(loadNamespaces, 'whereProblem');
 $('namespace').onchange = guard(loadWorkloads, 'whereProblem');
 $('workload').onchange = guard(workloadChanged, 'whereProblem');
-$('captureForm').onchange = guard(async e => { showParams(); if (['kind', 'when'].includes(e.target.name)) await Promise.all([loadProcesses(), loadProfiles()]); }, 'formProblem');
+$('captureForm').onchange = guard(async e => {
+  showParams();
+  // A condition that asks for something shows it: its fields come into sight.
+  if (e.target.name === 'when') conditionFields()?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  if (['kind', 'when'].includes(e.target.name)) await Promise.all([loadProcesses(), loadProfiles()]);
+}, 'formProblem');
 $('profilePath').oninput = showParams;
 $('sample').onclick = guard(async () => {
   if (!$('workload').value) return;
@@ -721,6 +757,7 @@ function showStep(n) {
   $('back').hidden = step === 1;
   $('next').hidden = step === 4;
   $('submit').hidden = step !== 4;
+  placeConditionFields();
   summarize();
 }
 // What the step needs before the next one; the message appears at the step.

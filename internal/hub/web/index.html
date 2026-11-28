@@ -107,12 +107,18 @@
   fieldset { border: 1px solid var(--line); background: var(--surface); margin: 0 0 12px; padding: 10px 12px 12px; min-width: 0; }
   legend { font: 600 18px var(--display); text-transform: uppercase; letter-spacing: .04em; padding: 0 6px; }
   .kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
-  .kinds label, .choice label { display: block; border: 1px solid var(--line); padding: 8px 10px; cursor: pointer; font-size: 13px; }
-  .kinds label:has(input:checked), .choice label:has(input:checked) { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--marker); background: var(--soft); }
-  .kinds input, .choice input { margin: 0 6px 0 0; accent-color: var(--ink); }
-  .kinds small, .choice small { display: block; color: var(--quiet); margin: 2px 0 0 20px; }
+  .kinds label, .choice > label { display: block; border: 1px solid var(--line); padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .kinds label:has(input:checked), .choice > label:has(input:checked) { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--marker); background: var(--soft); }
+  .kinds input, .choice > label > input { margin: 0 6px 0 0; accent-color: var(--ink); }
+  .kinds small, .choice > label > small { display: block; color: var(--quiet); margin: 2px 0 0 20px; }
   .choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-bottom: 8px; }
   .wide { grid-column: span 2; }
+  /* Of one column a wide field takes the one: a span of two would make a second, and the others narrower by the gap. */
+  @media (max-width: 760px) { .wide { grid-column: 1 / -1; } }
+  /* What the chosen condition asks for, at the conditions it is among. */
+  .fields.of { margin-top: 8px; padding: 10px 12px; border-left: 4px solid var(--marker); background: var(--soft); } .choice > .fields.of { grid-column: 1 / -1; margin-top: 0; }
+  /* Narrow, what a recording costs while it waits stands below its name and does not break it. */
+  @media (max-width: 760px) { #beforeFields .group label { flex-wrap: wrap; } #beforeFields .group label span { flex-basis: 100%; padding-left: 24px; } }
   /* The rows of fields under the ways to start, and the section between them, stand apart. */
   fieldset[data-step="4"] > .fields, #beforeFields { margin-top: 14px; }
   .badge { font: 500 11px var(--mono); color: var(--custody-ink); border: 1px solid var(--custody); padding: 0 6px; margin-left: 6px; white-space: nowrap; }
@@ -148,7 +154,7 @@
   button.pod .went { display: flex; flex-wrap: wrap; gap: 2px 12px; font: 400 12px var(--text); } button.pod .went .mark { margin-right: 4px; } button.pod .went .rec-Completed .mark { color: var(--ok); } button.pod .went .rec-Failed { color: var(--bad); }
   button.pod > .muted:last-child { margin-left: auto; } .podbox.folds.open > .podbody { padding: 0 0 10px 14px; }
   .options > * + * { margin-top: 14px; }
-  h3 { font-size: 13px; margin: 0 0 6px; } .choice + h3 { margin-top: 14px; } .lead { margin: 0 0 8px; }
+  h3 { font-size: 13px; margin: 0 0 6px; } .choice + h3, .fields.of + h3 { margin-top: 14px; } .lead { margin: 0 0 8px; }
   .options section > * + * { margin-top: 8px; }
   #flows td { vertical-align: middle; } #flows tr { cursor: pointer; } #flows tr:has(input:checked) { background: var(--soft); }
   #flows .arrow { font-size: 16px; text-align: center; }
@@ -186,7 +192,7 @@
  <section data-view="new" hidden>
   <h2>New capture</h2>
   <ol id="steps">
-    <li data-go="1"><b>1</b> Where</li><li data-go="2"><b>2</b> What to record</li><li data-go="3"><b>3</b> Details<span class="none">: none needed</span></li><li data-go="4"><b>4</b> When</li>
+    <li data-go="1"><b>1</b> Where</li><li data-go="2"><b>2</b> What to record</li><li data-go="3"><b>3</b> <span>Details<span class="none">: none needed</span></span></li><li data-go="4"><b>4</b> When</li>
   </ol>
   <p id="summary" class="muted"></p>
   <form id="captureForm">
@@ -269,7 +275,7 @@
               <label>Port<select id="profilePort"></select></label>
               <label class="wide">Path<input id="profilePath" placeholder="/debug/profile" spellcheck="false" autocomplete="off"></label>
             </div>
-            <p class="muted">Asservat cannot tell what a custom endpoint returns, so this needs approval.</p>
+            <p class="muted">Asservat cannot tell what a custom endpoint returns, so it counts as sensitive.</p>
           </details>
           <p class="problem" id="profileProblem"></p>
         </section>
