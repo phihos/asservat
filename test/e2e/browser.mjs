@@ -218,6 +218,12 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
         pattern: document.getElementById('logPattern').getBoundingClientRect().right, container: document.getElementById('logContainer').getBoundingClientRect().right})`));
     if (asked.below < 0 || asked.below > 40) throw new Error(`what the condition asks for stands ${asked.below} px below its group`);
     if (!asked.seen) throw new Error('what the chosen condition asks for is out of sight');
+    // Where the fields stand is decided while the step is shown: they are there also after it was left with another kind of recording chosen.
+    await run(`document.querySelector('input[name=when][value=cpu]').click()`); await sleep(200);
+    await run(`document.getElementById('back').click()`); await sleep(300); await run(next); await sleep(400);
+    const again = await run(`return document.getElementById('usageFields').getBoundingClientRect().top - document.querySelector('input[name=when]:checked').closest(${JSON.stringify(size === 'phone' ? 'label' : '.choice')}).getBoundingClientRect().bottom`);
+    if (again < 0 || again > 40) throw new Error(`after the step was left and come back to, what the condition asks for stands ${again} px below it`);
+    await run(`document.querySelector('input[name=when][value=log]').click()`); await sleep(400);
     if (asked.lines > 1) throw new Error(`the name of a recording to keep running is broken into ${asked.lines} lines`);
     if (size === 'phone' && Math.abs(asked.pattern - asked.container) > 1) throw new Error(`the fields of the condition end at ${asked.pattern} and ${asked.container} px`);
     // What is missing is said, and the cursor stands where it is to be entered.

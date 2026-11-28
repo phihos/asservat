@@ -215,6 +215,19 @@ function told(when) {
 // The condition that the form's last step describes.
 // conditionFields is what the chosen condition asks for, if anything.
 const conditionFields = () => ['logFields', 'usageFields', 'alertFields', 'eventFields', 'timeFields'].map($).find(fields => !fields.hidden);
+// What the chosen condition asks for stands at the condition, not below all
+// of them, a screen or more further down: below the row of conditions it
+// is among, or right below it where they stand in one column. How they
+// stand is only known while the step is shown, and changes with the
+// window's width.
+function placeConditionFields() {
+  const fields = conditionFields(), mine = document.querySelector('input[name=when]:checked').closest('label');
+  if (!fields || !mine.offsetParent) return;
+  const among = mine.closest('.choice'), columns = getComputedStyle(among).gridTemplateColumns.split(' ').length;
+  fields.classList.add('of');
+  (columns > 1 ? among : mine).after(fields);
+}
+window.addEventListener('resize', placeConditionFields);
 // missing is the problem of a field that is left empty: the cursor goes there.
 const missing = (field, message) => Object.assign(new Error(message), {field});
 function condition() {
@@ -357,14 +370,7 @@ function showParams() {
   $('alertFields').hidden = picked('when') !== 'alert';
   $('eventFields').hidden = picked('when') !== 'event';
   $('timeFields').hidden = picked('when') !== 'time';
-  // What the chosen condition asks for stands at the condition, not below
-  // all of them, a screen or more further down: below the row of
-  // conditions it is among, or right below it where they stand in one column.
-  if (conditionFields()) {
-    const mine = document.querySelector('input[name=when]:checked').closest('label'), among = mine.closest('.choice');
-    conditionFields().classList.add('of');
-    (getComputedStyle(among).gridTemplateColumns.split(' ').length > 1 ? among : mine).after(conditionFields());
-  }
+  placeConditionFields();
   // What a watch can keep running, of what is chosen.
   for (const label of document.querySelectorAll('[data-before]')) label.hidden = !has(label.dataset.before);
   $('beforeFields').hidden = !watching || !['pcap', 'cpu', 'memory', 'strace'].some(has);
@@ -751,6 +757,7 @@ function showStep(n) {
   $('back').hidden = step === 1;
   $('next').hidden = step === 4;
   $('submit').hidden = step !== 4;
+  placeConditionFields();
   summarize();
 }
 // What the step needs before the next one; the message appears at the step.
