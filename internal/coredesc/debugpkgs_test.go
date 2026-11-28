@@ -441,3 +441,67 @@ func TestADownloadIsAskedForAgainAfterAFailedConnection(t *testing.T) {
 		})
 	}
 }
+
+// An agent describes the cores of a capture at the same time, and the
+// cores of one workload are of the same program: a debuginfod server is
+// asked once for a build ID, not once by every core, and by all the cores
+// together no more at a time than by one. A hundred cores at once made a
+// public server refuse and reset connections.
+func TestCoresDescribedTogetherAskADebuginfodServerOnce(t *testing.T) {
+	var mu sync.Mutex
+	asked := map[string]int{}
+	asking, most := 0, 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		asked[r.URL.Path]++
+		asking++
+		most = max(most, asking)
+		mu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		mu.Lock()
+		asking--
+		mu.Unlock()
+		if strings.Contains(r.URL.Path, "/aa0") {
+			io.WriteString(w, "debug information")
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	files := map[string]string{}
+	for i := range 12 {
+		files[fmt.Sprintf("/lib/lib%d.so", i)] = fmt.Sprintf("aa%d%037d", i%2, i)
+	}
+	d := Describer{Scratch: t.TempDir()}
+	var cores sync.WaitGroup
+	for range 20 {
+		cores.Go(func() {
+			if _, found := debuginfo(d.fetcher(context.Background(), "debuginfo"), []string{server.URL}, files); len(found) != 12 {
+				t.Error("found", found)
+			}
+		})
+	}
+	cores.Wait()
+	if len(asked) != 12 {
+		t.Fatalf("%d build IDs were asked for, want 12", len(asked))
+	}
+	for path, times := range asked {
+		if times != 1 {
+			t.Errorf("%s was asked for %d times", path, times)
+		}
+	}
+	if most > 6 {
+		t.Errorf("%d requests at a time", most)
+	}
+	// What was found is there for every core.
+	_, found := debuginfo(d.fetcher(context.Background(), "debuginfo"), []string{server.URL}, files)
+	have := 0
+	for _, has := range found {
+		if has {
+			have++
+		}
+	}
+	if have != 6 {
+		t.Errorf("%d of the files have debug information, want 6", have)
+	}
+}
