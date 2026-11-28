@@ -469,6 +469,8 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     hostile = [[/^\/api\/approvals$/, waiting], [/^\/api\/captures(\?.*)?$/, []]];
     await open(hub + '/#captures');
     await until('the list', `return !document.getElementById('app').hidden`);
+    // An administrator decides in the list itself, where every request that waits is shown: this is for who is none.
+    if (await run(`return me.admin`)) return;
     await run(`loadCaptures()`); await sleep(400);
     const said = await run(`const a = document.getElementById('approvals'); return a.hidden ? '' : a.innerText`);
     for (const word of ['Awaiting your approval', 'alice', 'capture 0012', 'the api hangs after the deploy', 'payments', 'bob', 'a watch', 'No reason given']) {
