@@ -979,7 +979,7 @@ func (h *Hub) hint(what string) {
 		// that a capture exists is its requester's to know.
 		select {
 		case ch <- what:
-		default: // a slow reader misses the hint and reloads on its next event
+		default: // a slow reader misses the hint and loads on its next one what it has not got
 		}
 	}
 }

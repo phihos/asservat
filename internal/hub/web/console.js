@@ -382,19 +382,34 @@ let auditEntries = [];
 // The audit log follows what happens while it is shown and not paused: the
 // hub hints at every entry, and the entries that are new go on top. Paused,
 // it stands still to be read, and says how many it holds back.
-let auditLive = true, auditHeld = 0, auditNew = new Set();
-async function followAudit() {
+let auditLive = true, auditHeld = 0, auditNew = new Set(), auditAsking = null, auditAgain = false;
+// One request at a time: a hint that comes while the entries are asked for
+// has them asked for once more after that, so that two answers never put
+// the same entries on top.
+function followAudit() {
   if (!me?.admin || $('auditTable').closest('[data-view]').hidden) return;
-  if (!auditLive) { auditHeld++; return showAuditLive(); }
+  if (auditAsking) { auditAgain = true; return auditAsking; }
+  auditAsking = (async () => {
+    try { do { auditAgain = false; await takeAudit(); } while (auditAgain); } finally { auditAsking = null; }
+  })();
+  return auditAsking;
+}
+async function takeAudit() {
+  const page = await call('GET', `/api/audit?limit=${auditPage}`);
   const known = new Set(auditEntries.map(e => e.id));
-  const news = (await call('GET', `/api/audit?limit=${auditPage}`)).filter(e => !known.has(e.id));
+  const news = page.filter(e => !known.has(e.id));
+  // A whole page of new entries reaches none that is shown: more may lie between.
+  const beyond = auditEntries.length > 0 && page.length === auditPage && news.length === page.length;
+  // Paused, what waits is counted from the entries themselves, not from the hints, of which one can be missed.
+  if (!auditLive) { auditHeld = beyond ? Infinity : news.length; return showAuditLive(); }
+  if (beyond) return loadAudit(true);
   if (!news.length) return;
   auditEntries = news.concat(auditEntries);
   auditNew = new Set(news.map(e => e.id));
   drawAudit();
 }
 function showAuditLive() {
-  $('auditLive').textContent = auditLive ? 'Pause' : auditHeld ? `Resume · ${auditHeld} new ${auditHeld === 1 ? 'entry' : 'entries'}` : 'Resume';
+  $('auditLive').textContent = auditLive ? 'Pause' : auditHeld ? `Resume · ${auditHeld === Infinity ? `more than ${auditPage}` : auditHeld} new ${auditHeld === 1 ? 'entry' : 'entries'}` : 'Resume';
   $('auditLive').setAttribute('aria-pressed', String(!auditLive));
   $('auditLive').title = auditLive ? 'Hold the list still to read it. New entries wait until you resume.' : 'Show what happened meanwhile and follow again.';
   $('auditState').textContent = auditLive ? 'Live: new entries appear as they happen.' : 'Paused.';
@@ -733,9 +748,10 @@ $('captureFind').oninput = guard(loadCaptures, 'capturesProblem');
 $('auditOlder').onclick = guard(() => loadAudit(false), 'auditProblem');
 $('auditLive').onclick = guard(async () => {
   auditLive = !auditLive;
-  const held = auditHeld; auditHeld = 0;
+  auditHeld = 0;
   showAuditLive();
-  if (auditLive && held) await followAudit();
+  // What happened meanwhile is asked for anew: also what no hint told of.
+  if (auditLive) await followAudit();
 }, 'auditProblem');
 $('older').onclick = guard(async () => { pages++; await loadCaptures(); }, 'capturesProblem');
 $('states').onclick = guard(async e => {

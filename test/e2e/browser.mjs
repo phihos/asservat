@@ -420,6 +420,13 @@ if (adminToken) {
     await run(`document.getElementById('auditLive').click()`);
     await until('the entry that waited', `return (document.querySelector('#auditRows tr')?.dataset.entry || '') !== ${JSON.stringify(held)}`, 10);
     if (!/^Pause$/.test(await run(`return document.getElementById('auditLive').innerText.trim()`))) throw new Error('the audit log does not follow again');
+    // Two entries at the same moment are two rows, each once.
+    const before = await run(`return document.querySelectorAll('#auditRows tr').length`);
+    await run(`await Promise.all([0, 1].map(async () => { ${download} }))`);
+    await until('both entries', `return document.querySelectorAll('#auditRows tr').length >= ${before} + 2`, 10);
+    await sleep(600);
+    const rows = await run(`return [...document.querySelectorAll('#auditRows tr')].map(row => row.dataset.entry)`);
+    if (new Set(rows).size !== rows.length || rows.length !== before + 2) throw new Error(`two entries at once made ${rows.length - before} rows, ${rows.length - new Set(rows).size} of them twice`);
   });
   // What the audit log names is a link to it: the capture, and the file
   // that was opened or downloaded. The capture's link leads to the capture
