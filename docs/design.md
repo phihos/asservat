@@ -702,7 +702,11 @@ Arch and others, and from Ubuntu's. The describer asks the servers itself,
 for the debug files of the stripped files a core maps, and gdb asks none:
 gdb's own client waited minutes on a server that neither answered nor
 closed. A server that does not answer within 10 seconds is not asked
-again for that core; what no server has is asked for again after a day.
+again for a minute, by any core; what no server has is asked for again
+after a day. The cores that an agent or the hub describes at the same time
+ask together for no more than six files at a time, and for one file once:
+the cores of a capture are of the same program, and a hundred of them at
+once made a public server refuse.
 The servers are sent the build IDs of the programs and libraries of the
 cores that are described, which name compiled files and hold nothing of a
 process; an installation without a way out sets the list empty. The

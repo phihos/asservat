@@ -375,10 +375,12 @@ func apkDebugPackages(root, mirror, version string, stripped map[string]string) 
 // asks none: gdb's own client waited minutes for a server that neither
 // answered nor closed, and also asks for the program itself.
 //
-// A server is asked for one file at a time by each of a few askers. One
-// that fails, other than by not having a file, is not asked again for
-// this core. What no server has is remembered for a day, as an empty
-// file, which a server's index may take to learn of a new build.
+// A server is asked for one file at a time by each of a few askers, and
+// by all the cores that are described at the same time together no more
+// than by one (debuginfodTurn). One that fails, other than by not having a
+// file, is left alone for a while (debuginfodRest). What no server has is remembered
+// for a day, as an empty file, which a server's index may take to learn of
+// a new build.
 func debuginfo(f debugFetcher, servers []string, files map[string]string) (string, map[string]bool) {
 	ctx, cache := f.ctx, f.cache
 	dir := filepath.Join(cache, ".build-id")
@@ -403,16 +405,18 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 		}
 	}
 	var mu sync.Mutex
-	failed := map[string]bool{}
 	todo := make(chan string)
 	var askers sync.WaitGroup
-	// As many at a time as a browser asks one host for: enough to be done
-	// in seconds with dozens of libraries, and no flood for a public server.
-	for range 6 {
+	for range debuginfodAskers {
 		askers.Go(func() {
 			for id := range todo {
 				path := filepath.Join(dir, id[:2], id[2:]+".debug")
-				if info, err := os.Stat(path); err == nil && (info.Size() > 0 || time.Since(info.ModTime()) < debugIndexAge) {
+				// known tells whether the cache says what the servers have of the ID.
+				known := func() bool {
+					info, err := os.Stat(path)
+					if err != nil || info.Size() == 0 && time.Since(info.ModTime()) >= debugIndexAge {
+						return false
+					}
 					if info.Size() > 0 {
 						now := time.Now()
 						os.Chtimes(path, now, now)
@@ -420,16 +424,25 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 						ids[id] = true
 						mu.Unlock()
 					}
+					return true
+				}
+				if known() {
+					continue
+				}
+				// Another core may ask for the same ID right now: after it, the cache knows.
+				done, ok := debuginfodTurn(ctx, path)
+				if !ok {
+					continue
+				}
+				if known() {
+					done()
 					continue
 				}
 				os.MkdirAll(filepath.Dir(path), 0o700)
 				// unknown: every server was asked and has it not.
 				got, unknown := false, true
 				for _, server := range servers {
-					mu.Lock()
-					skip := failed[server]
-					mu.Unlock()
-					if skip {
+					if debuginfodRests(server) {
 						unknown = false
 						continue
 					}
@@ -454,11 +467,8 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 					}
 					if err != errNotPublished {
 						unknown = false
-						if ctx.Err() == nil {
-							slog.Warn("debuginfod server not asked further for this core", "server", server, "error", err)
-							mu.Lock()
-							failed[server] = true
-							mu.Unlock()
+						if ctx.Err() == nil && debuginfodFailed(server) {
+							slog.Warn("debuginfod server not asked for a while", "server", server, "error", err)
 						}
 					}
 				}
@@ -468,6 +478,7 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 				if unknown && !got {
 					os.WriteFile(path, nil, 0o600)
 				}
+				done()
 			}
 		})
 	}
@@ -478,6 +489,84 @@ func debuginfo(f debugFetcher, servers []string, files map[string]string) (strin
 	close(todo)
 	askers.Wait()
 	return cache, ids
+}
+
+// debuginfodAskers is how many files debuginfod servers are asked for at a
+// time: as many as a browser asks one host for, enough to be done in
+// seconds with dozens of libraries, and no flood for a public server.
+const debuginfodAskers = 6
+
+// debuginfodTurns holds who asks debuginfod servers right now, over all the
+// cores that this process describes: a place for each asker, and the files
+// that are being asked for.
+var debuginfodTurns = struct {
+	places chan struct{}
+	mu     sync.Mutex
+	asking map[string]chan struct{}
+	// failed holds when a server last failed.
+	failed map[string]time.Time
+}{places: make(chan struct{}, debuginfodAskers), asking: map[string]chan struct{}{}, failed: map[string]time.Time{}}
+
+// debuginfodRest is how long a debuginfod server that failed, other than by
+// not having a file, is not asked by any core: long enough for the cores of
+// one capture, which are described together and would otherwise each wait
+// for it in turn, and short enough that the next capture asks it again.
+const debuginfodRest = time.Minute
+
+// debuginfodRests tells whether a server failed a moment ago.
+func debuginfodRests(server string) bool {
+	debuginfodTurns.mu.Lock()
+	defer debuginfodTurns.mu.Unlock()
+	return time.Since(debuginfodTurns.failed[server]) < debuginfodRest
+}
+
+// debuginfodFailed notes that a server failed, and tells whether it is the
+// first to note it: the others that were asking it then say nothing more.
+func debuginfodFailed(server string) bool {
+	debuginfodTurns.mu.Lock()
+	defer debuginfodTurns.mu.Unlock()
+	first := time.Since(debuginfodTurns.failed[server]) >= debuginfodRest
+	debuginfodTurns.failed[server] = time.Now()
+	return first
+}
+
+// debuginfodTurn waits until no other core asks for the same file of the
+// cache and a place is free, and returns what ends the turn. An agent
+// describes the cores of a capture at the same time, and those of one
+// workload are of the same program: without turns a hundred cores asked a
+// public server six hundred things at once, the same few each, and the
+// server refused. It is false when the context ended first.
+func debuginfodTurn(ctx context.Context, path string) (done func(), ok bool) {
+	t := &debuginfodTurns
+	for {
+		t.mu.Lock()
+		other := t.asking[path]
+		if other == nil {
+			break
+		}
+		t.mu.Unlock()
+		select {
+		case <-other:
+		case <-ctx.Done():
+			return nil, false
+		}
+	}
+	mine := make(chan struct{})
+	t.asking[path] = mine
+	t.mu.Unlock()
+	end := func() {
+		t.mu.Lock()
+		delete(t.asking, path)
+		t.mu.Unlock()
+		close(mine)
+	}
+	select {
+	case t.places <- struct{}{}:
+	case <-ctx.Done():
+		end()
+		return nil, false
+	}
+	return func() { <-t.places; end() }, true
 }
 
 // plainName is a name or a version as distributions write them: nothing
