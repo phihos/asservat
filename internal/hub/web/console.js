@@ -99,7 +99,7 @@ const picked = name => document.querySelector(`input[name=${name}]:checked`).val
 const size = bytes => bytes >= 1 << 30 ? (bytes / (1 << 30)).toFixed(1) + ' GiB' : Math.max(1, Math.round(bytes / (1 << 20))) + ' MiB';
 const fileSize = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1 << 20 ? Math.round(bytes / 1024) + ' KiB' : size(bytes);
 // Who approves a sensitive request here: one administrator, or as many as the installation asks for.
-const approvers = () => me?.approvalsNeeded > 1 ? `${me.approvalsNeeded} administrators approve` : 'An administrator approves';
+const approvers = () => me?.approvalsNeeded > 1 ? `${me.approvalsNeeded} people who may approve here approve` : 'Someone who may approve here, an administrator or whom the cluster lets, approves';
 const badgeText = () => me?.selfApproval ? 'sensitive' : 'needs approval';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -356,7 +356,7 @@ function showParams() {
     ? `Sensitive because of ${list(sensitive)}. It starts right away because you may approve your own requests. The audit log records it as approved by you.`
     : `Needs approval because of ${list(sensitive)}. ` + (watching
       ? `${approvers()} the watch once, before it starts. Its captures then need no further approval.`
-      : chosen.length > 1 ? `${approvers()} the whole request at once. Nothing starts before that.` : `It starts once ${approvers().toLowerCase().replace(/ approves?$/, '')} ${me?.approvalsNeeded > 1 ? 'have' : 'has'} approved it.`);
+      : chosen.length > 1 ? `${approvers()} the whole request at once. Nothing starts before that.` : `It starts once it is approved${me?.approvalsNeeded > 1 ? ` by ${me.approvalsNeeded} people` : ''}: by an administrator, or by someone who may approve in this namespace.`);
   // An installation can ask for the reason of every request that is sensitive.
   const must = !!(sensitive.length && me?.reasonRequired);
   $('reasonLabel').textContent = (asks ? 'Reason, shown to the approver' : 'Reason') + (must ? ' (required)' : '');
@@ -483,7 +483,8 @@ async function loadApprovals() {
     <span class="acts"><button class="primary" data-path="${a.path}" data-id="${a.id}" data-act="approve" title="${me.approvalsNeeded > 1 ? 'Give your approval. It starts with the last one it needs.' : 'Let it start'}">Approve</button>${a.path === 'captures' ? `<button data-path="captures" data-id="${a.id}" data-act="deny" title="Refuse the request. It will not start.">Deny</button>` : ''}</span></div>`).join('');
 }
 async function loadCaptures() {
-  await loadApprovals();
+  // Not waited for: the clusters are asked for it, and the captures are not to wait for them.
+  guard(loadApprovals, 'capturesProblem')();
   let all = [];
   for (let i = 0; i < pages; i++) {
     const page = await call('GET', '/api/captures' + (all.length ? '?before=' + encodeURIComponent(all.at(-1).createdAt) : ''));

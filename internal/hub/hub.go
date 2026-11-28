@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"net/http"
 	"os"
@@ -823,6 +824,12 @@ func (h *Hub) decides(ctx context.Context, u User, cluster, namespace, requester
 	return ErrNotFound
 }
 
+// approvalsWait is how long the clusters are given to say where a user may
+// approve, for the list of what waits for the user: a cluster's RBAC
+// answers within milliseconds, so one that takes seconds is not well, and
+// the console waits for this list.
+const approvalsWait = 5 * time.Second
+
 // listApprovals lists the requests that wait for this user's word: those
 // of others, in namespaces where the user may approve, which the user has
 // not approved yet.
@@ -831,19 +838,40 @@ func (h *Hub) listApprovals(w http.ResponseWriter, r *http.Request, u User) erro
 	if err != nil {
 		return err
 	}
-	// Each namespace is asked about once.
+	// Each namespace is asked about once, all of them at the same time and
+	// none for longer than a few seconds: the console asks for this list
+	// with every change, and a cluster that is slow to answer must not hold
+	// it up. Such a cluster lets nobody approve this time.
 	asked := map[Place]bool{}
-	mine := func(cluster, namespace, requester string, approvals []string) bool {
-		if requester == u.Name || slices.Contains(approvals, u.Name) {
-			return false
+	wants := func(requester string, approvals []string) bool {
+		return requester != u.Name && !slices.Contains(approvals, u.Name)
+	}
+	for _, c := range captures {
+		if wants(c.Requester, c.Approvals) {
+			asked[Place{c.Cluster, c.Namespace}] = false
 		}
-		place := Place{cluster, namespace}
-		may, known := asked[place]
-		if !known {
-			may = h.approves(r.Context(), u, cluster, namespace)
+	}
+	for _, watch := range watches {
+		if wants(watch.Requester, watch.Approvals) {
+			asked[Place{watch.Cluster, watch.Namespace}] = false
+		}
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), approvalsWait)
+	defer cancel()
+	var answers sync.WaitGroup
+	var mu sync.Mutex
+	// The places first: the answers are written into the map while they are asked.
+	for _, place := range slices.Collect(maps.Keys(asked)) {
+		answers.Go(func() {
+			may := h.approves(ctx, u, place.Cluster, place.Namespace)
+			mu.Lock()
 			asked[place] = may
-		}
-		return may
+			mu.Unlock()
+		})
+	}
+	answers.Wait()
+	mine := func(cluster, namespace, requester string, approvals []string) bool {
+		return wants(requester, approvals) && asked[Place{cluster, namespace}]
 	}
 	list := struct {
 		Captures []api.Capture `json:"captures"`

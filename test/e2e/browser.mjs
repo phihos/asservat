@@ -380,7 +380,8 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) await chec
     await run(`loadCaptures()`); await sleep(400);
     const said = await run(`const a = document.getElementById('approvals'); return a.hidden ? '' : a.innerText`);
     for (const word of ['Awaiting your approval', 'alice', 'capture 0012', 'the api hangs after the deploy', 'payments', 'bob', 'a watch', 'No reason given']) {
-      if (!said.includes(word)) throw new Error(`what awaits approval does not say "${word}": ${said}`);
+      // The heading is shown in capitals.
+      if (!said.toLowerCase().includes(word.toLowerCase())) throw new Error(`what awaits approval does not say "${word}": ${said}`);
     }
     const buttons = await run(`return [...document.querySelectorAll('#approvals button')].map(b => b.dataset.act + ' ' + b.dataset.path).join(', ')`);
     if (buttons !== 'approve captures, deny captures, approve watches') throw new Error('the decisions offered: ' + buttons);
