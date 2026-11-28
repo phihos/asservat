@@ -51,6 +51,9 @@ spec:
             - --debuginfod-urls={{ join " " . }}
             {{- end }}
             - --allow-self-approval={{ .Values.hub.allowSelfApproval }}
+            {{- if .Values.hub.requireReason }}
+            - --require-reason
+            {{- end }}
             {{- if .Values.hub.auditToLog }}
             - --audit-to-log
             {{- end }}

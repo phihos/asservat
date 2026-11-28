@@ -327,7 +327,10 @@ function showParams() {
     : `Needs approval because of ${list(sensitive)}. ` + (watching
       ? 'An administrator approves the watch once, before it starts. Its captures then need no further approval.'
       : chosen.length > 1 ? 'One approval covers the whole request. Nothing starts before it.' : 'It starts once an administrator approves it.');
-  $('reasonLabel').textContent = asks ? 'Reason, shown to the approver' : 'Reason';
+  // An installation can ask for the reason of every request that is sensitive.
+  const must = !!(sensitive.length && me?.reasonRequired);
+  $('reasonLabel').textContent = (asks ? 'Reason, shown to the approver' : 'Reason') + (must ? ' (required)' : '');
+  $('reason').required = must;
   $('submit').textContent = watching ? (asks ? 'Request approval for this watch' : 'Start the watch') : asks ? 'Request approval' : 'Record now';
   $('done').textContent = $('formProblem').textContent = $('profileProblem').textContent = $('kindProblem').textContent = '';
   $('submit').disabled = false;

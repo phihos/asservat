@@ -73,6 +73,9 @@ type Config struct {
 	// AllowSelfApproval lets an administrator approve their own request, for
 	// installations with a single administrator.
 	AllowSelfApproval bool
+	// RequireReason refuses a request that needs approval and does not say
+	// why it is made.
+	RequireReason bool
 	// DebuginfodURLs are the debuginfod servers, separated by spaces, that
 	// gdb asks for debug information when the hub describes a core again.
 	DebuginfodURLs string
@@ -226,10 +229,12 @@ func (h *Hub) Handler() http.Handler {
 	}
 	user("GET /api/me", func(w http.ResponseWriter, r *http.Request, u User) error {
 		// SelfApproval tells the console that this user's sensitive requests start at once.
+		// ReasonRequired tells it that a sensitive request must say why.
 		return reply(w, struct {
 			User
-			SelfApproval bool `json:"selfApproval"`
-		}{u, h.approvesOwn(u)})
+			SelfApproval   bool `json:"selfApproval"`
+			ReasonRequired bool `json:"reasonRequired,omitempty"`
+		}{u, h.approvesOwn(u), h.RequireReason})
 	})
 	user("GET /api/clusters", h.listClusters)
 	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)
@@ -505,6 +510,9 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 			return api.Capture{}, errStatus{http.StatusBadRequest, "before only applies to a watch: a capture that starts now has nothing running beforehand"}
 		}
 	}
+	if err := h.reasoned(in); err != nil {
+		return api.Capture{}, err
+	}
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Capture{}, err
 	}
@@ -739,6 +747,16 @@ func (h *Hub) decide(state string) func(http.ResponseWriter, *http.Request, User
 		}
 		return reply(w, c)
 	}
+}
+
+// reasoned refuses a request that needs approval and gives no reason, where
+// the installation asks for one: the approver decides by it, and the audit
+// log keeps it. An administrator's own request says why as well.
+func (h *Hub) reasoned(in api.CaptureRequest) error {
+	if h.RequireReason && in.Sensitive() && strings.TrimSpace(in.Reason) == "" {
+		return errStatus{http.StatusBadRequest, "give a reason: this installation asks for one where a recording needs approval"}
+	}
+	return nil
 }
 
 // approvesOwn reports whether the user's sensitive requests need nobody

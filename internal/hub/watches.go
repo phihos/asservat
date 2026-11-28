@@ -42,6 +42,9 @@ func (h *Hub) Watch(ctx context.Context, u User, in api.WatchRequest) (api.Watch
 	if in.Count < 0 || in.BeforeSeconds < 0 {
 		return api.Watch{}, errStatus{http.StatusBadRequest, "count and beforeSeconds must not be negative"}
 	}
+	if err := h.reasoned(in.CaptureRequest); err != nil {
+		return api.Watch{}, err
+	}
 	if err := h.allowed(ctx, u, in.Cluster, in.Namespace); err != nil {
 		return api.Watch{}, err
 	}
