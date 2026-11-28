@@ -13,7 +13,7 @@ async function open() {
   if (res.status === 401) return notice('Please sign in to the console first.');
   if (!res.ok) return notice('This capture no longer exists.');
   const c = await res.json(), artifact = c.artifacts.find(a => a.name === file);
-  $('number').textContent = String(c.number).padStart(4, '0'); $('number').title = `Go to capture ${c.number}`; $('number').href = `/#capture=${c.id}`; $('number').hidden = false;
+  $('number').textContent = String(c.number).padStart(4, '0'); $('number').title = `Go to capture ${c.number}`; $('number').href = `/#capture=${encodeURIComponent(c.id)}`; $('number').hidden = false;
   document.title = `${$('number').textContent} ${$('name').textContent} – Asservat`;
   $('origin').textContent = `pod ${file.split('/')[0]} · ${c.workload} in ${c.namespace} on ${c.cluster}`;
   if (!artifact) return notice('This file no longer exists.');

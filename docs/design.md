@@ -901,7 +901,14 @@ more on request, and a find box narrows it by any of those words. An open
 capture shows each pod with its recordings in the order they were asked
 for, and under each recording the files it made, with their full names,
 what each file is, its size, and the ways to it: **Open** where a viewer
-exists, and **Download**. A capture of more than five pods shows a line
+exists, and **Download**; a file's name leads to the file as well. A capture
+has an address of its own, `/#capture=<id>`, under which the list opens it
+and brings it into sight, also from an older page; the number of a file's
+capture in its viewer leads there. The audit log's page names what an
+entry is about as a link while it is there, the capture and the file that
+was opened or downloaded, and writes a request as a sentence ("CPU profile
+for 30 s · Deployment/api in prod / payments") and not as the fields it
+was sent with. A capture of more than five pods shows a line
 for each pod instead, which says how each recording went on it and how
 much it left, and opens the pod's files: with all of them open, a capture
 of 200 pods was a page of 55,000 pixels. The hub tells which recording a file is from by

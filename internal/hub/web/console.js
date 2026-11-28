@@ -53,7 +53,6 @@ function route() {
     // Whatever narrows the list could hide it.
     captureFilter = 'all'; $('captureFind').value = '';
     for (const b of $('states').children) b.classList.toggle('on', b.dataset.filter === 'all');
-    if (me) guard(loadCaptures, 'capturesProblem')();
   }
   for (const v of document.querySelectorAll('[data-view]')) v.hidden = v.dataset.view !== view;
   for (const a of document.querySelectorAll('[data-nav]')) a.classList.toggle('on', a.dataset.nav === view);
@@ -61,7 +60,9 @@ function route() {
   if (view === 'new') showStep(step);
   if (view === 'audit' && me?.admin) guard(() => loadAudit(true), 'auditProblem')();
 }
-window.onhashchange = route;
+// A capture that an address names while the page is open is looked for at
+// once. At the start the list is loaded anyway, once, and finds it.
+window.onhashchange = () => { route(); if (sought && me) guard(loadCaptures, 'capturesProblem')(); };
 
 async function loadClusters() {
   const clusters = await call('GET', '/api/clusters');
@@ -369,7 +370,7 @@ async function loadAudit(fresh) {
   const page = await call('GET', `/api/audit?limit=${auditPage}${before}`);
   auditEntries = fresh ? page : auditEntries.concat(page);
   // What an entry names is a link to it while it is there: the capture, its file, the watches.
-  const linked = (e, k, v) => (k === 'name' || k === 'file') && e.number && typeof v === 'string' ? `<a href="/view?capture=${e.capture}&file=${encodeURIComponent(v)}" title="Look at the file">${esc(v)}</a>`
+  const linked = (e, k, v) => (k === 'name' || k === 'file') && e.number && typeof v === 'string' ? `<a href="/view?capture=${encodeURIComponent(e.capture)}&file=${encodeURIComponent(v)}" title="Look at the file">${esc(v)}</a>`
     : k === 'id' && e.action.startsWith('watch.') && e.action !== 'watch.delete' ? `<a href="#watches" title="The watches">${esc(v)}</a>` : esc(typeof v === 'object' ? JSON.stringify(v) : v);
   // A request reads as a sentence, not as the fields it was sent with: what
   // of which workload, for how long, on what condition, and why. What else
@@ -388,7 +389,7 @@ async function loadAudit(fresh) {
     return said.filter(Boolean).join(' · ');
   };
   $('auditRows').innerHTML = auditEntries.map(e => `<tr><td class="when">${new Date(e.at).toLocaleString()}</td><td>${esc(e.actor || 'Asservat')}</td><td>${esc(auditActions[e.action] || e.action)}</td>
-    <td>${e.capture ? (e.number ? `<a class="number" href="#capture=${e.capture}" title="Go to the capture"><b>${String(e.number).padStart(4, '0')}</b></a>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail, e)}</td></tr>`).join('');
+    <td>${e.capture ? (e.number ? `<a class="number" href="#capture=${encodeURIComponent(e.capture)}" title="Go to the capture"><b>${String(e.number).padStart(4, '0')}</b></a>` : `<span class="muted" title="${esc(e.capture)}">deleted or expired</span>`) : ''}</td><td class="muted">${detail(e.detail, e)}</td></tr>`).join('');
   $('auditTable').hidden = !auditEntries.length; $('noAudit').hidden = !!auditEntries.length;
   $('auditOlderLine').hidden = page.length < auditPage;
 }
