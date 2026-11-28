@@ -64,7 +64,8 @@
   input, select, button { font: inherit; min-height: 32px; box-sizing: border-box; padding: 4px 10px; border: 1px solid var(--line); border-radius: 0; background-color: var(--surface); color: inherit; }
   input[type=checkbox], input[type=radio] { min-height: 0; }
   input:hover, select:hover, button:hover:not(:disabled) { border-color: var(--quiet); } button.primary:hover:not(:disabled), a.button.primary:hover { background: color-mix(in srgb, var(--marker) 88%, var(--ink)); border-color: transparent; }
-  header button, .chips button, td button, .capture .acts button { background-color: transparent; }
+  /* Not the one that is the thing to do: it keeps its ground, on which its words are read. */
+  header button, .chips button, td button:not(.primary), .capture .acts button:not(.primary) { background-color: transparent; }
   select { max-width: 100%; }
   button { cursor: pointer; } button.primary { background: var(--marker); color: var(--on-marker); border-color: var(--marker); font-weight: 600; }
   button:disabled { opacity: .6; cursor: progress; }
