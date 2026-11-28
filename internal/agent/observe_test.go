@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -159,6 +160,11 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 	kube := fake.NewClientset(pod)
 	reports := make(chan api.Trigger, 100)
 	hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A watch that has ended, which the agent observes a while longer.
+		if strings.Contains(r.URL.Path, "/ended/") {
+			http.NotFound(w, r)
+			return
+		}
 		var report api.Trigger
 		json.NewDecoder(r.Body).Decode(&report)
 		reports <- report
@@ -175,9 +181,10 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 	watch := func(id string) api.Watch {
 		return api.Watch{ID: id, Selector: "app=api", CaptureRequest: api.CaptureRequest{Namespace: "shop", Workload: "Deployment/api", Recordings: []api.Recording{{Kind: api.KindCoredump}}}}
 	}
-	a.setWatches(ctx, []api.Watch{watch("cores"), watch("cores-too")})
+	// And one that has ended: what it takes and cannot report is the others'.
+	a.setWatches(ctx, []api.Watch{watch("ended"), watch("cores"), watch("cores-too")})
 	// The pod is marked for the node's handler, which then keeps its cores.
-	for _, id := range []string{"cores", "cores-too"} {
+	for _, id := range []string{"ended", "cores", "cores-too"} {
 		for i := 0; ; i++ {
 			if _, err := os.Stat(spool.marker(uid, id)); err == nil {
 				break
@@ -243,13 +250,18 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 	core("c0ffee", "4712")
 	time.Sleep(wait * 3 / 4)
 	core("decaf", "4713")
-	report = next("the first of two cores")
-	if got := taken(report); len(got) != 1 || !strings.Contains(got[0], "4712") {
-		t.Fatalf("the first report took %v", got)
+	var two []string
+	for _, what := range []string{"the first of two cores", "the second of two cores"} {
+		report = next(what)
+		got := taken(report)
+		if len(got) != 1 {
+			t.Fatalf("%s: the report took %v", what, got)
+		}
+		two = append(two, strings.Split(filepath.Base(got[0]), ".")[1])
 	}
-	report = next("the second of two cores")
-	if got := taken(report); len(got) != 1 || !strings.Contains(got[0], "4713") || !strings.Contains(report.Message, "container side") {
-		t.Fatalf("the second report took %v and said %q", got, report.Message)
+	// Which comes first is not said: a watch that has ended may have held one of them up.
+	if slices.Sort(two); !slices.Equal(two, []string{"4712", "4713"}) {
+		t.Fatalf("the two reports took the cores of %v", two)
 	}
 
 	// The next one takes its container with it: the crash is reported, by
@@ -272,7 +284,12 @@ func TestACoreWithoutACrashIsRecorded(t *testing.T) {
 		with += len(taken(report))
 	}
 	if with != 1 {
-		t.Fatalf("the crash's reports hold %d cores, want 1", with)
+		var tree []string
+		filepath.WalkDir(string(spool), func(path string, d os.DirEntry, err error) error {
+			tree = append(tree, strings.TrimPrefix(path, string(spool)))
+			return nil
+		})
+		t.Fatalf("the crash's reports hold %d cores, want 1; on the node: %v", with, tree)
 	}
 	quiet("the core of a crash was reported once more", 4*wait)
 }

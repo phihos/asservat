@@ -323,6 +323,11 @@ handler.
   rested on the node unread until the watch ended. Only a watch for core
   dumps records so; one for packets or logs waits for the container's
   crash.
+- Of several watches for a pod, one records a core: it is set aside for
+  the report before the report is sent. A report that the hub does not
+  take, as that of a watch which has ended and which the agent observes a
+  while longer, gives its cores back, for another watch of the pod to
+  record. Cores leave the node when no watch is left that wants them.
 - A process that the kernel kills for exceeding a memory limit leaves no
   core, and neither does one that exits by itself.
 

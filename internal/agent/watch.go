@@ -366,7 +366,7 @@ func (a *Agent) trigger(ctx context.Context, w api.Watch, crashed *corev1.Pod, m
 
 // tell is trigger for a report whose cores, if it has any, are set aside
 // under id already.
-func (a *Agent) tell(ctx context.Context, w api.Watch, crashed *corev1.Pod, id, message string) {
+func (a *Agent) tell(ctx context.Context, w api.Watch, crashed *corev1.Pod, id, message string) (recorded bool) {
 	pod := crashed.Name
 	// After a crash the packets up to it are set aside. A pod that goes on
 	// is recorded on by its buffer, which the capture reads when it is done.
@@ -388,10 +388,15 @@ func (a *Agent) tell(ctx context.Context, w api.Watch, crashed *corev1.Pod, id, 
 		delete(a.snapshots, id)
 		delete(a.calls, id)
 		a.mu.Unlock()
+		// The cores go back: this watch does not record them, as one that
+		// has ended, and another watch for the pod may. They leave the node
+		// when no watch is left that wants them (unmark).
 		if a.Cores != "" {
-			os.RemoveAll(a.Cores.taken(id))
+			a.Cores.giveBack(string(crashed.UID), id)
 		}
+		return false
 	}
+	return true
 }
 
 // buffer keeps the packet headers of the watch's last seconds in memory,

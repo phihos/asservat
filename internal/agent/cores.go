@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -330,8 +331,14 @@ func (s CoreSpool) take(podUID, trigger string) {
 	for waiting, late := true, false; waiting; {
 		parts, _ := filepath.Glob(filepath.Join(dir, "*.part"))
 		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
-		if len(parts) == 0 && (len(cores) > 0 || late) {
-			break
+		if len(parts) == 0 {
+			// Another report may be quicker, as that of a second watch for
+			// the pod. If the hub does not take that one, the cores come
+			// back: so this goes on waiting for them, for the few seconds
+			// that it waits for a core to appear at all.
+			if len(s.setAside(cores, trigger)) > 0 || late {
+				return
+			}
 		}
 		select {
 		case _, reports := <-changed:
@@ -344,6 +351,7 @@ func (s CoreSpool) take(podUID, trigger string) {
 			waiting = false
 		}
 	}
+	// The time is up: what is finished by now is taken.
 	cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	s.setAside(cores, trigger)
 }
@@ -369,6 +377,35 @@ func (s CoreSpool) setAside(cores []string, trigger string) (moved []string) {
 		os.Remove(s.taken(trigger))
 	}
 	return moved
+}
+
+// giveBack returns the cores that were set aside for a report that the hub
+// did not take to the pod's cores, where another watch for the pod finds
+// them.
+func (s CoreSpool) giveBack(podUID, trigger string) {
+	dir := s.taken(trigger)
+	defer os.RemoveAll(dir)
+	files, _ := filepath.Glob(filepath.Join(dir, "*"))
+	if len(files) == 0 {
+		return
+	}
+	// Only while a watch still wants the pod's cores: without one they go.
+	if watched, _ := filepath.Glob(s.marker(podUID, "*")); len(watched) == 0 {
+		return
+	}
+	os.MkdirAll(s.cores(podUID), 0o700)
+	// The program's files first: a core is looked for by its own name, and
+	// is found with them.
+	slices.SortFunc(files, func(a, b string) int {
+		return strings.Compare(strings.TrimSuffix(b, ".core"), strings.TrimSuffix(a, ".core"))
+	})
+	// A core that comes back waits its time anew before a watch records it
+	// by itself: the report of a crash, which looks for it now, goes first.
+	now := time.Now()
+	for _, file := range files {
+		os.Chtimes(file, now, now)
+		os.Rename(file, filepath.Join(s.cores(podUID), filepath.Base(file)))
+	}
 }
 
 // coreWaitsForCrash is how long a core that the handler kept waits for the
@@ -453,7 +490,12 @@ func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Poin
 				of = append(of, fmt.Sprintf("process %s of container %s", parts[1], name))
 			}
 		}
-		a.tell(agent, w, now, id, strings.Join(of, ", ")+" left a core dump; its container goes on")
+		if !a.tell(agent, w, now, id, strings.Join(of, ", ")+" left a core dump; its container goes on") {
+			// The hub does not record for this watch: it has ended, and the
+			// agent observes it a while longer. It looks at no more cores,
+			// which are another watch's to record.
+			return
+		}
 	}
 }
 
