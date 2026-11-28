@@ -262,6 +262,16 @@ for (const [size, [width, height, mobile]] of Object.entries(widths)) {
       return;
     }
     if (notice) throw new Error('the file did not open: ' + notice);
+    // The pod's events are read on a phone without moving the page sideways: what happened stands below its reason.
+    if (size === 'phone' && file.name.endsWith('/events.json')) {
+      const wider = await run(`const page = document.querySelector('#overview .page'); return page.scrollWidth - page.clientWidth`);
+      if (wider > 1) throw new Error(`the pod's events are ${wider} px wider than the phone's page`);
+    }
+    // How many system calls there are is said once while all of them are shown.
+    if (file.viewer === 'strace') {
+      const tally = await run(`return document.getElementById('shown').innerText`);
+      if (!/^[\d,]+ entr(y|ies)$/.test(tally)) throw new Error(`with nothing narrowed the trace says "${tally}"`);
+    }
     // Every view of the file, and the first row of its list.
     const tabs = await run(`return [...document.querySelectorAll('#root [data-tab]')].filter(b => !b.hidden).map(b => b.dataset.tab)`);
     for (const tab of tabs) {

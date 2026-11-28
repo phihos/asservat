@@ -88,7 +88,9 @@ export default async function (root, {capture}) {
     const words = $('text').value.toLowerCase(), name = $('syscall').value, pid = $('pid').value, failed = $('failed').checked, slower = Number($('slower').value) / 1000;
     visible = calls.filter(c => (!name || c.name === name) && (!pid || c.pid === pid) && (!failed || c.failed) && (!slower || c.seconds >= slower)
       && (!words || c.args.toLowerCase().includes(words) || c.result.toLowerCase().includes(words) || c.name.includes(words)));
-    $('shown').textContent = `${calls.length.toLocaleString('en')} entries · ${visible.length.toLocaleString('en')} shown`;
+    // Said once while all are shown, and as a part of them once the list is narrowed.
+    const all = calls.length.toLocaleString('en');
+    $('shown').textContent = visible.length === calls.length ? `${all} ${calls.length === 1 ? 'entry' : 'entries'}` : `${visible.length.toLocaleString('en')} of ${all} shown`;
     $('table').scrollTop = 0;
     list.count(visible.length);
   };

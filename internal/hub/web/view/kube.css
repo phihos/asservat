@@ -32,4 +32,12 @@ code .arg { display: inline-block; max-width: 100%; overflow-wrap: anywhere; ver
 @media (max-width: 700px) {
   .props th, .props td { display: block; width: auto; } .props th { padding-bottom: 0; } .props td { padding-top: 0; }
   .chip { white-space: normal; overflow-wrap: anywhere; }
+  /* An event is a block: its kind and reason, below them what happened, and below that who said it, how often and when. */
+  .grid.events thead { display: none; } .grid.events, .grid.events tbody, .grid.events tr { display: block; }
+  .grid.events tr { padding: 8px 0; border-bottom: 1px solid var(--soft); }
+  .grid.events td, .page .grid.events td:first-child, .page .grid.events td:last-child { display: inline; border: 0; padding: 0 10px 0 0; }
+  .grid.events td:nth-child(3) { display: block; padding: 3px 0; overflow-wrap: anywhere; }
+  .grid.events td:nth-child(n+4) { color: var(--quiet); white-space: normal; } .grid.events td:nth-child(n+6) { display: inline-block; white-space: nowrap; }
+  .grid.events td:nth-child(5)::before { content: "× "; } .grid.events td:nth-child(6)::before { content: "first "; } .grid.events td:nth-child(7)::before { content: "last "; }
+  .grid.events tr.selected td { color: inherit; }
 }
