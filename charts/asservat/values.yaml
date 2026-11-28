@@ -43,6 +43,10 @@ hub:
   # Let an administrator approve their own sensitive capture. Enable it only
   # for installations with a single administrator.
   allowSelfApproval: false
+  # How many people must approve a request that needs approval. Each is
+  # another person and none the requester; where an administrator may
+  # approve their own (allowSelfApproval), theirs counts as the first.
+  approvals: 1
   # Refuse a request that needs approval and gives no reason. The approver
   # decides by the reason, and the audit log keeps it.
   requireReason: false

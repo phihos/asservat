@@ -80,6 +80,7 @@ func runHub(ctx context.Context, args []string) error {
 	adminGroups := f.String("admin-groups", "asservat-admins", "comma-separated groups whose members are administrators")
 	retention := f.Duration("retention", 7*24*time.Hour, "how long evidence is kept")
 	selfApproval := f.Bool("allow-self-approval", false, "let an administrator approve their own sensitive capture")
+	approvals := f.Int("approvals", 1, "how many people must approve a request that needs approval, each of them another")
 	requireReason := f.Bool("require-reason", false, "refuse a request that needs approval and gives no reason")
 	auditToLog := f.Bool("audit-to-log", false, "write every entry of the audit log to standard output as well, one line of JSON each")
 	clustersFile := f.String("clusters-file", "", "YAML file with the clusters whose agents may join: a list of name and token")
@@ -107,7 +108,7 @@ func runHub(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("master-key-file: %w", err)
 	}
-	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval, RequireReason: *requireReason, WorkDir: *workDir, Sharkd: *sharkd, GoTrace: *goTrace, DebuginfodURLs: debuginfodServers(*debuginfod)}
+	c := hub.Config{MasterKey: key, AdminGroups: strings.Split(*adminGroups, ","), Retention: *retention, AllowSelfApproval: *selfApproval, RequireReason: *requireReason, Approvals: *approvals, WorkDir: *workDir, Sharkd: *sharkd, GoTrace: *goTrace, DebuginfodURLs: debuginfodServers(*debuginfod)}
 	switch {
 	case *dataDir != "":
 		if err := os.MkdirAll(*dataDir, 0o700); err != nil {

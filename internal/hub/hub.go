@@ -73,6 +73,9 @@ type Config struct {
 	// AllowSelfApproval lets an administrator approve their own request, for
 	// installations with a single administrator.
 	AllowSelfApproval bool
+	// Approvals is how many people must approve a request that needs
+	// approval, each of them another; one if it is less.
+	Approvals int
 	// RequireReason refuses a request that needs approval and does not say
 	// why it is made.
 	RequireReason bool
@@ -234,7 +237,9 @@ func (h *Hub) Handler() http.Handler {
 			User
 			SelfApproval   bool `json:"selfApproval"`
 			ReasonRequired bool `json:"reasonRequired,omitempty"`
-		}{u, h.approvesOwn(u), h.RequireReason})
+			// ApprovalsNeeded is how many approvals a sensitive request needs.
+			ApprovalsNeeded int `json:"approvalsNeeded"`
+		}{u, h.startsOwn(u), h.RequireReason, h.needed()})
 	})
 	user("GET /api/clusters", h.listClusters)
 	user("GET /api/clusters/{cluster}/namespaces", h.listNamespaces)
@@ -532,9 +537,17 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 // carries the watch's approver and needs none.
 func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action, approver string) (api.Capture, error) {
 	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, Approver: approver, ExpiresAt: time.Now().Add(h.Retention)}
+	if approver != "" {
+		// The capture of an approved watch has the watch's approvers.
+		c.Approvals = strings.Split(approver, ", ")
+	}
 	if c.Sensitive && approver == "" {
+		// Asking this user for their own approval would add nothing: it is
+		// the first, and the only one where one is enough.
 		if h.approvesOwn(u) {
-			// Asking this user for their own approval would add nothing.
+			c.Approvals = []string{u.Name}
+		}
+		if h.startsOwn(u) {
 			c.Approver = u.Name
 		} else {
 			c.State = api.StatePendingApproval
@@ -549,7 +562,7 @@ func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []
 	if err := h.Store.Audit(ctx, u.Name, action, c.ID, in); err != nil {
 		return api.Capture{}, err
 	}
-	if c.Sensitive && c.Approver == u.Name && approver == "" {
+	if c.Sensitive && len(c.Approvals) > 0 && approver == "" {
 		if err := h.Store.Audit(ctx, u.Name, "capture.approve", c.ID, map[string]bool{"own": true}); err != nil {
 			return api.Capture{}, err
 		}
@@ -763,6 +776,13 @@ func (h *Hub) reasoned(in api.CaptureRequest) error {
 // else: an administrator of an installation that allows self-approval.
 func (h *Hub) approvesOwn(u User) bool { return u.Admin && h.AllowSelfApproval }
 
+// needed is how many approvals a request that needs approval needs.
+func (h *Hub) needed() int { return max(h.Approvals, 1) }
+
+// startsOwn reports whether the user's sensitive requests start at once:
+// their own approval counts, and it is the only one that is needed.
+func (h *Hub) startsOwn(u User) bool { return h.approvesOwn(u) && h.needed() == 1 }
+
 // mayApprove refuses an administrator's approval of their own request,
 // unless the installation allows it.
 func (h *Hub) mayApprove(u User, requester string) error {
@@ -786,7 +806,10 @@ func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture
 			return c, err
 		}
 	}
-	ok, err := h.Store.Decide(ctx, id, u.Name, state)
+	if state == api.StateQueued && slices.Contains(c.Approvals, u.Name) {
+		return c, errStatus{http.StatusConflict, "you have approved this request; it needs another person's approval"}
+	}
+	ok, err := h.Store.Decide(ctx, id, u.Name, state, h.needed())
 	if err != nil {
 		return c, err
 	}
@@ -800,11 +823,13 @@ func (h *Hub) Decide(ctx context.Context, u User, id, state string) (api.Capture
 	if err := h.Store.Audit(ctx, u.Name, action, id, nil); err != nil {
 		return c, err
 	}
-	if state == api.StateQueued {
-		h.dispatch(c)
-	}
 	h.notify(id)
-	return h.Store.Capture(ctx, id)
+	now, err := h.Store.Capture(ctx, id)
+	// It starts with the last of the approvals it needs.
+	if err == nil && state == api.StateQueued && now.State == api.StateQueued {
+		h.dispatch(now)
+	}
+	return now, err
 }
 
 // stopCapture ends the recordings that run over time now and keeps what
