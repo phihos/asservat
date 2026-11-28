@@ -12,6 +12,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"asservat.local/asservat/internal/api"
@@ -200,5 +201,36 @@ func TestProfileRequest(t *testing.T) {
 	}
 	if got := strings.Join(profileRequest(42, target("8081/java-threads"), 20), " "); got != "-t 42 -n curl -sS --fail -H Accept: text/plain http://127.0.0.1:8081/actuator/threaddump" {
 		t.Fatal(got)
+	}
+}
+
+// The process list of a workload with many pods on the node: 150 pods of
+// three processes each, among 300 other processes.
+func BenchmarkProcessesOfManyPods(b *testing.B) {
+	proc := b.TempDir()
+	var pods []runtime.Object
+	var names []string
+	for i := range 300 {
+		fakeProcess(proc, 100+i, 1, 10+i, "other", "/usr/bin/other", "/system.slice/other.service", 100)
+	}
+	for i := range 150 {
+		id := fmt.Sprintf("%064x", i+1)
+		scope := "/kubelet.slice/cri-containerd-" + id + ".scope"
+		first := 1000 + 10*i
+		fakeProcess(proc, first, 1, 1000+i, "sh", "/bin/sh", scope, 100)
+		fakeProcess(proc, first+1, first, 2000+i, "sleep", "/bin/sleep", scope, 100)
+		fakeProcess(proc, first+2, first, 3000+i, "sleep", "/bin/sleep", scope, 100)
+		name := fmt.Sprintf("many-%03d", i)
+		names = append(names, name)
+		pods = append(pods, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "load"},
+			Spec: corev1.PodSpec{NodeName: "node-a", Containers: []corev1.Container{{Name: "app"}}},
+			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "app", ContainerID: "containerd://" + id,
+				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}}})
+	}
+	a := &Agent{Node: "node-a", Proc: proc, Kube: fake.NewClientset(pods...)}
+	for b.Loop() {
+		if got, skipped := a.processes(b.Context(), api.Query{Namespace: "load", Pods: names}); len(got) != 450 || len(skipped) != 0 {
+			b.Fatal(len(got), skipped)
+		}
 	}
 }
