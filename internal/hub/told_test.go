@@ -1,9 +1,13 @@
 package hub
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -37,5 +41,31 @@ func TestUnsharingEndsColleaguesViews(t *testing.T) {
 	v.endOf("c", false)
 	if !ended["alice"] || !ended["root"] || ended["other"] {
 		t.Fatal("deleting the capture left views of it open", ended)
+	}
+}
+
+type refusingBlobs struct{ Blobs }
+
+func (refusingBlobs) Put(context.Context, string, io.Reader) error {
+	return errors.New("The specified bucket does not exist: evidence at minio.infra.svc:9000")
+}
+func (refusingBlobs) Delete(context.Context, string) error { return nil }
+
+// An evidence store that does not take a file, as a bucket that is not
+// there, is said as that: a recording then tells its user what failed, not
+// "500 internal error". The store's own words stay in the hub's log.
+func TestAStoreThatTakesNoFileIsSaid(t *testing.T) {
+	h := &Hub{Config: Config{Blobs: refusingBlobs{}, MasterKey: bytes.Repeat([]byte{7}, 32)}}
+	_, err := h.keep(context.Background(), "api-1/app.log", strings.NewReader("a line\n"))
+	said := told(err)
+	// Not 502, 503 or 504: with those an agent waits for the hub to come back.
+	if said.code != http.StatusInsufficientStorage || !strings.Contains(said.msg, "evidence store") || strings.Contains(said.msg, "minio") {
+		t.Fatalf("told %d %q", said.code, said.msg)
+	}
+	// Who stopped waiting is not told that the store failed.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := h.keep(ctx, "api-1/app.log", strings.NewReader("a line\n")); told(err).code == http.StatusInsufficientStorage {
+		t.Fatalf("a request that was given up is told %q", told(err).msg)
 	}
 }
