@@ -768,6 +768,24 @@ if [ -n "${CORE_HANDLER:-}" ]; then
   fetch "$ALICE" "$id" "$name.analysis.json" "$WORK/crash.core.analysis.json"
   jq -e '(.stopped | contains("SIGSEGV")) and (.threads | length > 0) and .symbols and .executable == "/bin/sh"' "$WORK/crash.core.analysis.json" >/dev/null || fail "description of the crash core: $(cat "$WORK/crash.core.analysis.json")"
   [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "an uploaded core stayed on the node"
+
+  log "a core dump watch records the core of a process whose container goes on (edge)"
+  # As a worker that dies and is started again by its parent: the kubelet
+  # reports no crash, and the watch records with the core all the same.
+  worker=$(ok "$ALICE" POST /api/watches "$(target edge coredump)" | jq -r .id)
+  ok "$ROOT" POST "/api/watches/$worker/approve" >/dev/null
+  sleep 3 # the agent marks the pods for the node's core handler
+  victim=$(edge -n shop get pods -l app=web --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+  restarts=$(edge -n shop get pod "$victim" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+  edge -n shop exec "$victim" -- sh -c 'sleep 300 & kill -SEGV $!; wait' || true
+  id=$(triggered "$worker"); completed "$ALICE" "$id"
+  ok "$ALICE" GET "/api/captures/$id" | jq -e --arg p "$victim" '(.pods == [$p]) and (.reason | test("of container web left a core dump; its container goes on"))' >/dev/null || fail "the capture of a core without a crash: $(ok "$ALICE" GET "/api/captures/$id" | jq -c '[.pods, .reason, .message]')"
+  name=$(first_artifact "$ALICE" "$id")
+  case "$name" in "$victim"/core.web.*) ;; *) fail "the core of a process whose container goes on: $name" ;; esac
+  fetch "$ALICE" "$id" "$name" "$WORK/worker.core"
+  [ "$(od -An -tu2 -j16 -N2 "$WORK/worker.core" | tr -d ' ')" = 4 ] || fail "the worker's core is not a core (ET_CORE)"
+  [ "$(edge -n shop get pod "$victim" -o jsonpath='{.status.containerStatuses[0].restartCount}')" = "$restarts" ] || fail "the container did not go on"
+  [ -z "$(sudo find "$SPOOL/cores" "$SPOOL/taken" -type f)" ] || fail "the worker's core stayed on the node"
   # The core of a process outside of watched pods, here one of the node
   # itself, goes to the handler that the machine had before, with the
   # values that its pattern asks the kernel for: the signal and the program.

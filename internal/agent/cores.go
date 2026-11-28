@@ -12,10 +12,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"asservat.local/asservat/internal/api"
 
 	"asservat.local/asservat/internal/coredesc"
 )
@@ -353,6 +356,80 @@ func (s CoreSpool) take(podUID, trigger string) {
 	}
 }
 
+// coreWaitsForCrash is how long a core that the handler kept waits for the
+// kubelet to report its container as crashed, before the watch records it
+// by itself. A container that ends with its process is reported within a
+// second or two, and that report takes the core with the crash's other
+// recordings. Nothing tells that a container will go on, so this is a time:
+// long enough for the kubelet's report, short against what a core is for.
+var coreWaitsForCrash = 10 * time.Second
+
+// dumped has a core dump watch record a core that came without a crash: a
+// process of the pod died and left one while its container goes on, as a
+// worker that its parent starts again. The kubelet reports nothing then,
+// and the core that the watch was approved for would rest on the node
+// unread. The kernel tells when the handler has finished a core; if no
+// crash's report has taken it after coreWaitsForCrash, the watch records
+// with it. It ends with ctx.
+func (a *Agent) dumped(agent, ctx context.Context, w api.Watch, pod *atomic.Pointer[corev1.Pod]) {
+	dir := a.Cores.cores(string(pod.Load().UID))
+	// The handler makes the directory for the pod's first core. It is made
+	// here to be watched from before that.
+	os.MkdirAll(dir, 0o700)
+	changes, err := watchDir(dir, syscall.IN_MOVED_TO)
+	if err != nil {
+		slog.Warn("cores that come without a crash are not recorded for this pod", "pod", pod.Load().Name, "error", err)
+		return
+	}
+	defer changes.Close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, reports := <-changes.happened:
+			if !reports {
+				return
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(coreWaitsForCrash):
+		}
+		cores, _ := filepath.Glob(filepath.Join(dir, "*.core"))
+		if len(cores) == 0 {
+			continue // a crash's report took it
+		}
+		now := pod.Load()
+		names := containerNames(now)
+		var of []string
+		for _, file := range cores {
+			// "<container ID>.<pid>.<time>.core"
+			if parts := strings.Split(filepath.Base(file), "."); len(parts) > 1 {
+				name := names[parts[0]]
+				if name == "" {
+					name = fmt.Sprintf("%.12s", parts[0])
+				}
+				of = append(of, fmt.Sprintf("process %s of container %s", parts[1], name))
+			}
+		}
+		a.trigger(agent, w, now, strings.Join(of, ", ")+" left a core dump; its container goes on")
+	}
+}
+
+// containerNames returns the names of a pod's containers by the IDs of
+// their instances, the running and the last ended ones.
+func containerNames(pod *corev1.Pod) map[string]string {
+	names := map[string]string{}
+	for _, status := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
+		for _, id := range []string{status.ContainerID, terminatedID(status.State), terminatedID(status.LastTerminationState)} {
+			_, id, _ = strings.Cut(id, "://")
+			names[id] = status.Name
+		}
+	}
+	return names
+}
+
 // crashCores uploads the cores that were set aside for a crash report and
 // removes them from the node, also if the upload fails.
 func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string, known *processes, up func(string, io.Reader) error) error {
@@ -361,13 +438,7 @@ func (a *Agent) crashCores(ctx context.Context, pod *corev1.Pod, trigger string,
 	}
 	dir := a.Cores.taken(trigger)
 	defer os.RemoveAll(dir)
-	names := map[string]string{}
-	for _, status := range append(append([]corev1.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...) {
-		for _, id := range []string{status.ContainerID, terminatedID(status.State), terminatedID(status.LastTerminationState)} {
-			_, id, _ = strings.Cut(id, "://")
-			names[id] = status.Name
-		}
-	}
+	names := containerNames(pod)
 	files, _ := filepath.Glob(filepath.Join(dir, "*.core"))
 	if len(files) == 0 {
 		return errors.New("the crashed process left no core: it did not die of a signal that dumps core (a memory limit kills without one), or the node's disk is nearly full")

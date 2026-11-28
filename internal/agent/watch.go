@@ -120,7 +120,13 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	// The handlers run one at a time. A pod's first sighting only records
 	// the state it is in: what happened before is not reported.
 	seen := map[string]string{}
-	marked := map[string]bool{} // pod UIDs whose cores the node's handler keeps
+	// The pods whose cores the node's handler keeps, by UID: how to stop
+	// looking for cores that come without a crash, and the pod as last seen.
+	type cored struct {
+		stop context.CancelFunc
+		pod  *atomic.Pointer[corev1.Pod]
+	}
+	marked := map[string]cored{}
 	// The pods that a watch for a log line or for what a container uses
 	// keeps reading: how to stop that, and the pod as last seen.
 	type tended struct {
@@ -129,7 +135,8 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 	}
 	tending := map[string]tended{}
 	defer func() {
-		for uid := range marked {
+		for uid, m := range marked {
+			m.stop()
 			a.Cores.unmark(uid, w.ID)
 		}
 	}()
@@ -146,12 +153,20 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				a.keep(ctx, w, kind, pod)
 			}
 		}
-		if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" && !marked[string(pod.UID)] {
-			// From now on the node's core handler keeps this pod's cores.
-			if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
-				slog.Error("core handler marker", "pod", pod.Name, "error", err)
+		if w.Recording(api.KindCoredump) != nil && w.When.Crash() && a.Cores != "" {
+			if m, is := marked[string(pod.UID)]; is {
+				m.pod.Store(pod)
+			} else {
+				// From now on the node's core handler keeps this pod's cores.
+				if err := os.WriteFile(a.Cores.marker(string(pod.UID), w.ID), nil, 0o600); err != nil {
+					slog.Error("core handler marker", "pod", pod.Name, "error", err)
+				}
+				looking, stop := context.WithCancel(ctx)
+				m := cored{stop: stop, pod: &atomic.Pointer[corev1.Pod]{}}
+				m.pod.Store(pod)
+				marked[string(pod.UID)] = m
+				go a.dumped(agent, looking, w, m.pod)
 			}
-			marked[string(pod.UID)] = true
 		}
 		if w.When.Kind == api.OnLog || w.When.Kind == api.OnEvent || w.When.Usage() {
 			// The pod is read from once a container of it runs; Kubernetes
@@ -183,7 +198,8 @@ func (a *Agent) observe(agent, ctx context.Context, w api.Watch) {
 				delete(seen, key)
 			}
 		}
-		if marked[string(pod.UID)] {
+		if m, is := marked[string(pod.UID)]; is {
+			m.stop()
 			a.Cores.unmark(string(pod.UID), w.ID)
 			delete(marked, string(pod.UID))
 		}

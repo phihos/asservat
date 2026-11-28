@@ -310,6 +310,19 @@ handler.
   yet.
 - The capture that the crash triggers uploads the pod's cores and deletes
   them from the node. Until then they rest there unencrypted.
+- A process can die and leave a core while its container goes on, as a
+  worker that its parent starts again. The kubelet reports no crash then.
+  The watch records all the same, with that core: the kernel tells the
+  agent when the handler has finished a core, and if no crash's report has
+  taken it ten seconds later, the agent reports it to the hub like a crash
+  ("process 4711 of container web left a core dump; its container goes
+  on"). Ten seconds, as nothing tells that a container will go on: it is
+  what the kubelet is given to report a container that ended with its
+  process, whose report then takes the core with the crash's other
+  recordings. Without this the core, which the watch was approved for,
+  rested on the node unread until the watch ended. Only a watch for core
+  dumps records so; one for packets or logs waits for the container's
+  crash.
 - A process that the kernel kills for exceeding a memory limit leaves no
   core, and neither does one that exits by itself.
 
