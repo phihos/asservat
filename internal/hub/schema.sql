@@ -76,6 +76,10 @@ ALTER TABLE watches ADD COLUMN IF NOT EXISTS approver text NOT NULL DEFAULT '';
 -- approver names them all once the last has approved.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS approvals text[] NOT NULL DEFAULT '{}';
 ALTER TABLE captures ADD COLUMN IF NOT EXISTS approvals text[] NOT NULL DEFAULT '{}';
+-- What was approved before the column was there has its approvers in it as
+-- well. A denied capture's approver is who refused it, and approved it not.
+UPDATE watches SET approvals = string_to_array(approver, ', ') WHERE approver <> '' AND approvals = '{}';
+UPDATE captures SET approvals = string_to_array(approver, ', ') WHERE approver <> '' AND approvals = '{}' AND state <> 'Denied';
 -- What the watch waits for; a watch from before conditions waits for a crash.
 ALTER TABLE watches ADD COLUMN IF NOT EXISTS condition jsonb NOT NULL DEFAULT '{"kind":"crash"}';
 -- How far the watch's running recordings reach back; 0: its time frame.

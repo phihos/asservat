@@ -182,3 +182,50 @@ func TestARequestCanNeedSeveralApprovals(t *testing.T) {
 		t.Fatalf("the second approval of an administrator's own request: %d %+v", code, d)
 	}
 }
+
+// What was approved before a request could need several approvals reads
+// as approved by its approver, also in the list of who approved: the hub
+// fills that in when it starts. Who refused a capture approved it not.
+func TestApprovalsFromBeforeNameTheirApprover(t *testing.T) {
+	f, cluster := approving(t, nil)
+	sensitive := api.CaptureRequest{Cluster: cluster, Namespace: "payments", Workload: "Deployment/api", Recordings: []api.Recording{{Kind: api.KindCoredump}}}
+	ids := map[string]string{}
+	for _, decision := range []string{"approve", "deny"} {
+		code, b := f.call("alice-token", "POST", "/api/captures", sensitive)
+		var made struct{ ID string }
+		json.Unmarshal(b, &made)
+		if code != 201 {
+			t.Fatal(code, string(b))
+		}
+		if code, b := f.call("root-token", "POST", "/api/captures/"+made.ID+"/"+decision, nil); code != 200 {
+			t.Fatal(decision, code, string(b))
+		}
+		ids[decision] = made.ID
+	}
+	// As a hub from before left them: an approver, and no list.
+	store, err := hub.OpenStore(t.Context(), os.Getenv("ASSERVAT_TEST_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.ForgetApprovals(t.Context(), cluster); err != nil {
+		t.Fatal(err)
+	}
+	// A hub that starts opens its store, which brings the schema up to date.
+	again, err := hub.OpenStore(t.Context(), os.Getenv("ASSERVAT_TEST_DSN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	again.Close()
+	for decision, want := range map[string]string{"approve": "root", "deny": ""} {
+		_, b := f.call("root-token", "GET", "/api/captures/"+ids[decision], nil)
+		var c struct {
+			Approver  string
+			Approvals []string
+		}
+		json.Unmarshal(b, &c)
+		if c.Approver != "root" || strings.Join(c.Approvals, ",") != want {
+			t.Fatalf("a capture that was decided (%s) before: approver %q, approvals %v", decision, c.Approver, c.Approvals)
+		}
+	}
+}

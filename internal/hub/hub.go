@@ -537,6 +537,10 @@ func (h *Hub) Request(ctx context.Context, u User, in api.CaptureRequest) (api.C
 // carries the watch's approver and needs none.
 func (h *Hub) record(ctx context.Context, u User, in api.CaptureRequest, pods []api.Pod, action, approver string) (api.Capture, error) {
 	c := api.Capture{ID: uuid.NewString(), CaptureRequest: in, Requester: u.Name, Sensitive: in.Sensitive(), State: api.StateQueued, Approver: approver, ExpiresAt: time.Now().Add(h.Retention)}
+	if approver != "" {
+		// The capture of an approved watch has the watch's approvers.
+		c.Approvals = strings.Split(approver, ", ")
+	}
 	if c.Sensitive && approver == "" {
 		// Asking this user for their own approval would add nothing: it is
 		// the first, and the only one where one is enough.
