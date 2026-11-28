@@ -36,7 +36,7 @@
 .node.selected .twist { color: var(--on-marker); }
 /* Wireshark's expert severities. */
 .node.Chat, #statBody td.Chat { background: #80b7f7; color: #14181A; } .node.Note, #statBody td.Note { background: #b7f774; color: #14181A; }
-.node.Warn, #statBody td.Warn { background: #f7f240; color: #14181A; } .node.Error, #statBody td.Error { background: #ff5c5c; color: #14181A; }
+.node.Warn, #statBody td.Warn, #statBody td.Warning { background: #f7f240; color: #14181A; } .node.Error, #statBody td.Error { background: #ff5c5c; color: #14181A; }
 #sources, #statTabs { flex: none; display: flex; padding: 0 16px; border-bottom: 1px solid var(--line); }
 #sources button, #statTabs button { padding: 8px 12px 5px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--quiet); font: 600 15px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
 #sources button:first-child, #statTabs button:first-child { margin-left: -12px; }
@@ -58,6 +58,9 @@ dialog .client { color: var(--bad); background: color-mix(in srgb, var(--bad) 10
 dialog .server { color: var(--custody-ink); background: color-mix(in srgb, var(--custody) 10%, var(--surface)); }
 dialog .bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--soft); }
 dialog .bar .grow { flex: 1; }
+/* On a phone the two sides of a stream stand above the buttons, whose words stay on one line. */
+dialog .bar button { flex: none; white-space: nowrap; }
+@media (max-width: 700px) { dialog .bar { flex-wrap: wrap; } #streamSides { flex: 1 1 100%; } }
 dialog .bar button { height: 32px; padding: 0 14px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 dialog .bar button:hover { border-color: var(--quiet); }
 #stat { width: min(1200px, 94vw); }
@@ -65,7 +68,7 @@ dialog .bar button:hover { border-color: var(--quiet); }
 #statBody table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 #statBody th { position: sticky; top: 0; padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--ink); text-align: right; white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); }
 #statBody td { padding: 3px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--soft); font: 12px var(--mono); }
-#statBody th:first-child, #statBody td.text { text-align: left; }
+#statBody th.text, #statBody td.text { text-align: left; }
 #statBody td.none { text-align: left; color: var(--quiet); padding: 12px 10px; font-family: var(--text); }
 #statBody tr[data-filter] { cursor: pointer; }
 #statBody tr[data-filter]:hover { background: var(--soft); }

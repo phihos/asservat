@@ -223,23 +223,24 @@ async function follow() {
 // packets that the display filter shows; a row's filter narrows the list.
 const count = n => Number(n).toLocaleString('en-US');
 const seconds = n => Number(n).toFixed(6);
-const table = (head, rows) => `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="none">Nothing found in these packets.</td></tr>`}</tbody></table>`;
+// A column of text has its heading on the left, as its cells are: text names the headings of such columns.
+const table = (head, rows, text = []) => `<table><thead><tr>${head.map(h => `<th${text.includes(h) ? ' class="text"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('') || `<tr><td colspan="${head.length}" class="none">Nothing found in these packets.</td></tr>`}</tbody></table>`;
 const cell = (value, text) => `<td${text ? ' class="text"' : ''}>${esc(value ?? '')}</td>`;
 const filtered = (filter, cells) => `<tr data-filter="${esc(filter)}" title="Show these packets">${cells.join('')}</tr>`;
 const statistics = {
   conv: {title: 'Conversations', protocols: ['TCP', 'UDP', 'IPv4', 'IPv6', 'Ethernet'], draw: (t, ports) => table(
     ['Address A', ...(ports ? ['Port A'] : []), 'Address B', ...(ports ? ['Port B'] : []), 'Packets', 'Bytes', 'Packets A → B', 'Bytes A → B', 'Packets B → A', 'Bytes B → A', 'Rel Start', 'Duration'],
     (t.convs || []).map(c => filtered(c.filter, [cell(c.saddr, true), ...(ports ? [cell(c.sport)] : []), cell(c.daddr, true), ...(ports ? [cell(c.dport)] : []), cell(count(c.txf + c.rxf)), cell(count(c.txb + c.rxb)),
-      cell(count(c.txf)), cell(count(c.txb)), cell(count(c.rxf)), cell(count(c.rxb)), cell(seconds(c.start)), cell(seconds(c.stop - c.start))])))},
+      cell(count(c.txf)), cell(count(c.txb)), cell(count(c.rxf)), cell(count(c.rxb)), cell(seconds(c.start)), cell(seconds(c.stop - c.start))])), ['Address A', 'Address B'])},
   endpt: {title: 'Endpoints', protocols: ['TCP', 'UDP', 'IPv4', 'IPv6', 'Ethernet'], draw: (t, ports) => table(
     ['Address', ...(ports ? ['Port'] : []), 'Packets', 'Bytes', 'Tx Packets', 'Tx Bytes', 'Rx Packets', 'Rx Bytes'],
-    (t.hosts || []).map(h => filtered(h.filter, [cell(h.host, true), ...(ports ? [cell(h.port)] : []), cell(count(h.txf + h.rxf)), cell(count(h.txb + h.rxb)), cell(count(h.txf)), cell(count(h.txb)), cell(count(h.rxf)), cell(count(h.rxb))])))},
+    (t.hosts || []).map(h => filtered(h.filter, [cell(h.host, true), ...(ports ? [cell(h.port)] : []), cell(count(h.txf + h.rxf)), cell(count(h.txb + h.rxb)), cell(count(h.txf)), cell(count(h.txb)), cell(count(h.rxf)), cell(count(h.rxb))])), ['Address'])},
 };
 function hierarchy(tap) {
   const all = (tap.protos || []).reduce((sum, p) => ({frames: sum.frames + p.frames, bytes: sum.bytes + p.bytes}), {frames: 0, bytes: 0});
   const percent = (part, whole) => whole ? (part * 100 / whole).toFixed(1) : '0.0';
   const walk = (list, depth) => (list || []).flatMap(p => [filtered(p.proto, [`<td class="text" style="padding-left:${10 + depth * 18}px">${esc(p.proto)}</td>`, cell(percent(p.frames, all.frames)), cell(count(p.frames)), cell(percent(p.bytes, all.bytes)), cell(count(p.bytes))]), ...walk(p.protos, depth + 1)]);
-  return table(['Protocol', 'Percent Packets', 'Packets', 'Percent Bytes', 'Bytes'], walk(tap.protos, 0));
+  return table(['Protocol', 'Percent Packets', 'Packets', 'Percent Bytes', 'Bytes'], walk(tap.protos, 0), ['Protocol']);
 }
 function expert(tap) {
   // One line per finding, the gravest first, as Wireshark groups them.
@@ -248,9 +249,9 @@ function expert(tap) {
     const key = [d.s, d.g, d.p, d.m].join('\n'), g = groups.get(key) || {...d, count: 0};
     g.count++; groups.set(key, g);
   }
-  const rank = ['Error', 'Warn', 'Note', 'Chat'];
+  const rank = ['Error', 'Warning', 'Note', 'Chat'];
   return table(['Severity', 'Summary', 'Group', 'Protocol', 'Count'], [...groups.values()].sort((a, b) => rank.indexOf(a.s) - rank.indexOf(b.s) || b.count - a.count)
-    .map(g => filtered(`_ws.expert.message == "${g.m.replace(/[\\"]/g, '\\$&')}"`, [`<td class="text ${esc(g.s)}">${esc(g.s)}</td>`, cell(g.m, true), cell(g.g, true), cell(g.p, true), cell(count(g.count))])));
+    .map(g => filtered(`_ws.expert.message == "${g.m.replace(/[\\"]/g, '\\$&')}"`, [`<td class="text ${esc(g.s)}">${esc(g.s)}</td>`, cell(g.m, true), cell(g.g, true), cell(g.p, true), cell(count(g.count))])), ['Severity', 'Summary', 'Group', 'Protocol']);
 }
 async function showStatistics(kind) {
   const within = applied ? {filter: applied} : {}, named = statistics[kind];

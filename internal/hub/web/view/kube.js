@@ -50,8 +50,8 @@ function container(c, status, init) {
     ['Last state', last ? `${badge(last[0], last[1])} ${last[2]}` : ''],
     ['Image', esc(c.image)],
     ['Image ID', status?.imageID ? esc(status.imageID) : ''],
-    ['Command', c.command ? `<code>${esc(c.command.join(' '))}</code>` : ''],
-    ['Arguments', c.args ? `<code>${esc(c.args.join(' '))}</code>` : ''],
+    ['Command', c.command ? words(c.command) : ''],
+    ['Arguments', c.args ? words(c.args) : ''],
     ['Ports', (c.ports || []).map(p => `${p.name ? esc(p.name) + ': ' : ''}${esc(p.containerPort)}/${esc(p.protocol || 'TCP')}`).join(', ')],
     ['Requests', quantity(c.resources?.requests)],
     ['Limits', quantity(c.resources?.limits)],
@@ -62,6 +62,8 @@ function container(c, status, init) {
     ['Startup', c.startupProbe ? probe(c.startupProbe) : ''],
   ]) + '</div>';
 }
+// The words of a command line, each kept whole where the line has room for it.
+const words = list => `<code>${list.map(w => `<span class="arg">${esc(w)}</span>`).join(' ')}</code>`;
 const probe = p => esc((p.httpGet ? `http-get ${p.httpGet.scheme || 'HTTP'} :${p.httpGet.port}${p.httpGet.path || ''}` : p.tcpSocket ? `tcp-socket :${p.tcpSocket.port}` : p.exec ? `exec ${(p.exec.command || []).join(' ')}` : p.grpc ? `grpc :${p.grpc.port}` : '')
   + ` · delay ${p.initialDelaySeconds || 0}s, period ${p.periodSeconds || 10}s, timeout ${p.timeoutSeconds || 1}s, failure threshold ${p.failureThreshold || 3}`);
 

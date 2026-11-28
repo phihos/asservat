@@ -39,7 +39,7 @@
   .capture .number { font: 700 20px/1 var(--display); text-align: center; padding: 6px 2px; border: 2px dashed var(--line); color: var(--quiet); overflow: visible; }
   .capture .number.filed { border: 2px solid var(--marker); background: var(--marker); color: var(--on-marker); }
   .capture .what { font-weight: 600; } .capture .why { font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-  #captureFind { margin-left: auto; width: min(26em, 100%); min-height: 28px; padding: 2px 8px; font-size: 13px; } #olderLine { text-align: center; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #captureFind { margin-left: auto; width: min(30em, 100%); min-height: 28px; padding: 2px 8px; font-size: 13px; } #olderLine { text-align: center; } .capture .line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .capture .acts { overflow: visible; display: flex; gap: 4px; justify-content: flex-end; } .capture .acts button { min-height: 28px; padding: 2px 10px; }
   .capture .chev { overflow: visible; background: none; border: 0; padding: 6px; margin: -6px; min-height: 0; } .capture .chev::before { content: ""; display: block; width: 7px; height: 7px; border: solid var(--quiet); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; } .capture.open .chev::before { transform: rotate(45deg); }
   .capture > .more { display: none; padding: 0 12px 12px; border-top: 1px solid var(--line); }
@@ -92,7 +92,7 @@
   }
   [hidden] { display: none !important; }
   /* Signing in: the mark, large, over the two ways in. */
-  #login { max-width: 420px; margin-top: 12vh; text-align: center; }
+  #login { max-width: 420px; margin: 12vh auto 0; text-align: center; }
   #login img { width: 96px; height: 96px; }
   #login h2 { font-size: 44px; letter-spacing: .05em; margin: 12px 0 4px; }
   #login form { margin-top: 20px; text-align: left; grid-template-columns: 1fr auto; }
@@ -353,7 +353,7 @@
  <section data-view="captures" hidden>
   <div class="toolbar head">
     <h2>Captures</h2>
-    <input id="captureFind" type="search" aria-label="Search captures" placeholder="Search by workload, namespace, recording, person or reason" autocomplete="off" spellcheck="false">
+    <input id="captureFind" type="search" aria-label="Search captures" placeholder="Search workload, namespace, recording, person, reason" autocomplete="off" spellcheck="false">
     <span class="chips" id="states">
       <button type="button" data-filter="all" class="on">All</button><button type="button" data-filter="active">In progress</button><button type="button" data-filter="done">Finished</button>
     </span>
