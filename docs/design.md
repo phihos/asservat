@@ -947,8 +947,22 @@ files asks first.
   capturing grants nothing new, and permissions stay in Kubernetes RBAC.
 - Members of the administrator groups may capture everywhere, approve or deny
   sensitive captures, manage clusters and read the audit log.
-- An administrator cannot approve their own request unless the installation
-  allows it (`hub.allowSelfApproval`, for a single administrator). Where it
+- Approving is a right of its own, and the cluster's RBAC gives it as it
+  gives capturing: a user may approve and deny the requests for a namespace
+  if a `SubjectAccessReview` in that cluster allows them the verb `approve`
+  on `captures` of the group `asservat.io` there. No such resource exists;
+  RBAC answers for whatever a role names, so a Role and a RoleBinding in
+  the namespace are all it takes, and nothing is installed into the
+  cluster. So a team's lead or a data owner can decide for their
+  namespaces without being an administrator. Who may approve is shown the
+  requests that wait there (`GET /api/approvals`: who asks, for what and
+  why) and sees such a request until it is decided; what is recorded is
+  not theirs, and with the decision the capture is gone for them. Their
+  approvals and administrators' count alike where several are needed. A
+  cluster whose agents do not answer lets nobody but administrators
+  approve.
+- Nobody approves their own request, unless the installation allows it to
+  its administrators (`hub.allowSelfApproval`, for a single administrator). Where it
   does, an administrator's sensitive requests and watches start without a
   separate approval and are recorded as approved by themselves.
 - With `hub.approvals` above 1 a request that needs approval needs that

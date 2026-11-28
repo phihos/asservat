@@ -160,6 +160,24 @@ metadata: {name: devs-exec, namespace: shop}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: exec}
 subjects:
   - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: devs}
+---
+# Members of the group "shop-approvers" may approve the sensitive requests
+# for this namespace. The resource is one that only this rule names: the
+# cluster's RBAC answers for it all the same.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: approve-captures, namespace: shop}
+rules:
+  - apiGroups: [asservat.io]
+    resources: [captures]
+    verbs: [approve]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: shop-approvers, namespace: shop}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: approve-captures}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: shop-approvers}
 EOF
   # The workload namespace keeps Pod Security "restricted".
   $k label namespace shop pod-security.kubernetes.io/enforce=restricted --overwrite >/dev/null
@@ -167,6 +185,7 @@ done
 
 log "install hub and local agents"
 TOKEN=edge-join-token-0123456789abcdef0123456789abcdef
+CAROL=carol-token-0123456789abcdef0123456789a
 BOB=bob-token-0123456789abcdef0123456789abc ALICE=alice-token-0123456789abcdef0123456789 ROOT=root-token-0123456789abcdef0123456789ab MALLORY=mallory-token-0123456789abcdef012345
 ALERTS=alert-token-0123456789abcdef0123456789abcd
 hub create namespace asservat --dry-run=client -o yaml | hub apply -f - >/dev/null
@@ -179,6 +198,7 @@ install_hub() {
     --set hub.users[1].name=root,hub.users[1].token=$ROOT,hub.users[1].groups[0]=asservat-admins \
     --set hub.users[2].name=mallory,hub.users[2].token=$MALLORY \
     --set hub.users[3].name=bob,hub.users[3].token=$BOB,hub.users[3].groups[0]=devs \
+    --set hub.users[4].name=carol,hub.users[4].token=$CAROL,hub.users[4].groups[0]=shop-approvers \
     --set hub.alertToken=$ALERTS \
     --set hub.clusters[0].name=edge,hub.clusters[0].token=$TOKEN >/dev/null
 }
@@ -640,6 +660,18 @@ grep -q 'GET / HTTP' "$WORK/payload.pcap" || fail "approved payload capture lack
 id=$(capture "$ALICE" "$(target edge pcap '{"params":{"payload":"true"}}')")
 ok "$ROOT" POST "/api/captures/$id/deny" >/dev/null
 [ "$(ok "$ALICE" GET "/api/captures/$id" | jq -r '[.state, (.artifacts | length)] | @csv')" = '"Denied",0' ] || fail "denied capture"
+log "who may approve in a namespace is the cluster's RBAC's to say (edge)"
+# Carol is no administrator and may not capture: a role in the namespace
+# lets her group approve what is requested for it.
+id=$(capture "$ALICE" "$(target edge pcap '{"durationSeconds":3,"params":{"payload":"true"},"reason":"for carol to decide"}')")
+[ "$(ok "$CAROL" GET /api/approvals | jq -r --arg id "$id" '[.captures[] | select(.id == $id) | .requester + ": " + .reason] | join("")')" = "alice: for carol to decide" ] || fail "the approver is not shown the request: $(ok "$CAROL" GET /api/approvals)"
+[ "$(ok "$MALLORY" GET /api/approvals | jq -c '[.captures, .watches] | map(length)')" = '[0,0]' ] || fail "someone without the right is shown requests to approve"
+[ "$(status "$MALLORY" POST "/api/captures/$id/approve")" = 404 ] || fail "someone without the right approved"
+[ "$(status "$CAROL" POST /api/captures "$(target edge pod-state)")" = 403 ] || fail "the approver captured"
+[ "$(ok "$CAROL" POST "/api/captures/$id/approve" | jq -r .approver)" = carol ] || fail "the approver's approval"
+completed "$ALICE" "$id"
+[ "$(status "$CAROL" GET "/api/captures/$id")" = 404 ] || fail "the approver sees what was recorded"
+
 log "a crash watch records the crashed pod (edge): packets from before the crash and the crashed instance's logs"
 [ "$(status "$MALLORY" POST /api/watches "$(target edge pod-state)")" = 403 ] || fail "mallory watched"
 # The packet watch also records the pod's state: one crash, one capture with both.

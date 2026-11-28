@@ -10,10 +10,12 @@ import (
 	"sync"
 	"testing"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"asservat.local/asservat/internal/api"
 )
@@ -232,5 +234,34 @@ func BenchmarkProcessesOfManyPods(b *testing.B) {
 		if got, skipped := a.processes(b.Context(), api.Query{Namespace: "load", Pods: names}); len(got) != 450 || len(skipped) != 0 {
 			b.Fatal(len(got), skipped)
 		}
+	}
+}
+
+// Whether a user may approve for a namespace is asked of the cluster's
+// RBAC: the verb "approve" on "captures" of the group asservat.io. The
+// answer is the cluster's, for the user and groups as the hub names them.
+func TestApprovingIsAskedOfTheClustersRBAC(t *testing.T) {
+	kube := fake.NewClientset()
+	var asked []authorizationv1.SubjectAccessReviewSpec
+	kube.PrependReactor("create", "subjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		review := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SubjectAccessReview).DeepCopy()
+		asked = append(asked, review.Spec)
+		review.Status.Allowed = slices.Contains(review.Spec.Groups, "payments-leads") && review.Spec.ResourceAttributes.Namespace == "payments"
+		return true, review, nil
+	})
+	a := &Agent{Kube: kube}
+	for _, test := range []struct {
+		namespace string
+		groups    []string
+		allowed   bool
+	}{{"payments", []string{"payments-leads"}, true}, {"orders", []string{"payments-leads"}, false}, {"payments", []string{"devs"}, false}} {
+		reply := a.answer(t.Context(), api.Query{Op: "approves", Namespace: test.namespace, User: "carol", Groups: test.groups})
+		if reply.Error != "" || reply.Allowed != test.allowed {
+			t.Fatalf("approving in %s as %v: %+v", test.namespace, test.groups, reply)
+		}
+	}
+	about := asked[0].ResourceAttributes
+	if asked[0].User != "carol" || about.Verb != "approve" || about.Group != "asservat.io" || about.Resource != "captures" || about.Subresource != "" {
+		t.Fatalf("the cluster was asked about %+v as %s", about, asked[0].User)
 	}
 }
