@@ -192,7 +192,12 @@ agent runs a debugger for each process and holds each core in its scratch
 volume until it is uploaded. For the cores of 100 pods of a small program
 at once, 5 MiB each, its memory as Kubernetes counts it peaked at
 1.2 GiB, which includes the cache of the core files, and the capture was
-complete after 7 seconds; the debugger takes more for a larger program.
+complete after 7 seconds. The debuggers themselves take little, also for
+large processes: for the cores of 20 processes of 300 MiB each at once
+the agent's own memory stayed under 270 MiB, the capture was complete
+after 24 seconds, and the hub had added the Python stacks to all of them
+11 seconds later with 25 MiB of its own. What such cores need is room: 6.4 GiB
+in the agent's scratch volume here, until they were uploaded.
 
 A watch for packets keeps one `tcpdump` running for each pod it watches, so
 that a capture can begin before the moment it waited for. On the same node
